@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,8 +25,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Person
@@ -37,26 +40,34 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.projection.runStepDotIcon
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import java.util.Base64
+import org.jetbrains.skia.Image as SkiaImage
 
 @Composable
 fun DesktopChatSurface(
@@ -64,6 +75,8 @@ fun DesktopChatSurface(
     onConversationSelected: (String) -> Unit,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onAttachImage: () -> Unit,
+    onRemoveImageAttachment: (Int) -> Unit,
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -87,6 +100,8 @@ fun DesktopChatSurface(
             state = state,
             onComposerTextChanged = onComposerTextChanged,
             onSend = onSend,
+            onAttachImage = onAttachImage,
+            onRemoveImageAttachment = onRemoveImageAttachment,
             onRetryConnection = onRetryConnection,
             modifier = Modifier.weight(1f),
         )
@@ -316,6 +331,8 @@ private fun ChatDetailPane(
     state: DesktopChatSurfaceState,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onAttachImage: () -> Unit,
+    onRemoveImageAttachment: (Int) -> Unit,
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -351,9 +368,12 @@ private fun ChatDetailPane(
         )
         ComposerBar(
             text = state.composerText,
+            pendingImageAttachments = state.pendingImageAttachments,
             enabled = state.canSend,
             onTextChanged = onComposerTextChanged,
             onSend = onSend,
+            onAttachImage = onAttachImage,
+            onRemoveImageAttachment = onRemoveImageAttachment,
         )
     }
 }
@@ -613,6 +633,11 @@ private fun DesktopMessageContent(
             }
         }
 
+        DesktopImageAttachmentsGrid(
+            attachments = message.attachments,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         message.toolCalls.orEmpty().forEach { toolCall ->
             ToolCallCard(toolCall)
         }
@@ -649,6 +674,10 @@ private fun ToolCallCard(toolCall: UiToolCall) {
         toolCall.executionTimeMs?.let { duration ->
             StatusChip("$duration ms")
         }
+        DesktopImageAttachmentsGrid(
+            attachments = toolCall.generatedImageAttachments,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -763,40 +792,160 @@ private fun ArtifactCard(
 @Composable
 private fun ComposerBar(
     text: String,
+    pendingImageAttachments: List<MessageContentPart.Image>,
     enabled: Boolean,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onAttachImage: () -> Unit,
+    onRemoveImageAttachment: (Int) -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Bottom,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = onTextChanged,
-            enabled = enabled,
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 56.dp, max = 132.dp),
-            placeholder = { Text("Message") },
-            minLines = 1,
-            maxLines = 5,
-        )
-        Button(
-            onClick = onSend,
-            enabled = enabled && text.isNotBlank(),
-            modifier = Modifier.height(56.dp),
+        if (pendingImageAttachments.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                pendingImageAttachments.forEachIndexed { index, image ->
+                    PendingAttachmentThumbnail(
+                        image = image,
+                        onRemove = { onRemoveImageAttachment(index) },
+                    )
+                }
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.Send,
-                contentDescription = "Send message",
-                modifier = Modifier.size(18.dp),
+            Surface(
+                modifier = Modifier.size(56.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                IconButton(
+                    onClick = onAttachImage,
+                    enabled = enabled,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = "Attach image",
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChanged,
+                enabled = enabled,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 56.dp, max = 132.dp),
+                placeholder = { Text("Message") },
+                minLines = 1,
+                maxLines = 5,
             )
-            Spacer(Modifier.width(8.dp))
-            Text("Send")
+            Button(
+                onClick = onSend,
+                enabled = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty()),
+                modifier = Modifier.height(56.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Send,
+                    contentDescription = "Send message",
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Send")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingAttachmentThumbnail(
+    image: MessageContentPart.Image,
+    onRemove: () -> Unit,
+) {
+    Box(modifier = Modifier.size(68.dp)) {
+        DesktopAttachmentImage(
+            attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
+            modifier = Modifier.size(64.dp),
+        )
+        Surface(
+            modifier = Modifier
+                .size(22.dp)
+                .align(Alignment.TopEnd),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(22.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "Remove attachment",
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopImageAttachmentsGrid(
+    attachments: List<UiImageAttachment>,
+    modifier: Modifier = Modifier,
+) {
+    if (attachments.isEmpty()) return
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val cellHeight = if (attachments.size == 1) 220.dp else 128.dp
+        attachments.take(4).forEach { attachment ->
+            DesktopAttachmentImage(
+                attachment = attachment,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(cellHeight),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopAttachmentImage(
+    attachment: UiImageAttachment,
+    modifier: Modifier = Modifier,
+) {
+    val imageBitmap = remember(attachment.base64) {
+        runCatching {
+            val bytes = Base64.getDecoder().decode(attachment.base64)
+            SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+        }.getOrNull()
+    }
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        if (imageBitmap != null) {
+            Image(
+                bitmap = imageBitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }

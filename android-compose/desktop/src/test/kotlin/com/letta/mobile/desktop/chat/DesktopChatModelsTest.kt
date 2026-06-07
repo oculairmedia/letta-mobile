@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,13 +39,16 @@ class DesktopChatModelsTest {
     fun sendingLocalMessageQueuesPendingUserMessage() {
         val initial = defaultDesktopChatSurfaceState(defaultDesktopBootstrapState())
             .withComposerText("Ship the Windows preview")
+            .withImageAttachment(MessageContentPart.Image(base64 = "IMG", mediaType = "image/png"))
 
         val updated = initial.sendLocalMessage()
         val localMessage = updated.selectedMessages.last()
 
         assertEquals("", updated.composerText)
+        assertTrue(updated.pendingImageAttachments.isEmpty())
         assertEquals("user", localMessage.role)
         assertEquals("Ship the Windows preview", localMessage.content)
+        assertEquals("IMG", localMessage.attachments.single().base64)
         assertTrue(localMessage.isPending)
         assertTrue(updated.renderItems.any { it.containsMessageId(localMessage.id) })
         assertEquals(

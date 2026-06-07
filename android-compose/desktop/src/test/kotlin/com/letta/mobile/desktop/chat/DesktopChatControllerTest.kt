@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
@@ -23,6 +24,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,6 +73,76 @@ class DesktopChatControllerTest {
         assertEquals("user", sentMessage["role"]?.jsonPrimitive?.content)
         assertEquals("Ship live desktop chat", sentMessage["content"]?.jsonPrimitive?.content)
         assertTrue(state.selectedMessages.any { it.role == "assistant" && it.content == "Remote response" })
+
+        controller.close()
+    }
+
+    @Test
+    fun sendIncludesPendingImageAttachmentInContentPartsAndClearsComposer() = runTest {
+        val gateway = FakeDesktopChatGateway()
+        val controller = testController(gateway)
+        val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("Describe this")
+        controller.attachImage(image)
+        controller.send()
+        runCurrent()
+
+        val state = controller.state.value
+        assertTrue(state.pendingImageAttachments.isEmpty())
+        val sentMessage = gateway.sentRequests.single().messages?.single() as JsonObject
+        val contentParts = sentMessage["content"]!!.jsonArray
+        assertEquals("text", contentParts[0].jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("Describe this", contentParts[0].jsonObject["text"]!!.jsonPrimitive.content)
+        assertEquals("image", contentParts[1].jsonObject["type"]!!.jsonPrimitive.content)
+        val source = contentParts[1].jsonObject["source"]!!.jsonObject
+        assertEquals("base64", source["type"]!!.jsonPrimitive.content)
+        assertEquals("image/png", source["media_type"]!!.jsonPrimitive.content)
+        assertEquals("AAAA", source["data"]!!.jsonPrimitive.content)
+
+        controller.close()
+    }
+
+    @Test
+    fun sendFailureRestoresComposerTextAndAttachmentsForRetry() = runTest {
+        val image = MessageContentPart.Image(base64 = "BBBB", mediaType = "image/jpeg")
+        val loop = FakeDesktopTimelineLoop("conv-1", sendFailure = IllegalStateException("stream send failed"))
+            .also { it.completeHydrate() }
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            loopFactory = { _, _, _ -> loop },
+        )
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("try remote send")
+        controller.attachImage(image)
+        controller.send()
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(DesktopChatConnectionState.SendFailed, state.connectionState)
+        assertEquals("try remote send", state.composerText)
+        assertEquals(listOf(image), state.pendingImageAttachments)
+
+        controller.close()
+    }
+
+    @Test
+    fun attachmentLimitViolationsSurfaceComposerError() = runTest {
+        val controller = testController(FakeDesktopChatGateway())
+
+        controller.attachImage(MessageContentPart.Image(base64 = "1", mediaType = "image/png"))
+        controller.attachImage(MessageContentPart.Image(base64 = "2", mediaType = "image/png"))
+        controller.attachImage(MessageContentPart.Image(base64 = "3", mediaType = "image/png"))
+        controller.attachImage(MessageContentPart.Image(base64 = "4", mediaType = "image/png"))
+        controller.attachImage(MessageContentPart.Image(base64 = "5", mediaType = "image/png"))
+
+        val state = controller.state.value
+        assertEquals(4, state.pendingImageAttachments.size)
+        assertEquals("Attach up to 4 images.", state.errorMessage)
 
         controller.close()
     }
@@ -421,6 +494,7 @@ private class FakeDesktopTimelineLoop(
     override val state = MutableStateFlow(Timeline(conversationId))
     val hydrateStarted = CompletableDeferred<Unit>()
     val sentMessages = mutableListOf<String>()
+    val sentAttachments = mutableListOf<List<MessageContentPart.Image>>()
     var closeCount = 0
         private set
 
@@ -437,6 +511,7 @@ private class FakeDesktopTimelineLoop(
     ): String {
         sendFailure?.let { throw it }
         sentMessages += content
+        sentAttachments += attachments
         return "client-test"
     }
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageContentPart
@@ -19,6 +20,7 @@ import kotlinx.coroutines.launch
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
+    private val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     private val gatewayFactory: () -> DesktopChatGateway = {
         DesktopLettaHttpChatGateway(bootstrapState.config)
     },
@@ -103,10 +105,37 @@ class DesktopChatController(
         _state.update { it.withComposerText(text) }
     }
 
+    fun attachImage(image: MessageContentPart.Image) {
+        if (closed) return
+        _state.update { current ->
+            when {
+                current.pendingImageAttachments.size >= attachmentLimits.maxAttachmentCount -> current.copy(
+                    errorMessage = "Attach up to ${attachmentLimits.maxAttachmentCount} images.",
+                )
+                current.pendingImageAttachments.sumOf { it.base64.length } + image.base64.length >
+                    attachmentLimits.maxTotalBase64Bytes -> current.copy(
+                        errorMessage = "Attached images exceed the desktop payload limit.",
+                    )
+                else -> current.withImageAttachment(image).copy(errorMessage = null)
+            }
+        }
+    }
+
+    fun removeImageAttachment(index: Int) {
+        if (closed) return
+        _state.update { it.withoutImageAttachment(index).copy(errorMessage = null) }
+    }
+
+    fun showComposerError(message: String) {
+        if (closed) return
+        _state.update { it.copy(errorMessage = message) }
+    }
+
     fun send() {
         if (closed) return
         val text = _state.value.composerText.trim()
-        if (text.isBlank()) return
+        val attachments = _state.value.pendingImageAttachments
+        if (text.isBlank() && attachments.isEmpty()) return
 
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
@@ -123,6 +152,7 @@ class DesktopChatController(
         _state.update {
             it.copy(
                 composerText = "",
+                pendingImageAttachments = emptyList(),
                 isSending = true,
                 connectionState = DesktopChatConnectionState.Sending,
                 statusMessage = "Sending",
@@ -132,7 +162,7 @@ class DesktopChatController(
         sendJob?.cancel()
         sendJob = scope.launch {
             try {
-                loop.send(text, attachments = emptyList<MessageContentPart.Image>())
+                loop.send(text, attachments = attachments)
                 if (closed) return@launch
                 _state.update {
                     it.copy(
@@ -148,6 +178,8 @@ class DesktopChatController(
                 if (closed) return@launch
                 _state.update {
                     it.copy(
+                        composerText = text,
+                        pendingImageAttachments = attachments,
                         isSending = false,
                         connectionState = DesktopChatConnectionState.SendFailed,
                         statusMessage = "Send failed",
@@ -194,6 +226,7 @@ class DesktopChatController(
                 selectedConversationId = selectedId,
                 messagesByConversationId = emptyMap(),
                 composerText = "",
+                pendingImageAttachments = emptyList(),
                 isLoading = false,
                 isSending = false,
                 isRemoteBacked = true,
@@ -215,6 +248,7 @@ class DesktopChatController(
             _state.update {
                 initialState.copy(
                     composerText = it.composerText,
+                    pendingImageAttachments = it.pendingImageAttachments,
                     isLoading = false,
                     isSending = false,
                     isRemoteBacked = false,
@@ -245,6 +279,7 @@ class DesktopChatController(
                     }
                 },
                 composerText = "",
+                pendingImageAttachments = emptyList(),
                 isLoading = true,
                 connectionState = DesktopChatConnectionState.Loading,
                 statusMessage = "Loading messages",

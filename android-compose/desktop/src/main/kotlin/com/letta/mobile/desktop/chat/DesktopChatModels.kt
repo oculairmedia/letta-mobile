@@ -4,9 +4,11 @@ import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopBootstrapState
@@ -40,6 +42,7 @@ data class DesktopChatSurfaceState(
     val selectedConversationId: String?,
     val messagesByConversationId: Map<String, List<UiMessage>>,
     val composerText: String,
+    val pendingImageAttachments: List<MessageContentPart.Image> = emptyList(),
     val isSending: Boolean,
     val isLoading: Boolean = false,
     val isRemoteBacked: Boolean = false,
@@ -68,6 +71,9 @@ data class DesktopChatSurfaceState(
                 DesktopChatConnectionState.SendFailed,
                 DesktopChatConnectionState.StreamDisconnected,
             )
+
+    val hasComposerPayload: Boolean
+        get() = composerText.isNotBlank() || pendingImageAttachments.isNotEmpty()
 
     val shouldShowStatePanel: Boolean
         get() = selectedConversationId == null ||
@@ -113,6 +119,7 @@ fun defaultDesktopChatSurfaceState(
         selectedConversationId = conversations.first().id,
         messagesByConversationId = sampleDesktopMessagesByConversation(),
         composerText = "",
+        pendingImageAttachments = emptyList(),
         isSending = false,
         isLoading = false,
         isRemoteBacked = false,
@@ -132,6 +139,7 @@ fun initialLiveDesktopChatSurfaceState(
         selectedConversationId = null,
         messagesByConversationId = emptyMap(),
         composerText = "",
+        pendingImageAttachments = emptyList(),
         isSending = false,
         isLoading = true,
         isRemoteBacked = true,
@@ -158,16 +166,24 @@ fun DesktopChatSurfaceState.selectConversation(
             }
         },
         composerText = "",
+        pendingImageAttachments = emptyList(),
     )
 }
 
 fun DesktopChatSurfaceState.withComposerText(text: String): DesktopChatSurfaceState =
     copy(composerText = text)
 
+fun DesktopChatSurfaceState.withImageAttachment(image: MessageContentPart.Image): DesktopChatSurfaceState =
+    copy(pendingImageAttachments = pendingImageAttachments + image)
+
+fun DesktopChatSurfaceState.withoutImageAttachment(index: Int): DesktopChatSurfaceState =
+    copy(pendingImageAttachments = pendingImageAttachments.filterIndexed { i, _ -> i != index })
+
 fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
     val conversationId = selectedConversationId ?: return this
     val text = composerText.trim()
-    if (text.isBlank()) return this
+    val attachments = pendingImageAttachments
+    if (text.isBlank() && attachments.isEmpty()) return this
 
     val currentMessages = messagesByConversationId[conversationId].orEmpty()
     val localMessage = UiMessage(
@@ -176,6 +192,7 @@ fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
         content = text,
         timestamp = "2026-06-07T16:${(currentMessages.size + 10).toString().padStart(2, '0')}:00Z",
         isPending = true,
+        attachments = attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) },
     )
 
     return copy(
@@ -192,6 +209,7 @@ fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
         },
         messagesByConversationId = messagesByConversationId + (conversationId to currentMessages + localMessage),
         composerText = "",
+        pendingImageAttachments = emptyList(),
         isSending = false,
     )
 }
