@@ -4,6 +4,10 @@ import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
+import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
+import com.letta.mobile.data.chat.runtime.ChatComposerState
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -13,28 +17,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopBootstrapState
 
-@Immutable
-data class DesktopConversationSummary(
-    val id: String,
-    val title: String,
-    val agentName: String,
-    val updatedAtLabel: String,
-    val lastMessagePreview: String,
-    val unreadCount: Int = 0,
-)
-
-@Immutable
-enum class DesktopChatConnectionState {
-    Demo,
-    Loading,
-    ConfigNeeded,
-    Offline,
-    NoConversations,
-    Live,
-    Sending,
-    StreamDisconnected,
-    SendFailed,
-}
+typealias DesktopConversationSummary = ChatConversationSummary
+typealias DesktopChatConnectionState = ChatConnectionState
 
 @Immutable
 data class DesktopChatSurfaceState(
@@ -52,6 +36,12 @@ data class DesktopChatSurfaceState(
     val backendLabel: String,
     val sessionGraphId: Long,
 ) {
+    val composer: ChatComposerState
+        get() = ChatComposerState(
+            text = composerText,
+            pendingImageAttachments = pendingImageAttachments,
+        )
+
     val selectedConversation: DesktopConversationSummary?
         get() = conversations.firstOrNull { it.id == selectedConversationId }
 
@@ -171,19 +161,25 @@ fun DesktopChatSurfaceState.selectConversation(
 }
 
 fun DesktopChatSurfaceState.withComposerText(text: String): DesktopChatSurfaceState =
-    copy(composerText = text)
+    withComposer(ChatComposerPolicy.updateText(composer, text))
 
 fun DesktopChatSurfaceState.withImageAttachment(image: MessageContentPart.Image): DesktopChatSurfaceState =
-    copy(pendingImageAttachments = pendingImageAttachments + image)
+    withComposer(ChatComposerPolicy.attachImage(composer, image))
 
 fun DesktopChatSurfaceState.withoutImageAttachment(index: Int): DesktopChatSurfaceState =
-    copy(pendingImageAttachments = pendingImageAttachments.filterIndexed { i, _ -> i != index })
+    withComposer(ChatComposerPolicy.removeImageAttachment(composer, index))
+
+fun DesktopChatSurfaceState.withComposer(composer: ChatComposerState): DesktopChatSurfaceState =
+    copy(
+        composerText = composer.text,
+        pendingImageAttachments = composer.pendingImageAttachments,
+    )
 
 fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
     val conversationId = selectedConversationId ?: return this
-    val text = composerText.trim()
-    val attachments = pendingImageAttachments
-    if (text.isBlank() && attachments.isEmpty()) return this
+    val draft = ChatComposerPolicy.beginSend(composer) ?: return this
+    val text = draft.text
+    val attachments = draft.attachments
 
     val currentMessages = messagesByConversationId[conversationId].orEmpty()
     val localMessage = UiMessage(
@@ -195,7 +191,7 @@ fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
         attachments = attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) },
     )
 
-    return copy(
+    return withComposer(draft.nextState).copy(
         conversations = conversations.map { conversation ->
             if (conversation.id == conversationId) {
                 conversation.copy(
@@ -208,8 +204,6 @@ fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
             }
         },
         messagesByConversationId = messagesByConversationId + (conversationId to currentMessages + localMessage),
-        composerText = "",
-        pendingImageAttachments = emptyList(),
         isSending = false,
     )
 }

@@ -2,6 +2,8 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
+import com.letta.mobile.data.chat.runtime.ChatComposerError
+import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -108,22 +110,17 @@ class DesktopChatController(
     fun attachImage(image: MessageContentPart.Image) {
         if (closed) return
         _state.update { current ->
-            when {
-                current.pendingImageAttachments.size >= attachmentLimits.maxAttachmentCount -> current.copy(
-                    errorMessage = "Attach up to ${attachmentLimits.maxAttachmentCount} images.",
-                )
-                current.pendingImageAttachments.sumOf { it.base64.length } + image.base64.length >
-                    attachmentLimits.maxTotalBase64Bytes -> current.copy(
-                        errorMessage = "Attached images exceed the desktop payload limit.",
-                    )
-                else -> current.withImageAttachment(image).copy(errorMessage = null)
-            }
+            val composer = ChatComposerPolicy.attachImage(current.composer, image, attachmentLimits)
+            current.withComposer(composer).copy(errorMessage = composer.error?.toDesktopMessage(attachmentLimits))
         }
     }
 
     fun removeImageAttachment(index: Int) {
         if (closed) return
-        _state.update { it.withoutImageAttachment(index).copy(errorMessage = null) }
+        _state.update {
+            val composer = ChatComposerPolicy.removeImageAttachment(it.composer, index)
+            it.withComposer(composer).copy(errorMessage = null)
+        }
     }
 
     fun showComposerError(message: String) {
@@ -133,9 +130,9 @@ class DesktopChatController(
 
     fun send() {
         if (closed) return
-        val text = _state.value.composerText.trim()
-        val attachments = _state.value.pendingImageAttachments
-        if (text.isBlank() && attachments.isEmpty()) return
+        val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
+        val text = draft.text
+        val attachments = draft.attachments
 
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
@@ -150,9 +147,7 @@ class DesktopChatController(
         }
 
         _state.update {
-            it.copy(
-                composerText = "",
-                pendingImageAttachments = emptyList(),
+            it.withComposer(draft.nextState).copy(
                 isSending = true,
                 connectionState = DesktopChatConnectionState.Sending,
                 statusMessage = "Sending",
@@ -177,9 +172,7 @@ class DesktopChatController(
             } catch (t: Throwable) {
                 if (closed) return@launch
                 _state.update {
-                    it.copy(
-                        composerText = text,
-                        pendingImageAttachments = attachments,
+                    it.withComposer(ChatComposerPolicy.restoreAfterSendFailure(text, attachments)).copy(
                         isSending = false,
                         connectionState = DesktopChatConnectionState.SendFailed,
                         statusMessage = "Send failed",
@@ -360,6 +353,12 @@ private fun Conversation.toDesktopSummary(): DesktopConversationSummary {
 
 private fun List<UiMessage>.lastPreviewOr(fallback: String): String =
     lastOrNull { it.content.isNotBlank() }?.content?.lineSequence()?.firstOrNull()?.take(140) ?: fallback
+
+private fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
+    ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."
+    ChatComposerError.MaxTotalBase64BytesExceeded -> "Attached images exceed the desktop payload limit."
+    ChatComposerError.AttachmentLoadFailed -> "Could not attach image."
+}
 
 interface DesktopTimelineLoop {
     val state: StateFlow<Timeline>

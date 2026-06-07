@@ -50,7 +50,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,6 +68,8 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.projection.runStepDotIcon
+import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
+import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
@@ -505,31 +506,29 @@ private fun MessageList(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var followLatest by remember(conversationId) { mutableStateOf(true) }
-    val isNearLatest by remember {
-        derivedStateOf { listState.isNearLatestMessage() }
-    }
     val latestItemKey = renderItems.lastOrNull()?.key
 
     LaunchedEffect(conversationId) {
         followLatest = true
         if (renderItems.isNotEmpty()) {
-            listState.scrollToItem(latestMessageScrollIndex(renderItems.size))
+            listState.scrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
         }
     }
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress to listState.isNearLatestMessage() }
+        snapshotFlow { listState.toChatViewportSnapshot() }
             .distinctUntilChanged()
-            .collect { (isScrollInProgress, nearLatest) ->
-                if (!isScrollInProgress) {
-                    followLatest = nearLatest
-                }
+            .collect { snapshot ->
+                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
+                    currentFollowMode = followLatest,
+                    snapshot = snapshot,
+                )
             }
     }
 
     LaunchedEffect(latestItemKey, renderItems.size) {
-        if (followLatest && renderItems.isNotEmpty()) {
-            listState.scrollToItem(latestMessageScrollIndex(renderItems.size))
+        if (ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size)) {
+            listState.scrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
         }
     }
 
@@ -552,7 +551,7 @@ private fun MessageList(
             }
         }
 
-        if (renderItems.isNotEmpty() && !isNearLatest) {
+        if (ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot())) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -561,7 +560,7 @@ private fun MessageList(
                     .clickable {
                         followLatest = true
                         scope.launch {
-                            listState.animateScrollToItem(latestMessageScrollIndex(renderItems.size))
+                            listState.animateScrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
                         }
                     },
                 shape = CircleShape,
@@ -580,28 +579,12 @@ private fun MessageList(
     }
 }
 
-internal fun LazyListState.isNearLatestMessage(
-    thresholdItems: Int = 1,
-): Boolean {
-    val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return true
-    return isNearLatestMessage(
+private fun LazyListState.toChatViewportSnapshot(): ChatViewportSnapshot =
+    ChatViewportSnapshot(
         totalItems = layoutInfo.totalItemsCount,
-        lastVisibleIndex = lastVisibleIndex,
-        thresholdItems = thresholdItems,
+        lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index,
+        isScrollInProgress = isScrollInProgress,
     )
-}
-
-internal fun latestMessageScrollIndex(itemCount: Int): Int =
-    (itemCount - 1).coerceAtLeast(0)
-
-internal fun isNearLatestMessage(
-    totalItems: Int,
-    lastVisibleIndex: Int,
-    thresholdItems: Int = 1,
-): Boolean {
-    if (totalItems <= 0) return true
-    return lastVisibleIndex >= totalItems - 1 - thresholdItems
-}
 
 @Composable
 private fun DesktopRunBlock(item: ChatRenderItem.RunBlock) {
