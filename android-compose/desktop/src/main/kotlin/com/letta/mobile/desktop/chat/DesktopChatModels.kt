@@ -28,6 +28,10 @@ data class DesktopChatSurfaceState(
     val messagesByConversationId: Map<String, List<UiMessage>>,
     val composerText: String,
     val isSending: Boolean,
+    val isLoading: Boolean = false,
+    val isRemoteBacked: Boolean = false,
+    val statusMessage: String? = null,
+    val errorMessage: String? = null,
     val backendLabel: String,
     val sessionGraphId: Long,
 ) {
@@ -75,6 +79,10 @@ fun defaultDesktopChatSurfaceState(
         messagesByConversationId = sampleDesktopMessagesByConversation(),
         composerText = "",
         isSending = false,
+        isLoading = false,
+        isRemoteBacked = false,
+        statusMessage = "Local preview",
+        errorMessage = null,
         backendLabel = "${bootstrapState.config.serverUrl} - graph ${bootstrapState.sessionGraphId}",
         sessionGraphId = bootstrapState.sessionGraphId,
     )

@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 val composeDesktopMaterial3Version = "1.9.0"
 val composeDesktopMaterialIconsVersion = "1.7.3"
 val coroutinesVersion = "1.11.0"
+val ktorVersion = "3.5.0"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -57,6 +58,9 @@ dependencies {
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
+    implementation("io.ktor:ktor-client-cio:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")

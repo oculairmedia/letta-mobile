@@ -31,9 +31,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -43,18 +47,29 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurface
-import com.letta.mobile.desktop.chat.defaultDesktopChatSurfaceState
-import com.letta.mobile.desktop.chat.selectConversation
-import com.letta.mobile.desktop.chat.sendLocalMessage
-import com.letta.mobile.desktop.chat.withComposerText
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 
 @Composable
 fun LettaDesktopApp() {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Overview) }
     val bootstrapState = remember { defaultDesktopBootstrapState() }
-    var chatState by remember { mutableStateOf(defaultDesktopChatSurfaceState(bootstrapState)) }
+    val chatScope = rememberCoroutineScope()
+    val chatController = remember(bootstrapState, chatScope) {
+        DesktopChatController(
+            bootstrapState = bootstrapState,
+            scope = chatScope,
+        )
+    }
+    val chatState by chatController.state.collectAsState()
+
+    LaunchedEffect(chatController) {
+        chatController.start()
+    }
+    DisposableEffect(chatController) {
+        onDispose { chatController.close() }
+    }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -92,15 +107,9 @@ fun LettaDesktopApp() {
                     destination = selectedDestination,
                     state = bootstrapState,
                     chatState = chatState,
-                    onChatConversationSelected = { conversationId ->
-                        chatState = chatState.selectConversation(conversationId)
-                    },
-                    onChatComposerTextChanged = { text ->
-                        chatState = chatState.withComposerText(text)
-                    },
-                    onChatSend = {
-                        chatState = chatState.sendLocalMessage()
-                    },
+                    onChatConversationSelected = chatController::selectConversation,
+                    onChatComposerTextChanged = chatController::updateComposerText,
+                    onChatSend = chatController::send,
                     modifier = Modifier.weight(1f),
                 )
             }

@@ -115,6 +115,28 @@ private fun ConversationPane(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            state.statusMessage?.let { status ->
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (state.isRemoteBacked) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            state.errorMessage?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         LazyColumn(
@@ -253,7 +275,7 @@ private fun ChatDetailPane(
         )
         ComposerBar(
             text = state.composerText,
-            enabled = state.selectedConversationId != null && !state.isSending,
+            enabled = state.selectedConversationId != null && !state.isSending && !state.isLoading,
             onTextChanged = onComposerTextChanged,
             onSend = onSend,
         )
