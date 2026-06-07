@@ -188,6 +188,30 @@ internal sealed interface ConversationState {
     data class Error(val message: String) : ConversationState
 }
 
+/**
+ * Single source of truth for mapping the shared KMP [ChatConnectionState] into
+ * the Android UI's [ConversationState]. Used by AdminChatViewModel and the
+ * chat coordinators so Android never re-defines what "loading", "offline",
+ * "config needed", or "ready" mean — that lives in the shared runtime.
+ */
+internal fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversationState(
+    selectedConversationId: String?,
+    errorMessage: String?,
+): ConversationState = when (this) {
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Loading -> ConversationState.Loading
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.ConfigNeeded ->
+        ConversationState.Error(errorMessage ?: "Backend configuration required")
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Offline ->
+        ConversationState.Error(errorMessage ?: "Backend offline")
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.NoConversations -> ConversationState.NoConversation
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Demo,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Live,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Sending,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.StreamDisconnected,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.SendFailed ->
+        selectedConversationId?.let { ConversationState.Ready(it) } ?: ConversationState.NoConversation
+}
+
 @androidx.compose.runtime.Immutable
 internal data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,

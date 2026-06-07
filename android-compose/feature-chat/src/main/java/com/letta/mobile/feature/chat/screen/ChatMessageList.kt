@@ -72,6 +72,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
 import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.chatGeometrySignature
 

@@ -12,6 +12,7 @@ import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
+import com.letta.mobile.feature.chat.render.toConversationState
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every
@@ -138,13 +139,10 @@ class AdminChatParityTest {
             sessionState.value = reducerUpdate(sessionState.value)
             val next = sessionState.value
             uiState.value = uiState.value.copy(
-                conversationState = when (next.connectionState) {
-                    ChatConnectionState.Loading -> ConversationState.Loading
-                    ChatConnectionState.ConfigNeeded -> ConversationState.Error(next.errorMessage ?: "Config needed")
-                    ChatConnectionState.Offline -> ConversationState.Error(next.errorMessage ?: "Offline")
-                    ChatConnectionState.NoConversations -> ConversationState.NoConversation
-                    else -> if (next.selectedConversationId != null) ConversationState.Ready(next.selectedConversationId) else ConversationState.NoConversation
-                },
+                conversationState = next.connectionState.toConversationState(
+                    next.selectedConversationId,
+                    next.errorMessage,
+                ),
                 isLoadingMessages = next.isLoading,
                 error = next.errorMessage
             )

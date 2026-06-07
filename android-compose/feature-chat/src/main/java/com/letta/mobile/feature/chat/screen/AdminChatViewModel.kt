@@ -89,6 +89,7 @@ import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatTransport
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
+import com.letta.mobile.feature.chat.render.toConversationState
 import com.letta.mobile.feature.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
@@ -190,28 +191,6 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    private fun ChatConnectionState.toConversationState(
-        selectedConversationId: String?,
-        errorMessage: String?,
-    ): ConversationState {
-        return when (this) {
-            ChatConnectionState.Loading -> ConversationState.Loading
-            ChatConnectionState.ConfigNeeded -> ConversationState.Error(errorMessage ?: "Backend configuration required")
-            ChatConnectionState.Offline -> ConversationState.Error(errorMessage ?: "Backend offline")
-            ChatConnectionState.NoConversations -> ConversationState.NoConversation
-            ChatConnectionState.Demo,
-            ChatConnectionState.Live,
-            ChatConnectionState.Sending,
-            ChatConnectionState.StreamDisconnected,
-            ChatConnectionState.SendFailed -> {
-                if (selectedConversationId != null) {
-                    ConversationState.Ready(selectedConversationId)
-                } else {
-                    ConversationState.NoConversation
-                }
-            }
-        }
-    }
 
     val uiState: StateFlow<ChatUiState> by lazy(LazyThreadSafetyMode.NONE) {
         viewModelScope.launchMolecule(mode = Immediate) {
