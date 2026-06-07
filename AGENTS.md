@@ -71,6 +71,12 @@ $env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-26"
 $env:ANDROID_HOME="$env:USERPROFILE\AppData\Local\Android\Sdk"
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest
+
+# NOTE: If you are building on a Windows mapped network drive (e.g. U:), Java's Files.isWritable()
+# and canWrite() checks may fail due to remote Samba SID matching issues. Run the following command
+# in a Windows command prompt or PowerShell (replacing U: with your mapped drive) to grant recursive
+# Full Control permissions:
+# icacls U:\letta-mobile\android-compose /grant Everyone:(OI)(CI)F /T
 ```
 
 ### Linux / macOS Environments (Bash)

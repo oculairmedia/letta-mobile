@@ -2,6 +2,8 @@ package com.letta.mobile.feature.chat.coordination
 
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.chat.runtime.ChatComposerError
+import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.ImmutableList
@@ -34,6 +36,7 @@ internal data class ChatComposerState(
     val pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
     val inputHistory: ImmutableList<String> = persistentListOf(),
     val error: String? = null,
+    val sharedComposerState: com.letta.mobile.data.chat.runtime.ChatComposerState = com.letta.mobile.data.chat.runtime.ChatComposerState(),
 ) {
     val hasSendableContent: Boolean
         get() = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -79,21 +82,36 @@ internal class ChatComposerController(
     val state: StateFlow<ChatComposerState> = _state.asStateFlow()
 
     fun updateText(text: String) {
-        _state.update { it.copy(inputText = text) }
+        _state.update { current ->
+            val nextShared = ChatComposerPolicy.updateText(current.sharedComposerState, text)
+            current.copy(
+                inputText = nextShared.text,
+                sharedComposerState = nextShared,
+            )
+        }
     }
 
     fun clearText() {
-        if (_state.value.inputText.isEmpty()) return
-        _state.update { it.copy(inputText = "") }
+        _state.update { current ->
+            val nextShared = ChatComposerPolicy.updateText(current.sharedComposerState, "")
+            current.copy(
+                inputText = nextShared.text,
+                sharedComposerState = nextShared,
+            )
+        }
     }
 
     fun setError(message: String) {
-        _state.update { it.copy(error = message) }
+        _state.update { current ->
+            current.copy(error = message)
+        }
     }
 
     fun clearError() {
         if (_state.value.error == null) return
-        _state.update { it.copy(error = null) }
+        _state.update { current ->
+            current.copy(error = null)
+        }
     }
 
     /**
@@ -103,52 +121,65 @@ internal class ChatComposerController(
      * cap. Returns true on success; false if a cap was hit.
      */
     fun addAttachment(image: MessageContentPart.Image): Boolean {
-        val current = _state.value.pendingAttachments
-        if (current.size >= limits.maxAttachmentCount) {
-            telemetry.event(
-                "attachment.rejected",
-                "reason" to "count_cap",
-                "current" to current.size,
-                "max" to limits.maxAttachmentCount,
-            )
-            setError("Attachment limit reached (${limits.maxAttachmentCount} max).")
-            return false
+        var success = true
+        _state.update { current ->
+            val nextShared = ChatComposerPolicy.attachImage(current.sharedComposerState, image, limits)
+            if (nextShared.error != null) {
+                success = false
+                val errorString = when (nextShared.error) {
+                    ChatComposerError.MaxAttachmentCountExceeded -> {
+                        telemetry.event(
+                            "attachment.rejected",
+                            "reason" to "count_cap",
+                            "current" to current.pendingAttachments.size,
+                            "max" to limits.maxAttachmentCount,
+                        )
+                        "Attachment limit reached (${limits.maxAttachmentCount} max)."
+                    }
+                    ChatComposerError.MaxTotalBase64BytesExceeded -> {
+                        val newTotal = current.pendingAttachments.sumOf { it.base64.length } + image.base64.length
+                        telemetry.event(
+                            "attachment.rejected",
+                            "reason" to "size_cap",
+                            "newTotal" to newTotal,
+                            "max" to limits.maxTotalBase64Bytes,
+                        )
+                        "Attachments too large — downscale or remove some before sending."
+                    }
+                    ChatComposerError.AttachmentLoadFailed -> "Failed to load attachment."
+                    else -> "Failed to add attachment."
+                }
+                current.copy(
+                    error = errorString,
+                    sharedComposerState = nextShared.copy(error = null),
+                )
+            } else {
+                telemetry.event(
+                    "attachment.added",
+                    "size" to image.base64.length,
+                    "mediaType" to image.mediaType,
+                    "totalCount" to (current.pendingAttachments.size + 1),
+                )
+                current.copy(
+                    pendingAttachments = nextShared.pendingImageAttachments.toPersistentList(),
+                    error = null,
+                    sharedComposerState = nextShared,
+                )
+            }
         }
-        val newTotal = current.sumOf { it.base64.length } + image.base64.length
-        if (newTotal > limits.maxTotalBase64Bytes) {
-            telemetry.event(
-                "attachment.rejected",
-                "reason" to "size_cap",
-                "newTotal" to newTotal,
-                "max" to limits.maxTotalBase64Bytes,
-            )
-            setError("Attachments too large — downscale or remove some before sending.")
-            return false
-        }
-        _state.update {
-            it.copy(
-                pendingAttachments = (current + image).toPersistentList(),
-                error = null,
-            )
-        }
-        telemetry.event(
-            "attachment.added",
-            "size" to image.base64.length,
-            "mediaType" to image.mediaType,
-            "totalCount" to (current.size + 1),
-        )
-        return true
+        return success
     }
 
     /** Remove a staged attachment by index. */
     fun removeAttachment(index: Int) {
         val current = _state.value.pendingAttachments
         if (index !in current.indices) return
-        _state.update {
-            it.copy(
-                pendingAttachments = current.toMutableList()
-                    .also { attachments -> attachments.removeAt(index) }
-                    .toPersistentList(),
+        _state.update { current ->
+            val nextShared = ChatComposerPolicy.removeImageAttachment(current.sharedComposerState, index)
+            current.copy(
+                pendingAttachments = nextShared.pendingImageAttachments.toPersistentList(),
+                error = null,
+                sharedComposerState = nextShared,
             )
         }
         telemetry.event(
@@ -178,6 +209,7 @@ internal class ChatComposerController(
                 pendingAttachments = persistentListOf(),
                 inputHistory = nextHistory,
                 error = null,
+                sharedComposerState = com.letta.mobile.data.chat.runtime.ChatComposerState(),
             )
         }
     }

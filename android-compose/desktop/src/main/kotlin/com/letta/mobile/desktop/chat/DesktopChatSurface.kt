@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,43 +20,67 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.projection.runStepDotIcon
+import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
+import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import java.util.Base64
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import org.jetbrains.skia.Image as SkiaImage
 
 @Composable
 fun DesktopChatSurface(
@@ -63,6 +88,9 @@ fun DesktopChatSurface(
     onConversationSelected: (String) -> Unit,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onAttachImage: () -> Unit,
+    onRemoveImageAttachment: (Int) -> Unit,
+    onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -73,6 +101,7 @@ fun DesktopChatSurface(
         ConversationPane(
             state = state,
             onConversationSelected = onConversationSelected,
+            onRetryConnection = onRetryConnection,
         )
         Box(
             modifier = Modifier
@@ -84,6 +113,9 @@ fun DesktopChatSurface(
             state = state,
             onComposerTextChanged = onComposerTextChanged,
             onSend = onSend,
+            onAttachImage = onAttachImage,
+            onRemoveImageAttachment = onRemoveImageAttachment,
+            onRetryConnection = onRetryConnection,
             modifier = Modifier.weight(1f),
         )
     }
@@ -93,6 +125,7 @@ fun DesktopChatSurface(
 private fun ConversationPane(
     state: DesktopChatSurfaceState,
     onConversationSelected: (String) -> Unit,
+    onRetryConnection: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -115,12 +148,42 @@ private fun ConversationPane(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            state.statusMessage?.let { status ->
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (state.isRemoteBacked) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            state.errorMessage?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (state.conversations.isEmpty()) {
+                item {
+                    ConversationPaneStateCard(
+                        state = state,
+                        onRetryConnection = onRetryConnection,
+                    )
+                }
+            }
             items(
                 items = state.conversations,
                 key = { it.id },
@@ -130,6 +193,60 @@ private fun ConversationPane(
                     selected = conversation.id == state.selectedConversationId,
                     onClick = { onConversationSelected(conversation.id) },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConversationPaneStateCard(
+    state: DesktopChatSurfaceState,
+    onRetryConnection: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = state.connectionState.statusIcon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = state.connectionState.statusColor(),
+                )
+                Text(
+                    text = state.connectionState.panelTitle(),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Text(
+                text = state.errorMessage ?: state.connectionState.panelBody(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state.connectionState.canRetry()) {
+                Button(
+                    onClick = onRetryConnection,
+                    enabled = !state.isLoading,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Retry")
+                }
             }
         }
     }
@@ -227,6 +344,9 @@ private fun ChatDetailPane(
     state: DesktopChatSurfaceState,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onAttachImage: () -> Unit,
+    onRemoveImageAttachment: (Int) -> Unit,
+    onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -241,10 +361,19 @@ private fun ChatDetailPane(
                 .height(1.dp)
                 .background(MaterialTheme.colorScheme.outlineVariant),
         )
-        MessageList(
-            renderItems = state.renderItems,
-            modifier = Modifier.weight(1f),
-        )
+        if (state.shouldShowStatePanel) {
+            ChatStatePanel(
+                state = state,
+                onRetryConnection = onRetryConnection,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            MessageList(
+                conversationId = state.selectedConversationId,
+                renderItems = state.renderItems,
+                modifier = Modifier.weight(1f),
+            )
+        }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -253,10 +382,71 @@ private fun ChatDetailPane(
         )
         ComposerBar(
             text = state.composerText,
-            enabled = state.selectedConversationId != null && !state.isSending,
+            pendingImageAttachments = state.pendingImageAttachments,
+            enabled = state.canSend,
             onTextChanged = onComposerTextChanged,
             onSend = onSend,
+            onAttachImage = onAttachImage,
+            onRemoveImageAttachment = onRemoveImageAttachment,
         )
+    }
+}
+
+@Composable
+private fun ChatStatePanel(
+    state: DesktopChatSurfaceState,
+    onRetryConnection: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 28.dp, vertical = 22.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.widthIn(max = 520.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Surface(
+                modifier = Modifier.size(52.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = state.connectionState.statusIcon(),
+                        contentDescription = null,
+                    )
+                }
+            }
+            Text(
+                text = state.connectionState.panelTitle(),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = state.errorMessage ?: state.connectionState.panelBody(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state.connectionState.canRetry()) {
+                Button(
+                    onClick = onRetryConnection,
+                    enabled = !state.isLoading,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Retry connection")
+                }
+            }
+        }
     }
 }
 
@@ -309,26 +499,92 @@ private fun ChatHeader(state: DesktopChatSurfaceState) {
 
 @Composable
 private fun MessageList(
+    conversationId: String?,
     renderItems: List<ChatRenderItem>,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        items(
-            items = renderItems,
-            key = { it.key },
-        ) { item ->
-            when (item) {
-                is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
-                is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    var followLatest by remember(conversationId) { mutableStateOf(true) }
+    val latestItemKey = renderItems.lastOrNull()?.key
+
+    LaunchedEffect(conversationId) {
+        followLatest = true
+        if (renderItems.isNotEmpty()) {
+            listState.scrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.toChatViewportSnapshot() }
+            .distinctUntilChanged()
+            .collect { snapshot ->
+                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
+                    currentFollowMode = followLatest,
+                    snapshot = snapshot,
+                )
+            }
+    }
+
+    LaunchedEffect(latestItemKey, renderItems.size) {
+        if (ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size)) {
+            listState.scrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+        }
+    }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp, vertical = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            items(
+                items = renderItems,
+                key = { it.key },
+            ) { item ->
+                when (item) {
+                    is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
+                    is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                }
+            }
+        }
+
+        if (ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot())) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 18.dp)
+                    .size(44.dp)
+                    .clickable {
+                        followLatest = true
+                        scope.launch {
+                            listState.animateScrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+                        }
+                    },
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Outlined.KeyboardArrowDown,
+                        contentDescription = "Scroll to latest message",
+                    )
+                }
             }
         }
     }
 }
+
+private fun LazyListState.toChatViewportSnapshot(): ChatViewportSnapshot =
+    ChatViewportSnapshot(
+        totalItems = layoutInfo.totalItemsCount,
+        lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index,
+        isScrollInProgress = isScrollInProgress,
+    )
 
 @Composable
 private fun DesktopRunBlock(item: ChatRenderItem.RunBlock) {
@@ -457,6 +713,11 @@ private fun DesktopMessageContent(
             }
         }
 
+        DesktopImageAttachmentsGrid(
+            attachments = message.attachments,
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         message.toolCalls.orEmpty().forEach { toolCall ->
             ToolCallCard(toolCall)
         }
@@ -493,6 +754,10 @@ private fun ToolCallCard(toolCall: UiToolCall) {
         toolCall.executionTimeMs?.let { duration ->
             StatusChip("$duration ms")
         }
+        DesktopImageAttachmentsGrid(
+            attachments = toolCall.generatedImageAttachments,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
@@ -607,40 +872,160 @@ private fun ArtifactCard(
 @Composable
 private fun ComposerBar(
     text: String,
+    pendingImageAttachments: List<MessageContentPart.Image>,
     enabled: Boolean,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
+    onAttachImage: () -> Unit,
+    onRemoveImageAttachment: (Int) -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp, vertical = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Bottom,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = onTextChanged,
-            enabled = enabled,
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 56.dp, max = 132.dp),
-            placeholder = { Text("Message") },
-            minLines = 1,
-            maxLines = 5,
-        )
-        Button(
-            onClick = onSend,
-            enabled = enabled && text.isNotBlank(),
-            modifier = Modifier.height(56.dp),
+        if (pendingImageAttachments.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                pendingImageAttachments.forEachIndexed { index, image ->
+                    PendingAttachmentThumbnail(
+                        image = image,
+                        onRemove = { onRemoveImageAttachment(index) },
+                    )
+                }
+            }
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.Send,
-                contentDescription = "Send message",
-                modifier = Modifier.size(18.dp),
+            Surface(
+                modifier = Modifier.size(56.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                IconButton(
+                    onClick = onAttachImage,
+                    enabled = enabled,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = "Attach image",
+                    )
+                }
+            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChanged,
+                enabled = enabled,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 56.dp, max = 132.dp),
+                placeholder = { Text("Message") },
+                minLines = 1,
+                maxLines = 5,
             )
-            Spacer(Modifier.width(8.dp))
-            Text("Send")
+            Button(
+                onClick = onSend,
+                enabled = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty()),
+                modifier = Modifier.height(56.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Send,
+                    contentDescription = "Send message",
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Send")
+            }
+        }
+    }
+}
+
+@Composable
+private fun PendingAttachmentThumbnail(
+    image: MessageContentPart.Image,
+    onRemove: () -> Unit,
+) {
+    Box(modifier = Modifier.size(68.dp)) {
+        DesktopAttachmentImage(
+            attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
+            modifier = Modifier.size(64.dp),
+        )
+        Surface(
+            modifier = Modifier
+                .size(22.dp)
+                .align(Alignment.TopEnd),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(22.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Close,
+                    contentDescription = "Remove attachment",
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DesktopImageAttachmentsGrid(
+    attachments: List<UiImageAttachment>,
+    modifier: Modifier = Modifier,
+) {
+    if (attachments.isEmpty()) return
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val cellHeight = if (attachments.size == 1) 220.dp else 128.dp
+        attachments.take(4).forEach { attachment ->
+            DesktopAttachmentImage(
+                attachment = attachment,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(cellHeight),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopAttachmentImage(
+    attachment: UiImageAttachment,
+    modifier: Modifier = Modifier,
+) {
+    val imageBitmap = remember(attachment.base64) {
+        runCatching {
+            val bytes = Base64.getDecoder().decode(attachment.base64)
+            SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
+        }.getOrNull()
+    }
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        if (imageBitmap != null) {
+            Image(
+                bitmap = imageBitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
         }
     }
 }
@@ -670,6 +1055,67 @@ private fun StatusDot(color: Color) {
             .size(9.dp)
             .background(color, CircleShape),
     )
+}
+
+@Composable
+private fun DesktopChatConnectionState.statusColor(): Color = when (this) {
+    DesktopChatConnectionState.Live,
+    DesktopChatConnectionState.Sending -> MaterialTheme.colorScheme.primary
+    DesktopChatConnectionState.Demo,
+    DesktopChatConnectionState.NoConversations -> MaterialTheme.colorScheme.tertiary
+    DesktopChatConnectionState.Loading -> MaterialTheme.colorScheme.secondary
+    DesktopChatConnectionState.ConfigNeeded,
+    DesktopChatConnectionState.Offline,
+    DesktopChatConnectionState.StreamDisconnected,
+    DesktopChatConnectionState.SendFailed -> MaterialTheme.colorScheme.error
+}
+
+private fun DesktopChatConnectionState.statusIcon(): ImageVector = when (this) {
+    DesktopChatConnectionState.Live,
+    DesktopChatConnectionState.Sending -> Icons.Outlined.CheckCircle
+    DesktopChatConnectionState.Demo,
+    DesktopChatConnectionState.NoConversations -> Icons.Outlined.SmartToy
+    DesktopChatConnectionState.Loading -> Icons.Outlined.HourglassEmpty
+    DesktopChatConnectionState.ConfigNeeded,
+    DesktopChatConnectionState.Offline,
+    DesktopChatConnectionState.StreamDisconnected,
+    DesktopChatConnectionState.SendFailed -> Icons.Outlined.ErrorOutline
+}
+
+private fun DesktopChatConnectionState.panelTitle(): String = when (this) {
+    DesktopChatConnectionState.Demo -> "Demo preview"
+    DesktopChatConnectionState.Loading -> "Connecting"
+    DesktopChatConnectionState.ConfigNeeded -> "Backend configuration required"
+    DesktopChatConnectionState.Offline -> "Backend offline"
+    DesktopChatConnectionState.NoConversations -> "No conversations"
+    DesktopChatConnectionState.Live -> "Live"
+    DesktopChatConnectionState.Sending -> "Sending"
+    DesktopChatConnectionState.StreamDisconnected -> "Stream disconnected"
+    DesktopChatConnectionState.SendFailed -> "Send failed"
+}
+
+private fun DesktopChatConnectionState.panelBody(): String = when (this) {
+    DesktopChatConnectionState.Demo -> "Sample data is shown only in the explicit demo preview."
+    DesktopChatConnectionState.Loading -> "Loading conversations from the configured Letta backend."
+    DesktopChatConnectionState.ConfigNeeded -> "Set a server URL and token in Settings before connecting."
+    DesktopChatConnectionState.Offline -> "The configured backend could not be reached."
+    DesktopChatConnectionState.NoConversations -> "This backend returned no conversations for the active account."
+    DesktopChatConnectionState.Live -> "Connected to the configured backend."
+    DesktopChatConnectionState.Sending -> "Sending your message to the active conversation."
+    DesktopChatConnectionState.StreamDisconnected -> "The conversation stream disconnected. Existing messages remain visible."
+    DesktopChatConnectionState.SendFailed -> "The last send failed. You can edit and try again."
+}
+
+private fun DesktopChatConnectionState.canRetry(): Boolean = when (this) {
+    DesktopChatConnectionState.ConfigNeeded,
+    DesktopChatConnectionState.Offline,
+    DesktopChatConnectionState.StreamDisconnected -> true
+    DesktopChatConnectionState.Demo,
+    DesktopChatConnectionState.Loading,
+    DesktopChatConnectionState.NoConversations,
+    DesktopChatConnectionState.Live,
+    DesktopChatConnectionState.Sending,
+    DesktopChatConnectionState.SendFailed -> false
 }
 
 private fun UiMessage.senderLabel(): String = when {

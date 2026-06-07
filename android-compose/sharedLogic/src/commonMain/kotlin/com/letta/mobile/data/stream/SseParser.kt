@@ -1,7 +1,7 @@
 package com.letta.mobile.data.stream
 
 import com.letta.mobile.data.model.LettaMessage
-import io.ktor.utils.io.*
+import io.ktor.utils.io.ByteReadChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flow
@@ -45,7 +45,7 @@ object SseParser {
                     }
                 }
             } else {
-                buffer.append(line).append("\n")
+                buffer.append(line).append('\n')
             }
         }
 
@@ -67,7 +67,7 @@ object SseParser {
                 buffer.clear()
                 if (event.isNotBlank()) processRawEvent(event)?.let { emit(it) }
             } else {
-                buffer.append(line).append("\n")
+                buffer.append(line).append('\n')
             }
         }
         if (buffer.isNotBlank()) processRawEvent(buffer.toString())?.let { emit(it) }
@@ -116,33 +116,20 @@ object SseParser {
         }
 
         if (!data.startsWith("{")) {
-            // Non-JSON data frames are still valid SSE traffic and therefore
-            // useful liveness signals for watchdogs, but they are not timeline
-            // messages.
             return ProcessedEvent(frame = SseFrame.Heartbeat)
         }
 
-        // The Letta server's /stream endpoint (used by the resume-stream
-        // subscriber, letta-mobile-mge5) emits partial tool-call-delta frames
-        // during token streaming that lack a `message_type` field (they are
-        // the raw LLM tool-use delta shape). These are INCREMENTAL and the
-        // complete envelope arrives later in the stream as a normal
-        // `tool_call_message`. Treat them as liveness-only frames rather than
-        // logging a warning storm or emitting a timeline message.
         if (!data.contains("\"message_type\"")) {
             return ProcessedEvent(frame = SseFrame.Heartbeat)
         }
 
-        return try {
+        return runCatching {
             val message = json.decodeFromString<LettaMessage>(data)
             if (message.messageType == "ping") {
                 ProcessedEvent(frame = SseFrame.Heartbeat)
             } else {
                 ProcessedEvent(frame = SseFrame.Message(message))
             }
-        } catch (e: Exception) {
-            android.util.Log.w("SseParser", "Failed to parse SSE event: ${data.take(100)}", e)
-            ProcessedEvent()
-        }
+        }.getOrDefault(ProcessedEvent())
     }
 }

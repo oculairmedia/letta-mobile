@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.data
 
+import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.chat.runtime.ChatSessionGraph
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
@@ -33,6 +35,7 @@ import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
+import com.letta.mobile.desktop.chat.DesktopLettaHttpChatGateway
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -168,6 +171,37 @@ class DesktopSessionGraphProvider(
         return result
     }
 }
+
+class DesktopChatSessionGraph internal constructor(
+    override val repositories: DesktopSessionGraph,
+    override val gateway: ChatGateway,
+) : ChatSessionGraph<DesktopSessionGraph> {
+    override fun close() {
+        repositories.close()
+        (gateway as? AutoCloseable)?.close()
+    }
+}
+
+class DesktopChatSessionGraphFactory(
+    private val repositoryGraphFactory: SessionRepositoryGraphFactory<DesktopSessionGraph>,
+    private val gatewayFactory: () -> ChatGateway,
+) {
+    fun create(): DesktopChatSessionGraph =
+        DesktopChatSessionGraph(
+            repositories = repositoryGraphFactory.create(),
+            gateway = gatewayFactory(),
+        )
+}
+
+fun defaultDesktopChatSessionGraphFactory(
+    configProvider: () -> LettaConfig? = { null },
+    repositoryGraphFactory: SessionRepositoryGraphFactory<DesktopSessionGraph> =
+        DesktopSessionGraphFactory(configProvider = configProvider),
+): DesktopChatSessionGraphFactory =
+    DesktopChatSessionGraphFactory(
+        repositoryGraphFactory = repositoryGraphFactory,
+        gatewayFactory = { DesktopLettaHttpChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
+    )
 
 class DesktopRepositoryAdapters {
     val agentRepository: IAgentRepository = unavailableRepository()

@@ -23,6 +23,8 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import com.letta.mobile.data.chat.runtime.ChatSessionState
+import com.letta.mobile.feature.chat.render.toConversationState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -258,6 +260,7 @@ class ChatConversationCoordinatorTest {
         val agentRepository: IAgentRepository = mockk(relaxed = true)
         val currentConversationTracker = CurrentConversationTracker()
         val uiState = MutableStateFlow(ChatUiState())
+        var sessionState = ChatSessionState()
         val startedObservers = mutableListOf<String>()
         val reconcileCalls = mutableListOf<Pair<String, String>>()
         val sentClientModeMessages = mutableListOf<String>()
@@ -280,6 +283,18 @@ class ChatConversationCoordinatorTest {
             agentRepository = agentRepository,
             currentConversationTracker = currentConversationTracker,
             uiState = uiState,
+            updateSessionState = { reducerUpdate ->
+                sessionState = reducerUpdate(sessionState)
+                val next = sessionState
+                uiState.value = uiState.value.copy(
+                    conversationState = next.connectionState.toConversationState(
+                        next.selectedConversationId,
+                        next.errorMessage,
+                    ),
+                    isLoadingMessages = next.isLoading,
+                    error = next.errorMessage,
+                )
+            },
             pendingClientModeBootstrapMessages = { pendingBootstrapMessages },
             setPendingClientModeBootstrapUserMessage = { pendingBootstrapMessages = listOf(it).toImmutableList() },
             clearPendingClientModeBootstrapUserMessage = { pendingBootstrapMessages = persistentListOf() },
