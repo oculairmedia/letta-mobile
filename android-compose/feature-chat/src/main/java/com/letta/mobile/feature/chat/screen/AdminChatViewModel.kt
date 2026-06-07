@@ -90,6 +90,10 @@ import com.letta.mobile.feature.chat.render.ChatTransport
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.data.chat.runtime.ChatSessionState
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+
 
 
 @HiltViewModel
@@ -169,6 +173,45 @@ internal class AdminChatViewModel @Inject constructor(
     private val _uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(
         ChatUiState(agentName = initialAgentName.orEmpty())
     )
+
+    private val _sessionState = MutableStateFlow(ChatSessionState())
+
+    private fun updateSessionState(reducerUpdate: (ChatSessionState) -> ChatSessionState) {
+        _sessionState.update { current ->
+            val next = reducerUpdate(current)
+            _uiState.update { ui ->
+                ui.copy(
+                    conversationState = next.connectionState.toConversationState(next.selectedConversationId, next.errorMessage),
+                    isLoadingMessages = next.isLoading,
+                    error = next.errorMessage,
+                )
+            }
+            next
+        }
+    }
+
+    private fun ChatConnectionState.toConversationState(
+        selectedConversationId: String?,
+        errorMessage: String?,
+    ): ConversationState {
+        return when (this) {
+            ChatConnectionState.Loading -> ConversationState.Loading
+            ChatConnectionState.ConfigNeeded -> ConversationState.Error(errorMessage ?: "Backend configuration required")
+            ChatConnectionState.Offline -> ConversationState.Error(errorMessage ?: "Backend offline")
+            ChatConnectionState.NoConversations -> ConversationState.NoConversation
+            ChatConnectionState.Demo,
+            ChatConnectionState.Live,
+            ChatConnectionState.Sending,
+            ChatConnectionState.StreamDisconnected,
+            ChatConnectionState.SendFailed -> {
+                if (selectedConversationId != null) {
+                    ConversationState.Ready(selectedConversationId)
+                } else {
+                    ConversationState.NoConversation
+                }
+            }
+        }
+    }
 
     val uiState: StateFlow<ChatUiState> by lazy(LazyThreadSafetyMode.NONE) {
         viewModelScope.launchMolecule(mode = Immediate) {
@@ -398,6 +441,7 @@ internal class AdminChatViewModel @Inject constructor(
         agentRepository = agentRepository,
         currentConversationTracker = currentConversationTracker,
         uiState = _uiState,
+        updateSessionState = ::updateSessionState,
         pendingClientModeBootstrapMessages = { persistentListOf() },
         setPendingClientModeBootstrapUserMessage = { },
         clearPendingClientModeBootstrapUserMessage = { },
@@ -560,6 +604,12 @@ internal class AdminChatViewModel @Inject constructor(
     fun loadMessages() = chatConversationCoordinator.loadMessages(false)
 
     fun retryConversationLoad() {
+        updateSessionState { current ->
+            ChatSessionReducer.retryConnection(
+                current = current,
+                initial = ChatSessionState(),
+            )
+        }
         resolveConversationAndLoad()
     }
 
@@ -611,13 +661,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun updateInputText(text: String) = composerCoordinator.updateInputText(text)
 
     val canSendMessages: Boolean
-        get() = when (_uiState.value.conversationState) {
-            ConversationState.Loading -> false
-            is ConversationState.Error -> false
-            ConversationState.NoConversation,
-            is ConversationState.Ready,
-            -> true
-        }
+        get() = ChatSessionReducer.canSend(_sessionState.value)
 
     fun onScreenPaused() {
         currentConversationTracker.setCurrent(null)
@@ -629,7 +673,20 @@ internal class AdminChatViewModel @Inject constructor(
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenResumedAtMs < 200) return
         lastScreenResumedAtMs = now
-        conversationId?.value?.let { currentConversationTracker.setCurrent(it) }
+        val currentId = conversationId?.value
+        if (currentId != null) {
+            currentConversationTracker.setCurrent(currentId)
+            val conn = _sessionState.value.connectionState
+            if (conn == ChatConnectionState.Offline || conn == ChatConnectionState.StreamDisconnected) {
+                updateSessionState { current ->
+                    ChatSessionReducer.retryConnection(
+                        current = current,
+                        initial = ChatSessionState(),
+                    )
+                }
+                resolveConversationAndLoad()
+            }
+        }
     }
 
     override fun onCleared() {

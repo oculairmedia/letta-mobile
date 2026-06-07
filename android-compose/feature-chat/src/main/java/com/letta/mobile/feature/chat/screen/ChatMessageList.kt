@@ -52,8 +52,11 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.ScrollToBottomFab
+import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
+import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
+
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatDimens
@@ -436,16 +439,17 @@ internal fun ChatMessageList(
     }
     val currentLoadPressureSummary by rememberUpdatedState(loadPressureSummary)
 
+    val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
+
     val isNearBottom by remember {
         derivedStateOf {
-            listState.firstVisibleItemIndex <= 1 && listState.firstVisibleItemScrollOffset < 90
+            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot())
         }
     }
 
     val showScrollFab by remember {
         derivedStateOf {
-            val firstVisible = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
-            firstVisible > 3
+            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot())
         }
     }
 
@@ -462,70 +466,50 @@ internal fun ChatMessageList(
     }
 
     var lastStreamingSnapMs by remember { mutableStateOf(0L) }
-    // letta-mobile-4bgm3: track the newest message id we've already handled so
-    // we can detect when a brand-new user message lands (i.e. the user just
-    // hit send). Seeded null so the very first signature emission can be
-    // classified, but the force-scroll only fires for role == "user".
-    var lastHandledNewestMessageId by remember { mutableStateOf<String?>(null) }
+    var followLatest by remember(conversationId) { mutableStateOf(true) }
+    val latestItemKey = renderItems.firstOrNull()?.key
 
-    // Keep the bottom anchored while new messages arrive or the newest assistant
-    // bubble grows during streaming. With reverseLayout=true, item 0 is the
-    // newest edge (the typing slot), so scrolling to 0 means "bottom".
-    LaunchedEffect(Unit) {
-        snapshotFlow { autoScrollSignature }
+    LaunchedEffect(conversationId) {
+        followLatest = true
+        if (renderItems.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.toChatViewportSnapshot() }
             .distinctUntilChanged()
-            .collect { signature ->
-                if (signature == null || scrollToMessageId != null) {
-                    lastHandledNewestMessageId = signature?.messageId
-                    return@collect
-                }
-
-                // letta-mobile-4bgm3: when the user SENDS a message, the
-                // optimistic user bubble becomes the newest item. Force the
-                // viewport to that bubble regardless of current scroll
-                // position â€” distinct from the streaming auto-scroll throttle,
-                // which only snaps when already pinned near the bottom. Without
-                // this, sending from a scrolled-up position in a long
-                // conversation leaves the new prompt off the top edge.
-                val previousNewestId = lastHandledNewestMessageId
-                lastHandledNewestMessageId = signature.messageId
-                if (shouldForceScrollOnUserSend(
-                        signature = signature,
-                        previousNewestMessageId = previousNewestId,
-                    )
-                ) {
-                    // letta-mobile-58qlr.1: land the just-sent prompt CLEAR of
-                    // the bottom fading edge. With reverseLayout=true item 0 is
-                    // the newest item at the visual bottom; animateScrollToItem
-                    // would pin it flush to the bottom edge, where the
-                    // ChatFadingEdges overlay (bottom ~fade length) would dim
-                    // the user's own fresh prompt. A negative scrollOffset
-                    // shifts item 0 UP by the fade length so the whole bubble
-                    // sits above the fade zone and stays fully visible.
-                    val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
-                    listState.animateScrollToItem(0, sendScrollOffset)
-                    return@collect
-                }
-
-                if (isNearBottom) {
-                    val nowMs = System.currentTimeMillis()
-                    when (autoScrollAction(
-                        signature = signature,
-                        isStreaming = isStreamingForAutoScroll,
-                        firstVisibleItemIndex = listState.firstVisibleItemIndex,
-                        firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
-                        lastStreamingSnapMs = lastStreamingSnapMs,
-                        nowMs = nowMs,
-                    )) {
-                        ChatAutoScrollAction.Animate -> listState.animateScrollToItem(0)
-                        ChatAutoScrollAction.Snap -> {
-                            lastStreamingSnapMs = nowMs
-                            listState.scrollToItem(0)
-                        }
-                        ChatAutoScrollAction.Skip -> Unit
-                    }
-                }
+            .collect { snapshot ->
+                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
+                    currentFollowMode = followLatest,
+                    snapshot = snapshot,
+                )
             }
+    }
+
+    LaunchedEffect(latestItemKey, renderItems.size) {
+        if (ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size)) {
+            val nowMs = System.currentTimeMillis()
+            if (state.isStreaming) {
+                if (nowMs - lastStreamingSnapMs >= StreamingAutoScrollSnapThrottleMs) {
+                    lastStreamingSnapMs = nowMs
+                    listState.scrollToItem(0)
+                }
+            } else {
+                listState.scrollToItem(0)
+            }
+        }
+    }
+
+    val newestSingleMessage = renderItems.firstOrNull() as? ChatRenderItem.Single
+    val isNewestUserMessage = newestSingleMessage?.message?.role == "user"
+
+    LaunchedEffect(latestItemKey) {
+        if (latestItemKey != null && isNewestUserMessage) {
+            followLatest = true
+            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
+            listState.animateScrollToItem(0, sendScrollOffset)
+        }
     }
 
     LaunchedEffect(listState, state.hasMoreOlderMessages, state.isLoadingOlderMessages, state.messages.size) {
@@ -1225,3 +1209,15 @@ private fun DebugMessageCard(
         }
     }
 }
+
+private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(): ChatViewportSnapshot {
+    val totalItems = layoutInfo.totalItemsCount
+    val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()?.index
+    val lastVisibleIndexMapped = if (firstVisible != null) totalItems - 1 - firstVisible else null
+    return ChatViewportSnapshot(
+        totalItems = totalItems,
+        lastVisibleIndex = lastVisibleIndexMapped,
+        isScrollInProgress = isScrollInProgress,
+    )
+}
+
