@@ -8,6 +8,8 @@ import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -35,11 +37,27 @@ data class DesktopChatSurfaceState(
     val errorMessage: String? = null,
     val backendLabel: String,
     val sessionGraphId: Long,
+    val selectionGeneration: Long = 0L,
 ) {
     val composer: ChatComposerState
         get() = ChatComposerState(
             text = composerText,
             pendingImageAttachments = pendingImageAttachments,
+        )
+
+    val runtimeState: ChatSessionState
+        get() = ChatSessionState(
+            conversations = conversations,
+            selectedConversationId = selectedConversationId,
+            messagesByConversationId = messagesByConversationId,
+            composer = composer,
+            connectionState = connectionState,
+            isRemoteBacked = isRemoteBacked,
+            isLoading = isLoading,
+            isSending = isSending,
+            statusMessage = statusMessage,
+            errorMessage = errorMessage,
+            selectionGeneration = selectionGeneration,
         )
 
     val selectedConversation: DesktopConversationSummary?
@@ -52,28 +70,13 @@ data class DesktopChatSurfaceState(
         get() = buildDesktopChatRenderItems(selectedMessages)
 
     val canSend: Boolean
-        get() = selectedConversationId != null &&
-            isRemoteBacked &&
-            !isSending &&
-            !isLoading &&
-            connectionState in setOf(
-                DesktopChatConnectionState.Live,
-                DesktopChatConnectionState.SendFailed,
-                DesktopChatConnectionState.StreamDisconnected,
-            )
+        get() = ChatSessionReducer.canSend(runtimeState)
 
     val hasComposerPayload: Boolean
-        get() = composerText.isNotBlank() || pendingImageAttachments.isNotEmpty()
+        get() = composer.hasPayload
 
     val shouldShowStatePanel: Boolean
-        get() = selectedConversationId == null ||
-            (connectionState == DesktopChatConnectionState.StreamDisconnected && selectedMessages.isEmpty()) ||
-            connectionState in setOf(
-                DesktopChatConnectionState.Loading,
-                DesktopChatConnectionState.ConfigNeeded,
-                DesktopChatConnectionState.Offline,
-                DesktopChatConnectionState.NoConversations,
-            )
+        get() = ChatSessionReducer.shouldShowStatePanel(runtimeState)
 }
 
 fun defaultDesktopChatSurfaceState(
@@ -143,36 +146,43 @@ fun initialLiveDesktopChatSurfaceState(
 fun DesktopChatSurfaceState.selectConversation(
     conversationId: String,
 ): DesktopChatSurfaceState {
-    if (conversationId == selectedConversationId || conversations.none { it.id == conversationId }) {
-        return this
-    }
-    return copy(
-        selectedConversationId = conversationId,
-        conversations = conversations.map { conversation ->
-            if (conversation.id == conversationId) {
-                conversation.copy(unreadCount = 0)
-            } else {
-                conversation
-            }
-        },
-        composerText = "",
-        pendingImageAttachments = emptyList(),
+    val next = ChatSessionReducer.selectConversation(
+        state = runtimeState,
+        conversationId = conversationId,
+        remoteBacked = isRemoteBacked,
     )
+    return withRuntimeState(next)
 }
 
 fun DesktopChatSurfaceState.withComposerText(text: String): DesktopChatSurfaceState =
-    withComposer(ChatComposerPolicy.updateText(composer, text))
+    withRuntimeState(ChatSessionReducer.updateComposerText(runtimeState, text))
 
 fun DesktopChatSurfaceState.withImageAttachment(image: MessageContentPart.Image): DesktopChatSurfaceState =
-    withComposer(ChatComposerPolicy.attachImage(composer, image))
+    withRuntimeState(ChatSessionReducer.attachImage(runtimeState, image))
 
 fun DesktopChatSurfaceState.withoutImageAttachment(index: Int): DesktopChatSurfaceState =
-    withComposer(ChatComposerPolicy.removeImageAttachment(composer, index))
+    withRuntimeState(ChatSessionReducer.removeImageAttachment(runtimeState, index))
 
 fun DesktopChatSurfaceState.withComposer(composer: ChatComposerState): DesktopChatSurfaceState =
     copy(
         composerText = composer.text,
         pendingImageAttachments = composer.pendingImageAttachments,
+    )
+
+fun DesktopChatSurfaceState.withRuntimeState(runtimeState: ChatSessionState): DesktopChatSurfaceState =
+    copy(
+        conversations = runtimeState.conversations,
+        selectedConversationId = runtimeState.selectedConversationId,
+        messagesByConversationId = runtimeState.messagesByConversationId,
+        composerText = runtimeState.composer.text,
+        pendingImageAttachments = runtimeState.composer.pendingImageAttachments,
+        isSending = runtimeState.isSending,
+        isLoading = runtimeState.isLoading,
+        isRemoteBacked = runtimeState.isRemoteBacked,
+        connectionState = runtimeState.connectionState,
+        statusMessage = runtimeState.statusMessage,
+        errorMessage = runtimeState.errorMessage,
+        selectionGeneration = runtimeState.selectionGeneration,
     )
 
 fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
@@ -191,20 +201,13 @@ fun DesktopChatSurfaceState.sendLocalMessage(): DesktopChatSurfaceState {
         attachments = attachments.map { UiImageAttachment(base64 = it.base64, mediaType = it.mediaType) },
     )
 
-    return withComposer(draft.nextState).copy(
-        conversations = conversations.map { conversation ->
-            if (conversation.id == conversationId) {
-                conversation.copy(
-                    updatedAtLabel = "Queued",
-                    lastMessagePreview = text,
-                    unreadCount = 0,
-                )
-            } else {
-                conversation
-            }
-        },
-        messagesByConversationId = messagesByConversationId + (conversationId to currentMessages + localMessage),
-        isSending = false,
+    return withRuntimeState(
+        ChatSessionReducer.queueLocalMessage(
+            state = runtimeState,
+            draft = draft,
+            message = localMessage,
+            preview = text,
+        ),
     )
 }
 

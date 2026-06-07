@@ -4,9 +4,9 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
+import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.desktop.DesktopBootstrapState
@@ -50,7 +50,6 @@ class DesktopChatController(
     private var sendJob: Job? = null
     private var started = false
     private var closed = false
-    private var selectionGeneration = 0L
 
     fun start() {
         if (started || closed) return
@@ -69,15 +68,20 @@ class DesktopChatController(
         (gateway as? AutoCloseable)?.close()
         gateway = null
         started = false
-        selectionGeneration++
-        _state.value = initialState
+        _state.update { current ->
+            initialState.withRuntimeState(
+                ChatSessionReducer.retryConnection(
+                    current = current.runtimeState,
+                    initial = initialState.runtimeState,
+                ),
+            )
+        }
         start()
     }
 
     fun close() {
         if (closed) return
         closed = true
-        selectionGeneration++
         loadJob?.cancel()
         selectJob?.cancel()
         sendJob?.cancel()
@@ -90,36 +94,45 @@ class DesktopChatController(
 
     fun selectConversation(conversationId: String) {
         if (closed) return
-        val current = _state.value
-        if (current.isRemoteBacked) {
-            val generation = nextSelectionGeneration()
+        var generation: Long? = null
+        var shouldLoadRemote = false
+        _state.update { current ->
+            val currentRuntime = current.runtimeState
+            val next = ChatSessionReducer.selectConversation(
+                state = currentRuntime,
+                conversationId = conversationId,
+                remoteBacked = current.isRemoteBacked,
+            )
+            shouldLoadRemote = current.isRemoteBacked && next != currentRuntime
+            generation = if (shouldLoadRemote) next.selectionGeneration else null
+            current.withRuntimeState(next)
+        }
+        if (shouldLoadRemote) {
             selectJob?.cancel()
             selectJob = scope.launch {
-                selectRemoteConversation(conversationId, generation)
+                selectRemoteConversation(conversationId, generation ?: return@launch)
             }
-        } else {
-            _state.value = current.selectConversation(conversationId)
         }
     }
 
     fun updateComposerText(text: String) {
         if (closed) return
-        _state.update { it.withComposerText(text) }
+        _state.update { it.withRuntimeState(ChatSessionReducer.updateComposerText(it.runtimeState, text)) }
     }
 
     fun attachImage(image: MessageContentPart.Image) {
         if (closed) return
         _state.update { current ->
-            val composer = ChatComposerPolicy.attachImage(current.composer, image, attachmentLimits)
-            current.withComposer(composer).copy(errorMessage = composer.error?.toDesktopMessage(attachmentLimits))
+            val next = ChatSessionReducer.attachImage(current.runtimeState, image, attachmentLimits)
+            current.withRuntimeState(next).copy(errorMessage = next.composer.error?.toDesktopMessage(attachmentLimits))
         }
     }
 
     fun removeImageAttachment(index: Int) {
         if (closed) return
         _state.update {
-            val composer = ChatComposerPolicy.removeImageAttachment(it.composer, index)
-            it.withComposer(composer).copy(errorMessage = null)
+            it.withRuntimeState(ChatSessionReducer.removeImageAttachment(it.runtimeState, index))
+                .copy(errorMessage = null)
         }
     }
 
@@ -147,12 +160,7 @@ class DesktopChatController(
         }
 
         _state.update {
-            it.withComposer(draft.nextState).copy(
-                isSending = true,
-                connectionState = DesktopChatConnectionState.Sending,
-                statusMessage = "Sending",
-                errorMessage = null,
-            )
+            it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
         sendJob?.cancel()
         sendJob = scope.launch {
@@ -160,23 +168,20 @@ class DesktopChatController(
                 loop.send(text, attachments = attachments)
                 if (closed) return@launch
                 _state.update {
-                    it.copy(
-                        isSending = false,
-                        connectionState = DesktopChatConnectionState.Live,
-                        statusMessage = "Live",
-                        errorMessage = null,
-                    )
+                    it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 if (closed) return@launch
                 _state.update {
-                    it.withComposer(ChatComposerPolicy.restoreAfterSendFailure(text, attachments)).copy(
-                        isSending = false,
-                        connectionState = DesktopChatConnectionState.SendFailed,
-                        statusMessage = "Send failed",
-                        errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
+                    it.withRuntimeState(
+                        ChatSessionReducer.sendFailed(
+                            state = it.runtimeState,
+                            text = text,
+                            attachments = attachments,
+                            errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
+                        ),
                     )
                 }
             }
@@ -186,24 +191,14 @@ class DesktopChatController(
     private suspend fun connectAndLoad() {
         if (closed) return
         if (bootstrapState.config.serverUrl.isBlank()) {
-            _state.value = initialState.copy(
-                isLoading = false,
-                isSending = false,
-                isRemoteBacked = false,
-                connectionState = DesktopChatConnectionState.ConfigNeeded,
-                statusMessage = "Backend configuration required",
-                errorMessage = "Set a server URL in Settings.",
+            _state.value = initialState.withRuntimeState(
+                ChatSessionReducer.configNeeded(initialState.runtimeState),
             )
             return
         }
 
         _state.update {
-            it.copy(
-                isLoading = true,
-                connectionState = DesktopChatConnectionState.Loading,
-                statusMessage = "Loading conversations",
-                errorMessage = null,
-            )
+            it.withRuntimeState(ChatSessionReducer.beginConversationLoad(it.runtimeState))
         }
 
         try {
@@ -214,47 +209,31 @@ class DesktopChatController(
             val selectedId = summaries.firstOrNull()?.id
 
             if (closed) return
-            _state.value = initialState.copy(
+            val loadedRuntime = ChatSessionReducer.conversationsLoaded(
+                state = _state.value.runtimeState,
                 conversations = summaries,
-                selectedConversationId = selectedId,
-                messagesByConversationId = emptyMap(),
-                composerText = "",
-                pendingImageAttachments = emptyList(),
-                isLoading = false,
-                isSending = false,
-                isRemoteBacked = true,
-                connectionState = if (summaries.isEmpty()) {
-                    DesktopChatConnectionState.NoConversations
-                } else {
-                    DesktopChatConnectionState.Live
-                },
-                statusMessage = if (summaries.isEmpty()) "No conversations" else "Live",
-                errorMessage = null,
             )
+            _state.update { it.withRuntimeState(loadedRuntime) }
 
-            selectedId?.let { selectRemoteConversation(it, nextSelectionGeneration()) }
+            selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
             if (closed) return
             val message = t.message ?: t::class.simpleName ?: "Backend unavailable"
             _state.update {
-                initialState.copy(
-                    composerText = it.composerText,
-                    pendingImageAttachments = it.pendingImageAttachments,
-                    isLoading = false,
-                    isSending = false,
-                    isRemoteBacked = false,
-                    connectionState = DesktopChatConnectionState.Offline,
-                    statusMessage = "Backend offline",
-                    errorMessage = message,
+                it.withRuntimeState(
+                    ChatSessionReducer.conversationLoadFailed(
+                        state = it.runtimeState,
+                        errorMessage = message,
+                    ),
                 )
             }
         }
     }
 
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
-        if (!isCurrentGeneration(generation)) return
+        if (!isActiveSelection(generation)) return
         val nextGateway = gateway ?: return
         if (_state.value.conversations.none { it.id == conversationId }) return
 
@@ -262,79 +241,55 @@ class DesktopChatController(
         activeLoop?.close()
 
         _state.update {
-            it.copy(
-                selectedConversationId = conversationId,
-                conversations = it.conversations.map { conversation ->
-                    if (conversation.id == conversationId) {
-                        conversation.copy(unreadCount = 0)
-                    } else {
-                        conversation
-                    }
-                },
-                composerText = "",
-                pendingImageAttachments = emptyList(),
-                isLoading = true,
-                connectionState = DesktopChatConnectionState.Loading,
-                statusMessage = "Loading messages",
-                errorMessage = null,
-            )
+            it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
         }
 
         val loop = loopFactory(nextGateway, conversationId, scope)
         activeLoop = loop
         timelineJob = scope.launch {
             loop.state.collect { timeline ->
-                if (isCurrentGeneration(generation)) {
-                    updateTimelineMessages(conversationId, timeline)
-                }
+                updateTimelineMessages(conversationId, generation, timeline)
             }
         }
 
         try {
             loop.hydrate(limit = 50, recordConversationCursor = true)
-            if (!isCurrentGeneration(generation)) return
+            if (!isActiveSelection(generation)) return
             _state.update {
-                it.copy(
-                    isLoading = false,
-                    connectionState = DesktopChatConnectionState.Live,
-                    statusMessage = "Live",
-                    errorMessage = null,
-                )
+                it.withRuntimeState(ChatSessionReducer.hydrateCompleted(it.runtimeState, generation))
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            if (!isCurrentGeneration(generation)) return
+            if (!isActiveSelection(generation)) return
             _state.update {
-                it.copy(
-                    isLoading = false,
-                    connectionState = DesktopChatConnectionState.StreamDisconnected,
-                    statusMessage = "Stream disconnected",
-                    errorMessage = t.message ?: t::class.simpleName ?: "Message load failed",
+                it.withRuntimeState(
+                    ChatSessionReducer.streamDisconnected(
+                        state = it.runtimeState,
+                        generation = generation,
+                        errorMessage = t.message ?: t::class.simpleName ?: "Message load failed",
+                    ),
                 )
             }
         }
     }
 
-    private fun nextSelectionGeneration(): Long = ++selectionGeneration
+    private fun isActiveSelection(generation: Long): Boolean =
+        !closed && ChatSessionReducer.isCurrentSelection(_state.value.runtimeState, generation)
 
-    private fun isCurrentGeneration(generation: Long): Boolean =
-        !closed && generation == selectionGeneration
-
-    private fun updateTimelineMessages(conversationId: String, timeline: Timeline) {
+    private fun updateTimelineMessages(conversationId: String, generation: Long, timeline: Timeline) {
+        if (closed) return
         val messages = timeline.events
             .sortedBy { it.position }
             .mapNotNull(::timelineEventToUiMessage)
         _state.update { current ->
-            current.copy(
-                messagesByConversationId = current.messagesByConversationId + (conversationId to messages),
-                conversations = current.conversations.map { conversation ->
-                    if (conversation.id == conversationId) {
-                        conversation.copy(lastMessagePreview = messages.lastPreviewOr(conversation.lastMessagePreview))
-                    } else {
-                        conversation
-                    }
-                },
+            current.withRuntimeState(
+                ChatSessionReducer.timelineMessagesUpdated(
+                    state = current.runtimeState,
+                    generation = generation,
+                    conversationId = conversationId,
+                    messages = messages,
+                ),
             )
         }
     }
@@ -350,9 +305,6 @@ private fun Conversation.toDesktopSummary(): DesktopConversationSummary {
         lastMessagePreview = "Loaded from backend",
     )
 }
-
-private fun List<UiMessage>.lastPreviewOr(fallback: String): String =
-    lastOrNull { it.content.isNotBlank() }?.content?.lineSequence()?.firstOrNull()?.take(140) ?: fallback
 
 private fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."

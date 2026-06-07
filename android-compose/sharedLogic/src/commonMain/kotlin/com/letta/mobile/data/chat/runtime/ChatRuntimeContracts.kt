@@ -52,6 +52,11 @@ data class ChatSessionState(
     val composer: ChatComposerState = ChatComposerState(),
     val connectionState: ChatConnectionState = ChatConnectionState.Loading,
     val isRemoteBacked: Boolean = true,
+    val isLoading: Boolean = false,
+    val isSending: Boolean = false,
+    val statusMessage: String? = null,
+    val errorMessage: String? = null,
+    val selectionGeneration: Long = 0L,
 ) {
     val selectedConversation: ChatConversationSummary?
         get() = conversations.firstOrNull { it.id == selectedConversationId }
