@@ -15,7 +15,9 @@ internal class Utf8LineReader(
             val newlineIndex = pending.indexOf("\n")
             if (newlineIndex >= 0) {
                 val line = pending.substring(0, newlineIndex).removeSuffix("\r")
-                pending.delete(0, newlineIndex + 1)
+                val remainder = pending.substring(newlineIndex + 1)
+                pending.setLength(0)
+                pending.append(remainder)
                 return line
             }
 

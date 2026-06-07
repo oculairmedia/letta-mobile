@@ -107,7 +107,7 @@ data: [DONE]
     }
 
     private fun channelFrom(text: String): ByteReadChannel =
-        ByteReadChannel(text.toByteArray())
+        ByteReadChannel(text.encodeToByteArray())
 
     private fun TestScope.chunkedChannelFrom(text: String, chunkSize: Int): ByteReadChannel {
         val channel = ByteChannel(autoFlush = true)
