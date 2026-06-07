@@ -66,18 +66,23 @@ jobs:
             ${{ runner.os }}-konan-
 
       - name: Build Windows EXE + MSI installers
-        # Produces release distributables for the host OS (Windows here):
-        #   desktop/build/compose/binaries/main-release/exe/*.exe
-        #   desktop/build/compose/binaries/main-release/msi/*.msi
-        run: ./gradlew --no-daemon :desktop:packageReleaseDistributionForCurrentOS
+        # Non-minified distributable: builds EXE/MSI without the ProGuard pass.
+        # The *Release* variant runs proguardReleaseJars, which fails on JDK 26
+        # ("can't find superclass java.lang.Object") because ProGuard can't see
+        # the java.base module classes. For a testable desktop installer we want
+        # the non-minified build anyway; minified release packaging is a separate
+        # follow-up. Output:
+        #   desktop/build/compose/binaries/main/exe/*.exe
+        #   desktop/build/compose/binaries/main/msi/*.msi
+        run: ./gradlew --no-daemon :desktop:packageDistributionForCurrentOS
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
           name: letta-desktop-windows-installer-${{ github.run_number }}
           path: |
-            android-compose/desktop/build/compose/binaries/main-release/exe/*.exe
-            android-compose/desktop/build/compose/binaries/main-release/msi/*.msi
+            android-compose/desktop/build/compose/binaries/main/exe/*.exe
+            android-compose/desktop/build/compose/binaries/main/msi/*.msi
           if-no-files-found: error
 
   # Stable status check for branch protection.
