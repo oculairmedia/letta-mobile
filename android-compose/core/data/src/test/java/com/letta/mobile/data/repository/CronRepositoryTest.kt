@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import kotlinx.coroutines.CoroutineStart
@@ -209,7 +210,7 @@ class CronRepositoryTest {
         assertEquals(1, transport.cronListCalls.count { it.agentId == "agent-x" })
 
         // Simulate a WS drop + reconnect.
-        transport.state.value = ChannelTransport.State.Disconnected(1000, "idle timeout")
+        transport.state.value = ChannelTransportState.Disconnected(1000, "idle timeout")
         // Yield once so the observer sees the Disconnected state.
         delay(10)
         transport.state.value = connectedState()
@@ -243,7 +244,7 @@ class CronRepositoryTest {
 
     // ─── Helpers ──────────────────────────────────────────────────────
 
-    private fun connectedState() = ChannelTransport.State.Connected(
+    private fun connectedState() = ChannelTransportState.Connected(
         serverId = "srv",
         sessionId = "sess",
         deviceId = "dev",

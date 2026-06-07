@@ -12,18 +12,18 @@ import org.junit.Test
 class WsChatBridgeTest {
     @Test
     fun `connection maps transport states without exposing ChannelTransport to consumers`() = runTest {
-        val transport = FakeChannelTransport(initialState = ChannelTransport.State.Idle)
+        val transport = FakeChannelTransport(initialState = ChannelTransportState.Idle)
         val bridge = WsChatBridge(transport)
 
         assertEquals(WsConnectionState.Idle, bridge.connection.first())
         assertFalse(bridge.isConnected())
 
-        transport.state.value = ChannelTransport.State.Connecting
+        transport.state.value = ChannelTransportState.Connecting
 
         assertEquals(WsConnectionState.Connecting, bridge.connection.first())
         assertFalse(bridge.isConnected())
 
-        transport.state.value = ChannelTransport.State.Connected(
+        transport.state.value = ChannelTransportState.Connected(
             serverId = "server",
             sessionId = "session",
             deviceId = "device",
@@ -37,7 +37,7 @@ class WsChatBridgeTest {
         )
         assertTrue(bridge.isConnected())
 
-        transport.state.value = ChannelTransport.State.Disconnected(
+        transport.state.value = ChannelTransportState.Disconnected(
             code = 1008,
             reason = "unauthorized",
             isAuthFailure = true,
@@ -52,11 +52,11 @@ class WsChatBridgeTest {
 
     @Test
     fun `awaitConnected resumes with semantic connected state`() = runTest {
-        val transport = FakeChannelTransport(initialState = ChannelTransport.State.Connecting)
+        val transport = FakeChannelTransport(initialState = ChannelTransportState.Connecting)
         val bridge = WsChatBridge(transport)
 
         val connected = async { bridge.awaitConnected() }
-        transport.state.value = ChannelTransport.State.Connected(
+        transport.state.value = ChannelTransportState.Connected(
             serverId = "server",
             sessionId = "session",
             deviceId = "device",

@@ -26,33 +26,38 @@ import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LocalLettaBackend
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 
 class SessionGraph internal constructor(
-    val id: Long,
-    val backendDescriptor: BackendDescriptor,
-    val localRuntimeBackend: LocalLettaBackend?,
+    override val id: Long,
+    override val backendDescriptor: BackendDescriptor,
+    override val localRuntimeBackend: LocalLettaBackend?,
     val scope: CoroutineScope,
-    val agentRepository: AgentRepository,
+    override val agentRepository: AgentRepository,
     val allConversationsRepository: AllConversationsRepository,
-    val channelTransport: ChannelTransport,
-    val conversationRepository: ConversationRepository,
-    val cronRepository: CronRepository,
-    val archiveRepository: ArchiveRepository,
-    val folderRepository: FolderRepository,
-    val groupRepository: GroupRepository,
-    val identityRepository: IdentityRepository,
-    val mcpServerRepository: McpServerRepository,
-    val modelRepository: ModelRepository,
-    val passageRepository: PassageRepository,
-    val projectRepository: ProjectRepository,
-    val projectWorkRepository: ProjectWorkRepository,
-    val runRepository: RunRepository,
-    val jobRepository: JobRepository,
-    val providerRepository: ProviderRepository,
-    val scheduleRepository: ScheduleRepository,
-    val selfTodoRepository: SelfTodoRepository,
-    val stepRepository: StepRepository,
-    val subagentRepository: SubagentRepository,
-    val toolRepository: ToolRepository,
-    val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
-)
+    override val channelTransport: ChannelTransport,
+    override val conversationRepository: ConversationRepository,
+    override val cronRepository: CronRepository,
+    override val archiveRepository: ArchiveRepository,
+    override val folderRepository: FolderRepository,
+    override val groupRepository: GroupRepository,
+    override val identityRepository: IdentityRepository,
+    override val mcpServerRepository: McpServerRepository,
+    override val modelRepository: ModelRepository,
+    override val passageRepository: PassageRepository,
+    override val projectRepository: ProjectRepository,
+    override val projectWorkRepository: ProjectWorkRepository,
+    override val runRepository: RunRepository,
+    override val jobRepository: JobRepository,
+    override val providerRepository: ProviderRepository,
+    override val scheduleRepository: ScheduleRepository,
+    override val selfTodoRepository: SelfTodoRepository,
+    override val stepRepository: StepRepository,
+    override val subagentRepository: SubagentRepository,
+    override val toolRepository: ToolRepository,
+    override val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
+) : SessionRepositoryGraph {
+    override fun close() {
+        scope.cancel()
+    }
+}

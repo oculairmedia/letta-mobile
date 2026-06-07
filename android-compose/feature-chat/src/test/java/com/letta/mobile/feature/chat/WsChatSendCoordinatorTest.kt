@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -982,7 +983,7 @@ class WsChatSendCoordinatorTest {
         cancelResult: Boolean = true,
     ): WsChatBridge = mockk(relaxed = true) {
         every { state } returns MutableStateFlow(
-            ChannelTransport.State.Connected(
+            ChannelTransportState.Connected(
                 serverId = "server-1",
                 sessionId = "sess-1",
                 deviceId = "android-letta-mobile",

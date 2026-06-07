@@ -8,9 +8,9 @@ Authoritative implementation files:
 
 - Renderer: `android-compose/designsystem/src/main/java/com/letta/mobile/ui/a2ui/A2uiRenderer.kt`
 - Protocol models and catalog negotiation: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiProtocol.kt`
-- Surface state and binding resolver: `android-compose/core/src/main/java/com/letta/mobile/data/a2ui/A2uiSurfaceManager.kt`
-- JSON Pointer data model: `android-compose/core/src/main/java/com/letta/mobile/data/a2ui/A2uiDataModel.kt`
-- Action context resolution: `android-compose/core/src/main/java/com/letta/mobile/data/a2ui/A2uiActions.kt`
+- Surface state and binding resolver: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiSurfaceManager.kt`
+- JSON Pointer data model: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiDataModel.kt`
+- Action context resolution: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiActions.kt`
 - Renderer tests and examples: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererTest.kt`
 - WS round-trip tests: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiToolApprovalRoundTripTest.kt`
 - Screenshot tests: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererScreenshotTest.kt`

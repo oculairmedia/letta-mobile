@@ -1,7 +1,8 @@
-package com.letta.mobile.feature.chat.render
+﻿package com.letta.mobile.feature.chat.render
 
 import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
@@ -68,7 +69,7 @@ internal data class ProjectBriefSection(
 internal data class ProjectBriefUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    // ImmutableMap so Compose treats this whole state as stable — raw
+    // ImmutableMap so Compose treats this whole state as stable â€” raw
     // kotlin.collections.Map is an unstable interface type to the
     // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
     val sections: kotlinx.collections.immutable.ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
@@ -187,19 +188,28 @@ internal sealed interface ConversationState {
     data class Error(val message: String) : ConversationState
 }
 
-internal enum class ChatMessageListChange {
-    Full,
-    AppendTail,
-    ReplaceTail,
-
-    /**
-     * letta-mobile-yflpp: a deduped no-op tick — the projected message list is
-     * byte-identical to the previous one. The observer suppresses the uiState
-     * write entirely for this case, so this value should never reach the UI in
-     * practice; it exists so [ChatTimelineObserver] can flag the no-op
-     * projection it returns from its fast path.
-     */
-    None,
+/**
+ * Single source of truth for mapping the shared KMP [ChatConnectionState] into
+ * the Android UI's [ConversationState]. Used by AdminChatViewModel and the
+ * chat coordinators so Android never re-defines what "loading", "offline",
+ * "config needed", or "ready" mean — that lives in the shared runtime.
+ */
+internal fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversationState(
+    selectedConversationId: String?,
+    errorMessage: String?,
+): ConversationState = when (this) {
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Loading -> ConversationState.Loading
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.ConfigNeeded ->
+        ConversationState.Error(errorMessage ?: "Backend configuration required")
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Offline ->
+        ConversationState.Error(errorMessage ?: "Backend offline")
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.NoConversations -> ConversationState.NoConversation
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Demo,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Live,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.Sending,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.StreamDisconnected,
+    com.letta.mobile.data.chat.runtime.ChatConnectionState.SendFailed ->
+        selectedConversationId?.let { ConversationState.Ready(it) } ?: ConversationState.NoConversation
 }
 
 @androidx.compose.runtime.Immutable

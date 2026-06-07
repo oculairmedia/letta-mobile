@@ -10,7 +10,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import com.letta.mobile.feature.chat.render.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
@@ -85,7 +85,7 @@ internal class ChatHistoryPager(
         // generates locally to dedup tool returns. The server doesn't
         // recognize synthetic IDs as cursors, so older-message fetches with
         // such an ID either silently no-op or return the same page that's
-        // already loaded — which the merge then filters out, leaving the
+        // already loaded â€” which the merge then filters out, leaving the
         // visible message count unchanged.
         //
         // Fallback to the original "first non-pending" if no real ID is found

@@ -17,4 +17,7 @@ actual fun parseTimelineInstantOrNull(value: String): TimelineInstant? =
 actual fun compareTimelineInstants(left: TimelineInstant, right: TimelineInstant): Int =
     left.compareTo(right)
 
+actual fun timelineInstantDurationMillis(start: TimelineInstant, end: TimelineInstant): Long =
+    java.time.Duration.between(start, end).toMillis()
+
 actual fun newTimelineClientId(): String = UUID.randomUUID().toString()

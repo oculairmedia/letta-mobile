@@ -38,13 +38,13 @@ class ChannelTransportKeepaliveCloseTest {
 
             val firstHello = shim.frames.receiveType("hello")
             withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
-                transport.state.first { it is ChannelTransport.State.Connected }
+                transport.state.first { it is ChannelTransportState.Connected }
             }
             shim.closeFirstSocketAsKeepaliveTimeout()
             val secondHello = shim.frames.receiveType("hello")
 
             withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
-                transport.state.first { it is ChannelTransport.State.Connected }
+                transport.state.first { it is ChannelTransportState.Connected }
             }
 
             assertEquals("hello", firstHello.stringValue("type"))

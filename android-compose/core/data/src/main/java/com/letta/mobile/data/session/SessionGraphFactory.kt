@@ -90,7 +90,7 @@ class SessionGraphFactory internal constructor(
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val settingsRepository: ISettingsRepository? = null,
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
-) {
+) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
         agentApi: AgentApi,
@@ -152,7 +152,7 @@ class SessionGraphFactory internal constructor(
 
     private val nextId = AtomicLong(0L)
 
-    fun create(): SessionGraph {
+    override fun create(): SessionGraph {
         val graphId = nextId.incrementAndGet()
         val activeConfig = settingsRepository?.activeConfig?.value
         val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)

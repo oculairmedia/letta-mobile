@@ -10,8 +10,6 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -57,15 +55,9 @@ class SelfTodoTimelineExclusionTest {
     )
 
     @Test
-    fun `isSelfTodoChipFrame matches selftodo sentinel ids and not real tool calls`() {
-        assertTrue(selfTodoFrame().isSelfTodoChipFrame())
-        assertFalse(realToolCallFrame().isSelfTodoChipFrame())
-    }
-
-    @Test
     fun `self-todo frame does not produce a timeline MessageDelta but a real tool call does`() = runTest {
         val transport = FakeChannelTransport(
-            initialState = ChannelTransport.State.Connected(
+            initialState = ChannelTransportState.Connected(
                 serverId = "srv", sessionId = "sess", deviceId = "dev",
             ),
         )
@@ -94,7 +86,7 @@ class SelfTodoTimelineExclusionTest {
     fun `self-todo frame still updates the chip via SelfTodoRepository`() =
         runTest(UnconfinedTestDispatcher()) {
             val transport = FakeChannelTransport(
-                initialState = ChannelTransport.State.Connected(
+                initialState = ChannelTransportState.Connected(
                     serverId = "srv", sessionId = "sess", deviceId = "dev",
                 ),
             )

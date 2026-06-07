@@ -9,20 +9,29 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.core.content.FileProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Icon
@@ -31,9 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,16 +50,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.icons.LettaIcons
@@ -60,11 +80,116 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import kotlin.math.max
 
-private const val MinImageScale = 1f
-private const val DoubleTapImageScale = 2.5f
-private const val MaxImageScale = 5f
-private const val SwipeDismissThresholdPx = 160f
+internal const val MinImageScale = 1f
+internal const val DoubleTapImageScale = 2.5f
+internal const val MaxImageScale = 5f
+internal const val SwipeDismissThresholdPx = 160f
+internal val ChatImageViewerControlsPadding = 12.dp
+
+internal val ChatImageViewerScaleKey = SemanticsPropertyKey<Float>("ChatImageViewerScale")
+internal var SemanticsPropertyReceiver.chatImageViewerScale by ChatImageViewerScaleKey
+internal val ChatImageViewerTranslationXKey = SemanticsPropertyKey<Float>("ChatImageViewerTranslationX")
+internal var SemanticsPropertyReceiver.chatImageViewerTranslationX by ChatImageViewerTranslationXKey
+internal val ChatImageViewerTranslationYKey = SemanticsPropertyKey<Float>("ChatImageViewerTranslationY")
+internal var SemanticsPropertyReceiver.chatImageViewerTranslationY by ChatImageViewerTranslationYKey
+
+internal data class ImageTransformState(
+    val scale: Float = MinImageScale,
+    val offset: Offset = Offset.Zero,
+)
+
+internal fun applyImageTransformGesture(
+    state: ImageTransformState,
+    zoom: Float,
+    pan: Offset,
+    centroid: Offset,
+    containerSize: Size,
+): ImageTransformState {
+    val safeState = sanitizeImageTransform(state, containerSize)
+    val safeZoom = zoom.takeIf { it.isFinite() && it > 0f } ?: 1f
+    val safePan = pan.takeIfFinite() ?: Offset.Zero
+    val containerCenter = containerSize.centerOrZero()
+    val safeCentroid = centroid.takeIfFinite() ?: containerCenter
+    val previousScale = safeState.scale
+    val nextScale = (previousScale * safeZoom).coerceIn(MinImageScale, MaxImageScale)
+    if (nextScale <= MinImageScale) return ImageTransformState()
+
+    val centroidShift = safeCentroid - containerCenter
+    val scaleRatio = if (previousScale == 0f) 1f else nextScale / previousScale
+    val nextOffset = (safeState.offset + centroidShift) * scaleRatio - centroidShift + safePan
+    return ImageTransformState(
+        scale = nextScale,
+        offset = clampImageOffset(nextOffset, nextScale, containerSize),
+    )
+}
+
+internal fun clampImageOffset(offset: Offset, scale: Float, containerSize: Size): Offset {
+    if (
+        scale <= MinImageScale ||
+        !scale.isFinite() ||
+        !containerSize.width.isFinite() ||
+        !containerSize.height.isFinite() ||
+        containerSize.width <= 0f ||
+        containerSize.height <= 0f
+    ) return Offset.Zero
+    val safeOffset = offset.withFiniteAxes()
+    val maxX = ((containerSize.width * scale) - containerSize.width) / 2f
+    val maxY = ((containerSize.height * scale) - containerSize.height) / 2f
+    if (!maxX.isFinite() || !maxY.isFinite()) return Offset.Zero
+    return Offset(
+        x = safeOffset.x.coerceIn(-maxX, maxX),
+        y = safeOffset.y.coerceIn(-maxY, maxY),
+    )
+}
+
+internal fun sanitizeImageTransform(state: ImageTransformState, containerSize: Size): ImageTransformState {
+    val safeScale = state.scale.takeIf { it.isFinite() }?.coerceIn(MinImageScale, MaxImageScale) ?: MinImageScale
+    if (safeScale <= MinImageScale) return ImageTransformState()
+    return ImageTransformState(
+        scale = safeScale,
+        offset = clampImageOffset(state.offset, safeScale, containerSize),
+    )
+}
+
+private fun Offset.takeIfFinite(): Offset? = takeIf { x.isFinite() && y.isFinite() }
+
+private fun Offset.withFiniteAxes(): Offset = Offset(
+    x = x.takeIf { it.isFinite() } ?: 0f,
+    y = y.takeIf { it.isFinite() } ?: 0f,
+)
+
+private fun Size.centerOrZero(): Offset = if (width.isFinite() && height.isFinite()) {
+    Offset(width / 2f, height / 2f)
+} else {
+    Offset.Zero
+}
+
+internal fun doubleTapImageTransform(
+    state: ImageTransformState,
+    tap: Offset,
+    containerSize: Size,
+): ImageTransformState = if (state.scale > MinImageScale) {
+    ImageTransformState()
+} else {
+    applyImageTransformGesture(
+        state = state,
+        zoom = DoubleTapImageScale,
+        pan = Offset.Zero,
+        centroid = tap,
+        containerSize = containerSize,
+    )
+}
+
+internal fun chatImageViewerTopControlsY(safeDrawingTopPx: Float, density: Float): Float =
+    safeDrawingTopPx.coerceAtLeast(0f) +
+        (ChatImageViewerControlsPadding.value * density.coerceAtLeast(0f))
+
+internal fun shouldDismissImageViewer(
+    scale: Float,
+    verticalDragDistance: Float,
+): Boolean = scale <= 1.02f && abs(verticalDragDistance) > SwipeDismissThresholdPx
 
 @Composable
 internal fun ChatImageViewer(
@@ -76,14 +201,37 @@ internal fun ChatImageViewer(
     if (attachments.isEmpty()) return
 
     BackHandler(onBack = onDismiss)
+    ChatImageViewerSystemBarsEffect()
 
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            decorFitsSystemWindows = false,
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        ChatImageViewerContent(
+            attachments = attachments,
+            initialPage = initialPage,
+            onDismiss = onDismiss,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun ChatImageViewerContent(
+    attachments: ImmutableList<UiImageAttachment>,
+    initialPage: Int,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val pagerState = rememberPagerState(
         initialPage = initialPage.coerceIn(0, attachments.lastIndex),
         pageCount = { attachments.size },
     )
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var verticalDragDistance by remember { mutableFloatStateOf(0f) }
     val shareImageDescription = stringResource(R.string.action_share_image)
     val saveImageDescription = stringResource(R.string.action_save_image)
     val closeImageViewerDescription = stringResource(R.string.action_close)
@@ -92,21 +240,8 @@ internal fun ChatImageViewer(
 
     Surface(
         modifier = modifier
-            .background(Color.Black)
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        if (abs(verticalDragDistance) > SwipeDismissThresholdPx) {
-                            onDismiss()
-                        }
-                        verticalDragDistance = 0f
-                    },
-                    onDragCancel = { verticalDragDistance = 0f },
-                    onVerticalDrag = { _, dragAmount ->
-                        verticalDragDistance += dragAmount
-                    },
-                )
-            },
+            .fillMaxSize()
+            .background(Color.Black),
         color = Color.Black,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -119,6 +254,7 @@ internal fun ChatImageViewer(
                     page = page,
                     contentDescription = fullscreenImageDescription,
                     unavailableText = imageUnavailableText,
+                    onDismiss = onDismiss,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -127,7 +263,10 @@ internal fun ChatImageViewer(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    )
+                    .padding(ChatImageViewerControlsPadding),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -170,6 +309,24 @@ internal fun ChatImageViewer(
 }
 
 @Composable
+private fun ChatImageViewerSystemBarsEffect() {
+    val activity = LocalActivity.current ?: return
+    DisposableEffect(activity) {
+        val window = activity.window
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        val previousBehavior = controller.systemBarsBehavior
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior = previousBehavior
+            WindowCompat.setDecorFitsSystemWindows(window, true)
+        }
+    }
+}
+
+@Composable
 private fun ViewerActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
@@ -196,13 +353,13 @@ private fun ZoomableAttachmentImage(
     page: Int,
     contentDescription: String,
     unavailableText: String,
+    onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var scale by remember(page) { mutableFloatStateOf(MinImageScale) }
-    var offset by remember(page) { mutableStateOf(Offset.Zero) }
+    var transform by remember(page) { mutableStateOf(ImageTransformState()) }
+    var containerSize by remember(page) { mutableStateOf(IntSize.Zero) }
     LaunchedEffect(page) {
-        scale = MinImageScale
-        offset = Offset.Zero
+        transform = ImageTransformState()
     }
 
     val imageBitmap = remember(attachment.base64) {
@@ -214,26 +371,70 @@ private fun ZoomableAttachmentImage(
 
     Box(
         modifier = modifier
+            .onSizeChanged { size ->
+                containerSize = size
+                transform = sanitizeImageTransform(
+                    state = transform,
+                    containerSize = Size(size.width.toFloat(), size.height.toFloat()),
+                )
+            }
+            .semantics {
+                this.contentDescription = contentDescription
+                chatImageViewerScale = transform.scale
+                chatImageViewerTranslationX = transform.offset.x
+                chatImageViewerTranslationY = transform.offset.y
+            }
             .pointerInput(page) {
                 detectTapGestures(
-                    onDoubleTap = {
-                        if (scale > MinImageScale) {
-                            scale = MinImageScale
-                            offset = Offset.Zero
-                        } else {
-                            scale = DoubleTapImageScale
-                        }
+                    onDoubleTap = { tap ->
+                        transform = doubleTapImageTransform(
+                            state = transform,
+                            tap = tap,
+                            containerSize = Size(containerSize.width.toFloat(), containerSize.height.toFloat()),
+                        )
                     },
                 )
             }
             .pointerInput(page) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val nextScale = (scale * zoom).coerceIn(MinImageScale, MaxImageScale)
-                    scale = nextScale
-                    offset = if (nextScale == MinImageScale) {
-                        Offset.Zero
-                    } else {
-                        offset + pan
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    var verticalDragDistance = 0f
+                    var transformed = false
+                    var zoomedAtGestureStart = transform.scale > 1.02f
+                    var pointersPressed: Boolean
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val pressed = event.changes.filter { it.pressed }
+                        val zoom = event.calculateZoom()
+                        val pan = event.calculatePan()
+                        val isTransformGesture = pressed.isNotEmpty() &&
+                            (pressed.size >= 2 || zoom != 1f || transform.scale > 1.02f)
+                        if (isTransformGesture) {
+                            transformed = true
+                            val centroid = event.calculateCentroid(useCurrent = true)
+                            transform = applyImageTransformGesture(
+                                state = transform,
+                                zoom = zoom,
+                                pan = pan,
+                                centroid = centroid,
+                                containerSize = Size(containerSize.width.toFloat(), containerSize.height.toFloat()),
+                            )
+                            event.changes.forEach { it.consume() }
+                        } else if (!zoomedAtGestureStart && pressed.size == 1) {
+                            verticalDragDistance += pan.y
+                            if (abs(pan.y) > abs(pan.x)) {
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                        zoomedAtGestureStart = zoomedAtGestureStart || transform.scale > 1.02f
+                        pointersPressed = event.changes.any { it.pressed }
+                    } while (pointersPressed)
+                    transform = sanitizeImageTransform(
+                        state = transform,
+                        containerSize = Size(containerSize.width.toFloat(), containerSize.height.toFloat()),
+                    )
+                    if (!transformed && shouldDismissImageViewer(transform.scale, verticalDragDistance)) {
+                        onDismiss()
                     }
                 }
             },
@@ -242,15 +443,16 @@ private fun ZoomableAttachmentImage(
         if (imageBitmap != null) {
             Image(
                 bitmap = imageBitmap,
-                contentDescription = contentDescription,
+                contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = scale
-                        scaleY = scale
-                        translationX = offset.x
-                        translationY = offset.y
+                        val appliedScale = max(transform.scale, MinImageScale)
+                        scaleX = appliedScale
+                        scaleY = appliedScale
+                        translationX = transform.offset.x
+                        translationY = transform.offset.y
                     },
             )
         } else {

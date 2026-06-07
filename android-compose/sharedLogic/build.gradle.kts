@@ -54,6 +54,8 @@ kotlin {
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
                 api("org.jetbrains.compose.runtime:runtime:1.9.0")
+                api("io.ktor:ktor-http:3.5.0")
+                api("io.ktor:ktor-io:3.5.0")
             }
         }
 
