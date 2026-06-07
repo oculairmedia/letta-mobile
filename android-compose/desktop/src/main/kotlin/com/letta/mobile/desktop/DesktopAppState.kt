@@ -36,7 +36,7 @@ enum class DesktopDestination(
     ),
     Conversations(
         label = "Conversations",
-        summary = "Conversation UI will move here after Android-only navigation and Hilt dependencies are separated.",
+        summary = "Desktop chat uses a persistent conversation list, shared render models, and a JVM Compose detail pane.",
     ),
     Settings(
         label = "Settings",
@@ -69,6 +69,11 @@ fun defaultDesktopBootstrapState(
             title = "Desktop repository layer",
             description = "Desktop can construct a shared session graph with JVM settings and health adapters; concrete remote repositories are still pending.",
             state = DesktopFeatureState.InProgress,
+        ),
+        DesktopFeatureReadiness(
+            title = "Desktop chat surface",
+            description = "Conversation list, detail pane, shared run-block rows, tool cards, A2UI payload cards, and local composer queue are available in the Windows shell.",
+            state = DesktopFeatureState.Ready,
         ),
         DesktopFeatureReadiness(
             title = "Android app shell",
