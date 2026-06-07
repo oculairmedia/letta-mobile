@@ -25,4 +25,11 @@ class DesktopAppStateTest {
             },
         )
     }
+
+    @Test
+    fun defaultBootstrapConstructsDesktopSessionGraph() {
+        val state = defaultDesktopBootstrapState()
+
+        assertEquals(1L, state.sessionGraphId)
+    }
 }

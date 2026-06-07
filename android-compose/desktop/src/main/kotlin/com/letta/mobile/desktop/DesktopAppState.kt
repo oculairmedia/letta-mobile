@@ -1,9 +1,12 @@
 package com.letta.mobile.desktop
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.data.DesktopDataBindings
+import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 
 data class DesktopBootstrapState(
     val config: LettaConfig,
+    val sessionGraphId: Long,
     val featureReadiness: List<DesktopFeatureReadiness>,
 )
 
@@ -41,13 +44,16 @@ enum class DesktopDestination(
     ),
 }
 
-fun defaultDesktopBootstrapState() = DesktopBootstrapState(
+fun defaultDesktopBootstrapState(
+    dataBindings: DesktopDataBindings = createDefaultDesktopDataBindings(),
+) = DesktopBootstrapState(
     config = LettaConfig(
         id = "desktop-local",
         mode = LettaConfig.Mode.SELF_HOSTED,
         serverUrl = "http://localhost:8283",
         accessToken = null,
     ),
+    sessionGraphId = dataBindings.sessionGraphProvider.current.id,
     featureReadiness = listOf(
         DesktopFeatureReadiness(
             title = "Windows desktop runtime",
@@ -61,7 +67,7 @@ fun defaultDesktopBootstrapState() = DesktopBootstrapState(
         ),
         DesktopFeatureReadiness(
             title = "Desktop repository layer",
-            description = "JVM storage, credentials, and HTTP client bindings are the next portability step.",
+            description = "Desktop can construct a shared session graph with JVM settings and health adapters; concrete remote repositories are still pending.",
             state = DesktopFeatureState.InProgress,
         ),
         DesktopFeatureReadiness(
