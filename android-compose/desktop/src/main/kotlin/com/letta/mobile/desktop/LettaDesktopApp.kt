@@ -43,11 +43,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.chat.DesktopChatSurface
+import com.letta.mobile.desktop.chat.defaultDesktopChatSurfaceState
+import com.letta.mobile.desktop.chat.selectConversation
+import com.letta.mobile.desktop.chat.sendLocalMessage
+import com.letta.mobile.desktop.chat.withComposerText
 
 @Composable
 fun LettaDesktopApp() {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Overview) }
     val bootstrapState = remember { defaultDesktopBootstrapState() }
+    var chatState by remember { mutableStateOf(defaultDesktopChatSurfaceState(bootstrapState)) }
 
     MaterialTheme(
         colorScheme = lightColorScheme(
@@ -84,6 +91,16 @@ fun LettaDesktopApp() {
                 DestinationContent(
                     destination = selectedDestination,
                     state = bootstrapState,
+                    chatState = chatState,
+                    onChatConversationSelected = { conversationId ->
+                        chatState = chatState.selectConversation(conversationId)
+                    },
+                    onChatComposerTextChanged = { text ->
+                        chatState = chatState.withComposerText(text)
+                    },
+                    onChatSend = {
+                        chatState = chatState.sendLocalMessage()
+                    },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -174,8 +191,23 @@ private val DesktopDestination.icon: ImageVector
 private fun DestinationContent(
     destination: DesktopDestination,
     state: DesktopBootstrapState,
+    chatState: DesktopChatSurfaceState,
+    onChatConversationSelected: (String) -> Unit,
+    onChatComposerTextChanged: (String) -> Unit,
+    onChatSend: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (destination == DesktopDestination.Conversations) {
+        DesktopChatSurface(
+            state = chatState,
+            onConversationSelected = onChatConversationSelected,
+            onComposerTextChanged = onChatComposerTextChanged,
+            onSend = onChatSend,
+            modifier = modifier,
+        )
+        return
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxHeight()
@@ -213,13 +245,7 @@ private fun DestinationContent(
                 }
             }
             DesktopDestination.Conversations -> {
-                item {
-                    PortabilityCard(
-                        title = "Conversation surface",
-                        body = "The mobile conversation UI can inform this layout, but desktop should favor a persistent conversation list and detail pane instead of Android bottom navigation.",
-                        state = DesktopFeatureState.InProgress,
-                    )
-                }
+                // Rendered by the full-height branch above.
             }
             DesktopDestination.Settings -> {
                 item {
