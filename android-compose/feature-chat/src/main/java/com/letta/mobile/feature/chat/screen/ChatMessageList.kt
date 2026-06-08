@@ -767,6 +767,15 @@ internal fun ChatMessageList(
         // var stickyHeaderHeight by remember { mutableStateOf(0) }
         // val activePromptState by activeUserPromptState
         val topFadeLength = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
+        
+        // Only suppress bottom fade for the latest user prompt while waiting for agent response
+        val suppressBottomFade by remember {
+            derivedStateOf {
+                val lastMessage = state.messages.lastOrNull()
+                isNearBottom && lastMessage?.role == "user" && state.isStreaming
+            }
+        }
+        
         ChatFadingEdgesBox(
             listState = listState,
             targetColor = fadeTargetColor,
@@ -774,10 +783,7 @@ internal fun ChatMessageList(
             topPadding = topPadding,
             topFadeLength = topFadeLength,
             bottomFadeLength = if (bottomPadding > 0.dp) bottomPadding + 48.dp else ChatFadeEdgeLength + 48.dp,
-            // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
-            // to the newest message — keeps a just-sent prompt / live
-            // streaming bubble fully visible instead of dimming it.
-            suppressBottom = isNearBottom,
+            suppressBottom = suppressBottomFade,
         ) {
             LazyColumn(
                 state = listState,

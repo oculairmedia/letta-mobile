@@ -86,11 +86,12 @@ internal fun chatFadeTargetColor(
 internal fun Modifier.chatFadingEdges(
     showTop: Boolean,
     showBottom: Boolean,
+    bottomFadeAlpha: Float = 1f,
     topFadeLength: Dp,
     bottomFadeLength: Dp,
     targetColor: Color,
 ): Modifier {
-    if (!showTop && !showBottom) return this
+    if (!showTop && bottomFadeAlpha <= 0f) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
@@ -112,17 +113,18 @@ internal fun Modifier.chatFadingEdges(
                     )
                 }
             }
-            if (showBottom) {
+            if (bottomFadeAlpha > 0f) {
                 val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
                 if (bottomFadePx > 0f) {
                     val bottomTransparent = targetColor.copy(alpha = 0.0f)
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(targetColor, bottomTransparent),
+                            colors = listOf(targetColor.copy(alpha = bottomFadeAlpha), bottomTransparent),
                             startY = size.height - bottomFadePx,
                             endY = size.height,
                         ),
                         blendMode = BlendMode.DstIn,
+                        alpha = bottomFadeAlpha,
                     )
                 }
             }
@@ -140,15 +142,16 @@ internal fun Modifier.chatFadingEdges(
                     )
                 }
             }
-            if (showBottom) {
+            if (bottomFadeAlpha > 0f) {
                 val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
                 if (bottomFadePx > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.95f)),
+                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.95f * bottomFadeAlpha)),
                             startY = size.height - bottomFadePx,
                             endY = size.height,
-                        )
+                        ),
+                        alpha = bottomFadeAlpha,
                     )
                 }
             }
@@ -189,16 +192,25 @@ internal fun ChatFadingEdgesBox(
     val showTop by remember(listState) {
         derivedStateOf { chatFadeShowTop(listState.canScrollBackward) }
     }
-    val showBottom by remember(listState, suppressBottom) {
+    val showBottomTarget by remember(listState, suppressBottom) {
         derivedStateOf { !suppressBottom && chatFadeShowBottom(listState.canScrollForward) }
     }
+    
+    // Animate the bottom fade alpha to avoid hard snaps
+    val bottomFadeAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (showBottomTarget) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300),
+        label = "bottomFadeAlpha"
+    )
+    
     // Touch density so the unit-conversion in the modifier is well-defined even
     // if this composable is ever previewed without a provided density.
     LocalDensity.current
     Box(
         modifier = modifier.chatFadingEdges(
             showTop = showTop,
-            showBottom = showBottom,
+            showBottom = showBottomTarget,
+            bottomFadeAlpha = bottomFadeAlpha,
             topFadeLength = topFadeLength,
             bottomFadeLength = bottomFadeLength,
             targetColor = targetColor,
