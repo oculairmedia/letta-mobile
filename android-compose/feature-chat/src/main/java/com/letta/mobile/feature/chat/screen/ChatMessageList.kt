@@ -685,22 +685,27 @@ internal fun ChatMessageList(
             // edges (replaces the harsh clip line). The fade target is the
             // color the chat actually draws on â€” mirroring the ThinkingShader
             // bgColor logic in ChatScreen â€” so content dissolves exactly into
-            // the background. Applied on a wrapping Box (separate node) so its
-            // offscreen DstIn layer doesn't clobber the LazyColumn's own
-            // rasterization graphicsLayer used during pinch.
-            val fadeTargetColor = chatFadeTargetColor(
-                chatBackground = chatBackground,
-                fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            )
-            ChatFadingEdgesBox(
-                listState = listState,
-                targetColor = fadeTargetColor,
-                modifier = Modifier.fillMaxSize(),
-                // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
-                // to the newest message â€” keeps a just-sent prompt / live
-                // streaming bubble fully visible instead of dimming it.
-                suppressBottom = isNearBottom,
-            ) {
+        // letta-mobile-58qlr: soft gradient fade at the top/bottom scroll
+        // edges (replaces the harsh clip line). The fade target is the
+        // color the chat actually draws on — mirroring the ThinkingShader
+        // bgColor logic in ChatScreen — so content dissolves exactly into
+        // the background. Applied on a wrapping Box (separate node) so its
+        // offscreen DstIn layer doesn't clobber the LazyColumn's own
+        // rasterization graphicsLayer used during pinch.
+        val fadeTargetColor = chatFadeTargetColor(
+            chatBackground = chatBackground,
+            fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        )
+        ChatFadingEdgesBox(
+            listState = listState,
+            targetColor = fadeTargetColor,
+            modifier = Modifier.fillMaxSize(),
+            topPadding = topPadding,
+            // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
+            // to the newest message — keeps a just-sent prompt / live
+            // streaming bubble fully visible instead of dimming it.
+            suppressBottom = isNearBottom,
+        ) {
             LazyColumn(
                 state = listState,
                 // Use the chat theme's compact gutter so assistant prose,

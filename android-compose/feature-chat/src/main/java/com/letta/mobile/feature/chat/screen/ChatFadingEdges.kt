@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 
@@ -85,7 +86,8 @@ internal fun chatFadeTargetColor(
 internal fun Modifier.chatFadingEdges(
     showTop: Boolean,
     showBottom: Boolean,
-    fadeLength: Dp,
+    topFadeLength: Dp,
+    bottomFadeLength: Dp,
     targetColor: Color,
 ): Modifier {
     if (!showTop && !showBottom) return this
@@ -93,28 +95,33 @@ internal fun Modifier.chatFadingEdges(
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
-            val fadePx = fadeLength.toPx().coerceAtMost(size.height / 2f)
-            if (fadePx <= 0f) return@drawWithContent
-            val transparent = targetColor.copy(alpha = 0.05f)
             if (showTop) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(transparent, targetColor),
-                        startY = 0f,
-                        endY = fadePx,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+                val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
+                if (topFadePx > 0f) {
+                    val topTransparent = targetColor.copy(alpha = 0.15f)
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(topTransparent, targetColor),
+                            startY = 0f,
+                            endY = topFadePx,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             }
             if (showBottom) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(targetColor, transparent),
-                        startY = size.height - fadePx,
-                        endY = size.height,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+                val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
+                if (bottomFadePx > 0f) {
+                    val bottomTransparent = targetColor.copy(alpha = 0f)
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(targetColor, bottomTransparent),
+                            startY = size.height - bottomFadePx,
+                            endY = size.height,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             }
         }
 }
@@ -138,7 +145,8 @@ internal fun ChatFadingEdgesBox(
     listState: LazyListState,
     targetColor: Color,
     modifier: Modifier = Modifier,
-    fadeLength: Dp = ChatFadeEdgeLength,
+    topPadding: Dp = 0.dp,
+    bottomFadeLength: Dp = ChatFadeEdgeLength,
     // letta-mobile-58qlr.1: when true, the BOTTOM fade is suppressed regardless
     // of scroll state. The caller sets this while pinned to the newest edge so
     // a just-sent user prompt (or the live streaming bubble) at the bottom is
@@ -161,7 +169,8 @@ internal fun ChatFadingEdgesBox(
         modifier = modifier.chatFadingEdges(
             showTop = showTop,
             showBottom = showBottom,
-            fadeLength = fadeLength,
+            topFadeLength = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength,
+            bottomFadeLength = bottomFadeLength,
             targetColor = targetColor,
         ),
     ) {
