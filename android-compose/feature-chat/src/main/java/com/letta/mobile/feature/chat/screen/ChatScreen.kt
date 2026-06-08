@@ -484,6 +484,17 @@ internal fun ChatScreen(
                         )
                     }
 
+                    // letta-mobile-ndtc.3: gradient "thinking" text token —
+                    // ephemeral subtitle that appears between the message list /
+                    // A2UI surfaces and the composer while awaiting the agent's
+                    // first frame. Driven by `isAgentTyping`; switches to the
+                    // delay subtitle on the 60s A2UI timeout.
+                    ThinkingTextToken(
+                        visible = state.isAgentTyping,
+                        delayMessage = state.a2uiThinkingDelayMessage,
+                        reducedMotion = reducedMotion,
+                    )
+
                     val launchPicker = rememberImageAttachmentPicker(
                         onPicked = { viewModel.addAttachment(it) },
                         onError = { viewModel.reportComposerError(it) },
@@ -515,7 +526,6 @@ internal fun ChatScreen(
                         },
                     )
                 }
-            }
 
                 // letta-mobile-73o2h.3: tap-to-todolist bottom sheet. One-shot
                 // fetch of the tapped subagent's TodoWrite via the source.
@@ -553,50 +563,6 @@ internal fun ChatScreen(
                             },
                     )
                 }
-
-                // letta-mobile-ndtc.3: gradient "thinking" text token â€”
-                // ephemeral subtitle that appears between the message list /
-                // A2UI surfaces and the composer while awaiting the agent's
-                // first frame. Driven by `isAgentTyping`; switches to the
-                // delay subtitle on the 60s A2UI timeout.
-                ThinkingTextToken(
-                    visible = state.isAgentTyping,
-                    delayMessage = state.a2uiThinkingDelayMessage,
-                    reducedMotion = reducedMotion,
-                )
-
-                val launchPicker = rememberImageAttachmentPicker(
-                    onPicked = { viewModel.addAttachment(it) },
-                    onError = { viewModel.reportComposerError(it) },
-                    limits = viewModel.attachmentLimits,
-                )
-                val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-                ChatComposer(
-                    inputText = composerState.inputText,
-                    pendingAttachments = composerState.pendingAttachments,
-                    isStreaming = state.isStreaming,
-                    canSendMessages = viewModel.canSendMessages,
-                    onTextChange = { newText ->
-                        if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
-                            onBugCommand?.invoke()
-                        }
-                    },
-                    onSend = {
-                        if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
-                            onBugCommand?.invoke()
-                        }
-                    },
-                    onStop = { viewModel.interruptRun() },
-                    onRemoveAttachment = { viewModel.removeAttachment(it) },
-                    onAttachImage = launchPicker,
-                    availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
-                        activeAgent?.tools.orEmpty()
-                    } else {
-                        emptyList()
-                    },
-                )
-            }
-
 
             FloatingBanner(
                 visible = floatingBannerMessage.isNotBlank(),
@@ -648,6 +614,7 @@ internal fun ChatScreen(
                 )
             }
         }
+    }
 
     }
 }

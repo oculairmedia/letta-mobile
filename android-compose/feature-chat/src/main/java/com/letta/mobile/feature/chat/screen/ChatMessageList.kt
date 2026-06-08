@@ -1057,7 +1057,7 @@ internal fun ChatMessageList(
                                     val offset = nextPromptItemInfo.offset
                                     val size = nextPromptItemInfo.size
                                     val yTopNext = viewportHeight - (offset + size)
-                                    val pushOffset = yTopNext - stickyHeaderHeight
+                                    val pushOffset = (yTopNext - stickyHeaderHeight).toFloat()
                                     if (pushOffset < yOffset) {
                                         yOffset = pushOffset
                                     }
