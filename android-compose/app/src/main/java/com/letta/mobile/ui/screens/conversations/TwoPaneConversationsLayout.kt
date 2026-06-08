@@ -23,6 +23,8 @@ import com.letta.mobile.feature.chat.route.toViewModelKey
 import com.letta.mobile.ui.navigation.ArchivalRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.navigation.AllToolsRoute
+import com.letta.mobile.ui.navigation.AdminRoute
+import com.letta.mobile.ui.navigation.ConversationsRoute
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isWideWidth
 
@@ -110,6 +112,12 @@ fun TwoPaneConversationsLayout(
                         },
                         onNavigateToTools = {
                             outerNavController.navigate(AllToolsRoute)
+                        },
+                        onNavigateToAdmin = {
+                            outerNavController.navigate(AdminRoute)
+                        },
+                        onNavigateToConversationList = {
+                            outerNavController.navigate(ConversationsRoute)
                         },
                         onSwitchConversation = { agentId, conversationId, agentName ->
                             val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }

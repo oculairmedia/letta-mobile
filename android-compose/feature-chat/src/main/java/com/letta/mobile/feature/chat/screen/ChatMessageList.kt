@@ -762,7 +762,7 @@ internal fun ChatMessageList(
         // rasterization graphicsLayer used during pinch.
         val fadeTargetColor = chatFadeTargetColor(
             chatBackground = chatBackground,
-            fallbackContainerColor = androidx.compose.ui.graphics.Color.Black,
+            fallbackContainerColor = MaterialTheme.colorScheme.background,
         )
         // var stickyHeaderHeight by remember { mutableStateOf(0) }
         // val activePromptState by activeUserPromptState

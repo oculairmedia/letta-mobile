@@ -164,6 +164,8 @@ fun AgentScaffold(
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    onNavigateToAdmin: (() -> Unit)? = null,
+    onNavigateToConversationList: (() -> Unit)? = null,
     viewModelKey: String? = null,
 ) {
     AgentScaffoldContent(
@@ -173,6 +175,8 @@ fun AgentScaffold(
         onNavigateToArchival = onNavigateToArchival,
         onNavigateToTools = onNavigateToTools,
         onSwitchConversation = onSwitchConversation,
+        onNavigateToAdmin = onNavigateToAdmin,
+        onNavigateToConversationList = onNavigateToConversationList,
         conversationRepository = null,
         viewModel = hiltViewModel(key = viewModelKey),
     )
@@ -187,6 +191,8 @@ internal fun AgentScaffoldContent(
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    onNavigateToAdmin: (() -> Unit)? = null,
+    onNavigateToConversationList: (() -> Unit)? = null,
     conversationRepository: IConversationRepository? = null,
     viewModel: AdminChatViewModel,
 ) {
@@ -305,6 +311,14 @@ internal fun AgentScaffoldContent(
                         viewModel.resetMessages()
                     },
                     onRefreshContextWindow = projectBindings::refreshContextWindow,
+                    onNavigateToAdmin = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToAdmin?.invoke()
+                    },
+                    onNavigateToConversations = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToConversationList?.invoke()
+                    },
                     onClose = { scope.launch { drawerState.close() } },
                     modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
                 )

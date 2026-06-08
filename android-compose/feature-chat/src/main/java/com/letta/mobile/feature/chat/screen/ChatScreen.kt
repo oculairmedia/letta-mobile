@@ -338,7 +338,7 @@ internal fun ChatScreen(
                     // hard line. Use the explicit chat-bg color when set.
                     bgColor = when (val cb = chatBackground) {
                         is ChatBackground.SolidColor -> cb.color
-                        else -> Color.Black
+                        else -> MaterialTheme.colorScheme.background
                     },
                     animate = !reducedMotion,
                     modifier = Modifier
