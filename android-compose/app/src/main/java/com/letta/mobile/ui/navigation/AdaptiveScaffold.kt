@@ -72,23 +72,13 @@ fun AdaptiveScaffold(
             content()
         }
     } else {
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentDestination = navBackStackEntry?.destination
-        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination)
-
         Scaffold(
             modifier = modifier.fillMaxSize(),
-            bottomBar = {
-                LettaBottomBar(navController = navController)
-            },
             containerColor = MaterialTheme.colorScheme.surface,
         ) { innerPadding ->
             Box(
                 modifier = Modifier
-                    .padding(
-                        top = innerPadding.calculateTopPadding(),
-                        bottom = if (isChatDestination) 0.dp else innerPadding.calculateBottomPadding(),
-                    )
+                    .padding(innerPadding)
                     .consumeWindowInsets(innerPadding),
             ) {
                 content()

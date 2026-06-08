@@ -372,36 +372,12 @@ internal fun AgentScaffoldContent(
                                     modifier = Modifier.size(LettaIconSizing.Inline),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                ChatTransportChip(
-                                    transport = uiState.transport,
-                                    a2uiFrameCount = uiState.a2uiFrameCount,
-                                )
                             }
                         }
                     },
                     colors = LettaTopBarDefaults.topAppBarColors(),
                     scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                        }
-                    },
                     actions = {
-                        IconButton(onClick = {
-                            if (isChatSearchExpanded || uiState.isSearchActive) {
-                                isChatSearchExpanded = false
-                                viewModel.clearChatSearch()
-                            } else {
-                                isChatSearchExpanded = true
-                            }
-                        }) {
-                            Icon(
-                                if (isChatSearchExpanded || uiState.isSearchActive) LettaIcons.Clear else LettaIcons.Search,
-                                contentDescription = stringResource(
-                                    if (isChatSearchExpanded || uiState.isSearchActive) R.string.action_close else R.string.action_search
-                                ),
-                            )
-                        }
                         IconButton(onClick = {
                             HapticEffects.contextClick(haptic, view)
                             projectBindings.refreshContextWindow()
