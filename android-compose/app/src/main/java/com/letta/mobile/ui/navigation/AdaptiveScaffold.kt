@@ -90,7 +90,10 @@ fun AdaptiveScaffold(
                         start = innerPadding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
                         end = innerPadding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
                     )
-                    .consumeWindowInsets(innerPadding),
+                    .then(
+                        if (isChatDestination) Modifier
+                        else Modifier.consumeWindowInsets(innerPadding)
+                    ),
             ) {
                 content()
             }
