@@ -762,7 +762,7 @@ internal fun ChatMessageList(
         // rasterization graphicsLayer used during pinch.
         val fadeTargetColor = chatFadeTargetColor(
             chatBackground = chatBackground,
-            fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            fallbackContainerColor = androidx.compose.ui.graphics.Color.Black,
         )
         // var stickyHeaderHeight by remember { mutableStateOf(0) }
         // val activePromptState by activeUserPromptState
@@ -773,7 +773,7 @@ internal fun ChatMessageList(
             modifier = Modifier.fillMaxSize(),
             topPadding = topPadding,
             topFadeLength = topFadeLength,
-            bottomFadeLength = if (bottomPadding > 0.dp) bottomPadding else ChatFadeEdgeLength,
+            bottomFadeLength = if (bottomPadding > 0.dp) bottomPadding + 48.dp else ChatFadeEdgeLength + 48.dp,
             // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
             // to the newest message — keeps a just-sent prompt / live
             // streaming bubble fully visible instead of dimming it.

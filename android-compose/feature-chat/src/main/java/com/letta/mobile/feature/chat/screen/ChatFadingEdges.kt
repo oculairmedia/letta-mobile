@@ -133,7 +133,7 @@ internal fun Modifier.chatFadingEdges(
                 if (topFadePx > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(targetColor.copy(alpha = 0.85f), Color.Transparent),
+                            colors = listOf(targetColor.copy(alpha = 0.95f), Color.Transparent),
                             startY = 0f,
                             endY = topFadePx,
                         )
@@ -145,7 +145,7 @@ internal fun Modifier.chatFadingEdges(
                 if (bottomFadePx > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
-                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.85f)),
+                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.95f)),
                             startY = size.height - bottomFadePx,
                             endY = size.height,
                         )
