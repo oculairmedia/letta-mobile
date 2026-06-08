@@ -1096,7 +1096,10 @@ internal fun ChatMessageList(
             onClick = { scope.launch { listState.animateScrollToItem(0) } },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(LettaSpacing.innerPadding),
+                .padding(
+                    end = LettaSpacing.innerPadding,
+                    bottom = LettaSpacing.innerPadding + bottomPadding,
+                ),
         )
 
         if (showFontIndicator) {
