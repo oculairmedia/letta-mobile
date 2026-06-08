@@ -75,6 +75,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.graphics.Color
@@ -381,11 +382,12 @@ internal fun AgentScaffoldContent(
                             }
                         }
                     },
+                    modifier = Modifier.padding(top = with(LocalDensity.current) { (WindowInsets.safeDrawing.getTop(this) / 2).toDp() }),
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
                         scrolledContainerColor = Color.Transparent,
                     ),
-                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
                     scrollBehavior = scrollBehavior,
                     actions = {
                         IconButton(onClick = {

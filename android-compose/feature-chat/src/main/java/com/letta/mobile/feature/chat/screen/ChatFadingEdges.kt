@@ -98,7 +98,7 @@ internal fun Modifier.chatFadingEdges(
             if (showTop) {
                 val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
                 if (topFadePx > 0f) {
-                    val topTransparent = targetColor.copy(alpha = 0.15f)
+                    val topTransparent = targetColor.copy(alpha = 0.05f)
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(topTransparent, targetColor),
@@ -112,7 +112,7 @@ internal fun Modifier.chatFadingEdges(
             if (showBottom) {
                 val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
                 if (bottomFadePx > 0f) {
-                    val bottomTransparent = targetColor.copy(alpha = 0f)
+                    val bottomTransparent = targetColor.copy(alpha = 0.05f)
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(targetColor, bottomTransparent),

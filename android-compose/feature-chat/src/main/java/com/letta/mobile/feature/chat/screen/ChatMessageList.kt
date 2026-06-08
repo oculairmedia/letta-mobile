@@ -772,8 +772,8 @@ internal fun ChatMessageList(
                 contentPadding = PaddingValues(
                     start = chatDimens.contentPaddingHorizontal,
                     end = chatDimens.contentPaddingHorizontal,
-                    top = LettaSpacing.cardGap,
-                    bottom = LettaSpacing.cardGap + topPadding,
+                    top = LettaSpacing.cardGap + topPadding,
+                    bottom = LettaSpacing.cardGap,
                 ),
                 reverseLayout = true,
                 // letta-mobile-erhjl: keep an identity graphicsLayer so the
