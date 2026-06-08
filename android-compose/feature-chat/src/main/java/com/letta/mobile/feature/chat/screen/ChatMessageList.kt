@@ -1012,7 +1012,7 @@ internal fun ChatMessageList(
                             val visibleItems = listState.layoutInfo.visibleItemsInfo
                             val promptItemInfo = visibleItems.find { it.index == promptLazyIndex }
                             val topPaddingPx = topPadding.toPx()
-                            val viewportHeight = layoutInfo.viewportSize.height
+                            val viewportHeight = listState.layoutInfo.viewportSize.height
 
                             val yOffset = if (promptItemInfo != null) {
                                 val offset = promptItemInfo.offset
