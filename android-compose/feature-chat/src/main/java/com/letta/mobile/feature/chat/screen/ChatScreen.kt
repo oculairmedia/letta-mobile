@@ -315,6 +315,9 @@ internal fun ChatScreen(
                 animationSpec = tween(durationMillis = if (reducedMotion) 0 else 900, easing = EaseInOutCubic),
                 label = "thinkingAlpha",
             )
+            // TODO: Fix ThinkingShader blending with transparent background
+            // Commented out until blend can be fixed to work with edge-to-edge transparent chrome
+            /*
             if (thinkingAlpha > 0.001f) {
                 Box(
                     modifier = Modifier
@@ -352,6 +355,7 @@ internal fun ChatScreen(
                     }
                 }
             }
+            */
             var composerHeightDp by remember { mutableStateOf(0.dp) }
             val bottomPaddingDp = composerHeightDp + bottomInsetDp
 
