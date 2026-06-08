@@ -118,7 +118,7 @@ internal fun ChatScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(),
     chatBackground: ChatBackground = ChatBackground.Default,
-    chatMode: String = "interactive",
+    chatMode: String = "simple",
     onBugCommand: (() -> Unit)? = null,
     // letta-mobile-vo9y1: jump from a subagent chip / its todo sheet to that
     // subagent's own conversation. Receives the subagent agent id
@@ -316,35 +316,41 @@ internal fun ChatScreen(
                 label = "thinkingAlpha",
             )
             if (thinkingAlpha > 0.001f) {
-                ThinkingShader(
-                    // p2auf: theme-controlled chaser. Pass the active
-                    // theme's accent triad; the shader deepens each color
-                    // (saturates + caps luminance) so even pale theme
-                    // accents read as hue on the dark surface, then chases
-                    // them across the band over time.
-                    tint = MaterialTheme.colorScheme.primary,
-                    tint2 = MaterialTheme.colorScheme.tertiary,
-                    tint3 = MaterialTheme.colorScheme.secondary,
-                    // Dissolve toward the ACTUAL color the chat draws on, so
-                    // the glow grades seamlessly into it instead of producing
-                    // a hard line. With ChatBackground.Default the content
-                    // sits on the scaffold/window background (colorScheme.
-                    // background), NOT surface; use the explicit chat-bg
-                    // color when one is set.
-                    // The chat actually sits on the Scaffold container color
-                    // (LettaTopBarDefaults.scaffoldContainerColor() ==
-                    // colorScheme.surfaceContainer), NOT surface/background.
-                    // Dissolving toward the wrong one is what produced the
-                    // hard line. Use the explicit chat-bg color when set.
-                    bgColor = when (val cb = chatBackground) {
-                        is ChatBackground.SolidColor -> cb.color
-                        else -> MaterialTheme.colorScheme.background
-                    },
-                    animate = !reducedMotion,
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .alpha(thinkingAlpha),
-                )
+                        .alpha(thinkingAlpha)
+                ) {
+                    ThinkingShader(
+                        // p2auf: theme-controlled chaser. Pass the active
+                        // theme's accent triad; the shader deepens each color
+                        // (saturates + caps luminance) so even pale theme
+                        // accents read as hue on the dark surface, then chases
+                        // them across the band over time.
+                        tint = MaterialTheme.colorScheme.primary,
+                        tint2 = MaterialTheme.colorScheme.tertiary,
+                        tint3 = MaterialTheme.colorScheme.secondary,
+                        // With transparent background, use a neutral blend target
+                        // The alpha gradient overlay will handle the actual blending
+                        bgColor = Color.Transparent,
+                        animate = !reducedMotion,
+                    )
+                    // Vertical alpha gradient overlay: 0% at top (transparent) to 100% at bottom
+                    // This allows the shader to blend seamlessly with any background
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier
+                            .matchParentSize()
+                    ) {
+                        drawRect(
+                            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(androidx.compose.ui.graphics.Color.Transparent, androidx.compose.ui.graphics.Color.Black),
+                                startY = 0f,
+                                endY = size.height,
+                            ),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+                }
             }
             var composerHeightDp by remember { mutableStateOf(0.dp) }
             val bottomPaddingDp = composerHeightDp + bottomInsetDp
@@ -676,7 +682,7 @@ internal fun NoConversationChatContent(
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
-    chatMode: String = "interactive",
+    chatMode: String = "simple",
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,
@@ -734,7 +740,7 @@ private fun ChatContent(
     activeFontScale: Float = 1f,
     onActiveFontScaleChange: (Float) -> Unit = {},
     onFontScaleChange: (Float) -> Unit = {},
-    chatMode: String = "interactive",
+    chatMode: String = "simple",
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,

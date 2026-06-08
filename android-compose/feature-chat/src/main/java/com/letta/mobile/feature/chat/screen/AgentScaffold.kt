@@ -211,7 +211,7 @@ internal fun AgentScaffoldContent(
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    var chatMode by rememberSaveable { mutableStateOf("interactive") }
+    var chatMode by rememberSaveable { mutableStateOf("simple") }
     val drawerConversationRepo = conversationRepository
         ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)

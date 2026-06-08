@@ -762,7 +762,7 @@ internal fun ChatMessageList(
         // rasterization graphicsLayer used during pinch.
         val fadeTargetColor = chatFadeTargetColor(
             chatBackground = chatBackground,
-            fallbackContainerColor = MaterialTheme.colorScheme.background,
+            fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         )
         // var stickyHeaderHeight by remember { mutableStateOf(0) }
         // val activePromptState by activeUserPromptState
