@@ -294,6 +294,12 @@ private class ChatPinchFrameBudgetSampler {
     }
 }
 
+internal data class ActivePromptState(
+    val promptItem: ChatRenderItem.Single,
+    val renderIndex: Int,
+    val lazyIndex: Int
+)
+
 @Composable
 internal fun ChatMessageList(
     state: ChatUiState,
@@ -313,6 +319,7 @@ internal fun ChatMessageList(
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 0.dp,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -471,7 +478,7 @@ internal fun ChatMessageList(
         }
     }
 
-    val activeUserPromptItem = remember(listState, renderItems, topPadding, density) {
+    val activeUserPromptState = remember(listState, renderItems, topPadding, density) {
         derivedStateOf {
             val visibleItems = listState.layoutInfo.visibleItemsInfo
             val topMostVisibleItem = visibleItems.lastOrNull()
@@ -511,12 +518,12 @@ internal fun ChatMessageList(
                         val yTop = viewportHeight - (offset + size)
 
                         if (yTop < topPaddingPx) {
-                            foundPrompt
+                            ActivePromptState(foundPrompt, foundPromptRenderIndex, promptLazyIndex)
                         } else {
                             null
                         }
                     } else {
-                        foundPrompt
+                        ActivePromptState(foundPrompt, foundPromptRenderIndex, promptLazyIndex)
                     }
                 } else {
                     null
@@ -754,11 +761,20 @@ internal fun ChatMessageList(
             chatBackground = chatBackground,
             fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         )
+        var stickyHeaderHeight by remember { mutableStateOf(0) }
+        val activePromptState by activeUserPromptState
+        val topFadeLength = if (activePromptState != null && stickyHeaderHeight > 0) {
+            topPadding + with(LocalDensity.current) { stickyHeaderHeight.toDp() }
+        } else {
+            if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
+        }
         ChatFadingEdgesBox(
             listState = listState,
             targetColor = fadeTargetColor,
             modifier = Modifier.fillMaxSize(),
             topPadding = topPadding,
+            topFadeLength = topFadeLength,
+            bottomFadeLength = if (bottomPadding > 0.dp) bottomPadding else ChatFadeEdgeLength,
             // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
             // to the newest message — keeps a just-sent prompt / live
             // streaming bubble fully visible instead of dimming it.
@@ -773,7 +789,7 @@ internal fun ChatMessageList(
                     start = chatDimens.contentPaddingHorizontal,
                     end = chatDimens.contentPaddingHorizontal,
                     top = LettaSpacing.cardGap + topPadding,
-                    bottom = LettaSpacing.cardGap,
+                    bottom = LettaSpacing.cardGap + bottomPadding,
                 ),
                 reverseLayout = true,
                 // letta-mobile-erhjl: keep an identity graphicsLayer so the
@@ -997,24 +1013,19 @@ internal fun ChatMessageList(
             }
             } // letta-mobile-58qlr: end ChatFadingEdgesBox
 
-            val activePrompt by activeUserPromptItem
-            if (activePrompt != null) {
-                val promptItem = activePrompt!!
-                val promptLazyIndex = remember(promptItem, renderItems) {
-                    val idx = renderItems.indexOfFirst { it.key == promptItem.key }
-                    if (idx >= 0) calculateLazyIndexForRenderItem(idx, renderItems) else -1
-                }
-                val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
+            if (activePromptState != null) {
+                val activeState = activePromptState!!
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .onSizeChanged { stickyHeaderHeight = it.height }
                         .graphicsLayer {
                             val visibleItems = listState.layoutInfo.visibleItemsInfo
-                            val promptItemInfo = visibleItems.find { it.index == promptLazyIndex }
+                            val promptItemInfo = visibleItems.find { it.index == activeState.lazyIndex }
                             val topPaddingPx = topPadding.toPx()
                             val viewportHeight = listState.layoutInfo.viewportSize.height
 
-                            val yOffset = if (promptItemInfo != null) {
+                            var yOffset = if (promptItemInfo != null) {
                                 val offset = promptItemInfo.offset
                                 val size = promptItemInfo.size
                                 val yTop = viewportHeight - (offset + size)
@@ -1029,18 +1040,31 @@ internal fun ChatMessageList(
                                 topPaddingPx
                             }
 
+                            // Find the next user prompt's position to see if we should push away
+                            var nextPromptRenderIndex = -1
+                            for (i in (activeState.renderIndex - 1) downTo 0) {
+                                val item = renderItems[i]
+                                if (item is ChatRenderItem.Single && item.message.role == "user") {
+                                    nextPromptRenderIndex = i
+                                    break
+                                }
+                            }
+
+                            if (nextPromptRenderIndex >= 0) {
+                                val nextPromptLazyIndex = calculateLazyIndexForRenderItem(nextPromptRenderIndex, renderItems)
+                                val nextPromptItemInfo = visibleItems.find { it.index == nextPromptLazyIndex }
+                                if (nextPromptItemInfo != null) {
+                                    val offset = nextPromptItemInfo.offset
+                                    val size = nextPromptItemInfo.size
+                                    val yTopNext = viewportHeight - (offset + size)
+                                    val pushOffset = yTopNext - stickyHeaderHeight
+                                    if (pushOffset < yOffset) {
+                                        yOffset = pushOffset
+                                    }
+                                }
+                            }
+
                             translationY = yOffset
-                        }
-                        .background(fadeTargetColor)
-                        .drawBehind {
-                            val strokeWidth = 1.dp.toPx()
-                            val y = size.height - strokeWidth / 2
-                            drawLine(
-                                color = outlineVariantColor.copy(alpha = 0.2f),
-                                start = Offset(0f, y),
-                                end = Offset(size.width, y),
-                                strokeWidth = strokeWidth
-                            )
                         }
                         .padding(
                             start = chatDimens.contentPaddingHorizontal,
@@ -1050,16 +1074,16 @@ internal fun ChatMessageList(
                         )
                 ) {
                     RenderChatMessage(
-                        message = promptItem.message,
-                        position = promptItem.groupPosition,
+                        message = activeState.promptItem.message,
+                        position = activeState.promptItem.groupPosition,
                         state = state,
                         chatMode = chatMode,
                         highlightedMessageId = highlightedMessageId,
                         onSendMessage = onSendMessage,
                         onRerunMessage = onRerunMessage,
                         onSubmitApproval = onSubmitApproval,
-                        reasoningCollapsed = promptItem.message.id !in state.expandedReasoningMessageIds,
-                        onToggleReasoning = { onToggleReasoningExpanded(promptItem.message.id) },
+                        reasoningCollapsed = activeState.promptItem.message.id !in state.expandedReasoningMessageIds,
+                        onToggleReasoning = { onToggleReasoningExpanded(activeState.promptItem.message.id) },
                         onAttachmentImageTap = onAttachmentImageTap,
                     )
                 }

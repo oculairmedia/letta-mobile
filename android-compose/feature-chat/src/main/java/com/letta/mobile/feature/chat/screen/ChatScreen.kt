@@ -58,6 +58,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.a2ui.A2uiAction
@@ -345,12 +346,12 @@ internal fun ChatScreen(
                         .alpha(thinkingAlpha),
                 )
             }
-            Column(
+            var composerHeightDp by remember { mutableStateOf(0.dp) }
+            val bottomPaddingDp = composerHeightDp + bottomInsetDp
+
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(
-                        bottom = bottomInsetDp
-                    )
             ) {
                 val contentPhase = when {
                     state.conversationState is ConversationState.Loading -> "loading"
@@ -360,122 +361,161 @@ internal fun ChatScreen(
                     state.error != null && state.messages.isEmpty() -> "error"
                     else -> "ready"
                 }
+
                 CompositionLocalProvider(
                     LocalSubagentTodoSheetOpener provides { target ->
                         tappedSubagentTarget = target
                     },
                 ) {
-                Crossfade(
-                    targetState = contentPhase,
-                    animationSpec = tween(durationMillis = 200),
-                    modifier = Modifier.weight(1f),
-                    label = "chat-content",
-                ) { phase ->
-                    when (phase) {
-                        "loading" -> {
-                            MessageSkeletonList(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(top = contentPadding.calculateTopPadding())
-                            )
-                        }
-                        "error" -> {
-                            val msg = (state.conversationState as? ConversationState.Error)?.message
-                                ?: state.error ?: "Unknown error"
-                            val retry = if (state.conversationState is ConversationState.Error) {
-                                { viewModel.retryConversationLoad() }
-                            } else {
-                                { viewModel.loadMessages() }
+                    Crossfade(
+                        targetState = contentPhase,
+                        animationSpec = tween(durationMillis = 200),
+                        modifier = Modifier.fillMaxSize(),
+                        label = "chat-content",
+                    ) { phase ->
+                        when (phase) {
+                            "loading" -> {
+                                MessageSkeletonList(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = contentPadding.calculateTopPadding())
+                                )
                             }
-                            ErrorContent(
-                                message = msg,
-                                onRetry = retry,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(top = contentPadding.calculateTopPadding()),
-                            )
-                        }
-                        "no-conv" -> {
-                            NoConversationChatContent(
-                                state = state,
-                                scrollToMessageId = viewModel.scrollToMessageId,
-                                onSendMessage = { viewModel.sendMessage(it) },
-                                onRerunMessage = { viewModel.rerunMessage(it) },
-                                onLoadOlderMessages = { viewModel.loadOlderMessages() },
-                                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-                                },
-                                onToggleRunCollapsed = viewModel::toggleRunCollapsed,
-                                onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
-                                onA2uiAction = viewModel::submitA2uiAction,
-                                onDismissA2uiSurface = viewModel::dismissA2uiSurface,
-                                onAttachmentImageTap = openImageViewer,
-                                activeFontScale = activeFontScale,
-                                onActiveFontScaleChange = { activeFontScale = it },
-                                onFontScaleChange = { viewModel.setChatFontScale(it) },
-                                chatMode = chatMode,
-                                modifier = Modifier.fillMaxSize(),
-                                chatBackground = chatBackground,
-                                topPadding = contentPadding.calculateTopPadding(),
-                            )
-                        }
-                        else -> {
-                            ChatContent(
-                                state = state,
-                                scrollToMessageId = viewModel.scrollToMessageId,
-                                onSendMessage = { viewModel.sendMessage(it) },
-                                onRerunMessage = { viewModel.rerunMessage(it) },
-                                onLoadOlderMessages = { viewModel.loadOlderMessages() },
-                                onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                                    viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-                                },
-                                onToggleRunCollapsed = viewModel::toggleRunCollapsed,
-                                onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
-                                onA2uiAction = viewModel::submitA2uiAction,
-                                onDismissA2uiSurface = viewModel::dismissA2uiSurface,
-                                onAttachmentImageTap = openImageViewer,
-                                activeFontScale = activeFontScale,
-                                onActiveFontScaleChange = { activeFontScale = it },
-                                onFontScaleChange = { viewModel.setChatFontScale(it) },
-                                chatMode = chatMode,
-                                modifier = Modifier.fillMaxSize(),
-                                chatBackground = chatBackground,
-                                topPadding = contentPadding.calculateTopPadding(),
-                            )
+                            "error" -> {
+                                val msg = (state.conversationState as? ConversationState.Error)?.message
+                                    ?: state.error ?: "Unknown error"
+                                val retry = if (state.conversationState is ConversationState.Error) {
+                                    { viewModel.retryConversationLoad() }
+                                } else {
+                                    { viewModel.loadMessages() }
+                                }
+                                ErrorContent(
+                                    message = msg,
+                                    onRetry = retry,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(top = contentPadding.calculateTopPadding()),
+                                )
+                            }
+                            "no-conv" -> {
+                                NoConversationChatContent(
+                                    state = state,
+                                    scrollToMessageId = viewModel.scrollToMessageId,
+                                    onSendMessage = { viewModel.sendMessage(it) },
+                                    onRerunMessage = { viewModel.rerunMessage(it) },
+                                    onLoadOlderMessages = { viewModel.loadOlderMessages() },
+                                    onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                                        viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                                    },
+                                    onToggleRunCollapsed = viewModel::toggleRunCollapsed,
+                                    onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                                    onA2uiAction = viewModel::submitA2uiAction,
+                                    onDismissA2uiSurface = viewModel::dismissA2uiSurface,
+                                    onAttachmentImageTap = openImageViewer,
+                                    activeFontScale = activeFontScale,
+                                    onActiveFontScaleChange = { activeFontScale = it },
+                                    onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                    chatMode = chatMode,
+                                    modifier = Modifier.fillMaxSize(),
+                                    chatBackground = chatBackground,
+                                    topPadding = contentPadding.calculateTopPadding(),
+                                    bottomPadding = bottomPaddingDp,
+                                )
+                            }
+                            else -> {
+                                ChatContent(
+                                    state = state,
+                                    scrollToMessageId = viewModel.scrollToMessageId,
+                                    onSendMessage = { viewModel.sendMessage(it) },
+                                    onRerunMessage = { viewModel.rerunMessage(it) },
+                                    onLoadOlderMessages = { viewModel.loadOlderMessages() },
+                                    onSubmitApproval = { requestId, toolCallIds, approve, reason ->
+                                        viewModel.submitApproval(requestId, toolCallIds, approve, reason)
+                                    },
+                                    onToggleRunCollapsed = viewModel::toggleRunCollapsed,
+                                    onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
+                                    onA2uiAction = viewModel::submitA2uiAction,
+                                    onDismissA2uiSurface = viewModel::dismissA2uiSurface,
+                                    onAttachmentImageTap = openImageViewer,
+                                    activeFontScale = activeFontScale,
+                                    onActiveFontScaleChange = { activeFontScale = it },
+                                    onFontScaleChange = { viewModel.setChatFontScale(it) },
+                                    chatMode = chatMode,
+                                    modifier = Modifier.fillMaxSize(),
+                                    chatBackground = chatBackground,
+                                    topPadding = contentPadding.calculateTopPadding(),
+                                    bottomPadding = bottomPaddingDp,
+                                )
+                            }
                         }
                     }
                 }
 
-                // letta-mobile-73o2h.2: persistent active-subagent status
-                // bar. Sits between the chat content and the composer. The
-                // active-only visibility rule is enforced by `activeOnly()`
-                // on the source flow; the bar hides itself entirely when the
-                // snapshot is empty (AnimatedVisibility), so this call site
-                // is unconditional and does not perturb ChatMessageList /
-                // streaming.
-                ActiveSubagentBar(
-                    subagents = activeSubagents,
-                    // letta-mobile-dvobc: drive the "stuck" ring heuristic off
-                    // the same coarse 1s tick the linger window uses, so a
-                    // running chip's ring flips to yellow without a new WS
-                    // frame.
-                    now = lingerTick,
-                    onChipClick = { subagent ->
-                        tappedSubagentTarget = SubagentTodoSheetTarget(
-                            toolCallId = subagent.id,
-                            description = subagent.description,
-                            subagentAgentId = subagent.subagentAgentId,
+                // Floating composer column aligned to BottomCenter
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = bottomInsetDp)
+                        .onSizeChanged { size ->
+                            composerHeightDp = with(density) { size.height.toDp() }
+                        }
+                ) {
+                    CompositionLocalProvider(
+                        LocalSubagentTodoSheetOpener provides { target ->
+                            tappedSubagentTarget = target
+                        },
+                    ) {
+                        ActiveSubagentBar(
+                            subagents = activeSubagents,
+                            now = lingerTick,
+                            onChipClick = { subagent ->
+                                tappedSubagentTarget = SubagentTodoSheetTarget(
+                                    toolCallId = subagent.id,
+                                    description = subagent.description,
+                                    subagentAgentId = subagent.subagentAgentId,
+                                )
+                            },
+                            onViewConversation = { subagent ->
+                                subagent.subagentAgentId
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { agentId -> onViewSubagentConversation?.invoke(agentId) }
+                            },
                         )
-                    },
-                    // letta-mobile-vo9y1: jump straight to the subagent's
-                    // conversation from the chip's view-conversation action.
-                    onViewConversation = { subagent ->
-                        subagent.subagentAgentId
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { agentId -> onViewSubagentConversation?.invoke(agentId) }
-                    },
-                )
+                    }
+
+                    val launchPicker = rememberImageAttachmentPicker(
+                        onPicked = { viewModel.addAttachment(it) },
+                        onError = { viewModel.reportComposerError(it) },
+                        limits = viewModel.attachmentLimits,
+                    )
+                    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
+                    ChatComposer(
+                        inputText = composerState.inputText,
+                        pendingAttachments = composerState.pendingAttachments,
+                        isStreaming = state.isStreaming,
+                        canSendMessages = viewModel.canSendMessages,
+                        onTextChange = { newText ->
+                            if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
+                                onBugCommand?.invoke()
+                            }
+                        },
+                        onSend = {
+                            if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
+                                onBugCommand?.invoke()
+                            }
+                        },
+                        onStop = { viewModel.interruptRun() },
+                        onRemoveAttachment = { viewModel.removeAttachment(it) },
+                        onAttachImage = launchPicker,
+                        availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
+                            activeAgent?.tools.orEmpty()
+                        } else {
+                            emptyList()
+                        },
+                    )
                 }
+            }
 
                 // letta-mobile-73o2h.3: tap-to-todolist bottom sheet. One-shot
                 // fetch of the tapped subagent's TodoWrite via the source.
@@ -673,6 +713,7 @@ internal fun NoConversationChatContent(
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 0.dp,
 ) {
     // letta-mobile-qkct: a fresh Client Mode send remains in
     // NoConversation until the gateway returns the newly-created
@@ -683,7 +724,7 @@ internal fun NoConversationChatContent(
     if (shouldShowStarterPromptsForNoConversation(state)) {
         StarterPrompts(
             onPromptClick = onSendMessage,
-            modifier = modifier.padding(top = topPadding),
+            modifier = modifier.padding(top = topPadding, bottom = bottomPadding),
         )
     } else {
         ChatContent(
@@ -705,6 +746,7 @@ internal fun NoConversationChatContent(
             modifier = modifier,
             chatBackground = chatBackground,
             topPadding = topPadding,
+            bottomPadding = bottomPadding,
         )
     }
 }
@@ -729,6 +771,7 @@ private fun ChatContent(
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 0.dp,
 ) {
     val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
     val chatDisplayMode = chatMode.toChatDisplayMode()
@@ -740,15 +783,21 @@ private fun ChatContent(
         )
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    var a2uiStackHeightDp by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+
+    Box(modifier = modifier.fillMaxSize()) {
         if (state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()) {
             StarterPrompts(
                 onPromptClick = onSendMessage,
-                modifier = Modifier.weight(1f).padding(top = topPadding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = topPadding, bottom = bottomPadding),
             )
         } else {
+            val listBottomPadding = bottomPadding + if (state.a2uiSurfaces.isNotEmpty()) a2uiStackHeightDp else 0.dp
             if (state.messages.isEmpty() && !state.isStreaming) {
-                Spacer(modifier = Modifier.weight(1f))
+                // List is empty but A2UI is shown
             } else {
                 ChatMessageList(
                     state = state,
@@ -765,22 +814,34 @@ private fun ChatContent(
                     onToggleRunCollapsed = onToggleRunCollapsed,
                     onToggleReasoningExpanded = onToggleReasoningExpanded,
                     onAttachmentImageTap = onAttachmentImageTap,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                     chatBackground = chatBackground,
                     topPadding = topPadding,
+                    bottomPadding = listBottomPadding,
                 )
             }
-            A2uiSurfaceStack(
-                surfaces = state.a2uiSurfaces,
-                resolvedActionCounters = state.a2uiResolvedActionCounters,
-                onAction = onA2uiAction,
-                onDismissSurface = onDismissA2uiSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
-            )
+            if (state.a2uiSurfaces.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = bottomPadding)
+                        .onSizeChanged { size ->
+                            a2uiStackHeightDp = with(density) { size.height.toDp() }
+                        }
+                ) {
+                    A2uiSurfaceStack(
+                        surfaces = state.a2uiSurfaces,
+                        resolvedActionCounters = state.a2uiResolvedActionCounters,
+                        onAction = onA2uiAction,
+                        onDismissSurface = onDismissA2uiSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
+                    )
+                }
+            }
         }
-
     }
 }
 

@@ -94,11 +94,14 @@ internal fun Modifier.chatFadingEdges(
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
+            // 1. Draw the list content
             drawContent()
+
+            // 2. Draw the DstIn fades to dissolve list content
             if (showTop) {
                 val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
                 if (topFadePx > 0f) {
-                    val topTransparent = targetColor.copy(alpha = 0.05f)
+                    val topTransparent = targetColor.copy(alpha = 0.0f)
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(topTransparent, targetColor),
@@ -112,7 +115,7 @@ internal fun Modifier.chatFadingEdges(
             if (showBottom) {
                 val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
                 if (bottomFadePx > 0f) {
-                    val bottomTransparent = targetColor.copy(alpha = 0.05f)
+                    val bottomTransparent = targetColor.copy(alpha = 0.0f)
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(targetColor, bottomTransparent),
@@ -120,6 +123,32 @@ internal fun Modifier.chatFadingEdges(
                             endY = size.height,
                         ),
                         blendMode = BlendMode.DstIn,
+                    )
+                }
+            }
+
+            // 3. Draw the solid dark overlay (Normal blend mode) to darken the background/ambient shader
+            if (showTop) {
+                val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
+                if (topFadePx > 0f) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(targetColor.copy(alpha = 0.85f), Color.Transparent),
+                            startY = 0f,
+                            endY = topFadePx,
+                        )
+                    )
+                }
+            }
+            if (showBottom) {
+                val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
+                if (bottomFadePx > 0f) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.85f)),
+                            startY = size.height - bottomFadePx,
+                            endY = size.height,
+                        )
                     )
                 }
             }
@@ -146,6 +175,7 @@ internal fun ChatFadingEdgesBox(
     targetColor: Color,
     modifier: Modifier = Modifier,
     topPadding: Dp = 0.dp,
+    topFadeLength: Dp = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength,
     bottomFadeLength: Dp = ChatFadeEdgeLength,
     // letta-mobile-58qlr.1: when true, the BOTTOM fade is suppressed regardless
     // of scroll state. The caller sets this while pinned to the newest edge so
@@ -169,7 +199,7 @@ internal fun ChatFadingEdgesBox(
         modifier = modifier.chatFadingEdges(
             showTop = showTop,
             showBottom = showBottom,
-            topFadeLength = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength,
+            topFadeLength = topFadeLength,
             bottomFadeLength = bottomFadeLength,
             targetColor = targetColor,
         ),

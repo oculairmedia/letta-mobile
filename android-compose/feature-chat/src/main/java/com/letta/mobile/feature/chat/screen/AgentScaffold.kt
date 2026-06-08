@@ -382,7 +382,7 @@ internal fun AgentScaffoldContent(
                             }
                         }
                     },
-                    modifier = Modifier.padding(top = with(LocalDensity.current) { (WindowInsets.safeDrawing.getTop(this) / 2).toDp() }),
+                    modifier = Modifier.padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }),
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
                         scrolledContainerColor = Color.Transparent,
