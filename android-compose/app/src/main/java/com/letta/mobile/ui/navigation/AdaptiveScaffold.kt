@@ -72,13 +72,22 @@ fun AdaptiveScaffold(
             content()
         }
     } else {
+        val navBackStackEntry by navController.currentBackStackEntryAsState()
+        val currentDestination = navBackStackEntry?.destination
+        val isChatDestination = TopLevelDestination.CHAT.isSelected(currentDestination)
+
         Scaffold(
             modifier = modifier.fillMaxSize(),
             containerColor = MaterialTheme.colorScheme.surface,
         ) { innerPadding ->
             Box(
                 modifier = Modifier
-                    .padding(innerPadding)
+                    .padding(
+                        top = if (isChatDestination) 0.dp else innerPadding.calculateTopPadding(),
+                        bottom = if (isChatDestination) 0.dp else innerPadding.calculateBottomPadding(),
+                        start = innerPadding.calculateStartPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
+                        end = innerPadding.calculateEndPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    )
                     .consumeWindowInsets(innerPadding),
             ) {
                 content()

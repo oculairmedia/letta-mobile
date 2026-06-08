@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -113,6 +114,7 @@ private const val TOOL_AFFORDANCE_ROW_ENABLED = false
 @Composable
 internal fun ChatScreen(
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
     chatBackground: ChatBackground = ChatBackground.Default,
     chatMode: String = "interactive",
     onBugCommand: (() -> Unit)? = null,
@@ -205,7 +207,7 @@ internal fun ChatScreen(
         val windowSizeClass = LocalWindowSizeClass.current
         val imeBottomPx = WindowInsets.ime.getBottom(density)
         val navBottomPx = WindowInsets.navigationBars.getBottom(density)
-        val bottomBarPx = if (windowSizeClass.isExpandedWidth) 0 else with(density) { 56.dp.roundToPx() }
+        val bottomBarPx = 0
         val bottomInsetDp = with(density) { max(imeBottomPx, navBottomPx + bottomBarPx).toDp() }
         var ambientAgentStatus by remember { mutableStateOf("Idle") }
         var hadActiveAmbientRun by remember { mutableStateOf(false) }
@@ -289,8 +291,7 @@ internal fun ChatScreen(
             agentStatus = ambientAgentStatus,
             modifier = modifier
                 .fillMaxSize()
-                .then(backgroundModifier)
-                .padding(bottom = bottomInsetDp),
+                .then(backgroundModifier),
         ) {
             // letta-mobile-vcky.b3: thinking glow declared BEFORE the
             // Column so it paints first (behind everything). Aligned to
@@ -343,7 +344,14 @@ internal fun ChatScreen(
                         .alpha(thinkingAlpha),
                 )
             }
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = contentPadding.calculateTopPadding(),
+                        bottom = bottomInsetDp
+                    )
+            ) {
                 val contentPhase = when {
                     state.conversationState is ConversationState.Loading -> "loading"
                     state.conversationState is ConversationState.Error -> "error"

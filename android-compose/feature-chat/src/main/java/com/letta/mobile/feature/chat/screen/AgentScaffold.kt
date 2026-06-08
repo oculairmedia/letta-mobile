@@ -73,6 +73,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -307,7 +308,7 @@ internal fun AgentScaffoldContent(
     ) {
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
+            containerColor = Color.Transparent,
             topBar = {
                 TopAppBar(
                     title = {
@@ -375,7 +376,10 @@ internal fun AgentScaffoldContent(
                             }
                         }
                     },
-                    colors = LettaTopBarDefaults.topAppBarColors(),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
                     scrollBehavior = scrollBehavior,
                     actions = {
                         IconButton(onClick = {
@@ -405,9 +409,9 @@ internal fun AgentScaffoldContent(
                 }
             },
         ) { paddingValues ->
+            val topPadding = paddingValues.calculateTopPadding()
             Column(
                 modifier = Modifier
-                    .padding(paddingValues)
                     .fillMaxSize(),
             ) {
                 projectContext?.let { project ->
@@ -422,9 +426,16 @@ internal fun AgentScaffoldContent(
                         onRetryBrief = projectBindings::loadProjectBrief,
                         onSaveBriefSection = projectBindings::saveProjectBriefSection,
                         onCreateBugReport = { showBugReportSheet = true },
-                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
+                        modifier = Modifier
+                            .padding(top = topPadding)
+                            .testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
                     )
                 }
+                val chatModifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT)
+
                 if (uiState.isSearchActive) {
                     ChatSearchResultsContent(
                         searchQuery = uiState.searchQuery,
@@ -439,14 +450,16 @@ internal fun AgentScaffoldContent(
                                 onSwitchConversation?.invoke(agentIdValue, targetConversationId, agentName.takeIf { it.isNotBlank() })
                             }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT),
+                        modifier = chatModifier
+                            .padding(top = if (projectContext == null) topPadding else 0.dp, bottom = paddingValues.calculateBottomPadding()),
                     )
                 } else {
                     ChatScreen(
-                        modifier = Modifier.fillMaxWidth().weight(1f).testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT),
+                        modifier = chatModifier,
+                        contentPadding = PaddingValues(
+                            top = if (projectContext == null) topPadding else 0.dp,
+                            bottom = 0.dp
+                        ),
                         chatBackground = chatBackground,
                         chatMode = chatMode,
                         onBugCommand = { showBugReportSheet = true },
