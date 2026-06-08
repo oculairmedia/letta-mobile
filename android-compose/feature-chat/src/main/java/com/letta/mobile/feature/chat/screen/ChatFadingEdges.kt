@@ -43,11 +43,10 @@ import com.letta.mobile.ui.theme.LettaSpacing
 // drew, which composes cleanly.
 
 /**
- * Whether the TOP fade should be drawn: only when there is content scrolled
- * off the top edge to fade toward. With reverseLayout the visual top is the
- * "backward" scroll direction.
+ * Whether the TOP fade should be drawn. Always true to maintain a consistent
+ * visual dissolve into the header area, regardless of scroll position.
  */
-internal fun chatFadeShowTop(canScrollBackward: Boolean): Boolean = true
+internal fun chatFadeShowTop(): Boolean = true
 
 /**
  * Whether the BOTTOM fade should be drawn: only when there is content scrolled
@@ -124,7 +123,6 @@ internal fun Modifier.chatFadingEdges(
                             endY = size.height,
                         ),
                         blendMode = BlendMode.DstIn,
-                        alpha = bottomFadeAlpha,
                     )
                 }
             }
@@ -151,7 +149,6 @@ internal fun Modifier.chatFadingEdges(
                             startY = size.height - bottomFadePx,
                             endY = size.height,
                         ),
-                        alpha = bottomFadeAlpha,
                     )
                 }
             }
@@ -190,7 +187,7 @@ internal fun ChatFadingEdgesBox(
     content: @Composable () -> Unit,
 ) {
     val showTop by remember(listState) {
-        derivedStateOf { chatFadeShowTop(listState.canScrollBackward) }
+        derivedStateOf { chatFadeShowTop() }
     }
     val showBottomTarget by remember(listState, suppressBottom) {
         derivedStateOf { !suppressBottom && chatFadeShowBottom(listState.canScrollForward) }
