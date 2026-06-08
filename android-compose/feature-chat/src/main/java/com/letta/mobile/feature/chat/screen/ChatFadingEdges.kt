@@ -47,7 +47,7 @@ import com.letta.mobile.ui.theme.LettaSpacing
  * off the top edge to fade toward. With reverseLayout the visual top is the
  * "backward" scroll direction.
  */
-internal fun chatFadeShowTop(canScrollBackward: Boolean): Boolean = canScrollBackward
+internal fun chatFadeShowTop(canScrollBackward: Boolean): Boolean = true
 
 /**
  * Whether the BOTTOM fade should be drawn: only when there is content scrolled

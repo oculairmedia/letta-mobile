@@ -480,6 +480,7 @@ internal fun ChatMessageList(
 
     val activeUserPromptState = remember(listState, renderItems, topPadding, density) {
         derivedStateOf {
+            /*
             val visibleItems = listState.layoutInfo.visibleItemsInfo
             val topMostVisibleItem = visibleItems.lastOrNull()
             val topMostKey = topMostVisibleItem?.key as? String
@@ -531,6 +532,8 @@ internal fun ChatMessageList(
             } else {
                 null
             }
+            */
+            null
         }
     }
 
@@ -761,13 +764,9 @@ internal fun ChatMessageList(
             chatBackground = chatBackground,
             fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
         )
-        var stickyHeaderHeight by remember { mutableStateOf(0) }
-        val activePromptState by activeUserPromptState
-        val topFadeLength = if (activePromptState != null && stickyHeaderHeight > 0) {
-            topPadding + with(LocalDensity.current) { stickyHeaderHeight.toDp() }
-        } else {
-            if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
-        }
+        // var stickyHeaderHeight by remember { mutableStateOf(0) }
+        // val activePromptState by activeUserPromptState
+        val topFadeLength = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
         ChatFadingEdgesBox(
             listState = listState,
             targetColor = fadeTargetColor,
@@ -1013,6 +1012,7 @@ internal fun ChatMessageList(
             }
             } // letta-mobile-58qlr: end ChatFadingEdgesBox
 
+            /*
             if (activePromptState != null) {
                 val activeState = activePromptState!!
                 Box(
@@ -1088,6 +1088,7 @@ internal fun ChatMessageList(
                     )
                 }
             }
+            */
         } // letta-mobile-5e0f.r2: end CompositionLocalProvider(LocalChatIsPinching)
 
         ScrollToBottomFab(
