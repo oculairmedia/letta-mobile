@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.data.a2ui.A2uiAction
@@ -348,7 +349,6 @@ internal fun ChatScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        top = contentPadding.calculateTopPadding(),
                         bottom = bottomInsetDp
                     )
             ) {
@@ -373,7 +373,11 @@ internal fun ChatScreen(
                 ) { phase ->
                     when (phase) {
                         "loading" -> {
-                            MessageSkeletonList(modifier = Modifier.fillMaxSize())
+                            MessageSkeletonList(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = contentPadding.calculateTopPadding())
+                            )
                         }
                         "error" -> {
                             val msg = (state.conversationState as? ConversationState.Error)?.message
@@ -386,7 +390,9 @@ internal fun ChatScreen(
                             ErrorContent(
                                 message = msg,
                                 onRetry = retry,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(top = contentPadding.calculateTopPadding()),
                             )
                         }
                         "no-conv" -> {
@@ -410,6 +416,7 @@ internal fun ChatScreen(
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
                                 chatBackground = chatBackground,
+                                topPadding = contentPadding.calculateTopPadding(),
                             )
                         }
                         else -> {
@@ -433,6 +440,7 @@ internal fun ChatScreen(
                                 chatMode = chatMode,
                                 modifier = Modifier.fillMaxSize(),
                                 chatBackground = chatBackground,
+                                topPadding = contentPadding.calculateTopPadding(),
                             )
                         }
                     }
@@ -664,6 +672,7 @@ internal fun NoConversationChatContent(
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
+    topPadding: Dp = 0.dp,
 ) {
     // letta-mobile-qkct: a fresh Client Mode send remains in
     // NoConversation until the gateway returns the newly-created
@@ -674,7 +683,7 @@ internal fun NoConversationChatContent(
     if (shouldShowStarterPromptsForNoConversation(state)) {
         StarterPrompts(
             onPromptClick = onSendMessage,
-            modifier = modifier,
+            modifier = modifier.padding(top = topPadding),
         )
     } else {
         ChatContent(
@@ -695,6 +704,7 @@ internal fun NoConversationChatContent(
             chatMode = chatMode,
             modifier = modifier,
             chatBackground = chatBackground,
+            topPadding = topPadding,
         )
     }
 }
@@ -718,6 +728,7 @@ private fun ChatContent(
     chatMode: String = "interactive",
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
+    topPadding: Dp = 0.dp,
 ) {
     val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
     val chatDisplayMode = chatMode.toChatDisplayMode()
@@ -733,7 +744,7 @@ private fun ChatContent(
         if (state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()) {
             StarterPrompts(
                 onPromptClick = onSendMessage,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).padding(top = topPadding),
             )
         } else {
             if (state.messages.isEmpty() && !state.isStreaming) {
@@ -756,6 +767,7 @@ private fun ChatContent(
                     onAttachmentImageTap = onAttachmentImageTap,
                     modifier = Modifier.weight(1f),
                     chatBackground = chatBackground,
+                    topPadding = topPadding,
                 )
             }
             A2uiSurfaceStack(

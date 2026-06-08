@@ -41,6 +41,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -308,6 +310,7 @@ internal fun ChatMessageList(
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
+    topPadding: Dp = 0.dp,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -704,8 +707,10 @@ internal fun ChatMessageList(
                 // tool output, and run blocks get the widest useful line
                 // length without touching the screen edge.
                 contentPadding = PaddingValues(
-                    horizontal = chatDimens.contentPaddingHorizontal,
-                    vertical = LettaSpacing.cardGap,
+                    start = chatDimens.contentPaddingHorizontal,
+                    end = chatDimens.contentPaddingHorizontal,
+                    top = LettaSpacing.cardGap,
+                    bottom = LettaSpacing.cardGap + topPadding,
                 ),
                 reverseLayout = true,
                 // letta-mobile-erhjl: keep an identity graphicsLayer so the
