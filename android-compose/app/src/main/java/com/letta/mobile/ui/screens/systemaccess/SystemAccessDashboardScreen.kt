@@ -8,6 +8,12 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.AndroidFile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -124,9 +130,11 @@ private fun systemAccessPermissionIntentHandler(
     ) {
         onRefresh()
     }
-    val documentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-    ) { uri ->
+    val documentLauncher = rememberFilePickerLauncher(
+        type = FileKitType.File(),
+        mode = FileKitMode.Single,
+    ) { file ->
+        val uri = file?.uri
         if (uri != null) {
             val message = if (persistSafGrant(context, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)) {
                 R.string.screen_system_access_saf_file_granted
@@ -137,9 +145,8 @@ private fun systemAccessPermissionIntentHandler(
         }
         onRefresh()
     }
-    val treeLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree(),
-    ) { uri ->
+    val treeLauncher = rememberDirectoryPickerLauncher { directory ->
+        val uri = directory?.uri
         val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         if (uri != null) {
             val message = if (persistSafGrant(context, uri, flags)) {
@@ -162,9 +169,9 @@ private fun systemAccessPermissionIntentHandler(
                 snackbar.dispatch(context.getString(R.string.screen_system_access_settings_unavailable))
             }
         } else if (intent.id == "storage.saf.open_document") {
-            documentLauncher.launch(arrayOf("*/*"))
+            documentLauncher.launch()
         } else if (intent.id == "storage.saf.open_tree") {
-            treeLauncher.launch(null)
+            treeLauncher.launch()
         } else {
             snackbar.dispatch(context.getString(R.string.screen_system_access_action_future))
         }
@@ -481,3 +488,10 @@ private val SystemAccessCapability.auditSummary: String
 private fun String.toDisplayLabel(): String = replace('_', ' ')
     .lowercase(Locale.ROOT)
     .replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.ROOT) else char.toString() }
+
+private val PlatformFile.uri: Uri
+    get() = when (val wrapped = this.androidFile) {
+        is AndroidFile.UriWrapper -> wrapped.uri
+        is AndroidFile.FileWrapper -> Uri.fromFile(wrapped.file)
+        else -> error("Unknown AndroidFile type")
+    }
