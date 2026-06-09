@@ -836,10 +836,8 @@ internal fun ChatMessageList(
                             layoutDirection = layoutDirection,
                             activeFontScale = activeFontScale,
                         )
-                        val newestMessageIdForList = state.messages.lastOrNull()?.id
                         val isStreamingRenderItem = state.isStreaming &&
                             newestMessageId != null &&
-                            newestMessageId == newestMessageIdForList &&
                             renderItem.containsMessageId(newestMessageId)
                         // letta-mobile-8u662: during a pinch, items outside
                         // the viewport-bounded scale window keep the committed
