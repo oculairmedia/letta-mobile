@@ -420,11 +420,11 @@ internal fun ChatMessageList(
         }
     }
 
-    val autoScrollSignature by rememberUpdatedState(newestMessageAutoScrollSignature(state.messages))
+    val autoScrollSignature = newestMessageAutoScrollSignature(state.messages)
     val isStreamingForAutoScroll by rememberUpdatedState(state.isStreaming)
     // letta-mobile-gsvgt (F1): keep this per-tick summary O(1). The previous
-    // implementation keyed the remember on state.messages AND renderItems â€”
-    // both of which get a fresh identity on every streamed token â€” and its
+    // implementation keyed the remember on state.messages AND renderItems 
+    // both of which get a fresh identity on every streamed token  and its
     // body called renderItems.pinchVisibleContentSummary(), an O(total
     // conversation) walk over every render item and every message inside
     // every RunBlock. That ran PER TOKEN during streaming purely to keep a
@@ -539,7 +539,6 @@ internal fun ChatMessageList(
 
     var lastStreamingSnapMs by remember { mutableStateOf(0L) }
     var followLatest by remember(conversationId) { mutableStateOf(true) }
-    val latestItemKey = renderItems.firstOrNull()?.key
 
     LaunchedEffect(conversationId) {
         followLatest = true
@@ -559,10 +558,22 @@ internal fun ChatMessageList(
             }
     }
 
-    LaunchedEffect(latestItemKey, renderItems.size) {
-        if (ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size)) {
+    val lastAutoScrollSignature = remember { mutableStateOf<ChatAutoScrollSignature?>(null) }
+
+    LaunchedEffect(autoScrollSignature, isStreamingForAutoScroll, renderItems.size) {
+        val signature = autoScrollSignature ?: return@LaunchedEffect
+        val previousSignature = lastAutoScrollSignature.value
+
+        if (shouldForceScrollOnUserSend(signature, previousSignature?.messageId)) {
+            followLatest = true
+            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
+            listState.animateScrollToItem(0, sendScrollOffset)
+        } else if (
+            ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size) &&
+            (signature.role != "user" || signature.messageId != previousSignature?.messageId)
+        ) {
             val nowMs = System.currentTimeMillis()
-            if (state.isStreaming) {
+            if (isStreamingForAutoScroll) {
                 if (nowMs - lastStreamingSnapMs >= StreamingAutoScrollSnapThrottleMs) {
                     lastStreamingSnapMs = nowMs
                     listState.scrollToItem(0)
@@ -571,17 +582,8 @@ internal fun ChatMessageList(
                 listState.scrollToItem(0)
             }
         }
-    }
 
-    val newestSingleMessage = renderItems.firstOrNull() as? ChatRenderItem.Single
-    val isNewestUserMessage = newestSingleMessage?.message?.role == "user"
-
-    LaunchedEffect(latestItemKey) {
-        if (latestItemKey != null && isNewestUserMessage) {
-            followLatest = true
-            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
-            listState.animateScrollToItem(0, sendScrollOffset)
-        }
+        lastAutoScrollSignature.value = signature
     }
 
     LaunchedEffect(listState, state.hasMoreOlderMessages, state.isLoadingOlderMessages, state.messages.size) {
@@ -912,7 +914,9 @@ internal fun ChatMessageList(
                                         RenderChatMessage(
                                             message = message,
                                             position = position,
-                                            state = state,
+                                            isStreaming = isStreamingRenderItem && message.id == newestMessageId,
+                                            rerunEnabled = !state.isStreaming,
+                                            approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
                                             chatMode = chatMode,
                                             highlightedMessageId = highlightedMessageId,
                                             onSendMessage = onSendMessage,
@@ -928,7 +932,9 @@ internal fun ChatMessageList(
                                     RenderChatMessage(
                                         message = msg,
                                         position = renderItem.groupPosition,
-                                        state = state,
+                                        isStreaming = isStreamingRenderItem && msg.id == newestMessageId,
+                                        rerunEnabled = !state.isStreaming,
+                                        approvalInFlight = state.activeApprovalRequestId == msg.approvalRequest?.requestId,
                                         chatMode = chatMode,
                                         highlightedMessageId = highlightedMessageId,
                                         onSendMessage = onSendMessage,
@@ -968,7 +974,9 @@ internal fun ChatMessageList(
                                     RenderChatMessage(
                                         message = message,
                                         position = position,
-                                        state = state,
+                                        isStreaming = isStreamingRenderItem && message.id == newestMessageId,
+                                        rerunEnabled = !state.isStreaming,
+                                        approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
                                         chatMode = chatMode,
                                         highlightedMessageId = highlightedMessageId,
                                         onSendMessage = onSendMessage,
@@ -1082,7 +1090,9 @@ internal fun ChatMessageList(
                     RenderChatMessage(
                         message = activeState.promptItem.message,
                         position = activeState.promptItem.groupPosition,
-                        state = state,
+                        isStreaming = false,
+                        rerunEnabled = !state.isStreaming,
+                        approvalInFlight = state.activeApprovalRequestId == activeState.promptItem.message.approvalRequest?.requestId,
                         chatMode = chatMode,
                         highlightedMessageId = highlightedMessageId,
                         onSendMessage = onSendMessage,
@@ -1292,7 +1302,9 @@ internal fun calculateLazyIndexForRenderItem(
 private fun RenderChatMessage(
     message: UiMessage,
     position: GroupPosition,
-    state: ChatUiState,
+    isStreaming: Boolean,
+    rerunEnabled: Boolean,
+    approvalInFlight: Boolean,
     chatMode: String,
     highlightedMessageId: String?,
     onSendMessage: (String) -> Unit,
@@ -1328,16 +1340,16 @@ private fun RenderChatMessage(
         ChatMessageItem(
             message = message,
             groupPosition = position,
-            isStreaming = state.isStreaming && message.id == state.messages.lastOrNull()?.id,
+            isStreaming = isStreaming,
             reasoningCollapsed = reasoningCollapsed,
             onToggleReasoning = onToggleReasoning,
             onGeneratedUiMessage = onSendMessage,
             onRerunMessage = onRerunMessage,
-            rerunEnabled = !state.isStreaming,
+            rerunEnabled = rerunEnabled,
             onApprovalDecision = { requestId, toolCallIds, approve, reason ->
                 onSubmitApproval(requestId, toolCallIds, approve, reason)
             },
-            approvalInFlight = state.activeApprovalRequestId == message.approvalRequest?.requestId,
+            approvalInFlight = approvalInFlight,
             onAttachmentImageTap = onAttachmentImageTap,
             modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
         )

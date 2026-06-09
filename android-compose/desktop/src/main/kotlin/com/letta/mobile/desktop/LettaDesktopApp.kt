@@ -60,8 +60,10 @@ import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
-import java.awt.FileDialog
-import java.awt.Frame
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
 
 @Composable
@@ -88,6 +90,25 @@ fun LettaDesktopApp() {
     }
     val chatState by chatController.state.collectAsState()
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
+    val pickerLauncher = rememberFilePickerLauncher(
+        type = FileKitType.Image,
+        mode = FileKitMode.Single,
+        dialogSettings = FileKitDialogSettings(title = "Attach image"),
+    ) { file ->
+        if (file != null) {
+            chatScope.launch {
+                runCatching {
+                    val path = file.file.toPath()
+                    imageAttachmentLoader.load(path)
+                }.onSuccess(chatController::attachImage)
+                    .onFailure {
+                        chatController.showComposerError(
+                            it.message ?: it::class.simpleName ?: "Could not attach image",
+                        )
+                    }
+            }
+        }
+    }
 
     LaunchedEffect(chatController) {
         chatController.start()
@@ -137,18 +158,7 @@ fun LettaDesktopApp() {
                     onChatComposerTextChanged = chatController::updateComposerText,
                     onChatSend = chatController::send,
                     onChatAttachImage = {
-                        val file = chooseDesktopImageFile()
-                        if (file != null) {
-                            chatScope.launch {
-                                runCatching { imageAttachmentLoader.load(file.toPath()) }
-                                    .onSuccess(chatController::attachImage)
-                                    .onFailure {
-                                        chatController.showComposerError(
-                                            it.message ?: it::class.simpleName ?: "Could not attach image",
-                                        )
-                                    }
-                            }
-                        }
+                        pickerLauncher.launch()
                     },
                     onChatRemoveImageAttachment = chatController::removeImageAttachment,
                     onChatRetryConnection = chatController::retryConnection,
@@ -170,16 +180,6 @@ fun LettaDesktopApp() {
             }
         }
     }
-}
-
-private fun chooseDesktopImageFile(): java.io.File? {
-    val dialog = FileDialog(null as Frame?, "Attach image", FileDialog.LOAD).apply {
-        file = "*.png;*.jpg;*.jpeg;*.webp"
-        isVisible = true
-    }
-    val directory = dialog.directory ?: return null
-    val file = dialog.file ?: return null
-    return java.io.File(directory, file)
 }
 
 @Composable

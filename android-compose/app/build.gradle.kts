@@ -420,6 +420,8 @@ dependencies {
     implementation(project(":designsystem"))
     implementation(project(":feature-chat"))
     implementation(project(":feature-editagent"))
+    implementation("io.github.vinceglb:filekit-core:0.14.1")
+    implementation("io.github.vinceglb:filekit-dialogs-compose:0.14.1")
 
     val composeBom = platform("androidx.compose:compose-bom:2026.03.01")
     implementation(composeBom)

@@ -54,6 +54,8 @@ kotlin {
 dependencies {
     implementation(project(":sharedLogic"))
 
+    implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
+    implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")

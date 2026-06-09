@@ -6,9 +6,12 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.name
+import com.letta.mobile.feature.chat.util.uri
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -42,9 +45,10 @@ internal fun rememberImageAttachmentPicker(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-    ) { uri: Uri? ->
+    val launcher = rememberFilePickerLauncher(
+        type = FileKitType.Image,
+        mode = FileKitMode.Single,
+    ) { file: PlatformFile? ->
         // Proof-of-callback trace. If this line does not appear in logcat
         // after the picker activity closes, the ActivityResult contract
         // never delivered the result to this Composable's launcher — the
@@ -52,20 +56,21 @@ internal fun rememberImageAttachmentPicker(
         // death while DocumentsUI was foreground (see letta-mobile-jng2).
             Log.i(
                 "ChatComposerAttach",
-                "launcher.onResult uri=${if (uri == null) "<null>" else uri}",
+                "launcher.onResult file=${if (file == null) "<null>" else file?.name}",
             )
-        if (uri == null) {
+        if (file == null) {
             Telemetry.event(
                 "ChatComposerAttach",
                 "attach.pickResult",
                 "result" to "cancelled",
             )
-            return@rememberLauncherForActivityResult
+            return@rememberFilePickerLauncher
         }
 
         scope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
+                    val uri = file.uri
                     loadAndNormalize(context, uri, limits)
                 }
             }.fold(
@@ -99,15 +104,13 @@ internal fun rememberImageAttachmentPicker(
             // Trace immediately before we hand off to the system picker,
             // so logcat gives us a "launch → result" bracket to reason
             // about even when the result callback never fires.
-            Log.i("ChatComposerAttach", "launcher.launch() picker=PickVisualMedia.ImageOnly")
+            Log.i("ChatComposerAttach", "launcher.launch() picker=FileKitImagePicker")
             Telemetry.event(
                 "ChatComposerAttach",
                 "attach.launch",
-                "picker" to "PickVisualMedia.ImageOnly",
+                "picker" to "FileKitImagePicker",
             )
-            launcher.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-            )
+            launcher.launch()
         }
     }
 }

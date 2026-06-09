@@ -53,8 +53,14 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
+import io.github.vinceglb.filekit.dialogs.FileKitMode
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.name
+import io.github.vinceglb.filekit.readBytes
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -137,31 +143,34 @@ fun AgentListScreen(
         onNavigateToAgent(agentId, agentName)
     }
     val context = LocalContext.current
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        val bytes = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull()
-        if (bytes == null) {
-            snackbar.dispatch(context.getString(R.string.screen_agents_import_read_failed))
-        } else {
-            val fileName = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
-                ?: context.getString(R.string.screen_agents_import_default_filename)
-            viewModel.importAgent(
-                fileName = fileName,
-                fileBytes = bytes,
-                overrideName = uiState.pendingImportName,
-                overrideExistingTools = uiState.pendingImportOverrideTools,
-                stripMessages = uiState.pendingImportStripMessages,
-            ) { response ->
-                val importedId = response.agentIds.firstOrNull()
-                snackbar.dispatch(
-                    context.getString(
-                        if (response.agentIds.size == 1) R.string.screen_agents_import_success_single else R.string.screen_agents_import_success_multiple,
-                        response.agentIds.size,
+    val scope = rememberCoroutineScope()
+    val importLauncher = rememberFilePickerLauncher(
+        type = FileKitType.File(extensions = listOf("json", "txt")),
+        mode = FileKitMode.Single,
+    ) { file: PlatformFile? ->
+        if (file == null) return@rememberFilePickerLauncher
+        scope.launch {
+            val bytes = runCatching { file.readBytes() }.getOrNull()
+            if (bytes == null) {
+                snackbar.dispatch(context.getString(R.string.screen_agents_import_read_failed))
+            } else {
+                val fileName = file.name
+                viewModel.importAgent(
+                    fileName = fileName,
+                    fileBytes = bytes,
+                    overrideName = uiState.pendingImportName,
+                    overrideExistingTools = uiState.pendingImportOverrideTools,
+                    stripMessages = uiState.pendingImportStripMessages,
+                ) { response ->
+                    val importedId = response.agentIds.firstOrNull()
+                    snackbar.dispatch(
+                        context.getString(
+                            if (response.agentIds.size == 1) R.string.screen_agents_import_success_single else R.string.screen_agents_import_success_multiple,
+                            response.agentIds.size,
+                        )
                     )
-                )
-                importedId?.let { onNavigateToAgent(it, uiState.pendingImportName) }
+                    importedId?.let { onNavigateToAgent(it, uiState.pendingImportName) }
+                }
             }
         }
     }
@@ -475,7 +484,7 @@ fun AgentListScreen(
                 viewModel.setPendingImportName(overrideName)
                 viewModel.setPendingImportOverrideTools(overrideExistingTools)
                 viewModel.setPendingImportStripMessages(stripMessages)
-                importLauncher.launch(arrayOf("application/json", "text/plain"))
+                importLauncher.launch()
                 viewModel.hideImportDialog()
             },
         )

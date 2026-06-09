@@ -406,10 +406,8 @@ class ChatMessageListScrollTest {
     // letta-mobile-58qlr: fading-edge gating + target-color logic.
 
     @Test
-    fun `top fade shows only when there is content scrolled off the top`() {
-        // reverseLayout: visual top == canScrollBackward.
-        assertTrue(chatFadeShowTop(canScrollBackward = true))
-        assertFalse(chatFadeShowTop(canScrollBackward = false))
+    fun `top fade is always shown`() {
+        assertTrue(chatFadeShowTop())
     }
 
     @Test
