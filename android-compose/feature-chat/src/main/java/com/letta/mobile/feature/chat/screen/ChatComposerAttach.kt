@@ -10,8 +10,8 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.AndroidFile
 import io.github.vinceglb.filekit.name
+import com.letta.mobile.feature.chat.util.uri
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -212,11 +212,4 @@ private val ExifInterface.rotationDegrees: Int
         ExifInterface.ORIENTATION_ROTATE_180 -> 180
         ExifInterface.ORIENTATION_ROTATE_270 -> 270
         else -> 0
-    }
-
-private val PlatformFile.uri: Uri
-    get() = when (val wrapped = this.androidFile) {
-        is AndroidFile.UriWrapper -> wrapped.uri
-        is AndroidFile.FileWrapper -> Uri.fromFile(wrapped.file)
-        else -> error("Unknown AndroidFile type")
     }

@@ -13,7 +13,7 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLaunche
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.PlatformFile
-import io.github.vinceglb.filekit.AndroidFile
+import com.letta.mobile.feature.chat.util.uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -488,10 +488,3 @@ private val SystemAccessCapability.auditSummary: String
 private fun String.toDisplayLabel(): String = replace('_', ' ')
     .lowercase(Locale.ROOT)
     .replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.ROOT) else char.toString() }
-
-private val PlatformFile.uri: Uri
-    get() = when (val wrapped = this.androidFile) {
-        is AndroidFile.UriWrapper -> wrapped.uri
-        is AndroidFile.FileWrapper -> Uri.fromFile(wrapped.file)
-        else -> error("Unknown AndroidFile type")
-    }
