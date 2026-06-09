@@ -17,6 +17,8 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: (String) -> Unit,
     onNavigateToTools: () -> Unit,
+    onNavigateToAdmin: () -> Unit,
+    onNavigateToConversationList: () -> Unit,
     onSwitchConversation: (AgentChatRoute) -> Unit,
 ) {
     composable<AgentChatRoute>(
@@ -32,6 +34,8 @@ fun NavGraphBuilder.chatGraph(
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToArchival = onNavigateToArchival,
             onNavigateToTools = onNavigateToTools,
+            onNavigateToAdmin = onNavigateToAdmin,
+            onNavigateToConversationList = onNavigateToConversationList,
             onSwitchConversation = { agentId, conversationId, agentName ->
                 val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }
                 onSwitchConversation(

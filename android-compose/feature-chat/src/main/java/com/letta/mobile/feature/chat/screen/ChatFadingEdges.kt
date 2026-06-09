@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 
@@ -42,11 +43,10 @@ import com.letta.mobile.ui.theme.LettaSpacing
 // drew, which composes cleanly.
 
 /**
- * Whether the TOP fade should be drawn: only when there is content scrolled
- * off the top edge to fade toward. With reverseLayout the visual top is the
- * "backward" scroll direction.
+ * Whether the TOP fade should be drawn. Always true to maintain a consistent
+ * visual dissolve into the header area, regardless of scroll position.
  */
-internal fun chatFadeShowTop(canScrollBackward: Boolean): Boolean = canScrollBackward
+internal fun chatFadeShowTop(): Boolean = true
 
 /**
  * Whether the BOTTOM fade should be drawn: only when there is content scrolled
@@ -85,36 +85,72 @@ internal fun chatFadeTargetColor(
 internal fun Modifier.chatFadingEdges(
     showTop: Boolean,
     showBottom: Boolean,
-    fadeLength: Dp,
+    bottomFadeAlpha: Float = 1f,
+    topFadeLength: Dp,
+    bottomFadeLength: Dp,
     targetColor: Color,
 ): Modifier {
-    if (!showTop && !showBottom) return this
+    if (!showTop && bottomFadeAlpha <= 0f) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
+            // 1. Draw the list content
             drawContent()
-            val fadePx = fadeLength.toPx().coerceAtMost(size.height / 2f)
-            if (fadePx <= 0f) return@drawWithContent
-            val transparent = targetColor.copy(alpha = 0f)
+
+            // 2. Draw the DstIn fades to dissolve list content
             if (showTop) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(transparent, targetColor),
-                        startY = 0f,
-                        endY = fadePx,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+                val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
+                if (topFadePx > 0f) {
+                    val topTransparent = targetColor.copy(alpha = 0.0f)
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(topTransparent, targetColor),
+                            startY = 0f,
+                            endY = topFadePx,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             }
-            if (showBottom) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(targetColor, transparent),
-                        startY = size.height - fadePx,
-                        endY = size.height,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+            if (bottomFadeAlpha > 0f) {
+                val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
+                if (bottomFadePx > 0f) {
+                    val bottomTransparent = targetColor.copy(alpha = 0.0f)
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(targetColor.copy(alpha = bottomFadeAlpha), bottomTransparent),
+                            startY = size.height - bottomFadePx,
+                            endY = size.height,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
+            }
+
+            // 3. Draw the solid dark overlay (Normal blend mode) to darken the background/ambient shader
+            if (showTop) {
+                val topFadePx = topFadeLength.toPx().coerceAtMost(size.height)
+                if (topFadePx > 0f) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(targetColor.copy(alpha = 0.95f), Color.Transparent),
+                            startY = 0f,
+                            endY = topFadePx,
+                        )
+                    )
+                }
+            }
+            if (bottomFadeAlpha > 0f) {
+                val bottomFadePx = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
+                if (bottomFadePx > 0f) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, targetColor.copy(alpha = 0.95f * bottomFadeAlpha)),
+                            startY = size.height - bottomFadePx,
+                            endY = size.height,
+                        ),
+                    )
+                }
             }
         }
 }
@@ -138,7 +174,9 @@ internal fun ChatFadingEdgesBox(
     listState: LazyListState,
     targetColor: Color,
     modifier: Modifier = Modifier,
-    fadeLength: Dp = ChatFadeEdgeLength,
+    topPadding: Dp = 0.dp,
+    topFadeLength: Dp = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength,
+    bottomFadeLength: Dp = ChatFadeEdgeLength,
     // letta-mobile-58qlr.1: when true, the BOTTOM fade is suppressed regardless
     // of scroll state. The caller sets this while pinned to the newest edge so
     // a just-sent user prompt (or the live streaming bubble) at the bottom is
@@ -149,19 +187,29 @@ internal fun ChatFadingEdgesBox(
     content: @Composable () -> Unit,
 ) {
     val showTop by remember(listState) {
-        derivedStateOf { chatFadeShowTop(listState.canScrollBackward) }
+        derivedStateOf { chatFadeShowTop() }
     }
-    val showBottom by remember(listState, suppressBottom) {
+    val showBottomTarget by remember(listState, suppressBottom) {
         derivedStateOf { !suppressBottom && chatFadeShowBottom(listState.canScrollForward) }
     }
+    
+    // Animate the bottom fade alpha to avoid hard snaps
+    val bottomFadeAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (showBottomTarget) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300),
+        label = "bottomFadeAlpha"
+    )
+    
     // Touch density so the unit-conversion in the modifier is well-defined even
     // if this composable is ever previewed without a provided density.
     LocalDensity.current
     Box(
         modifier = modifier.chatFadingEdges(
             showTop = showTop,
-            showBottom = showBottom,
-            fadeLength = fadeLength,
+            showBottom = showBottomTarget,
+            bottomFadeAlpha = bottomFadeAlpha,
+            topFadeLength = topFadeLength,
+            bottomFadeLength = bottomFadeLength,
             targetColor = targetColor,
         ),
     ) {

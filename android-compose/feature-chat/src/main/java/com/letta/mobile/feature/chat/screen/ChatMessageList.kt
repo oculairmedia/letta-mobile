@@ -39,8 +39,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -290,6 +294,12 @@ private class ChatPinchFrameBudgetSampler {
     }
 }
 
+internal data class ActivePromptState(
+    val promptItem: ChatRenderItem.Single,
+    val renderIndex: Int,
+    val lazyIndex: Int
+)
+
 @Composable
 internal fun ChatMessageList(
     state: ChatUiState,
@@ -308,6 +318,8 @@ internal fun ChatMessageList(
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
     modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
+    topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 0.dp,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -463,6 +475,65 @@ internal fun ChatMessageList(
             val lastVisible = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
             val totalItems = listState.layoutInfo.totalItemsCount
             totalItems > 0 && lastVisible >= totalItems - 3
+        }
+    }
+
+    val activeUserPromptState = remember(listState, renderItems, topPadding, density) {
+        derivedStateOf {
+            /*
+            val visibleItems = listState.layoutInfo.visibleItemsInfo
+            val topMostVisibleItem = visibleItems.lastOrNull()
+            val topMostKey = topMostVisibleItem?.key as? String
+            val topMostRenderItemIndex = if (topMostKey != null) {
+                val cleanKey = if (topMostKey.startsWith("date-")) {
+                    topMostKey.substringAfter("date-")
+                } else {
+                    topMostKey
+                }
+                renderItems.indexOfFirst { it.key == cleanKey }
+            } else {
+                -1
+            }
+
+            if (topMostRenderItemIndex >= 0) {
+                var foundPrompt: ChatRenderItem.Single? = null
+                var foundPromptRenderIndex = -1
+                for (i in topMostRenderItemIndex until renderItems.size) {
+                    val item = renderItems[i]
+                    if (item is ChatRenderItem.Single && item.message.role == "user") {
+                        foundPrompt = item
+                        foundPromptRenderIndex = i
+                        break
+                    }
+                }
+
+                if (foundPrompt != null && foundPromptRenderIndex >= 0) {
+                    val promptLazyIndex = calculateLazyIndexForRenderItem(foundPromptRenderIndex, renderItems)
+                    val promptItemInfo = visibleItems.find { it.index == promptLazyIndex }
+                    val topPaddingPx = with(density) { topPadding.toPx() }
+                    val viewportHeight = listState.layoutInfo.viewportSize.height
+
+                    if (promptItemInfo != null) {
+                        val offset = promptItemInfo.offset
+                        val size = promptItemInfo.size
+                        val yTop = viewportHeight - (offset + size)
+
+                        if (yTop < topPaddingPx) {
+                            ActivePromptState(foundPrompt, foundPromptRenderIndex, promptLazyIndex)
+                        } else {
+                            null
+                        }
+                    } else {
+                        ActivePromptState(foundPrompt, foundPromptRenderIndex, promptLazyIndex)
+                    }
+                } else {
+                    null
+                }
+            } else {
+                null
+            }
+            */
+            null
         }
     }
 
@@ -682,30 +753,48 @@ internal fun ChatMessageList(
             // edges (replaces the harsh clip line). The fade target is the
             // color the chat actually draws on â€” mirroring the ThinkingShader
             // bgColor logic in ChatScreen â€” so content dissolves exactly into
-            // the background. Applied on a wrapping Box (separate node) so its
-            // offscreen DstIn layer doesn't clobber the LazyColumn's own
-            // rasterization graphicsLayer used during pinch.
-            val fadeTargetColor = chatFadeTargetColor(
-                chatBackground = chatBackground,
-                fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            )
-            ChatFadingEdgesBox(
-                listState = listState,
-                targetColor = fadeTargetColor,
-                modifier = Modifier.fillMaxSize(),
-                // letta-mobile-58qlr.1: don't fade the bottom edge while pinned
-                // to the newest message â€” keeps a just-sent prompt / live
-                // streaming bubble fully visible instead of dimming it.
-                suppressBottom = isNearBottom,
-            ) {
+        // letta-mobile-58qlr: soft gradient fade at the top/bottom scroll
+        // edges (replaces the harsh clip line). The fade target is the
+        // color the chat actually draws on — mirroring the ThinkingShader
+        // bgColor logic in ChatScreen — so content dissolves exactly into
+        // the background. Applied on a wrapping Box (separate node) so its
+        // offscreen DstIn layer doesn't clobber the LazyColumn's own
+        // rasterization graphicsLayer used during pinch.
+        val fadeTargetColor = chatFadeTargetColor(
+            chatBackground = chatBackground,
+            fallbackContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+        )
+        // var stickyHeaderHeight by remember { mutableStateOf(0) }
+        // val activePromptState by activeUserPromptState
+        val topFadeLength = if (topPadding > 0.dp) topPadding + 16.dp else ChatFadeEdgeLength
+        
+        // Only suppress bottom fade for the latest user prompt while waiting for agent response
+        val suppressBottomFade by remember {
+            derivedStateOf {
+                val lastMessage = state.messages.lastOrNull()
+                isNearBottom && lastMessage?.role == "user" && state.isStreaming
+            }
+        }
+        
+        ChatFadingEdgesBox(
+            listState = listState,
+            targetColor = fadeTargetColor,
+            modifier = Modifier.fillMaxSize(),
+            topPadding = topPadding,
+            topFadeLength = topFadeLength,
+            bottomFadeLength = if (bottomPadding > 0.dp) bottomPadding + 48.dp else ChatFadeEdgeLength + 48.dp,
+            suppressBottom = suppressBottomFade,
+        ) {
             LazyColumn(
                 state = listState,
                 // Use the chat theme's compact gutter so assistant prose,
                 // tool output, and run blocks get the widest useful line
                 // length without touching the screen edge.
                 contentPadding = PaddingValues(
-                    horizontal = chatDimens.contentPaddingHorizontal,
-                    vertical = LettaSpacing.cardGap,
+                    start = chatDimens.contentPaddingHorizontal,
+                    end = chatDimens.contentPaddingHorizontal,
+                    top = LettaSpacing.cardGap + topPadding,
+                    bottom = LettaSpacing.cardGap + bottomPadding,
                 ),
                 reverseLayout = true,
                 // letta-mobile-erhjl: keep an identity graphicsLayer so the
@@ -928,6 +1017,84 @@ internal fun ChatMessageList(
                 }
             }
             } // letta-mobile-58qlr: end ChatFadingEdgesBox
+
+            /*
+            if (activePromptState != null) {
+                val activeState = activePromptState!!
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { stickyHeaderHeight = it.height }
+                        .graphicsLayer {
+                            val visibleItems = listState.layoutInfo.visibleItemsInfo
+                            val promptItemInfo = visibleItems.find { it.index == activeState.lazyIndex }
+                            val topPaddingPx = topPadding.toPx()
+                            val viewportHeight = listState.layoutInfo.viewportSize.height
+
+                            var yOffset = if (promptItemInfo != null) {
+                                val offset = promptItemInfo.offset
+                                val size = promptItemInfo.size
+                                val yTop = viewportHeight - (offset + size)
+                                val yBottom = viewportHeight - offset
+
+                                when {
+                                    yTop >= topPaddingPx -> topPaddingPx
+                                    yBottom <= topPaddingPx -> topPaddingPx
+                                    else -> yTop.toFloat()
+                                }
+                            } else {
+                                topPaddingPx
+                            }
+
+                            // Find the next user prompt's position to see if we should push away
+                            var nextPromptRenderIndex = -1
+                            for (i in (activeState.renderIndex - 1) downTo 0) {
+                                val item = renderItems[i]
+                                if (item is ChatRenderItem.Single && item.message.role == "user") {
+                                    nextPromptRenderIndex = i
+                                    break
+                                }
+                            }
+
+                            if (nextPromptRenderIndex >= 0) {
+                                val nextPromptLazyIndex = calculateLazyIndexForRenderItem(nextPromptRenderIndex, renderItems)
+                                val nextPromptItemInfo = visibleItems.find { it.index == nextPromptLazyIndex }
+                                if (nextPromptItemInfo != null) {
+                                    val offset = nextPromptItemInfo.offset
+                                    val size = nextPromptItemInfo.size
+                                    val yTopNext = viewportHeight - (offset + size)
+                                    val pushOffset = (yTopNext - stickyHeaderHeight).toFloat()
+                                    if (pushOffset < yOffset) {
+                                        yOffset = pushOffset
+                                    }
+                                }
+                            }
+
+                            translationY = yOffset
+                        }
+                        .padding(
+                            start = chatDimens.contentPaddingHorizontal,
+                            end = chatDimens.contentPaddingHorizontal,
+                            top = LettaSpacing.innerPaddingSmall,
+                            bottom = LettaSpacing.innerPaddingSmall,
+                        )
+                ) {
+                    RenderChatMessage(
+                        message = activeState.promptItem.message,
+                        position = activeState.promptItem.groupPosition,
+                        state = state,
+                        chatMode = chatMode,
+                        highlightedMessageId = highlightedMessageId,
+                        onSendMessage = onSendMessage,
+                        onRerunMessage = onRerunMessage,
+                        onSubmitApproval = onSubmitApproval,
+                        reasoningCollapsed = activeState.promptItem.message.id !in state.expandedReasoningMessageIds,
+                        onToggleReasoning = { onToggleReasoningExpanded(activeState.promptItem.message.id) },
+                        onAttachmentImageTap = onAttachmentImageTap,
+                    )
+                }
+            }
+            */
         } // letta-mobile-5e0f.r2: end CompositionLocalProvider(LocalChatIsPinching)
 
         ScrollToBottomFab(
@@ -935,7 +1102,10 @@ internal fun ChatMessageList(
             onClick = { scope.launch { listState.animateScrollToItem(0) } },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(LettaSpacing.innerPadding),
+                .padding(
+                    end = LettaSpacing.innerPadding,
+                    bottom = LettaSpacing.innerPadding + bottomPadding,
+                ),
         )
 
         if (showFontIndicator) {

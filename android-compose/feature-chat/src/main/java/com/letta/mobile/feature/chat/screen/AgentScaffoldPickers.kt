@@ -710,6 +710,8 @@ internal fun DrawerContent(
     onEditAgent: () -> Unit,
     onResetMessages: () -> Unit = {},
     onRefreshContextWindow: () -> Unit,
+    onNavigateToAdmin: () -> Unit = {},
+    onNavigateToConversations: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -842,6 +844,30 @@ internal fun DrawerContent(
                 )
             }
         }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // Navigation items
+        NavigationDrawerItem(
+            icon = { Icon(LettaIcons.Chat, contentDescription = null) },
+            label = { Text(stringResource(R.string.common_conversations)) },
+            selected = false,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onNavigateToConversations()
+            },
+            colors = drawerItemColors,
+        )
+        NavigationDrawerItem(
+            icon = { Icon(LettaIcons.Settings, contentDescription = null) },
+            label = { Text("Admin") },
+            selected = false,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onNavigateToAdmin()
+            },
+            colors = drawerItemColors,
+        )
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 

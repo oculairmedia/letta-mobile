@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -78,18 +81,21 @@ fun AdaptiveScaffold(
 
         Scaffold(
             modifier = modifier.fillMaxSize(),
-            bottomBar = {
-                LettaBottomBar(navController = navController)
-            },
             containerColor = MaterialTheme.colorScheme.surface,
         ) { innerPadding ->
+            val layoutDirection = LocalLayoutDirection.current
             Box(
                 modifier = Modifier
                     .padding(
-                        top = innerPadding.calculateTopPadding(),
+                        top = if (isChatDestination) 0.dp else innerPadding.calculateTopPadding(),
                         bottom = if (isChatDestination) 0.dp else innerPadding.calculateBottomPadding(),
+                        start = innerPadding.calculateStartPadding(layoutDirection),
+                        end = innerPadding.calculateEndPadding(layoutDirection)
                     )
-                    .consumeWindowInsets(innerPadding),
+                    .then(
+                        if (isChatDestination) Modifier
+                        else Modifier.consumeWindowInsets(innerPadding)
+                    ),
             ) {
                 content()
             }

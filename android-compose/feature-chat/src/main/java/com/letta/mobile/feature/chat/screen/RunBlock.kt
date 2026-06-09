@@ -362,9 +362,9 @@ private fun RunHeader(
     onToggleCollapsed: () -> Unit,
 ) {
     val label = if (collapsed) {
-        "Run Â· $messageCount steps Â· tap to expand"
+        "Run · $messageCount steps · tap to expand"
     } else {
-        "Run Â· $messageCount steps Â· tap to collapse"
+        "Run · $messageCount steps · tap to collapse"
     }
     Row(
         modifier = Modifier

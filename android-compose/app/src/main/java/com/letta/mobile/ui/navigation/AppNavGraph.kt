@@ -182,6 +182,12 @@ fun AppNavGraph(
             onNavigateToTools = {
                 navController.navigate(AllToolsRoute)
             },
+            onNavigateToAdmin = {
+                navController.navigate(AdminRoute)
+            },
+            onNavigateToConversationList = {
+                navController.navigate(ConversationsRoute)
+            },
             onSwitchConversation = { route ->
                 navController.navigate(route) {
                     popUpTo<AgentChatRoute> { inclusive = true }

@@ -24,6 +24,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -71,8 +75,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -158,6 +164,8 @@ fun AgentScaffold(
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    onNavigateToAdmin: (() -> Unit)? = null,
+    onNavigateToConversationList: (() -> Unit)? = null,
     viewModelKey: String? = null,
 ) {
     AgentScaffoldContent(
@@ -167,6 +175,8 @@ fun AgentScaffold(
         onNavigateToArchival = onNavigateToArchival,
         onNavigateToTools = onNavigateToTools,
         onSwitchConversation = onSwitchConversation,
+        onNavigateToAdmin = onNavigateToAdmin,
+        onNavigateToConversationList = onNavigateToConversationList,
         conversationRepository = null,
         viewModel = hiltViewModel(key = viewModelKey),
     )
@@ -181,6 +191,8 @@ internal fun AgentScaffoldContent(
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    onNavigateToAdmin: (() -> Unit)? = null,
+    onNavigateToConversationList: (() -> Unit)? = null,
     conversationRepository: IConversationRepository? = null,
     viewModel: AdminChatViewModel,
 ) {
@@ -199,7 +211,7 @@ internal fun AgentScaffoldContent(
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    var chatMode by rememberSaveable { mutableStateOf("interactive") }
+    var chatMode by rememberSaveable { mutableStateOf("simple") }
     val drawerConversationRepo = conversationRepository
         ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)
@@ -299,6 +311,14 @@ internal fun AgentScaffoldContent(
                         viewModel.resetMessages()
                     },
                     onRefreshContextWindow = projectBindings::refreshContextWindow,
+                    onNavigateToAdmin = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToAdmin?.invoke()
+                    },
+                    onNavigateToConversations = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToConversationList?.invoke()
+                    },
                     onClose = { scope.launch { drawerState.close() } },
                     modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
                 )
@@ -307,7 +327,8 @@ internal fun AgentScaffoldContent(
     ) {
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
+            containerColor = Color.Transparent,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
                 TopAppBar(
                     title = {
@@ -372,36 +393,17 @@ internal fun AgentScaffoldContent(
                                     modifier = Modifier.size(LettaIconSizing.Inline),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                                ChatTransportChip(
-                                    transport = uiState.transport,
-                                    a2uiFrameCount = uiState.a2uiFrameCount,
-                                )
                             }
                         }
                     },
-                    colors = LettaTopBarDefaults.topAppBarColors(),
+                    modifier = Modifier.padding(top = with(LocalDensity.current) { WindowInsets.safeDrawing.getTop(this).toDp() }),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    ),
+                    windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
                     scrollBehavior = scrollBehavior,
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                        }
-                    },
                     actions = {
-                        IconButton(onClick = {
-                            if (isChatSearchExpanded || uiState.isSearchActive) {
-                                isChatSearchExpanded = false
-                                viewModel.clearChatSearch()
-                            } else {
-                                isChatSearchExpanded = true
-                            }
-                        }) {
-                            Icon(
-                                if (isChatSearchExpanded || uiState.isSearchActive) LettaIcons.Clear else LettaIcons.Search,
-                                contentDescription = stringResource(
-                                    if (isChatSearchExpanded || uiState.isSearchActive) R.string.action_close else R.string.action_search
-                                ),
-                            )
-                        }
                         IconButton(onClick = {
                             HapticEffects.contextClick(haptic, view)
                             projectBindings.refreshContextWindow()
@@ -429,9 +431,9 @@ internal fun AgentScaffoldContent(
                 }
             },
         ) { paddingValues ->
+            val topPadding = paddingValues.calculateTopPadding()
             Column(
                 modifier = Modifier
-                    .padding(paddingValues)
                     .fillMaxSize(),
             ) {
                 projectContext?.let { project ->
@@ -446,9 +448,16 @@ internal fun AgentScaffoldContent(
                         onRetryBrief = projectBindings::loadProjectBrief,
                         onSaveBriefSection = projectBindings::saveProjectBriefSection,
                         onCreateBugReport = { showBugReportSheet = true },
-                        modifier = Modifier.testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
+                        modifier = Modifier
+                            .padding(top = topPadding)
+                            .testTag(AgentScaffoldTestTags.PROJECT_CONTEXT_CARD),
                     )
                 }
+                val chatModifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT)
+
                 if (uiState.isSearchActive) {
                     ChatSearchResultsContent(
                         searchQuery = uiState.searchQuery,
@@ -463,14 +472,16 @@ internal fun AgentScaffoldContent(
                                 onSwitchConversation?.invoke(agentIdValue, targetConversationId, agentName.takeIf { it.isNotBlank() })
                             }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT),
+                        modifier = chatModifier
+                            .padding(top = if (projectContext == null) topPadding else 0.dp, bottom = paddingValues.calculateBottomPadding()),
                     )
                 } else {
                     ChatScreen(
-                        modifier = Modifier.fillMaxWidth().weight(1f).testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT),
+                        modifier = chatModifier,
+                        contentPadding = PaddingValues(
+                            top = if (projectContext == null) topPadding else 0.dp,
+                            bottom = 0.dp
+                        ),
                         chatBackground = chatBackground,
                         chatMode = chatMode,
                         onBugCommand = { showBugReportSheet = true },
