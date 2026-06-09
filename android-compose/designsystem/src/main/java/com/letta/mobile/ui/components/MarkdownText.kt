@@ -549,11 +549,11 @@ private fun MarkdownTextRaw(
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
             ),
             padding = markdownPadding(
-                block = LettaSpacing.md,
-                list = LettaSpacing.xs,
-                listItemTop = LettaSpacing.xxxs,
-                listItemBottom = LettaSpacing.xxxs,
-                listIndent = LettaSpacing.lg,
+                block = LettaSpacing.sm * fontScale,
+                list = LettaSpacing.xs * fontScale,
+                listItemTop = LettaSpacing.xxxs * fontScale,
+                listItemBottom = LettaSpacing.xxxs * fontScale,
+                listIndent = LettaSpacing.lg * fontScale,
             ),
             typography = markdownTypography(
                 text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
