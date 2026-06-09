@@ -1,9 +1,13 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +52,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -86,6 +93,7 @@ import org.jetbrains.skia.Image as SkiaImage
 fun DesktopChatSurface(
     state: DesktopChatSurfaceState,
     onConversationSelected: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
@@ -101,6 +109,7 @@ fun DesktopChatSurface(
         ConversationPane(
             state = state,
             onConversationSelected = onConversationSelected,
+            onDeleteConversation = onDeleteConversation,
             onRetryConnection = onRetryConnection,
         )
         Box(
@@ -125,6 +134,7 @@ fun DesktopChatSurface(
 private fun ConversationPane(
     state: DesktopChatSurfaceState,
     onConversationSelected: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
     onRetryConnection: () -> Unit,
 ) {
     Column(
@@ -192,6 +202,7 @@ private fun ConversationPane(
                     conversation = conversation,
                     selected = conversation.id == state.selectedConversationId,
                     onClick = { onConversationSelected(conversation.id) },
+                    onDelete = { onDeleteConversation(conversation.id) },
                 )
             }
         }
@@ -252,12 +263,15 @@ private fun ConversationPaneStateCard(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ConversationRow(
     conversation: DesktopConversationSummary,
     selected: Boolean,
     onClick: () -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     val container = if (selected) {
         MaterialTheme.colorScheme.primaryContainer
     } else {
@@ -269,18 +283,26 @@ private fun ConversationRow(
         MaterialTheme.colorScheme.onSurface
     }
 
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = MaterialTheme.shapes.medium,
-        color = container,
-        contentColor = content,
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
-        ),
-    ) {
+    Box {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = { showMenu = true }
+                )
+                .onClick(
+                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                    onClick = { showMenu = true }
+                ),
+            shape = MaterialTheme.shapes.medium,
+            color = container,
+            contentColor = content,
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+            ),
+        ) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -322,6 +344,20 @@ private fun ConversationRow(
             )
         }
     }
+    DropdownMenu(
+        expanded = showMenu,
+        onDismissRequest = { showMenu = false }
+    ) {
+        DropdownMenuItem(
+            text = { Text("Delete Conversation") },
+            leadingIcon = { Icon(Icons.Outlined.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            onClick = {
+                showMenu = false
+                onDelete()
+            }
+        )
+    }
+}
 }
 
 @Composable

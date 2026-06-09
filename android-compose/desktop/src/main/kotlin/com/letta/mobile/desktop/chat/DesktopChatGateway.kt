@@ -144,7 +144,7 @@ class DesktopLettaHttpChatGateway(
         return response.body()
     }
 
-    suspend fun deleteConversation(conversationId: String) {
+    override suspend fun deleteConversation(conversationId: String) {
         val response = httpClient.delete("$baseUrl/v1/conversations/$conversationId") {
             applyDesktopAuth()
         }
