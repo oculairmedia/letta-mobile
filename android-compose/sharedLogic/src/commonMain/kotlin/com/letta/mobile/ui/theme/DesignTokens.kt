@@ -32,7 +32,8 @@ object LettaSpacingTokens {
     // Chat-specific semantic tokens
     const val bubblePaddingHorizontal = 10f
     const val bubblePaddingVertical = 7f
-    const val messageSpacing = xxxs
+    const val messageSpacing = sm              // Tighter: space within grouped messages (8dp)
+    const val ungroupedMessageSpacing = md     // Editorial: clear separation between sections (12dp)
     const val composerAttachIconSize = 18f
     const val composerAttachButtonSize = 36f
 
@@ -117,7 +118,7 @@ object LettaChatTokens {
         bubbleMaxWidthFraction = 0.88f,
         messageSpacingDp = LettaSpacingTokens.messageSpacing,
         groupedMessageSpacingDp = LettaSpacingTokens.messageSpacing,
-        ungroupedMessageSpacingDp = LettaSpacingTokens.xs,
+        ungroupedMessageSpacingDp = LettaSpacingTokens.ungroupedMessageSpacing,
         contentPaddingHorizontalDp = LettaSpacingTokens.screenHorizontal,
     )
 

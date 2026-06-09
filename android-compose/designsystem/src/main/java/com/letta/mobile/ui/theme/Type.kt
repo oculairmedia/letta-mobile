@@ -51,6 +51,12 @@ val LettaCodeFont: FontFamily = FontFamily(
     Font(R.font.jetbrains_mono_bold, FontWeight.Bold),
 )
 
+/**
+ * Editorial serif font family for body text.
+ * Uses Android system Noto Serif for magazine-quality readability.
+ */
+val LettaSerifFont: FontFamily = FontFamily.Serif
+
 val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = InterFontFamily,
@@ -116,18 +122,24 @@ val Typography = Typography(
         letterSpacing = 0.1.sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = InterFontFamily,
+        fontFamily = LettaSerifFont,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
+        lineHeight = 26.sp,
+        letterSpacing = 0.sp,
+        fontFeatureSettings = "liga, calt",
+        hyphens = androidx.compose.ui.text.style.Hyphens.Auto,
+        lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
     ),
     bodyMedium = TextStyle(
-        fontFamily = InterFontFamily,
+        fontFamily = LettaSerifFont,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.25.sp
+        lineHeight = 24.sp,         // Editorial: generous line height (1.71 ratio)
+        letterSpacing = 0.sp,       // Editorial: serif needs less spacing than sans
+        fontFeatureSettings = "liga, calt",  // Enable ligatures and contextual alternates
+        hyphens = androidx.compose.ui.text.style.Hyphens.Auto,
+        lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph,
     ),
     bodySmall = TextStyle(
         fontFamily = InterFontFamily,

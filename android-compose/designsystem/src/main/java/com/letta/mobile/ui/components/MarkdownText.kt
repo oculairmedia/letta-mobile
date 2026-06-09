@@ -48,10 +48,12 @@ import com.mikepenz.markdown.compose.Markdown as CoreMarkdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.markdownExtendedSpans
+import com.mikepenz.markdown.model.markdownPadding
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.ast.ASTNode
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.text.PreparedRichInlineItem
@@ -545,6 +547,13 @@ private fun MarkdownTextRaw(
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
                 inlineCodeBackground = MaterialTheme.colorScheme.surfaceVariant,
                 dividerColor = MaterialTheme.colorScheme.outlineVariant,
+            ),
+            padding = markdownPadding(
+                block = LettaSpacing.md,
+                list = LettaSpacing.xs,
+                listItemTop = LettaSpacing.xxxs,
+                listItemBottom = LettaSpacing.xxxs,
+                listIndent = LettaSpacing.lg,
             ),
             typography = markdownTypography(
                 text = MaterialTheme.typography.bodyMedium.copy(color = textColor),
