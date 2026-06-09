@@ -26,7 +26,7 @@ class TimelineRepositoryTest {
     @Test
     fun `clear cancels cached loop stream subscriber before removing it`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(api, NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
 
         repository.getOrCreate("conv-clear")
         api.awaitActive("conv-clear")
@@ -41,7 +41,7 @@ class TimelineRepositoryTest {
     @Test
     fun `cache evicts least recently used loop and keeps recently accessed loop active`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(api, NoOpPendingLocalStore, maxCachedLoops = 2)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2)
 
         repository.getOrCreate("conv-a")
         repository.getOrCreate("conv-b")
@@ -65,7 +65,7 @@ class TimelineRepositoryTest {
     @Test
     fun `post handler collapse cache hit is synchronized and refreshes access order`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(api, NoOpPendingLocalStore, maxCachedLoops = 2)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2)
 
         repository.getOrCreate("conv-a")
         repository.getOrCreate("conv-b")
@@ -89,7 +89,7 @@ class TimelineRepositoryTest {
     @Test
     fun `getOrCreate hydrates on background dispatcher even when caller is main-like`() = runBlocking {
         val api = CancellableStreamApi()
-        val repository = TimelineRepository(api, NoOpPendingLocalStore, maxCachedLoops = 4)
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
         val callerDispatcher = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "caller-main-probe")
         }.asCoroutineDispatcher()

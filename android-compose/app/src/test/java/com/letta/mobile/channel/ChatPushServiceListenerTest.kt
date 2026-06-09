@@ -1,6 +1,5 @@
 package com.letta.mobile.channel
 
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpPendingLocalStore
@@ -43,10 +42,9 @@ class ChatPushServiceListenerTest {
 
     private fun newRepository(): TimelineRepository =
         TimelineRepository(
-            messageApi = mockk<MessageApi>(relaxed = true),
+            timelineTransport = mockk(relaxed = true),
             pendingLocalStore = NoOpPendingLocalStore,
             conversationCursorStore = NoOpConversationCursorStore,
-            sessionManager = null,
         )
 
     private fun testListener(): IngestedMessageListener = object : IngestedMessageListener {
