@@ -82,6 +82,20 @@ compose.desktop {
             description = "Desktop client foundation for the Letta AI platform."
             copyright = "Copyright (C) 2026 Letta"
             vendor = "Letta"
+
+            windows {
+                // Create a Start Menu entry ("Letta" group) and a desktop
+                // shortcut so the app is discoverable after install instead of
+                // only living under AppData/Program Files.
+                menuGroup = "Letta"
+                menu = true
+                shortcut = true
+                // Per-user install: no admin/UAC prompt required.
+                perUserInstall = true
+                // Stable GUID so MSI installs UPGRADE in place across versions
+                // instead of stacking side-by-side. Must never change.
+                upgradeUuid = "44e25263-67d4-443c-b85c-655a41118add"
+            }
         }
     }
 }
