@@ -133,6 +133,7 @@ fun LettaDesktopApp() {
                     state = bootstrapState,
                     chatState = chatState,
                     onChatConversationSelected = chatController::selectConversation,
+                    onChatConversationDeleted = chatController::deleteConversation,
                     onChatComposerTextChanged = chatController::updateComposerText,
                     onChatSend = chatController::send,
                     onChatAttachImage = {
@@ -266,6 +267,7 @@ private fun DestinationContent(
     state: DesktopBootstrapState,
     chatState: DesktopChatSurfaceState,
     onChatConversationSelected: (String) -> Unit,
+    onChatConversationDeleted: (String) -> Unit,
     onChatComposerTextChanged: (String) -> Unit,
     onChatSend: () -> Unit,
     onChatAttachImage: () -> Unit,
@@ -279,6 +281,7 @@ private fun DestinationContent(
         DesktopChatSurface(
             state = chatState,
             onConversationSelected = onChatConversationSelected,
+            onDeleteConversation = onChatConversationDeleted,
             onComposerTextChanged = onChatComposerTextChanged,
             onSend = onChatSend,
             onAttachImage = onChatAttachImage,

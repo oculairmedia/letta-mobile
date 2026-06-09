@@ -115,6 +115,22 @@ class DesktopChatController(
         }
     }
 
+    fun deleteConversation(conversationId: String) {
+        if (closed) return
+        scope.launch {
+            try {
+                val nextGateway = gateway ?: return@launch
+                nextGateway.deleteConversation(conversationId)
+                retryConnection()
+            } catch (t: Throwable) {
+                val message = t.message ?: t::class.simpleName ?: "Delete failed"
+                _state.update { current ->
+                    current.copy(errorMessage = message)
+                }
+            }
+        }
+    }
+
     fun updateComposerText(text: String) {
         if (closed) return
         _state.update { it.withRuntimeState(ChatSessionReducer.updateComposerText(it.runtimeState, text)) }
