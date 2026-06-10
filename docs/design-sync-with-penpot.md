@@ -1,7 +1,11 @@
 # Design sync with Penpot — plan & status
 
-**Status:** exploratory. Started June 2026 alongside `docs/DESIGN_SYSTEM.md`. Both files
-are in flux; expect rewrites.
+**Status:** exploratory, but the core unknowns are now resolved (June 2026).
+The Penpot API + auth work (access token in vault), Penpot 2.14.5 has a native
+token catalog, and our `letta mobile` file has `design-tokens/v1` enabled but
+**empty** — so the immediate work is a one-way **code → Penpot push** via a
+DTCG-JSON exporter. See "Current status" for the verified ground truth; the
+older "shapes + plugin-data" architecture is struck through where superseded.
 
 ## Why this doc exists
 
@@ -80,22 +84,37 @@ current blocker (auth).
 
 Three sync layers, run in this order by `scripts/sync-design-tokens.py`:
 
-### Layer 1: Code → Spec → Penpot (token push)
+> **CORRECTION (June 2026):** the original Layer 1 below proposed encoding tokens
+> as **decorative shapes with plugin-data** because we assumed Penpot had no
+> native token support. That assumption was wrong — Penpot 2.14.5 has a
+> **first-class native token catalog** (`design-tokens/v1`, enabled on our file).
+> Target the native catalog, **not** shapes-with-plugin-data. The corrected
+> approach is below; the original text is struck through for history.
+
+### Layer 1 (CORRECTED): Code → DTCG JSON → Penpot native token catalog
 
 - Read `LettaColorTokens.kt`, `LettaThemeTokens.kt`, `DesignTokens.kt`,
-  `CustomColors.kt` from the working tree.
-- Parse out: 96 base palette colors (6 presets × 2 modes × 8 M3 roles), 10-step
-  spacing scale + ~20 semantic aliases, 7 motion durations, 5 type role
-  families, 14+ custom semantic colors.
-- Diff against the last-synced snapshot in `docs/.design-snapshot.json`.
-- For each new or changed token:
-  - Update `docs/DESIGN_SYSTEM.md` (regenerate the tables).
-  - POST to Penpot REST API to upsert a "Design Tokens" board on the
-    `Letta Mobile / Tokens` page, with a colored swatch per token and the
-    token name as the shape's plugin-data name.
-- Commit the spec + snapshot as part of the same PR as the Kotlin change.
-  Token changes always go through the standard branch → PR → CI → merge loop
-  in `AGENTS.md`.
+  `CustomColors.kt`, `Type.kt` from the working tree.
+- Parse out: base palette colors (6 presets × 2 modes × 8 M3 roles), 10-step
+  spacing scale + semantic aliases, motion durations, type role families,
+  custom semantic colors.
+- Emit a **DTCG-style token JSON** (`docs/design/penpot-tokens.json`) — the
+  W3C/Design-Tokens-Community-Group shape that Penpot's own importer round-trips.
+  Token sets group via `/`; theme = a token set selection (light/dark/preset);
+  aliases use `{token.name}`. This file is the sync contract.
+- **Push into the `letta mobile` file's native token catalog** via the
+  authed REST `update-file` change-ops (`:set-token-set`, `:set-token`,
+  `:set-token-theme`) — see the "How writes work" section under Current status.
+  NOT shape-upserts.
+- Regenerate `docs/DESIGN_SYSTEM.md` and commit spec + JSON in the same PR as
+  the Kotlin change (standard branch → PR → CI → merge loop per `AGENTS.md`).
+
+#### ~~Layer 1 (ORIGINAL, superseded — shapes + plugin-data)~~
+
+- ~~Diff against the last-synced snapshot in `docs/.design-snapshot.json`.~~
+- ~~POST to Penpot REST API to upsert a "Design Tokens" board with a colored
+  swatch per token and the token name as the shape's plugin-data name.~~
+  *(Superseded: use the native token catalog, not swatch shapes.)*
 
 ### Layer 2: Penpot → Spec (layout pull, manual)
 
@@ -159,37 +178,59 @@ Three sync layers, run in this order by `scripts/sync-design-tokens.py`:
 
 ## Current blocker (June 2026)
 
-I have full read access to the Postgres database, the running JVM's PREPL,
-and SSH to the box. The blocker is **getting a working session token** for
-the Penpot REST API so the sync script can read/write the design file.
+~~The blocker is getting a working session token.~~ **RESOLVED (June 2026).**
+This whole section is kept for history but is no longer accurate.
 
-What's been tried, with results:
+### Ground truth (verified against the live box, June 2026)
 
-| Attempt | Result |
-|---|---|
-| 3 existing access tokens in the DB (`teat`, `test`, `cline`, all belonging to `emanuvaderland@gmail.com`) | 401 on every endpoint |
-| Decompiled `app/http/access_token.clj` from the backend jar | Tokens have `perms = {}` (empty array). The `auth-data` middleware attaches `::actoken/profile-id` only when claims decrypt successfully, but the existing tokens appear to have been encrypted with a `tokens-key` that no longer matches the running JVM's `tokens-key` (the secret-key derived from `PENPOT_SECRET_KEY` may have been regenerated at some point). |
-| Reset `emanuvaderland@gmail.com` password to `bangbang` via the PREPL `derive-password` command (which produces a hash in the exact format `buddy.hashers` expects), pushed to DB, then attempted `login-with-password` over REST | Body is parsed (response 400 with `wrong-credentials`, not 404 / params-validation), so the body shape is correct, but verify is still failing. Suspect either the body has a quirk I'm not seeing or the session cookie path is being rejected by the Caddy reverse proxy in front of the backend. |
-| Read the Penpot `app/rpc/commands/auth.clj` source | The `login-with-password` handler reads `email` and `password` from `params`, normalizes email, looks up the profile, calls `auth/verify-password`, then writes a session cookie. The handler is straightforward. The 400 we're getting is the right response for "user typed wrong password" — so the email IS being found and the password IS being checked, but the verify is failing for some reason. |
+- **Penpot version: 2.14.5** (containers `penpot-penpot-backend-1` etc. on
+  `192.168.50.80`).
+- **The API works and auth is solved.** A long-lived **access token** exists in
+  Vaultwarden — item **"Penpot API — prototype.oculair.ca (access token)"**,
+  custom field `access_token` (+ `team_id`, `default_project_id`). Use it as
+  `Authorization: Token <token>` (Penpot's scheme is `Token`, **not** `Bearer`).
+  Verified: `get-profile` returns Emmanuel's real profile, and `get-file` on the
+  `letta mobile` file returns HTTP 200 with the full decoded file (312 KB).
+- **The earlier "empty `perms`" / `login-with-password` rabbit hole was
+  unnecessary** — a UI-minted access token sidesteps all of it. Don't reset
+  passwords or poke the PREPL; just read the token from the vault.
+- **API doc:** `https://prototype.oculair.ca/api/main/doc` (the RPC command
+  surface). RPC base from the box: `POST http://localhost:9001/api/rpc/command/<cmd>`.
 
-**Next steps to unblock:**
+### Where tokens actually live (verified)
 
-1. Try `login-with-password` from a real browser (the user, not me) to confirm
-   the password reset actually took effect and isn't being rejected by a
-   separate Caddy / session cookie config issue. If the user can log in via
-   the web UI, then the issue is on the API client side (body shape,
-   missing header, etc.) and I can iterate.
-2. If the user can't log in either, the issue is upstream of the API
-   (Caddy cookie path, session v2 schema, etc.) and I need to look at the
-   Caddy config and the `http_session_v2` table.
-3. If the user CAN log in but the API still fails, add a Cookie header to
-   the request — the API may be reading the session from a cookie and not
-   recognizing the JSON body as authenticated.
-4. Last resort: mint a long-lived access token via the web UI
-   (Account Settings → Tokens) and pass that as `Authorization: Bearer` to
-   the API. If even that fails, the issue is the empty `perms` array
-   preventing the access-token middleware from attaching a profile-id, and
-   I'd need to UPDATE the `perms` column in the DB to a non-empty value.
+- **No dedicated token DB tables.** The only `%token%` table is `access_token`
+  (API auth). Design tokens live **inside the file `data` blob** (zstd-compressed
+  Fressian, ~31 KB inline in Postgres for `letta mobile`).
+- **`design-tokens/v1` feature is ENABLED** on both relevant files:
+  `letta mobile` (`46e68d89-bd4b-8008-8007-fa0da54a88af`) and
+  `Pencil` (`11a02f61-0341-81f7-8008-115286a21c43`).
+- **…but both token catalogs are currently EMPTY.** A `get-file` scan found zero
+  `token-set` / `token-theme` / token entries in either file (the only
+  `tokens-lib` hits are migration names like `0014-fix-tokens-lib-duplicate-ids`).
+  The feature is switched on; nobody has populated tokens yet.
+
+**Consequence:** the first job is a **one-way PUSH** (code → Penpot), not a
+bidirectional sync. There is nothing to pull until designers start editing
+tokens in Penpot. The pull/merge machinery in this doc is deferred.
+
+### How writes work (verified vocabulary)
+
+- There is **no dedicated `import-tokens-lib` RPC** (404). Tokens are written via
+  **`update-file`** change-ops — the same path the plugin uses.
+- Token change-op vocabulary (from Penpot `common/files/changes.cljc`, 2.x):
+  `:set-token-set` `{:id, :attrs {:name, :description}}`,
+  `:set-token` `{:set-id, :token-id, :attrs {:name, :type, :value, :description}}`,
+  `:set-token-theme` `{:id, :attrs}`,
+  `:set-active-token-themes` `{:theme-paths #{...}}`.
+- Token `:type` values are DTCG-style: `color`, `dimension`, `spacing`,
+  `sizing`, `border-radius`, `font-size`, `font-weight`, `font-family`,
+  `letter-spacing`, `line-height`, `opacity`, `number`, `typography` (composite),
+  etc. Aliases use `{token.name}` reference syntax.
+- `update-file` requires `{:id, :session-id, :revn, :changes [...]}` and the
+  payload is **transit+json** for nested values — see `transit.ts` (adaptable
+  from the MIT `design-token-manager` repo) for decode, and the inverse for
+  encode.
 
 ## File plan (in this repo)
 
