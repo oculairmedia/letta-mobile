@@ -3,6 +3,8 @@
 import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
+import com.letta.mobile.data.chat.runtime.ChatScreenStatus
+import com.letta.mobile.data.chat.runtime.chatScreenStatusOf
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.ProjectBugReport
 import com.letta.mobile.data.model.UiMessage
@@ -190,26 +192,50 @@ internal sealed interface ConversationState {
 
 /**
  * Single source of truth for mapping the shared KMP [ChatConnectionState] into
- * the Android UI's [ConversationState]. Used by AdminChatViewModel and the
- * chat coordinators so Android never re-defines what "loading", "offline",
- * "config needed", or "ready" mean — that lives in the shared runtime.
+ * the Android UI's [ConversationState].  The mapping is now derived from the
+ * shared [ChatScreenStatus] descriptor so Android and Desktop compute the same
+ * meaning for the same state — only the Android-specific [ConversationState]
+ * type lives here.
+ *
+ * Used by AdminChatViewModel and the chat coordinators so Android never
+ * re-defines what "loading", "offline", "config needed", or "ready" mean —
+ * that logic lives in the shared [chatScreenStatusOf] function.
+ */
+internal fun com.letta.mobile.data.chat.runtime.ChatSessionState.toConversationState(): ConversationState {
+    return when (val status = chatScreenStatusOf(this)) {
+        is ChatScreenStatus.Loading -> ConversationState.Loading
+        is ChatScreenStatus.ConfigNeeded ->
+            ConversationState.Error(status.errorMessage ?: "Backend configuration required")
+        is ChatScreenStatus.BackendOffline ->
+            ConversationState.Error(status.errorMessage ?: "Backend offline")
+        is ChatScreenStatus.NoConversations -> ConversationState.NoConversation
+        is ChatScreenStatus.SendFailed ->
+            // SendFailed keeps the chat readable — treat as Ready so the message
+            // list remains visible and the user can edit the composer for retry.
+            // The selected conversation id lives on the session state, not the descriptor.
+            selectedConversationId?.let { ConversationState.Ready(it) }
+                ?: ConversationState.NoConversation
+        is ChatScreenStatus.Ready ->
+            status.selectedConversationId?.let { ConversationState.Ready(it) }
+                ?: ConversationState.NoConversation
+    }
+}
+
+/**
+ * Backward-compat shim used by coordinators that still pass the connection state
+ * and error message as separate parameters.  Delegates to the [ChatSessionState]
+ * overload so both call sites go through [chatScreenStatusOf].
  */
 internal fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversationState(
     selectedConversationId: String?,
     errorMessage: String?,
-): ConversationState = when (this) {
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.Loading -> ConversationState.Loading
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.ConfigNeeded ->
-        ConversationState.Error(errorMessage ?: "Backend configuration required")
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.Offline ->
-        ConversationState.Error(errorMessage ?: "Backend offline")
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.NoConversations -> ConversationState.NoConversation
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.Demo,
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.Live,
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.Sending,
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.StreamDisconnected,
-    com.letta.mobile.data.chat.runtime.ChatConnectionState.SendFailed ->
-        selectedConversationId?.let { ConversationState.Ready(it) } ?: ConversationState.NoConversation
+): ConversationState {
+    val syntheticState = com.letta.mobile.data.chat.runtime.ChatSessionState(
+        connectionState = this,
+        selectedConversationId = selectedConversationId,
+        errorMessage = errorMessage,
+    )
+    return syntheticState.toConversationState()
 }
 
 @androidx.compose.runtime.Immutable
