@@ -38,7 +38,8 @@ git push --force-with-lease                 # safe force-push to your branch
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
 - **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`.
-- **CI gates merges, not pushes.** Required status checks: `test` and `build-apk`. Both must be green before squash-merge.
+- **CI gates merges, not pushes.** Required status checks: `test`, `build-apk`, and `shared-multiplatform`. All must be green before squash-merge.
+- **`sharedLogic` commonMain/commonTest must stay platform-neutral.** No JVM-only APIs (`String.format`, `StringBuilder.delete(start, end)`, `String.toByteArray()`, …) — the code must compile for every configured KMP target (Android, JVM/desktop, host-native for Windows). The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) enforces this; see bead letta-mobile-kx1r3 for the leaks that motivated it.
 - **First-time setup in a fresh clone:** run `./scripts/install-hooks.sh` to activate the local hooks via `core.hooksPath`.
 
 **When CI fails on your PR:**
