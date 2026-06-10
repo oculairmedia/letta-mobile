@@ -276,8 +276,7 @@ object ChatSessionReducer {
     }
 
     fun canSend(state: ChatSessionState): Boolean =
-        state.selectedConversationId != null &&
-            state.isRemoteBacked &&
+        state.isRemoteBacked &&
             !state.isSending &&
             !state.isLoading &&
             state.connectionState in sendEnabledStates
@@ -300,6 +299,7 @@ object ChatSessionReducer {
         ChatConnectionState.Live,
         ChatConnectionState.SendFailed,
         ChatConnectionState.StreamDisconnected,
+        ChatConnectionState.NoConversations,
     )
 
     private val panelStates = setOf(

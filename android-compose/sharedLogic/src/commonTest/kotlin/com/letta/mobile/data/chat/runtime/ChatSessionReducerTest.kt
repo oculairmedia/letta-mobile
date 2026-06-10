@@ -173,10 +173,17 @@ class ChatSessionReducerTest {
             connectionState = ChatConnectionState.Offline,
             isRemoteBacked = false,
         )
+        val newChat = live.copy(selectedConversationId = null)
+        val noConversations = live.copy(
+            selectedConversationId = null,
+            connectionState = ChatConnectionState.NoConversations,
+        )
 
         assertTrue(ChatSessionReducer.canSend(live))
         assertFalse(ChatSessionReducer.canSend(loading))
         assertTrue(ChatSessionReducer.shouldShowStatePanel(offline))
+        assertTrue(ChatSessionReducer.canSend(newChat))
+        assertTrue(ChatSessionReducer.canSend(noConversations))
     }
 
     private fun conversation(
