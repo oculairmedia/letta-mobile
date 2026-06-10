@@ -1,19 +1,12 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.session.BackendScopedCache
-import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
-import java.util.LinkedHashMap
-import javax.inject.Inject
-import javax.inject.Singleton
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -21,27 +14,22 @@ import kotlinx.coroutines.withContext
 /**
  * Per-conversation [TimelineSyncLoop] registry.
  *
- * A single instance is shared across the app (Hilt @Singleton). Conversation
+ * A single instance is shared across the app. Conversation
  * timelines are cached so that navigating away and back preserves state,
  * pending sends, and live cursors.
  *
  * This is the single source of truth for conversation message state.
- * [com.letta.mobile.data.repository.MessageRepository] is retained only as a
- * stateless HTTP helper for older-message pagination, approvals, search,
- * batches, reset, and the conversation inspector.
  */
-@Singleton
-open class TimelineRepository @Inject constructor(
-    private val messageApi: MessageApi,
+open class TimelineRepository(
+    private val timelineTransport: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
-    sessionManager: SessionManager?,
 ) : TimelineExternalTransportWriter, BackendScopedCache {
-    internal constructor(
-        messageApi: MessageApi,
+    constructor(
+        timelineTransport: TimelineTransport,
         pendingLocalStore: PendingLocalStore,
         maxCachedLoops: Int,
-    ) : this(messageApi, pendingLocalStore, NoOpConversationCursorStore, sessionManager = null) {
+    ) : this(timelineTransport, pendingLocalStore, NoOpConversationCursorStore) {
         require(maxCachedLoops > 0) { "maxCachedLoops must be positive" }
         this.maxCachedLoops = maxCachedLoops
     }
@@ -49,16 +37,22 @@ open class TimelineRepository @Inject constructor(
     // Dedicated supervisor scope — child jobs fail in isolation.
     private val scope = CoroutineScope(SupervisorJob() + timelineIoDispatcher)
 
-    init {
-        sessionManager?.currentGraph
-            ?.drop(1)
-            ?.onEach { clearAll() }
-            ?.launchIn(scope)
-    }
-
     private var maxCachedLoops = DEFAULT_MAX_CACHED_LOOPS
-    private val loops = LinkedHashMap<String, TimelineSyncLoop>(16, 0.75f, true)
+
+    // LRU registry. Kotlin common has no access-order LinkedHashMap
+    // constructor (JVM-only), so we keep an insertion-ordered map and
+    // emulate access order manually: getLoopLocked() re-inserts on hit so
+    // the eldest entry is always first. Every access goes through
+    // [loopsMutex], which makes the remove+reinsert touch safe.
+    private val loops = LinkedHashMap<String, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
+
+    /** Mutex-guarded LRU get: touches the entry so eviction stays correct. */
+    private fun getLoopLocked(conversationId: String): TimelineSyncLoop? {
+        val loop = loops.remove(conversationId) ?: return null
+        loops[conversationId] = loop
+        return loop
+    }
 
     /**
      * Listener the :app module can install to receive inbound-message events
@@ -78,7 +72,7 @@ open class TimelineRepository @Inject constructor(
     suspend fun getOrCreate(conversationId: String): TimelineSyncLoop {
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
-        loopsMutex.withLock { loops[conversationId] }?.let {
+        loopsMutex.withLock { getLoopLocked(conversationId) }?.let {
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
                 "conversationId" to conversationId,
@@ -112,13 +106,13 @@ open class TimelineRepository @Inject constructor(
         // wasn't hydrated until ~15s after app start because earlier slots in
         // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
         loopsMutex.withLock {
-            loops[conversationId]?.let { return@withLock it }
+            getLoopLocked(conversationId)?.let { return@withLock it }
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheMiss",
                 "conversationId" to conversationId,
             )
             val created = TimelineSyncLoop(
-                messageApi = MessageApiTimelineTransport(messageApi),
+                messageApi = timelineTransport,
                 conversationId = conversationId,
                 scope = scope,
                 ingestedListenerProvider = { ingestedListener },
@@ -199,7 +193,7 @@ open class TimelineRepository @Inject constructor(
     }
 
     suspend fun postHandlerCollapse(conversationId: String) {
-        val loop = loopsMutex.withLock { loops[conversationId] }
+        val loop = loopsMutex.withLock { getLoopLocked(conversationId) }
         loop?.postHandlerCollapse()
     }
 
@@ -240,7 +234,7 @@ open class TimelineRepository @Inject constructor(
      * stream subscriber resumes ingesting messages for idle-period coverage.
      */
     override suspend fun clearExternalTransportActive(conversationId: String) {
-        loopsMutex.withLock { loops[conversationId] }?.clearExternalTransportActive()
+        loopsMutex.withLock { getLoopLocked(conversationId) }?.clearExternalTransportActive()
     }
 
     /**

@@ -12,7 +12,7 @@ import com.letta.mobile.data.stream.SseParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-internal class MessageApiTimelineTransport(
+class MessageApiTimelineTransport(
     private val messageApi: MessageApi,
 ) : TimelineTransport {
     override suspend fun sendConversationMessage(
