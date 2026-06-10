@@ -4,9 +4,6 @@ import com.letta.mobile.util.Telemetry
 import javax.inject.Inject
 import javax.inject.Singleton
 
-interface BackendScopedCache {
-    suspend fun clearForBackendSwitch()
-}
 
 /**
  * Result of attempting to clear every registered backend-scoped cache for a

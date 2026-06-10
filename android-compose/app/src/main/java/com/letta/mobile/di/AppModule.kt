@@ -64,6 +64,10 @@ import com.letta.mobile.data.session.SessionScopedSelfTodoRepository
 import com.letta.mobile.data.session.SessionScopedSubagentRepository
 import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
+import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.timeline.ConversationCursorStore
+import com.letta.mobile.data.timeline.MessageApiTimelineTransport
+import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.DataStoreRunCursorStore
@@ -96,6 +100,20 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideWsChatBridge(transport: IChannelTransport): WsChatBridge = WsChatBridge(transport)
+
+        @Provides
+        @Singleton
+        fun provideTimelineRepository(
+            messageApi: MessageApi,
+            pendingLocalStore: PendingLocalStore,
+            conversationCursorStore: ConversationCursorStore,
+        ): TimelineRepository {
+            return TimelineRepository(
+                timelineTransport = MessageApiTimelineTransport(messageApi),
+                pendingLocalStore = pendingLocalStore,
+                conversationCursorStore = conversationCursorStore,
+            )
+        }
     }
 
     @Binds

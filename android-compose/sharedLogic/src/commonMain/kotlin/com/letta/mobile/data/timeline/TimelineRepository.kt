@@ -1,19 +1,11 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.session.BackendScopedCache
-import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
-import java.util.LinkedHashMap
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -21,40 +13,28 @@ import kotlinx.coroutines.withContext
 /**
  * Per-conversation [TimelineSyncLoop] registry.
  *
- * A single instance is shared across the app (Hilt @Singleton). Conversation
+ * A single instance is shared across the app. Conversation
  * timelines are cached so that navigating away and back preserves state,
  * pending sends, and live cursors.
  *
  * This is the single source of truth for conversation message state.
- * [com.letta.mobile.data.repository.MessageRepository] is retained only as a
- * stateless HTTP helper for older-message pagination, approvals, search,
- * batches, reset, and the conversation inspector.
  */
-@Singleton
-open class TimelineRepository @Inject constructor(
-    private val messageApi: MessageApi,
+open class TimelineRepository(
+    private val timelineTransport: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
-    sessionManager: SessionManager?,
 ) : TimelineExternalTransportWriter, BackendScopedCache {
-    internal constructor(
-        messageApi: MessageApi,
+    constructor(
+        timelineTransport: TimelineTransport,
         pendingLocalStore: PendingLocalStore,
         maxCachedLoops: Int,
-    ) : this(messageApi, pendingLocalStore, NoOpConversationCursorStore, sessionManager = null) {
+    ) : this(timelineTransport, pendingLocalStore, NoOpConversationCursorStore) {
         require(maxCachedLoops > 0) { "maxCachedLoops must be positive" }
         this.maxCachedLoops = maxCachedLoops
     }
 
     // Dedicated supervisor scope — child jobs fail in isolation.
     private val scope = CoroutineScope(SupervisorJob() + timelineIoDispatcher)
-
-    init {
-        sessionManager?.currentGraph
-            ?.drop(1)
-            ?.onEach { clearAll() }
-            ?.launchIn(scope)
-    }
 
     private var maxCachedLoops = DEFAULT_MAX_CACHED_LOOPS
     private val loops = LinkedHashMap<String, TimelineSyncLoop>(16, 0.75f, true)
@@ -118,7 +98,7 @@ open class TimelineRepository @Inject constructor(
                 "conversationId" to conversationId,
             )
             val created = TimelineSyncLoop(
-                messageApi = MessageApiTimelineTransport(messageApi),
+                messageApi = timelineTransport,
                 conversationId = conversationId,
                 scope = scope,
                 ingestedListenerProvider = { ingestedListener },
