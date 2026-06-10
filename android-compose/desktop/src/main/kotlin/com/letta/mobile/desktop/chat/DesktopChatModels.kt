@@ -8,8 +8,10 @@ import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
+import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatSessionState
+import com.letta.mobile.data.chat.runtime.chatScreenStatusOf
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -77,6 +79,14 @@ data class DesktopChatSurfaceState(
 
     val shouldShowStatePanel: Boolean
         get() = ChatSessionReducer.shouldShowStatePanel(runtimeState)
+
+    /**
+     * Shared platform-neutral descriptor for the current chat screen condition.
+     * Desktop UI composables switch on this to decide which panel/icon/copy to
+     * show, instead of re-deriving the meaning from [connectionState] directly.
+     */
+    val chatScreenStatus: ChatScreenStatus
+        get() = chatScreenStatusOf(runtimeState)
 }
 
 fun defaultDesktopChatSurfaceState(
