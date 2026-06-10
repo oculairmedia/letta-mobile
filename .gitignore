@@ -38,3 +38,4 @@ reports/*.json
 # Local performance traces
 scripts/perf/traces/*
 !scripts/perf/traces/.gitignore
+scripts/__pycache__/
