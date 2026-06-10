@@ -15,7 +15,9 @@ import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
@@ -25,6 +27,7 @@ import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.session.SessionManager
@@ -117,6 +120,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val subagentRepository: ISubagentRepository,
     private val clientVersionProvider: ChatClientVersionProvider,
     private val selfTodoRepository: com.letta.mobile.data.repository.api.ISelfTodoRepository,
+    private val modelRepository: IModelRepository,
     val attachmentLimits: com.letta.mobile.data.attachment.AttachmentLimits =
         com.letta.mobile.data.attachment.AttachmentLimits.Default,
 ) : ViewModel() {
@@ -345,6 +349,30 @@ internal class AdminChatViewModel @Inject constructor(
 
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
+
+    val llmModels: StateFlow<List<LlmModel>> = modelRepository.llmModels
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun refreshModels() {
+        viewModelScope.launch {
+            runCatching { modelRepository.refreshLlmModels() }
+        }
+    }
+
+    fun updateActiveAgentModel(handle: String) {
+        viewModelScope.launch {
+            try {
+                agentRepository.updateAgent(agentId, AgentUpdateParams(model = handle))
+                refreshModels()
+            } catch (e: Exception) {
+                // Surface the failure to the user and re-sync the displayed model state
+                val currentModel = activeAgent.value?.model ?: "unknown"
+                chatBannerController.showError("Couldn't switch model — still on $currentModel")
+                // Re-sync the active agent record so the drawer reflects reality
+                runCatching { agentRepository.refreshAgents() }
+            }
+        }
+    }
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {

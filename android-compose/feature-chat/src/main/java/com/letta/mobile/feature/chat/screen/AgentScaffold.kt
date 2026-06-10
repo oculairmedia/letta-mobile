@@ -144,6 +144,8 @@ internal object AgentScaffoldTestTags {
     const val CHAT_SEARCH_FIELD = "agent_scaffold_chat_search_field"
     const val AGENT_PICKER_SEARCH_FIELD = "agent_scaffold_agent_picker_search_field"
     const val DRAWER_EDIT_AGENT = "agent_scaffold_drawer_edit_agent"
+    const val MODEL_PICKER_SHEET = "agent_scaffold_model_picker_sheet"
+    const val DRAWER_MODEL_CARD = "agent_scaffold_drawer_model_card"
     fun drawerChatMode(mode: String) = "agent_scaffold_drawer_chat_mode_$mode"
 }
 
@@ -166,6 +168,7 @@ fun AgentScaffold(
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
+    onNavigateToSchedules: (() -> Unit)? = null,
     viewModelKey: String? = null,
 ) {
     AgentScaffoldContent(
@@ -177,6 +180,7 @@ fun AgentScaffold(
         onSwitchConversation = onSwitchConversation,
         onNavigateToAdmin = onNavigateToAdmin,
         onNavigateToConversationList = onNavigateToConversationList,
+        onNavigateToSchedules = onNavigateToSchedules,
         conversationRepository = null,
         viewModel = hiltViewModel(key = viewModelKey),
     )
@@ -193,6 +197,7 @@ internal fun AgentScaffoldContent(
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
+    onNavigateToSchedules: (() -> Unit)? = null,
     conversationRepository: IConversationRepository? = null,
     viewModel: AdminChatViewModel,
 ) {
@@ -207,6 +212,10 @@ internal fun AgentScaffoldContent(
     val availableAgents by viewModel.availableAgents.collectAsStateWithLifecycle()
     val favoriteAgentId by viewModel.favoriteAgentId.collectAsStateWithLifecycle()
     val activeBackendLabel by viewModel.activeBackendLabel.collectAsStateWithLifecycle()
+    val availableModels by viewModel.llmModels.collectAsStateWithLifecycle()
+    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
+    val activeAgentModel = remember(activeAgent) { activeAgent?.model }
+    var showModelPicker by remember { mutableStateOf(false) }
     val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
@@ -289,9 +298,11 @@ internal fun AgentScaffoldContent(
                     agentName = agentName,
                     agentId = agentIdValue,
                     activeBackendLabel = activeBackendLabel,
+                    currentModel = activeAgentModel,
                     contextWindow = uiState.contextWindow,
                     chatMode = chatMode,
                     onChatModeSelected = { chatMode = it },
+                    onModelTap = { showModelPicker = true },
                     conversations = drawerConversations,
                     currentConversationId = conversationId,
                     onNewConversation = {
@@ -318,6 +329,10 @@ internal fun AgentScaffoldContent(
                     onNavigateToConversations = {
                         scope.launch { drawerState.close() }
                         onNavigateToConversationList?.invoke()
+                    },
+                    onNavigateToSchedules = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToSchedules?.invoke()
                     },
                     onClose = { scope.launch { drawerState.close() } },
                     modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
@@ -529,6 +544,19 @@ internal fun AgentScaffoldContent(
                 projectBindings.submitStructuredBugReport(it)
                 showBugReportSheet = false
             },
+        )
+    }
+
+    if (showModelPicker) {
+        ModelPickerSheet(
+            models = availableModels,
+            currentModel = activeAgentModel,
+            onDismiss = { showModelPicker = false },
+            onModelSelected = { handle ->
+                viewModel.updateActiveAgentModel(handle)
+                showModelPicker = false
+            },
+            onRefresh = viewModel::refreshModels,
         )
     }
 }

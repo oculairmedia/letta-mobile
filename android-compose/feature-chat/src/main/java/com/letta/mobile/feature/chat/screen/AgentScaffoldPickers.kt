@@ -68,6 +68,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
@@ -694,15 +695,266 @@ internal fun contrastDrawerItemColors() =
         unselectedBadgeColor = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 
+/**
+ * Compact model info card for the chat drawer. Shows the current model handle
+ * (or a fallback label) and acts as a tap target to open the [ModelPickerSheet].
+ *
+ * letta-mobile-g5hyz: at-a-glance model row near the context-utilization card.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ModelInfoCard(
+    currentModel: String?,
+    onTap: () -> Unit,
+) {
+    val modelLabel = currentModel?.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.screen_drawer_model_unknown)
+    val displayModel = remember(modelLabel) {
+        if (modelLabel.length > 48) modelLabel.take(45) + "\u2026" else modelLabel
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onTap),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                LettaIcons.Psychology,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.tertiary,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.screen_drawer_model_label),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = displayModel,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * Bottom-sheet quick picker for swapping the active agent's model.
+ * Lists available LLM models grouped by provider type, with one-tap
+ * apply. Capability hints (context window size, tier) are included
+ * when the model-list API provides them.
+ *
+ * letta-mobile-g5hyz: tap → bottom-sheet quick picker.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ModelPickerSheet(
+    models: List<LlmModel>,
+    currentModel: String?,
+    onDismiss: () -> Unit,
+    onModelSelected: (String) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    var isDismissingForAction by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    fun dismissThen(action: () -> Unit) {
+        if (isDismissingForAction) return
+        isDismissingForAction = true
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            if (!sheetState.isVisible) {
+                action()
+                onDismiss()
+            } else {
+                isDismissingForAction = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (models.isEmpty()) onRefresh()
+    }
+
+    val grouped = remember(models) {
+        val sorted = models.sortedWith(compareBy({ it.providerType }, { it.displayName.lowercase() }))
+        sorted.groupBy { it.providerType.ifBlank { "Other" } }
+    }
+
+    val currentModelHandle = remember(currentModel) {
+        currentModel?.takeIf { it.isNotBlank() }
+    }
+
+    ModalBottomSheet(
+        sheetState = sheetState,
+        onDismissRequest = onDismiss,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .testTag(AgentScaffoldTestTags.MODEL_PICKER_SHEET),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.screen_drawer_model_picker_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onRefresh) {
+                    Icon(
+                        LettaIcons.Refresh,
+                        contentDescription = stringResource(R.string.action_refresh),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            if (grouped.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.screen_drawer_model_picker_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.heightIn(max = 400.dp),
+                ) {
+                    grouped.forEach { (provider, providerModels) ->
+                        item(key = "provider-$provider") {
+                            Text(
+                                text = provider.uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+                            )
+                        }
+                        items(providerModels, key = { it.handle ?: it.id }) { model ->
+                            val handle = model.handle ?: model.name
+                            val isActive = handle == currentModelHandle
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .combinedClickable(
+                                        enabled = !isDismissingForAction && !isActive,
+                                        onClick = {
+                                            dismissThen { onModelSelected(handle) }
+                                        },
+                                    ),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isActive) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        CardDefaults.cardColors().containerColor
+                                    },
+                                ),
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            Text(
+                                                text = model.displayName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f, fill = false),
+                                            )
+                                            // Tier badge — only when the API provides it.
+                                            model.tier?.takeIf { it.isNotBlank() }?.let { tier ->
+                                                AssistChip(
+                                                    onClick = {},
+                                                    label = {
+                                                        Text(
+                                                            tier.replaceFirstChar { it.uppercase() },
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                        )
+                                                    },
+                                                    modifier = Modifier.height(24.dp),
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = buildModelSubtitle(model),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (isActive) {
+                                        Icon(
+                                            LettaIcons.CheckCircle,
+                                            contentDescription = stringResource(R.string.screen_agents_current_indicator),
+                                            modifier = Modifier
+                                                .padding(start = 8.dp)
+                                                .size(LettaIconSizing.Toolbar),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * Builds the subtitle line for a model picker item: context window
+ * size and provider name when available.
+ */
+private fun buildModelSubtitle(model: LlmModel): String {
+    val parts = mutableListOf<String>()
+    model.contextWindow?.takeIf { it > 0 }?.let {
+        parts.add("${it / 1000}K context")
+    }
+    model.providerName?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
+    return parts.joinToString(" · ")
+}
+
 @androidx.annotation.VisibleForTesting
 @Composable
 internal fun DrawerContent(
     agentName: String,
     agentId: String,
     activeBackendLabel: String?,
+    currentModel: String?,
     contextWindow: ContextWindowUiState,
     chatMode: String,
     onChatModeSelected: (String) -> Unit,
+    onModelTap: () -> Unit,
     conversations: List<Conversation>,
     currentConversationId: String?,
     onNewConversation: () -> Unit,
@@ -712,6 +964,7 @@ internal fun DrawerContent(
     onRefreshContextWindow: () -> Unit,
     onNavigateToAdmin: () -> Unit = {},
     onNavigateToConversations: () -> Unit = {},
+    onNavigateToSchedules: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -792,6 +1045,11 @@ internal fun DrawerContent(
             state = contextWindow,
             onRefresh = onRefreshContextWindow,
         )
+        Spacer(modifier = Modifier.height(8.dp))
+        ModelInfoCard(
+            currentModel = currentModel,
+            onTap = onModelTap,
+        )
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))
@@ -855,6 +1113,16 @@ internal fun DrawerContent(
             onClick = {
                 HapticEffects.segmentTick(haptic, view)
                 onNavigateToConversations()
+            },
+            colors = drawerItemColors,
+        )
+        NavigationDrawerItem(
+            icon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
+            label = { Text("Schedules") },
+            selected = false,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onNavigateToSchedules()
             },
             colors = drawerItemColors,
         )
