@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,8 +41,10 @@ REPO = Path(__file__).resolve().parents[1]
 TOKENS_JSON = REPO / "docs/design/penpot-tokens.json"
 # Default target = the "letta mobile" file; override with --file-id.
 DEFAULT_FILE_ID = "46e68d89-bd4b-8008-8007-fa0da54a88af"
-HOST = "192.168.50.80"
-HOST_PW = "bangbang"
+HOST = os.environ.get("PENPOT_SSH_HOST", "192.168.50.80")
+# SSH password for the Penpot host. NEVER hardcode — repo is public.
+# Set PENPOT_SSH_PASSWORD, or rely on ssh-agent/key auth (preferred; leave unset).
+HOST_PW = os.environ.get("PENPOT_SSH_PASSWORD", "")
 RPC = "http://localhost:9001/api/rpc/command"
 
 # DTCG $type -> Penpot internal token :type keyword
@@ -89,11 +92,11 @@ def rpc(token: str, command: str, payload: str) -> tuple[int, str]:
         f"-H 'Accept: application/transit+json' "
         f"--data-binary @/tmp/_pp_payload.json -w '\\n__HTTP__%{{http_code}}'"
     )
-    res = subprocess.run(
-        ["sshpass", "-p", HOST_PW, "ssh", "-o", "StrictHostKeyChecking=no",
-         "-o", "ConnectTimeout=10", f"root@{HOST}", remote_cmd],
-        capture_output=True, text=True,
-    )
+    ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no",
+               "-o", "ConnectTimeout=10", f"root@{HOST}", remote_cmd]
+    if HOST_PW:
+        ssh_cmd = ["sshpass", "-p", HOST_PW] + ssh_cmd
+    res = subprocess.run(ssh_cmd, capture_output=True, text=True)
     body = res.stdout
     m = re.search(r"__HTTP__(\d+)\s*$", body)
     code = int(m.group(1)) if m else 0
