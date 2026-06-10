@@ -182,7 +182,9 @@ internal class AdminChatViewModel @Inject constructor(
             val next = reducerUpdate(current)
             _uiState.update { ui ->
                 ui.copy(
-                    conversationState = next.connectionState.toConversationState(next.selectedConversationId, next.errorMessage),
+                    // Derive Android ConversationState through the shared ChatScreenStatus
+                    // descriptor so both platforms agree on the meaning of each state.
+                    conversationState = next.toConversationState(),
                     isLoadingMessages = next.isLoading,
                     error = next.errorMessage,
                 )
