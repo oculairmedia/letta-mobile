@@ -575,6 +575,58 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `ujz3x first content delta after tool_return not dropped as prefix orphan`() {
+        // Setup: a previous assistant message in the same run starts with "Yes — the"
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-before-tool",
+                contentRaw = JsonPrimitive("Yes — the `Agent` tool takes an optional `model` parameter"),
+                runId = "run-1",
+                seqId = 1,
+            )
+        ).next
+
+        // Now the post-tool-return content stream starts. The first delta is just "Y"
+        // — a single character that coincidentally is a prefix of the previous
+        // assistant message. This must NOT be dropped.
+        val output1 = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "cm-stream-post-tool-otid",
+                contentRaw = JsonPrimitive("Y"),
+                runId = "run-1",
+                seqId = 1,  // FIRST frame for this new otid — genuinely new message
+                otid = "post-tool-otid",
+            ),
+        )
+
+        output1.next.events shouldHaveSize 2
+        val event1 = output1.next.events.last() as TimelineEvent.Confirmed
+        event1.serverId shouldBe "cm-stream-post-tool-otid"
+        event1.content shouldBe "Y"
+        event1.otid shouldBe "post-tool-otid"
+
+        // Second delta continues: "es — confirmed working at both layers:"
+        val output2 = reduce(
+            prev = output1.next,
+            frame = AssistantMessage(
+                id = "cm-stream-post-tool-otid",
+                contentRaw = JsonPrimitive("es — confirmed working at both layers:"),
+                runId = "run-1",
+                seqId = 2,
+                otid = "post-tool-otid",
+            ),
+        )
+
+        output2.next.events shouldHaveSize 2
+        val event2 = output2.next.events.last() as TimelineEvent.Confirmed
+        event2.serverId shouldBe "cm-stream-post-tool-otid"
+        event2.content shouldBe "Yes — confirmed working at both layers:"
+        // The first token 'Y' must be preserved — the full content starts with "Yes"
+        event2.content.startsWith("Yes") shouldBe true
+    }
+
+    @Test
     fun `semantic duplicate detection stays bounded on long histories`() {
         val longHistory = Timeline(
             conversationId = "conv-test",
