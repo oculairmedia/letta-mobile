@@ -48,6 +48,7 @@ import com.mikepenz.markdown.compose.Markdown as CoreMarkdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.markdownExtendedSpans
+import com.mikepenz.markdown.model.markdownPadding
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.ast.ASTNode
@@ -540,6 +541,15 @@ private fun MarkdownTextRaw(
             extendedSpans = extendedSpans,
             imageTransformer = Coil3ImageTransformerImpl,
             retainState = true,
+            // Editorial breathing room: generous spacing between list items,
+            // paragraphs, and blocks so prose feels loose and magazine-like.
+            padding = markdownPadding(
+                block = 8.dp,
+                list = 8.dp,
+                listItemBottom = 8.dp,
+                listItemTop = 0.dp,
+                indentList = 12.dp,
+            ),
             colors = markdownColor(
                 text = textColor,
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
