@@ -75,8 +75,10 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.projection.runStepDotIcon
+import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
+import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
@@ -214,6 +216,7 @@ private fun ConversationPaneStateCard(
     state: DesktopChatSurfaceState,
     onRetryConnection: () -> Unit,
 ) {
+    val screenStatus = state.chatScreenStatus
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
@@ -229,23 +232,23 @@ private fun ConversationPaneStateCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = state.connectionState.statusIcon(),
+                    imageVector = screenStatus.statusIcon(),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = state.connectionState.statusColor(),
+                    tint = screenStatus.statusColor(),
                 )
                 Text(
-                    text = state.connectionState.panelTitle(),
+                    text = screenStatus.panelTitle(),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
             }
             Text(
-                text = state.errorMessage ?: state.connectionState.panelBody(),
+                text = state.errorMessage ?: screenStatus.panelBody(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (state.connectionState.canRetry()) {
+            if (screenStatus.isConnectionRetryable) {
                 Button(
                     onClick = onRetryConnection,
                     enabled = !state.isLoading,
@@ -434,6 +437,7 @@ private fun ChatStatePanel(
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val screenStatus = state.chatScreenStatus
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -453,22 +457,22 @@ private fun ChatStatePanel(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = state.connectionState.statusIcon(),
+                        imageVector = screenStatus.statusIcon(),
                         contentDescription = null,
                     )
                 }
             }
             Text(
-                text = state.connectionState.panelTitle(),
+                text = screenStatus.panelTitle(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = state.errorMessage ?: state.connectionState.panelBody(),
+                text = state.errorMessage ?: screenStatus.panelBody(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (state.connectionState.canRetry()) {
+            if (screenStatus.isConnectionRetryable) {
                 Button(
                     onClick = onRetryConnection,
                     enabled = !state.isLoading,
@@ -1093,65 +1097,55 @@ private fun StatusDot(color: Color) {
     )
 }
 
+// ---------------------------------------------------------------------------
+// Desktop-side UI mappings for ChatScreenStatus
+// Icon, colour, copy, and retry affordance are all platform concerns kept
+// here — only the MEANING of which state we are in moves to shared code.
+// ---------------------------------------------------------------------------
+
 @Composable
-private fun DesktopChatConnectionState.statusColor(): Color = when (this) {
-    DesktopChatConnectionState.Live,
-    DesktopChatConnectionState.Sending -> MaterialTheme.colorScheme.primary
-    DesktopChatConnectionState.Demo,
-    DesktopChatConnectionState.NoConversations -> MaterialTheme.colorScheme.tertiary
-    DesktopChatConnectionState.Loading -> MaterialTheme.colorScheme.secondary
-    DesktopChatConnectionState.ConfigNeeded,
-    DesktopChatConnectionState.Offline,
-    DesktopChatConnectionState.StreamDisconnected,
-    DesktopChatConnectionState.SendFailed -> MaterialTheme.colorScheme.error
+private fun ChatScreenStatus.statusColor(): Color = when (this) {
+    is ChatScreenStatus.Ready -> if (isSending) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    is ChatScreenStatus.NoConversations -> MaterialTheme.colorScheme.tertiary
+    is ChatScreenStatus.Loading -> MaterialTheme.colorScheme.secondary
+    is ChatScreenStatus.ConfigNeeded,
+    is ChatScreenStatus.BackendOffline,
+    is ChatScreenStatus.SendFailed -> MaterialTheme.colorScheme.error
 }
 
-private fun DesktopChatConnectionState.statusIcon(): ImageVector = when (this) {
-    DesktopChatConnectionState.Live,
-    DesktopChatConnectionState.Sending -> Icons.Outlined.CheckCircle
-    DesktopChatConnectionState.Demo,
-    DesktopChatConnectionState.NoConversations -> Icons.Outlined.SmartToy
-    DesktopChatConnectionState.Loading -> Icons.Outlined.HourglassEmpty
-    DesktopChatConnectionState.ConfigNeeded,
-    DesktopChatConnectionState.Offline,
-    DesktopChatConnectionState.StreamDisconnected,
-    DesktopChatConnectionState.SendFailed -> Icons.Outlined.ErrorOutline
+private fun ChatScreenStatus.statusIcon(): ImageVector = when (this) {
+    is ChatScreenStatus.Ready -> Icons.Outlined.CheckCircle
+    is ChatScreenStatus.NoConversations -> Icons.Outlined.SmartToy
+    is ChatScreenStatus.Loading -> Icons.Outlined.HourglassEmpty
+    is ChatScreenStatus.ConfigNeeded,
+    is ChatScreenStatus.BackendOffline,
+    is ChatScreenStatus.SendFailed -> Icons.Outlined.ErrorOutline
 }
 
-private fun DesktopChatConnectionState.panelTitle(): String = when (this) {
-    DesktopChatConnectionState.Demo -> "Demo preview"
-    DesktopChatConnectionState.Loading -> "Connecting"
-    DesktopChatConnectionState.ConfigNeeded -> "Backend configuration required"
-    DesktopChatConnectionState.Offline -> "Backend offline"
-    DesktopChatConnectionState.NoConversations -> "No conversations"
-    DesktopChatConnectionState.Live -> "Live"
-    DesktopChatConnectionState.Sending -> "Sending"
-    DesktopChatConnectionState.StreamDisconnected -> "Stream disconnected"
-    DesktopChatConnectionState.SendFailed -> "Send failed"
+private fun ChatScreenStatus.panelTitle(): String = when (this) {
+    is ChatScreenStatus.Loading -> "Connecting"
+    is ChatScreenStatus.ConfigNeeded -> "Backend configuration required"
+    is ChatScreenStatus.BackendOffline -> "Backend offline"
+    is ChatScreenStatus.NoConversations -> "No conversations"
+    is ChatScreenStatus.SendFailed -> "Send failed"
+    is ChatScreenStatus.Ready -> if (isSending) "Sending" else "Live"
 }
 
-private fun DesktopChatConnectionState.panelBody(): String = when (this) {
-    DesktopChatConnectionState.Demo -> "Sample data is shown only in the explicit demo preview."
-    DesktopChatConnectionState.Loading -> "Loading conversations from the configured Letta backend."
-    DesktopChatConnectionState.ConfigNeeded -> "Set a server URL and token in Settings before connecting."
-    DesktopChatConnectionState.Offline -> "The configured backend could not be reached."
-    DesktopChatConnectionState.NoConversations -> "This backend returned no conversations for the active account."
-    DesktopChatConnectionState.Live -> "Connected to the configured backend."
-    DesktopChatConnectionState.Sending -> "Sending your message to the active conversation."
-    DesktopChatConnectionState.StreamDisconnected -> "The conversation stream disconnected. Existing messages remain visible."
-    DesktopChatConnectionState.SendFailed -> "The last send failed. You can edit and try again."
-}
-
-private fun DesktopChatConnectionState.canRetry(): Boolean = when (this) {
-    DesktopChatConnectionState.ConfigNeeded,
-    DesktopChatConnectionState.Offline,
-    DesktopChatConnectionState.StreamDisconnected -> true
-    DesktopChatConnectionState.Demo,
-    DesktopChatConnectionState.Loading,
-    DesktopChatConnectionState.NoConversations,
-    DesktopChatConnectionState.Live,
-    DesktopChatConnectionState.Sending,
-    DesktopChatConnectionState.SendFailed -> false
+private fun ChatScreenStatus.panelBody(): String = when (this) {
+    is ChatScreenStatus.Loading -> "Loading conversations from the configured Letta backend."
+    is ChatScreenStatus.ConfigNeeded -> "Set a server URL and token in Settings before connecting."
+    is ChatScreenStatus.BackendOffline -> "The configured backend could not be reached."
+    is ChatScreenStatus.NoConversations -> "This backend returned no conversations for the active account."
+    is ChatScreenStatus.SendFailed -> "The last send failed. You can edit and try again."
+    is ChatScreenStatus.Ready -> if (isSending) {
+        "Sending your message to the active conversation."
+    } else {
+        "Connected to the configured backend."
+    }
 }
 
 private fun UiMessage.senderLabel(): String = when {

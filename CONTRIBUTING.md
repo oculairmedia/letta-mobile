@@ -29,7 +29,7 @@ git push --force-with-lease                 # safe force-push of your branch
 |-------|--------------|--------|
 | `.githooks/pre-commit` | Refuses commits on `main`/`master` | `git commit --no-verify` |
 | `.githooks/pre-push`   | Refuses pushes targeting `refs/heads/main` or `refs/heads/master` on any remote, runs `compileRootDebugKotlin` | `git push --no-verify` |
-| GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk` to pass, linear history only | Admin override in the UI |
+| GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk` + `shared-multiplatform` to pass, linear history only | Admin override in the UI |
 
 The local hooks are nudges — they save a round-trip to CI. The branch-protection rule is the wall.
 
@@ -100,6 +100,14 @@ Run these from `android-compose/` before pushing (the pre-push hook covers the f
 ```bash
 ./gradlew :app:compileRootDebugKotlin
 ./gradlew :app:testRootDebugUnitTest
+```
+
+If you touched `sharedLogic/` (KMP common code), also run the all-target gate locally —
+commonMain/commonTest must stay platform-neutral (no JVM-only APIs) and this is what
+the required `shared-multiplatform` CI check runs:
+
+```bash
+./gradlew :sharedLogic:allTests :desktop:test
 ```
 
 Device install:
