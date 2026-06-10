@@ -364,9 +364,12 @@ internal class AdminChatViewModel @Inject constructor(
             try {
                 agentRepository.updateAgent(agentId, AgentUpdateParams(model = handle))
                 refreshModels()
-            } catch (_: Exception) {
-                // Swallow individual update failures; the UI will show
-                // whatever the agent currently reports via activeAgent.
+            } catch (e: Exception) {
+                // Surface the failure to the user and re-sync the displayed model state
+                val currentModel = activeAgent.value?.model ?: "unknown"
+                chatBannerController.showError("Couldn't switch model — still on $currentModel")
+                // Re-sync the active agent record so the drawer reflects reality
+                runCatching { agentRepository.refreshAgents() }
             }
         }
     }
