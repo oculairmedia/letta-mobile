@@ -82,6 +82,10 @@
   <string name="screen_drawer_chat_mode_label">Chat mode</string>
   <string name="screen_drawer_chat_mode_simple">Simple</string>
   <string name="screen_drawer_default_agent_name">Agent</string>
+  <string name="screen_drawer_model_label">Current model</string>
+  <string name="screen_drawer_model_unknown">No model set</string>
+  <string name="screen_drawer_model_picker_title">Choose a model</string>
+  <string name="screen_drawer_model_picker_empty">No models available yet</string>
   <string name="screen_drawer_edit_agent">Edit Agent</string>
   <string name="screen_drawer_reset_icon_description">Reset</string>
   <string name="screen_home_search_messages_section">Messages</string>
