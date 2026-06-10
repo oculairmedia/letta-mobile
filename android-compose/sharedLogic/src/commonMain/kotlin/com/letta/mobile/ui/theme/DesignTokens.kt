@@ -32,7 +32,12 @@ object LettaSpacingTokens {
     // Chat-specific semantic tokens
     const val bubblePaddingHorizontal = 10f
     const val bubblePaddingVertical = 7f
-    const val messageSpacing = xxxs
+    // Editorial inter-message rhythm (see docs/design/editorial-prose.md §3):
+    // tighter WITHIN a turn, looser BETWEEN turns. messageSpacing is the beat
+    // between consecutive bubbles from the same speaker; ungroupedMessageSpacing
+    // is the editorial section break between speakers / run boundaries.
+    const val messageSpacing = sm
+    const val ungroupedMessageSpacing = xl
     const val composerAttachIconSize = 18f
     const val composerAttachButtonSize = 36f
 
@@ -117,7 +122,7 @@ object LettaChatTokens {
         bubbleMaxWidthFraction = 0.88f,
         messageSpacingDp = LettaSpacingTokens.messageSpacing,
         groupedMessageSpacingDp = LettaSpacingTokens.messageSpacing,
-        ungroupedMessageSpacingDp = LettaSpacingTokens.xs,
+        ungroupedMessageSpacingDp = LettaSpacingTokens.ungroupedMessageSpacing,
         contentPaddingHorizontalDp = LettaSpacingTokens.screenHorizontal,
     )
 
