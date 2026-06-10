@@ -9,6 +9,8 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.Hyphens
+import androidx.compose.ui.text.style.LineBreak
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.designsystem.R
 
@@ -115,19 +117,29 @@ val Typography = Typography(
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
+    // Editorial body prose (see docs/design/editorial-prose.md §1): generous
+    // line height + opened tracking + ligatures/hyphenation/paragraph line
+    // break so multi-paragraph chat prose reads like a well-set article.
+    // Font-agnostic — improves Inter today, would improve any future body face.
     bodyLarge = TextStyle(
         fontFamily = InterFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = 0.5.sp
+        lineHeight = 26.sp,
+        letterSpacing = 0.3.sp,
+        fontFeatureSettings = "liga, calt",
+        hyphens = Hyphens.Auto,
+        lineBreak = LineBreak.Paragraph,
     ),
     bodyMedium = TextStyle(
         fontFamily = InterFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.25.sp
+        lineHeight = 24.sp,
+        letterSpacing = 0.3.sp,
+        fontFeatureSettings = "liga, calt",
+        hyphens = Hyphens.Auto,
+        lineBreak = LineBreak.Paragraph,
     ),
     bodySmall = TextStyle(
         fontFamily = InterFontFamily,

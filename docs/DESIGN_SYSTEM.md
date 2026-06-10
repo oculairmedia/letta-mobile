@@ -79,7 +79,8 @@ Beyond Material 3, the app defines its own semantic colors:
 |---|---|
 | `bubblePaddingHorizontal` | 10 |
 | `bubblePaddingVertical` | 7 |
-| `messageSpacing` | 2 |
+| `messageSpacing` (grouped) | 8 |
+| `ungroupedMessageSpacing` | 24 |
 | `bubbleRadius` | 12 |
 | `codeBlockRadius` | 8 |
 | `composerAttachIconSize` | 18 |
@@ -97,6 +98,12 @@ Beyond Material 3, the app defines its own semantic colors:
 
 `Typography` — Material 3 scale using **Inter** variable font (and **JetBrains Mono** for code).
 
+> **Editorial body prose** (`bodyMedium`, `bodyLarge`) — see `docs/design/editorial-prose.md`.
+> Both carry `fontFeatureSettings = "liga, calt"`, `Hyphens.Auto`, and
+> `LineBreak.Paragraph` for magazine-quality chat prose. Line height is opened to
+> 1.71 (`bodyMedium` 14/24) and 1.63 (`bodyLarge` 16/26). Code styles keep
+> ligatures **off** for ASCII-art alignment (unchanged).
+
 | Role | Size | Line | Weight | Letter |
 |---|---|---|---|---|
 | displayLarge | 57 | 64 | Bold | -0.25 |
@@ -108,8 +115,8 @@ Beyond Material 3, the app defines its own semantic colors:
 | titleLarge | 22 | 28 | SemiBold | 0 |
 | titleMedium | 16 | 24 | Medium | 0.15 |
 | titleSmall | 14 | 20 | Medium | 0.1 |
-| bodyLarge | 16 | 24 | Normal | 0.5 |
-| bodyMedium | 14 | 20 | Normal | 0.25 |
+| bodyLarge | 16 | 26 | Normal | 0.3 |
+| bodyMedium | 14 | 24 | Normal | 0.3 |
 | bodySmall | 12 | 16 | Normal | 0.4 |
 | labelLarge | 14 | 20 | Medium | 0.1 |
 | labelMedium | 12 | 16 | Medium | 0.5 |
@@ -160,7 +167,8 @@ Beyond Material 3, the app defines its own semantic colors:
 - `shapes.bubbleRadiusDp` 12, `shapes.codeBlockRadiusDp` 8
 - `dimens.bubbleMaxWidthFraction` 0.88 (88% of parent width)
 - `dimens.contentPaddingHorizontalDp` 12
-- `dimens.groupedMessageSpacingDp` 2, `ungroupedMessageSpacingDp` 6
+- `dimens.groupedMessageSpacingDp` 8, `ungroupedMessageSpacingDp` 24 (editorial rhythm — see `docs/design/editorial-prose.md`)
+- **Markdown list spacing** (`MarkdownText.kt` → `markdownPadding`): `block` 8dp, `list` 8dp, `listItemBottom` 8dp, `listItemTop` 0dp, `indentList` 12dp
 - `typography.codeBlockFontSizeSp` 12, `codeBlockLineHeightSp` 16
 
 ## Design system rules (from AGENTS.md)
