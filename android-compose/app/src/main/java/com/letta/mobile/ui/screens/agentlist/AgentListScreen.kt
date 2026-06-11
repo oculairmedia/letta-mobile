@@ -61,6 +61,7 @@ import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
+import java.util.UUID
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -86,7 +87,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Switch
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelSettings
@@ -123,7 +123,8 @@ import com.letta.mobile.ui.theme.isExpandedWidth
 @Composable
 fun AgentListScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToAgent: (String, String?) -> Unit,
+    onNavigateToAgent: (String, String?, String?) -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     onNavigateToEditAgent: (String) -> Unit,
     shareContentPreview: String? = null,
     viewModel: AgentListViewModel = hiltViewModel(),
@@ -140,7 +141,7 @@ fun AgentListScreen(
             if (shareNavigationConsumed) return
             shareNavigationConsumed = true
         }
-        onNavigateToAgent(agentId, agentName)
+        onNavigateToAgent(agentId, agentName, null)
     }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -169,7 +170,7 @@ fun AgentListScreen(
                             response.agentIds.size,
                         )
                     )
-                    importedId?.let { onNavigateToAgent(it, uiState.pendingImportName) }
+                    importedId?.let { onNavigateToAgent(it, uiState.pendingImportName, null) }
                 }
             }
         }
@@ -467,10 +468,17 @@ fun AgentListScreen(
             llmModels = uiState.llmModels,
             embeddingModels = uiState.embeddingModels,
             onLoadModels = { viewModel.loadAvailableModels() },
-            onCreate = { params ->
-                viewModel.createAgent(params) { agentId ->
+            localReadiness = uiState.localLettaCodeReadiness,
+            onOpenLocalSettings = onNavigateToSettings,
+            onCreate = { params, runtimeOption ->
+                viewModel.createAgent(params, runtimeOption) { agentId ->
                     viewModel.hideCreateDialog()
-                    onNavigateToAgent(agentId.value, params.name)
+                    val conversationId = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+                        "local-conv-${agentId.value}-${UUID.randomUUID()}"
+                    } else {
+                        null
+                    }
+                    onNavigateToAgent(agentId.value, params.name, conversationId)
                 }
             },
         )

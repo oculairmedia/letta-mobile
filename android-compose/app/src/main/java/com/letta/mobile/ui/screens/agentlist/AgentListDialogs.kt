@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -41,7 +44,9 @@ internal fun CreateAgentDialog(
     llmModels: List<LlmModel> = emptyList(),
     embeddingModels: List<EmbeddingModel> = emptyList(),
     onLoadModels: () -> Unit = {},
-    onCreate: (AgentCreateParams) -> Unit
+    localReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
+    onOpenLocalSettings: () -> Unit = {},
+    onCreate: (AgentCreateParams, AgentCreateRuntimeOption) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -55,6 +60,7 @@ internal fun CreateAgentDialog(
     var enableSleeptime by remember { mutableStateOf(false) }
     var includeBaseTools by remember { mutableStateOf(true) }
     var selectedToolIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var runtimeOption by remember { mutableStateOf(AgentCreateRuntimeOption.REMOTE) }
     var showToolPicker by remember { mutableStateOf(false) }
     val embeddingDropdownModels = remember(embeddingModels) {
         embeddingModels.map {
@@ -73,7 +79,7 @@ internal fun CreateAgentDialog(
         confirmText = stringResource(R.string.action_create),
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
-        confirmEnabled = name.isNotBlank() && model.isNotBlank() && embedding.isNotBlank(),
+        confirmEnabled = name.isNotBlank() && if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) localReadiness.ready else model.isNotBlank() && embedding.isNotBlank(),
         onConfirm = {
             onCreate(AgentCreateParams(
                 name = name,
@@ -86,11 +92,12 @@ internal fun CreateAgentDialog(
                     maxOutputTokens = maxOutputTokens.toIntOrNull(),
                     parallelToolCalls = parallelToolCalls,
                 ),
-                toolIds = selectedToolIds.map { ToolId(it) }.ifEmpty { null },
+                toolIds = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) null else selectedToolIds.map { ToolId(it) }.ifEmpty { null },
                 system = systemPrompt.ifBlank { null },
-                enableSleeptime = enableSleeptime,
-                includeBaseTools = includeBaseTools,
-            ))
+                enableSleeptime = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) false else enableSleeptime,
+                includeBaseTools = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) false else includeBaseTools,
+                parallelToolCalls = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) false else null,
+            ), runtimeOption)
         },
     ) {
         Column(
@@ -111,22 +118,70 @@ internal fun CreateAgentDialog(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            ModelDropdown(
-                selectedModel = model,
-                models = llmModels,
-                onModelSelected = { model = it },
-                onLoadModels = onLoadModels,
-                modifier = Modifier.fillMaxWidth(),
-                label = stringResource(R.string.common_model),
+
+            Text(
+                text = "Runtime",
+                style = MaterialTheme.typography.titleSmall,
             )
-            ModelDropdown(
-                selectedModel = embedding,
-                models = embeddingDropdownModels,
-                onModelSelected = { embedding = it },
-                onLoadModels = onLoadModels,
-                modifier = Modifier.fillMaxWidth(),
-                label = stringResource(R.string.screen_agent_edit_embedding_model),
+            FormItem(
+                label = {
+                    Column {
+                        Text("Remote Letta")
+                        Text(
+                            text = "Use the current server/shim connection.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                tail = {
+                    Switch(
+                        checked = runtimeOption == AgentCreateRuntimeOption.REMOTE,
+                        onCheckedChange = { if (it) runtimeOption = AgentCreateRuntimeOption.REMOTE },
+                    )
+                },
             )
+            FormItem(
+                label = {
+                    Column {
+                        Text("Local LettaCode")
+                        Text(
+                            text = "Text-only on-device chat. Tools and approvals are disabled for now.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                tail = {
+                    Switch(
+                        checked = runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE,
+                        onCheckedChange = { if (it) runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE },
+                    )
+                },
+            )
+            if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+                LocalLettaCodeReadinessCard(
+                    readiness = localReadiness,
+                    onOpenLocalSettings = onOpenLocalSettings,
+                )
+            } else {
+                ModelDropdown(
+                    selectedModel = model,
+                    models = llmModels,
+                    onModelSelected = { model = it },
+                    onLoadModels = onLoadModels,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.common_model),
+                )
+                ModelDropdown(
+                    selectedModel = embedding,
+                    models = embeddingDropdownModels,
+                    onModelSelected = { embedding = it },
+                    onLoadModels = onLoadModels,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.screen_agent_edit_embedding_model),
+                )
+            }
             Text(
                 text = stringResource(R.string.screen_agents_create_advanced_model_section),
                 style = MaterialTheme.typography.titleSmall,
@@ -161,12 +216,14 @@ internal fun CreateAgentDialog(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
-            FormItem(
-                label = { Text(stringResource(R.string.common_parallel_tool_calls)) },
-                tail = {
-                    Switch(checked = parallelToolCalls, onCheckedChange = { parallelToolCalls = it })
-                },
-            )
+            if (runtimeOption != AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+                FormItem(
+                    label = { Text(stringResource(R.string.common_parallel_tool_calls)) },
+                    tail = {
+                        Switch(checked = parallelToolCalls, onCheckedChange = { parallelToolCalls = it })
+                    },
+                )
+            }
             OutlinedTextField(
                 value = systemPrompt,
                 onValueChange = { systemPrompt = it },
@@ -175,41 +232,49 @@ internal fun CreateAgentDialog(
                 minLines = 3,
                 maxLines = 5,
             )
-            FormItem(
-                label = { Text(stringResource(R.string.common_enable_sleeptime)) },
-                tail = {
-                    Switch(checked = enableSleeptime, onCheckedChange = { enableSleeptime = it })
-                },
-            )
-            FormItem(
-                label = { Text(stringResource(R.string.screen_agents_create_include_base_tools)) },
-                tail = {
-                    Switch(checked = includeBaseTools, onCheckedChange = { includeBaseTools = it })
-                },
-            )
-            Text(
-                text = stringResource(R.string.common_tools),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            if (selectedToolIds.isEmpty()) {
+            if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
                 Text(
-                    text = stringResource(R.string.screen_tools_empty_attached),
+                    text = "Text only · tools off · approvals off",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                Text(
-                    text = stringResource(R.string.screen_agents_create_selected_tools_count, selectedToolIds.size),
-                    style = MaterialTheme.typography.bodyMedium,
+                FormItem(
+                    label = { Text(stringResource(R.string.common_enable_sleeptime)) },
+                    tail = {
+                        Switch(checked = enableSleeptime, onCheckedChange = { enableSleeptime = it })
+                    },
                 )
-            }
-            OutlinedButton(
-                onClick = { showToolPicker = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(LettaIcons.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.screen_agents_create_select_tools))
+                FormItem(
+                    label = { Text(stringResource(R.string.screen_agents_create_include_base_tools)) },
+                    tail = {
+                        Switch(checked = includeBaseTools, onCheckedChange = { includeBaseTools = it })
+                    },
+                )
+                Text(
+                    text = stringResource(R.string.common_tools),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (selectedToolIds.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.screen_tools_empty_attached),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        text = stringResource(R.string.screen_agents_create_selected_tools_count, selectedToolIds.size),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                OutlinedButton(
+                    onClick = { showToolPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(LettaIcons.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.screen_agents_create_select_tools))
+                }
             }
         }
     }
@@ -225,6 +290,43 @@ internal fun CreateAgentDialog(
                 showToolPicker = false
             },
         )
+    }
+}
+
+@Composable
+private fun LocalLettaCodeReadinessCard(
+    readiness: LocalLettaCodeCreateReadiness,
+    onOpenLocalSettings: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (readiness.ready) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer
+            },
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = if (readiness.ready) "Local LettaCode is ready" else "Finish Local LettaCode setup",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = readiness.setupMessage
+                    ?: "Your selected on-device model will be used for this agent. Tools and approvals are off for now.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (!readiness.ready) {
+                OutlinedButton(onClick = onOpenLocalSettings) {
+                    Text(readiness.setupActionLabel)
+                }
+            }
+        }
     }
 }
 
