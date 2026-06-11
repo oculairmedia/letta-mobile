@@ -84,6 +84,7 @@ import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
+import com.letta.mobile.feature.chat.subagent.ActiveSubagentRings
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.withLingeringTerminals
@@ -461,6 +462,35 @@ internal fun ChatScreen(
                     }
                 }
 
+                // letta-mobile-w8mog: circular progress rings stacked on the
+                // RIGHT edge of the chat surface. REPLACES the ActiveSubagentBar
+                // chip presentation.
+                CompositionLocalProvider(
+                    LocalSubagentTodoSheetOpener provides { target ->
+                        tappedSubagentTarget = target
+                    },
+                ) {
+                    ActiveSubagentRings(
+                        subagents = activeSubagents,
+                        now = lingerTick,
+                        onRingClick = { subagent ->
+                            tappedSubagentTarget = SubagentTodoSheetTarget(
+                                toolCallId = subagent.id,
+                                description = subagent.description,
+                                subagentAgentId = subagent.subagentAgentId,
+                            )
+                        },
+                        onViewConversation = { subagent ->
+                            subagent.subagentAgentId
+                                ?.takeIf { it.isNotBlank() }
+                                ?.let { agentId -> onViewSubagentConversation?.invoke(agentId) }
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(bottom = bottomPaddingDp + 8.dp, end = 8.dp),
+                    )
+                }
+
                 // Floating composer column aligned to BottomCenter
                 Column(
                     modifier = Modifier
@@ -471,28 +501,6 @@ internal fun ChatScreen(
                             composerHeightDp = with(density) { size.height.toDp() }
                         }
                 ) {
-                    CompositionLocalProvider(
-                        LocalSubagentTodoSheetOpener provides { target ->
-                            tappedSubagentTarget = target
-                        },
-                    ) {
-                        ActiveSubagentBar(
-                            subagents = activeSubagents,
-                            now = lingerTick,
-                            onChipClick = { subagent ->
-                                tappedSubagentTarget = SubagentTodoSheetTarget(
-                                    toolCallId = subagent.id,
-                                    description = subagent.description,
-                                    subagentAgentId = subagent.subagentAgentId,
-                                )
-                            },
-                            onViewConversation = { subagent ->
-                                subagent.subagentAgentId
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?.let { agentId -> onViewSubagentConversation?.invoke(agentId) }
-                            },
-                        )
-                    }
 
                     // letta-mobile-ndtc.3: gradient "thinking" text token —
                     // ephemeral subtitle that appears between the message list /
