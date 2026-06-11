@@ -34,6 +34,8 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.platform.BatteryOptimizationHelper
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -149,6 +151,9 @@ fun ConfigScreen(
                 onImportLocalModel = {
                     localModelImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
                 },
+                onDownloadEmbeddedModel = { viewModel.downloadEmbeddedModel(it) },
+                onCancelEmbeddedModelDownload = { viewModel.cancelEmbeddedModelDownload(it) },
+                onSelectEmbeddedModel = { viewModel.selectEmbeddedModel(it) },
                 batteryOptimizationExempt = batteryOptimizationExempt,
                 onRequestBatteryOptimizationExemption = {
                     Telemetry.event(
@@ -203,6 +208,9 @@ private fun ConfigContent(
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
     onImportLocalModel: () -> Unit,
+    onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
+    onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
+    onSelectEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
@@ -290,6 +298,9 @@ private fun ConfigContent(
                             onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
                             onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
                             onImportLocalModel = onImportLocalModel,
+                            onDownloadEmbeddedModel = onDownloadEmbeddedModel,
+                            onCancelEmbeddedModelDownload = onCancelEmbeddedModelDownload,
+                            onSelectEmbeddedModel = onSelectEmbeddedModel,
                         )
                     },
                 )
@@ -543,6 +554,9 @@ private fun LocalModelSettingsItem(
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
     onImportLocalModel: () -> Unit,
+    onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
+    onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
+    onSelectEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -554,6 +568,13 @@ private fun LocalModelSettingsItem(
         Text(
             text = stringResource(R.string.screen_config_on_device_model_title),
             style = MaterialTheme.typography.bodyLarge,
+        )
+        EmbeddedModelCatalogSection(
+            items = state.embeddedModelCatalog,
+            selectedPath = state.localModelPath,
+            onDownload = onDownloadEmbeddedModel,
+            onCancel = onCancelEmbeddedModelDownload,
+            onSelect = onSelectEmbeddedModel,
         )
         OutlinedTextField(
             value = state.localModelPath,
@@ -634,6 +655,108 @@ private fun LocalModelSettingsItem(
             singleLine = true,
         )
     }
+}
+
+@Composable
+private fun EmbeddedModelCatalogSection(
+    items: List<EmbeddedModelCatalogItem>,
+    selectedPath: String,
+    onDownload: (EmbeddedModelCatalogItem) -> Unit,
+    onCancel: (EmbeddedModelCatalogItem) -> Unit,
+    onSelect: (EmbeddedModelCatalogItem) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.screen_config_embedded_model_catalog),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (items.isEmpty()) {
+            Text(
+                text = stringResource(R.string.screen_config_embedded_model_catalog_empty),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        items.forEach { item ->
+            EmbeddedModelCatalogRow(
+                item = item,
+                selected = (item.state as? EmbeddedModelDownloadState.Downloaded)?.localPath == selectedPath,
+                onDownload = { onDownload(item) },
+                onCancel = { onCancel(item) },
+                onSelect = { onSelect(item) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EmbeddedModelCatalogRow(
+    item: EmbeddedModelCatalogItem,
+    selected: Boolean,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onSelect: () -> Unit,
+) {
+    val entry = item.entry
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(entry.name, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                text = stringResource(
+                    R.string.screen_config_embedded_model_size,
+                    formatBytes(entry.sizeInBytes),
+                    formatBytes(entry.estimatedPeakMemoryInBytes),
+                ),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (!entry.isSupported) {
+                AssistChip(
+                    enabled = false,
+                    onClick = {},
+                    label = { Text(entry.unsupportedReason ?: stringResource(R.string.screen_config_embedded_model_unsupported)) },
+                )
+            } else {
+                when (val state = item.state) {
+                    EmbeddedModelDownloadState.Idle,
+                    EmbeddedModelDownloadState.Cancelled,
+                    is EmbeddedModelDownloadState.Failed -> {
+                        if (state is EmbeddedModelDownloadState.Failed) {
+                            Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                        OutlinedButton(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.screen_config_embedded_model_download))
+                        }
+                    }
+                    is EmbeddedModelDownloadState.Downloading -> {
+                        val progress = state.totalBytes?.takeIf { it > 0L }?.let { state.bytesDownloaded.toFloat() / it.toFloat() }
+                        if (progress != null) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
+                            Text(stringResource(R.string.screen_config_embedded_model_cancel))
+                        }
+                    }
+                    is EmbeddedModelDownloadState.Downloaded -> {
+                        FilledTonalButton(onClick = onSelect, modifier = Modifier.fillMaxWidth(), enabled = !selected) {
+                            Text(
+                                stringResource(
+                                    if (selected) R.string.screen_config_embedded_model_downloaded
+                                    else R.string.screen_config_embedded_model_select,
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatBytes(bytes: Long): String {
+    val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
+    val mib = bytes.toDouble() / (1024.0 * 1024.0)
+    return if (gib >= 1.0) "%.1f GiB".format(gib) else "%.0f MiB".format(mib)
 }
 
 private enum class LocalModelAcceleratorOption(

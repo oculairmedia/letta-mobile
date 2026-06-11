@@ -14,6 +14,9 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,6 +48,7 @@ data class ConfigUiState(
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
     val localModelMaxTokens: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS,
     val isImportingLocalModel: Boolean = false,
+    val embeddedModelCatalog: List<EmbeddedModelCatalogItem> = emptyList(),
     val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
         nativeEnabled = false,
         assetsEnabled = false,
@@ -61,6 +65,7 @@ class ConfigViewModel @Inject constructor(
     private val cloudConnectionValidator: CloudConnectionValidator,
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceModelImporter: OnDeviceModelImporter,
+    private val embeddedModelRepository: EmbeddedModelRepository,
 ) : ViewModel() {
 
     companion object {
@@ -85,6 +90,7 @@ class ConfigViewModel @Inject constructor(
 
     init {
         loadConfig()
+        observeEmbeddedModelCatalog()
     }
 
     fun loadConfig() {
@@ -109,6 +115,7 @@ class ConfigViewModel @Inject constructor(
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
                         localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
+                        embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 } else {
@@ -122,6 +129,7 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
+                        embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 }
@@ -230,6 +238,31 @@ class ConfigViewModel @Inject constructor(
         _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
     }
 
+    fun downloadEmbeddedModel(item: EmbeddedModelCatalogItem) {
+        viewModelScope.launch {
+            embeddedModelRepository.download(item.entry)
+        }
+    }
+
+    fun cancelEmbeddedModelDownload(item: EmbeddedModelCatalogItem) {
+        embeddedModelRepository.cancel(item.entry)
+    }
+
+    fun selectEmbeddedModel(item: EmbeddedModelCatalogItem) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        val downloaded = item.state as? EmbeddedModelDownloadState.Downloaded ?: return
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                mode = ServerMode.LOCAL,
+                serverUrl = LOCAL_RUNTIME_URL,
+                localModelPath = downloaded.localPath,
+                localModelHandle = item.entry.modelId,
+                localModelAccelerator = item.entry.primaryAccelerator,
+                localModelMaxTokens = item.entry.defaultConfig.maxTokens.toString(),
+            )
+        )
+    }
+
     fun importLocalModel(
         uri: Uri,
         onSuccess: ((String) -> Unit)? = null,
@@ -256,6 +289,16 @@ class ConfigViewModel @Inject constructor(
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
                 _uiState.value = UiState.Success(latest.copy(isImportingLocalModel = false))
                 onError?.invoke(e.message ?: "Failed to import local model.")
+            }
+        }
+    }
+
+    private fun observeEmbeddedModelCatalog() {
+        viewModelScope.launch {
+            embeddedModelRepository.refresh()
+            embeddedModelRepository.catalog.collect { catalog ->
+                val currentState = (_uiState.value as? UiState.Success)?.data ?: return@collect
+                _uiState.value = UiState.Success(currentState.copy(embeddedModelCatalog = catalog))
             }
         }
     }

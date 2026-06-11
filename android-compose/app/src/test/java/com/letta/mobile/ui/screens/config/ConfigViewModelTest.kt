@@ -12,11 +12,18 @@ import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.ImportedOnDeviceModel
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogEntry
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDefaultConfig
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.ui.common.UiState
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -36,6 +43,7 @@ class ConfigViewModelTest {
     private lateinit var fakeRepository: FakeSettingsRepository
     private lateinit var fakeValidator: FakeCloudConnectionValidator
     private lateinit var fakeModelImporter: FakeOnDeviceModelImporter
+    private lateinit var fakeEmbeddedModelRepository: FakeEmbeddedModelRepository
     private lateinit var viewModel: ConfigViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -45,6 +53,7 @@ class ConfigViewModelTest {
         fakeRepository = FakeSettingsRepository()
         fakeValidator = FakeCloudConnectionValidator()
         fakeModelImporter = FakeOnDeviceModelImporter()
+        fakeEmbeddedModelRepository = FakeEmbeddedModelRepository()
         // letta-mobile-cdlk: ConfigViewModel now reads ConfigRoute(createNew)
         // from SavedStateHandle. Empty handle is fine for the existing edit-
         // active-config test cases (createNew defaults to false when the
@@ -55,6 +64,7 @@ class ConfigViewModelTest {
             fakeValidator,
             FakeEmbeddedLettaCodeRuntimeStatusProvider(),
             fakeModelImporter,
+            fakeEmbeddedModelRepository,
         )
     }
 
@@ -593,6 +603,34 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun selectEmbeddedModel_updatesLocalRuntimeConfigFields() = runTest {
+        val entry = EmbeddedModelCatalogEntry(
+            name = "Gemma test",
+            modelId = "google/gemma-test-litert-lm",
+            modelFile = "gemma-test.litertlm",
+            sizeInBytes = 1024L,
+            estimatedPeakMemoryInBytes = 2048L,
+            defaultConfig = EmbeddedModelDefaultConfig(maxTokens = 8192, accelerators = listOf("GPU", "cpu")),
+            taskTypes = listOf("chat"),
+        )
+        val item = EmbeddedModelCatalogItem(
+            entry = entry,
+            state = EmbeddedModelDownloadState.Downloaded("/data/user/0/com.letta.mobile/files/embedded-lettacode/models/gemma-test.litertlm"),
+        )
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.selectEmbeddedModel(item)
+
+        val successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(ServerMode.LOCAL, successState.mode)
+        assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, successState.serverUrl)
+        assertEquals("/data/user/0/com.letta.mobile/files/embedded-lettacode/models/gemma-test.litertlm", successState.localModelPath)
+        assertEquals("google/gemma-test-litert-lm", successState.localModelHandle)
+        assertEquals("gpu", successState.localModelAccelerator)
+        assertEquals("8192", successState.localModelMaxTokens)
+    }
+
+    @Test
     fun saveConfig_trimsSelfHostedUrlAndToken() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
@@ -626,6 +664,24 @@ class ConfigViewModelTest {
         )
 
         override suspend fun importModel(uri: Uri): ImportedOnDeviceModel = nextModel
+    }
+
+    private class FakeEmbeddedModelRepository : EmbeddedModelRepository {
+        override val catalog: StateFlow<List<EmbeddedModelCatalogItem>> = MutableStateFlow(emptyList())
+        var downloadedEntry: EmbeddedModelCatalogEntry? = null
+        var cancelledEntry: EmbeddedModelCatalogEntry? = null
+
+        override suspend fun refresh() = Unit
+
+        override suspend fun download(entry: EmbeddedModelCatalogEntry) {
+            downloadedEntry = entry
+        }
+
+        override fun cancel(entry: EmbeddedModelCatalogEntry) {
+            cancelledEntry = entry
+        }
+
+        override fun localPathFor(entry: EmbeddedModelCatalogEntry): String? = null
     }
 
     private class FakeCloudConnectionValidator(
