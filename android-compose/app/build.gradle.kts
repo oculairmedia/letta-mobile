@@ -586,6 +586,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
+    // On-device LLM inference for explicitly constructed .litertlm engines.
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.13.1")
+
     // Drag-to-reorder for Compose
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
 
