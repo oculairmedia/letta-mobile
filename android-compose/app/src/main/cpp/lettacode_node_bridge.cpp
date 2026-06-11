@@ -224,6 +224,9 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeWriteStdin(
             if (errno == EINTR) continue;
             return JNI_FALSE;
         }
+        if (written == 0) {
+            return JNI_FALSE;
+        }
         data += written;
         remaining -= static_cast<size_t>(written);
     }

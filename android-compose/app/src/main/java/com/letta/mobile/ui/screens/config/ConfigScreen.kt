@@ -4,12 +4,14 @@ import android.content.ActivityNotFoundException
 import android.os.Build
 import com.letta.mobile.BuildConfig
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -18,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -30,6 +33,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.platform.BatteryOptimizationHelper
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -78,6 +82,19 @@ fun ConfigScreen(
             "exempt" to BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context),
         )
     }
+    val localModelImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importLocalModel(
+                uri = uri,
+                onSuccess = { fileName ->
+                    snackbar.dispatch(context.getString(R.string.screen_config_local_model_import_success, fileName))
+                },
+                onError = { snackbar.dispatch(it) },
+            )
+        }
+    }
 
     DisposableEffect(context, lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -125,6 +142,13 @@ fun ConfigScreen(
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
+                onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
+                onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
+                onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
+                onImportLocalModel = {
+                    localModelImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                },
                 batteryOptimizationExempt = batteryOptimizationExempt,
                 onRequestBatteryOptimizationExemption = {
                     Telemetry.event(
@@ -174,6 +198,11 @@ private fun ConfigContent(
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
+    onLocalModelPathChange: (String) -> Unit,
+    onLocalModelHandleChange: (String) -> Unit,
+    onLocalModelAcceleratorChange: (String) -> Unit,
+    onLocalModelMaxTokensChange: (String) -> Unit,
+    onImportLocalModel: () -> Unit,
     batteryOptimizationExempt: Boolean,
     onRequestBatteryOptimizationExemption: () -> Unit,
     onNavigateToSystemAccess: () -> Unit,
@@ -246,6 +275,25 @@ private fun ConfigContent(
                     )
                 },
             )
+            if (state.mode == ServerMode.LOCAL) {
+                item(
+                    headlineContent = {
+                        EmbeddedRuntimeStatusItem(status = state.embeddedRuntimeStatus)
+                    },
+                )
+                item(
+                    headlineContent = {
+                        LocalModelSettingsItem(
+                            state = state,
+                            onLocalModelPathChange = onLocalModelPathChange,
+                            onLocalModelHandleChange = onLocalModelHandleChange,
+                            onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
+                            onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
+                            onImportLocalModel = onImportLocalModel,
+                        )
+                    },
+                )
+            }
             if (state.mode != ServerMode.LOCAL) {
                 item(
                     headlineContent = {
@@ -437,6 +485,164 @@ private fun ConfigContent(
             )
         }
     }
+}
+
+@Composable
+private fun EmbeddedRuntimeStatusItem(
+    status: EmbeddedLettaCodeRuntimeStatus,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = LettaIcons.Psychology,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = stringResource(R.string.screen_config_embedded_runtime_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.screen_config_embedded_runtime_disabled_placeholder),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AssistChip(
+                onClick = {},
+                enabled = false,
+                label = {
+                    Text(stringResource(R.string.screen_config_embedded_runtime_version, status.version.ifBlank { "disabled" }))
+                },
+            )
+            AssistChip(
+                onClick = {},
+                enabled = false,
+                label = { Text(stringResource(R.string.screen_config_embedded_runtime_execution_disabled)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LocalModelSettingsItem(
+    state: ConfigUiState,
+    onLocalModelPathChange: (String) -> Unit,
+    onLocalModelHandleChange: (String) -> Unit,
+    onLocalModelAcceleratorChange: (String) -> Unit,
+    onLocalModelMaxTokensChange: (String) -> Unit,
+    onImportLocalModel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.screen_config_on_device_model_title),
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        OutlinedTextField(
+            value = state.localModelPath,
+            onValueChange = onLocalModelPathChange,
+            label = { Text(stringResource(R.string.screen_config_local_model_path)) },
+            placeholder = { Text(stringResource(R.string.screen_config_local_model_path_placeholder)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Database, null) },
+            singleLine = true,
+        )
+        OutlinedButton(
+            onClick = onImportLocalModel,
+            enabled = !state.isImportingLocalModel,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.isImportingLocalModel) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            } else {
+                Icon(LettaIcons.FileOpen, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                stringResource(
+                    if (state.isImportingLocalModel) {
+                        R.string.screen_config_local_model_importing
+                    } else {
+                        R.string.screen_config_local_model_import
+                    }
+                )
+            )
+        }
+        OutlinedTextField(
+            value = state.localModelHandle,
+            onValueChange = onLocalModelHandleChange,
+            label = { Text(stringResource(R.string.screen_config_local_model_handle)) },
+            placeholder = { Text(stringResource(R.string.screen_config_local_model_handle_placeholder)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Psychology, null) },
+            singleLine = true,
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.screen_config_local_model_accelerator),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                LocalModelAcceleratorOption.entries.forEachIndexed { index, option ->
+                    SegmentedButton(
+                        selected = state.localModelAccelerator == option.value,
+                        onClick = {
+                            HapticEffects.segmentTick(
+                                haptic,
+                                view,
+                                enabled = state.localModelAccelerator != option.value,
+                            )
+                            onLocalModelAcceleratorChange(option.value)
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(
+                            index = index,
+                            count = LocalModelAcceleratorOption.entries.size,
+                        ),
+                        label = { Text(stringResource(option.labelRes)) },
+                    )
+                }
+            }
+        }
+        OutlinedTextField(
+            value = state.localModelMaxTokens,
+            onValueChange = onLocalModelMaxTokensChange,
+            label = { Text(stringResource(R.string.screen_config_local_model_max_tokens)) },
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            leadingIcon = { Icon(LettaIcons.Settings, null) },
+            singleLine = true,
+        )
+    }
+}
+
+private enum class LocalModelAcceleratorOption(
+    val value: String,
+    val labelRes: Int,
+) {
+    CPU("cpu", R.string.screen_config_local_model_accelerator_cpu),
+    GPU("gpu", R.string.screen_config_local_model_accelerator_gpu),
+    NPU("npu", R.string.screen_config_local_model_accelerator_npu),
 }
 
 @Composable
