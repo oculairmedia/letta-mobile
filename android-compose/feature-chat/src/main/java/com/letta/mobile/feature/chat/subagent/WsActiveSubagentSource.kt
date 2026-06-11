@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.subagent
 
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SubagentTodoProgressWire
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -148,6 +149,13 @@ class WsActiveSubagentSource(
                 ActiveSubagent.Kind.SUBAGENT
             },
             subagentAgentId = subagentAgentId?.takeIf { it.isNotBlank() },
+            // letta-mobile-i2f23: map the wire `todo_progress` snapshot
+            // ({ completed, total }) into the UI-facing progress model so the
+            // ring can render determinate fill. Absent / null → ring shows
+            // a sliver (no todos yet).
+            progress = todoProgress?.let {
+                SubagentTodoProgress(completed = it.completed, total = it.total)
+            },
             // letta-mobile-dvobc: baseline for the stuck heuristic. The
             // registry snapshot does not yet carry a per-todo-change
             // timestamp, so we seed it from `startedAt` when present. FOLLOW-UP

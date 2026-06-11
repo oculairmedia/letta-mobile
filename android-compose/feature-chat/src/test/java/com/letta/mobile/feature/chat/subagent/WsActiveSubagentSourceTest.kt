@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.subagent
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.SubagentTodoProgressWire
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource.Companion.toActiveSubagent
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
@@ -201,5 +203,52 @@ class WsActiveSubagentSourceTest {
         val done = lingering.single { it.id == "toolu_1" }
         assertEquals(ActiveSubagent.Status.COMPLETED, done.status)
         assertEquals(5_000L, done.terminalAt)
+    }
+
+    // ── i2f23: todo_progress mapping ──────────────────────────────────────
+
+    @Test
+    fun `todo_progress is mapped from wire to UI progress model`() {
+        val wire = SubagentEntry(
+            toolCallId = "toolu_1",
+            status = SubagentStatus.RUNNING,
+            todoProgress = SubagentTodoProgressWire(completed = 3, total = 7),
+        )
+        val mapped = wire.toActiveSubagent()
+
+        assertNotNull(mapped.progress)
+        assertEquals(3, mapped.progress?.completed)
+        assertEquals(7, mapped.progress?.total)
+        assertEquals(3f / 7f, mapped.ringFraction)
+        assertTrue(mapped.hasDeterminateProgress)
+    }
+
+    @Test
+    fun `null todo_progress maps to null progress on ActiveSubagent`() {
+        val wire = entry("toolu_1")
+        // entry() helper doesn't set todoProgress, so it defaults to null
+        val mapped = wire.toActiveSubagent()
+
+        assertNull(wire.todoProgress)
+        assertEquals(null, mapped.progress)
+        assertFalse(mapped.hasDeterminateProgress)
+        assertEquals(0f, mapped.ringFraction)
+    }
+
+    @Test
+    fun `todo_progress with zero total maps to determinate progress`() {
+        val wire = SubagentEntry(
+            toolCallId = "toolu_z",
+            status = SubagentStatus.RUNNING,
+            todoProgress = SubagentTodoProgressWire(completed = 0, total = 0),
+        )
+        val mapped = wire.toActiveSubagent()
+
+        assertNotNull(mapped.progress)
+        assertEquals(0, mapped.progress?.completed)
+        assertEquals(0, mapped.progress?.total)
+        // Total 0 → hasDeterminateProgress is false (no meaningful fraction).
+        assertFalse(mapped.hasDeterminateProgress)
+        assertEquals(0f, mapped.ringFraction)
     }
 }
