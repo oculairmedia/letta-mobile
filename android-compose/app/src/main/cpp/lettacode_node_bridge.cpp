@@ -2,8 +2,10 @@
 #include <android/log.h>
 #include <fcntl.h>
 #include <node.h>
+#include <pthread.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <sys/system_properties.h>
 #include <unistd.h>
 
 #include <atomic>
@@ -18,6 +20,7 @@
 namespace {
 
 constexpr const char* kTag = "LettaCodeNodeBridge";
+constexpr size_t kNodeThreadStackSize = 8 * 1024 * 1024;
 
 JavaVM* gJvm = nullptr;
 jclass gBridgeClass = nullptr;
@@ -108,6 +111,102 @@ void ApplyAndroidLibuvMitigations() {
 void DisableStdStreamBuffering() {
     setvbuf(stdout, nullptr, _IONBF, 0);
     setvbuf(stderr, nullptr, _IONBF, 0);
+}
+
+bool IsPropertyEnabled(const char* key) {
+    char value[PROP_VALUE_MAX] = {};
+    if (__system_property_get(key, value) <= 0) {
+        return false;
+    }
+    return strcmp(value, "1") == 0 || strcasecmp(value, "true") == 0 || strcasecmp(value, "yes") == 0;
+}
+
+std::vector<std::string> ResolveNodeArguments(const std::vector<std::string>& requestedArgs) {
+    if (!IsPropertyEnabled("debug.letta.embedded_node_minimal")) {
+        return requestedArgs;
+    }
+    LogInfo("embedded node minimal mode enabled by debug.letta.embedded_node_minimal");
+    return {
+        "node",
+        "-e",
+        "console.log(process.version)",
+    };
+}
+
+struct ContiguousArguments {
+    std::vector<char> buffer;
+    std::vector<char*> argv;
+};
+
+ContiguousArguments ToContiguousArguments(const std::vector<std::string>& args) {
+    size_t bufferSize = 0;
+    for (const auto& arg : args) {
+        bufferSize += arg.size() + 1;
+    }
+    ContiguousArguments result;
+    result.buffer.resize(bufferSize == 0 ? 1 : bufferSize);
+    result.argv.reserve(args.size());
+    char* current = result.buffer.data();
+    for (const auto& arg : args) {
+        memcpy(current, arg.c_str(), arg.size() + 1);
+        result.argv.push_back(current);
+        current += arg.size() + 1;
+    }
+    return result;
+}
+
+struct NodeStartContext {
+    std::vector<std::string> args;
+    int exitCode = -1;
+};
+
+void* StartNodeOnPthread(void* data) {
+    auto* context = static_cast<NodeStartContext*>(data);
+    ContiguousArguments arguments = ToContiguousArguments(context->args);
+    LogInfo(std::string("embedded node pthread stack size bytes: ") + std::to_string(kNodeThreadStackSize));
+    LogPhase("before node::Start");
+    try {
+        context->exitCode = node::Start(static_cast<int>(arguments.argv.size()), arguments.argv.data());
+    } catch (const std::exception& error) {
+        LogError(std::string("node::Start threw std::exception: ") + error.what());
+        dprintf(STDERR_FILENO, "[lettacode-node-bridge] node::Start threw: %s\n", error.what());
+        context->exitCode = -1;
+    } catch (...) {
+        LogError("node::Start threw non-standard exception");
+        dprintf(STDERR_FILENO, "[lettacode-node-bridge] node::Start threw non-standard exception\n");
+        context->exitCode = -1;
+    }
+    return nullptr;
+}
+
+int StartNodeWithDedicatedThread(std::vector<std::string> args) {
+    NodeStartContext context{std::move(args), -1};
+    pthread_attr_t attr;
+    int status = pthread_attr_init(&attr);
+    if (status != 0) {
+        LogError(std::string("pthread_attr_init failed: ") + strerror(status));
+        return -1;
+    }
+    status = pthread_attr_setstacksize(&attr, kNodeThreadStackSize);
+    if (status != 0) {
+        LogError(std::string("pthread_attr_setstacksize failed: ") + strerror(status));
+        pthread_attr_destroy(&attr);
+        return -1;
+    }
+
+    pthread_t nodeThread;
+    status = pthread_create(&nodeThread, &attr, StartNodeOnPthread, &context);
+    pthread_attr_destroy(&attr);
+    if (status != 0) {
+        LogError(std::string("pthread_create failed: ") + strerror(status));
+        return -1;
+    }
+    status = pthread_join(nodeThread, nullptr);
+    if (status != 0) {
+        LogError(std::string("pthread_join failed: ") + strerror(status));
+        return -1;
+    }
+    return context.exitCode;
 }
 
 void LogAndroidResourceProbe() {
@@ -302,26 +401,9 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     std::thread(PumpFdLines, stderrPipe[0], gStderrMethod).detach();
     LogPhase("stdio redirected");
 
-    std::vector<std::string> args = ToStringVector(env, arguments);
-    std::vector<char*> argv;
-    argv.reserve(args.size());
-    for (auto& arg : args) {
-        argv.push_back(arg.data());
-    }
-    LogInfo(std::string("embedded node argv count: ") + std::to_string(argv.size()));
-    LogPhase("before node::Start");
-    int exitCode = -1;
-    try {
-        exitCode = node::Start(static_cast<int>(argv.size()), argv.data());
-    } catch (const std::exception& error) {
-        LogError(std::string("node::Start threw std::exception: ") + error.what());
-        dprintf(STDERR_FILENO, "[lettacode-node-bridge] node::Start threw: %s\n", error.what());
-        return -1;
-    } catch (...) {
-        LogError("node::Start threw non-standard exception");
-        dprintf(STDERR_FILENO, "[lettacode-node-bridge] node::Start threw non-standard exception\n");
-        return -1;
-    }
+    std::vector<std::string> args = ResolveNodeArguments(ToStringVector(env, arguments));
+    LogInfo(std::string("embedded node argv count: ") + std::to_string(args.size()));
+    const int exitCode = StartNodeWithDedicatedThread(std::move(args));
     LogInfo(std::string("embedded node::Start returned: ") + std::to_string(exitCode));
     return exitCode;
 }
