@@ -6,12 +6,16 @@ import com.letta.mobile.data.local.RoomRuntimeEventOutbox
 import com.letta.mobile.data.session.LocalRuntimeProvider
 import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
+import com.letta.mobile.runtime.local.DisabledEmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.LettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.LettaCodeNodeBridge
 import com.letta.mobile.runtime.local.LettaCodeRuntimeController
 import com.letta.mobile.runtime.local.LocalKoogRuntimeProvider
 import com.letta.mobile.runtime.local.LocalLettaCodeRuntimeProvider
 import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
+import com.letta.mobile.runtime.local.OnDeviceModelImporter
+import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.Module
@@ -46,6 +50,16 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideLettaCodeNodeBridge(bridge: NativeLettaCodeNodeBridge): LettaCodeNodeBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideOnDeviceModelImporter(importer: SafOnDeviceModelImporter): OnDeviceModelImporter = importer
+
+    @Provides
+    @Singleton
+    fun provideEmbeddedLettaCodeRuntimeStatusProvider(
+        provider: DisabledEmbeddedLettaCodeRuntimeStatusProvider,
+    ): EmbeddedLettaCodeRuntimeStatusProvider = provider
 
     @Provides
     @IntoSet
