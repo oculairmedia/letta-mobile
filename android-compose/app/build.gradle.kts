@@ -312,7 +312,8 @@ android {
             }
             externalNativeBuild {
                 cmake {
-                    arguments += "-DLETTACODE_LIBNODE_DIR=${embeddedLettaCodeLibnodeDir.get().asFile.absolutePath.replace("\\", "/")}"
+                    arguments += "-DLETTACODE_LIBNODE_DIR=${embeddedLettaCodeLibnodeDir.get().asFile.absolutePath.replace("\\", "/")}" 
+                    arguments += "-DANDROID_STL=c++_shared"
                 }
             }
         }
