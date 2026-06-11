@@ -83,9 +83,10 @@ data class ActiveSubagent(
      */
     val subagentAgentId: String? = null,
     /**
-     * letta-mobile-ww9iu: the subagent's own conversation id when the shim
-     * supplies one. Older shims omit it; navigation then falls back to the
-     * subagent default conversation, never the parent conversation.
+     * letta-mobile-ww9iu/r2sh2: the subagent's own conversation id when the
+     * shim supplies one. Mobile must not infer this from the parent
+     * conversation or from a default conversation id; when absent, callers
+     * must resolve it from the registry/detail source or refuse navigation.
      */
     val subagentConversationId: String? = null,
     /**
@@ -160,9 +161,8 @@ data class ActiveSubagent(
     val canViewConversation: Boolean
         get() = !isSelf && !subagentAgentId.isNullOrBlank()
 
-    val subagentNavigationConversationId: String
+    val subagentNavigationConversationId: String?
         get() = subagentConversationId?.takeIf { it.isNotBlank() }
-            ?: SUBAGENT_DEFAULT_CONVERSATION_ID
 
     /**
      * letta-mobile-dvobc: the ring FILL fraction in [0f, 1f]. Driven by the
@@ -263,8 +263,6 @@ data class ActiveSubagent(
          * window. The signal is derived from elapsed-since-[lastUpdateAt].
          */
         const val STUCK_THRESHOLD_MS: Long = 35_000L
-
-        const val SUBAGENT_DEFAULT_CONVERSATION_ID: String = "default"
     }
 }
 

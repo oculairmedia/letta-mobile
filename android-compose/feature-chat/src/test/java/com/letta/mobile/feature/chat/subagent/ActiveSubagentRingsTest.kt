@@ -195,7 +195,7 @@ class ActiveSubagentRingsTest {
     }
 
     @Test
-    fun `long press routing logic - conversation nav when canViewConversation`() {
+    fun `long press routing logic - conversation nav when actual id exists`() {
         val subagent = running(
             id = "test_1",
             subagentAgentId = "agent-local-abc123",
@@ -205,8 +205,10 @@ class ActiveSubagentRingsTest {
         var conversationNavCalled = false
         var todoSheetCalled = false
 
-        // Simulate the long-press routing logic from ActiveSubagentRings.
-        if (subagent.canViewConversation) {
+        // Simulate the long-press routing logic from ChatScreen: agent id alone
+        // is not enough; the actual subagent conversation id must exist.
+        val conversationId = subagent.subagentNavigationConversationId
+        if (subagent.canViewConversation && conversationId != null) {
             conversationNavCalled = true
         } else {
             todoSheetCalled = true
@@ -214,7 +216,7 @@ class ActiveSubagentRingsTest {
 
         assertTrue(conversationNavCalled)
         assertFalse(todoSheetCalled)
-        assertEquals("conv-subagent-456", subagent.subagentNavigationConversationId)
+        assertEquals("conv-subagent-456", conversationId)
     }
 
     @Test
@@ -237,14 +239,26 @@ class ActiveSubagentRingsTest {
     }
 
     @Test
-    fun `subagent navigation conversation defaults when missing`() {
+    fun `long press routing logic - missing conversation id falls back to todo sheet`() {
         val subagent = running(
             id = "test_1",
             subagentAgentId = "agent-local-abc123",
             subagentConversationId = null,
         )
 
-        assertEquals(ActiveSubagent.SUBAGENT_DEFAULT_CONVERSATION_ID, subagent.subagentNavigationConversationId)
+        var conversationNavCalled = false
+        var todoSheetCalled = false
+
+        val conversationId = subagent.subagentNavigationConversationId
+        if (subagent.canViewConversation && conversationId != null) {
+            conversationNavCalled = true
+        } else {
+            todoSheetCalled = true
+        }
+
+        assertFalse(conversationNavCalled)
+        assertTrue(todoSheetCalled)
+        assertEquals(null, conversationId)
     }
 
     // ---- OVERFLOW: >3 rings → show 3 + badge -----------------------------

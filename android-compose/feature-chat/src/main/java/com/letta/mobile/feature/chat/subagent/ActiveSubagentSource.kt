@@ -41,6 +41,15 @@ interface ActiveSubagentSource {
     suspend fun todos(toolCallId: String): Result<List<com.letta.mobile.data.model.SubagentTodo>> =
         Result.success(emptyList())
 
+    /**
+     * letta-mobile-r2sh2: resolve the ACTUAL worker conversation id before a
+     * subagent navigation. Implementations may use a fresh registry/detail
+     * lookup, but must return null rather than guessing a default or parent
+     * conversation when the shim has not provided the field.
+     */
+    suspend fun resolveConversationId(subagent: ActiveSubagent): Result<String?> =
+        Result.success(subagent.subagentNavigationConversationId)
+
     companion object {
         /**
          * The active-only visibility rule, applied as a flow operator. Keeps

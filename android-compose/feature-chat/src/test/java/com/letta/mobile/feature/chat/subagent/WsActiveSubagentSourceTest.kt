@@ -34,8 +34,13 @@ class WsActiveSubagentSourceTest {
         initial: List<SubagentEntry> = emptyList(),
     ) : ISubagentRepository {
         val state = MutableStateFlow(initial)
+        var refreshResult: Result<List<SubagentEntry>>? = null
+        var refreshCalls = 0
         override fun activeSubagentsFlow(): Flow<List<SubagentEntry>> = state
-        override suspend fun refresh(): Result<List<SubagentEntry>> = Result.success(state.value)
+        override suspend fun refresh(): Result<List<SubagentEntry>> {
+            refreshCalls += 1
+            return refreshResult ?: Result.success(state.value)
+        }
         override suspend fun todos(toolCallId: String): Result<List<SubagentTodo>> = Result.success(emptyList())
     }
 
@@ -44,6 +49,7 @@ class WsActiveSubagentSourceTest {
         status: String = SubagentStatus.RUNNING,
         taskId: String? = null,
         subagentAgentId: String? = null,
+        subagentConversationId: String? = null,
     ) = SubagentEntry(
         toolCallId = toolCallId,
         description = "desc $toolCallId",
@@ -51,6 +57,7 @@ class WsActiveSubagentSourceTest {
         status = status,
         taskId = taskId,
         subagentAgentId = subagentAgentId,
+        subagentConversationId = subagentConversationId,
     )
 
     @Test
@@ -118,6 +125,50 @@ class WsActiveSubagentSourceTest {
         // Absent / blank -> no affordance.
         assertNull(entry("toolu_2").toActiveSubagent().subagentAgentId)
         assertFalse(entry("toolu_3", subagentAgentId = "").toActiveSubagent().canViewConversation)
+    }
+
+    @Test
+    fun `resolveConversationId uses existing actual conversation id without refresh`() = runTest {
+        val repo = FakeSubagentRepository()
+        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val subagent = entry(
+            "toolu_1",
+            subagentAgentId = "agent-local-abc",
+            subagentConversationId = "conv-subagent-123",
+        ).toActiveSubagent()
+
+        assertEquals("conv-subagent-123", source.resolveConversationId(subagent).getOrNull())
+        assertEquals(0, repo.refreshCalls)
+    }
+
+    @Test
+    fun `resolveConversationId refresh lookup finds actual conversation id by tool call`() = runTest {
+        val repo = FakeSubagentRepository()
+        repo.refreshResult = Result.success(
+            listOf(
+                entry(
+                    "toolu_1",
+                    subagentAgentId = "agent-local-abc",
+                    subagentConversationId = "conv-subagent-456",
+                ),
+            ),
+        )
+        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val subagent = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
+
+        assertEquals("conv-subagent-456", source.resolveConversationId(subagent).getOrNull())
+        assertEquals(1, repo.refreshCalls)
+    }
+
+    @Test
+    fun `resolveConversationId returns null instead of default when lookup fails`() = runTest {
+        val repo = FakeSubagentRepository()
+        repo.refreshResult = Result.success(listOf(entry("toolu_other", subagentConversationId = "default")))
+        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val subagent = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
+
+        assertNull(source.resolveConversationId(subagent).getOrNull())
+        assertEquals(1, repo.refreshCalls)
     }
 
     @Test
