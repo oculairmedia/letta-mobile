@@ -2,12 +2,15 @@
 #include <android/log.h>
 #include <fcntl.h>
 #include <node.h>
+#include <signal.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <atomic>
 #include <cerrno>
 #include <cstring>
 #include <cstdlib>
+#include <exception>
 #include <string>
 #include <thread>
 #include <vector>
@@ -25,6 +28,93 @@ std::atomic<bool> gStopRequested(false);
 
 void LogError(const char* message) {
     __android_log_write(ANDROID_LOG_ERROR, kTag, message);
+}
+
+void LogInfo(const char* message) {
+    __android_log_write(ANDROID_LOG_INFO, kTag, message);
+}
+
+void LogInfo(const std::string& message) {
+    LogInfo(message.c_str());
+}
+
+void LogError(const std::string& message) {
+    LogError(message.c_str());
+}
+
+void LogPhase(const char* phase) {
+    std::string message = "embedded node phase: ";
+    message += phase;
+    LogInfo(message);
+    dprintf(STDERR_FILENO, "[lettacode-node-bridge] %s\n", message.c_str());
+}
+
+void AbortSignalHandler(int signalNumber) {
+    const char message[] = "[lettacode-node-bridge] embedded node received SIGABRT before returning from node::Start\n";
+    __android_log_write(ANDROID_LOG_FATAL, kTag, message);
+    write(STDERR_FILENO, message, sizeof(message) - 1);
+    signal(signalNumber, SIG_DFL);
+    raise(signalNumber);
+}
+
+void InstallFatalSignalDiagnostics() {
+    struct sigaction action = {};
+    action.sa_handler = AbortSignalHandler;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_RESETHAND;
+    sigaction(SIGABRT, &action, nullptr);
+}
+
+void SetEnvDefault(const char* key, const char* value) {
+    if (getenv(key) == nullptr) {
+        setenv(key, value, 0);
+    }
+}
+
+std::string ReadSmallFile(const char* path) {
+    const int fd = open(path, O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+        return {};
+    }
+    char buffer[1024];
+    const ssize_t readCount = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+    if (readCount <= 0) {
+        return {};
+    }
+    buffer[readCount] = '\0';
+    return std::string(buffer, static_cast<size_t>(readCount));
+}
+
+void LogPathProbe(const char* path) {
+    struct stat info = {};
+    errno = 0;
+    if (stat(path, &info) == 0) {
+        LogInfo(std::string("embedded node path probe ok: ") + path);
+        return;
+    }
+    LogInfo(
+        std::string("embedded node path probe failed: ") + path +
+        " errno=" + std::to_string(errno) + " (" + strerror(errno) + ")"
+    );
+}
+
+void ApplyAndroidLibuvMitigations() {
+    SetEnvDefault("UV_USE_IO_URING", "0");
+    SetEnvDefault("UV_THREADPOOL_SIZE", "2");
+    SetEnvDefault("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16");
+}
+
+void LogAndroidResourceProbe() {
+    const std::string cgroup = ReadSmallFile("/proc/self/cgroup");
+    if (cgroup.empty()) {
+        LogInfo("embedded node /proc/self/cgroup probe empty or denied");
+    } else {
+        LogInfo(std::string("embedded node /proc/self/cgroup: ") + cgroup.substr(0, 240));
+    }
+    LogPathProbe("/sys/fs/cgroup");
+    LogPathProbe("/sys/fs/cgroup/memory/memory.limit_in_bytes");
+    LogPathProbe("/sys/fs/cgroup/memory.max");
 }
 
 std::string ToString(JNIEnv* env, jstring value) {
@@ -156,11 +246,17 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     jobjectArray environment,
     jstring workingDirectory
 ) {
+    InstallFatalSignalDiagnostics();
+    LogPhase("nativeStart entered");
+    ApplyAndroidLibuvMitigations();
+    LogAndroidResourceProbe();
+
     const std::string cwd = ToString(env, workingDirectory);
     if (!cwd.empty() && chdir(cwd.c_str()) != 0) {
         LogError("chdir() failed");
         return -1;
     }
+    LogPhase("working directory configured");
 
     for (const auto& item : ToStringVector(env, environment)) {
         const size_t equals = item.find('=');
@@ -169,6 +265,8 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
         const std::string value = item.substr(equals + 1);
         setenv(key.c_str(), value.c_str(), 1);
     }
+    ApplyAndroidLibuvMitigations();
+    LogPhase("environment configured");
 
     int stdinPipe[2] = {-1, -1};
     int stdoutPipe[2] = {-1, -1};
@@ -196,6 +294,7 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     gStopRequested.store(false);
     std::thread(PumpFdLines, stdoutPipe[0], gStdoutMethod).detach();
     std::thread(PumpFdLines, stderrPipe[0], gStderrMethod).detach();
+    LogPhase("stdio redirected");
 
     std::vector<std::string> args = ToStringVector(env, arguments);
     std::vector<char*> argv;
@@ -203,7 +302,22 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     for (auto& arg : args) {
         argv.push_back(arg.data());
     }
-    return node::Start(static_cast<int>(argv.size()), argv.data());
+    LogInfo(std::string("embedded node argv count: ") + std::to_string(argv.size()));
+    LogPhase("before node::Start");
+    int exitCode = -1;
+    try {
+        exitCode = node::Start(static_cast<int>(argv.size()), argv.data());
+    } catch (const std::exception& error) {
+        LogError(std::string("node::Start threw std::exception: ") + error.what());
+        dprintf(STDERR_FILENO, "[lettacode-node-bridge] node::Start threw: %s\n", error.what());
+        return -1;
+    } catch (...) {
+        LogError("node::Start threw non-standard exception");
+        dprintf(STDERR_FILENO, "[lettacode-node-bridge] node::Start threw non-standard exception\n");
+        return -1;
+    }
+    LogInfo(std::string("embedded node::Start returned: ") + std::to_string(exitCode));
+    return exitCode;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

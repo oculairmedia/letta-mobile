@@ -143,6 +143,8 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         return LettaCodeNodeStartRequest(
             arguments = buildList {
                 add("node")
+                add("--max-old-space-size=384")
+                add("--max-semi-space-size=16")
                 add(entrypoint.absolutePath)
                 add("--backend")
                 add("local")
@@ -170,6 +172,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
                 modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
                 put("NO_COLOR", "1")
+                put("UV_USE_IO_URING", "0")
+                put("UV_THREADPOOL_SIZE", "2")
+                put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
             },
             workingDirectory = workingDirectory,
         )
