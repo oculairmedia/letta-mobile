@@ -11,7 +11,7 @@ data class EmbeddedLettaCodeRuntimeStatus(
     val integrity: String,
 ) {
     val runnable: Boolean
-        get() = false
+        get() = nativeEnabled && assetsEnabled
 }
 
 interface EmbeddedLettaCodeRuntimeStatusProvider {
