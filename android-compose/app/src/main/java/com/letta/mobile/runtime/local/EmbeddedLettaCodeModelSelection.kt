@@ -11,7 +11,7 @@ data class EmbeddedLettaCodeModelSelection(
     val maxTokens: Int,
 ) {
     val openAiModelId: String
-        get() = modelHandle.substringAfterLast('/').takeIf { it.isNotBlank() } ?: DEFAULT_OPENAI_MODEL_ID
+        get() = modelHandle.toOpenAiModelId()
 
     val lettaCodeModelHandle: String
         get() = "lmstudio/$openAiModelId"
@@ -20,12 +20,10 @@ data class EmbeddedLettaCodeModelSelection(
         get() = listOf(modelHandle, modelPath.orEmpty(), runtime, accelerator, maxTokens.toString()).joinToString("|")
 
     companion object {
-        const val DEFAULT_MODEL_HANDLE = "local/on-device"
+        const val DEFAULT_MODEL_HANDLE = "local/default"
         const val DEFAULT_MODEL_RUNTIME = "litert-lm"
         const val DEFAULT_ACCELERATOR = "gpu"
         const val DEFAULT_MAX_TOKENS = 4096
-        private const val DEFAULT_OPENAI_MODEL_ID = "on-device"
-
         fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection = EmbeddedLettaCodeModelSelection(
             modelHandle = config.localModelHandle.normalizedOr(DEFAULT_MODEL_HANDLE),
             modelPath = config.localModelPath?.trim()?.takeIf { it.isNotBlank() },
@@ -38,3 +36,11 @@ data class EmbeddedLettaCodeModelSelection(
 
 private fun String?.normalizedOr(defaultValue: String): String =
     this?.trim()?.takeIf { it.isNotBlank() } ?: defaultValue
+
+private fun String.toOpenAiModelId(): String =
+    trim()
+        .removePrefix("local/")
+        .removePrefix("lmstudio/")
+        .removePrefix("llama-cpp/")
+        .removePrefix("llama.cpp/")
+        .ifBlank { "default" }

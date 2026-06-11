@@ -29,24 +29,6 @@ interface LettaCodeRuntimeController {
     fun submit(command: TurnCommand, config: LettaConfig): Flow<String>
 }
 
-data class OnDeviceOpenAiBridgeSession(
-    val baseUrl: String,
-    private val closeAction: () -> Unit = {},
-) : AutoCloseable {
-    override fun close() = closeAction()
-}
-
-interface OnDeviceOpenAiBridge {
-    fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession
-}
-
-@Singleton
-class DisabledOnDeviceOpenAiBridge @Inject constructor() : OnDeviceOpenAiBridge {
-    override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession {
-        error("Embedded LettaCode on-device provider bridge is disabled until bridge/device smoke is ready.")
-    }
-}
-
 @Singleton
 class AndroidLettaCodeRuntimeController @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -70,7 +52,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     try {
                         nodeBridge.outputLines.collect { line ->
                             send(line)
-                            if (line.isTerminalResult()) {
+                            if (line.isTerminalFrame()) {
                                 throw TerminalResultSeen()
                             }
                         }
@@ -232,7 +214,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     "response",
                     buildJsonObject {
                         put("subtype", "success")
-                        put("request_id", "perm-${input.decision.callId.value}")
+                        put("request_id", input.decision.approvalId.value)
                         put(
                             "response",
                             buildJsonObject {
@@ -246,9 +228,18 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
-    private fun String.isTerminalResult(): Boolean {
+    private fun String.isTerminalFrame(): Boolean {
         val root = runCatching { json.parseToJsonElement(this).jsonObject }.getOrNull() ?: return false
-        return root["type"]?.toString()?.trim('"') == "result"
+        return when (root["type"]?.toString()?.trim('"')) {
+            "result",
+            "error",
+            -> true
+            "stream_event" -> {
+                val event = root["event"] as? JsonObject
+                event?.get("type")?.toString()?.trim('"') in setOf("result", "error")
+            }
+            else -> false
+        }
     }
 
     private class TerminalResultSeen : CancellationException()
@@ -263,41 +254,3 @@ data class EmbeddedLettaCodeSessionKey(
     val conversationId: String,
     val modelKey: String,
 )
-
-data class EmbeddedLettaCodeModelSelection(
-    val modelHandle: String,
-    val modelPath: String?,
-    val runtime: String,
-    val accelerator: String,
-    val maxTokens: Int,
-) {
-    val startKey: String =
-        listOf(modelHandle, modelPath.orEmpty(), runtime, accelerator, maxTokens.toString()).joinToString("|")
-    val openAiModelId: String = modelHandle.toOpenAiModelId()
-    val lettaCodeModelHandle: String = "lmstudio/$openAiModelId"
-
-    companion object {
-        const val DEFAULT_MODEL_HANDLE = "local/default"
-        const val DEFAULT_MODEL_RUNTIME = "litert-lm"
-        const val DEFAULT_ACCELERATOR = "gpu"
-        const val DEFAULT_MAX_TOKENS = 4096
-
-        fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection = EmbeddedLettaCodeModelSelection(
-            modelHandle = config.localModelHandle.trimmedOrNull() ?: DEFAULT_MODEL_HANDLE,
-            modelPath = config.localModelPath.trimmedOrNull(),
-            runtime = config.localModelRuntime.trimmedOrNull() ?: DEFAULT_MODEL_RUNTIME,
-            accelerator = config.localModelAccelerator.trimmedOrNull() ?: DEFAULT_ACCELERATOR,
-            maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKENS,
-        )
-    }
-}
-
-private fun String?.trimmedOrNull(): String? = this?.trim()?.takeIf { it.isNotBlank() }
-
-private fun String.toOpenAiModelId(): String =
-    trim()
-        .removePrefix("local/")
-        .removePrefix("lmstudio/")
-        .removePrefix("llama-cpp/")
-        .removePrefix("llama.cpp/")
-        .ifBlank { "default" }
