@@ -54,9 +54,14 @@ data class SubagentTodoSheetTarget(
      * is then hidden ([canViewConversation] is false).
      */
     val subagentAgentId: String? = null,
+    val subagentConversationId: String? = null,
 ) {
     /** Whether the sheet should offer the "view conversation" affordance. */
     val canViewConversation: Boolean get() = !subagentAgentId.isNullOrBlank()
+
+    val subagentNavigationConversationId: String
+        get() = subagentConversationId?.takeIf { it.isNotBlank() }
+            ?: ActiveSubagent.SUBAGENT_DEFAULT_CONVERSATION_ID
 }
 
 val LocalSubagentTodoSheetOpener = staticCompositionLocalOf<(SubagentTodoSheetTarget) -> Unit> {

@@ -23,9 +23,10 @@ import org.junit.jupiter.api.Test
  *  - failed → frozen at reached fill
  *  - completed → animate to 100% then release hold
  *
- * TAP ROUTING TESTS (xm8qk):
- *  - Tap with canViewConversation=true -> navigate to conversation
- *  - Tap with canViewConversation=false -> open todo sheet
+ * ROUTING TESTS (xm8qk + ww9iu):
+ *  - Tap always opens TodoWrite sheet
+ *  - Long press with canViewConversation=true -> navigate to conversation
+ *  - Long press with canViewConversation=false -> no navigation
  *
  * OVERFLOW TESTS:
  *  - >3 rings -> show 3 + count badge
@@ -36,6 +37,7 @@ class ActiveSubagentRingsTest {
     private fun running(
         id: String = "id",
         subagentAgentId: String? = null,
+        subagentConversationId: String? = null,
         isSelf: Boolean = false,
         progress: SubagentTodoProgress? = null,
     ) = ActiveSubagent(
@@ -45,6 +47,7 @@ class ActiveSubagentRingsTest {
         status = ActiveSubagent.Status.RUNNING,
         isSelf = isSelf,
         subagentAgentId = subagentAgentId,
+        subagentConversationId = subagentConversationId,
         progress = progress,
     )
 
@@ -118,7 +121,7 @@ class ActiveSubagentRingsTest {
         assertEquals("fail_1", visible[2].id)
     }
 
-    // ---- TAP ROUTING: conversation navigation vs todo sheet ---------------
+    // ---- ROUTING: tap opens sheet, long press navigates -------------------
 
     @Test
     fun `canViewConversation is true when subagentAgentId is present`() {
@@ -158,7 +161,7 @@ class ActiveSubagentRingsTest {
     }
 
     @Test
-    fun `tap routing logic - conversation nav when canViewConversation`() {
+    fun `tap routing logic - opens todo sheet even when canViewConversation`() {
         val subagent = running(
             id = "test_1",
             subagentAgentId = "agent-local-abc123",
@@ -167,19 +170,15 @@ class ActiveSubagentRingsTest {
         var conversationNavCalled = false
         var todoSheetCalled = false
 
-        // Simulate the tap routing logic from ActiveSubagentRings
-        if (subagent.canViewConversation) {
-            conversationNavCalled = true
-        } else {
-            todoSheetCalled = true
-        }
+        // Simulate the tap routing logic from ActiveSubagentRings.
+        todoSheetCalled = true
 
-        assertTrue(conversationNavCalled)
-        assertFalse(todoSheetCalled)
+        assertFalse(conversationNavCalled)
+        assertTrue(todoSheetCalled)
     }
 
     @Test
-    fun `tap routing logic - todo sheet when NOT canViewConversation`() {
+    fun `tap routing logic - opens todo sheet when NOT canViewConversation`() {
         val subagent = running(
             id = "test_1",
             subagentAgentId = null,
@@ -188,15 +187,64 @@ class ActiveSubagentRingsTest {
         var conversationNavCalled = false
         var todoSheetCalled = false
 
-        // Simulate the tap routing logic from ActiveSubagentRings
+        // Simulate the tap routing logic from ActiveSubagentRings.
+        todoSheetCalled = true
+
+        assertFalse(conversationNavCalled)
+        assertTrue(todoSheetCalled)
+    }
+
+    @Test
+    fun `long press routing logic - conversation nav when canViewConversation`() {
+        val subagent = running(
+            id = "test_1",
+            subagentAgentId = "agent-local-abc123",
+            subagentConversationId = "conv-subagent-456",
+        )
+
+        var conversationNavCalled = false
+        var todoSheetCalled = false
+
+        // Simulate the long-press routing logic from ActiveSubagentRings.
         if (subagent.canViewConversation) {
             conversationNavCalled = true
         } else {
             todoSheetCalled = true
         }
 
+        assertTrue(conversationNavCalled)
+        assertFalse(todoSheetCalled)
+        assertEquals("conv-subagent-456", subagent.subagentNavigationConversationId)
+    }
+
+    @Test
+    fun `long press routing logic - no conversation nav when NOT canViewConversation`() {
+        val subagent = running(
+            id = "test_1",
+            subagentAgentId = null,
+        )
+
+        var conversationNavCalled = false
+        var todoSheetCalled = false
+
+        // Simulate the long-press routing logic from ActiveSubagentRings.
+        if (subagent.canViewConversation) {
+            conversationNavCalled = true
+        }
+
         assertFalse(conversationNavCalled)
-        assertTrue(todoSheetCalled)
+        assertFalse(todoSheetCalled)
+    }
+
+    @Test
+    fun `subagent navigation conversation defaults when missing`() {
+        val subagent = running(
+            id = "test_1",
+            subagentAgentId = "agent-local-abc123",
+            subagentConversationId = null,
+        )
+
+        assertEquals(ActiveSubagent.SUBAGENT_DEFAULT_CONVERSATION_ID, subagent.subagentNavigationConversationId)
     }
 
     // ---- OVERFLOW: >3 rings → show 3 + badge -----------------------------

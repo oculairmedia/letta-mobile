@@ -37,6 +37,8 @@ import kotlinx.coroutines.flow.stateIn
  *  - letta-mobile-vo9y1: `subagentAgentId` (`agent-local-*`) is carried
  *    through so the bar can offer "view conversation" once the shim has
  *    correlated the dispatch to a concrete subagent run.
+ *  - letta-mobile-ww9iu: `subagentConversationId` is carried through when
+ *    present; older shims fall back to the subagent default conversation.
  *
  * letta-mobile-29h9u — lingering terminals: the shim drops a subagent from
  * the next snapshot once it finishes (or flips it to a terminal status), so a
@@ -149,6 +151,7 @@ class WsActiveSubagentSource(
                 ActiveSubagent.Kind.SUBAGENT
             },
             subagentAgentId = subagentAgentId?.takeIf { it.isNotBlank() },
+            subagentConversationId = subagentConversationId?.takeIf { it.isNotBlank() },
             // letta-mobile-i2f23: map the wire `todo_progress` snapshot
             // ({ completed, total }) into the UI-facing progress model so the
             // ring can render determinate fill. Absent / null → ring shows
