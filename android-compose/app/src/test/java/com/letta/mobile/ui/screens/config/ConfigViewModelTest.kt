@@ -603,6 +603,30 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun updateHuggingFaceToken_doesNotPersistOrDownloadUntilExplicitActions() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateHuggingFaceToken("hf_partial_token")
+
+        assertEquals(null, fakeRepository.huggingFaceToken.value)
+        assertEquals(null, fakeEmbeddedModelRepository.downloadedEntry)
+    }
+
+    @Test
+    fun saveConfig_persistsTrimmedHuggingFaceToken() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateHuggingFaceToken("  hf_saved_token  ")
+        viewModel.saveConfig(onSuccess = {})
+
+        assertEquals("hf_saved_token", fakeRepository.huggingFaceToken.value)
+    }
+
+    @Test
     fun selectEmbeddedModel_updatesLocalRuntimeConfigFields() = runTest {
         val entry = EmbeddedModelCatalogEntry(
             name = "Gemma test",

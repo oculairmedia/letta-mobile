@@ -19,4 +19,23 @@ class EmbeddedModelRepositoryStateTest {
         assertEquals("network unavailable", failed.message)
         assertEquals("/data/model.litertlm", downloaded.localPath)
     }
+
+    @Test
+    fun shouldPublishEmbeddedModelProgress_coalescesSmallProgressUpdates() {
+        assertEquals(true, shouldPublishEmbeddedModelProgress(null, 8L * 1024L, 256L * 1024L * 1024L))
+        assertEquals(false, shouldPublishEmbeddedModelProgress(0L, 8L * 1024L, 256L * 1024L * 1024L))
+        assertEquals(true, shouldPublishEmbeddedModelProgress(0L, 3L * 1024L * 1024L, 256L * 1024L * 1024L))
+        assertEquals(true, shouldPublishEmbeddedModelProgress(3L * 1024L * 1024L, 256L * 1024L * 1024L, 256L * 1024L * 1024L))
+    }
+
+    @Test
+    fun sanitizeEmbeddedModelDownloadFailure_keepsFailureMessageShortAndSingleLine() {
+        val hugeMessage = "first line with safe context" + "x".repeat(500) + "\nsecret-token\nstack trace"
+
+        val sanitized = sanitizeEmbeddedModelDownloadFailure(hugeMessage)
+
+        assertEquals(160, sanitized.length)
+        assertEquals(false, sanitized.contains("secret-token"))
+        assertEquals("Download failed.", sanitizeEmbeddedModelDownloadFailure(null))
+    }
 }
