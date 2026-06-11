@@ -36,8 +36,8 @@ class LocalLettaCodeRuntimeProvider @Inject constructor(
             capabilities = BackendCapabilities(
                 supportsStreaming = true,
                 supportsMemFs = true,
-                supportsTools = true,
-                supportsApprovals = true,
+                supportsTools = false,
+                supportsApprovals = false,
                 supportsAgentFileImport = false,
                 supportsAgentFileExport = false,
             ),
