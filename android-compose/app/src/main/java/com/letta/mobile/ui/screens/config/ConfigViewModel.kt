@@ -48,6 +48,7 @@ data class ConfigUiState(
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
     val localModelMaxTokens: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS,
     val huggingFaceToken: String = "",
+    val savedHuggingFaceToken: String = "",
     val isImportingLocalModel: Boolean = false,
     val embeddedModelCatalog: List<EmbeddedModelCatalogItem> = emptyList(),
     val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
@@ -117,6 +118,7 @@ class ConfigViewModel @Inject constructor(
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
                         localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
+                        savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
@@ -132,6 +134,7 @@ class ConfigViewModel @Inject constructor(
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
+                        savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
@@ -248,6 +251,15 @@ class ConfigViewModel @Inject constructor(
 
     fun downloadEmbeddedModel(item: EmbeddedModelCatalogItem) {
         viewModelScope.launch {
+            val state = (_uiState.value as? UiState.Success)?.data
+            val token = state?.huggingFaceToken?.trim().orEmpty()
+            if (item.entry.requiresAuth && token.isNotBlank() && token != state?.savedHuggingFaceToken?.trim().orEmpty()) {
+                settingsRepository.setHuggingFaceToken(token)
+                val latest = (_uiState.value as? UiState.Success)?.data ?: state
+                if (latest != null) {
+                    _uiState.value = UiState.Success(latest.copy(savedHuggingFaceToken = token))
+                }
+            }
             embeddedModelRepository.download(item.entry)
         }
     }

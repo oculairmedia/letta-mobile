@@ -738,19 +738,17 @@ private fun EmbeddedModelCatalogRow(
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (entry.requiresAuth) {
+            if (entry.requiresAuth && !hasHuggingFaceToken) {
                 AssistChip(
                     enabled = false,
                     onClick = {},
                     label = { Text(stringResource(R.string.screen_config_embedded_model_requires_hf_token_badge)) },
                 )
-                if (!hasHuggingFaceToken) {
-                    Text(
-                        text = stringResource(R.string.screen_config_embedded_model_requires_hf_token_message),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.screen_config_embedded_model_requires_hf_token_message),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             if (!entry.isSupported) {
                 AssistChip(

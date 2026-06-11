@@ -44,13 +44,18 @@ fun shouldPublishEmbeddedModelProgress(
         bytesDownloaded - previousBytesDownloaded >= minDelta
 }
 
-fun sanitizeEmbeddedModelDownloadFailure(message: String?): String =
-    message
+fun sanitizeEmbeddedModelDownloadFailure(message: String?): String {
+    val firstLine = message
         ?.lineSequence()
         ?.firstOrNull()
-        ?.take(MAX_EMBEDDED_MODEL_FAILURE_MESSAGE_CHARS)
         ?.takeIf { it.isNotBlank() }
-        ?: "Download failed."
+        ?: return "Download failed."
+    val lower = firstLine.lowercase()
+    if (lower.contains("outofmemory") || lower.contains("out of memory") || lower.contains("failed to allocate")) {
+        return "Download failed because the app ran out of memory. Please retry after closing other apps."
+    }
+    return firstLine.take(MAX_EMBEDDED_MODEL_FAILURE_MESSAGE_CHARS)
+}
 
 private const val MIN_EMBEDDED_MODEL_PROGRESS_UPDATE_BYTES = 1L * 1024L * 1024L
 private const val EMBEDDED_MODEL_PROGRESS_UPDATE_STEPS = 100L
