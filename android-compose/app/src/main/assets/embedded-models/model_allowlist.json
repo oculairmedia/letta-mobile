@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Gemma 3n E2B LiteRT-LM",
+    "modelId": "google/gemma-3n-E2B-it-litert-lm",
+    "modelFile": "gemma-3n-E2B-it-int4.litertlm",
+    "sizeInBytes": 3137339392,
+    "estimatedPeakMemoryInBytes": 6442450944,
+    "defaultConfig": {
+      "maxTokens": 4096,
+      "accelerators": ["cpu", "gpu"]
+    },
+    "taskTypes": ["chat", "text-generation"],
+    "downloadUrl": "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm"
+  },
+  {
+    "name": "Gemma 3n E4B LiteRT-LM",
+    "modelId": "google/gemma-3n-E4B-it-litert-lm",
+    "modelFile": "gemma-3n-E4B-it-int4.litertlm",
+    "sizeInBytes": 4294967296,
+    "estimatedPeakMemoryInBytes": 8589934592,
+    "defaultConfig": {
+      "maxTokens": 4096,
+      "accelerators": ["cpu", "gpu"]
+    },
+    "taskTypes": ["chat", "text-generation"],
+    "downloadUrl": "https://huggingface.co/google/gemma-3n-E4B-it-litert-lm/resolve/main/gemma-3n-E4B-it-int4.litertlm"
+  },
+  {
+    "name": "Gallery sample .task model",
+    "modelId": "google/gemma-3n-E2B-it-litert-preview",
+    "modelFile": "gemma-3n-E2B-it.task",
+    "sizeInBytes": 3137339392,
+    "estimatedPeakMemoryInBytes": 6442450944,
+    "defaultConfig": {
+      "maxTokens": 4096,
+      "accelerators": ["cpu", "gpu"]
+    },
+    "taskTypes": ["chat"],
+    "supported": false,
+    "unsupportedReason": "LiteRT-LM embedded runtime currently requires .litertlm files; .task support needs a format adapter follow-up."
+  }
+]

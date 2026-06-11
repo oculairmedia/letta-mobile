@@ -20,8 +20,13 @@ import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
+import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -74,6 +79,20 @@ object RuntimeModule {
     fun provideEmbeddedLettaCodeRuntimeStatusProvider(
         provider: BuildConfigEmbeddedLettaCodeRuntimeStatusProvider,
     ): EmbeddedLettaCodeRuntimeStatusProvider = provider
+
+    @Provides
+    @Singleton
+    fun provideEmbeddedModelHttpClient(): HttpClient = HttpClient(OkHttp) {
+        install(HttpTimeout) {
+            requestTimeoutMillis = 0
+            connectTimeoutMillis = 30_000
+            socketTimeoutMillis = 30_000
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideEmbeddedModelRepository(repository: AssetEmbeddedModelRepository): EmbeddedModelRepository = repository
 
     @Provides
     @IntoSet

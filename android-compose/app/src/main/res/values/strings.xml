@@ -311,6 +311,15 @@
     <string name="screen_config_local_model_import">Import .litertlm model</string>
     <string name="screen_config_local_model_importing">Importing model…</string>
     <string name="screen_config_local_model_import_success">Imported %1$s</string>
+    <string name="screen_config_embedded_model_catalog">Curated downloads</string>
+    <string name="screen_config_embedded_model_catalog_empty">No embedded model catalog entries are available.</string>
+    <string name="screen_config_embedded_model_download">Download</string>
+    <string name="screen_config_embedded_model_cancel">Cancel</string>
+    <string name="screen_config_embedded_model_select">Use model</string>
+    <string name="screen_config_embedded_model_downloaded">Downloaded</string>
+    <string name="screen_config_embedded_model_unsupported">Unsupported</string>
+    <string name="screen_config_embedded_model_downloading">Downloading %1$d%%</string>
+    <string name="screen_config_embedded_model_size">Download %1$s · peak memory %2$s</string>
     <string name="screen_config_local_model_handle">Model handle</string>
     <string name="screen_config_local_model_handle_placeholder">local/model</string>
     <string name="screen_config_local_model_accelerator">Accelerator preference</string>
