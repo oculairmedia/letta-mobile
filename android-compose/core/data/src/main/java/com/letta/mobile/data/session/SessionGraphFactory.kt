@@ -47,6 +47,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
@@ -167,7 +168,11 @@ class SessionGraphFactory internal constructor(
             agentDao = agentDao,
             repositoryScope = scope,
         )
-        val channelTransport = ChannelTransport(scope, runCursorStore, conversationCursorStore)
+        val channelTransport = if (localRuntimeBackend == null) {
+            ChannelTransport(scope, runCursorStore, conversationCursorStore)
+        } else {
+            NoOpChannelTransport()
+        }
         return SessionGraph(
             id = graphId,
             backendDescriptor = localRuntimeBackend?.descriptor ?: remoteLettaDescriptor(activeConfig),

@@ -61,7 +61,13 @@ internal class LocalRuntimeChatSendCoordinator(
                 return@launch
             }
 
-            val conversationId = activeConversationId() ?: newLocalConversationId()
+            val activeId = activeConversationId()
+            if (activeId != null && !activeId.isLocalRuntimeConversationId()) {
+                failSend("Local runtime setup required for this conversation")
+                timer.stop("accepted" to false, "reason" to "missing_local_binding")
+                return@launch
+            }
+            val conversationId = activeId ?: newLocalConversationId()
             val otid = newOtid()
             activeConversation = conversationId
             activeOtid = otid
@@ -278,6 +284,8 @@ internal class LocalRuntimeChatSendCoordinator(
             error = error,
         )
     }
+
+    private fun String.isLocalRuntimeConversationId(): Boolean = startsWith("local-conv-")
 
     private fun newLocalConversationId(): String = "local-conv-$agentId-${UUID.randomUUID()}"
 
