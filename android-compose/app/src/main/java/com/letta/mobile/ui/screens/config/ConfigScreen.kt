@@ -45,6 +45,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.util.Telemetry
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -782,9 +783,17 @@ private fun EmbeddedModelCatalogRow(
                         }
                     }
                     is EmbeddedModelDownloadState.Downloading -> {
-                        val progress = state.totalBytes?.takeIf { it > 0L }?.let { state.bytesDownloaded.toFloat() / it.toFloat() }
-                        if (progress != null) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-                        else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        val progress = embeddedModelDownloadProgress(state.bytesDownloaded, state.totalBytes)
+                        if (progress != null) {
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        Text(
+                            text = embeddedModelDownloadProgressLabel(state.bytesDownloaded, state.totalBytes),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         OutlinedButton(onClick = onCancel, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.screen_config_embedded_model_cancel))
                         }
@@ -809,6 +818,18 @@ private fun formatBytes(bytes: Long): String {
     val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
     val mib = bytes.toDouble() / (1024.0 * 1024.0)
     return if (gib >= 1.0) "%.1f GiB".format(gib) else "%.0f MiB".format(mib)
+}
+
+fun embeddedModelDownloadProgress(bytesDownloaded: Long, totalBytes: Long?): Float? {
+    val total = totalBytes?.takeIf { it > 0L } ?: return null
+    return (bytesDownloaded.toDouble() / total.toDouble()).toFloat().coerceIn(0f, 1f)
+}
+
+fun embeddedModelDownloadProgressLabel(bytesDownloaded: Long, totalBytes: Long?): String {
+    val downloaded = formatBytes(bytesDownloaded.coerceAtLeast(0L))
+    val total = totalBytes?.takeIf { it > 0L } ?: return downloaded
+    val percent = ((bytesDownloaded.toDouble() / total.toDouble()) * 100.0).roundToInt().coerceIn(0, 100)
+    return "$downloaded / ${formatBytes(total)} · $percent%"
 }
 
 private enum class LocalModelAcceleratorOption(
