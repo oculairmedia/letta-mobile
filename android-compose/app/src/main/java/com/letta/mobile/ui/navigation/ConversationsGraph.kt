@@ -99,9 +99,17 @@ fun NavGraphBuilder.conversationsGraph(
         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
             AgentListScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToAgent = { agentId, agentName ->
-                    navController.navigate(AgentChatRoute(agentId = agentId, agentName = agentName))
+                onNavigateToAgent = { agentId, agentName, conversationId ->
+                    navController.navigate(
+                        AgentChatRoute(
+                            agentId = agentId,
+                            agentName = agentName,
+                            conversationId = conversationId,
+                            freshRouteKey = conversationId?.let { System.currentTimeMillis() },
+                        )
+                    )
                 },
+                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                 onNavigateToEditAgent = { agentId ->
                     navController.navigate(EditAgentRoute(agentId))
                 },
@@ -119,17 +127,20 @@ fun NavGraphBuilder.conversationsGraph(
         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
             AgentListScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onNavigateToAgent = { agentId, agentName ->
+                onNavigateToAgent = { agentId, agentName, conversationId ->
                     navController.navigate(
                         AgentChatRoute(
                             agentId = agentId,
                             agentName = agentName,
+                            conversationId = conversationId,
+                            freshRouteKey = conversationId?.let { System.currentTimeMillis() },
                             initialMessage = route.sharedText,
                         ),
                     ) {
                         popUpTo<ShareToAgentRoute> { inclusive = true }
                     }
                 },
+                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
                 onNavigateToEditAgent = { agentId ->
                     navController.navigate(EditAgentRoute(agentId))
                 },

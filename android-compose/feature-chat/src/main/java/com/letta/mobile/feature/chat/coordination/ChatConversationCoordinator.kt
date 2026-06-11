@@ -22,6 +22,7 @@ import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -34,13 +35,12 @@ internal sealed interface LocalRuntimeRouting {
 }
 
 internal object AgentRuntimeBinding {
-    private val metadataKeys = setOf("runtime", "runtime_id", "runtimeId", "runtime_provider", "runtimeProvider")
-
     fun isLocalBound(agent: Agent?): Boolean {
         if (agent == null) return false
         if (agent.id.value.startsWith("local-agent-")) return true
         return agent.metadata.any { (key, value) ->
-            key in metadataKeys && value.jsonPrimitive.contentOrNull?.startsWith("local-") == true
+            key in LocalAgentRuntimeMetadata.bindingKeys &&
+                value.jsonPrimitive.contentOrNull?.startsWith("local-") == true
         }
     }
 }

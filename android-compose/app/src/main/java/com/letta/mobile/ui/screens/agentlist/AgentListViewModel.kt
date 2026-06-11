@@ -8,12 +8,19 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
+import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeModelSelection
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -28,14 +35,48 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
+enum class AgentCreateRuntimeOption {
+    REMOTE,
+    LOCAL_LETTACODE,
+}
+
+data class LocalLettaCodeCreateReadiness(
+    val runtimeEnabled: Boolean = false,
+    val modelSelected: Boolean = false,
+    val modelDownloaded: Boolean = false,
+    val activeConfigIsLocal: Boolean = false,
+) {
+    val ready: Boolean
+        get() = runtimeEnabled && modelSelected && modelDownloaded && activeConfigIsLocal
+
+    val setupMessage: String?
+        get() = when {
+            !runtimeEnabled -> "This build does not include the embedded Local LettaCode runtime."
+            !activeConfigIsLocal -> "Enable Local LettaCode in Settings to create agents that run on this device."
+            !modelDownloaded -> "Download or import a model in Settings before creating a local agent."
+            !modelSelected -> "Choose which downloaded model Local LettaCode should use."
+            else -> null
+        }
+
+    val setupActionLabel: String
+        get() = when {
+            !activeConfigIsLocal -> "Enable Local LettaCode"
+            !modelDownloaded -> "Browse local models"
+            !modelSelected -> "Choose model"
+            else -> "Open Local LettaCode settings"
+        }
+}
+
 data class AgentListUiState(
     val agents: ImmutableList<Agent> = persistentListOf(),
     val availableTools: ImmutableList<Tool> = persistentListOf(),
     val llmModels: ImmutableList<LlmModel> = persistentListOf(),
     val embeddingModels: ImmutableList<EmbeddingModel> = persistentListOf(),
+    val localLettaCodeReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
     val favoriteAgentId: AgentId? = null,
     val pinnedAgentIds: Set<AgentId> = emptySet(),
     val searchQuery: String = "",
@@ -62,6 +103,8 @@ class AgentListViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val toolRepository: IToolRepository,
     private val modelRepository: IModelRepository,
+    private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
+    private val embeddedModelRepository: EmbeddedModelRepository,
 ) : ViewModel() {
     companion object {
         private const val LIST_CACHE_TTL_MS = 30_000L
@@ -95,14 +138,27 @@ class AgentListViewModel @Inject constructor(
     private data class Overlay(
         val llm: List<LlmModel>,
         val emb: List<EmbeddingModel>,
+        val localReadiness: LocalLettaCodeCreateReadiness,
         val transient: TransientState,
     )
 
     private val overlay = combine(
         modelRepository.llmModels,
         modelRepository.embeddingModels,
+        settingsRepository.activeConfig,
+        embeddedModelRepository.catalog,
         _transient,
-    ) { llm, emb, transient -> Overlay(llm, emb, transient) }
+    ) { llm, emb, activeConfig, catalog, transient ->
+        Overlay(
+            llm = llm,
+            emb = emb,
+            localReadiness = activeConfig.localLettaCodeCreateReadiness(
+                runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
+                downloadedModelHandles = catalog.downloadedModelHandles(),
+            ),
+            transient = transient,
+        )
+    }
 
     val uiState: StateFlow<AgentListUiState> = combine(
         agentRepository.agents,
@@ -116,6 +172,7 @@ class AgentListViewModel @Inject constructor(
             availableTools = tools.toImmutableList(),
             llmModels = overlay.llm.toImmutableList(),
             embeddingModels = overlay.emb.toImmutableList(),
+            localLettaCodeReadiness = overlay.localReadiness,
             favoriteAgentId = favId?.let { AgentId(it) },
             pinnedAgentIds = pinnedIds.map { AgentId(it) }.toSet(),
             searchQuery = overlay.transient.searchQuery,
@@ -302,11 +359,33 @@ class AgentListViewModel @Inject constructor(
         _transient.update { it.copy(error = null) }
     }
 
-    fun createAgent(params: AgentCreateParams, onSuccess: (AgentId) -> Unit) {
+    fun createAgent(
+        params: AgentCreateParams,
+        runtimeOption: AgentCreateRuntimeOption = AgentCreateRuntimeOption.REMOTE,
+        onSuccess: (AgentId) -> Unit,
+    ) {
         viewModelScope.launch {
-            _transient.update { it.copy(isCreating = true) }
+            _transient.update { it.copy(isCreating = true, error = null) }
             try {
-                val agent = agentRepository.createAgent(params)
+                val createParams = when (runtimeOption) {
+                    AgentCreateRuntimeOption.REMOTE -> params
+                    AgentCreateRuntimeOption.LOCAL_LETTACODE -> {
+                        val activeConfig = settingsRepository.activeConfig.value
+                        val readiness = activeConfig.localLettaCodeCreateReadiness(
+                            runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
+                            downloadedModelHandles = embeddedModelRepository.catalog.value.downloadedModelHandles(),
+                        )
+                        val setupMessage = readiness.setupMessage
+                        if (setupMessage != null || activeConfig == null) {
+                            _transient.update {
+                                it.copy(isCreating = false, error = setupMessage ?: "Enable Local LettaCode in Settings before creating a local agent.")
+                            }
+                            return@launch
+                        }
+                        params.withLocalLettaCodeRuntimeBinding(activeConfig)
+                    }
+                }
+                val agent = agentRepository.createAgent(createParams)
                 _transient.update { it.copy(isCreating = false) }
                 agentRepository.refreshAgents()
                 onSuccess(agent.id)
@@ -392,4 +471,58 @@ class AgentListViewModel @Inject constructor(
     fun setShareNavigationConsumed(consumed: Boolean) {
         _transient.update { it.copy(shareNavigationConsumed = consumed) }
     }
+}
+private fun LettaConfig?.localLettaCodeCreateReadiness(
+    runtimeRunnable: Boolean,
+    downloadedModelHandles: Set<String>,
+): LocalLettaCodeCreateReadiness {
+    val config = this
+    val activeConfigIsLocal = config?.mode == LettaConfig.Mode.LOCAL &&
+        config.serverUrl.trim().startsWith("local-lettacode://")
+    val selectedModel = config?.selectedLocalModelHandle()
+    val selectedImportedPath = config?.localModelPath?.trim()?.takeIf { it.isNotBlank() }
+    val modelDownloaded = selectedImportedPath != null || (selectedModel != null && selectedModel in downloadedModelHandles)
+    return LocalLettaCodeCreateReadiness(
+        runtimeEnabled = runtimeRunnable,
+        modelSelected = selectedModel != null && modelDownloaded,
+        modelDownloaded = modelDownloaded,
+        activeConfigIsLocal = activeConfigIsLocal,
+    )
+}
+
+private fun LettaConfig.selectedLocalModelHandle(): String? = localModelHandle
+    ?.trim()
+    ?.takeIf { it.isNotBlank() && it != EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE }
+
+private fun List<com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem>.downloadedModelHandles(): Set<String> =
+    mapNotNull { item ->
+        item.entry.modelId.takeIf { item.state is EmbeddedModelDownloadState.Downloaded }
+    }.toSet()
+
+private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConfig): AgentCreateParams {
+    val selection = EmbeddedLettaCodeModelSelection.from(config)
+    val localMetadata = mapOf(
+        LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
+        LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
+        LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
+        LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(selection.modelHandle),
+        LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(selection.runtime),
+        LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(selection.accelerator),
+    )
+    return copy(
+        model = selection.lettaCodeModelHandle,
+        modelSettings = (modelSettings ?: ModelSettings()).copy(
+            providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
+            parallelToolCalls = false,
+            maxOutputTokens = selection.maxTokens,
+        ),
+        metadata = metadata.orEmpty() + localMetadata,
+        toolIds = null,
+        tools = null,
+        enableSleeptime = false,
+        includeBaseTools = false,
+        includeMultiAgentTools = false,
+        includeBaseToolRules = false,
+        parallelToolCalls = false,
+    )
 }
