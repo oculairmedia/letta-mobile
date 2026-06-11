@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.config
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,6 +11,9 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,6 +40,17 @@ data class ConfigUiState(
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
+    val localModelPath: String = "",
+    val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
+    val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
+    val localModelMaxTokens: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS,
+    val isImportingLocalModel: Boolean = false,
+    val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+        nativeEnabled = false,
+        assetsEnabled = false,
+        version = "disabled",
+        integrity = "",
+    ),
     val isSaving: Boolean = false,
 )
 
@@ -44,11 +59,17 @@ class ConfigViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val settingsRepository: ISettingsRepository,
     private val cloudConnectionValidator: CloudConnectionValidator,
+    private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
+    private val onDeviceModelImporter: OnDeviceModelImporter,
 ) : ViewModel() {
 
     companion object {
         const val DEFAULT_CLOUD_URL = "https://api.letta.com"
         const val LOCAL_RUNTIME_URL = "local-lettacode://device"
+        const val DEFAULT_LOCAL_MODEL_HANDLE = "local/model"
+        const val DEFAULT_LOCAL_MODEL_RUNTIME = "litert-lm"
+        const val DEFAULT_LOCAL_MODEL_ACCELERATOR = "cpu"
+        const val DEFAULT_LOCAL_MODEL_MAX_TOKENS = "4096"
         private const val LEGACY_LOCAL_RUNTIME_URL = "local://device"
     }
 
@@ -84,6 +105,11 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
+                        localModelPath = activeConfig.localModelPath.orEmpty(),
+                        localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
+                        localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
+                        localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
+                        embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 } else {
                     // createNew = true: empty form, fresh UUID at save time.
@@ -96,6 +122,7 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
+                        embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 }
                 _uiState.value = UiState.Success(configUiState)
@@ -183,6 +210,56 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
+    fun updateLocalModelPath(path: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localModelPath = path))
+    }
+
+    fun updateLocalModelHandle(handle: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localModelHandle = handle))
+    }
+
+    fun updateLocalModelAccelerator(accelerator: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localModelAccelerator = accelerator))
+    }
+
+    fun updateLocalModelMaxTokens(maxTokens: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
+    }
+
+    fun importLocalModel(
+        uri: Uri,
+        onSuccess: ((String) -> Unit)? = null,
+        onError: ((String) -> Unit)? = null,
+    ) {
+        viewModelScope.launch {
+            val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            if (state.isImportingLocalModel) return@launch
+            _uiState.value = UiState.Success(state.copy(isImportingLocalModel = true))
+            try {
+                val imported = onDeviceModelImporter.importModel(uri)
+                val latest = (_uiState.value as? UiState.Success)?.data ?: state
+                _uiState.value = UiState.Success(
+                    latest.copy(
+                        mode = ServerMode.LOCAL,
+                        serverUrl = LOCAL_RUNTIME_URL,
+                        localModelPath = imported.path,
+                        localModelHandle = imported.handle,
+                        isImportingLocalModel = false,
+                    )
+                )
+                onSuccess?.invoke(imported.fileName)
+            } catch (e: Exception) {
+                val latest = (_uiState.value as? UiState.Success)?.data ?: state
+                _uiState.value = UiState.Success(latest.copy(isImportingLocalModel = false))
+                onError?.invoke(e.message ?: "Failed to import local model.")
+            }
+        }
+    }
+
     fun saveConfig(onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
         viewModelScope.launch {
             val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
@@ -203,6 +280,20 @@ class ConfigViewModel @Inject constructor(
                 }
                 _uiState.value = UiState.Success(state.copy(isSaving = true))
                 val apiToken = state.apiToken.trim()
+                val localModelMaxTokens = if (state.mode == ServerMode.LOCAL) {
+                    val rawMaxTokens = state.localModelMaxTokens.trim()
+                    if (rawMaxTokens.isBlank()) {
+                        DEFAULT_LOCAL_MODEL_MAX_TOKENS.toInt()
+                    } else {
+                        rawMaxTokens.toIntOrNull()?.takeIf { it > 0 } ?: run {
+                            _uiState.value = UiState.Success(state.copy(isSaving = false))
+                            onError?.invoke("Local model max tokens must be a positive number.")
+                            return@launch
+                        }
+                    }
+                } else {
+                    null
+                }
                 if (state.mode == ServerMode.CLOUD) {
                     if (apiToken.isBlank()) {
                         _uiState.value = UiState.Success(state.copy(isSaving = false))
@@ -230,6 +321,23 @@ class ConfigViewModel @Inject constructor(
                     mode = state.mode.toLettaMode(),
                     serverUrl = url,
                     accessToken = if (state.mode == ServerMode.LOCAL) null else apiToken.ifBlank { null },
+                    localModelPath = if (state.mode == ServerMode.LOCAL) {
+                        state.localModelPath.trim().ifBlank { null }
+                    } else {
+                        null
+                    },
+                    localModelHandle = if (state.mode == ServerMode.LOCAL) {
+                        state.localModelHandle.trim().ifBlank { DEFAULT_LOCAL_MODEL_HANDLE }
+                    } else {
+                        null
+                    },
+                    localModelRuntime = if (state.mode == ServerMode.LOCAL) DEFAULT_LOCAL_MODEL_RUNTIME else null,
+                    localModelAccelerator = if (state.mode == ServerMode.LOCAL) {
+                        state.localModelAccelerator.normalizedLocalModelAccelerator()
+                    } else {
+                        null
+                    },
+                    localModelMaxTokens = localModelMaxTokens,
                 )
                 settingsRepository.saveConfig(config)
                 onSuccess()
@@ -252,3 +360,17 @@ private fun ServerMode.toLettaMode(): LettaConfig.Mode = when (this) {
     ServerMode.SELF_HOSTED -> LettaConfig.Mode.SELF_HOSTED
     ServerMode.LOCAL -> LettaConfig.Mode.LOCAL
 }
+
+private fun String?.normalizedLocalModelHandle(): String =
+    this?.trim()?.takeIf { it.isNotBlank() } ?: ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE
+
+private fun String?.normalizedLocalModelAccelerator(): String =
+    this?.trim()
+        ?.lowercase()
+        ?.takeIf { it in LOCAL_MODEL_ACCELERATORS }
+        ?: ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR
+
+private fun Int?.normalizedLocalModelMaxTokens(): String =
+    this?.takeIf { it > 0 }?.toString() ?: ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS
+
+private val LOCAL_MODEL_ACCELERATORS = setOf("cpu", "gpu", "npu")
