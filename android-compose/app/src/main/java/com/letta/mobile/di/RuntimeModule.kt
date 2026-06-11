@@ -24,10 +24,6 @@ import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.okhttp.OkHttp
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.HttpTimeoutConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -80,16 +76,6 @@ object RuntimeModule {
     fun provideEmbeddedLettaCodeRuntimeStatusProvider(
         provider: BuildConfigEmbeddedLettaCodeRuntimeStatusProvider,
     ): EmbeddedLettaCodeRuntimeStatusProvider = provider
-
-    @Provides
-    @Singleton
-    fun provideEmbeddedModelHttpClient(): HttpClient = HttpClient(OkHttp) {
-        install(HttpTimeout) {
-            requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS
-            connectTimeoutMillis = 30_000
-            socketTimeoutMillis = 30_000
-        }
-    }
 
     @Provides
     @Singleton

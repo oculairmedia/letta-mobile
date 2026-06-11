@@ -3,13 +3,9 @@ package com.letta.mobile.runtime.local.modelcatalog
 import android.content.Context
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.ktor.client.HttpClient
-import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsChannel
-import io.ktor.http.isSuccess
-import io.ktor.utils.io.readAvailable
 import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -77,7 +73,6 @@ interface EmbeddedModelRepository {
 @Singleton
 class AssetEmbeddedModelRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val httpClient: HttpClient,
     private val settingsRepository: ISettingsRepository,
 ) : EmbeddedModelRepository {
     private val parser = EmbeddedModelCatalogParser()
@@ -105,25 +100,12 @@ class AssetEmbeddedModelRepository @Inject constructor(
         val state = stateFor(entry)
         state.value = EmbeddedModelDownloadState.Downloading(bytesDownloaded = 0L, totalBytes = entry.sizeInBytes)
         try {
-            val response = httpClient.get(url) {
-                huggingFaceTokenFor(url)?.let { token -> bearerAuth(token) }
-            }
-            if (!response.status.isSuccess()) {
-                throw IllegalStateException(embeddedModelDownloadFailureMessage(url, response.status.value))
-            }
-            val channel = response.bodyAsChannel()
-            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-            var downloaded = 0L
-            temp.outputStream().use { output ->
-                while (currentCoroutineContext().isActive) {
-                    val read = channel.readAvailable(buffer, 0, buffer.size)
-                    if (read == -1) break
-                    if (state.value == EmbeddedModelDownloadState.Cancelled) throw CancellationException()
-                    output.write(buffer, 0, read)
-                    downloaded += read
-                    publishProgress(state, downloaded, entry.sizeInBytes)
-                }
-            }
+            streamDownloadToFile(
+                url = url,
+                target = temp,
+                expectedTotalBytes = entry.sizeInBytes,
+                state = state,
+            )
             if (!currentCoroutineContext().isActive || state.value == EmbeddedModelDownloadState.Cancelled) throw CancellationException()
             if (temp.length() == 0L) throw IllegalStateException("Downloaded model file is empty.")
             entry.checksumSha256?.takeIf { it.isNotBlank() }?.let { expected ->
@@ -157,6 +139,44 @@ class AssetEmbeddedModelRepository @Inject constructor(
     override fun localPathFor(entry: EmbeddedModelCatalogEntry): String? {
         val target = File(File(context.filesDir, MODEL_DIRECTORY), entry.modelFile)
         return target.takeIf { it.exists() && it.length() > 0L }?.absolutePath
+    }
+
+    private suspend fun streamDownloadToFile(
+        url: String,
+        target: File,
+        expectedTotalBytes: Long?,
+        state: MutableStateFlow<EmbeddedModelDownloadState>,
+    ) {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 30_000
+            readTimeout = 30_000
+            instanceFollowRedirects = true
+            requestMethod = "GET"
+            huggingFaceTokenFor(url)?.let { token -> setRequestProperty("Authorization", "Bearer $token") }
+        }
+        try {
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                throw IllegalStateException(embeddedModelDownloadFailureMessage(url, status))
+            }
+            val totalBytes = connection.contentLengthLong.takeIf { it > 0L } ?: expectedTotalBytes
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var downloaded = 0L
+            connection.inputStream.use { input ->
+                target.outputStream().use { output ->
+                    while (currentCoroutineContext().isActive) {
+                        if (state.value == EmbeddedModelDownloadState.Cancelled) throw CancellationException()
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        publishProgress(state, downloaded, totalBytes)
+                    }
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun publishCatalog() {
