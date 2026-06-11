@@ -26,6 +26,7 @@ import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import com.letta.mobile.feature.chat.screen.SubagentNotificationCard
+import androidx.annotation.VisibleForTesting
 import kotlinx.collections.immutable.toImmutableList
 
 internal interface MessageContentRenderer {
@@ -247,7 +248,8 @@ private fun String.looksLikeMarkdownTableSeparator(start: Int, endExclusive: Int
  *    swallow it).
  */
 private const val STREAMING_CURSOR = "\u258E" // ▎ LEFT VERTICAL BAR
-private const val MAX_HELD_TAIL_CHARS = 24
+@VisibleForTesting
+internal const val MAX_HELD_TAIL_CHARS = 24
 
 internal fun streamingDisplayText(raw: String): String {
     // letta-mobile-flk2 (revision 11+): word-boundary clamp plus markdown-tail
@@ -279,6 +281,24 @@ internal fun streamingDisplayText(raw: String): String {
     // glyph can fade independently via cursorAlpha. Empty input still
     // returns empty so the renderer short-circuits to no render at all
     // (the typing indicator already covers the pre-content state).
+    //
+    // ── letta-mobile-644ez: prefix-stability contract ──
+    //
+    // This function implements a prefix-stable streaming markdown pipeline
+    // (inspired by llm-typewriter). The guarantees:
+    //
+    //  1. No text is ever dropped — incomplete markup renders as plain
+    //     text until its closer arrives.
+    //  2. Earlier prefixes are stable — committed markdown never flickers
+    //     when new chunks arrive.
+    //  3. Incomplete tail markup (open **, *, _, __, `, ~~, [) passes
+    //     through unclamped — the renderer repairs it.
+    //  4. Fenced code/math block transitions are clean — word-boundary
+    //     clamp is skipped inside open fences.
+    //  5. Plain prose uses word-boundary clamping to avoid mid-word
+    //     garble from arbitrary chunk boundaries.
+    //
+    // See StreamingDisplayTextTest for exhaustive contract verification.
     if (raw.isEmpty()) return ""
     if (insideOpenCodeFence(raw)) {
         return raw
@@ -294,7 +314,8 @@ internal fun streamingDisplayText(raw: String): String {
     }
 }
 
-private fun clampToWordBoundary(raw: String): String {
+@VisibleForTesting
+internal fun clampToWordBoundary(raw: String): String {
     if (raw.isEmpty()) return raw
     if (raw.last().isStreamingBoundary()) return raw
     val boundary = raw.indexOfLast { it.isStreamingBoundary() }
@@ -308,10 +329,12 @@ private fun clampToWordBoundary(raw: String): String {
 // indexOfLast in clampToWordBoundary) on every streamingDisplayText pass, so a
 // `setOf(...)` literal inside the function allocated a fresh Set per char —
 // pure GC churn on the streaming hot path.
-private val STREAMING_BOUNDARY_CHARS =
+@VisibleForTesting
+internal val STREAMING_BOUNDARY_CHARS =
     setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
 
-private fun Char.isStreamingBoundary(): Boolean =
+@VisibleForTesting
+internal fun Char.isStreamingBoundary(): Boolean =
     isWhitespace() || this in STREAMING_BOUNDARY_CHARS
 
 /**
@@ -348,7 +371,8 @@ internal fun shouldShowStreamingCursor(raw: String): Boolean =
  * paragraphs) are stable as soon as their content tokens land; the
  * parser handles those incrementally without flashing.
  */
-private fun clampToStableMarkdown(raw: String): String {
+@VisibleForTesting
+internal fun clampToStableMarkdown(raw: String): String {
     val lastBreak = raw.lastIndexOf('\n')
     val lineStart = if (lastBreak < 0) 0 else lastBreak + 1
     val line = raw.substring(lineStart)
@@ -369,7 +393,8 @@ private fun clampToStableMarkdown(raw: String): String {
     return raw
 }
 
-private fun findUnmatchedMathOpenerInLine(line: String): Int {
+@VisibleForTesting
+internal fun findUnmatchedMathOpenerInLine(line: String): Int {
     val displayOpenIdx = findUnmatchedDisplayMathOpenerInLine(line)
     val inlineOpenIdx = findUnmatchedInlineMathOpenerInLine(line)
     return when {
@@ -451,7 +476,8 @@ private fun isLikelyIncompleteInlineMathBody(body: String): Boolean {
  * we record its index. If multiple unmatched openers exist we return
  * the EARLIEST one, since clipping there hides all of them.
  */
-private fun findUnmatchedOpenerInLine(line: String): Int {
+@VisibleForTesting
+internal fun findUnmatchedOpenerInLine(line: String): Int {
     var earliestUnmatched = -1
     var i = 0
     val len = line.length
@@ -535,7 +561,8 @@ private fun findEmphasisCloser(line: String, from: Int, marker: Char, runLen: In
 }
 
 /** True if the text contains an odd number of ``` fences (i.e. a code block is currently open). */
-private fun insideOpenCodeFence(text: String): Boolean {
+@VisibleForTesting
+internal fun insideOpenCodeFence(text: String): Boolean {
     var count = 0
     var i = 0
     while (i <= text.length - 3) {
@@ -549,7 +576,8 @@ private fun insideOpenCodeFence(text: String): Boolean {
     return count % 2 == 1
 }
 
-private fun hasOpenDisplayMathFence(text: String): Boolean {
+@VisibleForTesting
+internal fun hasOpenDisplayMathFence(text: String): Boolean {
     var open = false
     var i = 0
     while (i <= text.length - 2) {

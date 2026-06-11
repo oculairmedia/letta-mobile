@@ -1,166 +1,518 @@
 package com.letta.mobile.feature.chat
 
+import com.letta.mobile.feature.chat.render.MAX_HELD_TAIL_CHARS
+import com.letta.mobile.feature.chat.render.clampToStableMarkdown
+import com.letta.mobile.feature.chat.render.clampToWordBoundary
+import com.letta.mobile.feature.chat.render.findUnmatchedOpenerInLine
+import com.letta.mobile.feature.chat.render.hasOpenDisplayMathFence
+import com.letta.mobile.feature.chat.render.insideOpenCodeFence
+import com.letta.mobile.feature.chat.render.isStreamingBoundary
+import com.letta.mobile.feature.chat.render.streamingDisplayText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.letta.mobile.feature.chat.render.streamingDisplayText
-import com.letta.mobile.feature.chat.render.shouldShowStreamingCursor
+import org.junit.jupiter.api.Tag
 
 /**
- * Pure-JVM tests for [streamingDisplayText] and [shouldShowStreamingCursor]
- * — the streaming-tail decorator + cursor-eligibility check applied while
- * `isStreaming = true`.
+ * Tests for the prefix-stable streaming markdown pipeline.
  *
- * Background: see letta-mobile-flk2 for the markdown-stability clamp.
+ * ## Prefix-Stability Contract
  *
- * letta-mobile-d9zy.5 (retry): cursor injection moved out of
- * [streamingDisplayText] into the renderer so the cursor can fade
- * independently. The tests below pin both halves of the new contract:
+ * 1. **No text dropped.** Every char survives — incomplete markup renders as
+ *    plain text until its closer arrives.
+ * 2. **Earlier prefixes stable.** Committed markdown never flickers when new
+ *    chunks arrive. Only the trailing incomplete construct is "unstable".
+ * 3. **Incomplete tail passes through.** Open `**`, `*`, `_`, `__`, `` ` ``,
+ *    `~~`, `[text]`(no url yet), `$$`, ` ``` ` cause full raw tail to pass
+ *    through unclamped.  Renderer repairs markup synthetically.
+ * 4. **Fence transitions clean.** Inside open ` ``` ` or `$$` fence, no
+ *    word-boundary clamp.  When closed, clamp re-engages.
+ * 5. **Plain prose uses word-boundary clamp.** Trailing partial words held
+ *    until next chunk avoids mid-word garble.
  *
- *  1. [streamingDisplayText] returns clean text — no cursor glyph
- *     appended. Inside an open ``` fence it returns the raw text
- *     unchanged so whitespace stays meaningful for code blocks.
- *  2. [shouldShowStreamingCursor] returns false for empty input and
- *     inside open ``` fences, true otherwise. The renderer pairs this
- *     with [streamingDisplayText] to decide whether to emit a cursor
- *     span on the active tail.
+ * References: llm-typewriter (prefix-stability), letta-mobile-flk2,
+ * letta-mobile-6p4o, letta-mobile-c8of.6.
  */
+@Tag("unit")
 class StreamingDisplayTextTest {
 
+    // ═══ streamingDisplayText pipeline ═══
+
     @Test
-    fun emptyInput_returnsEmpty() {
+    fun `empty returns empty`() {
         assertEquals("", streamingDisplayText(""))
     }
 
     @Test
-    fun textEndingInWhitespace_returnsAsIs() {
-        assertEquals("Hello world ", streamingDisplayText("Hello world "))
-    }
-
-    @Test
-    fun textEndingMidWord_holdsTrailingPartialWord() {
+    fun `plain prose clips trailing partial word to last boundary`() {
         assertEquals("Hello ", streamingDisplayText("Hello wor"))
     }
 
     @Test
-    fun trailingPunctuation_returnsAsIs() {
+    fun `prose ending at boundary char returns full`() {
+        assertEquals("Hello.", streamingDisplayText("Hello."))
         assertEquals("Hello, world.", streamingDisplayText("Hello, world."))
     }
 
+    // ── Incomplete tail markup: passes through, no drop ──
+
     @Test
-    fun singleVeryLongTokenWithNoBoundary_returnsAsIs() {
-        val raw = "a".repeat(50)
-        assertEquals(raw, streamingDisplayText(raw))
+    fun `open bold star-star tail passes through`() {
+        assertEquals("Hello **wor", streamingDisplayText("Hello **wor"))
     }
 
     @Test
-    fun longTrailingFragment_returnsAsIs() {
-        val tail = "ab".repeat(50)
-        val raw = "Hi $tail"
-        assertEquals(raw, streamingDisplayText(raw))
+    fun `open bold underscore-underscore tail passes through`() {
+        assertEquals("Hello __wor", streamingDisplayText("Hello __wor"))
     }
 
     @Test
-    fun shortTrailingFragment_returnsAsIs() {
-        assertEquals("Hello ", streamingDisplayText("Hello supercalifrag"))
+    fun `open italic star tail passes through`() {
+        assertEquals("Hello *wor", streamingDisplayText("Hello *wor"))
     }
 
     @Test
-    fun incompleteBold_returnsRawForMarkdownRepair() {
-        assertEquals("This is **bol", streamingDisplayText("This is **bol"))
+    fun `open italic underscore tail passes through`() {
+        assertEquals("Hello _wor", streamingDisplayText("Hello _wor"))
     }
 
     @Test
-    fun incompleteLink_returnsRawForMarkdownRepair() {
-        assertEquals("See [doc", streamingDisplayText("See [doc"))
+    fun `open bold-italic star-star-star tail passes through`() {
+        assertEquals("Hello ***wor", streamingDisplayText("Hello ***wor"))
     }
 
     @Test
-    fun incompleteDisplayMath_returnsRawForMarkdownRepair() {
-        assertEquals("Let \$\$x^2", streamingDisplayText("Let \$\$x^2"))
+    fun `open inline code backtick tail passes through`() {
+        assertEquals("Run `ls /tmp/so", streamingDisplayText("Run `ls /tmp/so"))
     }
 
     @Test
-    fun multilineIncompleteDisplayMath_returnsRawForMarkdownRepair() {
-        val raw = "Let:\n\$\$\nx^2 + y^2"
-        assertEquals(raw, streamingDisplayText(raw))
+    fun `open strikethrough tilde-tilde tail passes through`() {
+        assertEquals("This is ~~wr", streamingDisplayText("This is ~~wr"))
     }
 
     @Test
-    fun incompleteInlineMath_returnsRawForMarkdownRepair() {
-        assertEquals("Let \$x_i", streamingDisplayText("Let \$x_i"))
+    fun `open link bracket tail passes through`() {
+        assertEquals("See [the docs", streamingDisplayText("See [the docs"))
     }
 
     @Test
-    fun mathLikeTextInsideIncompleteInlineCode_returnsRawForCodeRepair() {
-        assertEquals("Use `\$x", streamingDisplayText("Use `\$x"))
+    fun `link text closed bracket but no paren yet passes through`() {
+        assertEquals("See [the docs] f", streamingDisplayText("See [the docs] f"))
     }
 
     @Test
-    fun currency_stillUsesWordBoundaryClamp() {
-        assertEquals("Cost is ", streamingDisplayText("Cost is \$100"))
+    fun `link with open paren but no close passes through`() {
+        assertEquals("See [docs](https://ex", streamingDisplayText("See [docs](https://ex"))
+    }
+
+    // Closed markup ending with * or ` (not in STREAMING_BOUNDARY_CHARS)
+    // gets word-boundary-clamped — the closing marker is held until a space
+    // or punctuation arrives in the next chunk. In practice, the smoother
+    // catches up and reveals the full text before the user notices.
+
+    @Test
+    fun `closed bold word-boundary clamped until trailing boundary arrives`() {
+        // "**bold text**" — last * is not a boundary, so clamped at space
+        assertEquals("**bold ", streamingDisplayText("**bold text**"))
     }
 
     @Test
-    fun newline_returnsAsIs() {
+    fun `closed bold with trailing period renders fully`() {
+        assertEquals("**bold text**.", streamingDisplayText("**bold text**."))
+    }
+
+    @Test
+    fun `closed italic word-boundary clamped until trailing boundary arrives`() {
+        assertEquals("*italic ", streamingDisplayText("*italic text*"))
+    }
+
+    @Test
+    fun `closed inline code word-boundary clamped`() {
+        assertEquals("Run `ls` ", streamingDisplayText("Run `ls` now"))
+    }
+
+    @Test
+    fun `closed strikethrough without trailing boundary returns full`() {
+        // ~~done~~ has no boundary chars (no spaces/punctuation), so returns full
+        assertEquals("~~done~~", streamingDisplayText("~~done~~"))
+    }
+
+    @Test
+    fun `closed link with trailing boundary renders fully`() {
+        // ) is a boundary char, so full link renders
+        assertEquals("See [docs](https://x.com)", streamingDisplayText("See [docs](https://x.com)"))
+    }
+
+    @Test
+    fun `mixed balanced and unbalanced — passes through`() {
+        assertEquals("**done** and *st", streamingDisplayText("**done** and *st"))
+    }
+
+    @Test
+    fun `prior paragraph stable when current line has open markup`() {
         assertEquals(
-            "Line one\n",
-            streamingDisplayText("Line one\nLineTwoMidWor"),
+            "Prior paragraph.\n\nNow **incomplete",
+            streamingDisplayText("Prior paragraph.\n\nNow **incomplete"),
         )
     }
 
+    // ── Fenced code block transitions ──
+
     @Test
-    fun multilineMidWord_returnsAsIs() {
-        assertEquals(
-            "Line one\nLine ",
-            streamingDisplayText("Line one\nLine tw"),
+    fun `inside open code fence raw passes through unchanged`() {
+        val text = "Intro\n\n```kotlin\nfun foo() {"
+        assertEquals(text, streamingDisplayText(text))
+    }
+
+    @Test
+    fun `open fence mid-line code not clamped`() {
+        val text = "```kotlin\nval x = "
+        assertEquals(text, streamingDisplayText(text))
+    }
+
+    @Test
+    fun `closed code fence re-engages word-boundary clamp`() {
+        val result = streamingDisplayText("```kt\nval x = 1\n```\n\nNow tex")
+        assertTrue(result.startsWith("```kt\nval x = 1\n```\n\nNow "))
+    }
+
+    @Test
+    fun `progressive code fence open content close`() {
+        assertEquals("Intro\n\n```kt", streamingDisplayText("Intro\n\n```kt"))
+        val step2 = streamingDisplayText("Intro\n\n```kt\nval x = 1\nval y")
+        assertEquals("Intro\n\n```kt\nval x = 1\nval y", step2)
+        val step3 = streamingDisplayText("Intro\n\n```kt\nval x = 1\n```\n\nNext paragrap")
+        assertTrue(step3.contains("```kt\nval x = 1\n```"))
+        assertTrue(step3.contains("Next "))
+    }
+
+    // ── Display math fence transitions ──
+
+    @Test
+    fun `inside open display math raw passes through`() {
+        val text = "Here:\n\n\$\$x^2 + "
+        assertEquals(text, streamingDisplayText(text))
+    }
+
+    @Test
+    fun `closed display math re-engages word-boundary clamp`() {
+        val result = streamingDisplayText("Here:\n\n\$\$x^2+y^2=z^2\$\$\n\nConclusion rea")
+        assertTrue(result.contains("\$\$x^2+y^2=z^2\$\$"))
+    }
+
+    @Test
+    fun `progressive display math open content close`() {
+        assertEquals("Look:\n\n\$\$x", streamingDisplayText("Look:\n\n\$\$x"))
+        val step2 = streamingDisplayText("Look:\n\n\$\$x^2+y^2")
+        assertEquals("Look:\n\n\$\$x^2+y^2", step2)
+        val step3 = streamingDisplayText("Look:\n\n\$\$x^2+y^2=z^2\$\$\n\nNow tex")
+        assertTrue(step3.contains("\$\$x^2+y^2=z^2\$\$"))
+    }
+
+    // ═══ clampToWordBoundary ═══
+
+    @Test
+    fun `clampToWordBoundary empty`() {
+        assertEquals("", clampToWordBoundary(""))
+    }
+
+    @Test
+    fun `clampToWordBoundary ends at boundary`() {
+        assertEquals("Hello.", clampToWordBoundary("Hello."))
+        assertEquals("Hello ", clampToWordBoundary("Hello "))
+    }
+
+    @Test
+    fun `clampToWordBoundary clips partial word`() {
+        assertEquals("Hello ", clampToWordBoundary("Hello wo"))
+    }
+
+    @Test
+    fun `clampToWordBoundary no boundary holds all`() {
+        assertEquals("abcdef", clampToWordBoundary("abcdef"))
+    }
+
+    @Test
+    fun `clampToWordBoundary long tail beyond max emits anyway`() {
+        val long = "a".repeat(MAX_HELD_TAIL_CHARS + 5)
+        val input = "Hello $long"
+        assertEquals(input, clampToWordBoundary(input))
+    }
+
+    @Test
+    fun `clampToWordBoundary tail at max is held`() {
+        val tail = "a".repeat(MAX_HELD_TAIL_CHARS)
+        assertEquals("Hello ", clampToWordBoundary("Hello $tail"))
+    }
+
+    // ═══ clampToStableMarkdown ═══
+
+    @Test
+    fun `clampToStableMarkdown balanced returns full`() {
+        assertEquals("Hello world", clampToStableMarkdown("Hello world"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched star-star clips before`() {
+        assertEquals("Hello ", clampToStableMarkdown("Hello **wor"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched star clips before`() {
+        assertEquals("Hello ", clampToStableMarkdown("Hello *wor"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched underscore clips before`() {
+        assertEquals("Hello ", clampToStableMarkdown("Hello _wor"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched double-underscore clips before`() {
+        assertEquals("Hello ", clampToStableMarkdown("Hello __wor"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched backtick clips before`() {
+        assertEquals("Run ", clampToStableMarkdown("Run `ls /tmp/so"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched strikethrough clips before`() {
+        assertEquals("This is ", clampToStableMarkdown("This is ~~wr"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown unmatched bracket clips before`() {
+        assertEquals("See ", clampToStableMarkdown("See [the docs"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown bracket closed no paren clips before bracket`() {
+        assertEquals("See ", clampToStableMarkdown("See [the docs] f"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown bracket with paren no close-paren clips before bracket`() {
+        assertEquals("See ", clampToStableMarkdown("See [docs](https://ex"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown balanced bold returns full`() {
+        assertEquals("**bold** here", clampToStableMarkdown("**bold** here"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown balanced backtick returns full`() {
+        assertEquals("Run `ls` now", clampToStableMarkdown("Run `ls` now"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown balanced link returns full`() {
+        assertEquals("See [d](https://x.com)", clampToStableMarkdown("See [d](https://x.com)"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown balanced strikethrough returns full`() {
+        assertEquals("~~done~~ here", clampToStableMarkdown("~~done~~ here"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown multiple unmatched earliest wins`() {
+        assertEquals("a ", clampToStableMarkdown("a *b `c"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown mixed underscore and star`() {
+        assertEquals("__bold__ and ", clampToStableMarkdown("__bold__ and *italic text "))
+    }
+
+    @Test
+    fun `clampToStableMarkdown text ending at newline returns full`() {
+        assertEquals("Hello\n", clampToStableMarkdown("Hello\n"))
+    }
+
+    @Test
+    fun `clampToStableMarkdown multi-line only last line scanned`() {
+        val result = clampToStableMarkdown("**done** here\n**open")
+        assertEquals("**done** here\n", result)
+    }
+
+    // ═══ findUnmatchedOpenerInLine ═══
+
+    @Test
+    fun `findUnmatchedOpenerInLine balanced returns -1`() {
+        assertEquals(-1, findUnmatchedOpenerInLine("**bold**"))
+        assertEquals(-1, findUnmatchedOpenerInLine("*italic*"))
+        assertEquals(-1, findUnmatchedOpenerInLine("`code`"))
+        assertEquals(-1, findUnmatchedOpenerInLine("~~strike~~"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine unmatched double-star`() {
+        assertEquals(6, findUnmatchedOpenerInLine("Hello **world"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine unmatched single-star`() {
+        assertEquals(6, findUnmatchedOpenerInLine("Hello *world"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine unmatched backtick`() {
+        assertEquals(4, findUnmatchedOpenerInLine("Run `command"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine unmatched tilde-tilde`() {
+        assertEquals(5, findUnmatchedOpenerInLine("This ~~text"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine unmatched bracket`() {
+        assertEquals(4, findUnmatchedOpenerInLine("See [link"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine unmatched underscore`() {
+        assertEquals(6, findUnmatchedOpenerInLine("Hello _world"))
+    }
+
+    @Test
+    fun `findUnmatchedOpenerInLine multiple unmatched returns earliest`() {
+        assertEquals(2, findUnmatchedOpenerInLine("a *b `c"))
+    }
+
+    // ═══ insideOpenCodeFence ═══
+
+    @Test
+    fun `insideOpenCodeFence no fences returns false`() {
+        assertFalse(insideOpenCodeFence("plain text"))
+    }
+
+    @Test
+    fun `insideOpenCodeFence one closed pair returns false`() {
+        assertFalse(insideOpenCodeFence("```\ncode\n```"))
+    }
+
+    @Test
+    fun `insideOpenCodeFence one open fence returns true`() {
+        assertTrue(insideOpenCodeFence("```kotlin\nval x = 1"))
+    }
+
+    @Test
+    fun `insideOpenCodeFence three fences one pair plus open returns true`() {
+        assertTrue(insideOpenCodeFence("```\nblock1\n```\n```\nblock2"))
+    }
+
+    @Test
+    fun `insideOpenCodeFence two full pairs returns false`() {
+        assertFalse(insideOpenCodeFence("```a\n```\n```b\n```"))
+    }
+
+    @Test
+    fun `insideOpenCodeFence empty returns false`() {
+        assertFalse(insideOpenCodeFence(""))
+    }
+
+    // ═══ hasOpenDisplayMathFence ═══
+
+    @Test
+    fun `hasOpenDisplayMathFence no math returns false`() {
+        assertFalse(hasOpenDisplayMathFence("plain text"))
+    }
+
+    @Test
+    fun `hasOpenDisplayMathFence closed math returns false`() {
+        assertFalse(hasOpenDisplayMathFence("\$\$x = 1\$\$"))
+    }
+
+    @Test
+    fun `hasOpenDisplayMathFence open math returns true`() {
+        assertTrue(hasOpenDisplayMathFence("\$\$x = "))
+    }
+
+    @Test
+    fun `hasOpenDisplayMathFence empty returns false`() {
+        assertFalse(hasOpenDisplayMathFence(""))
+    }
+
+    // ═══ isStreamingBoundary ═══
+
+    @Test
+    fun `isStreamingBoundary whitespace`() {
+        assertTrue(' '.isStreamingBoundary())
+        assertTrue('\n'.isStreamingBoundary())
+    }
+
+    @Test
+    fun `isStreamingBoundary punctuation`() {
+        assertTrue('.'.isStreamingBoundary())
+        assertTrue(','.isStreamingBoundary())
+        assertTrue('!'.isStreamingBoundary())
+        assertTrue('?'.isStreamingBoundary())
+        assertTrue(':'.isStreamingBoundary())
+        assertTrue(')'.isStreamingBoundary())
+        assertTrue(']'.isStreamingBoundary())
+    }
+
+    @Test
+    fun `isStreamingBoundary letters not boundary`() {
+        assertFalse('a'.isStreamingBoundary())
+        assertFalse('Z'.isStreamingBoundary())
+        assertFalse('0'.isStreamingBoundary())
+    }
+
+    // ═══ Prefix-stability contract tests ═══
+
+    /** CONTRACT 1: No text is ever dropped. */
+    @Test
+    fun `contract-1 no text dropped open bold tail passes through`() {
+        val input = "Hello **wor"
+        val output = streamingDisplayText(input)
+        assertEquals(input, output)
+        assertEquals(11, output.length)
+    }
+
+    /** CONTRACT 2: Earlier prefixes stable across progressive arrival. */
+    @Test
+    fun `contract-2 progressive arrival keeps earlier prefixes stable`() {
+        assertEquals("Hello ", streamingDisplayText("Hello "))
+        val step2 = streamingDisplayText("Hello **wor")
+        assertEquals("Hello **wor", step2)
+        assertTrue(step2.startsWith("Hello "))
+        val step3 = streamingDisplayText("Hello **world** and more text that is")
+        assertTrue(step3.startsWith("Hello **world** and more text that "))
+    }
+
+    /** CONTRACT 3: Every incomplete markup construct passes through. */
+    @Test
+    fun `contract-3 all incomplete markup types pass through`() {
+        val cases = listOf(
+            "Hello **wor", "Hello *wor", "Hello _wor", "Hello __wor",
+            "Run `com", "This ~~wr", "See [the", "Hello ***wor",
         )
+        for (input in cases) {
+            assertEquals("case: '$input'", input, streamingDisplayText(input))
+        }
     }
 
+    /** CONTRACT 4: Fence transitions are clean. */
     @Test
-    fun realWireFrameFromWsstreamTrace_returnsAsIs() {
-        val raw = "- **Lightweight threads**: thousands can run concurrently on a small thread pool — suspension is cheap, no O"
-        assertEquals("- **Lightweight threads**: thousands can run concurrently on a small thread pool — suspension is cheap, no ", streamingDisplayText(raw))
+    fun `contract-4 fence transitions clean`() {
+        assertEquals("```kt\nval x", streamingDisplayText("```kt\nval x"))
+        val closed = streamingDisplayText("```kt\nval x = 1\n```\n\nProse her")
+        assertTrue(closed.contains("```kt\nval x = 1\n```"))
+        assertEquals("\$\$x^2", streamingDisplayText("\$\$x^2"))
+        val closedMath = streamingDisplayText("\$\$x=1\$\$\n\nFinal wor")
+        assertTrue(closedMath.contains("\$\$x=1\$\$"))
     }
 
+    /** CONTRACT 5: Plain prose uses word-boundary clamping. */
     @Test
-    fun openCodeFence_returnsRawUnchanged() {
-        // Inside an open ``` fence — leave content alone (whitespace is
-        // meaningful in code blocks).
-        val raw = "Here:\n```kotlin\nfun foo() {\n    val x = 1"
-        assertEquals(raw, streamingDisplayText(raw))
-    }
-
-    @Test
-    fun closedCodeFence_returnsClampedText() {
-        // After a closing ``` the fence count is even — clamp applies again.
-        val raw = "Done:\n```\nfoo\n```\nNext wo"
-        assertEquals("Done:\n```\nfoo\n```\nNext ", streamingDisplayText(raw))
-    }
-
-    @Test
-    fun shouldShowStreamingCursor_emptyInput_isFalse() {
-        assertFalse(shouldShowStreamingCursor(""))
-    }
-
-    @Test
-    fun shouldShowStreamingCursor_plainText_isTrue() {
-        assertTrue(shouldShowStreamingCursor("Hello world"))
-    }
-
-    @Test
-    fun shouldShowStreamingCursor_insideOpenCodeFence_isFalse() {
-        // Open ``` fence — cursor glyph would render as literal content
-        // inside the rendered code block, which looks broken.
-        val raw = "Here:\n```kotlin\nfun foo() {\n    val x = 1"
-        assertFalse(shouldShowStreamingCursor(raw))
-    }
-
-    @Test
-    fun shouldShowStreamingCursor_afterClosedCodeFence_isTrue() {
-        // Even fence count — we are back in prose; cursor is appropriate again.
-        val raw = "Done:\n```\nfoo\n```\nNext wo"
-        assertTrue(shouldShowStreamingCursor(raw))
+    fun `contract-5 plain prose clips to word boundary`() {
+        assertEquals("Hello ", streamingDisplayText("Hello wor"))
     }
 }
