@@ -121,11 +121,11 @@ internal fun ChatScreen(
     chatBackground: ChatBackground = ChatBackground.Default,
     chatMode: String = "simple",
     onBugCommand: (() -> Unit)? = null,
-    // letta-mobile-vo9y1: jump from a subagent chip / its todo sheet to that
-    // subagent's own conversation. Receives the subagent agent id
-    // (`agent-local-*`); the host (AgentScaffold) maps it to a conversation
-    // switch. Null when navigation is not available (e.g. previews).
-    onViewSubagentConversation: ((String) -> Unit)? = null,
+    // letta-mobile-vo9y1/ww9iu: jump from a subagent chip / ring long-press
+    // to that subagent's own conversation. Receives the subagent agent id
+    // (`agent-local-*`) and conversation id (shim-provided, or default).
+    // Null when navigation is not available (e.g. previews).
+    onViewSubagentConversation: ((String, String) -> Unit)? = null,
     // letta-mobile-73o2h.2/.3: the WS SEAM for the active-subagent status
     // bar. In production this is left null so the screen binds the real
     // WS-backed source from the view model (the per-socket subagent registry
@@ -462,9 +462,9 @@ internal fun ChatScreen(
                     }
                 }
 
-                // letta-mobile-w8mog: circular progress rings stacked on the
-                // RIGHT edge of the chat surface. REPLACES the ActiveSubagentBar
-                // chip presentation.
+                // letta-mobile-w8mog/ww9iu: circular progress rings stacked on
+                // the TOP RIGHT edge of the chat surface, under the menu control.
+                // Tap opens TodoWrite; long-press navigates to the subagent.
                 CompositionLocalProvider(
                     LocalSubagentTodoSheetOpener provides { target ->
                         tappedSubagentTarget = target
@@ -478,16 +478,23 @@ internal fun ChatScreen(
                                 toolCallId = subagent.id,
                                 description = subagent.description,
                                 subagentAgentId = subagent.subagentAgentId,
+                                subagentConversationId = subagent.subagentConversationId,
                             )
                         },
                         onViewConversation = { subagent ->
                             subagent.subagentAgentId
                                 ?.takeIf { it.isNotBlank() }
-                                ?.let { agentId -> onViewSubagentConversation?.invoke(agentId) }
+                                ?.let { agentId ->
+                                    HapticEffects.longPress(haptic)
+                                    onViewSubagentConversation?.invoke(
+                                        agentId,
+                                        subagent.subagentNavigationConversationId,
+                                    )
+                                }
                         },
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(bottom = bottomPaddingDp + 8.dp, end = 8.dp),
+                            .align(Alignment.TopEnd)
+                            .padding(top = contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
                     )
                 }
 
@@ -576,7 +583,10 @@ internal fun ChatScreen(
                             ?.let { agentId ->
                                 {
                                     tappedSubagentTarget = null
-                                    onViewSubagentConversation?.invoke(agentId)
+                                    onViewSubagentConversation?.invoke(
+                                        agentId,
+                                        target.subagentNavigationConversationId,
+                                    )
                                 }
                             },
                     )

@@ -47,6 +47,7 @@ data class SubagentEntry(
     val status: String,
     @SerialName("taskId") val taskId: String? = null,
     @SerialName("subagentAgentId") val subagentAgentId: String? = null,
+    @SerialName("subagentConversationId") val subagentConversationId: String? = null,
     @SerialName("parentRunId") val parentRunId: String? = null,
     @SerialName("startedAt") val startedAt: String? = null,
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,

@@ -83,6 +83,12 @@ data class ActiveSubagent(
      */
     val subagentAgentId: String? = null,
     /**
+     * letta-mobile-ww9iu: the subagent's own conversation id when the shim
+     * supplies one. Older shims omit it; navigation then falls back to the
+     * subagent default conversation, never the parent conversation.
+     */
+    val subagentConversationId: String? = null,
+    /**
      * letta-mobile-29h9u: wall-clock epoch-ms at which this entry FIRST
      * became terminal (completed/failed), stamped by the source as the chip
      * transitions out of [Status.RUNNING]. Null while still running. Drives
@@ -153,6 +159,10 @@ data class ActiveSubagent(
      */
     val canViewConversation: Boolean
         get() = !isSelf && !subagentAgentId.isNullOrBlank()
+
+    val subagentNavigationConversationId: String
+        get() = subagentConversationId?.takeIf { it.isNotBlank() }
+            ?: SUBAGENT_DEFAULT_CONVERSATION_ID
 
     /**
      * letta-mobile-dvobc: the ring FILL fraction in [0f, 1f]. Driven by the
@@ -253,6 +263,8 @@ data class ActiveSubagent(
          * window. The signal is derived from elapsed-since-[lastUpdateAt].
          */
         const val STUCK_THRESHOLD_MS: Long = 35_000L
+
+        const val SUBAGENT_DEFAULT_CONVERSATION_ID: String = "default"
     }
 }
 

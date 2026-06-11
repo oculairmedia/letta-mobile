@@ -13,15 +13,15 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,14 +37,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.icons.LettaIconSizing
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaMotion
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
@@ -59,18 +56,18 @@ import kotlinx.collections.immutable.ImmutableList
  *  - BORN: ring appears with a small "started" sliver (~8% arc). When
  *    todo_progress arrives the ring transitions to determinate fill
  *    (0→360° sweep tracked to completed/total).
- *  - RUNNING: tap → navigate to the subagent's conversation if it has one
- *    (FIX: uses SubagentEntry.subagentAgentId + default conversation, NOT the
- *    parent conversation); fall back to the todo sheet when no conversation
- *    exists
+ *  - RUNNING: tap → open TodoWrite sheet; long press → navigate to the
+ *    subagent's own conversation when available (FIX: uses
+ *    SubagentEntry.subagentAgentId + SubagentEntry.subagentConversationId or
+ *    default conversation, NOT the parent conversation).
  *  - COMPLETED: animate fill to 100% briefly (~300ms) then collapse away
  *    (silent success — NO lingering green checkmark)
  *  - FAILED: ring turns red (error color token), FROZEN at whatever fill it
  *    reached, persists until tapped/acknowledged
  *  - Overflow: >3 rings → show 3 + a '+N' count badge
  *
- * HARD CONSTRAINT (Emmanuel): NO bot/robot iconography anywhere — ring centers
- * are abstract or task-derived (tool glyph, role initial, or plain ring).
+ * HARD CONSTRAINT (Emmanuel): NO center iconography anywhere — no tool glyph,
+ * bot glyph, role glyph, or initials. Rings are progress circles only.
  * Applies to badges and empty/error states.
  *
  * DESIGN DISCIPLINE (Pencil-spec):
@@ -82,6 +79,7 @@ import kotlinx.collections.immutable.ImmutableList
  *  - Render hot-path rules: no per-frame work in composition bodies,
  *    remember() everything computed, react to discrete events O(delta)
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ActiveSubagentRings(
     subagents: ImmutableList<ActiveSubagent>,
@@ -138,13 +136,11 @@ fun ActiveSubagentRings(
                     subagent = subagent,
                     now = now,
                     onClick = {
-                        // letta-mobile-xm8qk: tap must navigate to the correct
-                        // conversation (subagent's conversation if it has one,
-                        // or open the todo sheet when no conversation exists)
+                        onRingClick(subagent)
+                    },
+                    onLongClick = {
                         if (subagent.canViewConversation) {
                             onViewConversation(subagent)
-                        } else {
-                            onRingClick(subagent)
                         }
                     },
                 )
@@ -173,11 +169,11 @@ private fun ActivityRing(
     now: Long,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
+    onLongClick: () -> Unit = {},
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
     val ringState = subagent.ringState(now)
     val color = ringColor(ringState)
-    val glyph = subagent.kindGlyph()
 
     // ── Determinate sweep angle ──────────────────────────────────────────
     // i2f23: sweep tracks the TodoWrite completion fraction. The target
@@ -237,14 +233,18 @@ private fun ActivityRing(
     // (-90°) with variable sweep length.
     val drawSweep = sliverPulseSweep ?: animatedSweep
 
-    val ringSize = 48.dp
-    val strokeWidth = 2.dp
+    val touchTargetSize = 48.dp
+    val ringSize = 36.dp
+    val strokeWidth = 4.dp
 
     Box(
         modifier = modifier
-            .size(ringSize)
+            .size(touchTargetSize)
             .clip(CircleShape)
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .semantics {
                 contentDescription = subagent.chipSemanticLabel()
             },
@@ -285,13 +285,6 @@ private fun ActivityRing(
             )
         }
 
-        // Center glyph (NO bot/robot iconography per Emmanuel)
-        Icon(
-            imageVector = glyph,
-            contentDescription = null,
-            modifier = Modifier.size(LettaIconSizing.Inline),
-            tint = color,
-        )
     }
 }
 
@@ -306,7 +299,7 @@ private fun OverflowBadge(
 ) {
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(36.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .semantics {
@@ -338,21 +331,6 @@ private fun ringColor(state: RingState): Color = when (state) {
     RingState.ERROR -> MaterialTheme.customColors.errorTextColor
         .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.error
     RingState.SUCCESS -> MaterialTheme.colorScheme.primary // Not used
-}
-
-/**
- * letta-mobile-w8mog: the glyph that differentiates the ring kind. NO
- * bot/robot iconography per Emmanuel — tool glyph, role initial, or plain
- * ring only.
- */
-private fun ActiveSubagent.kindGlyph(): ImageVector = when (kind) {
-    // A tool task is NOT an agent — distinct glyph (a wrench) + label.
-    ActiveSubagent.Kind.BACKGROUND_TASK -> LettaIcons.Tool
-    // letta-mobile-w8mog: NO Agent icon (bot/robot iconography). Use a
-    // generic activity indicator instead. For now, reuse Tool icon as a
-    // placeholder for abstract glyph.
-    ActiveSubagent.Kind.SELF -> LettaIcons.Tool
-    ActiveSubagent.Kind.SUBAGENT -> LettaIcons.Tool
 }
 
 /**
