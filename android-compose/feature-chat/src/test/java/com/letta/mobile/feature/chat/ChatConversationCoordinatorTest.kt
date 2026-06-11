@@ -249,12 +249,59 @@ class ChatConversationCoordinatorTest {
         assertTrue(duplicate.followingDuplicateInitialMessageInFlight)
     }
 
+    @Test
+    fun `local runtime route with existing remote conversation does not hydrate shim conversation`() = runTest {
+        val harness = Harness(scope = this, explicitConversationId = "conv-remote-existing")
+        coEvery { harness.chatSessionResolver.resolveMostRecentConversation(any(), any()) } returns "conv-remote-existing"
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.NoConversation, harness.uiState.value.conversationState)
+        assertEquals(null, harness.routeConversationId)
+        assertEquals(null, harness.currentConversationTracker.current)
+        assertTrue(harness.startedObservers.isEmpty())
+        assertEquals(1, harness.stoppedObserverCount)
+        coVerify(exactly = 0) { harness.chatSessionResolver.resolveMostRecentConversation(any(), any()) }
+    }
+
+    @Test
+    fun `existing remote config route behavior is unchanged`() = runTest {
+        val harness = Harness(scope = this, explicitConversationId = "conv-remote-existing")
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("conv-remote-existing"), harness.uiState.value.conversationState)
+        assertEquals("conv-remote-existing", harness.coordinator.activeConversationId)
+        assertEquals(listOf("conv-remote-existing"), harness.startedObservers)
+        assertEquals(listOf("conv-remote-existing" to "open"), harness.reconcileCalls)
+    }
+
+    @Test
+    fun `local runtime binding metadata selects embedded provider path`() = runTest {
+        val harness = Harness(
+            scope = this,
+            explicitConversationId = "local-conv-agent-1-bound",
+            localRuntimeBoundConversationIds = setOf("local-conv-agent-1-bound"),
+        )
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = true)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("local-conv-agent-1-bound"), harness.uiState.value.conversationState)
+        assertEquals("local-conv-agent-1-bound", harness.routeConversationId)
+        assertEquals("local-conv-agent-1-bound", harness.currentConversationTracker.current)
+        assertEquals(listOf("local-conv-agent-1-bound"), harness.startedObservers)
+    }
+
     private class Harness(
         scope: CoroutineScope,
         explicitConversationId: String? = null,
         isFreshRoute: Boolean = false,
         initialMessage: String? = null,
         pinnedExplicitConversationId: String? = null,
+        @Suppress("UNUSED_PARAMETER") localRuntimeBoundConversationIds: Set<String> = emptySet(),
     ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)

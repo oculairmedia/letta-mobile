@@ -151,6 +151,30 @@ class LocalRuntimeChatSendCoordinatorTest {
         assertEquals("Local runtime does not support image attachments yet", uiState.value.error)
     }
 
+    @Test
+    fun `missing local conversation binding surfaces setup error instead of using remote conversation`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        var observedConversation: String? = null
+        val coordinator = coordinator(
+            scope = backgroundScope,
+            timelineRepository = timelineRepository,
+            uiState = uiState,
+            activeConversationId = { "conv-remote-existing" },
+            startTimelineObserver = { observedConversation = it },
+        )
+
+        coordinator.send("hello local").join()
+
+        assertTrue(timelineRepository.externalLocals.isEmpty())
+        assertTrue(timelineRepository.sentLocals.isEmpty())
+        assertTrue(timelineRepository.ingestedMessages.isEmpty())
+        assertEquals(null, observedConversation)
+        assertEquals("Local runtime setup required for this conversation", uiState.value.error)
+        assertFalse(uiState.value.isStreaming)
+        assertFalse(uiState.value.isAgentTyping)
+    }
+
     private fun coordinator(
         scope: CoroutineScope,
         timelineRepository: FakeTimelineExternalTransportWriter,
