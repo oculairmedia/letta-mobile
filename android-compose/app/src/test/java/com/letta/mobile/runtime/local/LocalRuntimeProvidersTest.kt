@@ -27,13 +27,7 @@ class LocalRuntimeProvidersTest {
 
     @Test
     fun `local lettacode does not advertise unprojected tool or approval events`() {
-        val provider = LocalLettaCodeRuntimeProvider(
-            turnEngine = LettaCodeTurnEngine(
-                client = object : LettaCodeHeadlessClient {
-                    override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = emptyFlow()
-                },
-            ),
-        )
+        val provider = localLettaCodeProvider()
 
         val capabilities = provider.descriptor(
             LettaConfig(
@@ -48,4 +42,36 @@ class LocalRuntimeProvidersTest {
         assertFalse(capabilities.supportsTools)
         assertFalse(capabilities.supportsApprovals)
     }
+
+    @Test
+    fun `local lettacode provider requires explicit scheme`() {
+        val provider = localLettaCodeProvider()
+
+        assertFalse(
+            provider.supports(
+                LettaConfig(
+                    id = "local-default",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "local://device",
+                )
+            )
+        )
+        assertTrue(
+            provider.supports(
+                LettaConfig(
+                    id = "local-lettacode",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "local-lettacode://device",
+                )
+            )
+        )
+    }
+
+    private fun localLettaCodeProvider(): LocalLettaCodeRuntimeProvider = LocalLettaCodeRuntimeProvider(
+        turnEngineFactory = LettaCodeTurnEngineFactory(
+            client = object : LettaCodeHeadlessClient {
+                override fun runTurn(command: TurnCommand, config: LettaConfig): Flow<RuntimeEventDraft> = emptyFlow()
+            },
+        ),
+    )
 }

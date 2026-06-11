@@ -7,6 +7,7 @@ import com.letta.mobile.data.session.LocalRuntimeProvider
 import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
 import com.letta.mobile.runtime.local.BuildConfigEmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.DisabledOnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.LettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.LettaCodeNodeBridge
@@ -15,6 +16,7 @@ import com.letta.mobile.runtime.local.LocalKoogRuntimeProvider
 import com.letta.mobile.runtime.local.LocalLettaCodeRuntimeProvider
 import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
+import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
@@ -50,6 +52,10 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideLettaCodeNodeBridge(bridge: NativeLettaCodeNodeBridge): LettaCodeNodeBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideOnDeviceOpenAiBridge(bridge: DisabledOnDeviceOpenAiBridge): OnDeviceOpenAiBridge = bridge
 
     @Provides
     @Singleton

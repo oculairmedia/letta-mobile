@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 
 @Singleton
 class LocalLettaCodeRuntimeProvider @Inject constructor(
-    private val turnEngine: LettaCodeTurnEngine,
+    private val turnEngineFactory: LettaCodeTurnEngineFactory,
 ) : LocalRuntimeProvider {
     override val providerId: String = "local-lettacode"
     override val priority: Int = 100
@@ -44,10 +44,10 @@ class LocalLettaCodeRuntimeProvider @Inject constructor(
         )
     }
 
-    override fun turnEngine(config: LettaConfig): TurnEngine = turnEngine
+    override fun turnEngine(config: LettaConfig): TurnEngine = turnEngineFactory.create(config)
 
     private companion object {
-        val LETTACODE_SCHEMES = setOf("local", "local-lettacode", "local-letta-code")
+        val LETTACODE_SCHEMES = setOf("local-lettacode", "local-letta-code")
     }
 }
 

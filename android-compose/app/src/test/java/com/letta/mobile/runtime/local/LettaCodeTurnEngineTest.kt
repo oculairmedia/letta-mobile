@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -19,12 +20,18 @@ import org.junit.Test
 class LettaCodeTurnEngineTest {
     @Test
     fun `failed client startup becomes failed runtime lifecycle`() = runTest {
+        val config = LettaConfig(
+            id = "local-lettacode",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "local-lettacode://device",
+        )
         val engine = LettaCodeTurnEngine(
             client = object : LettaCodeHeadlessClient {
-                override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
+                override fun runTurn(command: TurnCommand, config: LettaConfig): Flow<RuntimeEventDraft> = flow {
                     throw IllegalStateException("Embedded LettaCode is disabled in this build.")
                 }
             },
+            config = config,
         )
 
         val events = engine.runTurn(command()).toList()
