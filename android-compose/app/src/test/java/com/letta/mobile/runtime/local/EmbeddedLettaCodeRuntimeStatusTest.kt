@@ -1,12 +1,13 @@
 package com.letta.mobile.runtime.local
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EmbeddedLettaCodeRuntimeStatusTest {
     @Test
-    fun runnableRemainsDisabledEvenWhenNativeAndAssetsArePresent() {
-        assertFalse(status(nativeEnabled = true, assetsEnabled = true).runnable)
+    fun runnableRequiresNativeAndAssetsPrerequisites() {
+        assertTrue(status(nativeEnabled = true, assetsEnabled = true).runnable)
         assertFalse(status(nativeEnabled = false, assetsEnabled = true).runnable)
         assertFalse(status(nativeEnabled = true, assetsEnabled = false).runnable)
         assertFalse(status(nativeEnabled = false, assetsEnabled = false).runnable)

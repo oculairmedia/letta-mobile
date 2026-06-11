@@ -7,14 +7,16 @@ import com.letta.mobile.data.session.LocalRuntimeProvider
 import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
 import com.letta.mobile.runtime.local.BuildConfigEmbeddedLettaCodeRuntimeStatusProvider
-import com.letta.mobile.runtime.local.DisabledOnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.LettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.LettaCodeNodeBridge
 import com.letta.mobile.runtime.local.LettaCodeRuntimeController
+import com.letta.mobile.runtime.local.LiteRtLmOnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.LocalKoogRuntimeProvider
 import com.letta.mobile.runtime.local.LocalLettaCodeRuntimeProvider
+import com.letta.mobile.runtime.local.LocalOpenAiOnDeviceBridge
 import com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge
+import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
@@ -55,7 +57,13 @@ object RuntimeModule {
 
     @Provides
     @Singleton
-    fun provideOnDeviceOpenAiBridge(bridge: DisabledOnDeviceOpenAiBridge): OnDeviceOpenAiBridge = bridge
+    fun provideOnDeviceOpenAiBridge(bridge: LocalOpenAiOnDeviceBridge): OnDeviceOpenAiBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideOnDeviceChatCompletionEngine(
+        engine: LiteRtLmOnDeviceChatCompletionEngine,
+    ): OnDeviceChatCompletionEngine = engine
 
     @Provides
     @Singleton

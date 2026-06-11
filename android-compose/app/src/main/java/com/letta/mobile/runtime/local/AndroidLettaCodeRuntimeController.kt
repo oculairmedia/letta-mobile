@@ -1,8 +1,8 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.runtime.ToolApprovalDecisionValue
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -45,6 +45,10 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private var activeOnDeviceBridgeSession: OnDeviceOpenAiBridgeSession? = null
 
     override fun submit(command: TurnCommand, config: LettaConfig): Flow<String> = channelFlow {
+        if (command.input is TurnInput.ToolApprovalResponse) {
+            Log.w(TAG, "Ignoring tool approval response for embedded LettaCode; approvals are not supported yet.")
+            return@channelFlow
+        }
         submitMutex.withLock {
             ensureStarted(command, config)
             withTimeout(TURN_TIMEOUT_MS) {
@@ -88,7 +92,16 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             if (!runtimeStatusProvider.status.runnable) {
                 throw IllegalStateException(
                     "Embedded LettaCode is disabled in this build. " +
-                        "Bridge/device smoke must pass before it can run on device.",
+                        "Enable embedded native and asset prerequisites before selecting local-lettacode://device.",
+                )
+            }
+            val modelPath = modelSelection.modelPath?.let(::File)
+                ?: throw IllegalStateException(
+                    "Embedded LettaCode requires an imported .litertlm model path before it can start.",
+                )
+            if (!modelPath.isFile) {
+                throw IllegalStateException(
+                    "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.",
                 )
             }
 
@@ -206,26 +219,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             )
         }.toString()
 
-        is TurnInput.ToolApprovalResponse -> {
-            val allow = input.decision.decision == ToolApprovalDecisionValue.Approved
-            buildJsonObject {
-                put("type", "control_response")
-                put(
-                    "response",
-                    buildJsonObject {
-                        put("subtype", "success")
-                        put("request_id", input.decision.approvalId.value)
-                        put(
-                            "response",
-                            buildJsonObject {
-                                put("behavior", if (allow) "allow" else "deny")
-                                input.decision.response?.let { put("message", it) }
-                            },
-                        )
-                    },
-                )
-            }.toString()
-        }
+        is TurnInput.ToolApprovalResponse -> error("Tool approvals are not supported by embedded LettaCode.")
     }
 
     private fun String.isTerminalFrame(): Boolean {
@@ -245,6 +239,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private class TerminalResultSeen : CancellationException()
 
     private companion object {
+        private const val TAG = "LettaCodeRuntime"
         private const val TURN_TIMEOUT_MS = 120_000L
     }
 }
