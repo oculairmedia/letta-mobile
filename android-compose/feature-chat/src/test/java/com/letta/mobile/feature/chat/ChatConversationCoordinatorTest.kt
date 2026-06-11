@@ -301,6 +301,7 @@ class ChatConversationCoordinatorTest {
         assertTrue(duplicate.followingDuplicateInitialMessageInFlight)
     }
 
+
     private class Harness(
         scope: CoroutineScope,
         explicitConversationId: String? = null,
