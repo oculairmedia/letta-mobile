@@ -26,8 +26,8 @@ class EmbeddedLettaCodeModelSelectionTest {
         assertEquals("litert-lm", selection.runtime)
         assertEquals("cpu", selection.accelerator)
         assertEquals(8192, selection.maxTokens)
-        assertEquals("gemma-3n", selection.openAiModelId)
-        assertEquals("lmstudio/gemma-3n", selection.lettaCodeModelHandle)
+        assertEquals("google/gemma-3n", selection.openAiModelId)
+        assertEquals("lmstudio/google/gemma-3n", selection.lettaCodeModelHandle)
     }
 
     @Test
@@ -50,7 +50,7 @@ class EmbeddedLettaCodeModelSelectionTest {
         assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_RUNTIME, selection.runtime)
         assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_ACCELERATOR, selection.accelerator)
         assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_MAX_TOKENS, selection.maxTokens)
-        assertEquals("on-device", selection.openAiModelId)
+        assertEquals("default", selection.openAiModelId)
     }
 
     @Test
