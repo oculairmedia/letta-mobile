@@ -376,6 +376,11 @@ internal class ChatTimelineObserver(
         val previous = lastProjectionSnapshot ?: return null
         if (previous.conversationId != timeline.conversationId || timeline.events.isEmpty()) return null
         if (previous.prefix !== prefix) return null
+        // letta-mobile-ixtzn: guard against empty previous.records (e.g. after
+        // reconnect-clear or frame-before-first-message ordering). The fast path
+        // assumes ≥1 existing record to compare/extend the tail against; fall
+        // through to full projection when the list is empty.
+        if (previous.records.isEmpty()) return null
 
         val replaceTail = timeline.events.size == previous.records.size &&
             timeline.stablePrefixVersion == previous.stablePrefixVersion
@@ -434,6 +439,7 @@ internal class ChatTimelineObserver(
         val live = if (appendTail) {
             if (tailRecord.uiMessage == null) previous.liveMessages else previous.liveMessages + tailRecord.uiMessage
         } else {
+            // Safe to call .last() here: we've already guarded for isEmpty() at line 384
             val previousTailHadUi = previous.records.last().uiMessage != null
             when {
                 previousTailHadUi && tailRecord.uiMessage != null -> previous.liveMessages.dropLast(1) + tailRecord.uiMessage
@@ -449,6 +455,7 @@ internal class ChatTimelineObserver(
             // streaming delta. The previous snapshot already holds the combined
             // a2ui list; strip the previous tail's contribution (a suffix of
             // known length) and append the new tail's, keeping this O(delta).
+            // Safe to call .last() here: we've already guarded for isEmpty() at line 384
             val previousTailA2uiCount = previous.records.last().a2uiMessages.size
             val prefixA2ui = if (previousTailA2uiCount == 0) {
                 previous.a2uiMessages
@@ -461,6 +468,7 @@ internal class ChatTimelineObserver(
         // so a replaceTail can recompute the aggregate booleans in O(delta)
         // (subtract the old tail, add the new tail) instead of re-scanning the
         // whole history per streaming delta.
+        // Safe to call .last() here: we've already guarded for isEmpty() at line 384
         val previousTailRecord = previous.records.last()
         val pendingCount = when {
             appendTail -> previous.pendingCount + (if (tailRecord.isLettaServerLocalPending) 1 else 0)
@@ -479,6 +487,7 @@ internal class ChatTimelineObserver(
         val toolCardCount = if (appendTail) {
             previous.toolCardCount + tailRecord.toolCardCount
         } else {
+            // Safe to call .last() here: we've already guarded for isEmpty() at line 384
             previous.toolCardCount - previous.records.last().toolCardCount + tailRecord.toolCardCount
         }
         val tailIsAssistant = tailEvent is TimelineEvent.Confirmed && tailEvent.messageType == TimelineMessageType.ASSISTANT

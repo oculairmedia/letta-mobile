@@ -501,6 +501,52 @@ class ChatTimelineObserverTest {
         assertEquals(ChatMessageListChange.ReplaceTail, harness.uiState.value.messageListChange)
     }
 
+    @Test
+    fun `empty timeline after reconnect-clear does not crash on projection tick (letta-mobile-ixtzn)`() = runTest {
+        val harness = Harness(backgroundScope)
+        val flow = harness.seedTimeline("conv-1", listOf(confirmed("assistant-1", "initial", TimelineMessageType.ASSISTANT)))
+        
+        harness.observer.start("conv-1")
+        runCurrent()
+        
+        assertEquals(1, harness.uiState.value.messages.size)
+        
+        // Simulate reconnect-clear: empty timeline emitted before new frames arrive
+        flow.value = Timeline("conv-1")
+        runCurrent()
+        
+        // Should not crash; empty projection accepted gracefully
+        assertEquals(0, harness.uiState.value.messages.size)
+        
+        // New frame arrives on cleared timeline
+        flow.value = Timeline("conv-1", events = persistentListOf(confirmed("assistant-2", "after reconnect", TimelineMessageType.ASSISTANT)))
+        runCurrent()
+        
+        assertEquals(1, harness.uiState.value.messages.size)
+        assertEquals("assistant-2", harness.uiState.value.messages.first().id)
+    }
+
+    @Test
+    fun `out-of-band frame arriving before first message does not crash (letta-mobile-ixtzn)`() = runTest {
+        val harness = Harness(backgroundScope)
+        // Start with an empty timeline (fresh conversation)
+        val flow = harness.seedTimeline("conv-1")
+        
+        harness.observer.start("conv-1")
+        runCurrent()
+        
+        assertEquals(0, harness.uiState.value.messages.size)
+        
+        // Out-of-band frame arrives on fresh/empty timeline
+        // The guard at line 383 ensures we don't crash when previous.records is empty
+        flow.value = Timeline("conv-1", events = persistentListOf(confirmed("frame-1", "hello", TimelineMessageType.ASSISTANT)))
+        runCurrent()
+        
+        // Should not crash; projection succeeds
+        assertEquals(1, harness.uiState.value.messages.size)
+        assertEquals("frame-1", harness.uiState.value.messages.first().id)
+    }
+
     private class Harness(
         scope: CoroutineScope,
         activeReplyConversationIds: Set<String> = emptySet(),
