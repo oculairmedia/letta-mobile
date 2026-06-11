@@ -29,11 +29,13 @@ interface ISettingsRepository {
     val favoriteAgentId: StateFlow<String?>
     val adminAgentId: StateFlow<String?>
     val lastChatSelection: StateFlow<LastChatSelection?>
+    val huggingFaceToken: StateFlow<String?>
     fun getActiveConfig(): Flow<LettaConfig?>
     suspend fun saveConfig(config: LettaConfig)
     suspend fun setActiveConfigId(id: String)
     suspend fun deleteConfig(id: String)
     suspend fun clearAllData()
+    suspend fun setHuggingFaceToken(token: String?)
     fun getTheme(): Flow<AppTheme>
     fun getThemePreset(): Flow<ThemePreset>
     fun getDynamicColor(): Flow<Boolean>

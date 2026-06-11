@@ -10,6 +10,7 @@
       "accelerators": ["cpu", "gpu"]
     },
     "taskTypes": ["chat", "text-generation"],
+    "requiresAuth": true,
     "downloadUrl": "https://huggingface.co/google/gemma-3n-E2B-it-litert-lm/resolve/main/gemma-3n-E2B-it-int4.litertlm"
   },
   {
@@ -23,6 +24,7 @@
       "accelerators": ["cpu", "gpu"]
     },
     "taskTypes": ["chat", "text-generation"],
+    "requiresAuth": true,
     "downloadUrl": "https://huggingface.co/google/gemma-3n-E4B-it-litert-lm/resolve/main/gemma-3n-E4B-it-int4.litertlm"
   },
   {

@@ -1,8 +1,10 @@
 package com.letta.mobile.runtime.local.modelcatalog
 
 import android.content.Context
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsChannel
 import io.ktor.http.isSuccess
@@ -46,6 +48,7 @@ interface EmbeddedModelRepository {
 class AssetEmbeddedModelRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val httpClient: HttpClient,
+    private val settingsRepository: ISettingsRepository,
 ) : EmbeddedModelRepository {
     private val parser = EmbeddedModelCatalogParser()
     private val entries: List<EmbeddedModelCatalogEntry> by lazy {
@@ -72,9 +75,11 @@ class AssetEmbeddedModelRepository @Inject constructor(
         val state = stateFor(entry)
         state.value = EmbeddedModelDownloadState.Downloading(bytesDownloaded = 0L, totalBytes = entry.sizeInBytes)
         try {
-            val response = httpClient.get(url)
+            val response = httpClient.get(url) {
+                huggingFaceTokenFor(url)?.let { token -> bearerAuth(token) }
+            }
             if (!response.status.isSuccess()) {
-                throw IllegalStateException("Download failed with HTTP ${response.status.value}.")
+                throw IllegalStateException(embeddedModelDownloadFailureMessage(url, response.status.value))
             }
             val channel = response.bodyAsChannel()
             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -138,6 +143,9 @@ class AssetEmbeddedModelRepository @Inject constructor(
 
     private fun stateFor(entry: EmbeddedModelCatalogEntry): MutableStateFlow<EmbeddedModelDownloadState> =
         downloadStates.getOrPut(entry.id) { MutableStateFlow(EmbeddedModelDownloadState.Idle) }
+
+    private fun huggingFaceTokenFor(url: String): String? =
+        settingsRepository.huggingFaceToken.value?.takeIf { it.isNotBlank() && url.isHuggingFaceUrl() }
 
     private fun Context.availableStorageBytes(): Long = filesDir.usableSpace
 

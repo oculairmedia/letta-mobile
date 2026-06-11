@@ -17,6 +17,7 @@ data class EmbeddedModelCatalogEntry(
     val taskTypes: List<String>,
     val downloadUrl: String? = null,
     val checksumSha256: String? = null,
+    val requiresAuth: Boolean = false,
     @SerialName("supported")
     private val supportedFlag: Boolean? = null,
     val unsupportedReason: String? = null,
