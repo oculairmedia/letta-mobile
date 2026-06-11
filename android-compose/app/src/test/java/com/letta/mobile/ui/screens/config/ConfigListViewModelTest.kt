@@ -4,6 +4,8 @@ import android.content.Context
 import app.cash.turbine.test
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeServerHealthRepository
 import com.letta.mobile.testutil.TestData
@@ -45,7 +47,12 @@ class ConfigListViewModelTest {
         // test, hit DNS resolution paths, etc.) that has no bearing on
         // what these tests assert (config-mapping into uiState).
         val healthRepo = FakeServerHealthRepository()
-        viewModel = ConfigListViewModel(fakeRepo, healthRepo, appContext)
+        viewModel = ConfigListViewModel(
+            fakeRepo,
+            healthRepo,
+            FakeEmbeddedLettaCodeRuntimeStatusProvider(),
+            appContext,
+        )
     }
 
     @After
@@ -95,17 +102,59 @@ class ConfigListViewModelTest {
 
     @Test
     fun `setActiveConfig sets Error on failure`() = runTest {
-        val config = TestData.lettaConfig(id = "c1")
         val failingRepo = mockk<ISettingsRepository>(relaxed = true)
         coEvery { failingRepo.setActiveConfigId(any()) } throws Exception("Failed")
         every { failingRepo.configs } returns MutableStateFlow(emptyList())
         every { failingRepo.activeConfig } returns MutableStateFlow(null)
         
         val healthRepo = FakeServerHealthRepository()
-        val failViewModel = ConfigListViewModel(failingRepo, healthRepo, mockk(relaxed = true))
+        val failViewModel = ConfigListViewModel(
+            failingRepo,
+            healthRepo,
+            FakeEmbeddedLettaCodeRuntimeStatusProvider(),
+            mockk(relaxed = true),
+        )
 
         failViewModel.setActiveConfig("c1")
 
         failViewModel.uiState.test { assertTrue(awaitItem() is UiState.Error) }
+    }
+
+    @Test
+    fun `connectEmbeddedLettaCodeRuntime creates local config and makes it active`() = runTest {
+        viewModel.connectEmbeddedLettaCodeRuntime()
+
+        val saved = fakeRepo.activeConfig.value
+        assertEquals(LettaConfig.Mode.LOCAL, saved?.mode)
+        assertEquals(ConfigViewModel.LOCAL_RUNTIME_URL, saved?.serverUrl)
+        assertEquals(null, saved?.accessToken)
+    }
+
+    @Test
+    fun `connectEmbeddedLettaCodeRuntime reuses existing local config`() = runTest {
+        val existing = LettaConfig(
+            id = "local-existing",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "local://device",
+            accessToken = "ignored",
+        )
+        val cloud = TestData.lettaConfig(id = "cloud")
+        fakeRepo.saveConfig(cloud)
+        fakeRepo.saveConfig(existing)
+        fakeRepo.setActiveConfigId("cloud")
+
+        viewModel.connectEmbeddedLettaCodeRuntime()
+
+        assertEquals("local-existing", fakeRepo.activeConfig.value?.id)
+        assertEquals(2, fakeRepo.configs.value.size)
+    }
+
+    private class FakeEmbeddedLettaCodeRuntimeStatusProvider : EmbeddedLettaCodeRuntimeStatusProvider {
+        override val status: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+            nativeEnabled = true,
+            assetsEnabled = true,
+            version = "test",
+            integrity = "sha512-test",
+        )
     }
 }

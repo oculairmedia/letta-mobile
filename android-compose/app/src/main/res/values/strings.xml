@@ -304,6 +304,7 @@
     <string name="screen_config_embedded_runtime_disabled_placeholder">Model import and configuration are available, but local turn execution is disabled in this build.</string>
     <string name="screen_config_embedded_runtime_execution_disabled">Execution disabled</string>
     <string name="screen_config_embedded_runtime_version">Runtime: %1$s</string>
+    <string name="screen_config_embedded_runtime_connect">Use embedded LettaCode</string>
     <string name="screen_config_on_device_model_title">On-device model</string>
     <string name="screen_config_local_model_path">Model file</string>
     <string name="screen_config_local_model_path_placeholder">Import a .litertlm file or enter a local path</string>

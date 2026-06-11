@@ -16,6 +16,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.health.ServerHealthState
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.EmptyState
@@ -25,6 +26,7 @@ import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.listItemHeadline
+import com.letta.mobile.ui.theme.listItemSupporting
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +66,7 @@ fun ConfigListScreen(
                 state = state.data,
                 onSetActive = { viewModel.setActiveConfig(it.id) },
                 onDelete = { viewModel.deleteConfig(it.id) },
+                onConnectEmbeddedRuntime = viewModel::connectEmbeddedLettaCodeRuntime,
                 modifier = Modifier.padding(paddingValues)
             )
         }
@@ -75,9 +78,11 @@ private fun ConfigListContent(
     state: ConfigListUiState,
     onSetActive: (ServerConfig) -> Unit,
     onDelete: (ServerConfig) -> Unit,
+    onConnectEmbeddedRuntime: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (state.configs.isEmpty()) {
+    val showEmbeddedRuntimeConnect = !state.hasEmbeddedLettaCodeConfig
+    if (state.configs.isEmpty() && !showEmbeddedRuntimeConnect) {
         EmptyState(
             icon = LettaIcons.Settings,
             message = stringResource(R.string.screen_config_list_empty),
@@ -89,6 +94,14 @@ private fun ConfigListContent(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            if (showEmbeddedRuntimeConnect) {
+                item(key = "embedded-lettacode-connect") {
+                    EmbeddedRuntimeConnectCard(
+                        status = state.embeddedRuntimeStatus,
+                        onConnect = onConnectEmbeddedRuntime,
+                    )
+                }
+            }
             items(
                 items = state.configs,
                 key = { it.id }
@@ -98,6 +111,52 @@ private fun ConfigListContent(
                     onSetActive = { onSetActive(config) },
                     onDelete = { onDelete(config) }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmbeddedRuntimeConnectCard(
+    status: EmbeddedLettaCodeRuntimeStatus,
+    onConnect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = LettaCardDefaults.listCardColors(),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = LettaIcons.Psychology,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.screen_config_embedded_runtime_title),
+                        style = MaterialTheme.typography.listItemHeadline,
+                    )
+                    Text(
+                        text = stringResource(R.string.screen_config_embedded_runtime_disabled_placeholder),
+                        style = MaterialTheme.typography.listItemSupporting,
+                    )
+                    Text(
+                        text = stringResource(R.string.screen_config_embedded_runtime_version, status.version),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            FilledTonalButton(
+                onClick = onConnect,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.screen_config_embedded_runtime_connect))
             }
         }
     }
