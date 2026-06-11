@@ -2,6 +2,7 @@ package com.letta.mobile.data.api
 
 import android.content.Context
 import android.util.Log
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryContext
@@ -22,6 +23,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 data class ApiSession(val client: HttpClient, val baseUrl: String)
+
+class AdminApiUnavailableForLocalRuntimeException : IllegalStateException(
+    "Admin API widgets require an HTTP(S) Letta or admin-shim URL. Local LettaCode is a chat runtime selector, not an Admin API endpoint."
+)
 
 @Singleton
 open class LettaApiClient @Inject constructor(
@@ -45,9 +50,9 @@ open class LettaApiClient @Inject constructor(
     open suspend fun getClient(): HttpClient = session().client
 
     open suspend fun session(): ApiSession {
-        val config = settingsRepository.activeConfig.value
-        val url = config?.serverUrl?.trim() ?: "https://api.letta.com"
-        val token = config?.accessToken?.trim()
+        val adminConfig = resolveAdminApiConfig()
+        val url = adminConfig?.serverUrl?.trim() ?: DEFAULT_ADMIN_API_URL
+        val token = adminConfig?.accessToken?.trim()
 
         return mutex.withLock {
             if (cachedClient != null && cachedBaseUrl == url && cachedToken == token) {
@@ -68,8 +73,7 @@ open class LettaApiClient @Inject constructor(
     }
 
     open fun getBaseUrl(): String {
-        val config = settingsRepository.activeConfig.value
-        return config?.serverUrl ?: "https://api.letta.com"
+        return resolveAdminApiConfig()?.serverUrl ?: DEFAULT_ADMIN_API_URL
     }
 
     fun invalidateClient() {
@@ -77,6 +81,25 @@ open class LettaApiClient @Inject constructor(
         cachedClient = null
         cachedBaseUrl = null
         cachedToken = null
+    }
+
+    private fun resolveAdminApiConfig(): LettaConfig? {
+        val activeConfig = settingsRepository.activeConfig.value ?: return null
+
+        if (activeConfig.serverUrl.isHttpAdminUrl()) {
+            return activeConfig
+        }
+
+        return settingsRepository.configs.value
+            .asReversed()
+            .firstOrNull { it.serverUrl.isHttpAdminUrl() }
+            ?: throw AdminApiUnavailableForLocalRuntimeException()
+    }
+
+    private fun String.isHttpAdminUrl(): Boolean {
+        val normalized = trim()
+        return normalized.startsWith("https://", ignoreCase = true) ||
+            normalized.startsWith("http://", ignoreCase = true)
     }
 
     private fun createClient(apiKey: String?, baseUrl: String): HttpClient {
@@ -165,5 +188,9 @@ open class LettaApiClient @Inject constructor(
                 url(baseUrl)
             }
         }
+    }
+
+    private companion object {
+        const val DEFAULT_ADMIN_API_URL = "https://api.letta.com"
     }
 }
