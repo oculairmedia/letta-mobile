@@ -71,6 +71,7 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import com.letta.mobile.feature.chat.coordination.AdminChatA2uiCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatComposerCoordinator
+import com.letta.mobile.feature.chat.coordination.AgentRuntimeBinding
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -85,6 +86,7 @@ import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeChatSendCoordinator
+import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
@@ -476,7 +478,19 @@ internal class AdminChatViewModel @Inject constructor(
             )
         },
         markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
+        localRuntimeRouting = ::localRuntimeRouting,
     )
+
+    private fun localRuntimeRouting(): LocalRuntimeRouting {
+        if (sessionManager.current.localRuntimeBackend == null) return LocalRuntimeRouting.Remote
+        val conversationId = chatConversationCoordinator.activeConversationId ?: explicitConversationId
+        if (conversationId?.startsWith("local-conv-") == true) return LocalRuntimeRouting.LocalBound
+        return if (AgentRuntimeBinding.isLocalBound(activeAgent.value)) {
+            LocalRuntimeRouting.LocalBound
+        } else {
+            LocalRuntimeRouting.Blocked()
+        }
+    }
 
     private val chatHistoryPager: ChatHistoryPager by lazy {
         ChatHistoryPager(

@@ -22,7 +22,7 @@ import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
-import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LocalLettaBackend
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +35,7 @@ class SessionGraph internal constructor(
     val scope: CoroutineScope,
     override val agentRepository: AgentRepository,
     val allConversationsRepository: AllConversationsRepository,
-    override val channelTransport: ChannelTransport,
+    override val channelTransport: IChannelTransport,
     override val conversationRepository: ConversationRepository,
     override val cronRepository: CronRepository,
     override val archiveRepository: ArchiveRepository,

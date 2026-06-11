@@ -39,6 +39,8 @@ import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.coordination.InitialRouteMessageDeliveryGuard
+import com.letta.mobile.feature.chat.coordination.LOCAL_RUNTIME_REMOTE_AGENT_ERROR
+import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
 import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.render.ConversationState
@@ -222,6 +224,56 @@ class ChatConversationCoordinatorTest {
     }
 
     @Test
+    fun `local runtime selected with remote agent blocks remote timeline hydration`() = runTest {
+        val harness = Harness(
+            scope = this,
+            explicitConversationId = "conv-remote",
+            localRuntimeRouting = { LocalRuntimeRouting.Blocked() },
+        )
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Error(LOCAL_RUNTIME_REMOTE_AGENT_ERROR), harness.uiState.value.conversationState)
+        assertEquals(LOCAL_RUNTIME_REMOTE_AGENT_ERROR, harness.uiState.value.error)
+        assertTrue(harness.startedObservers.isEmpty())
+        assertTrue(harness.reconcileCalls.isEmpty())
+        assertEquals(1, harness.stoppedObserverCount)
+    }
+
+    @Test
+    fun `remote config with remote agent still hydrates timeline normally`() = runTest {
+        val harness = Harness(
+            scope = this,
+            explicitConversationId = "conv-remote",
+            localRuntimeRouting = { LocalRuntimeRouting.Remote },
+        )
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("conv-remote"), harness.uiState.value.conversationState)
+        assertEquals(listOf("conv-remote"), harness.startedObservers)
+        assertEquals(listOf("conv-remote" to "open"), harness.reconcileCalls)
+    }
+
+    @Test
+    fun `local-bound agent routes through local conversation path without remote reconcile`() = runTest {
+        val harness = Harness(
+            scope = this,
+            explicitConversationId = "local-conv-agent-1-existing",
+            localRuntimeRouting = { LocalRuntimeRouting.LocalBound },
+        )
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        assertEquals(ConversationState.Ready("local-conv-agent-1-existing"), harness.uiState.value.conversationState)
+        assertEquals(listOf("local-conv-agent-1-existing"), harness.startedObservers)
+        assertTrue(harness.reconcileCalls.isEmpty())
+    }
+
+    @Test
     fun `loadMessages reconciles recent messages on conversation open (letta-mobile-ork1)`() = runTest {
         val harness = Harness(scope = this, explicitConversationId = "conv-explicit")
 
@@ -255,6 +307,7 @@ class ChatConversationCoordinatorTest {
         isFreshRoute: Boolean = false,
         initialMessage: String? = null,
         pinnedExplicitConversationId: String? = null,
+        localRuntimeRouting: () -> LocalRuntimeRouting = { LocalRuntimeRouting.Remote },
     ) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)
@@ -306,6 +359,7 @@ class ChatConversationCoordinatorTest {
             sendMessageViaClientMode = { sentClientModeMessages += it },
             sendMessageViaTimeline = { sentTimelineMessages += it },
             markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
+            localRuntimeRouting = localRuntimeRouting,
         )
 
         init {
