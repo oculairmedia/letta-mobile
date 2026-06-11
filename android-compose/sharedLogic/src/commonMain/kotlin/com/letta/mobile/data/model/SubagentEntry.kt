@@ -28,6 +28,17 @@ import kotlinx.serialization.Serializable
  * Timestamps are ISO-8601 strings on the wire; mobile does not parse them
  * eagerly at this layer.
  */
+/**
+ * letta-mobile-i2f23: wire shape of the shim's per-subagent
+ * todo_progress snapshot — { completed: Int, total: Int }. Nullable
+ * with default on [SubagentEntry] so older shims parse without error.
+ */
+@Serializable
+data class SubagentTodoProgressWire(
+    val completed: Int = 0,
+    val total: Int = 0,
+)
+
 @Serializable
 data class SubagentEntry(
     @SerialName("toolCallId") val toolCallId: String,
@@ -38,6 +49,7 @@ data class SubagentEntry(
     @SerialName("subagentAgentId") val subagentAgentId: String? = null,
     @SerialName("parentRunId") val parentRunId: String? = null,
     @SerialName("startedAt") val startedAt: String? = null,
+    @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
 )
 
 object SubagentStatus {

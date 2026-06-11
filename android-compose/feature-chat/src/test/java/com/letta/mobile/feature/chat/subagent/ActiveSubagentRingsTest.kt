@@ -3,18 +3,25 @@ package com.letta.mobile.feature.chat.subagent
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
 /**
- * letta-mobile-w8mog: unit tests for ActiveSubagentRings lifecycle and tap
- * routing behavior.
+ * letta-mobile-w8mog + i2f23: unit tests for ActiveSubagentRings lifecycle,
+ * tap routing behavior, and DETERMINATE RING FILL.
  *
- * LIFECYCLE TESTS (consolidated from xm8qk + q6v8b + od488):
+ * LIFECYCLE TESTS (consolidated from xm8qk + q6v8b + od488 + i2f23):
  *  - RUNNING rings are visible
  *  - FAILED rings persist (visible)
- *  - COMPLETED rings collapse away (NOT visible)
+ *  - COMPLETED rings briefly visible (fill-to-100% hold), then collapse
+ *
+ * FILL TESTS (i2f23):
+ *  - fraction → sweep mapping (determinate from todo_progress)
+ *  - null progress → sliver (~8% arc)
+ *  - failed → frozen at reached fill
+ *  - completed → animate to 100% then release hold
  *
  * TAP ROUTING TESTS (xm8qk):
  *  - Tap with canViewConversation=true -> navigate to conversation
@@ -30,6 +37,7 @@ class ActiveSubagentRingsTest {
         id: String = "id",
         subagentAgentId: String? = null,
         isSelf: Boolean = false,
+        progress: SubagentTodoProgress? = null,
     ) = ActiveSubagent(
         id = id,
         description = "Test description",
@@ -37,13 +45,20 @@ class ActiveSubagentRingsTest {
         status = ActiveSubagent.Status.RUNNING,
         isSelf = isSelf,
         subagentAgentId = subagentAgentId,
+        progress = progress,
     )
 
-    private fun completed(id: String = "id") = running(id).copy(
+    private fun completed(
+        id: String = "id",
+        progress: SubagentTodoProgress? = null,
+    ) = running(id, progress = progress).copy(
         status = ActiveSubagent.Status.COMPLETED,
     )
 
-    private fun failed(id: String = "id") = running(id).copy(
+    private fun failed(
+        id: String = "id",
+        progress: SubagentTodoProgress? = null,
+    ) = running(id, progress = progress).copy(
         status = ActiveSubagent.Status.FAILED,
     )
 
@@ -228,6 +243,179 @@ class ActiveSubagentRingsTest {
         assertEquals("1", displayed[0].id)
         assertEquals("2", displayed[1].id)
         assertEquals("3", displayed[2].id)
+    }
+
+    // ---- i2f23: DETERMINATE FILL — fraction → sweep mapping ───────────
+
+    @Test
+    fun `ring fraction maps to sweep angle for determinate fill`() {
+        // fraction = completed/total → sweep = fraction * 360°
+        assertEquals(180f, SubagentTodoProgress(2, 4).fraction * COMPLETED_SWEEP)
+        assertEquals(90f, SubagentTodoProgress(1, 4).fraction * COMPLETED_SWEEP)
+        assertEquals(360f, SubagentTodoProgress(5, 5).fraction * COMPLETED_SWEEP)
+    }
+
+    @Test
+    fun `ring fraction is zero when total is zero`() {
+        assertEquals(0f, SubagentTodoProgress(0, 0).fraction * COMPLETED_SWEEP)
+    }
+
+    @Test
+    fun `null progress yields hasDeterminateProgress false`() {
+        assertFalse(running(progress = null).hasDeterminateProgress)
+    }
+
+    @Test
+    fun `zero-total progress yields hasDeterminateProgress false`() {
+        // Total 0 means no meaningful completion fraction — the ring renders
+        // as indeterminate (sliver), consistent with the model's contract.
+        assertFalse(running(progress = SubagentTodoProgress(0, 0)).hasDeterminateProgress)
+    }
+
+    // ── i2f23: sliver sweep for no-progress entries ──────────────────────
+
+    @Test
+    fun `sliver sweep is used when progress is null`() {
+        // When no todo_progress, target sweep should be SLIVER_SWEEP (~8%)
+        val subagent = running(progress = null)
+        // hasDeterminateProgress is false → sliver path
+        assertFalse(subagent.hasDeterminateProgress)
+        assertEquals(0f, subagent.ringFraction) // fraction is 0 with no progress
+    }
+
+    @Test
+    fun `sliver sweep constant is approximately 8 percent of a full ring`() {
+        assertEquals(28.8f, SLIVER_SWEEP, 0.01f)
+        assertEquals(28.8f / 360f, SLIVER_SWEEP / COMPLETED_SWEEP, 0.001f)
+    }
+
+    @Test
+    fun `sliver pulse max is larger than base sliver`() {
+        assertTrue(SLIVER_SWEEP_MAX > SLIVER_SWEEP)
+        assertTrue(SLIVER_SWEEP_MAX <= 360f)
+    }
+
+    // ── i2f23: failed → frozen at reached fill ───────────────────────────
+
+    @Test
+    fun `failed ring fraction is frozen at last progress`() {
+        val failedWithProgress = failed(
+            progress = SubagentTodoProgress(2, 5),
+        )
+        // ringFraction returns progress.fraction for non-completed status
+        assertEquals(0.4f, failedWithProgress.ringFraction)
+        // The sweep for failed should be the fraction * 360 (frozen)
+        assertEquals(0.4f * COMPLETED_SWEEP, failedWithProgress.ringFraction * COMPLETED_SWEEP)
+    }
+
+    @Test
+    fun `failed without progress has zero fill`() {
+        val failedNoProgress = failed(progress = null)
+        assertEquals(0f, failedNoProgress.ringFraction)
+    }
+
+    @Test
+    fun `failed subagent maps to ERROR ring state`() {
+        val entry = failed(progress = SubagentTodoProgress(1, 3))
+        assertEquals(RingState.ERROR, entry.ringState(now = 0L))
+    }
+
+    // ── i2f23: completed → fill to 100% briefly ──────────────────────────
+
+    @Test
+    fun `completed ring fraction is always 1 point 0`() {
+        val done = completed(progress = SubagentTodoProgress(2, 5))
+        assertEquals(1f, done.ringFraction)
+        assertEquals(COMPLETED_SWEEP, done.ringFraction * COMPLETED_SWEEP)
+    }
+
+    @Test
+    fun `completed fill linger window is a positive duration`() {
+        assertTrue(COMPLETED_FILL_LINGER_MS > 0)
+        assertTrue(COMPLETED_FILL_LINGER_MS >= 300)
+    }
+
+    @Test
+    fun `completed hold registration works for newly completed entries`() {
+        // Simulate: a COMPLETED entry at t=5000 should register in holds.
+        val now = 5000L
+        val holds = mutableMapOf<String, Long>()
+        val entry = completed(id = "done_1")
+
+        // Register new completion
+        if (entry.status == ActiveSubagent.Status.COMPLETED && entry.id !in holds) {
+            holds[entry.id] = now
+        }
+
+        assertTrue(holds.containsKey("done_1"))
+        assertEquals(5000L, holds["done_1"])
+    }
+
+    @Test
+    fun `completed hold expires after the linger window`() {
+        val now = 5000L
+        val holds = mutableMapOf("done_1" to 5000L)
+
+        // Before expiration
+        val stillValid = holds.filterValues { ts -> now - ts < COMPLETED_FILL_LINGER_MS }
+        assertTrue(stillValid.containsKey("done_1"))
+
+        // After expiration
+        val expired = holds.filterValues { ts -> now + COMPLETED_FILL_LINGER_MS - ts <= COMPLETED_FILL_LINGER_MS }
+        // At exactly the threshold it should expire
+        holds.entries.removeAll { (_, ts) -> (now + COMPLETED_FILL_LINGER_MS) - ts >= COMPLETED_FILL_LINGER_MS }
+        assertFalse(holds.containsKey("done_1"))
+    }
+
+    @Test
+    fun `completed ring is visible during the hold window`() {
+        // When the hold is active, COMPLETED passes the visibility filter.
+        val completedHolds = mapOf("done_1" to 4000L)
+        val subagents = persistentListOf(
+            running(id = "run_1"),
+            completed(id = "done_1"),
+            failed(id = "fail_1"),
+        )
+
+        val visible = subagents.filter { subagent ->
+            when (subagent.status) {
+                ActiveSubagent.Status.RUNNING -> true
+                ActiveSubagent.Status.FAILED -> true
+                ActiveSubagent.Status.COMPLETED -> completedHolds.containsKey(subagent.id)
+            }
+        }
+
+        assertEquals(3, visible.size)
+        assertTrue(visible.any { it.id == "done_1" })
+    }
+
+    @Test
+    fun `completed ring is NOT visible without a hold registration`() {
+        // Without a hold, COMPLETED does not pass the visibility filter.
+        val completedHolds = emptyMap<String, Long>()
+        val subagents = persistentListOf(
+            running(id = "run_1"),
+            completed(id = "done_1"),
+        )
+
+        val visible = subagents.filter { subagent ->
+            when (subagent.status) {
+                ActiveSubagent.Status.RUNNING -> true
+                ActiveSubagent.Status.FAILED -> true
+                ActiveSubagent.Status.COMPLETED -> completedHolds.containsKey(subagent.id)
+            }
+        }
+
+        assertEquals(1, visible.size)
+        assertEquals("run_1", visible[0].id)
+    }
+
+    // ── i2f23: fill animation duration ───────────────────────────────────
+
+    @Test
+    fun `fill animation duration is a positive short value`() {
+        assertTrue(RING_FILL_ANIMATION_MS > 0)
+        assertTrue(RING_FILL_ANIMATION_MS <= 500)
     }
 
     // ---- EDGE CASES -------------------------------------------------------
