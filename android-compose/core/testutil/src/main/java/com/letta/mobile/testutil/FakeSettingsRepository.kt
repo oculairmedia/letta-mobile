@@ -50,6 +50,7 @@ class FakeSettingsRepository(
     private val adminAgentIdState = MutableStateFlow<String?>(null)
     private val configsState = MutableStateFlow(initialActiveConfig?.let(::listOf).orEmpty())
     private val lastChatSelectionState = MutableStateFlow<LastChatSelection?>(null)
+    private val huggingFaceTokenState = MutableStateFlow<String?>(null)
     private val themeState = MutableStateFlow(AppTheme.SYSTEM)
     private val themePresetState = MutableStateFlow(ThemePreset.DEFAULT)
     private val dynamicColorState = MutableStateFlow(true)
@@ -72,6 +73,8 @@ class FakeSettingsRepository(
 
     override val lastChatSelection: StateFlow<LastChatSelection?> = lastChatSelectionState.asStateFlow()
 
+    override val huggingFaceToken: StateFlow<String?> = huggingFaceTokenState.asStateFlow()
+
     override fun getActiveConfig(): Flow<LettaConfig?> = activeConfigState
 
     override suspend fun saveConfig(config: LettaConfig) {
@@ -92,6 +95,11 @@ class FakeSettingsRepository(
         configsState.value = emptyList()
         activeConfigState.value = null
         lastChatSelectionState.value = null
+        huggingFaceTokenState.value = null
+    }
+
+    override suspend fun setHuggingFaceToken(token: String?) {
+        huggingFaceTokenState.value = token?.trim()?.takeIf { it.isNotBlank() }
     }
 
     override fun getTheme(): Flow<AppTheme> = themeState

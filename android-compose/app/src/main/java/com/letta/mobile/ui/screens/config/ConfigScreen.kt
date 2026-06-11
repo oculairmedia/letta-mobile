@@ -148,6 +148,7 @@ fun ConfigScreen(
                 onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
                 onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
                 onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
+                onHuggingFaceTokenChange = { viewModel.updateHuggingFaceToken(it) },
                 onImportLocalModel = {
                     localModelImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
                 },
@@ -207,6 +208,7 @@ private fun ConfigContent(
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
+    onHuggingFaceTokenChange: (String) -> Unit,
     onImportLocalModel: () -> Unit,
     onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
     onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
@@ -297,6 +299,7 @@ private fun ConfigContent(
                             onLocalModelHandleChange = onLocalModelHandleChange,
                             onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
                             onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
+                            onHuggingFaceTokenChange = onHuggingFaceTokenChange,
                             onImportLocalModel = onImportLocalModel,
                             onDownloadEmbeddedModel = onDownloadEmbeddedModel,
                             onCancelEmbeddedModelDownload = onCancelEmbeddedModelDownload,
@@ -553,6 +556,7 @@ private fun LocalModelSettingsItem(
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
+    onHuggingFaceTokenChange: (String) -> Unit,
     onImportLocalModel: () -> Unit,
     onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
     onCancelEmbeddedModelDownload: (EmbeddedModelCatalogItem) -> Unit,
@@ -569,9 +573,29 @@ private fun LocalModelSettingsItem(
             text = stringResource(R.string.screen_config_on_device_model_title),
             style = MaterialTheme.typography.bodyLarge,
         )
+        var hfTokenVisible by remember { mutableStateOf(false) }
+        OutlinedTextField(
+            value = state.huggingFaceToken,
+            onValueChange = onHuggingFaceTokenChange,
+            label = { Text(stringResource(R.string.screen_config_hugging_face_token)) },
+            placeholder = { Text(stringResource(R.string.screen_config_hugging_face_token_placeholder)) },
+            visualTransformation = if (hfTokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Key, null) },
+            trailingIcon = {
+                IconButton(onClick = { hfTokenVisible = !hfTokenVisible }) {
+                    Icon(
+                        imageVector = if (hfTokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        contentDescription = if (hfTokenVisible) "Hide token" else "Show token",
+                    )
+                }
+            },
+            singleLine = true,
+        )
         EmbeddedModelCatalogSection(
             items = state.embeddedModelCatalog,
             selectedPath = state.localModelPath,
+            hasHuggingFaceToken = state.huggingFaceToken.isNotBlank(),
             onDownload = onDownloadEmbeddedModel,
             onCancel = onCancelEmbeddedModelDownload,
             onSelect = onSelectEmbeddedModel,
@@ -661,6 +685,7 @@ private fun LocalModelSettingsItem(
 private fun EmbeddedModelCatalogSection(
     items: List<EmbeddedModelCatalogItem>,
     selectedPath: String,
+    hasHuggingFaceToken: Boolean,
     onDownload: (EmbeddedModelCatalogItem) -> Unit,
     onCancel: (EmbeddedModelCatalogItem) -> Unit,
     onSelect: (EmbeddedModelCatalogItem) -> Unit,
@@ -680,6 +705,7 @@ private fun EmbeddedModelCatalogSection(
             EmbeddedModelCatalogRow(
                 item = item,
                 selected = (item.state as? EmbeddedModelDownloadState.Downloaded)?.localPath == selectedPath,
+                hasHuggingFaceToken = hasHuggingFaceToken,
                 onDownload = { onDownload(item) },
                 onCancel = { onCancel(item) },
                 onSelect = { onSelect(item) },
@@ -692,6 +718,7 @@ private fun EmbeddedModelCatalogSection(
 private fun EmbeddedModelCatalogRow(
     item: EmbeddedModelCatalogItem,
     selected: Boolean,
+    hasHuggingFaceToken: Boolean,
     onDownload: () -> Unit,
     onCancel: () -> Unit,
     onSelect: () -> Unit,
@@ -711,6 +738,20 @@ private fun EmbeddedModelCatalogRow(
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (entry.requiresAuth) {
+                AssistChip(
+                    enabled = false,
+                    onClick = {},
+                    label = { Text(stringResource(R.string.screen_config_embedded_model_requires_hf_token_badge)) },
+                )
+                if (!hasHuggingFaceToken) {
+                    Text(
+                        text = stringResource(R.string.screen_config_embedded_model_requires_hf_token_message),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (!entry.isSupported) {
                 AssistChip(
                     enabled = false,
@@ -725,8 +766,21 @@ private fun EmbeddedModelCatalogRow(
                         if (state is EmbeddedModelDownloadState.Failed) {
                             Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
-                        OutlinedButton(onClick = onDownload, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.screen_config_embedded_model_download))
+                        val downloadEnabled = !entry.requiresAuth || hasHuggingFaceToken
+                        OutlinedButton(
+                            onClick = onDownload,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = downloadEnabled,
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (downloadEnabled) {
+                                        R.string.screen_config_embedded_model_download
+                                    } else {
+                                        R.string.screen_config_embedded_model_add_hf_token
+                                    }
+                                )
+                            )
                         }
                     }
                     is EmbeddedModelDownloadState.Downloading -> {

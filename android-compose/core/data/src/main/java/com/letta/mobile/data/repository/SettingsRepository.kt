@@ -97,6 +97,9 @@ class SettingsRepository internal constructor(
     private val _lastChatSelection = MutableStateFlow<LastChatSelection?>(null)
     override val lastChatSelection: StateFlow<LastChatSelection?> = _lastChatSelection.asStateFlow()
 
+    private val _huggingFaceToken = MutableStateFlow<String?>(null)
+    override val huggingFaceToken: StateFlow<String?> = _huggingFaceToken.asStateFlow()
+
     private object Keys {
         val CONFIGS = stringPreferencesKey("configs")
         val ACTIVE_CONFIG_ID = stringPreferencesKey("active_config_id")
@@ -138,6 +141,7 @@ class SettingsRepository internal constructor(
         // so internal builds get the new behaviour automatically; release builds
         // keep the legacy fresh-chat path until the flag is flipped explicitly.
         val RESUME_RECENT_CONVERSATION = booleanPreferencesKey("resume_recent_conversation")
+        val HUGGING_FACE_TOKEN = stringPreferencesKey("hugging_face_token")
     }
 
     init {
@@ -146,6 +150,7 @@ class SettingsRepository internal constructor(
         _favoriteAgentId.value = secureSettingsStore.getString(Keys.FAVORITE_AGENT_ID.name)
         _adminAgentId.value = secureSettingsStore.getString(Keys.ADMIN_AGENT_ID.name)
         _lastChatSelection.value = loadLastChatSelection()
+        _huggingFaceToken.value = secureSettingsStore.getString(Keys.HUGGING_FACE_TOKEN.name)?.takeIf { it.isNotBlank() }
     }
 
     private fun loadConfigs() {
@@ -308,6 +313,17 @@ class SettingsRepository internal constructor(
         _favoriteAgentId.update { null }
         _adminAgentId.update { null }
         _lastChatSelection.update { null }
+        _huggingFaceToken.update { null }
+    }
+
+    override suspend fun setHuggingFaceToken(token: String?) = withContext(Dispatchers.IO) {
+        val normalized = token?.trim()?.takeIf { it.isNotBlank() }
+        _huggingFaceToken.update { normalized }
+        if (normalized != null) {
+            secureSettingsStore.putString(Keys.HUGGING_FACE_TOKEN.name, normalized)
+        } else {
+            secureSettingsStore.remove(Keys.HUGGING_FACE_TOKEN.name)
+        }
     }
 
     override suspend fun setTheme(theme: AppTheme) {

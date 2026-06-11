@@ -47,6 +47,7 @@ data class ConfigUiState(
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
     val localModelMaxTokens: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS,
+    val huggingFaceToken: String = "",
     val isImportingLocalModel: Boolean = false,
     val embeddedModelCatalog: List<EmbeddedModelCatalogItem> = emptyList(),
     val embeddedRuntimeStatus: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
@@ -115,6 +116,7 @@ class ConfigViewModel @Inject constructor(
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
                         localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
+                        huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
@@ -129,6 +131,7 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
+                        huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
@@ -236,6 +239,14 @@ class ConfigViewModel @Inject constructor(
     fun updateLocalModelMaxTokens(maxTokens: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
+    }
+
+    fun updateHuggingFaceToken(token: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(huggingFaceToken = token))
+        viewModelScope.launch {
+            settingsRepository.setHuggingFaceToken(token)
+        }
     }
 
     fun downloadEmbeddedModel(item: EmbeddedModelCatalogItem) {

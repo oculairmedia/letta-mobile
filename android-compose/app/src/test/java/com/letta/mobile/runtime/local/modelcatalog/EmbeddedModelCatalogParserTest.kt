@@ -31,7 +31,30 @@ class EmbeddedModelCatalogParserTest {
         assertEquals("google/gemma-litert-lm", entries.single().modelId)
         assertEquals("gemma.litertlm", entries.single().modelFile)
         assertEquals(4096, entries.single().defaultConfig.maxTokens)
+        assertFalse(entries.single().requiresAuth)
         assertTrue(entries.single().isSupported)
+    }
+
+    @Test
+    fun parse_readsRequiresAuthMetadata() {
+        val entries = EmbeddedModelCatalogParser().parse(
+            """
+            [
+              {
+                "name": "Gated Gemma LiteRT-LM",
+                "modelId": "google/gated",
+                "modelFile": "gated.litertlm",
+                "sizeInBytes": 1024,
+                "estimatedPeakMemoryInBytes": 2048,
+                "defaultConfig": { "maxTokens": 4096, "accelerators": ["cpu"] },
+                "taskTypes": ["chat"],
+                "requiresAuth": true
+              }
+            ]
+            """.trimIndent()
+        )
+
+        assertTrue(entries.single().requiresAuth)
     }
 
     @Test
