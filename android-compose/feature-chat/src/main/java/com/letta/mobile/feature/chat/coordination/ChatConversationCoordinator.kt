@@ -21,6 +21,29 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionState
+import com.letta.mobile.data.model.Agent
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+
+internal const val LOCAL_RUNTIME_REMOTE_AGENT_ERROR = "This agent is remote; create/select a local-runtime agent to use Local LettaCode."
+
+internal sealed interface LocalRuntimeRouting {
+    data object Remote : LocalRuntimeRouting
+    data object LocalBound : LocalRuntimeRouting
+    data class Blocked(val message: String = LOCAL_RUNTIME_REMOTE_AGENT_ERROR) : LocalRuntimeRouting
+}
+
+internal object AgentRuntimeBinding {
+    private val metadataKeys = setOf("runtime", "runtime_id", "runtimeId", "runtime_provider", "runtimeProvider")
+
+    fun isLocalBound(agent: Agent?): Boolean {
+        if (agent == null) return false
+        if (agent.id.value.startsWith("local-agent-")) return true
+        return agent.metadata.any { (key, value) ->
+            key in metadataKeys && value.jsonPrimitive.contentOrNull?.startsWith("local-") == true
+        }
+    }
+}
 
 private sealed interface ClientModeBootstrapState {
     data object Idle : ClientModeBootstrapState
@@ -70,6 +93,7 @@ internal class ChatConversationCoordinator(
     private val sendMessageViaClientMode: (String) -> Unit,
     private val sendMessageViaTimeline: (String) -> Unit,
     private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
+    private val localRuntimeRouting: () -> LocalRuntimeRouting = { LocalRuntimeRouting.Remote },
 ) {
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
@@ -206,6 +230,29 @@ internal class ChatConversationCoordinator(
     }
 
     private suspend fun resolveTimelineConversation(isFirstResolve: Boolean) {
+        when (val route = localRuntimeRouting()) {
+            LocalRuntimeRouting.Remote -> Unit
+            LocalRuntimeRouting.LocalBound -> {
+                resolveClientModeConversation(isFirstResolve)
+                return
+            }
+            is LocalRuntimeRouting.Blocked -> {
+                stopTimelineObserver()
+                currentConversationTracker.setCurrent(null)
+                updateSessionState { ChatSessionReducer.conversationLoadFailed(it, route.message) }
+                uiState.value = uiState.value.copy(
+                    messages = persistentListOf(),
+                    messageListChange = ChatMessageListChange.Full,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                    isStreaming = false,
+                    isAgentTyping = false,
+                    error = route.message,
+                )
+                return
+            }
+        }
+
         // letta-mobile-9cb37: when the route explicitly asked for a conversation
         // (e.g. the subagent "view conversation" shortcut targeting `default`),
         // that request must win on the first resolve — even across an agent

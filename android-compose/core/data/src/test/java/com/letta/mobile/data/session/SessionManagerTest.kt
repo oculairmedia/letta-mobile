@@ -57,6 +57,8 @@ import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -131,6 +133,7 @@ class SessionManagerTest {
         assertEquals("https://backend-a.example.test", graph.backendDescriptor.label)
         assertTrue(graph.backendDescriptor.capabilities.supportsMemFs)
         assertTrue(graph.backendDescriptor.capabilities.supportsApprovals)
+        assertTrue(graph.channelTransport is ChannelTransport)
     }
 
     @Test
@@ -201,6 +204,7 @@ class SessionManagerTest {
         assertEquals("Local LettaCode", graph.backendDescriptor.label)
         assertTrue(graph.backendDescriptor.capabilities.supportsMemFs)
         assertTrue(graph.backendDescriptor.capabilities.supportsTools)
+        assertTrue(graph.channelTransport is NoOpChannelTransport)
 
         val backend = graph.localRuntimeBackend ?: error("Expected local runtime backend")
         val emitted = backend.runTurn(
