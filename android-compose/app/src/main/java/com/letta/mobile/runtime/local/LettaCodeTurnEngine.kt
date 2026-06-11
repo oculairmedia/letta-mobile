@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
@@ -13,16 +14,16 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 
 interface LettaCodeHeadlessClient {
-    fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft>
+    fun runTurn(command: TurnCommand, config: LettaConfig): Flow<RuntimeEventDraft>
 }
 
-@Singleton
-class LettaCodeTurnEngine @Inject constructor(
+class LettaCodeTurnEngine(
     private val client: LettaCodeHeadlessClient,
+    private val config: LettaConfig,
 ) : TurnEngine {
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
         emit(command.runStatus(RuntimeRunStatus.Running))
-        client.runTurn(command).collect { draft ->
+        client.runTurn(command, config).collect { draft ->
             emit(draft)
         }
     }.catch { error ->
@@ -45,4 +46,11 @@ class LettaCodeTurnEngine @Inject constructor(
         source = RuntimeEventSource.LocalRuntime,
         payload = RuntimeEventPayload.RunLifecycleChanged(status = status, reason = reason),
     )
+}
+
+@Singleton
+class LettaCodeTurnEngineFactory @Inject constructor(
+    private val client: LettaCodeHeadlessClient,
+) {
+    fun create(config: LettaConfig): TurnEngine = LettaCodeTurnEngine(client, config)
 }
