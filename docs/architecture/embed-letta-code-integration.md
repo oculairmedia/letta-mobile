@@ -17,8 +17,9 @@ a live Day 0 spike confirming Node-version compatibility.
 - Letta Code is TS/Node end-to-end and already has `letta --backend local`.
 - Instead of reimplementing the local runtime in Kotlin, embed nodejs-mobile in
   the Android app and ship actual `letta.js` as the on-device runtime.
-- Day 0 result: `letta.js` from `@letta-ai/letta-code` 0.26.2 boots on Node
-  18.20.8. The `engines >=22.19.0` constraint is install-time only.
+- Day 0 result: `letta.js` from `@letta-ai/letta-code` 0.26.1 boots on Node
+  18.20.8. Newer 0.26.x releases require Node `>=22.19.0` and must not be
+  bundled with the nodejs-mobile v18 runtime.
 - Use nodejs-mobile v18.20.4 prebuilt, following the SeekerClaw bridge pattern.
 - The local runtime slot must remain pluggable so LettaCode can coexist with
   future engines such as Koog.
@@ -62,7 +63,7 @@ The Android implementation follows these constraints:
   a vendored `libnode.so` or a network npm install.
 - Build with `-PembedLettaCodeNative=true -PembedLettaCodeAssets=true` after
   adding nodejs-mobile `libnode` under `android-compose/app/libnode`.
-- `prepareEmbeddedLettaCodeAssets` installs `@letta-ai/letta-code@0.26.2` into
+- `prepareEmbeddedLettaCodeAssets` installs `@letta-ai/letta-code@0.26.1` into
   generated APK assets when asset packaging is enabled.
 - The JNI bridge starts Node once, writes user/control frames to stdin, and
   emits stdout JSON lines into the Kotlin stream-json mapper.

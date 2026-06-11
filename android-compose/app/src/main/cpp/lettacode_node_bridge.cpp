@@ -105,6 +105,11 @@ void ApplyAndroidLibuvMitigations() {
     SetEnvDefault("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16");
 }
 
+void DisableStdStreamBuffering() {
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+}
+
 void LogAndroidResourceProbe() {
     const std::string cgroup = ReadSmallFile("/proc/self/cgroup");
     if (cgroup.empty()) {
@@ -290,6 +295,7 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
         cleanupRedirects();
         return -1;
     }
+    DisableStdStreamBuffering();
 
     gStopRequested.store(false);
     std::thread(PumpFdLines, stdoutPipe[0], gStdoutMethod).detach();
