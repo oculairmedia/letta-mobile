@@ -57,9 +57,9 @@ import kotlinx.collections.immutable.ImmutableList
  *    todo_progress arrives the ring transitions to determinate fill
  *    (0→360° sweep tracked to completed/total).
  *  - RUNNING: tap → open TodoWrite sheet; long press → navigate to the
- *    subagent's own conversation when available (FIX: uses
- *    SubagentEntry.subagentAgentId + SubagentEntry.subagentConversationId or
- *    default conversation, NOT the parent conversation).
+ *    subagent's own conversation only when the actual
+ *    SubagentEntry.subagentConversationId is present or resolved. Missing ids
+ *    fall back to the TodoWrite sheet; mobile never guesses parent/default.
  *  - COMPLETED: animate fill to 100% briefly (~300ms) then collapse away
  *    (silent success — NO lingering green checkmark)
  *  - FAILED: ring turns red (error color token), FROZEN at whatever fill it

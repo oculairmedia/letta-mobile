@@ -37,8 +37,9 @@ import kotlinx.coroutines.flow.stateIn
  *  - letta-mobile-vo9y1: `subagentAgentId` (`agent-local-*`) is carried
  *    through so the bar can offer "view conversation" once the shim has
  *    correlated the dispatch to a concrete subagent run.
- *  - letta-mobile-ww9iu: `subagentConversationId` is carried through when
- *    present; older shims fall back to the subagent default conversation.
+ *  - letta-mobile-ww9iu/r2sh2: `subagentConversationId` is carried through
+ *    when present; older shims are refreshed once on navigation and otherwise
+ *    refuse navigation rather than guessing `default` or the parent.
  *
  * letta-mobile-29h9u — lingering terminals: the shim drops a subagent from
  * the next snapshot once it finishes (or flips it to a terminal status), so a
@@ -58,6 +59,15 @@ class WsActiveSubagentSource(
 ) : ActiveSubagentSource {
 
     override suspend fun todos(toolCallId: String) = repository.todos(toolCallId)
+
+    override suspend fun resolveConversationId(subagent: ActiveSubagent): Result<String?> {
+        subagent.subagentNavigationConversationId?.let { return Result.success(it) }
+        return repository.refresh().map { entries ->
+            entries.firstOrNull { entry ->
+                entry.toolCallId == subagent.id || entry.taskId == subagent.id
+            }?.subagentConversationId?.takeIf { it.isNotBlank() }
+        }
+    }
 
     override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
         repository.activeSubagentsFlow()

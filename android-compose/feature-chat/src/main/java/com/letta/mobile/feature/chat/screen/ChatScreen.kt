@@ -43,6 +43,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,6 +103,7 @@ import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.launch
 import kotlin.math.max
 
 /**
@@ -158,6 +160,7 @@ internal fun ChatScreen(
 
     LettaChatTheme(fontScale = activeFontScale) {
         var floatingBannerMessage by remember { mutableStateOf("") }
+        val subagentNavigationScope = rememberCoroutineScope()
         val snackbarDispatcher = LocalSnackbarDispatcher.current
         val density = LocalDensity.current
         val haptic = LocalHapticFeedback.current
@@ -482,15 +485,28 @@ internal fun ChatScreen(
                             )
                         },
                         onViewConversation = { subagent ->
-                            subagent.subagentAgentId
-                                ?.takeIf { it.isNotBlank() }
-                                ?.let { agentId ->
-                                    HapticEffects.longPress(haptic)
-                                    onViewSubagentConversation?.invoke(
-                                        agentId,
-                                        subagent.subagentNavigationConversationId,
-                                    )
+                            subagentNavigationScope.launch {
+                                val agentId = subagent.subagentAgentId?.takeIf { it.isNotBlank() }
+                                val conversationId = if (agentId == null) {
+                                    null
+                                } else {
+                                    resolvedSubagentSource.resolveConversationId(subagent)
+                                        .getOrNull()
+                                        ?.takeIf { it.isNotBlank() }
                                 }
+                                if (agentId != null && conversationId != null && onViewSubagentConversation != null) {
+                                    HapticEffects.longPress(haptic)
+                                    onViewSubagentConversation.invoke(agentId, conversationId)
+                                } else {
+                                    tappedSubagentTarget = SubagentTodoSheetTarget(
+                                        toolCallId = subagent.id,
+                                        description = subagent.description,
+                                        subagentAgentId = subagent.subagentAgentId,
+                                        subagentConversationId = subagent.subagentConversationId,
+                                    )
+                                    floatingBannerMessage = "Subagent conversation is not available yet"
+                                }
+                            }
                         },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -581,12 +597,11 @@ internal fun ChatScreen(
                         onViewConversation = target.subagentAgentId
                             ?.takeIf { it.isNotBlank() && onViewSubagentConversation != null }
                             ?.let { agentId ->
-                                {
-                                    tappedSubagentTarget = null
-                                    onViewSubagentConversation?.invoke(
-                                        agentId,
-                                        target.subagentNavigationConversationId,
-                                    )
+                                target.subagentNavigationConversationId?.let { conversationId ->
+                                    {
+                                        tappedSubagentTarget = null
+                                        onViewSubagentConversation?.invoke(agentId, conversationId)
+                                    }
                                 }
                             },
                     )
