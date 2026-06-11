@@ -31,6 +31,31 @@ sealed interface EmbeddedModelDownloadState {
     data object Cancelled : EmbeddedModelDownloadState
 }
 
+fun shouldPublishEmbeddedModelProgress(
+    previousBytesDownloaded: Long?,
+    bytesDownloaded: Long,
+    totalBytes: Long?,
+): Boolean {
+    val minDelta = totalBytes?.takeIf { it > 0L }?.let {
+        (it / EMBEDDED_MODEL_PROGRESS_UPDATE_STEPS).coerceAtLeast(MIN_EMBEDDED_MODEL_PROGRESS_UPDATE_BYTES)
+    } ?: MIN_EMBEDDED_MODEL_PROGRESS_UPDATE_BYTES
+    return previousBytesDownloaded == null ||
+        bytesDownloaded >= (totalBytes ?: Long.MAX_VALUE) ||
+        bytesDownloaded - previousBytesDownloaded >= minDelta
+}
+
+fun sanitizeEmbeddedModelDownloadFailure(message: String?): String =
+    message
+        ?.lineSequence()
+        ?.firstOrNull()
+        ?.take(MAX_EMBEDDED_MODEL_FAILURE_MESSAGE_CHARS)
+        ?.takeIf { it.isNotBlank() }
+        ?: "Download failed."
+
+private const val MIN_EMBEDDED_MODEL_PROGRESS_UPDATE_BYTES = 1L * 1024L * 1024L
+private const val EMBEDDED_MODEL_PROGRESS_UPDATE_STEPS = 100L
+private const val MAX_EMBEDDED_MODEL_FAILURE_MESSAGE_CHARS = 160
+
 data class EmbeddedModelCatalogItem(
     val entry: EmbeddedModelCatalogEntry,
     val state: EmbeddedModelDownloadState,
@@ -91,7 +116,7 @@ class AssetEmbeddedModelRepository @Inject constructor(
                     if (state.value == EmbeddedModelDownloadState.Cancelled) throw CancellationException()
                     output.write(buffer, 0, read)
                     downloaded += read
-                    state.value = EmbeddedModelDownloadState.Downloading(downloaded, entry.sizeInBytes)
+                    publishProgress(state, downloaded, entry.sizeInBytes)
                 }
             }
             if (!currentCoroutineContext().isActive || state.value == EmbeddedModelDownloadState.Cancelled) throw CancellationException()
@@ -113,7 +138,7 @@ class AssetEmbeddedModelRepository @Inject constructor(
             throw e
         } catch (e: Exception) {
             temp.delete()
-            state.value = EmbeddedModelDownloadState.Failed(e.message ?: "Download failed.")
+            state.value = EmbeddedModelDownloadState.Failed(e.safeDownloadFailureMessage())
         } finally {
             publishCatalog()
         }
@@ -143,6 +168,19 @@ class AssetEmbeddedModelRepository @Inject constructor(
 
     private fun stateFor(entry: EmbeddedModelCatalogEntry): MutableStateFlow<EmbeddedModelDownloadState> =
         downloadStates.getOrPut(entry.id) { MutableStateFlow(EmbeddedModelDownloadState.Idle) }
+
+    private fun publishProgress(
+        state: MutableStateFlow<EmbeddedModelDownloadState>,
+        downloaded: Long,
+        totalBytes: Long?,
+    ) {
+        val previous = state.value as? EmbeddedModelDownloadState.Downloading
+        if (shouldPublishEmbeddedModelProgress(previous?.bytesDownloaded, downloaded, totalBytes)) {
+            state.value = EmbeddedModelDownloadState.Downloading(downloaded, totalBytes)
+        }
+    }
+
+    private fun Throwable.safeDownloadFailureMessage(): String = sanitizeEmbeddedModelDownloadFailure(message)
 
     private fun huggingFaceTokenFor(url: String): String? =
         settingsRepository.huggingFaceToken.value?.takeIf { it.isNotBlank() && url.isHuggingFaceUrl() }

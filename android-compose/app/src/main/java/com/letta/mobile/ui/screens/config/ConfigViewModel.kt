@@ -244,9 +244,6 @@ class ConfigViewModel @Inject constructor(
     fun updateHuggingFaceToken(token: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(currentState.copy(huggingFaceToken = token))
-        viewModelScope.launch {
-            settingsRepository.setHuggingFaceToken(token)
-        }
     }
 
     fun downloadEmbeddedModel(item: EmbeddedModelCatalogItem) {
@@ -365,6 +362,7 @@ class ConfigViewModel @Inject constructor(
                         }
                     }
                 }
+                settingsRepository.setHuggingFaceToken(state.huggingFaceToken.trim().ifBlank { null })
                 // letta-mobile-cdlk: createNew bypasses the activeConfig
                 // id lookup so '+ Add server' in the backend-switcher sheet
                 // actually creates a new entry instead of overwriting the
