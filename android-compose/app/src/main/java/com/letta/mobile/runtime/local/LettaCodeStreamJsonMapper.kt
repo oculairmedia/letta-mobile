@@ -7,6 +7,7 @@ import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolApprovalId
 import com.letta.mobile.runtime.ToolApprovalRequest
+import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
@@ -38,6 +39,8 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
             }
             "message" -> root.messageDraft(command)?.let(::listOf).orEmpty()
             "control_request" -> root.approvalRequestDraft(command)?.let(::listOf).orEmpty()
+            "tool_call", "tool_call_message" -> root.toolCallDraft(command)?.let(::listOf).orEmpty()
+            "tool_return", "tool_return_message" -> root.toolReturnDraft(command)?.let(::listOf).orEmpty()
             "error" -> listOf(
                 command.runStatus(
                     status = RuntimeRunStatus.Failed,
@@ -80,6 +83,9 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
         if (request.string("subtype") != "can_use_tool") return null
         val toolCallId = request.string("tool_call_id")?.takeIf { it.isNotBlank() } ?: return null
         val toolName = request.string("tool_name")?.takeIf { it.isNotBlank() } ?: return null
+        val requestId = string("request_id")
+            ?: request.string("request_id")
+            ?: "perm-$toolCallId"
         val inputPreview = request["input"]?.toString()
         return RuntimeEventDraft(
             backendId = command.backendId,
@@ -90,12 +96,68 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.ApprovalRequested(
                 ToolApprovalRequest(
-                    approvalId = ToolApprovalId("letta-code:$toolCallId"),
+                    approvalId = ToolApprovalId(requestId),
                     callId = ToolCallId(toolCallId),
                     toolName = ToolName(toolName),
                     prompt = "Allow LettaCode to run $toolName?",
                     argumentsPreview = inputPreview,
                 )
+            ),
+        )
+    }
+
+    private fun JsonObject.toolCallDraft(command: TurnCommand): RuntimeEventDraft? {
+        val call = (this["tool_call"] as? JsonObject)
+            ?: firstObject(this["tool_calls"])
+            ?: this
+        val toolCallId = call.string("id")
+            ?: call.string("tool_call_id")
+            ?: string("tool_call_id")
+            ?: return null
+        val toolName = call.string("name")
+            ?: call.string("tool_name")
+            ?: call.functionName()
+            ?: string("tool_name")
+            ?: return null
+        val argumentsJson = call["arguments"]?.toString()
+            ?: call["args"]?.toString()
+            ?: (call["function"] as? JsonObject)?.get("arguments")?.toString()
+        return RuntimeEventDraft(
+            backendId = command.backendId,
+            runtimeId = command.runtimeId,
+            agentId = command.agentId,
+            conversationId = command.conversationId,
+            runId = runId(),
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.ToolCallObserved(
+                toolCallId = ToolCallId(toolCallId),
+                toolName = ToolName(toolName),
+                argumentsJson = argumentsJson,
+            ),
+        )
+    }
+
+    private fun JsonObject.toolReturnDraft(command: TurnCommand): RuntimeEventDraft? {
+        val toolCallId = string("tool_call_id")
+            ?: string("id")
+            ?: return null
+        val body = textContent(this["content"])
+            ?: string("func_response")
+            ?: string("message")
+            ?: string("body")
+            ?: string("error")
+            ?: return null
+        return RuntimeEventDraft(
+            backendId = command.backendId,
+            runtimeId = command.runtimeId,
+            agentId = command.agentId,
+            conversationId = command.conversationId,
+            runId = runId(),
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.ToolReturnObserved(
+                toolCallId = ToolCallId(toolCallId),
+                status = toolExecutionStatus(),
+                body = body,
             ),
         )
     }
@@ -134,6 +196,23 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
 
     private fun JsonObject.runId(): RunId? =
         string("run_id")?.let(::RunId)
+
+    private fun JsonObject.functionName(): String? =
+        (this["function"] as? JsonObject)?.string("name")
+
+    private fun JsonObject.toolExecutionStatus(): ToolExecutionStatus {
+        val status = string("status") ?: string("tool_return_status")
+        return when (status) {
+            "success", "succeeded", "ok" -> ToolExecutionStatus.Succeeded
+            "error", "failed", "failure" -> ToolExecutionStatus.Failed
+            "cancelled", "canceled" -> ToolExecutionStatus.Cancelled
+            "running" -> ToolExecutionStatus.Running
+            else -> ToolExecutionStatus.Succeeded
+        }
+    }
+
+    private fun firstObject(element: JsonElement?): JsonObject? =
+        (element as? JsonArray)?.firstNotNullOfOrNull { it as? JsonObject }
 
     private fun JsonObject.withEventMetadata(event: JsonObject): JsonObject =
         JsonObject(

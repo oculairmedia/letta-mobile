@@ -6,6 +6,7 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.RuntimeId
+import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import org.junit.Assert.assertEquals
@@ -74,15 +75,77 @@ class LettaCodeStreamJsonMapperTest {
         )
 
         val payload = drafts.single().payload as RuntimeEventPayload.ApprovalRequested
-        assertEquals("letta-code:call-1", payload.request.approvalId.value)
+        assertEquals("perm-call-1", payload.request.approvalId.value)
         assertEquals("call-1", payload.request.callId.value)
         assertEquals("Write", payload.request.toolName.value)
         assertTrue(payload.request.argumentsPreview?.contains("README.md") == true)
     }
 
     @Test
+    fun `maps tool approval request id independently from tool call id`() {
+        val drafts = mapper.mapLine(
+            """{"type":"control_request","request_id":"approval-random-123","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ApprovalRequested
+        assertEquals("approval-random-123", payload.request.approvalId.value)
+        assertEquals("call-1", payload.request.callId.value)
+    }
+
+    @Test
+    fun `maps openai compatible tool call payload`() {
+        val drafts = mapper.mapLine(
+            """{"type":"tool_call","run_id":"run-1","tool_calls":[{"id":"call-1","function":{"name":"Write","arguments":{"file_path":"README.md"}}}]}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolCallObserved
+        assertEquals("call-1", payload.toolCallId.value)
+        assertEquals("Write", payload.toolName.value)
+        assertTrue(payload.argumentsJson?.contains("README.md") == true)
+        assertEquals("run-1", drafts.single().runId?.value)
+    }
+
+    @Test
+    fun `maps tool return payload`() {
+        val drafts = mapper.mapLine(
+            """{"type":"tool_return_message","run_id":"run-1","tool_call_id":"call-1","status":"error","func_response":"permission denied"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolReturnObserved
+        assertEquals("call-1", payload.toolCallId.value)
+        assertEquals(ToolExecutionStatus.Failed, payload.status)
+        assertEquals("permission denied", payload.body)
+        assertEquals("run-1", drafts.single().runId?.value)
+    }
+
+    @Test
+    fun `maps error frame to failed lifecycle`() {
+        val drafts = mapper.mapLine(
+            """{"type":"error","run_id":"run-1","message":"provider failed"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.RunLifecycleChanged
+        assertEquals(RuntimeRunStatus.Failed, payload.status)
+        assertEquals("provider failed", payload.reason)
+        assertEquals("run-1", drafts.single().runId?.value)
+    }
+
+    @Test
     fun `ignores non-json runtime log lines`() {
         assertEquals(emptyList<RuntimeEventPayload>(), mapper.mapLine("plain log", command()).map { it.payload })
+    }
+
+    @Test
+    fun `ignores malformed json and unknown stream events`() {
+        assertEquals(emptyList<RuntimeEventPayload>(), mapper.mapLine("{bad-json", command()).map { it.payload })
+        assertEquals(
+            emptyList<RuntimeEventPayload>(),
+            mapper.mapLine("""{"type":"stream_event","event":{"type":"future_event","payload":true}}""", command()).map { it.payload },
+        )
     }
 
     private fun command(): TurnCommand = TurnCommand(
