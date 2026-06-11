@@ -137,8 +137,8 @@ val computedVersionCode = computeVersionCode(computedVersionName)
 
 logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$computedVersionCode")
 
-val embeddedLettaCodeVersion = "0.26.2"
-val embeddedLettaCodeIntegrity = "sha512-J8dqAXCrQMlZNh81vTMj5q6E6iH0ZrNc8mSrWyv4h92Dq+qD4XqjC6H1f9HyX84zLIL3LcMqZk7itlDoEnHNiQ=="
+val embeddedLettaCodeVersion = "0.26.1"
+val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
