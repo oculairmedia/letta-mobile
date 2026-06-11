@@ -6,6 +6,8 @@ import com.letta.mobile.data.local.RoomRuntimeEventOutbox
 import com.letta.mobile.data.session.LocalRuntimeProvider
 import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
+import com.letta.mobile.runtime.local.BuildConfigEmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.LettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.LettaCodeNodeBridge
 import com.letta.mobile.runtime.local.LettaCodeRuntimeController
@@ -46,6 +48,12 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideLettaCodeNodeBridge(bridge: NativeLettaCodeNodeBridge): LettaCodeNodeBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideEmbeddedLettaCodeRuntimeStatusProvider(
+        provider: BuildConfigEmbeddedLettaCodeRuntimeStatusProvider,
+    ): EmbeddedLettaCodeRuntimeStatusProvider = provider
 
     @Provides
     @IntoSet
