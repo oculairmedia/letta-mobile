@@ -43,6 +43,18 @@
         android:theme="@style/Theme.LettaMobile">
 
         <!--
+          LiteRT GPU delegate (letta-mobile-37uvo): on Android 12+ vendor
+          native libraries must be declared or the linker namespace blocks
+          them — without these, OpenCL fails to dlopen (libvndksupport.so)
+          and GPU inference cannot initialize. libOpenCL-pixel.so is the
+          Pixel/Tensor variant. required=false keeps installs working on
+          devices without the libs.
+        -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-car.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false" />
+
+        <!--
           Sentry configuration.
 
           The SDK is initialized programmatically in `SentryInitializer`
