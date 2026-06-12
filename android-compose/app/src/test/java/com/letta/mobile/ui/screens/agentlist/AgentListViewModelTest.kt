@@ -225,6 +225,68 @@ class AgentListViewModelTest {
     }
 
     @Test
+    fun `create form remote missing model fields remains enabled with server default help`() = runTest {
+        val validation = validateCreateAgentForm(
+            name = "Remote",
+            runtimeOption = AgentCreateRuntimeOption.REMOTE,
+            localReadiness = LocalLettaCodeCreateReadiness(),
+        )
+
+        assertTrue(validation.enabled)
+        assertNull(validation.disabledReason)
+        assertEquals(
+            "Model and embedding are optional; the server default will be used if left blank.",
+            remoteCreateAgentModelHelp(model = "", embedding = ""),
+        )
+    }
+
+    @Test
+    fun `create form local missing prerequisites reports exact blocker`() = runTest {
+        val validation = validateCreateAgentForm(
+            name = "Local",
+            runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE,
+            localReadiness = LocalLettaCodeCreateReadiness(
+                runtimeEnabled = true,
+                activeConfigIsLocal = true,
+                modelDownloaded = false,
+                modelSelected = false,
+            ),
+        )
+
+        assertFalse(validation.enabled)
+        assertEquals("Download or import a model in Settings before creating a local agent.", validation.disabledReason)
+    }
+
+    @Test
+    fun `create form local ready does not require remote model fields`() = runTest {
+        val validation = validateCreateAgentForm(
+            name = "Local",
+            runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE,
+            localReadiness = LocalLettaCodeCreateReadiness(
+                runtimeEnabled = true,
+                activeConfigIsLocal = true,
+                modelDownloaded = true,
+                modelSelected = true,
+            ),
+        )
+
+        assertTrue(validation.enabled)
+        assertNull(validation.disabledReason)
+    }
+
+    @Test
+    fun `create form missing name reports disabled reason`() = runTest {
+        val validation = validateCreateAgentForm(
+            name = "",
+            runtimeOption = AgentCreateRuntimeOption.REMOTE,
+            localReadiness = LocalLettaCodeCreateReadiness(),
+        )
+
+        assertFalse(validation.enabled)
+        assertEquals("Enter an agent name to enable Create.", validation.disabledReason)
+    }
+
+    @Test
     fun `importAgent forwards safety flags and returns imported ids`() = runTest {
         coEvery {
             agentRepository.importAgent(

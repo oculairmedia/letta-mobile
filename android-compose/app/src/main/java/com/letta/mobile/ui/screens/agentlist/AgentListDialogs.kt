@@ -62,6 +62,13 @@ internal fun CreateAgentDialog(
     var selectedToolIds by remember { mutableStateOf<List<String>>(emptyList()) }
     var runtimeOption by remember { mutableStateOf(AgentCreateRuntimeOption.REMOTE) }
     var showToolPicker by remember { mutableStateOf(false) }
+    val validation = remember(name, runtimeOption, localReadiness) {
+        validateCreateAgentForm(
+            name = name,
+            runtimeOption = runtimeOption,
+            localReadiness = localReadiness,
+        )
+    }
     val embeddingDropdownModels = remember(embeddingModels) {
         embeddingModels.map {
             LlmModel(
@@ -79,13 +86,13 @@ internal fun CreateAgentDialog(
         confirmText = stringResource(R.string.action_create),
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
-        confirmEnabled = name.isNotBlank() && if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) localReadiness.ready else model.isNotBlank() && embedding.isNotBlank(),
+        confirmEnabled = validation.enabled,
         onConfirm = {
             onCreate(AgentCreateParams(
                 name = name,
                 description = description.ifBlank { null },
-                model = model,
-                embedding = embedding,
+                model = model.ifBlank { null },
+                embedding = embedding.ifBlank { null },
                 modelSettings = ModelSettings(
                     providerType = providerType.ifBlank { null },
                     temperature = temperature.toDoubleOrNull(),
@@ -181,42 +188,47 @@ internal fun CreateAgentDialog(
                     modifier = Modifier.fillMaxWidth(),
                     label = stringResource(R.string.screen_agent_edit_embedding_model),
                 )
+                Text(
+                    text = remoteCreateAgentModelHelp(model = model, embedding = embedding),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Text(
-                text = stringResource(R.string.screen_agents_create_advanced_model_section),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            OutlinedTextField(
-                value = providerType,
-                onValueChange = { providerType = it },
-                label = { Text(stringResource(R.string.common_provider)) },
-                placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = temperature,
-                onValueChange = { value ->
-                    if (value.isBlank() || value.toDoubleOrNull() != null) {
-                        temperature = value
-                    }
-                },
-                label = { Text(stringResource(R.string.screen_agent_edit_temperature_value, temperature.toFloatOrNull() ?: 0f)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-            OutlinedTextField(
-                value = maxOutputTokens,
-                onValueChange = { value ->
-                    if (value.isBlank() || value.toIntOrNull() != null) {
-                        maxOutputTokens = value
-                    }
-                },
-                label = { Text(stringResource(R.string.common_max_output_tokens)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
             if (runtimeOption != AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+                Text(
+                    text = stringResource(R.string.screen_agents_create_advanced_model_section),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                OutlinedTextField(
+                    value = providerType,
+                    onValueChange = { providerType = it },
+                    label = { Text(stringResource(R.string.common_provider)) },
+                    placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = temperature,
+                    onValueChange = { value ->
+                        if (value.isBlank() || value.toDoubleOrNull() != null) {
+                            temperature = value
+                        }
+                    },
+                    label = { Text(stringResource(R.string.screen_agent_edit_temperature_value, temperature.toFloatOrNull() ?: 0f)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = maxOutputTokens,
+                    onValueChange = { value ->
+                        if (value.isBlank() || value.toIntOrNull() != null) {
+                            maxOutputTokens = value
+                        }
+                    },
+                    label = { Text(stringResource(R.string.common_max_output_tokens)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
                 FormItem(
                     label = { Text(stringResource(R.string.common_parallel_tool_calls)) },
                     tail = {
@@ -276,6 +288,13 @@ internal fun CreateAgentDialog(
                     Text(stringResource(R.string.screen_agents_create_select_tools))
                 }
             }
+            validation.disabledReason?.let { reason ->
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
         }
     }
 
@@ -291,6 +310,38 @@ internal fun CreateAgentDialog(
             },
         )
     }
+}
+
+data class CreateAgentValidation(
+    val enabled: Boolean,
+    val disabledReason: String?,
+)
+
+fun validateCreateAgentForm(
+    name: String,
+    runtimeOption: AgentCreateRuntimeOption,
+    localReadiness: LocalLettaCodeCreateReadiness,
+): CreateAgentValidation {
+    if (name.isBlank()) {
+        return CreateAgentValidation(
+            enabled = false,
+            disabledReason = "Enter an agent name to enable Create.",
+        )
+    }
+    if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE && !localReadiness.ready) {
+        return CreateAgentValidation(
+            enabled = false,
+            disabledReason = localReadiness.setupMessage ?: "Finish Local LettaCode setup before creating a local agent.",
+        )
+    }
+    return CreateAgentValidation(enabled = true, disabledReason = null)
+}
+
+fun remoteCreateAgentModelHelp(model: String, embedding: String): String = when {
+    model.isBlank() && embedding.isBlank() -> "Model and embedding are optional; the server default will be used if left blank."
+    model.isBlank() -> "Model is optional; the server default model will be used if left blank."
+    embedding.isBlank() -> "Embedding is optional; the server default embedding will be used if left blank."
+    else -> "Selected model and embedding will be sent with the create request."
 }
 
 @Composable
