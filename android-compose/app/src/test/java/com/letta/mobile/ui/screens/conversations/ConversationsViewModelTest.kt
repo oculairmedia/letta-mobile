@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
@@ -15,6 +16,11 @@ import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogEntry
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,6 +67,8 @@ class ConversationsViewModelTest {
             fakeAgentRepo,
             fakeMessageRepo,
             settingsRepository,
+            FakeEmbeddedRuntimeStatusProvider(),
+            FakeEmbeddedModelRepository(),
         )
     }
 
@@ -131,6 +139,52 @@ class ConversationsViewModelTest {
 
         assertEquals(1_000, viewModel.uiState.value.conversations.size)
         assertTrue("1k conversation load should stay well under 2s", elapsedNanos < 2_000_000_000L)
+    }
+
+
+    @Test
+    fun `empty install shows first run onboarding`() = runTest {
+        fakeAgentRepo.setAgents(emptyList())
+        fakeAllRepo.setConversations(emptyList())
+
+        viewModel.loadConversations()
+
+        assertTrue(viewModel.uiState.value.shouldShowFirstRunOnboarding())
+    }
+
+    @Test
+    fun `existing agent suppresses first run onboarding`() = runTest {
+        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
+        fakeAllRepo.setConversations(emptyList())
+
+        viewModel.loadConversations()
+
+        assertFalse(viewModel.uiState.value.shouldShowFirstRunOnboarding())
+    }
+
+    @Test
+    fun `existing conversation suppresses first run onboarding`() = runTest {
+        fakeAgentRepo.setAgents(emptyList())
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
+
+        viewModel.loadConversations()
+
+        assertFalse(viewModel.uiState.value.shouldShowFirstRunOnboarding())
+    }
+
+    @Test
+    fun `local config without model exposes setup readiness`() = runTest {
+        settingsRepository.saveConfig(
+            LettaConfig(
+                id = "local",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "local-lettacode://runtime",
+            )
+        )
+
+        assertTrue(viewModel.uiState.value.localLettaCodeReadiness.activeConfigIsLocal)
+        assertFalse(viewModel.uiState.value.localLettaCodeReadiness.ready)
+        assertEquals("Download or import a model in Settings before creating a local agent.", viewModel.uiState.value.localLettaCodeReadiness.setupMessage)
     }
 
     @Test
@@ -254,6 +308,7 @@ class ConversationsViewModelTest {
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val _agents = MutableStateFlow(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+        fun setAgents(list: List<Agent>) { _agents.value = list }
         private val _refreshError = MutableStateFlow<Throwable?>(null)
         override val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
         var fresh: Boolean = false
@@ -274,6 +329,25 @@ class ConversationsViewModelTest {
         override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams) = _agents.value.first()
         override suspend fun updateAgent(id: AgentId, params: com.letta.mobile.data.model.AgentUpdateParams) = _agents.value.first()
         override suspend fun deleteAgent(id: AgentId) {}
+    }
+
+
+    private class FakeEmbeddedRuntimeStatusProvider : EmbeddedLettaCodeRuntimeStatusProvider {
+        override val status: EmbeddedLettaCodeRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+            nativeEnabled = true,
+            assetsEnabled = true,
+            version = "test",
+            integrity = "test",
+        )
+    }
+
+    private class FakeEmbeddedModelRepository : EmbeddedModelRepository {
+        private val catalogState = MutableStateFlow<List<EmbeddedModelCatalogItem>>(emptyList())
+        override val catalog: StateFlow<List<EmbeddedModelCatalogItem>> = catalogState.asStateFlow()
+        override suspend fun refresh() = Unit
+        override suspend fun download(entry: EmbeddedModelCatalogEntry) = Unit
+        override fun cancel(entry: EmbeddedModelCatalogEntry) = Unit
+        override fun localPathFor(entry: EmbeddedModelCatalogEntry): String? = null
     }
 
     private class FakeMessageRepository : MessageRepository(FakeMessageApi()) {
