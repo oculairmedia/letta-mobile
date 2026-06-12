@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
@@ -139,6 +140,7 @@ class AgentListViewModel @Inject constructor(
         val llm: List<LlmModel>,
         val emb: List<EmbeddingModel>,
         val localReadiness: LocalLettaCodeCreateReadiness,
+        val activeConfigIsLocalRuntime: Boolean,
         val transient: TransientState,
     )
 
@@ -156,6 +158,7 @@ class AgentListViewModel @Inject constructor(
                 runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
                 downloadedModelHandles = catalog.downloadedModelHandles(),
             ),
+            activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(activeConfig),
             transient = transient,
         )
     }
@@ -167,8 +170,13 @@ class AgentListViewModel @Inject constructor(
         toolRepository.getTools(),
         overlay,
     ) { agents, favId, pinnedIds, tools, overlay ->
+        val displayAgents = if (overlay.activeConfigIsLocalRuntime) {
+            agents.filter(AgentRuntimeBinding::isLocalBound)
+        } else {
+            agents
+        }
         AgentListUiState(
-            agents = agents.toImmutableList(),
+            agents = displayAgents.toImmutableList(),
             availableTools = tools.toImmutableList(),
             llmModels = overlay.llm.toImmutableList(),
             embeddingModels = overlay.emb.toImmutableList(),
@@ -232,6 +240,10 @@ class AgentListViewModel @Inject constructor(
                 _transient.update { it.copy(isHydrating = true, error = null) }
             }
             try {
+                if (settingsRepository.activeConfig.value.isLocalRuntimeConfig()) {
+                    _transient.update { it.copy(isLoading = false, isHydrating = false) }
+                    return@launch
+                }
                 val firstPageMarker = launch {
                     agentRepository.agents
                         .drop(if (agentRepository.agents.value.isEmpty()) 0 else 1)
@@ -265,6 +277,10 @@ class AgentListViewModel @Inject constructor(
         viewModelScope.launch {
             _transient.update { it.copy(isRefreshing = true, isHydrating = true) }
             try {
+                if (settingsRepository.activeConfig.value.isLocalRuntimeConfig()) {
+                    _transient.update { it.copy(isRefreshing = false, isHydrating = false) }
+                    return@launch
+                }
                 agentRepository.refreshAgents()
                 _transient.update { it.copy(isRefreshing = false, isHydrating = false) }
             } catch (e: Exception) {
@@ -477,8 +493,7 @@ private fun LettaConfig?.localLettaCodeCreateReadiness(
     downloadedModelHandles: Set<String>,
 ): LocalLettaCodeCreateReadiness {
     val config = this
-    val activeConfigIsLocal = config?.mode == LettaConfig.Mode.LOCAL &&
-        config.serverUrl.trim().startsWith("local-lettacode://")
+    val activeConfigIsLocal = AgentRuntimeBinding.isLocalRuntime(config)
     val selectedModel = config?.selectedLocalModelHandle()
     val selectedImportedPath = config?.localModelPath?.trim()?.takeIf { it.isNotBlank() }
     val modelDownloaded = selectedImportedPath != null || (selectedModel != null && selectedModel in downloadedModelHandles)
@@ -489,6 +504,8 @@ private fun LettaConfig?.localLettaCodeCreateReadiness(
         activeConfigIsLocal = activeConfigIsLocal,
     )
 }
+
+private fun LettaConfig?.isLocalRuntimeConfig(): Boolean = AgentRuntimeBinding.isLocalRuntime(this)
 
 private fun LettaConfig.selectedLocalModelHandle(): String? = localModelHandle
     ?.trim()

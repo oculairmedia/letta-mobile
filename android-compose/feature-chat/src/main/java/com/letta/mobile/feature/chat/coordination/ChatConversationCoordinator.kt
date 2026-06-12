@@ -21,10 +21,7 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionState
-import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
+import com.letta.mobile.data.model.AgentRuntimeBinding
 
 internal const val LOCAL_RUNTIME_REMOTE_AGENT_ERROR = "This agent is remote; create/select a local-runtime agent to use Local LettaCode."
 
@@ -32,17 +29,6 @@ internal sealed interface LocalRuntimeRouting {
     data object Remote : LocalRuntimeRouting
     data object LocalBound : LocalRuntimeRouting
     data class Blocked(val message: String = LOCAL_RUNTIME_REMOTE_AGENT_ERROR) : LocalRuntimeRouting
-}
-
-internal object AgentRuntimeBinding {
-    fun isLocalBound(agent: Agent?): Boolean {
-        if (agent == null) return false
-        if (agent.id.value.startsWith("local-agent-")) return true
-        return agent.metadata.any { (key, value) ->
-            key in LocalAgentRuntimeMetadata.bindingKeys &&
-                value.jsonPrimitive.contentOrNull?.startsWith("local-") == true
-        }
-    }
 }
 
 private sealed interface ClientModeBootstrapState {

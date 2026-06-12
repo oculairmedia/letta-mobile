@@ -71,7 +71,7 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import com.letta.mobile.feature.chat.coordination.AdminChatA2uiCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatComposerCoordinator
-import com.letta.mobile.feature.chat.coordination.AgentRuntimeBinding
+import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
