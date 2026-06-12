@@ -644,6 +644,12 @@ android {
                 "META-INF/NOTICE.md",
             )
         }
+        if (embeddedLettaCodeNativeEnabled.get()) {
+            // libgit.so is exec()'d as a program (memfs git), which requires
+            // a real file in nativeLibraryDir — loading straight from the APK
+            // (the non-legacy default) only supports dlopen.
+            jniLibs.useLegacyPackaging = true
+        }
     }
 
     sourceSets {
@@ -658,6 +664,11 @@ android {
         if (embeddedLettaCodeNativeEnabled.get()) {
             getByName("main") {
                 jniLibs.directories.add(embeddedLettaCodeLibnodeDir.get().asFile.resolve("bin").absolutePath)
+                // git for android-arm64, shipped as libgit.so so it lands in
+                // the executable nativeLibraryDir (filesDir is noexec). Built
+                // by scripts/build-android-git.sh (gitignored); when absent,
+                // the runtime keeps local memfs disabled instead of failing.
+                jniLibs.directories.add(file("libs/embedded-git").absolutePath)
             }
         }
         // The `benchmark` buildType (macrobenchmark target) uses the same

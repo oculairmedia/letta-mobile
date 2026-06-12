@@ -112,6 +112,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             assetExtractor = EmbeddedLettaCodeAssetExtractor(context),
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
+            localBackendStore = LettaCodeLocalBackendStore(context),
             onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
                 engine = object : OnDeviceChatCompletionEngine {
                     override fun generate(

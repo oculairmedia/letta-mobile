@@ -287,7 +287,12 @@ internal class LocalRuntimeChatSendCoordinator(
 
     private fun String.isLocalRuntimeConversationId(): Boolean = startsWith("local-conv-")
 
-    private fun newLocalConversationId(): String = "local-conv-$agentId-${UUID.randomUUID()}"
+    // Stable per agent: the embedded letta.js runtime binds every session of
+    // an agent to its single on-disk "default" conversation, so a random
+    // suffix per app session would fragment the timeline for what is one
+    // underlying conversation (and the conversations list, which maps the
+    // on-disk record to this same id, could never match it).
+    private fun newLocalConversationId(): String = "local-conv-$agentId"
 
     private fun localErrorMessage(
         message: String,

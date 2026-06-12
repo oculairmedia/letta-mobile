@@ -22,7 +22,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 
 private val embeddedProviderAuthJson = Json { prettyPrint = true }
 
@@ -37,6 +36,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val nodeBridge: LettaCodeNodeBridge,
     private val runtimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceOpenAiBridge: OnDeviceOpenAiBridge,
+    private val localBackendStore: LettaCodeLocalBackendStore,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -141,7 +141,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
         val modelHandle =
             if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
-        seedLocalBackendAgent(session.agentId, modelHandle)
+        localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(onDeviceProviderBaseUrl)
         }
@@ -178,9 +178,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
                 put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
                 put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
-                // Android has no git binary; local memfs shells out to git
-                // (memory-git), failing turns with "spawn git ENOENT".
-                put("LETTA_LOCAL_BACKEND_NO_MEMFS", "1")
+                putAll(memfsEnvironment())
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelSelection.modelHandle)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
@@ -198,48 +196,61 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     }
 
     /**
-     * letta.js's local backend runs with strictAgentAccess/strictConversationAccess,
-     * so --agent <id> exits with "Agent <id> not found" (and the first turn fails
-     * with "Conversation default not found") unless both records already exist in
-     * LETTA_LOCAL_BACKEND_DIR, and --new-agent cannot be combined with --agent to
-     * create them under our id. Seed minimal records — agents/<base64url(id)>.json
-     * and conversations/<base64url("default:" + id)>/conversation.json — so first
-     * turns against a fresh agent id work; normalizeAgentRecord in letta.js fills
-     * in every other agent field with defaults, and a conversation without
-     * messages.jsonl needs no transcript manifest.
+     * Local memfs (letta-mobile-xa92p): letta.js memory-git spawns the
+     * literal binary "git" via PATH, which Android lacks. We ship git built
+     * for android-arm64 as a jniLib (libgit.so — app filesDir is noexec on
+     * API 29+, but nativeLibraryDir is executable) and symlink it onto a
+     * PATH entry for the node process. When the binary isn't packaged
+     * (builds without scripts/build-android-git.sh output), memfs stays
+     * disabled so turns keep working.
      */
-    private fun PreparedLettaCodeProject.seedLocalBackendAgent(agentId: String, modelHandle: String) {
-        val agentFile = File(File(storageDirectory, "agents").apply { mkdirs() }, "${base64Url(agentId)}.json")
-        if (!agentFile.isFile) {
-            val record = buildJsonObject {
-                put("id", agentId)
-                put("name", "Letta Mobile")
-                put("model", modelHandle)
-            }
-            agentFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), record))
+    private fun PreparedLettaCodeProject.memfsEnvironment(): Map<String, String> {
+        val gitLib = File(context.applicationInfo.nativeLibraryDir, "libgit.so")
+        if (!gitLib.canExecute()) {
+            Log.i(TAG, "libgit.so not packaged; local memfs disabled")
+            return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
         }
-
-        val conversationDirectory =
-            File(File(storageDirectory, "conversations"), base64Url("default:$agentId")).apply { mkdirs() }
-        val conversationFile = File(conversationDirectory, "conversation.json")
-        if (!conversationFile.isFile) {
-            val record = buildJsonObject {
-                put("id", "default")
-                put("agent_id", agentId)
-                put("archived", false)
-                put("archived_at", null as String?)
-                put("created_at", "2026-01-01T00:00:00.000Z")
-                put("updated_at", "2026-01-01T00:00:00.000Z")
-                put("last_message_at", null as String?)
-                put("summary", null as String?)
-                putJsonArray("in_context_message_ids") {}
+        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
+        val gitLink = File(binDirectory, "git")
+        // nativeLibraryDir changes across installs, so an existing link may
+        // dangle; canExecute() follows the link and catches that.
+        if (!gitLink.canExecute()) {
+            gitLink.delete()
+            try {
+                android.system.Os.symlink(gitLib.absolutePath, gitLink.absolutePath)
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to link git; local memfs disabled", error)
+                return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
             }
-            conversationFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), record))
         }
+        // letta.js memory-git installs bash pre/post-commit hooks; the repo
+        // lives on the noexec data partition (and Android has no bash), so
+        // any hook exec fails the commit. Route hook lookup to an empty dir:
+        // pre-commit is advisory frontmatter linting and post-commit only
+        // pushes when a remote memory repository is configured.
+        val disabledHooksDirectory = File(storageDirectory.parentFile, "git-hooks-disabled").apply { mkdirs() }
+        // Regenerated every start — it's ours, and hooksPath must track the
+        // current path.
+        File(homeDirectory, ".gitconfig").writeText(
+            """
+            [user]
+            	name = Letta Mobile
+            	email = letta-mobile@localhost
+            [core]
+            	hooksPath = ${disabledHooksDirectory.absolutePath}
+            [maintenance]
+            	auto = false
+            [safe]
+            	directory = *
+            """.trimIndent() + "\n",
+        )
+        return mapOf(
+            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
+            "GIT_EXEC_PATH" to binDirectory.absolutePath,
+            "GIT_TEMPLATE_DIR" to "",
+            "GIT_CONFIG_NOSYSTEM" to "1",
+        )
     }
-
-    private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
-        .encodeToString(value.toByteArray(Charsets.UTF_8))
 
     private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String) {
         val authFile = File(storageDirectory, "providers/auth.json")

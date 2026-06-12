@@ -3,7 +3,9 @@ package com.letta.mobile.di
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.RoomMemFsStore
 import com.letta.mobile.data.local.RoomRuntimeEventOutbox
+import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.LocalRuntimeProvider
+import com.letta.mobile.runtime.local.LettaCodeLocalBackendStore
 import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
 import com.letta.mobile.runtime.local.BuildConfigEmbeddedLettaCodeRuntimeStatusProvider
@@ -60,6 +62,12 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideOnDeviceOpenAiBridge(bridge: LocalOpenAiOnDeviceBridge): OnDeviceOpenAiBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideLocalRuntimeConversationSource(
+        store: LettaCodeLocalBackendStore,
+    ): LocalRuntimeConversationSource = store
 
     @Provides
     @Singleton

@@ -32,6 +32,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = statusProvider(runnable = false),
             onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
         )
 
         val error = runCatching { controller.submit(command(), config()).first() }.exceptionOrNull()
@@ -55,6 +56,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = statusProvider(runnable = true),
             onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
         )
 
         val error = runCatching { controller.submit(command(), config()).first() }.exceptionOrNull()
@@ -77,6 +79,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = statusProvider(runnable = true),
             onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
         )
 
         val error = runCatching {
@@ -101,6 +104,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = statusProvider(runnable = true),
             onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
         )
 
         val events = mutableListOf<String>()
