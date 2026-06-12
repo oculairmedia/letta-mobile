@@ -105,6 +105,7 @@ data class UiSubagentNotification(
     val taskId: String? = null,
     val subagentAgentId: String? = null,
     val toolCallId: String? = null,
+    val durationMs: Long? = null,
 )
 
 /**

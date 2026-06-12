@@ -50,6 +50,10 @@ interface ActiveSubagentSource {
     suspend fun resolveConversationId(subagent: ActiveSubagent): Result<String?> =
         Result.success(subagent.subagentNavigationConversationId)
 
+    /** Resolve a registry entry by parent toolCallId or background taskId. */
+    suspend fun resolveSubagent(id: String): Result<ActiveSubagent?> =
+        Result.success(activeSubagents.value.firstOrNull { it.id == id })
+
     companion object {
         /**
          * The active-only visibility rule, applied as a flow operator. Keeps
