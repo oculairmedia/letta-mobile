@@ -230,6 +230,12 @@
     <string name="common_loading">Loading...</string>
     <string name="error_generic">An error occurred</string>
     <string name="screen_conversations_empty">No conversations yet</string>
+    <string name="screen_conversations_first_run_title">Welcome to Letta</string>
+    <string name="screen_conversations_first_run_body">Create your first agent, choose where it runs, then start a conversation.</string>
+    <string name="screen_conversations_first_run_step_create">Create an agent from the shared setup flow</string>
+    <string name="screen_conversations_first_run_step_runtime">Choose cloud, self-hosted, or Local LettaCode</string>
+    <string name="screen_conversations_first_run_step_chat">Start chatting once your agent is ready</string>
+    <string name="screen_conversations_first_run_create_agent">Create your first agent</string>
     <string name="screen_conversations_search_empty">No matching conversations</string>
     <string name="screen_conversations_search_hint">Search conversations\u2026</string>
     <string name="screen_conversations_unnamed">Conversation</string>

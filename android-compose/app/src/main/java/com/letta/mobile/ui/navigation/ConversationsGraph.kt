@@ -36,7 +36,7 @@ fun NavGraphBuilder.conversationsGraph(
                 TwoPaneConversationsLayout(
                     outerNavController = navController,
                     onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                    onNavigateToAgentList = { navController.navigate(AgentListRoute()) },
                     onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
                     onNavigateToArchives = { navController.navigate(ArchivesRoute) },
                     onNavigateToFolders = { navController.navigate(FoldersRoute) },
@@ -54,6 +54,7 @@ fun NavGraphBuilder.conversationsGraph(
                     onNavigateToProjects = { navController.navigate(HomeRoute) },
                     activeBackendLabel = activeBackendLabel,
                     onNavigateToBackendSwitcher = openBackendSwitcher,
+                    onCreateFirstAgent = { navController.navigate(AgentListRoute(openCreate = true)) },
                 )
             } else {
                 ConversationsScreen(
@@ -67,7 +68,7 @@ fun NavGraphBuilder.conversationsGraph(
                         )
                     },
                     onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                    onNavigateToAgentList = { navController.navigate(AgentListRoute) },
+                    onNavigateToAgentList = { navController.navigate(AgentListRoute()) },
                     onNavigateToTemplates = { navController.navigate(TemplatesRoute) },
                     onNavigateToArchives = { navController.navigate(ArchivesRoute) },
                     onNavigateToFolders = { navController.navigate(FoldersRoute) },
@@ -85,6 +86,7 @@ fun NavGraphBuilder.conversationsGraph(
                     onNavigateToProjects = { navController.navigate(HomeRoute) },
                     activeBackendLabel = activeBackendLabel,
                     onNavigateToBackendSwitcher = openBackendSwitcher,
+                    onCreateFirstAgent = { navController.navigate(AgentListRoute(openCreate = true)) },
                 )
             }
         }
@@ -95,7 +97,8 @@ fun NavGraphBuilder.conversationsGraph(
         exitTransition = drillInExit,
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
-    ) {
+    ) { backStackEntry ->
+        val route = backStackEntry.toRoute<AgentListRoute>()
         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
             AgentListScreen(
                 onNavigateBack = { navController.popBackStack() },
@@ -113,6 +116,7 @@ fun NavGraphBuilder.conversationsGraph(
                 onNavigateToEditAgent = { agentId ->
                     navController.navigate(EditAgentRoute(agentId))
                 },
+                openCreateOnStart = route.openCreate,
             )
         }
     }

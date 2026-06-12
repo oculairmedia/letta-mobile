@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -77,6 +79,7 @@ import com.letta.mobile.ui.components.LoadingIndicator
 import com.letta.mobile.ui.components.ShimmerConversationList
 import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
@@ -113,6 +116,7 @@ fun ConversationsScreen(
     onNavigateToAbout: () -> Unit = {},
     onNavigateToBotSettings: () -> Unit = {},
     onNavigateToProjects: () -> Unit = {},
+    onCreateFirstAgent: () -> Unit = onNavigateToAgentList,
     activeBackendLabel: String? = null,
     onNavigateToBackendSwitcher: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -278,6 +282,10 @@ fun ConversationsScreen(
                     conversations = filteredConversations,
                     isRefreshing = uiState.isRefreshing,
                     isSearchActive = uiState.searchQuery.isNotBlank(),
+                    showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
+                    localReadiness = uiState.localLettaCodeReadiness,
+                    onCreateFirstAgent = onCreateFirstAgent,
+                    onOpenLocalSettings = onNavigateToSettings,
                     onConversationClick = { display ->
                         onNavigateToChat(display.conversation.agentId.value, display.conversation.id.value, display.routeAgentName())
                     },
@@ -341,6 +349,10 @@ private fun ConversationsContent(
     conversations: List<ConversationDisplay>,
     isRefreshing: Boolean,
     isSearchActive: Boolean,
+    showFirstRunOnboarding: Boolean,
+    localReadiness: LocalLettaCodeCreateReadiness,
+    onCreateFirstAgent: () -> Unit,
+    onOpenLocalSettings: () -> Unit,
     onConversationClick: (ConversationDisplay) -> Unit,
     onOpenAdmin: (ConversationDisplay) -> Unit,
     onDeleteConversation: (ConversationDisplay) -> Unit,
@@ -353,14 +365,23 @@ private fun ConversationsContent(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     if (conversations.isEmpty()) {
-        EmptyState(
-            icon = LettaIcons.ChatOutline,
-            message = stringResource(
-                if (isSearchActive) R.string.screen_conversations_search_empty
-                else R.string.screen_conversations_empty
-            ),
-            modifier = modifier.fillMaxSize()
-        )
+        if (showFirstRunOnboarding) {
+            FirstRunWelcomeCard(
+                localReadiness = localReadiness,
+                onCreateFirstAgent = onCreateFirstAgent,
+                onOpenLocalSettings = onOpenLocalSettings,
+                modifier = modifier.fillMaxSize(),
+            )
+        } else {
+            EmptyState(
+                icon = LettaIcons.ChatOutline,
+                message = stringResource(
+                    if (isSearchActive) R.string.screen_conversations_search_empty
+                    else R.string.screen_conversations_empty
+                ),
+                modifier = modifier.fillMaxSize()
+            )
+        }
     } else {
         @OptIn(ExperimentalMaterial3Api::class)
         PullToRefreshBox(
@@ -407,6 +428,93 @@ private fun ConversationsContent(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FirstRunWelcomeCard(
+    localReadiness: LocalLettaCodeCreateReadiness,
+    onCreateFirstAgent: () -> Unit,
+    onOpenLocalSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 520.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Icon(
+                    imageVector = LettaIcons.Agent,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp),
+                )
+                Text(
+                    text = stringResource(R.string.screen_conversations_first_run_title),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.screen_conversations_first_run_body),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                FirstRunStep(text = stringResource(R.string.screen_conversations_first_run_step_create))
+                FirstRunStep(text = stringResource(R.string.screen_conversations_first_run_step_runtime))
+                FirstRunStep(text = stringResource(R.string.screen_conversations_first_run_step_chat))
+                Button(
+                    onClick = onCreateFirstAgent,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.screen_conversations_first_run_create_agent))
+                }
+                if (localReadiness.activeConfigIsLocal && !localReadiness.ready) {
+                    Text(
+                        text = localReadiness.setupMessage.orEmpty(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(
+                        onClick = onOpenLocalSettings,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(localReadiness.setupActionLabel)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FirstRunStep(text: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = LettaIcons.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

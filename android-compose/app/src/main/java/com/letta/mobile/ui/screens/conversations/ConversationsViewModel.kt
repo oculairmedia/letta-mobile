@@ -13,6 +13,11 @@ import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
+import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
+import com.letta.mobile.ui.screens.agentlist.downloadedModelHandles
+import com.letta.mobile.ui.screens.agentlist.localLettaCodeCreateReadiness
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -22,6 +27,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import java.time.Instant
@@ -47,12 +54,20 @@ data class ConversationsUiState(
     val inspectorError: String? = null,
     val recompilePreview: String? = null,
     val error: String? = null,
+    val localLettaCodeReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
 )
 
 private data class ConversationListLoadResult(
     val agents: Result<List<Agent>>,
     val conversations: Result<List<Conversation>>,
 )
+
+fun ConversationsUiState.shouldShowFirstRunOnboarding(): Boolean =
+    !isLoading &&
+        error == null &&
+        searchQuery.isBlank() &&
+        conversations.isEmpty() &&
+        agents.isEmpty()
 
 @HiltViewModel
 class ConversationsViewModel @Inject constructor(
@@ -61,6 +76,8 @@ class ConversationsViewModel @Inject constructor(
     private val agentRepository: IAgentRepository,
     private val messageRepository: IMessageRepository,
     private val settingsRepository: ISettingsRepository,
+    private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
+    private val embeddedModelRepository: EmbeddedModelRepository,
 ) : ViewModel() {
     companion object {
         private const val LIST_CACHE_TTL_MS = 30_000L
@@ -73,6 +90,19 @@ class ConversationsViewModel @Inject constructor(
     private var pinnedConversationIds: Set<ConversationId> = emptySet()
 
     init {
+        viewModelScope.launch {
+            combine(
+                settingsRepository.activeConfig,
+                embeddedModelRepository.catalog,
+            ) { activeConfig, catalog ->
+                activeConfig.localLettaCodeCreateReadiness(
+                    runtimeRunnable = embeddedRuntimeStatusProvider.status.runnable,
+                    downloadedModelHandles = catalog.downloadedModelHandles(),
+                )
+            }.collectLatest { readiness ->
+                _uiState.update { it.copy(localLettaCodeReadiness = readiness) }
+            }
+        }
         viewModelScope.launch {
             settingsRepository.getPinnedConversationIds().collectLatest { pinnedIds ->
                 val typedPinnedIds = pinnedIds.map { ConversationId(it) }.toSet()

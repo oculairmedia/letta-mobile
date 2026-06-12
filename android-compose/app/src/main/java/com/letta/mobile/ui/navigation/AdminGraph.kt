@@ -42,7 +42,7 @@ fun NavGraphBuilder.adminGraph(
 ) {
     composable<AdminRoute> {
         HomeScreen(
-            onNavigateToAgents = { navController.navigate(AgentListRoute) },
+            onNavigateToAgents = { navController.navigate(AgentListRoute()) },
             onNavigateToConversations = { navController.navigate(ConversationsRoute) },
             onNavigateToTools = { navController.navigate(AllToolsRoute) },
             onNavigateToBlocks = { navController.navigate(BlocksRoute) },
@@ -128,7 +128,7 @@ fun NavGraphBuilder.adminGraph(
                 navController.navigate(AgentChatRoute(agentId = agentId))
             },
             onNavigateToAgentList = {
-                navController.navigate(AgentListRoute)
+                navController.navigate(AgentListRoute())
             },
         )
     }

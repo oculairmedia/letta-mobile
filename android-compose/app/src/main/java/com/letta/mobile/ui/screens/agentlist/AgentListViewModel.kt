@@ -488,7 +488,7 @@ class AgentListViewModel @Inject constructor(
         _transient.update { it.copy(shareNavigationConsumed = consumed) }
     }
 }
-private fun LettaConfig?.localLettaCodeCreateReadiness(
+internal fun LettaConfig?.localLettaCodeCreateReadiness(
     runtimeRunnable: Boolean,
     downloadedModelHandles: Set<String>,
 ): LocalLettaCodeCreateReadiness {
@@ -511,7 +511,7 @@ private fun LettaConfig.selectedLocalModelHandle(): String? = localModelHandle
     ?.trim()
     ?.takeIf { it.isNotBlank() && it != EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE }
 
-private fun List<com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem>.downloadedModelHandles(): Set<String> =
+internal fun List<com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem>.downloadedModelHandles(): Set<String> =
     mapNotNull { item ->
         item.entry.modelId.takeIf { item.state is EmbeddedModelDownloadState.Downloaded }
     }.toSet()

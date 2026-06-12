@@ -31,8 +31,10 @@ class RouteSerializationTest {
         verifyIdempotent(ConversationsRoute)
 
     @Test
-    fun `AgentListRoute serializes and deserializes`() =
-        verifyIdempotent(AgentListRoute)
+    fun `AgentListRoute serializes and deserializes`() {
+        verifyRoundTrip(AgentListRoute())
+        verifyRoundTrip(AgentListRoute(openCreate = true))
+    }
 
     @Test
     fun `ConfigRoute serializes and deserializes`() {

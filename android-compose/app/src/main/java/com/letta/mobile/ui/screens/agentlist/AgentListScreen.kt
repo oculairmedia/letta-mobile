@@ -64,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -128,6 +129,7 @@ fun AgentListScreen(
     onNavigateToSettings: () -> Unit = {},
     onNavigateToEditAgent: (String) -> Unit,
     shareContentPreview: String? = null,
+    openCreateOnStart: Boolean = false,
     viewModel: AgentListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -137,6 +139,13 @@ fun AgentListScreen(
     val view = LocalView.current
     val isShareMode = shareContentPreview != null
     var shareNavigationConsumed by rememberSaveable(shareContentPreview) { mutableStateOf(false) }
+
+    LaunchedEffect(openCreateOnStart, isShareMode) {
+        if (openCreateOnStart && !isShareMode) {
+            viewModel.showCreateDialog()
+        }
+    }
+
     fun selectAgent(agentId: String, agentName: String?) {
         if (isShareMode) {
             if (shareNavigationConsumed) return

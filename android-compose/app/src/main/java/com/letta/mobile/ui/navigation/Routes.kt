@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object HomeRoute
 @Serializable data object AdminRoute
 @Serializable data object ConversationsRoute
-@Serializable data object AgentListRoute
+@Serializable data class AgentListRoute(val openCreate: Boolean = false)
 @Serializable data class ConfigRoute(
     /**
      * When true, the screen opens with an empty form and saves as a brand-new

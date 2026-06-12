@@ -18,7 +18,7 @@ sealed interface AppLaunchTarget {
 data object AgentListLaunchTarget : AppLaunchTarget {
     private const val EXTRA_OPEN_AGENT_LIST = "automation_open_agent_list"
 
-    override fun toRoute(): Any = AgentListRoute
+    override fun toRoute(): Any = AgentListRoute()
 
     fun fromIntent(intent: Intent?): AgentListLaunchTarget? {
         return if (intent?.getBooleanExtra(EXTRA_OPEN_AGENT_LIST, false) == true) {
