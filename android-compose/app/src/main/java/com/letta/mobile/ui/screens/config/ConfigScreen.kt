@@ -149,6 +149,9 @@ fun ConfigScreen(
                 onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
                 onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
                 onLocalModelMaxTokensChange = { viewModel.updateLocalModelMaxTokens(it) },
+                onLocalProviderBaseUrlChange = { viewModel.updateLocalProviderBaseUrl(it) },
+                onLocalProviderApiKeyChange = { viewModel.updateLocalProviderApiKey(it) },
+                onLocalProviderModelChange = { viewModel.updateLocalProviderModel(it) },
                 onHuggingFaceTokenChange = { viewModel.updateHuggingFaceToken(it) },
                 onImportLocalModel = {
                     localModelImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
@@ -209,6 +212,9 @@ private fun ConfigContent(
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
+    onLocalProviderBaseUrlChange: (String) -> Unit,
+    onLocalProviderApiKeyChange: (String) -> Unit,
+    onLocalProviderModelChange: (String) -> Unit,
     onHuggingFaceTokenChange: (String) -> Unit,
     onImportLocalModel: () -> Unit,
     onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
@@ -300,6 +306,9 @@ private fun ConfigContent(
                             onLocalModelHandleChange = onLocalModelHandleChange,
                             onLocalModelAcceleratorChange = onLocalModelAcceleratorChange,
                             onLocalModelMaxTokensChange = onLocalModelMaxTokensChange,
+                            onLocalProviderBaseUrlChange = onLocalProviderBaseUrlChange,
+                            onLocalProviderApiKeyChange = onLocalProviderApiKeyChange,
+                            onLocalProviderModelChange = onLocalProviderModelChange,
                             onHuggingFaceTokenChange = onHuggingFaceTokenChange,
                             onImportLocalModel = onImportLocalModel,
                             onDownloadEmbeddedModel = onDownloadEmbeddedModel,
@@ -557,6 +566,9 @@ private fun LocalModelSettingsItem(
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
     onLocalModelMaxTokensChange: (String) -> Unit,
+    onLocalProviderBaseUrlChange: (String) -> Unit,
+    onLocalProviderApiKeyChange: (String) -> Unit,
+    onLocalProviderModelChange: (String) -> Unit,
     onHuggingFaceTokenChange: (String) -> Unit,
     onImportLocalModel: () -> Unit,
     onDownloadEmbeddedModel: (EmbeddedModelCatalogItem) -> Unit,
@@ -677,6 +689,41 @@ private fun LocalModelSettingsItem(
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             leadingIcon = { Icon(LettaIcons.Settings, null) },
+            singleLine = true,
+        )
+        Text(
+            text = stringResource(R.string.screen_config_local_provider_section),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Text(
+            text = stringResource(R.string.screen_config_local_provider_help),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedTextField(
+            value = state.localProviderBaseUrl,
+            onValueChange = onLocalProviderBaseUrlChange,
+            label = { Text(stringResource(R.string.screen_config_local_provider_base_url)) },
+            placeholder = { Text("http://192.168.1.10:8082/v1") },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Link, null) },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = state.localProviderModel,
+            onValueChange = onLocalProviderModelChange,
+            label = { Text(stringResource(R.string.screen_config_local_provider_model)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Cloud, null) },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = state.localProviderApiKey,
+            onValueChange = onLocalProviderApiKeyChange,
+            label = { Text(stringResource(R.string.screen_config_local_provider_api_key)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Key, null) },
+            visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
         )
     }

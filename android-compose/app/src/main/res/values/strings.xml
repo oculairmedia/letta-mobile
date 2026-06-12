@@ -339,6 +339,11 @@
     <string name="screen_config_local_model_accelerator_gpu">GPU</string>
     <string name="screen_config_local_model_accelerator_npu">NPU</string>
     <string name="screen_config_local_model_max_tokens">Max tokens</string>
+    <string name="screen_config_local_provider_section">Custom OpenAI-compatible endpoint (optional)</string>
+    <string name="screen_config_local_provider_help">Route the local agent\'s model calls to a remote OpenAI-compatible server instead of the on-device model. Memory, tools, and conversations stay on this device. Tool calling works natively with capable models.</string>
+    <string name="screen_config_local_provider_base_url">Endpoint base URL</string>
+    <string name="screen_config_local_provider_model">Model id</string>
+    <string name="screen_config_local_provider_api_key">API key (optional)</string>
     <string name="action_save_configuration">Save Configuration</string>
     <string name="screen_config_appearance_section">Appearance</string>
     <string name="screen_config_theme_mode">Theme Mode</string>

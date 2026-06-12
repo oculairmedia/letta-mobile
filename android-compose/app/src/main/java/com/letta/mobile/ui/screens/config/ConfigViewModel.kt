@@ -47,6 +47,9 @@ data class ConfigUiState(
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
     val localModelMaxTokens: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_MAX_TOKENS,
+    val localProviderBaseUrl: String = "",
+    val localProviderApiKey: String = "",
+    val localProviderModel: String = "",
     val huggingFaceToken: String = "",
     val savedHuggingFaceToken: String = "",
     val isImportingLocalModel: Boolean = false,
@@ -117,6 +120,9 @@ class ConfigViewModel @Inject constructor(
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
                         localModelMaxTokens = activeConfig.localModelMaxTokens.normalizedLocalModelMaxTokens(),
+                        localProviderBaseUrl = activeConfig.localProviderBaseUrl.orEmpty(),
+                        localProviderApiKey = activeConfig.localProviderApiKey.orEmpty(),
+                        localProviderModel = activeConfig.localProviderModel.orEmpty(),
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -242,6 +248,21 @@ class ConfigViewModel @Inject constructor(
     fun updateLocalModelMaxTokens(maxTokens: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
+    }
+
+    fun updateLocalProviderBaseUrl(baseUrl: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localProviderBaseUrl = baseUrl))
+    }
+
+    fun updateLocalProviderApiKey(apiKey: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localProviderApiKey = apiKey))
+    }
+
+    fun updateLocalProviderModel(model: String) {
+        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        _uiState.value = UiState.Success(currentState.copy(localProviderModel = model))
     }
 
     fun updateHuggingFaceToken(token: String) {
@@ -378,6 +399,14 @@ class ConfigViewModel @Inject constructor(
                 } else {
                     null
                 }
+                val trimmedProviderBaseUrl = state.localProviderBaseUrl.trim()
+                if (state.mode == ServerMode.LOCAL && trimmedProviderBaseUrl.isNotBlank() &&
+                    !trimmedProviderBaseUrl.startsWith("http://") && !trimmedProviderBaseUrl.startsWith("https://")
+                ) {
+                    _uiState.value = UiState.Success(state.copy(isSaving = false))
+                    onError?.invoke("Custom provider URL must start with http:// or https://.")
+                    return@launch
+                }
                 if (state.mode == ServerMode.CLOUD) {
                     if (apiToken.isBlank()) {
                         _uiState.value = UiState.Success(state.copy(isSaving = false))
@@ -423,6 +452,21 @@ class ConfigViewModel @Inject constructor(
                         null
                     },
                     localModelMaxTokens = localModelMaxTokens,
+                    localProviderBaseUrl = if (state.mode == ServerMode.LOCAL) {
+                        state.localProviderBaseUrl.trim().trimEnd('/').ifBlank { null }
+                    } else {
+                        null
+                    },
+                    localProviderApiKey = if (state.mode == ServerMode.LOCAL) {
+                        state.localProviderApiKey.trim().ifBlank { null }
+                    } else {
+                        null
+                    },
+                    localProviderModel = if (state.mode == ServerMode.LOCAL) {
+                        state.localProviderModel.trim().ifBlank { null }
+                    } else {
+                        null
+                    },
                 )
                 settingsRepository.saveConfig(config)
                 // Clear isSaving on success too: auto-persist callers

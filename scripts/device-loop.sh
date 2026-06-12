@@ -43,8 +43,24 @@ fi
 # often attached twice: USB serial + wifi).
 export ANDROID_SERIAL="$DEVICE_SERIAL"
 
+# IMPORTANT: nodejs-mobile can only start node ONCE per app process, so any
+# two node-starting tests (tier1/3/4/5) in a single am-instrument invocation
+# SIGTRAP at the second node::Start. Each FILTERS entry runs as its own
+# invocation (fresh process) — keep one node-starting test per entry and do
+# not pass a bare class filter.
 if [[ -n "$CLASS_FILTER" ]]; then
-  FILTERS=("$CLASS_FILTER")
+  if [[ "$CLASS_FILTER" != *"#"* ]]; then
+    echo "device-loop: refusing bare class filter (node restarts crash); expanding to per-method tiers"
+    FILTERS=(
+      "$CLASS_FILTER#tier1NodeBootSmokePrintsEmbeddedNodeVersion"
+      "$CLASS_FILTER#tier2RuntimeStatusReportsRunnableForEmbeddedBuild"
+      "$CLASS_FILTER#tier3LocalTurnProducesRuntimeEventWhenModelExists"
+      "$CLASS_FILTER#tier4LocalToolCallRoundTripExecutesToolAndCompletes"
+      "$CLASS_FILTER#tier5CustomProviderTurnSkipsOnDeviceModelAndCallsTools"
+    )
+  else
+    FILTERS=("$CLASS_FILTER")
+  fi
 else
   FILTERS=(
     "$TEST_CLASS#tier1NodeBootSmokePrintsEmbeddedNodeVersion"

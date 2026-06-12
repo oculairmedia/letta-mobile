@@ -9,7 +9,17 @@ data class EmbeddedLettaCodeModelSelection(
     val runtime: String,
     val accelerator: String,
     val maxTokens: Int,
+    /**
+     * Custom OpenAI-compatible endpoint (letta-mobile-3icw7). When set, the
+     * embedded runtime routes LLM calls here instead of starting the
+     * on-device LiteRT bridge; no .litertlm model is required.
+     */
+    val customProviderBaseUrl: String? = null,
+    val customProviderApiKey: String? = null,
 ) {
+    val isCustomProvider: Boolean
+        get() = customProviderBaseUrl != null
+
     val openAiModelId: String
         get() = modelHandle.toOpenAiModelId()
 
@@ -17,20 +27,36 @@ data class EmbeddedLettaCodeModelSelection(
         get() = "lmstudio/$openAiModelId"
 
     val startKey: String
-        get() = listOf(modelHandle, modelPath.orEmpty(), runtime, accelerator, maxTokens.toString()).joinToString("|")
+        get() = listOf(
+            modelHandle,
+            modelPath.orEmpty(),
+            runtime,
+            accelerator,
+            maxTokens.toString(),
+            customProviderBaseUrl.orEmpty(),
+        ).joinToString("|")
 
     companion object {
         const val DEFAULT_MODEL_HANDLE = "local/default"
         const val DEFAULT_MODEL_RUNTIME = "litert-lm"
         const val DEFAULT_ACCELERATOR = "gpu"
         const val DEFAULT_MAX_TOKENS = 4096
-        fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection = EmbeddedLettaCodeModelSelection(
-            modelHandle = config.localModelHandle.normalizedOr(DEFAULT_MODEL_HANDLE),
-            modelPath = config.localModelPath?.trim()?.takeIf { it.isNotBlank() },
-            runtime = config.localModelRuntime.normalizedOr(DEFAULT_MODEL_RUNTIME).lowercase(Locale.US),
-            accelerator = config.localModelAccelerator.normalizedOr(DEFAULT_ACCELERATOR).lowercase(Locale.US),
-            maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKENS,
-        )
+        fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection {
+            val customBaseUrl = config.localProviderBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
+            return EmbeddedLettaCodeModelSelection(
+                modelHandle = if (customBaseUrl != null) {
+                    config.localProviderModel.normalizedOr(DEFAULT_MODEL_HANDLE)
+                } else {
+                    config.localModelHandle.normalizedOr(DEFAULT_MODEL_HANDLE)
+                },
+                modelPath = config.localModelPath?.trim()?.takeIf { it.isNotBlank() },
+                runtime = config.localModelRuntime.normalizedOr(DEFAULT_MODEL_RUNTIME).lowercase(Locale.US),
+                accelerator = config.localModelAccelerator.normalizedOr(DEFAULT_ACCELERATOR).lowercase(Locale.US),
+                maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKENS,
+                customProviderBaseUrl = customBaseUrl,
+                customProviderApiKey = config.localProviderApiKey?.trim()?.takeIf { it.isNotBlank() },
+            )
+        }
     }
 }
 

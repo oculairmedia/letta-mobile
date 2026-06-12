@@ -494,12 +494,17 @@ internal fun LettaConfig?.localLettaCodeCreateReadiness(
 ): LocalLettaCodeCreateReadiness {
     val config = this
     val activeConfigIsLocal = AgentRuntimeBinding.isLocalRuntime(config)
+    // A custom OpenAI-compatible endpoint replaces the on-device model
+    // entirely (letta-mobile-3icw7) — no download/import required.
+    val customProviderConfigured = config?.localProviderBaseUrl?.trim()?.takeIf { it.isNotBlank() } != null
     val selectedModel = config?.selectedLocalModelHandle()
     val selectedImportedPath = config?.localModelPath?.trim()?.takeIf { it.isNotBlank() }
-    val modelDownloaded = selectedImportedPath != null || (selectedModel != null && selectedModel in downloadedModelHandles)
+    val modelDownloaded = customProviderConfigured ||
+        selectedImportedPath != null ||
+        (selectedModel != null && selectedModel in downloadedModelHandles)
     return LocalLettaCodeCreateReadiness(
         runtimeEnabled = runtimeRunnable,
-        modelSelected = selectedModel != null && modelDownloaded,
+        modelSelected = customProviderConfigured || (selectedModel != null && modelDownloaded),
         modelDownloaded = modelDownloaded,
         activeConfigIsLocal = activeConfigIsLocal,
     )

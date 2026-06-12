@@ -119,32 +119,41 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                         "Enable embedded native and asset prerequisites before selecting local-lettacode://device.",
                 )
             }
-            val modelPath = modelSelection.modelPath?.let(::File)
-                ?: throw IllegalStateException(
-                    "Embedded LettaCode requires an imported .litertlm model path before it can start.",
-                )
-            if (!modelPath.isFile) {
-                throw IllegalStateException(
-                    "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.",
-                )
+            // Custom OpenAI-compatible endpoint (letta-mobile-3icw7): the
+            // agent loop stays embedded but LLM calls go to the configured
+            // endpoint — no on-device model or LiteRT bridge needed.
+            if (!modelSelection.isCustomProvider) {
+                val modelPath = modelSelection.modelPath?.let(::File)
+                    ?: throw IllegalStateException(
+                        "Embedded LettaCode requires an imported .litertlm model path before it can start.",
+                    )
+                if (!modelPath.isFile) {
+                    throw IllegalStateException(
+                        "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.",
+                    )
+                }
             }
 
             check(LocalLettaCodeService.start(context)) {
                 "Embedded LettaCode foreground service could not start."
             }
             val project = assetExtractor.prepare()
-            val bridgeSession = onDeviceOpenAiBridge.start(modelSelection)
+            val bridgeSession = if (modelSelection.isCustomProvider) {
+                null
+            } else {
+                onDeviceOpenAiBridge.start(modelSelection)
+            }
             activeOnDeviceBridgeSession = bridgeSession
             try {
                 nodeBridge.start(
                     project.toLettaCodeNodeStartRequest(
                         session = requestedSession,
                         modelSelection = modelSelection,
-                        onDeviceProviderBaseUrl = bridgeSession.baseUrl,
+                        onDeviceProviderBaseUrl = modelSelection.customProviderBaseUrl ?: bridgeSession?.baseUrl,
                     )
                 ).getOrThrow()
             } catch (error: Throwable) {
-                bridgeSession.close()
+                bridgeSession?.close()
                 activeOnDeviceBridgeSession = null
                 throw error
             }
@@ -165,7 +174,10 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
         localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
-            writeEmbeddedLettaCodeProviderAuth(onDeviceProviderBaseUrl)
+            writeEmbeddedLettaCodeProviderAuth(
+                baseUrl = onDeviceProviderBaseUrl,
+                apiKey = modelSelection.customProviderApiKey ?: "not-needed",
+            )
         }
         return LettaCodeNodeStartRequest(
             arguments = buildList {
@@ -281,7 +293,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         )
     }
 
-    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String) {
+    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String, apiKey: String) {
         val authFile = File(storageDirectory, "providers/auth.json")
         val root = buildJsonObject {
             put("version", 1)
@@ -299,7 +311,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                                 "auth",
                                 buildJsonObject {
                                     put("type", "api")
-                                    put("key", "not-needed")
+                                    put("key", apiKey)
                                 },
                             )
                             put("base_url", baseUrl)
