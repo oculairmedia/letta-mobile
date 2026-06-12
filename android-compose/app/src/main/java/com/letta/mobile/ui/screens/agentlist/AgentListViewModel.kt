@@ -240,10 +240,7 @@ class AgentListViewModel @Inject constructor(
                 _transient.update { it.copy(isHydrating = true, error = null) }
             }
             try {
-                if (settingsRepository.activeConfig.value.isLocalRuntimeConfig()) {
-                    _transient.update { it.copy(isLoading = false, isHydrating = false) }
-                    return@launch
-                }
+                // Local mode routes inside AgentRepository (on-device store).
                 val firstPageMarker = launch {
                     agentRepository.agents
                         .drop(if (agentRepository.agents.value.isEmpty()) 0 else 1)
@@ -277,10 +274,6 @@ class AgentListViewModel @Inject constructor(
         viewModelScope.launch {
             _transient.update { it.copy(isRefreshing = true, isHydrating = true) }
             try {
-                if (settingsRepository.activeConfig.value.isLocalRuntimeConfig()) {
-                    _transient.update { it.copy(isRefreshing = false, isHydrating = false) }
-                    return@launch
-                }
                 agentRepository.refreshAgents()
                 _transient.update { it.copy(isRefreshing = false, isHydrating = false) }
             } catch (e: Exception) {

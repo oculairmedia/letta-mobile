@@ -8,7 +8,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
@@ -79,20 +80,22 @@ class EditAgentScreenTest {
         composeRule.onNodeWithText("Identity").assertIsDisplayed()
         composeRule.onNodeWithText("Name").assertIsDisplayed()
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(5)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Models"))
         composeRule.onNodeWithText("Models").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(7)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("LLM Configuration"))
         composeRule.onNodeWithText("LLM Configuration").assertIsDisplayed()
         composeRule.onAllNodesWithText("Embedding Model").assertCountEquals(1)
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(17)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Runtime"))
         composeRule.onNodeWithText("Runtime").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(18)
-        composeRule.onNodeWithText("LettaBot Client Mode").assertIsDisplayed()
+        // letta-mobile-d9cpg: the legacy "LettaBot Client Mode" item was
+        // removed from the Runtime section; the Danger Zone follows it now.
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Reset Messages"))
+        composeRule.onNodeWithText("Reset Messages").assertIsDisplayed()
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(8)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Advanced"))
         composeRule.onNodeWithText("Advanced").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(9)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Primary Model Advanced"))
         composeRule.onNodeWithText("Primary Model Advanced").assertIsDisplayed()
         listOf(
             "Provider Name",
@@ -111,9 +114,9 @@ class EditAgentScreenTest {
             composeRule.onAllNodesWithText(label, substring = true).assertCountEquals(1)
         }
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(10)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Memory"))
         composeRule.onNodeWithText("Memory").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(11)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Compaction Mode"))
         listOf(
             "Compaction Mode",
             "Summarizer Model",
@@ -126,11 +129,11 @@ class EditAgentScreenTest {
             composeRule.onAllNodesWithText(label, substring = true).assertCountEquals(1)
         }
 
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(13)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Tools"))
         composeRule.onNodeWithText("Tools").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(15)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Tools (1)"))
         composeRule.onNodeWithText("Tools (1)").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(16)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Tool Rules / Approval Policy"))
         composeRule.onNodeWithText("Tool Rules / Approval Policy").assertIsDisplayed()
         composeRule.onNodeWithText("Tool Rules JSON").assertIsDisplayed()
     }
@@ -158,9 +161,9 @@ class EditAgentScreenTest {
         }
 
         assertTrue(EditAgentConfigTab.Tools.hasValidationWarning(editState))
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(13)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Tools"))
         composeRule.onNodeWithText("Tools").assertIsDisplayed()
-        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToIndex(16)
+        composeRule.onNodeWithTag(EditAgentTestTags.CONTENT_LIST).performScrollToNode(hasText("Tool Rules JSON"))
         composeRule.onNodeWithText("Tool Rules JSON").assertIsDisplayed()
     }
 

@@ -39,3 +39,5 @@ reports/*.json
 scripts/perf/traces/*
 !scripts/perf/traces/.gitignore
 scripts/__pycache__/
+models-cache/
+android-compose/app/libs/embedded-git/

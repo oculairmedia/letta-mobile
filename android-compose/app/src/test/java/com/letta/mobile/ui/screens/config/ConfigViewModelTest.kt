@@ -679,6 +679,63 @@ class ConfigViewModelTest {
         assertEquals("8192", successState.localModelMaxTokens)
     }
 
+    // letta-mobile-qmrs8: selecting a catalog model must persist without an
+    // explicit Save, or leaving the screen silently loses the selection and
+    // local turns fail with "requires an imported .litertlm model path".
+    @Test
+    fun selectEmbeddedModel_persistsLocalConfigWithoutExplicitSave() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.selectEmbeddedModel(downloadedGemmaTestItem())
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals(LettaConfig.Mode.LOCAL, savedConfig?.mode)
+        assertEquals(
+            "/data/user/0/com.letta.mobile/files/embedded-lettacode/models/gemma-test.litertlm",
+            savedConfig?.localModelPath,
+        )
+        assertEquals("google/gemma-test-litert-lm", savedConfig?.localModelHandle)
+    }
+
+    @Test
+    fun selectEmbeddedModel_keepsRemoteActiveConfigAsSeparateEntry() = runTest {
+        val remote = LettaConfig(
+            id = "remote-1",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "https://self-hosted.letta.dev",
+            accessToken = "remote-token",
+        )
+        fakeRepository.saveConfig(remote)
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.selectEmbeddedModel(downloadedGemmaTestItem())
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals(LettaConfig.Mode.LOCAL, savedConfig?.mode)
+        assertTrue(savedConfig?.id != remote.id)
+        val remoteEntry = fakeRepository.configs.value.firstOrNull { it.id == remote.id }
+        assertEquals("https://self-hosted.letta.dev", remoteEntry?.serverUrl)
+        assertEquals(LettaConfig.Mode.SELF_HOSTED, remoteEntry?.mode)
+    }
+
+    private fun downloadedGemmaTestItem(): EmbeddedModelCatalogItem {
+        val entry = EmbeddedModelCatalogEntry(
+            name = "Gemma test",
+            modelId = "google/gemma-test-litert-lm",
+            modelFile = "gemma-test.litertlm",
+            sizeInBytes = 1024L,
+            estimatedPeakMemoryInBytes = 2048L,
+            defaultConfig = EmbeddedModelDefaultConfig(maxTokens = 8192, accelerators = listOf("cpu")),
+            taskTypes = listOf("chat"),
+        )
+        return EmbeddedModelCatalogItem(
+            entry = entry,
+            state = EmbeddedModelDownloadState.Downloaded("/data/user/0/com.letta.mobile/files/embedded-lettacode/models/gemma-test.litertlm"),
+        )
+    }
+
     @Test
     fun saveConfig_trimsSelfHostedUrlAndToken() = runTest {
         fakeRepository.activeConfigState.value = null

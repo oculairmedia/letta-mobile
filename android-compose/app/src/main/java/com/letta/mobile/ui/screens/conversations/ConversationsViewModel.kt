@@ -151,15 +151,14 @@ class ConversationsViewModel @Inject constructor(
             val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
             val loadResult = supervisorScope {
                 val agents = async {
-                    if (!activeConfigIsLocalRuntime) {
-                        agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
-                    }
+                    // Local mode routes inside AgentRepository (on-device store).
+                    agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
                     agentRepository.agents.value
                 }
                 val conversations = async {
-                    if (!activeConfigIsLocalRuntime) {
-                        allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
-                    }
+                    // Local mode routes inside the repository (on-device
+                    // letta.js store) — refresh unconditionally.
+                    allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
                     allConversationsRepository.conversations.value
                 }
                 ConversationListLoadResult(
@@ -201,9 +200,7 @@ class ConversationsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isRefreshing = true)
             try {
                 val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
-                if (!activeConfigIsLocalRuntime) {
-                    allConversationsRepository.refresh()
-                }
+                allConversationsRepository.refresh()
                 val displayAgents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
                 val displayConversations = displayConversations(
                     allConversationsRepository.conversations.value,

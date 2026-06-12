@@ -1,9 +1,7 @@
 package com.letta.mobile.runtime.local
 
-import java.io.BufferedReader
 import java.io.Closeable
 import java.io.File
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -98,8 +96,11 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
         }
 
         private fun handleSocket(socket: Socket) {
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-            val requestLine = reader.readLine() ?: return
+            // Content-Length counts BYTES; never wrap the request stream in a
+            // Reader before the body is consumed, or multibyte UTF-8 bodies
+            // block forever (chars < bytes).
+            val input = socket.getInputStream().buffered()
+            val requestLine = input.readHttpLine() ?: return
             val parts = requestLine.split(" ")
             if (parts.size < 2) {
                 socket.outputStream.writeJsonResponse(400, errorBody("invalid_request", "Malformed request line."))
@@ -109,7 +110,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             val path = parts[1].substringBefore("?")
             val headers = mutableMapOf<String, String>()
             while (true) {
-                val line = reader.readLine() ?: return
+                val line = input.readHttpLine() ?: return
                 if (line.isEmpty()) break
                 val separator = line.indexOf(':')
                 if (separator > 0) {
@@ -117,7 +118,29 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                         line.substring(separator + 1).trim()
                 }
             }
-            val body = readBody(reader, headers["content-length"]?.toIntOrNull() ?: 0)
+            if (headers["expect"]?.equals("100-continue", ignoreCase = true) == true) {
+                socket.outputStream.apply {
+                    write("HTTP/1.1 100 Continue\r\n\r\n".toByteArray(Charsets.UTF_8))
+                    flush()
+                }
+            }
+            val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+            if (contentLength < 0 || contentLength > MAX_BODY_BYTES) {
+                socket.outputStream.writeJsonResponse(
+                    400,
+                    errorBody("invalid_request", "Content-Length out of range: $contentLength"),
+                )
+                return
+            }
+            val body = readBody(input, contentLength)
+            if (body == null) {
+                socket.outputStream.writeJsonResponse(
+                    400,
+                    errorBody("invalid_request", "Request body ended before Content-Length bytes."),
+                )
+                return
+            }
+            android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$contentLength")
             when {
                 method == "GET" && path == "/v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
                 method == "POST" && path == "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
@@ -298,17 +321,35 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
 
     private companion object {
         private const val LOOPBACK_HOST = "127.0.0.1"
+
+        // Generous bound for chat-completion payloads (the full local system
+        // prompt + transcript is ~50 KB today); rejects pathological
+        // Content-Length values before allocation.
+        private const val MAX_BODY_BYTES = 8 * 1024 * 1024
     }
 }
 
-private fun readBody(reader: BufferedReader, length: Int): String {
+/** Reads exactly [length] bytes; null when the stream ends early (truncated request). */
+private fun readBody(input: java.io.InputStream, length: Int): String? {
     if (length <= 0) return ""
-    val buffer = CharArray(length)
+    val buffer = ByteArray(length)
     var offset = 0
     while (offset < length) {
-        val read = reader.read(buffer, offset, length - offset)
-        if (read <= 0) break
+        val read = input.read(buffer, offset, length - offset)
+        if (read <= 0) return null
         offset += read
     }
-    return if (offset > 0) String(buffer, 0, offset) else ""
+    return String(buffer, Charsets.UTF_8)
+}
+
+/** Reads a CRLF- (or LF-) terminated line as ISO-8859-1 bytes; null on EOF. */
+private fun java.io.InputStream.readHttpLine(): String? {
+    val line = StringBuilder()
+    while (true) {
+        val byte = read()
+        if (byte == -1) return if (line.isEmpty()) null else line.toString()
+        if (byte == '\n'.code) break
+        if (byte != '\r'.code) line.append(byte.toChar())
+    }
+    return line.toString()
 }

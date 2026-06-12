@@ -19,7 +19,12 @@ import kotlinx.coroutines.flow.flowOf
 @Singleton
 class LocalLettaCodeRuntimeProvider @Inject constructor(
     private val turnEngineFactory: LettaCodeTurnEngineFactory,
+    private val runtimeController: LettaCodeRuntimeController,
 ) : LocalRuntimeProvider {
+    override suspend fun interruptActiveTurn() {
+        runtimeController.interrupt()
+    }
+
     override val providerId: String = "local-lettacode"
     override val priority: Int = 100
 

@@ -177,8 +177,12 @@ class ConversationsViewModelTest {
 
         viewModel.loadConversations()
 
-        assertFalse(fakeAgentRepo.didRefresh)
-        assertFalse(fakeAllRepo.didRefresh)
+        // letta-mobile-y5c9u/ajtu2: refreshes now flow unconditionally — the
+        // local-vs-remote routing happens inside the repositories, which list
+        // from the on-device store in local mode. The display filters still
+        // keep remote-shaped cache rows out of local-mode UI state.
+        assertTrue(fakeAgentRepo.didRefresh)
+        assertTrue(fakeAllRepo.didRefresh)
         assertEquals(0, viewModel.uiState.value.agents.size)
         assertEquals(0, viewModel.uiState.value.conversations.size)
         assertTrue(viewModel.uiState.value.shouldShowFirstRunOnboarding())

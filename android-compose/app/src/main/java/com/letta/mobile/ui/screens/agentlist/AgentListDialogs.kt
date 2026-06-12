@@ -60,7 +60,18 @@ internal fun CreateAgentDialog(
     var enableSleeptime by remember { mutableStateOf(false) }
     var includeBaseTools by remember { mutableStateOf(true) }
     var selectedToolIds by remember { mutableStateOf<List<String>>(emptyList()) }
-    var runtimeOption by remember { mutableStateOf(AgentCreateRuntimeOption.REMOTE) }
+    // letta-mobile-vc680: under a local config the dialog used to default to
+    // REMOTE, presenting a remote model picker that can never list on-device
+    // models — users concluded their downloaded model was missing.
+    var runtimeOption by remember {
+        mutableStateOf(
+            if (localReadiness.activeConfigIsLocal) {
+                AgentCreateRuntimeOption.LOCAL_LETTACODE
+            } else {
+                AgentCreateRuntimeOption.REMOTE
+            }
+        )
+    }
     var showToolPicker by remember { mutableStateOf(false) }
     val validation = remember(name, runtimeOption, localReadiness) {
         validateCreateAgentForm(

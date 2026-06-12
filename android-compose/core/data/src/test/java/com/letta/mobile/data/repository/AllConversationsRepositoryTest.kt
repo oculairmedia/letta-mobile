@@ -1,7 +1,9 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.ConversationCountEstimate
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.testutil.FakeConversationApi
+import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.joinAll
@@ -39,6 +41,54 @@ class AllConversationsRepositoryTest {
 
         assertEquals(1, fakeApi.calls.count { it == "listConversations" })
         assertEquals(listOf("1"), repository.conversations.value.map { it.id.value })
+    }
+
+    // letta-mobile-ajtu2: local-runtime mode routes refreshes to the
+    // on-device letta.js store instead of the remote API, inside the
+    // repository so ViewModels need no per-screen branching.
+    @Test
+    fun `refresh uses local source when active config is local runtime`() = runTest {
+        fakeApi.conversations.add(TestData.conversation(id = "remote-1"))
+        val localConversation = TestData.conversation(id = "local-conv-agent-1", agentId = "agent-1")
+        val localRepository = AllConversationsRepository(
+            conversationApi = fakeApi,
+            conversationDao = null,
+            localConversationSource = { listOf(localConversation) },
+            settingsRepository = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "local-1",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "local-lettacode://device",
+                ),
+            ),
+        )
+
+        localRepository.refresh()
+
+        assertEquals(listOf("local-conv-agent-1"), localRepository.conversations.value.map { it.id.value })
+        assertEquals(0, fakeApi.calls.count { it == "listConversations" })
+        assertFalse(localRepository.hasMore.value)
+    }
+
+    @Test
+    fun `refresh uses remote api when active config is not local`() = runTest {
+        fakeApi.conversations.add(TestData.conversation(id = "remote-1"))
+        val repositoryWithLocal = AllConversationsRepository(
+            conversationApi = fakeApi,
+            conversationDao = null,
+            localConversationSource = { fail("local source must not be used for remote configs"); emptyList() },
+            settingsRepository = FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "remote-1",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "https://letta.example.dev",
+                ),
+            ),
+        )
+
+        repositoryWithLocal.refresh()
+
+        assertEquals(listOf("remote-1"), repositoryWithLocal.conversations.value.map { it.id.value })
     }
 
     @Test

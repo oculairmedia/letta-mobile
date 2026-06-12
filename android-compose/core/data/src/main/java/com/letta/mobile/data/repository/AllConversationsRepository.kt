@@ -12,7 +12,10 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.paging.ConversationPagingSource
+import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,9 +37,25 @@ open class AllConversationsRepository(
     private val conversationApi: ConversationApi,
     private val conversationDao: ConversationDao? = null,
     private val repositoryScope: CoroutineScope,
+    private val localConversationSource: LocalRuntimeConversationSource? = null,
+    private val settingsRepository: ISettingsRepository? = null,
 ) : IAllConversationsRepository, BackendScopedCache {
     /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
     @Inject
+    constructor(
+        conversationApi: ConversationApi,
+        conversationDao: ConversationDao?,
+        localConversationSource: LocalRuntimeConversationSource,
+        settingsRepository: ISettingsRepository,
+    ) : this(
+        conversationApi,
+        conversationDao,
+        defaultAllConversationsScope(),
+        localConversationSource,
+        settingsRepository,
+    )
+
+    /** Remote-only convenience constructor (tests, previews). */
     constructor(
         conversationApi: ConversationApi,
         conversationDao: ConversationDao? = null,
@@ -118,6 +137,20 @@ open class AllConversationsRepository(
     }
 
     private suspend fun refreshLocked() {
+        // Local-runtime mode: conversations live in the on-device letta.js
+        // store, not behind the remote API. Route here (not in ViewModels)
+        // so every screen reading [conversations] works uniformly.
+        val localSource = localConversationSource
+        if (localSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)) {
+            val local = localSource.listConversations()
+            Log.d(TAG, "refreshLocked: local source returned ${local.size} conversations")
+            _conversations.value = local
+            _hasMore.value = false
+            currentCursor = null
+            hasLoadedAtLeastOnce = true
+            lastRefreshAtMillis = System.currentTimeMillis()
+            return
+        }
         val firstPage = fetchPage(after = null)
         currentCursor = null
         hasLoadedAtLeastOnce = false

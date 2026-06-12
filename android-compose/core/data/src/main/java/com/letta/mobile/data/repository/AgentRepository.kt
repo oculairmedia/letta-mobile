@@ -10,11 +10,15 @@ import com.letta.mobile.data.local.AgentEntity
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.paging.AgentPagingSource
+import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
@@ -40,6 +44,8 @@ open class AgentRepository(
     private val agentApi: AgentApi,
     private val agentDao: AgentDao,
     private val repositoryScope: CoroutineScope = defaultAgentRepositoryScope(),
+    private val localAgentSource: LocalRuntimeAgentSource? = null,
+    private val settingsRepository: ISettingsRepository? = null,
 ) : IAgentRepository, BackendScopedCache {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
@@ -105,7 +111,20 @@ open class AgentRepository(
         }
     }
 
+    private fun isLocalRuntimeActive(): Boolean =
+        localAgentSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
+
     private suspend fun refreshAgentsLocked() {
+        // Local-runtime mode: agents persist in the on-device store; the
+        // Room cache is wiped per session and must be repopulated from it.
+        val localSource = localAgentSource
+        if (localSource != null && isLocalRuntimeActive()) {
+            val local = localSource.listAgents()
+            _agents.update { local }
+            agentDao.insertAll(local.map { AgentEntity.fromAgent(it) })
+            lastRefreshAtMillis = System.currentTimeMillis()
+            return
+        }
         val fresh = fetchAgentsForCache { partial ->
             _agents.update { partial }
         }
@@ -188,13 +207,32 @@ open class AgentRepository(
         if (cached != null) {
             emit(cached)
         }
+        val localSource = localAgentSource
+        if (localSource != null && isLocalRuntimeActive()) {
+            // No remote API for local agents; serve the durable store copy
+            // when the in-memory cache missed (cold start).
+            if (cached == null) {
+                val stored = localSource.listAgents().find { it.id == id }
+                    ?: throw NoSuchElementException("Local agent ${id.value} not found in the on-device store.")
+                emit(stored)
+                updateAgentInCache(stored)
+            }
+            return@flow
+        }
         val fresh = agentApi.getAgent(id)
         emit(fresh)
         updateAgentInCache(fresh)
     }
 
-    override open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?) =
-        agentApi.getContextWindow(agentId, conversationId)
+    override open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+        val localSource = localAgentSource
+        if (localSource != null && isLocalRuntimeActive()) {
+            // No remote API for local agents; estimate from the on-disk
+            // transcript (same chars/4 heuristic letta.js uses internally).
+            return localSource.contextWindowOverview(agentId) ?: ContextWindowOverview()
+        }
+        return agentApi.getContextWindow(agentId, conversationId)
+    }
 
     fun getAgentPolling(id: AgentId): Flow<Agent> = flow {
         while (true) {
@@ -237,10 +275,34 @@ open class AgentRepository(
         )
         agentDao.upsert(AgentEntity.fromAgent(agent))
         updateAgentInCache(agent)
+        // Room is wiped on every session-graph creation; the durable copy
+        // lives in the local-runtime store (letta-mobile-y5c9u).
+        localAgentSource?.persistAgent(agent)
         return agent
     }
 
     override open suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
+        val cached = _agents.value.find { it.id == id }
+        val localSource = localAgentSource
+        if (localSource != null && cached != null && AgentRuntimeBinding.isLocalBound(cached)) {
+            // Local agents have no remote API. Apply the fields letta.js
+            // respects from its store record (name/system/model + settings);
+            // a running embedded session picks them up on next start.
+            val updated = cached.copy(
+                name = params.name ?: cached.name,
+                description = params.description ?: cached.description,
+                model = params.model ?: cached.model,
+                modelSettings = params.modelSettings ?: cached.modelSettings,
+                llmConfig = params.llmConfig ?: cached.llmConfig,
+                system = params.system ?: cached.system,
+                tags = params.tags ?: cached.tags,
+                contextWindowLimit = params.contextWindowLimit ?: cached.contextWindowLimit,
+            )
+            localSource.persistAgent(updated)
+            agentDao.upsert(AgentEntity.fromAgent(updated))
+            updateAgentInCache(updated)
+            return updated
+        }
         val agent = agentApi.updateAgent(id, params)
         refreshAgents()
         return agent

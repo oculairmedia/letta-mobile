@@ -73,5 +73,9 @@ class LocalRuntimeProvidersTest {
                 override fun runTurn(command: TurnCommand, config: LettaConfig): Flow<RuntimeEventDraft> = emptyFlow()
             },
         ),
+        runtimeController = object : LettaCodeRuntimeController {
+            override fun submit(command: TurnCommand, config: LettaConfig): Flow<String> = emptyFlow()
+            override suspend fun interrupt() = Unit
+        },
     )
 }

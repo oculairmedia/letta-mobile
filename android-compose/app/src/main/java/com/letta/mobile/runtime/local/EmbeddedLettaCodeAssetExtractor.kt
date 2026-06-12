@@ -34,8 +34,11 @@ class EmbeddedLettaCodeAssetExtractor @Inject constructor(
         val marker = File(baseDir, "asset-version.txt")
         val expectedMarker = BuildConfig.EMBEDDED_LETTACODE_VERSION
         val entrypoint = File(projectDir, "node_modules/@letta-ai/letta-code/letta.js")
+        // Re-extract when the ICU regexp polyfill is missing (added after the
+        // version marker scheme; same version can have newer asset contents).
+        val regexpPolyfill = File(projectDir, "regexp-polyfill.cjs")
 
-        if (marker.readTextOrNull() != expectedMarker || !entrypoint.isFile) {
+        if (marker.readTextOrNull() != expectedMarker || !entrypoint.isFile || !regexpPolyfill.isFile) {
             projectDir.deleteRecursively()
             projectDir.mkdirs()
             copyAssetTree(ASSET_ROOT, projectDir)

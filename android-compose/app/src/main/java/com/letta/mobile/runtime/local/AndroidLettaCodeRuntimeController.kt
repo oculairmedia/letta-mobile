@@ -27,6 +27,13 @@ private val embeddedProviderAuthJson = Json { prettyPrint = true }
 
 interface LettaCodeRuntimeController {
     fun submit(command: TurnCommand, config: LettaConfig): Flow<String>
+
+    /**
+     * Asks the embedded letta.js process to abort the in-flight generation
+     * via the stdin control protocol (letta-mobile-p2mmd). No-op when no
+     * session is running.
+     */
+    suspend fun interrupt()
 }
 
 @Singleton
@@ -36,6 +43,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val nodeBridge: LettaCodeNodeBridge,
     private val runtimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceOpenAiBridge: OnDeviceOpenAiBridge,
+    private val localBackendStore: LettaCodeLocalBackendStore,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -55,6 +63,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 val reader = launch(start = CoroutineStart.UNDISPATCHED) {
                     try {
                         nodeBridge.outputLines.collect { line ->
+                            Log.d(TAG, "embedded node out: ${line.take(400)}")
                             send(line)
                             if (line.isTerminalFrame()) {
                                 throw TerminalResultSeen()
@@ -67,6 +76,21 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 nodeBridge.writeLine(command.toWireLine()).getOrThrow()
                 reader.join()
             }
+        }
+    }
+
+    override suspend fun interrupt() {
+        startMutex.withLock {
+            if (activeSession == null) return
+        }
+        nodeBridge.writeLine(
+            buildJsonObject {
+                put("type", "control_request")
+                put("request_id", "interrupt-${System.currentTimeMillis()}")
+                put("request", buildJsonObject { put("subtype", "interrupt") })
+            }.toString(),
+        ).onFailure { error ->
+            Log.w(TAG, "Failed to send interrupt to embedded LettaCode", error)
         }
     }
 
@@ -137,6 +161,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         storageDirectory.mkdirs()
         homeDirectory.mkdirs()
         val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
+        val modelHandle =
+            if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(onDeviceProviderBaseUrl)
         }
@@ -145,15 +172,24 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 add("node")
                 add("--max-old-space-size=384")
                 add("--max-semi-space-size=16")
+                // ICU-less V8 rejects \p{...} regexes; preload a RegExp wrapper
+                // that rewrites them through regexpu-core (see asset prep task).
+                add("--require")
+                add(File(projectDir, "regexp-polyfill.cjs").absolutePath)
                 add(entrypoint.absolutePath)
                 add("--backend")
                 add("local")
                 add("--model")
-                add(if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle)
+                add(modelHandle)
                 add("--agent")
                 add(session.agentId)
+                // letta.js rejects --conversation <custom-id> together with
+                // --agent ("--conversation cannot be used with --agent") —
+                // only the literal "default" is allowed alongside --agent.
+                // The Kotlin session key still tracks the real conversation id;
+                // the embedded process is bound to one session anyway.
                 add("--conversation")
-                add(session.conversationId)
+                add("default")
                 add("--input-format")
                 add("stream-json")
                 add("--output-format")
@@ -164,6 +200,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
                 put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
                 put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
+                putAll(memfsEnvironment())
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelSelection.modelHandle)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
@@ -177,6 +214,63 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
             },
             workingDirectory = workingDirectory,
+        )
+    }
+
+    /**
+     * Local memfs (letta-mobile-xa92p): letta.js memory-git spawns the
+     * literal binary "git" via PATH, which Android lacks. We ship git built
+     * for android-arm64 as a jniLib (libgit.so — app filesDir is noexec on
+     * API 29+, but nativeLibraryDir is executable) and symlink it onto a
+     * PATH entry for the node process. When the binary isn't packaged
+     * (builds without scripts/build-android-git.sh output), memfs stays
+     * disabled so turns keep working.
+     */
+    private fun PreparedLettaCodeProject.memfsEnvironment(): Map<String, String> {
+        val gitLib = File(context.applicationInfo.nativeLibraryDir, "libgit.so")
+        if (!gitLib.canExecute()) {
+            Log.i(TAG, "libgit.so not packaged; local memfs disabled")
+            return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+        }
+        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
+        val gitLink = File(binDirectory, "git")
+        // nativeLibraryDir changes across installs, so an existing link may
+        // dangle; canExecute() follows the link and catches that.
+        if (!gitLink.canExecute()) {
+            gitLink.delete()
+            try {
+                android.system.Os.symlink(gitLib.absolutePath, gitLink.absolutePath)
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to link git; local memfs disabled", error)
+                return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+            }
+        }
+        // letta.js memory-git installs bash pre/post-commit hooks; the repo
+        // lives on the noexec data partition (and Android has no bash), so
+        // any hook exec fails the commit. Route hook lookup to an empty dir:
+        // pre-commit is advisory frontmatter linting and post-commit only
+        // pushes when a remote memory repository is configured.
+        val disabledHooksDirectory = File(storageDirectory.parentFile, "git-hooks-disabled").apply { mkdirs() }
+        // Regenerated every start — it's ours, and hooksPath must track the
+        // current path.
+        File(homeDirectory, ".gitconfig").writeText(
+            """
+            [user]
+            	name = Letta Mobile
+            	email = letta-mobile@localhost
+            [core]
+            	hooksPath = ${disabledHooksDirectory.absolutePath}
+            [maintenance]
+            	auto = false
+            [safe]
+            	directory = *
+            """.trimIndent() + "\n",
+        )
+        return mapOf(
+            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
+            "GIT_EXEC_PATH" to binDirectory.absolutePath,
+            "GIT_TEMPLATE_DIR" to "",
+            "GIT_CONFIG_NOSYSTEM" to "1",
         )
     }
 

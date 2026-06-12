@@ -148,6 +148,9 @@ internal class LocalRuntimeChatSendCoordinator(
 
     fun cancel(): Boolean {
         val job = activeJob ?: return false
+        // Cancelling the collection alone leaves the embedded model
+        // generating; ask the runtime to abort too (letta-mobile-p2mmd).
+        scope.launch { runCatching { localBackend()?.interrupt() } }
         job.cancel()
         finishTurn(error = null)
         return true
@@ -287,7 +290,12 @@ internal class LocalRuntimeChatSendCoordinator(
 
     private fun String.isLocalRuntimeConversationId(): Boolean = startsWith("local-conv-")
 
-    private fun newLocalConversationId(): String = "local-conv-$agentId-${UUID.randomUUID()}"
+    // Stable per agent: the embedded letta.js runtime binds every session of
+    // an agent to its single on-disk "default" conversation, so a random
+    // suffix per app session would fragment the timeline for what is one
+    // underlying conversation (and the conversations list, which maps the
+    // on-disk record to this same id, could never match it).
+    private fun newLocalConversationId(): String = "local-conv-$agentId"
 
     private fun localErrorMessage(
         message: String,
