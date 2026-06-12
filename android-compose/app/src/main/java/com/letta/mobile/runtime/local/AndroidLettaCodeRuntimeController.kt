@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 
 private val embeddedProviderAuthJson = Json { prettyPrint = true }
 
@@ -55,6 +56,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 val reader = launch(start = CoroutineStart.UNDISPATCHED) {
                     try {
                         nodeBridge.outputLines.collect { line ->
+                            Log.d(TAG, "embedded node out: ${line.take(400)}")
                             send(line)
                             if (line.isTerminalFrame()) {
                                 throw TerminalResultSeen()
@@ -137,6 +139,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         storageDirectory.mkdirs()
         homeDirectory.mkdirs()
         val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
+        val modelHandle =
+            if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        seedLocalBackendAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(onDeviceProviderBaseUrl)
         }
@@ -153,11 +158,16 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 add("--backend")
                 add("local")
                 add("--model")
-                add(if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle)
+                add(modelHandle)
                 add("--agent")
                 add(session.agentId)
+                // letta.js rejects --conversation <custom-id> together with
+                // --agent ("--conversation cannot be used with --agent") —
+                // only the literal "default" is allowed alongside --agent.
+                // The Kotlin session key still tracks the real conversation id;
+                // the embedded process is bound to one session anyway.
                 add("--conversation")
-                add(session.conversationId)
+                add("default")
                 add("--input-format")
                 add("stream-json")
                 add("--output-format")
@@ -168,6 +178,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
                 put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
                 put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
+                // Android has no git binary; local memfs shells out to git
+                // (memory-git), failing turns with "spawn git ENOENT".
+                put("LETTA_LOCAL_BACKEND_NO_MEMFS", "1")
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelSelection.modelHandle)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
@@ -183,6 +196,50 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             workingDirectory = workingDirectory,
         )
     }
+
+    /**
+     * letta.js's local backend runs with strictAgentAccess/strictConversationAccess,
+     * so --agent <id> exits with "Agent <id> not found" (and the first turn fails
+     * with "Conversation default not found") unless both records already exist in
+     * LETTA_LOCAL_BACKEND_DIR, and --new-agent cannot be combined with --agent to
+     * create them under our id. Seed minimal records — agents/<base64url(id)>.json
+     * and conversations/<base64url("default:" + id)>/conversation.json — so first
+     * turns against a fresh agent id work; normalizeAgentRecord in letta.js fills
+     * in every other agent field with defaults, and a conversation without
+     * messages.jsonl needs no transcript manifest.
+     */
+    private fun PreparedLettaCodeProject.seedLocalBackendAgent(agentId: String, modelHandle: String) {
+        val agentFile = File(File(storageDirectory, "agents").apply { mkdirs() }, "${base64Url(agentId)}.json")
+        if (!agentFile.isFile) {
+            val record = buildJsonObject {
+                put("id", agentId)
+                put("name", "Letta Mobile")
+                put("model", modelHandle)
+            }
+            agentFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), record))
+        }
+
+        val conversationDirectory =
+            File(File(storageDirectory, "conversations"), base64Url("default:$agentId")).apply { mkdirs() }
+        val conversationFile = File(conversationDirectory, "conversation.json")
+        if (!conversationFile.isFile) {
+            val record = buildJsonObject {
+                put("id", "default")
+                put("agent_id", agentId)
+                put("archived", false)
+                put("archived_at", null as String?)
+                put("created_at", "2026-01-01T00:00:00.000Z")
+                put("updated_at", "2026-01-01T00:00:00.000Z")
+                put("last_message_at", null as String?)
+                put("summary", null as String?)
+                putJsonArray("in_context_message_ids") {}
+            }
+            conversationFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), record))
+        }
+    }
+
+    private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(value.toByteArray(Charsets.UTF_8))
 
     private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String) {
         val authFile = File(storageDirectory, "providers/auth.json")

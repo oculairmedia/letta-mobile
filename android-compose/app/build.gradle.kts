@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "3"
+val embeddedLettaCodeAssetRevision = "6"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -283,6 +283,35 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .inheritIO()
             .start()
         check(babelInstall.waitFor() == 0) { "npm install for babel transform failed." }
+
+        // sharp ships no android-arm64 native binary, so module load aborts with
+        // "Could not load the sharp module using the android-arm64 runtime".
+        // sharp's own loader falls back to the wasm32 build when present —
+        // install it (version must match the sharp dependency in letta-code).
+        val sharpVersion = npmWorkDir.resolve("node_modules/sharp/package.json")
+            .takeIf { it.isFile }
+            ?.let { groovy.json.JsonSlurper().parse(it) as Map<*, *> }
+            ?.get("version") as? String
+        if (sharpVersion != null) {
+            val sharpWasmInstall = ProcessBuilder(
+                npmCommand(),
+                "install",
+                "--no-audit",
+                "--no-fund",
+                "--ignore-scripts",
+                // npm refuses cross-cpu installs (EBADPLATFORM) even with
+                // --cpu=wasm32 on this npm version; --force is the documented
+                // escape hatch for platform-package side-installs.
+                "--force",
+                "--prefix",
+                npmWorkDir.absolutePath,
+                "@img/sharp-wasm32@$sharpVersion",
+            )
+                .directory(projectDir)
+                .inheritIO()
+                .start()
+            check(sharpWasmInstall.waitFor() == 0) { "npm install for @img/sharp-wasm32 failed." }
+        }
         val transformScript = npmWorkDir.resolve("transform-unicode-property.mjs")
         transformScript.writeText(
             """

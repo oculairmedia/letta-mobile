@@ -139,7 +139,24 @@ class EmbeddedRuntimeDeviceLoopTest {
         }
 
         assertTrue("expected assistant text or clean failure runtime event", event != null)
+        if (requireAssistantText()) {
+            val payload = event?.payload
+            assertTrue(
+                "strict mode: expected assistant text but got $payload",
+                payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.isNotBlank(),
+            )
+        }
     }
+
+    /**
+     * When run with -Pandroid.testInstrumentationRunnerArguments.requireAssistantText=true
+     * a "clean failure" lifecycle event is NOT accepted — only real assistant text passes.
+     * This is how the device loop distinguishes "runtime crashed politely" from
+     * "the on-device model actually answered".
+     */
+    private fun requireAssistantText(): Boolean =
+        androidx.test.platform.app.InstrumentationRegistry.getArguments()
+            .getString("requireAssistantText") == "true"
 
     private fun assumeEmbeddedNative() {
         assumeTrue(
