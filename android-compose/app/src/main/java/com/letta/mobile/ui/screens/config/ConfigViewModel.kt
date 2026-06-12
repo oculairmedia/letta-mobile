@@ -281,6 +281,22 @@ class ConfigViewModel @Inject constructor(
                 localModelMaxTokens = item.entry.defaultConfig.maxTokens.toString(),
             )
         )
+        autoPersistLocalModelSelection()
+    }
+
+    // letta-mobile-qmrs8: selecting/importing a local model only mutated form
+    // state; leaving the screen without tapping Save silently lost the choice
+    // and local turns later failed with "requires an imported .litertlm model
+    // path". Persist immediately — in place when the active config is already
+    // local, as a new local entry otherwise so a remote backend entry is
+    // never converted as a side effect of tapping a catalog model.
+    private fun autoPersistLocalModelSelection() {
+        val activeMode = settingsRepository.activeConfig.value?.mode
+        saveConfig(
+            onSuccess = {},
+            onError = null,
+            asNewEntry = createNew || (activeMode != null && activeMode != LettaConfig.Mode.LOCAL),
+        )
     }
 
     fun importLocalModel(
@@ -304,6 +320,7 @@ class ConfigViewModel @Inject constructor(
                         isImportingLocalModel = false,
                     )
                 )
+                autoPersistLocalModelSelection()
                 onSuccess?.invoke(imported.fileName)
             } catch (e: Exception) {
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
@@ -323,7 +340,11 @@ class ConfigViewModel @Inject constructor(
         }
     }
 
-    fun saveConfig(onSuccess: () -> Unit, onError: ((String) -> Unit)? = null) {
+    fun saveConfig(
+        onSuccess: () -> Unit,
+        onError: ((String) -> Unit)? = null,
+        asNewEntry: Boolean = createNew,
+    ) {
         viewModelScope.launch {
             val state = (_uiState.value as? UiState.Success)?.data ?: return@launch
             if (state.isSaving) return@launch
@@ -375,11 +396,11 @@ class ConfigViewModel @Inject constructor(
                     }
                 }
                 settingsRepository.setHuggingFaceToken(state.huggingFaceToken.trim().ifBlank { null })
-                // letta-mobile-cdlk: createNew bypasses the activeConfig
+                // letta-mobile-cdlk: asNewEntry bypasses the activeConfig
                 // id lookup so '+ Add server' in the backend-switcher sheet
                 // actually creates a new entry instead of overwriting the
                 // currently active backend.
-                val reuseId = if (createNew) null else settingsRepository.activeConfig.value?.id
+                val reuseId = if (asNewEntry) null else settingsRepository.activeConfig.value?.id
                 val config = LettaConfig(
                     id = reuseId ?: UUID.randomUUID().toString(),
                     mode = state.mode.toLettaMode(),
