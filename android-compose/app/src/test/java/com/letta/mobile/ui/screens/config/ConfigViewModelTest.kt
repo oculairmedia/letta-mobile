@@ -627,6 +627,31 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun embeddedModelCatalog_updatesUiStateWhenRepositoryEmitsProgress() = runTest {
+        val entry = EmbeddedModelCatalogEntry(
+            name = "Gemma test",
+            modelId = "google/gemma-test-litert-lm",
+            modelFile = "gemma-test.litertlm",
+            sizeInBytes = 1024L,
+            estimatedPeakMemoryInBytes = 2048L,
+            defaultConfig = EmbeddedModelDefaultConfig(maxTokens = 8192, accelerators = listOf("cpu")),
+            taskTypes = listOf("chat"),
+        )
+        fakeEmbeddedModelRepository.catalogState.value = listOf(
+            EmbeddedModelCatalogItem(
+                entry = entry,
+                state = EmbeddedModelDownloadState.Downloading(bytesDownloaded = 512L, totalBytes = 1024L),
+            )
+        )
+
+        val successState = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(
+            EmbeddedModelDownloadState.Downloading(bytesDownloaded = 512L, totalBytes = 1024L),
+            successState.embeddedModelCatalog.single().state,
+        )
+    }
+
+    @Test
     fun selectEmbeddedModel_updatesLocalRuntimeConfigFields() = runTest {
         val entry = EmbeddedModelCatalogEntry(
             name = "Gemma test",
@@ -691,7 +716,8 @@ class ConfigViewModelTest {
     }
 
     private class FakeEmbeddedModelRepository : EmbeddedModelRepository {
-        override val catalog: StateFlow<List<EmbeddedModelCatalogItem>> = MutableStateFlow(emptyList())
+        val catalogState = MutableStateFlow<List<EmbeddedModelCatalogItem>>(emptyList())
+        override val catalog: StateFlow<List<EmbeddedModelCatalogItem>> = catalogState
         var downloadedEntry: EmbeddedModelCatalogEntry? = null
         var cancelledEntry: EmbeddedModelCatalogEntry? = null
 

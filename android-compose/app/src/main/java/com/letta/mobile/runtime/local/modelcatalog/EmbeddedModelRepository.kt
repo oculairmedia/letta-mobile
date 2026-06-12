@@ -99,6 +99,7 @@ class AssetEmbeddedModelRepository @Inject constructor(
         }
         val state = stateFor(entry)
         state.value = EmbeddedModelDownloadState.Downloading(bytesDownloaded = 0L, totalBytes = entry.sizeInBytes)
+        publishCatalog()
         try {
             streamDownloadToFile(
                 url = url,
@@ -202,6 +203,7 @@ class AssetEmbeddedModelRepository @Inject constructor(
         val previous = state.value as? EmbeddedModelDownloadState.Downloading
         if (shouldPublishEmbeddedModelProgress(previous?.bytesDownloaded, downloaded, totalBytes)) {
             state.value = EmbeddedModelDownloadState.Downloading(downloaded, totalBytes)
+            publishCatalog()
         }
     }
 
