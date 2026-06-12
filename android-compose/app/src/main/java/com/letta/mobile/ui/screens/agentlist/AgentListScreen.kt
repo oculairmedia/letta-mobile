@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -341,14 +342,19 @@ fun AgentListScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     if (filteredAgents.isEmpty()) {
-                        EmptyState(
-                            icon = LettaIcons.Agent,
+                        AgentListEmptyState(
                             message = when {
                                 uiState.searchQuery.isNotBlank() && uiState.isHydrating ->
                                     "Still loading agents while searching for \"${uiState.searchQuery}\""
                                 uiState.searchQuery.isBlank() -> stringResource(R.string.screen_agents_empty)
                                 else -> "No agents matching \"${uiState.searchQuery}\""
                             },
+                            showCreateAction = shouldShowEmptyAgentCreateAction(
+                                isShareMode = isShareMode,
+                                isHydrating = uiState.isHydrating,
+                                searchQuery = uiState.searchQuery,
+                            ),
+                            onCreateAgent = viewModel::showCreateDialog,
                             modifier = Modifier
                                 .padding(paddingValues)
                                 .fillMaxSize(),
@@ -496,6 +502,42 @@ fun AgentListScreen(
                 viewModel.hideImportDialog()
             },
         )
+    }
+}
+
+fun shouldShowEmptyAgentCreateAction(
+    isShareMode: Boolean,
+    isHydrating: Boolean,
+    searchQuery: String,
+): Boolean = !isShareMode && !isHydrating && searchQuery.isBlank()
+
+@Composable
+private fun AgentListEmptyState(
+    message: String,
+    showCreateAction: Boolean,
+    onCreateAgent: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        EmptyState(
+            icon = LettaIcons.Agent,
+            message = message,
+        )
+        if (showCreateAction) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onCreateAgent,
+                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+            ) {
+                Icon(LettaIcons.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.screen_agents_empty_create_action))
+            }
+        }
     }
 }
 
