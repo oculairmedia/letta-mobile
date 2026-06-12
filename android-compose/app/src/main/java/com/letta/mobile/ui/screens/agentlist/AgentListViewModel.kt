@@ -531,8 +531,14 @@ private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConf
         LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(selection.runtime),
         LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(selection.accelerator),
     )
+    // A model picked in the dialog (endpoint or downloaded catalog id) wins
+    // over the config-level default; letta.js handles use the lmstudio/
+    // prefix convention for the local provider plumbing.
+    val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }?.let { picked ->
+        if (picked.startsWith("lmstudio/")) picked else "lmstudio/$picked"
+    }
     return copy(
-        model = selection.lettaCodeModelHandle,
+        model = pickedModel ?: selection.lettaCodeModelHandle,
         modelSettings = (modelSettings ?: ModelSettings()).copy(
             providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
             parallelToolCalls = false,

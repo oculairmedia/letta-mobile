@@ -710,14 +710,6 @@ private fun LocalModelSettingsItem(
             singleLine = true,
         )
         OutlinedTextField(
-            value = state.localProviderModel,
-            onValueChange = onLocalProviderModelChange,
-            label = { Text(stringResource(R.string.screen_config_local_provider_model)) },
-            modifier = Modifier.fillMaxWidth(),
-            leadingIcon = { Icon(LettaIcons.Cloud, null) },
-            singleLine = true,
-        )
-        OutlinedTextField(
             value = state.localProviderApiKey,
             onValueChange = onLocalProviderApiKeyChange,
             label = { Text(stringResource(R.string.screen_config_local_provider_api_key)) },

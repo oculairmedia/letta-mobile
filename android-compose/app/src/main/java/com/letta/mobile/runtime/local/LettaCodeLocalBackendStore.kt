@@ -207,6 +207,20 @@ class LettaCodeLocalBackendStore @Inject constructor(
     }
 
     /**
+     * The agent's stored model handle from its letta.js record. The
+     * controller passes this back as --model on session start: letta.js
+     * overwrites the agent's model with whatever --model says
+     * (updateAgentLLMConfig on resume), so anything other than the stored
+     * value would clobber per-agent model selection.
+     */
+    fun storedModelHandle(agentId: String): String? {
+        val recordFile = File(File(storageDirectory, "agents"), "${base64Url(agentId)}.json")
+        if (!recordFile.isFile) return null
+        val record = runCatching { json.parseToJsonElement(recordFile.readText()).jsonObject }.getOrNull()
+        return record?.stringField("model")?.takeIf { it.isNotBlank() }
+    }
+
+    /**
      * Reads the agent's default-conversation transcript (messages.jsonl,
      * pi-ai local-message rows maintained by letta.js) as timeline messages,
      * so the chat screen can hydrate history across app restarts. Synthetic

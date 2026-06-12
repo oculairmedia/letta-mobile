@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
@@ -8,17 +9,28 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Serves downloaded embedded-catalog models as [LlmModel]s so model pickers
- * (edit-agent, dashboards) have real options in local-runtime mode instead of
- * an empty remote list.
+ * Models available in local-runtime mode, served to every model picker
+ * through the repository routing:
+ *
+ *  - custom OpenAI-compatible endpoint configured → the endpoint's own
+ *    model list (letta-mobile-3icw7), live from GET {base}/models
+ *  - downloaded embedded-catalog models (on-device LiteRT)
  */
 @Singleton
 class EmbeddedCatalogModelSource @Inject constructor(
     private val embeddedModelRepository: EmbeddedModelRepository,
+    private val endpointCatalog: EndpointOpenAiModelCatalog,
+    private val settingsRepository: ISettingsRepository,
 ) : LocalRuntimeModelSource {
     override suspend fun listLlmModels(): List<LlmModel> {
+        val config = settingsRepository.activeConfig.value
+        val endpointModels = config?.localProviderBaseUrl
+            ?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
+            ?.let { baseUrl -> endpointCatalog.listModels(baseUrl, config.localProviderApiKey) }
+            .orEmpty()
+
         embeddedModelRepository.refresh()
-        return embeddedModelRepository.catalog.value
+        val downloaded = embeddedModelRepository.catalog.value
             .filter { item -> item.state is EmbeddedModelDownloadState.Downloaded }
             .map { item ->
                 LlmModel(
@@ -31,5 +43,7 @@ class EmbeddedCatalogModelSource @Inject constructor(
                     maxOutputTokens = item.entry.defaultConfig.maxTokens,
                 )
             }
+
+        return endpointModels + downloaded
     }
 }

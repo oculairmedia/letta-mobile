@@ -170,8 +170,12 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         storageDirectory.mkdirs()
         homeDirectory.mkdirs()
         val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
-        val modelHandle =
-            if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        // Per-agent model: letta.js overwrites the agent's model with the
+        // --model argv on resume, so the stored record's handle must win;
+        // the config-level selection is only the seed default for brand-new
+        // agents (letta-mobile-3icw7).
+        val modelHandle = localBackendStore.storedModelHandle(session.agentId)
+            ?: if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
         localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(
