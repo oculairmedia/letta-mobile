@@ -44,6 +44,7 @@ import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.data.repository.VibesyncEventStreamRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
@@ -91,6 +92,7 @@ class SessionGraphFactory internal constructor(
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val settingsRepository: ISettingsRepository? = null,
     private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
+    private val localConversationSource: LocalRuntimeConversationSource? = null,
 ) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
@@ -117,6 +119,7 @@ class SessionGraphFactory internal constructor(
         runtimeEventOutbox: RuntimeEventOutbox,
         memFsStore: MemFsStore,
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
+        localConversationSource: LocalRuntimeConversationSource,
         runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
         conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
         settingsRepository: ISettingsRepository? = null,
@@ -144,6 +147,7 @@ class SessionGraphFactory internal constructor(
         runCursorStore = runCursorStore,
         conversationCursorStore = conversationCursorStore,
         settingsRepository = settingsRepository,
+        localConversationSource = localConversationSource,
         localRuntimeOptions = LocalRuntimeOptions.Enabled(
             runtimeEventOutbox = runtimeEventOutbox,
             memFsStore = memFsStore,
@@ -183,6 +187,8 @@ class SessionGraphFactory internal constructor(
                 conversationApi = conversationApi,
                 conversationDao = conversationDao,
                 repositoryScope = scope,
+                localConversationSource = localConversationSource,
+                settingsRepository = settingsRepository,
             ),
             channelTransport = channelTransport,
             conversationRepository = ConversationRepository(

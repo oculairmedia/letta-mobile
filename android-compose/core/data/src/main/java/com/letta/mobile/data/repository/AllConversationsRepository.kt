@@ -142,7 +142,9 @@ open class AllConversationsRepository(
         // so every screen reading [conversations] works uniformly.
         val localSource = localConversationSource
         if (localSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)) {
-            _conversations.value = localSource.listConversations()
+            val local = localSource.listConversations()
+            Log.d(TAG, "refreshLocked: local source returned ${local.size} conversations")
+            _conversations.value = local
             _hasMore.value = false
             currentCursor = null
             hasLoadedAtLeastOnce = true

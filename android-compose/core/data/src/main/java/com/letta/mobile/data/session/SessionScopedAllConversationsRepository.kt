@@ -66,7 +66,11 @@ class SessionScopedAllConversationsRepository internal constructor(
         .flatMapLatest { it.allConversationsRepository.getConversationsPaged(agentId, archiveStatus, summarySearch) }
 
     override suspend fun loadNextPage() = sessionManager.withCurrentSession { it.allConversationsRepository.loadNextPage() }
-    override suspend fun refresh() = sessionManager.withCurrentSession { it.allConversationsRepository.refresh() }
+
+    override suspend fun refresh() = sessionManager.withCurrentSession {
+        it.allConversationsRepository.refresh()
+        syncProxyState(it)
+    }
     override suspend fun clearForBackendSwitch() {
         _conversations.value = emptyList()
         _hasMore.value = true
@@ -74,7 +78,22 @@ class SessionScopedAllConversationsRepository internal constructor(
     }
 
     override fun hasFreshConversations(maxAgeMs: Long): Boolean = current.hasFreshConversations(maxAgeMs)
-    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.allConversationsRepository.refreshIfStale(maxAgeMs) }
+
+    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession {
+        val refreshed = it.allConversationsRepository.refreshIfStale(maxAgeMs)
+        syncProxyState(it)
+        refreshed
+    }
+
+    // The proxy StateFlows are fed by an async collection in [proxyScope];
+    // callers that read [conversations].value right after a refresh raced it
+    // and saw the pre-refresh snapshot (empty list on first local-runtime
+    // load). Copy the session repository's state synchronously on refresh so
+    // refresh-then-read is always consistent.
+    private fun syncProxyState(graph: SessionGraph) {
+        _conversations.value = graph.allConversationsRepository.conversations.value
+        _hasMore.value = graph.allConversationsRepository.hasMore.value
+    }
     override fun handleOptimisticUpdate(conversation: Conversation) = current.handleOptimisticUpdate(conversation)
     override fun handleOptimisticDelete(conversationId: ConversationId) = current.handleOptimisticDelete(conversationId)
     override fun loadedCountEstimate(): ConversationCountEstimate? = current.loadedCountEstimate()

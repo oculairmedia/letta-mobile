@@ -49,12 +49,32 @@ import org.junit.runners.MethodSorters
 class EmbeddedRuntimeDeviceLoopTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val bridgesToStop = mutableListOf<LettaCodeNodeBridge>()
+    private val seededAgentIds = mutableListOf<String>()
 
     @After
     fun stopBridges() = runBlocking {
         bridgesToStop.forEach { bridge -> bridge.stop() }
         bridgesToStop.clear()
+        cleanUpSeededAgents()
     }
+
+    /**
+     * Tier 3 seeds real agent/conversation/memfs records into the shared
+     * local-backend store; without cleanup every run leaves a dead
+     * "device-loop-agent-…" conversation in the app's conversations screen.
+     */
+    private fun cleanUpSeededAgents() {
+        val storage = File(context.filesDir, "embedded-lettacode/local-backend")
+        seededAgentIds.forEach { agentId ->
+            File(File(storage, "agents"), "${base64Url(agentId)}.json").delete()
+            File(File(storage, "conversations"), base64Url("default:$agentId")).deleteRecursively()
+            File(File(storage, "memfs"), agentId).deleteRecursively()
+        }
+        seededAgentIds.clear()
+    }
+
+    private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(value.toByteArray(Charsets.UTF_8))
 
     @Test
     fun tier1NodeBootSmokePrintsEmbeddedNodeVersion() = runBlocking {
@@ -199,7 +219,7 @@ class EmbeddedRuntimeDeviceLoopTest {
     private fun command(): TurnCommand = TurnCommand(
         backendId = BACKEND_ID,
         runtimeId = RUNTIME_ID,
-        agentId = AgentId("device-loop-agent-${UUID.randomUUID()}"),
+        agentId = AgentId("device-loop-agent-${UUID.randomUUID()}".also(seededAgentIds::add)),
         conversationId = ConversationId("device-loop-conversation-${UUID.randomUUID()}"),
         input = TurnInput.UserMessage(
             localMessageId = "device-loop-message-${UUID.randomUUID()}",
