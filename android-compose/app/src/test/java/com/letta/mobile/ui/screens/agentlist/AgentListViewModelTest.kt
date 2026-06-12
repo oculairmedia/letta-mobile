@@ -147,7 +147,7 @@ class AgentListViewModelTest {
         activeConfigFlow.value = localConfig()
         embeddedModelRepository.catalogFlow.value = listOf(downloadedModel())
         val paramsSlot = slot<AgentCreateParams>()
-        coEvery { agentRepository.createAgent(capture(paramsSlot)) } returns Agent(id = AgentId("a-local"), name = "Local")
+        coEvery { agentRepository.createLocalAgent(capture(paramsSlot)) } returns Agent(id = AgentId("local-agent-test"), name = "Local")
 
         var createdId: AgentId? = null
         viewModel.createAgent(
@@ -163,7 +163,7 @@ class AgentListViewModelTest {
         ) { createdId = it }
 
         val captured = paramsSlot.captured
-        assertEquals(AgentId("a-local"), createdId)
+        assertEquals(AgentId("local-agent-test"), createdId)
         assertEquals("lmstudio/google/gemma-test-litert-lm", captured.model)
         assertEquals(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime, captured.modelSettings?.providerType)
         assertEquals(false, captured.modelSettings?.parallelToolCalls)
@@ -183,7 +183,8 @@ class AgentListViewModelTest {
             "google/gemma-test-litert-lm",
             captured.metadata?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
         )
-        coVerify(exactly = 1) { agentRepository.createAgent(any()) }
+        coVerify(exactly = 0) { agentRepository.createAgent(any()) }
+        coVerify(exactly = 1) { agentRepository.createLocalAgent(any()) }
     }
 
     @Test
@@ -200,6 +201,7 @@ class AgentListViewModelTest {
         assertNull(createdId)
         assertEquals("Download or import a model in Settings before creating a local agent.", viewModel.uiState.value.error)
         coVerify(exactly = 0) { agentRepository.createAgent(any()) }
+        coVerify(exactly = 0) { agentRepository.createLocalAgent(any()) }
     }
 
     @Test
@@ -222,6 +224,7 @@ class AgentListViewModelTest {
         assertEquals(params, paramsSlot.captured)
         assertEquals(AgentId("a-remote"), createdId)
         coVerify(exactly = 1) { agentRepository.createAgent(any()) }
+        coVerify(exactly = 0) { agentRepository.createLocalAgent(any()) }
     }
 
     @Test

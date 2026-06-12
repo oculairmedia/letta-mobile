@@ -1299,6 +1299,10 @@ class SessionManagerTest {
             this.agents.value = agents
         }
 
+        override suspend fun upsert(agent: AgentEntity) {
+            agents.value = agents.value.filterNot { it.id == agent.id } + agent
+        }
+
         override suspend fun deleteExcept(keepIds: List<String>) {
             agents.value = agents.value.filter { it.id in keepIds }
         }

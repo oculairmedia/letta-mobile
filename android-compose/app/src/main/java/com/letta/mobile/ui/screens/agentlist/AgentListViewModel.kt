@@ -383,6 +383,7 @@ class AgentListViewModel @Inject constructor(
         viewModelScope.launch {
             _transient.update { it.copy(isCreating = true, error = null) }
             try {
+                val localCreate = runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE
                 val createParams = when (runtimeOption) {
                     AgentCreateRuntimeOption.REMOTE -> params
                     AgentCreateRuntimeOption.LOCAL_LETTACODE -> {
@@ -401,9 +402,15 @@ class AgentListViewModel @Inject constructor(
                         params.withLocalLettaCodeRuntimeBinding(activeConfig)
                     }
                 }
-                val agent = agentRepository.createAgent(createParams)
+                val agent = if (localCreate) {
+                    agentRepository.createLocalAgent(createParams)
+                } else {
+                    agentRepository.createAgent(createParams)
+                }
                 _transient.update { it.copy(isCreating = false) }
-                agentRepository.refreshAgents()
+                if (!localCreate) {
+                    agentRepository.refreshAgents()
+                }
                 onSuccess(agent.id)
             } catch (e: Exception) {
                 _transient.update {

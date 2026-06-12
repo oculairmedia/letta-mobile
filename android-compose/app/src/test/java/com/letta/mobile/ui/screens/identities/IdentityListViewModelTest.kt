@@ -184,6 +184,10 @@ private class FakeAgentDao : AgentDao {
         this.agents = agents
     }
 
+    override suspend fun upsert(agent: AgentEntity) {
+        agents = agents.filterNot { it.id == agent.id } + agent
+    }
+
     override suspend fun deleteExcept(keepIds: List<String>) {
         agents = agents.filter { it.id in keepIds }
     }
