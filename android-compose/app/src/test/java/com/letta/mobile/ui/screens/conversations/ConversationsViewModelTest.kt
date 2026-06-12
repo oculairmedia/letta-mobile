@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ConversationInspectorMessage
@@ -32,6 +33,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.system.measureNanoTime
 import org.junit.Assert.assertFalse
 import org.junit.After
@@ -61,15 +63,7 @@ class ConversationsViewModelTest {
         fakeConvRepo = FakeConversationRepository(fakeAgentRepo)
         fakeMessageRepo = FakeMessageRepository()
         settingsRepository = FakeSettingsRepository()
-        viewModel = ConversationsViewModel(
-            fakeAllRepo,
-            fakeConvRepo,
-            fakeAgentRepo,
-            fakeMessageRepo,
-            settingsRepository,
-            FakeEmbeddedRuntimeStatusProvider(),
-            FakeEmbeddedModelRepository(),
-        )
+        viewModel = newViewModel()
     }
 
     @After
@@ -173,6 +167,71 @@ class ConversationsViewModelTest {
     }
 
     @Test
+    fun `local config filters cached remote state and shows first run onboarding`() = runTest {
+        settingsRepository.saveConfig(localConfig())
+        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("remote-agent"), name = "Remote Agent")))
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "remote-conv", agentId = "remote-agent")))
+        fakeAllRepo.didRefresh = false
+        fakeAgentRepo.didRefresh = false
+        viewModel = newViewModel()
+
+        viewModel.loadConversations()
+
+        assertFalse(fakeAgentRepo.didRefresh)
+        assertFalse(fakeAllRepo.didRefresh)
+        assertEquals(0, viewModel.uiState.value.agents.size)
+        assertEquals(0, viewModel.uiState.value.conversations.size)
+        assertTrue(viewModel.uiState.value.shouldShowFirstRunOnboarding())
+    }
+
+    @Test
+    fun `local config displays local agents and conversations only`() = runTest {
+        settingsRepository.saveConfig(localConfig())
+        val localAgent = localAgent(id = "local-agent-1", name = "Local Agent")
+        fakeAgentRepo.setAgents(
+            listOf(
+                Agent(id = AgentId("remote-agent"), name = "Remote Agent"),
+                localAgent,
+            )
+        )
+        fakeAllRepo.setConversations(
+            listOf(
+                TestData.conversation(id = "remote-conv", agentId = "remote-agent"),
+                TestData.conversation(id = "local-agent-conv", agentId = localAgent.id.value),
+                TestData.conversation(id = "local-conv-orphan", agentId = "missing-agent"),
+            )
+        )
+        viewModel = newViewModel()
+
+        viewModel.loadConversations()
+
+        assertEquals(listOf(localAgent.id), viewModel.uiState.value.agents.map { it.id })
+        assertEquals(
+            setOf(ConversationId("local-agent-conv"), ConversationId("local-conv-orphan")),
+            viewModel.uiState.value.conversations.map { it.conversation.id }.toSet(),
+        )
+        assertFalse(viewModel.uiState.value.shouldShowFirstRunOnboarding())
+    }
+
+    @Test
+    fun `remote config keeps cached remote state and refresh behavior unchanged`() = runTest {
+        settingsRepository.saveConfig(remoteConfig())
+        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("remote-agent"), name = "Remote Agent")))
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "remote-conv", agentId = "remote-agent")))
+        fakeAllRepo.didRefresh = false
+        fakeAgentRepo.didRefresh = false
+        viewModel = newViewModel()
+
+        viewModel.loadConversations()
+
+        assertTrue(fakeAgentRepo.didRefresh)
+        assertTrue(fakeAllRepo.didRefresh)
+        assertEquals(listOf(AgentId("remote-agent")), viewModel.uiState.value.agents.map { it.id })
+        assertEquals(listOf(ConversationId("remote-conv")), viewModel.uiState.value.conversations.map { it.conversation.id })
+        assertFalse(viewModel.uiState.value.shouldShowFirstRunOnboarding())
+    }
+
+    @Test
     fun `local config without model exposes setup readiness`() = runTest {
         settingsRepository.saveConfig(
             LettaConfig(
@@ -252,6 +311,34 @@ class ConversationsViewModelTest {
         assertEquals(0, viewModel.uiState.value.inspectorMessages.size)
         assertEquals("Inspector failed", viewModel.uiState.value.inspectorError)
     }
+
+    private fun newViewModel(): ConversationsViewModel = ConversationsViewModel(
+        fakeAllRepo,
+        fakeConvRepo,
+        fakeAgentRepo,
+        fakeMessageRepo,
+        settingsRepository,
+        FakeEmbeddedRuntimeStatusProvider(),
+        FakeEmbeddedModelRepository(),
+    )
+
+    private fun localConfig(): LettaConfig = LettaConfig(
+        id = "local",
+        mode = LettaConfig.Mode.LOCAL,
+        serverUrl = "local-lettacode://runtime",
+    )
+
+    private fun remoteConfig(): LettaConfig = LettaConfig(
+        id = "remote",
+        mode = LettaConfig.Mode.CLOUD,
+        serverUrl = "https://api.letta.example",
+    )
+
+    private fun localAgent(id: String, name: String): Agent = Agent(
+        id = AgentId(id),
+        name = name,
+        metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+    )
 
     private class FakeAllConversationsRepository : AllConversationsRepository(FakeConversationApi()) {
         private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())

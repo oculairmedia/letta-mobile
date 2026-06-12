@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.model.Conversation
@@ -124,14 +125,16 @@ class ConversationsViewModel @Inject constructor(
             settingsRepository.activeConfigChanges.collect { refresh() }
         }
         val cachedAgents = agentRepository.agents.value
-        if (cachedAgents.isNotEmpty()) {
-            agentNameCache = cachedAgents.associate { it.id to it.name }.toMutableMap()
-        }
         val cachedConversations = allConversationsRepository.conversations.value
-        if (cachedConversations.isNotEmpty()) {
+        val initialAgents = displayAgents(cachedAgents)
+        val initialConversations = displayConversations(cachedConversations, initialAgents)
+        if (initialAgents.isNotEmpty()) {
+            agentNameCache = initialAgents.associate { it.id to it.name }.toMutableMap()
+        }
+        if (initialConversations.isNotEmpty() || initialAgents.isNotEmpty()) {
             _uiState.value = _uiState.value.copy(
-                conversations = applyPinnedState(cachedConversations.map { it.toDisplay() }).toImmutableList(),
-                agents = cachedAgents.toImmutableList(),
+                conversations = applyPinnedState(initialConversations.map { it.toDisplay() }).toImmutableList(),
+                agents = initialAgents.toImmutableList(),
                 isLoading = false,
             )
         }
@@ -145,13 +148,18 @@ class ConversationsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(isLoading = true)
             }
 
+            val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
             val loadResult = supervisorScope {
                 val agents = async {
-                    agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
+                    if (!activeConfigIsLocalRuntime) {
+                        agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS)
+                    }
                     agentRepository.agents.value
                 }
                 val conversations = async {
-                    allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
+                    if (!activeConfigIsLocalRuntime) {
+                        allConversationsRepository.refreshIfStale(LIST_CACHE_TTL_MS)
+                    }
                     allConversationsRepository.conversations.value
                 }
                 ConversationListLoadResult(
@@ -161,22 +169,26 @@ class ConversationsViewModel @Inject constructor(
             }
 
             loadResult.agents.onSuccess { agents ->
-                agentNameCache = agents.associate { it.id to it.name }.toMutableMap()
+                agentNameCache = displayAgents(agents, activeConfigIsLocalRuntime).associate { it.id to it.name }.toMutableMap()
             }.onFailure { error ->
                 Log.w("ConversationsVM", "Agent load failed", error)
             }
 
             loadResult.conversations.onSuccess { conversations ->
+                val agents = loadResult.agents.getOrDefault(_uiState.value.agents)
+                val displayAgents = displayAgents(agents, activeConfigIsLocalRuntime)
+                val displayConversations = displayConversations(conversations, displayAgents, activeConfigIsLocalRuntime)
                 _uiState.value = _uiState.value.copy(
-                    conversations = applyPinnedState(conversations.map { it.toDisplay() }).toImmutableList(),
-                    agents = loadResult.agents.getOrDefault(_uiState.value.agents).toImmutableList(),
+                    conversations = applyPinnedState(displayConversations.map { it.toDisplay() }).toImmutableList(),
+                    agents = displayAgents.toImmutableList(),
                     isLoading = false,
                     error = null,
                 )
             }.onFailure { error ->
                 Log.w("ConversationsVM", "Load failed", error)
+                val agents = loadResult.agents.getOrDefault(_uiState.value.agents)
                 _uiState.value = _uiState.value.copy(
-                    agents = loadResult.agents.getOrDefault(_uiState.value.agents).toImmutableList(),
+                    agents = displayAgents(agents, activeConfigIsLocalRuntime).toImmutableList(),
                     isLoading = false,
                     error = if (hadConversationsAtStart) null else error.message,
                 )
@@ -188,10 +200,20 @@ class ConversationsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRefreshing = true)
             try {
-                allConversationsRepository.refresh()
+                val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
+                if (!activeConfigIsLocalRuntime) {
+                    allConversationsRepository.refresh()
+                }
+                val displayAgents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
+                val displayConversations = displayConversations(
+                    allConversationsRepository.conversations.value,
+                    displayAgents,
+                    activeConfigIsLocalRuntime,
+                )
+                agentNameCache = displayAgents.associate { it.id to it.name }.toMutableMap()
                 _uiState.value = _uiState.value.copy(
-                    conversations = applyPinnedState(allConversationsRepository.conversations.value.map { it.toDisplay() }).toImmutableList(),
-                    agents = agentRepository.agents.value.toImmutableList(),
+                    conversations = applyPinnedState(displayConversations.map { it.toDisplay() }).toImmutableList(),
+                    agents = displayAgents.toImmutableList(),
                     isRefreshing = false,
                 )
             } catch (e: Exception) {
@@ -387,6 +409,27 @@ class ConversationsViewModel @Inject constructor(
         agentName = agentNameCache[agentId] ?: agentId.value.take(8),
         isPinned = id in pinnedConversationIds,
     )
+
+    private fun displayAgents(
+        agents: List<Agent>,
+        activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
+    ): List<Agent> = if (activeConfigIsLocalRuntime) {
+        agents.filter(AgentRuntimeBinding::isLocalBound)
+    } else {
+        agents
+    }
+
+    private fun displayConversations(
+        conversations: List<Conversation>,
+        agents: List<Agent>,
+        activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
+    ): List<Conversation> {
+        if (!activeConfigIsLocalRuntime) return conversations
+        val localAgentIds = agents.map { it.id }.toSet()
+        return conversations.filter { conversation ->
+            conversation.id.value.startsWith("local-conv-") || conversation.agentId in localAgentIds
+        }
+    }
 
     private fun applyPinnedState(
         displays: List<ConversationDisplay>,
