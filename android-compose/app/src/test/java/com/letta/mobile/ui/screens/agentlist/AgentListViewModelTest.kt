@@ -22,6 +22,7 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDefaultConfig
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
+import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -42,6 +43,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertNull
@@ -374,6 +376,61 @@ class AgentListViewModelTest {
     }
 
     @Test
+    fun `local runtime mode displays only local-bound agents`() = runTest {
+        clearMocks(agentRepository, answers = false, recordedCalls = true)
+        activeConfigFlow.value = localConfig()
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = AgentId("remote-agent"), name = "Remote"),
+                Agent(id = AgentId("local-agent-generated"), name = "Local id"),
+                Agent(
+                    id = AgentId("metadata-local"),
+                    name = "Local metadata",
+                    metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+                ),
+            )
+        )
+
+        viewModel = newViewModel()
+
+        assertEquals(listOf("local-agent-generated", "metadata-local"), viewModel.uiState.value.agents.map { it.id.value })
+        assertEquals(listOf("local-agent-generated", "metadata-local"), viewModel.getFilteredAgents().map { it.id.value })
+    }
+
+    @Test
+    fun `local runtime mode does not refresh remote agent list`() = runTest {
+        clearMocks(agentRepository, answers = false, recordedCalls = true)
+        activeConfigFlow.value = localConfig()
+        every { agentRepository.agents } returns MutableStateFlow(emptyList())
+
+        viewModel = newViewModel()
+        viewModel.refresh()
+
+        assertTrue(viewModel.uiState.value.agents.isEmpty())
+        assertFalse(viewModel.uiState.value.isLoading)
+        coVerify(exactly = 0) { agentRepository.refreshAgentsIfStale(any()) }
+        coVerify(exactly = 0) { agentRepository.refreshAgents() }
+    }
+
+    @Test
+    fun `remote runtime mode displays all agents and refreshes normally`() = runTest {
+        clearMocks(agentRepository, answers = false, recordedCalls = true)
+        activeConfigFlow.value = remoteConfig()
+        every { agentRepository.agents } returns MutableStateFlow(
+            listOf(
+                Agent(id = AgentId("remote-agent"), name = "Remote"),
+                Agent(id = AgentId("local-agent-generated"), name = "Local id"),
+            )
+        )
+        coEvery { agentRepository.refreshAgentsIfStale(any()) } returns false
+
+        viewModel = newViewModel()
+
+        assertEquals(listOf("remote-agent", "local-agent-generated"), viewModel.uiState.value.agents.map { it.id.value })
+        coVerify(exactly = 1) { agentRepository.refreshAgentsIfStale(any()) }
+    }
+
+    @Test
     fun `loadAgents shows first hydrated page while refresh continues`() = runTest {
         val agentsFlow = MutableStateFlow<List<Agent>>(emptyList())
         val keepRefreshing = CompletableDeferred<Unit>()
@@ -414,6 +471,12 @@ class AgentListViewModelTest {
         localModelRuntime = "litert-lm",
         localModelAccelerator = "gpu",
         localModelMaxTokens = 8192,
+    )
+
+    private fun remoteConfig(): LettaConfig = LettaConfig(
+        id = "remote-config",
+        mode = LettaConfig.Mode.CLOUD,
+        serverUrl = "https://api.letta.com",
     )
 
     private fun downloadedModel(): EmbeddedModelCatalogItem = EmbeddedModelCatalogItem(
