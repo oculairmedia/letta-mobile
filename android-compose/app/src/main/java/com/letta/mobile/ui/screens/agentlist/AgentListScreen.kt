@@ -62,7 +62,6 @@ import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-import java.util.UUID
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -489,7 +488,10 @@ fun AgentListScreen(
                 viewModel.createAgent(params, runtimeOption) { agentId ->
                     viewModel.hideCreateDialog()
                     val conversationId = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
-                        "local-conv-${agentId.value}-${UUID.randomUUID()}"
+                        // Stable per agent: every embedded session is the same
+                        // on-disk default conversation; a random suffix would
+                        // fragment the timeline and never match list rows.
+                        "local-conv-${agentId.value}"
                     } else {
                         null
                     }

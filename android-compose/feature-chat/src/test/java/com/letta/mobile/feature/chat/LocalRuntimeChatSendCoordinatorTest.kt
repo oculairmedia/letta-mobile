@@ -79,7 +79,9 @@ class LocalRuntimeChatSendCoordinatorTest {
         assertEquals("hello", local.content)
         assertTrue(local.otid.startsWith("client-"))
         val resolvedConversation = requireNotNull(activeConversation)
-        assertTrue(resolvedConversation.startsWith("local-conv-agent-1-"))
+        // Stable per agent (no random suffix): every embedded session is the
+        // same on-disk default conversation.
+        assertEquals("local-conv-agent-1", resolvedConversation)
         assertEquals(activeConversation, observedConversation)
         assertTrue(cleared)
         assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(resolvedConversation, local.otid), timelineRepository.sentLocals.single())

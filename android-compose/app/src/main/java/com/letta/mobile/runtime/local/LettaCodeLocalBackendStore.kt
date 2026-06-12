@@ -3,9 +3,12 @@ package com.letta.mobile.runtime.local
 import android.content.Context
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,7 +18,9 @@ import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -198,6 +203,55 @@ class LettaCodeLocalBackendStore @Inject constructor(
                 archived = record["archived"]?.jsonPrimitive?.content?.toBooleanStrictOrNull(),
             )
         }.sortedByDescending { it.lastMessageAt ?: it.updatedAt ?: it.createdAt ?: "" }
+    }
+
+    /**
+     * Reads the agent's default-conversation transcript (messages.jsonl,
+     * pi-ai local-message rows maintained by letta.js) as timeline messages,
+     * so the chat screen can hydrate history across app restarts. Synthetic
+     * context rows (system-reminder user messages letta.js injects) are
+     * skipped — they were never user-visible.
+     */
+    suspend fun readTranscript(agentId: String): List<LettaMessage> = withContext(Dispatchers.IO) {
+        val transcript = File(
+            File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
+            "messages.jsonl",
+        )
+        if (!transcript.isFile) return@withContext emptyList()
+        transcript.useLines { lines ->
+            lines.filter { it.isNotBlank() }.mapIndexedNotNull { index, line ->
+                val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+                    ?: return@mapIndexedNotNull null
+                val id = row.stringField("id") ?: return@mapIndexedNotNull null
+                val role = row.stringField("role") ?: return@mapIndexedNotNull null
+                val text = (row["content"] as? JsonArray)
+                    ?.mapNotNull { part ->
+                        (part as? JsonObject)?.takeIf { it.stringField("type") == "text" }?.stringField("text")
+                    }
+                    ?.joinToString("\n")
+                    ?.takeIf { it.isNotBlank() }
+                    ?: return@mapIndexedNotNull null
+                val date = (row["metadata"] as? JsonObject)?.stringField("created_at")
+                when (role) {
+                    "user" -> {
+                        if (text.trimStart().startsWith("<system-reminder>")) return@mapIndexedNotNull null
+                        UserMessage(
+                            id = id,
+                            contentRaw = JsonPrimitive(text),
+                            date = date,
+                            seqId = index + 1,
+                        )
+                    }
+                    "assistant" -> AssistantMessage(
+                        id = id,
+                        contentRaw = JsonPrimitive(text),
+                        date = date,
+                        seqId = index + 1,
+                    )
+                    else -> null
+                }
+            }.toList()
+        }
     }
 
     private fun JsonObject.stringField(key: String): String? =

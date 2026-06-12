@@ -9,11 +9,21 @@ class LocalLettaBackend(
     private val engine: TurnEngine,
     private val outbox: RuntimeEventOutbox,
     private val memFsStore: MemFsStore,
+    private val onInterrupt: (suspend () -> Unit)? = null,
 ) : LettaBackend {
     init {
         require(descriptor.kind.isLocalRuntime()) {
             "LocalLettaBackend requires a local or compatible backend descriptor."
         }
+    }
+
+    /**
+     * Best-effort cancellation of the in-flight generation
+     * (letta-mobile-p2mmd). Cancelling the [runTurn] collection alone leaves
+     * the runtime generating; this asks the runtime itself to stop.
+     */
+    suspend fun interrupt() {
+        onInterrupt?.invoke()
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventEnvelope> = flow {

@@ -21,4 +21,10 @@ interface LocalRuntimeProvider {
     fun descriptor(config: LettaConfig): BackendDescriptor
 
     fun turnEngine(config: LettaConfig): TurnEngine
+
+    /**
+     * Best-effort cancellation of the runtime's in-flight generation
+     * (letta-mobile-p2mmd). Default no-op for runtimes without one.
+     */
+    suspend fun interruptActiveTurn() {}
 }

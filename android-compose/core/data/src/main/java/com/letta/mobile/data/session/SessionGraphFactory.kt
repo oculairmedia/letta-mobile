@@ -261,6 +261,7 @@ class SessionGraphFactory internal constructor(
                     engine = provider.turnEngine(config),
                     outbox = runtimeEventOutbox,
                     memFsStore = memFsStore,
+                    onInterrupt = provider::interruptActiveTurn,
                 )
             }
         }

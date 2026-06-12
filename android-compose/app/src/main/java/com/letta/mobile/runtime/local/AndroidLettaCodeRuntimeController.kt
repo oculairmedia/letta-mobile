@@ -27,6 +27,13 @@ private val embeddedProviderAuthJson = Json { prettyPrint = true }
 
 interface LettaCodeRuntimeController {
     fun submit(command: TurnCommand, config: LettaConfig): Flow<String>
+
+    /**
+     * Asks the embedded letta.js process to abort the in-flight generation
+     * via the stdin control protocol (letta-mobile-p2mmd). No-op when no
+     * session is running.
+     */
+    suspend fun interrupt()
 }
 
 @Singleton
@@ -69,6 +76,21 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 nodeBridge.writeLine(command.toWireLine()).getOrThrow()
                 reader.join()
             }
+        }
+    }
+
+    override suspend fun interrupt() {
+        startMutex.withLock {
+            if (activeSession == null) return
+        }
+        nodeBridge.writeLine(
+            buildJsonObject {
+                put("type", "control_request")
+                put("request_id", "interrupt-${System.currentTimeMillis()}")
+                put("request", buildJsonObject { put("subtype", "interrupt") })
+            }.toString(),
+        ).onFailure { error ->
+            Log.w(TAG, "Failed to send interrupt to embedded LettaCode", error)
         }
     }
 

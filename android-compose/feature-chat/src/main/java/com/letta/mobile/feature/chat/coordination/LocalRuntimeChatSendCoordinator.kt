@@ -148,6 +148,9 @@ internal class LocalRuntimeChatSendCoordinator(
 
     fun cancel(): Boolean {
         val job = activeJob ?: return false
+        // Cancelling the collection alone leaves the embedded model
+        // generating; ask the runtime to abort too (letta-mobile-p2mmd).
+        scope.launch { runCatching { localBackend()?.interrupt() } }
         job.cancel()
         finishTurn(error = null)
         return true

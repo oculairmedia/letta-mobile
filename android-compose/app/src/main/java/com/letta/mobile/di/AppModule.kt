@@ -107,9 +107,15 @@ abstract class AppModule {
             messageApi: MessageApi,
             pendingLocalStore: PendingLocalStore,
             conversationCursorStore: ConversationCursorStore,
+            localTimelineTransport: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
         ): TimelineRepository {
             return TimelineRepository(
-                timelineTransport = MessageApiTimelineTransport(messageApi),
+                // local-conv-* hydrates from the on-device letta.js transcript
+                // (letta-mobile-czomn); everything else uses the remote API.
+                timelineTransport = com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
+                    local = localTimelineTransport,
+                    remote = MessageApiTimelineTransport(messageApi),
+                ),
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
             )
