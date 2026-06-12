@@ -221,6 +221,22 @@ internal fun ChatScreen(
         // first-class subagent timeline cards both set the same target so
         // active bar + dispatch/result chrome open one coherent todo surface.
         var tappedSubagentTarget by remember { mutableStateOf<SubagentTodoSheetTarget?>(null) }
+        val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit = { target ->
+            tappedSubagentTarget = target
+            if (target.subagentConversationId == null) {
+                subagentNavigationScope.launch {
+                    val subagent = resolvedSubagentSource.resolveSubagent(target.toolCallId).getOrNull()
+                    val agentId = target.subagentAgentId ?: subagent?.subagentAgentId
+                    val conversationId = subagent?.let { resolvedSubagentSource.resolveConversationId(it).getOrNull() }
+                    if (agentId != null && conversationId != null) {
+                        tappedSubagentTarget = target.copy(
+                            subagentAgentId = agentId,
+                            subagentConversationId = conversationId,
+                        )
+                    }
+                }
+            }
+        }
         var imageViewerState by remember {
             mutableStateOf<Pair<kotlinx.collections.immutable.ImmutableList<UiImageAttachment>, Int>?>(null)
         }
@@ -377,9 +393,7 @@ internal fun ChatScreen(
                 }
 
                 CompositionLocalProvider(
-                    LocalSubagentTodoSheetOpener provides { target ->
-                        tappedSubagentTarget = target
-                    },
+                    LocalSubagentTodoSheetOpener provides openSubagentTarget,
                 ) {
                     Crossfade(
                         targetState = contentPhase,
@@ -469,9 +483,7 @@ internal fun ChatScreen(
                 // the TOP RIGHT edge of the chat surface, under the menu control.
                 // Tap opens TodoWrite; long-press navigates to the subagent.
                 CompositionLocalProvider(
-                    LocalSubagentTodoSheetOpener provides { target ->
-                        tappedSubagentTarget = target
-                    },
+                    LocalSubagentTodoSheetOpener provides openSubagentTarget,
                 ) {
                     ActiveSubagentRings(
                         subagents = activeSubagents,

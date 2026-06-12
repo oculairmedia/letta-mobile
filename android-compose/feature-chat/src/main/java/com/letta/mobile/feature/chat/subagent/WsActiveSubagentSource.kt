@@ -69,6 +69,16 @@ class WsActiveSubagentSource(
         }
     }
 
+    override suspend fun resolveSubagent(id: String): Result<ActiveSubagent?> {
+        val local = activeSubagents.value.firstOrNull { it.id == id }
+        if (local?.subagentNavigationConversationId != null) return Result.success(local)
+        return repository.refresh().map { entries ->
+            entries.firstOrNull { entry ->
+                entry.toolCallId == id || entry.taskId == id
+            }?.toActiveSubagent()
+        }
+    }
+
     override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
         repository.activeSubagentsFlow()
             .map { entries -> entries.map { it.toActiveSubagent() } }

@@ -61,6 +61,60 @@ class TimelineEventToUiMessageTest {
     )
 
     @Test
+    fun `injected USER task notification maps to assistant card model`() {
+        val ev = confirmed(
+            TimelineMessageType.USER,
+            serverId = "task-note-injected",
+            content = """
+                <task-notification>
+                <task-id>task-789</task-id>
+                <status>completed</status>
+                <summary>Agent &quot;Review&quot; completed</summary>
+                <result>Found &lt;one&gt; issue.</result>
+                <usage>total_tokens: 4096
+                tool_uses: 7
+                duration_ms: 42000</usage>
+                </task-notification>
+                Full transcript available at: /tmp/task-789.log
+            """.trimIndent(),
+        )
+
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertEquals("assistant", ui.role)
+        assertEquals("", ui.content)
+        val notification = ui.subagentNotification!!
+        assertEquals("completed", notification.status)
+        assertEquals("Agent \"Review\" completed", notification.summary)
+        assertEquals("Found <one> issue.", notification.result)
+        assertEquals("task-789", notification.taskId)
+        assertEquals(42_000L, notification.durationMs)
+        assertEquals("/tmp/task-789.log", notification.transcriptUri)
+    }
+
+    @Test
+    fun `failed task notification preserves deviation status`() {
+        val ev = confirmed(
+            TimelineMessageType.USER,
+            serverId = "task-note-failed",
+            content = """
+                <task-notification>
+                <task-id>task-failed</task-id>
+                <status>failed</status>
+                <summary>Agent failed</summary>
+                <result>Timed out</result>
+                </task-notification>
+            """.trimIndent(),
+        )
+
+        val notification = timelineEventToUiMessage(ev)!!.subagentNotification!!
+
+        assertEquals("failed", notification.status)
+        assertEquals("Agent failed", notification.summary)
+        assertEquals("Timed out", notification.result)
+    }
+
+    @Test
     fun `standalone TOOL_RETURN events map to null`() {
         val ev = confirmed(TimelineMessageType.TOOL_RETURN, content = "output")
         assertNull(timelineEventToUiMessage(ev))

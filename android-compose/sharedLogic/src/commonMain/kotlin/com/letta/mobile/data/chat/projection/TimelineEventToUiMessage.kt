@@ -220,7 +220,23 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
         }
         is TimelineEvent.Confirmed -> {
             if (ev.messageType == TimelineMessageType.SYSTEM) return null
-            
+
+            val projectedSubagentNotification = when (ev.messageType) {
+                TimelineMessageType.USER, TimelineMessageType.ASSISTANT -> extractSubagentNotification(ev.content)
+                else -> null
+            }
+            if (projectedSubagentNotification != null) {
+                return UiMessage(
+                    id = ev.serverId,
+                    role = "assistant",
+                    content = "",
+                    timestamp = ev.date.toString(),
+                    runId = ev.runId,
+                    stepId = ev.stepId,
+                    subagentNotification = projectedSubagentNotification,
+                )
+            }
+
             val role = when (ev.messageType) {
                 TimelineMessageType.USER -> "user"
                 TimelineMessageType.ASSISTANT -> "assistant"

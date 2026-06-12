@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -211,20 +212,22 @@ internal fun SubagentNotificationCard(
     val opener = LocalSubagentTodoSheetOpener.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    val effectiveToolCallId = toolCallId ?: notification.toolCallId
-    val headerOpenTodosModifier = if (!effectiveToolCallId.isNullOrBlank()) {
-        Modifier.clickable {
+    val effectiveToolCallId = toolCallId ?: notification.toolCallId ?: notification.taskId
+    val canOpenSubagent = !effectiveToolCallId.isNullOrBlank()
+    val openSubagent = {
+        val targetId = effectiveToolCallId
+        if (!targetId.isNullOrBlank()) {
             HapticEffects.segmentTick(haptic, view)
             opener(
                 SubagentTodoSheetTarget(
-                    toolCallId = effectiveToolCallId,
+                    toolCallId = targetId,
                     description = notification.summary ?: fallbackDescription,
+                    subagentAgentId = notification.subagentAgentId,
                 )
             )
         }
-    } else {
-        Modifier
     }
+    val headerOpenTodosModifier = if (canOpenSubagent) Modifier.clickable { openSubagent() } else Modifier
     val isFailure = notification.status.equals("failed", ignoreCase = true) ||
         notification.status.equals("error", ignoreCase = true)
     // Collapse the full report by default — the summary already conveys the
@@ -236,12 +239,13 @@ internal fun SubagentNotificationCard(
     val report = notification.result?.takeIf { it.isNotBlank() }
     Card(
         modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.70f),
+            containerColor = MaterialTheme.colorScheme.surface,
         ),
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
+            color = if (isFailure) MaterialTheme.colorScheme.error.copy(alpha = 0.62f) else MaterialTheme.colorScheme.outlineVariant,
         ),
     ) {
         Column(
@@ -258,7 +262,7 @@ internal fun SubagentNotificationCard(
                     imageVector = if (isFailure) LettaIcons.Error else LettaIcons.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
+                    tint = if (isFailure) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
@@ -277,8 +281,19 @@ internal fun SubagentNotificationCard(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                notification.usage?.let { SubagentMetaChip(text = it) }
+                notification.durationMs?.let(::formatToolExecutionTime)?.let { SubagentMetaChip(text = it) }
                 notification.taskId?.let { SubagentMetaChip(text = it) }
+            }
+            if (canOpenSubagent) {
+                Text(
+                    text = "View conversation",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = 32.dp)
+                        .clickable { openSubagent() }
+                        .padding(vertical = 8.dp),
+                )
             }
             if (report != null) {
                 Row(
@@ -314,9 +329,9 @@ internal fun SubagentNotificationCard(
             }
             notification.transcriptUri?.let { transcript ->
                 Text(
-                    text = "View transcript: $transcript",
+                    text = "Transcript: $transcript",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
