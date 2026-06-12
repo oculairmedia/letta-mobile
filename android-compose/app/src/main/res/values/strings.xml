@@ -241,6 +241,7 @@
         <item quantity="other">Delete %1$d conversations? This cannot be undone.</item>
     </plurals>
     <string name="screen_agents_empty">No agents yet</string>
+    <string name="screen_agents_empty_create_action">Create agent</string>
     <string name="screen_agents_no_matches">No agents matching \u201c%1$s\u201d</string>
     <string name="screen_agents_favorite_indicator">Favorite agent</string>
     <string name="screen_agents_pinned_indicator">Pinned agent</string>

@@ -398,6 +398,44 @@ class AgentListViewModelTest {
     }
 
     @Test
+    fun `empty local runtime mode exposes create action`() = runTest {
+        clearMocks(agentRepository, answers = false, recordedCalls = true)
+        activeConfigFlow.value = localConfig()
+        every { agentRepository.agents } returns MutableStateFlow(emptyList())
+
+        viewModel = newViewModel()
+
+        assertTrue(viewModel.uiState.value.agents.isEmpty())
+        assertFalse(viewModel.uiState.value.isLoading)
+        assertTrue(
+            shouldShowEmptyAgentCreateAction(
+                isShareMode = false,
+                isHydrating = viewModel.uiState.value.isHydrating,
+                searchQuery = viewModel.uiState.value.searchQuery,
+            )
+        )
+    }
+
+    @Test
+    fun `empty local create action opens shared create dialog`() = runTest {
+        clearMocks(agentRepository, answers = false, recordedCalls = true)
+        activeConfigFlow.value = localConfig()
+        every { agentRepository.agents } returns MutableStateFlow(emptyList())
+        viewModel = newViewModel()
+
+        viewModel.showCreateDialog()
+
+        assertTrue(viewModel.uiState.value.showCreateDialog)
+    }
+
+    @Test
+    fun `empty create action hidden while searching or sharing`() = runTest {
+        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = true, isHydrating = false, searchQuery = ""))
+        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = false, isHydrating = false, searchQuery = "missing"))
+        assertFalse(shouldShowEmptyAgentCreateAction(isShareMode = false, isHydrating = true, searchQuery = ""))
+    }
+
+    @Test
     fun `local runtime mode does not refresh remote agent list`() = runTest {
         clearMocks(agentRepository, answers = false, recordedCalls = true)
         activeConfigFlow.value = localConfig()
