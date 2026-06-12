@@ -13,6 +13,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <exception>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -27,6 +28,12 @@ jclass gBridgeClass = nullptr;
 jmethodID gStdoutMethod = nullptr;
 jmethodID gStderrMethod = nullptr;
 int gStdinWriteFd = -1;
+int gSavedStdinFd = -1;
+int gSavedStdoutFd = -1;
+int gSavedStderrFd = -1;
+std::thread gStdoutPump;
+std::thread gStderrPump;
+std::mutex gIoMutex;
 std::atomic<bool> gStopRequested(false);
 
 void LogError(const char* message) {
@@ -320,6 +327,35 @@ void CloseIfOpen(int& fd) {
     }
 }
 
+void RestoreFd(int& savedFd, int targetFd) {
+    if (savedFd >= 0) {
+        dup2(savedFd, targetFd);
+        close(savedFd);
+        savedFd = -1;
+    }
+}
+
+void JoinPumpThreads() {
+    if (gStdoutPump.joinable()) {
+        gStdoutPump.join();
+    }
+    if (gStderrPump.joinable()) {
+        gStderrPump.join();
+    }
+}
+
+void CleanupNativeIo() {
+    gStopRequested.store(true);
+    {
+        std::lock_guard<std::mutex> lock(gIoMutex);
+        CloseIfOpen(gStdinWriteFd);
+    }
+    RestoreFd(gSavedStdinFd, STDIN_FILENO);
+    RestoreFd(gSavedStdoutFd, STDOUT_FILENO);
+    RestoreFd(gSavedStderrFd, STDERR_FILENO);
+    JoinPumpThreads();
+}
+
 }  // namespace
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
@@ -372,20 +408,34 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     ApplyAndroidLibuvMitigations();
     LogPhase("environment configured");
 
+    CleanupNativeIo();
+
     int stdinPipe[2] = {-1, -1};
     int stdoutPipe[2] = {-1, -1};
     int stderrPipe[2] = {-1, -1};
     auto cleanupRedirects = [&]() {
-        CloseIfOpen(gStdinWriteFd);
+        CleanupNativeIo();
         CloseIfOpen(stdoutPipe[0]);
         CloseIfOpen(stderrPipe[0]);
     };
+
+    gSavedStdinFd = dup(STDIN_FILENO);
+    gSavedStdoutFd = dup(STDOUT_FILENO);
+    gSavedStderrFd = dup(STDERR_FILENO);
+    if (gSavedStdinFd < 0 || gSavedStdoutFd < 0 || gSavedStderrFd < 0) {
+        LogError("dup() for stdio restore failed");
+        cleanupRedirects();
+        return -1;
+    }
 
     if (!RedirectFd(STDIN_FILENO, stdinPipe, true)) {
         cleanupRedirects();
         return -1;
     }
-    gStdinWriteFd = stdinPipe[1];
+    {
+        std::lock_guard<std::mutex> lock(gIoMutex);
+        gStdinWriteFd = stdinPipe[1];
+    }
     if (!RedirectFd(STDOUT_FILENO, stdoutPipe, false)) {
         cleanupRedirects();
         return -1;
@@ -397,14 +447,15 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStart(
     DisableStdStreamBuffering();
 
     gStopRequested.store(false);
-    std::thread(PumpFdLines, stdoutPipe[0], gStdoutMethod).detach();
-    std::thread(PumpFdLines, stderrPipe[0], gStderrMethod).detach();
+    gStdoutPump = std::thread(PumpFdLines, stdoutPipe[0], gStdoutMethod);
+    gStderrPump = std::thread(PumpFdLines, stderrPipe[0], gStderrMethod);
     LogPhase("stdio redirected");
 
     std::vector<std::string> args = ResolveNodeArguments(ToStringVector(env, arguments));
     LogInfo(std::string("embedded node argv count: ") + std::to_string(args.size()));
     const int exitCode = StartNodeWithDedicatedThread(std::move(args));
     LogInfo(std::string("embedded node::Start returned: ") + std::to_string(exitCode));
+    CleanupNativeIo();
     return exitCode;
 }
 
@@ -414,14 +465,16 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeWriteStdin(
     jobject,
     jstring line
 ) {
+    std::lock_guard<std::mutex> lock(gIoMutex);
     if (gStdinWriteFd < 0) {
         return JNI_FALSE;
     }
+    const int fd = gStdinWriteFd;
     const std::string payload = ToString(env, line);
     const char* data = payload.data();
     size_t remaining = payload.size();
     while (remaining > 0) {
-        const ssize_t written = write(gStdinWriteFd, data, remaining);
+        const ssize_t written = write(fd, data, remaining);
         if (written < 0) {
             if (errno == EINTR) continue;
             return JNI_FALSE;
@@ -440,10 +493,6 @@ Java_com_letta_mobile_runtime_local_NativeLettaCodeNodeBridge_nativeStop(
     JNIEnv*,
     jobject
 ) {
-    gStopRequested.store(true);
-    if (gStdinWriteFd >= 0) {
-        close(gStdinWriteFd);
-        gStdinWriteFd = -1;
-    }
+    CleanupNativeIo();
     return JNI_TRUE;
 }

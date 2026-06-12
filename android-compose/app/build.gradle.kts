@@ -139,6 +139,9 @@ logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$com
 
 val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
+// Bump when asset-prep transforms change (transpile/polyfill), so the on-device
+// extractor re-extracts even though the npm version is unchanged.
+val embeddedLettaCodeAssetRevision = "3"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -257,10 +260,181 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .inheritIO()
             .start()
         check(npmInstall.waitFor() == 0) { "npm install for embedded LettaCode failed." }
+
+        // nodejs-mobile's libnode is built WITHOUT ICU (--with-intl=none), so V8
+        // rejects unicode property escapes (/\p{...}/u) with "Invalid property
+        // name" SyntaxError at module load. Desktop Node parses these fine, which
+        // is why letta.js "boots on Node 18" on a workstation but SIGABRTs inside
+        // node::Start on device. Transpile property escapes to plain character
+        // classes at asset-prep time (standard nodejs-mobile prior art via
+        // regexpu/babel). See letta-mobile-7to5o.
+        val babelInstall = ProcessBuilder(
+            npmCommand(),
+            "install",
+            "--no-audit",
+            "--no-fund",
+            "--prefix",
+            npmWorkDir.absolutePath,
+            "@babel/core@7",
+            "@babel/plugin-transform-unicode-property-regex@7",
+            "regexpu-core@6",
+        )
+            .directory(projectDir)
+            .inheritIO()
+            .start()
+        check(babelInstall.waitFor() == 0) { "npm install for babel transform failed." }
+        val transformScript = npmWorkDir.resolve("transform-unicode-property.mjs")
+        transformScript.writeText(
+            """
+            import { transformAsync } from '@babel/core';
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            const src = readFileSync(file, 'utf8');
+            const result = await transformAsync(src, {
+              plugins: ['@babel/plugin-transform-unicode-property-regex'],
+              compact: false,
+              babelrc: false,
+              configFile: false,
+              parserOpts: { sourceType: 'unambiguous' },
+            });
+            writeFileSync(file, result.code);
+            console.log('[embedded-lettacode] transpiled unicode property escapes in ' + file);
+            """.trimIndent(),
+        )
+        val lettaJs = npmWorkDir.resolve("node_modules/@letta-ai/letta-code/letta.js")
+        check(lettaJs.isFile) { "letta.js not found for unicode-property transform at ${lettaJs.absolutePath}" }
+        val transform = ProcessBuilder(
+            "node",
+            "--max-old-space-size=8192",
+            transformScript.absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(transform.waitFor() == 0) { "Unicode property escape transform for letta.js failed." }
+
         copy {
             from(npmWorkDir.resolve("node_modules"))
             into(assetRoot.resolve("node_modules"))
+            // babel is a build-time tool only; don't ship it on device.
+            // regexpu-core (+ regenerate/regjs*/unicode-* data) IS shipped: the
+            // runtime RegExp polyfill below needs it for dynamically constructed
+            // patterns that the static babel pass cannot reach.
+            exclude("@babel/**", ".bin/**", "@jridgewell/**", "browserslist/**", "caniuse-lite/**", "electron-to-chromium/**")
         }
+        // Runtime guard for ICU-less V8: letta.js also builds regexes at RUNTIME
+        // (e.g. the oniguruma-to-js highlighter calls new RegExp with \p{...}
+        // patterns), which static transpilation cannot reach. Preload a RegExp
+        // wrapper (node --require) that retries failed compilations through
+        // regexpu-core with property escapes transformed.
+        assetRoot.resolve("regexp-polyfill.cjs").writeText(
+            """
+            'use strict';
+            // nodejs-mobile libnode has no ICU: /\p{...}/u throws "Invalid
+            // property name". Retry failed patterns through regexpu-core.
+            const rewritePattern = require('regexpu-core');
+            const NativeRegExp = RegExp;
+            function rewriteOptions(flags) {
+              return {
+                unicodePropertyEscapes: 'transform',
+                unicodeSetsFlag: flags.includes('v') ? 'transform' : false,
+              };
+            }
+            function PatchedRegExp(pattern, flags) {
+              try {
+                return flags === undefined
+                  ? new NativeRegExp(pattern)
+                  : new NativeRegExp(pattern, flags);
+              } catch (originalError) {
+                if (pattern instanceof NativeRegExp && flags === undefined) throw originalError;
+                try {
+                  const sourceFlags = flags !== undefined
+                    ? String(flags)
+                    : (pattern instanceof NativeRegExp ? pattern.flags : '');
+                  const sourcePattern = pattern instanceof NativeRegExp ? pattern.source : String(pattern);
+                  const rewritten = rewritePattern(sourcePattern, sourceFlags, rewriteOptions(sourceFlags));
+                  const outFlags = sourceFlags.replace('v', 'u');
+                  return new NativeRegExp(rewritten, outFlags);
+                } catch (_) {
+                  throw originalError;
+                }
+              }
+            }
+            PatchedRegExp.prototype = NativeRegExp.prototype;
+            Object.setPrototypeOf(PatchedRegExp, NativeRegExp);
+            globalThis.RegExp = PatchedRegExp;
+
+            // ICU-less node also lacks the entire Intl namespace. Provide the
+            // minimal surface letta.js touches. Segmenter: code-point graphemes
+            // (good enough for width/wrapping on device). Formatters: passthrough.
+            if (typeof globalThis.Intl === 'undefined') {
+              class Segmenter {
+                constructor(_locale, options) { this.granularity = (options && options.granularity) || 'grapheme'; }
+                segment(input) {
+                  const str = String(input);
+                  const segments = [];
+                  if (this.granularity === 'word') {
+                    const re = /\S+|\s+/g; let m;
+                    while ((m = re.exec(str)) !== null) {
+                      segments.push({ segment: m[0], index: m.index, input: str, isWordLike: /\S/.test(m[0]) });
+                    }
+                  } else {
+                    let index = 0;
+                    for (const ch of str) { segments.push({ segment: ch, index, input: str }); index += ch.length; }
+                  }
+                  segments[Symbol.iterator] = Array.prototype[Symbol.iterator];
+                  segments.containing = (i) => segments.find(s => s.index <= i && i < s.index + s.segment.length);
+                  return segments;
+                }
+              }
+              class NumberFormat {
+                constructor() {}
+                format(n) { return String(n); }
+                formatToParts(n) { return [{ type: 'integer', value: String(n) }]; }
+                resolvedOptions() { return { locale: 'en-US' }; }
+              }
+              class DateTimeFormat {
+                constructor() {}
+                format(d) { return new Date(d ?? Date.now()).toISOString(); }
+                formatToParts(d) { return [{ type: 'literal', value: this.format(d) }]; }
+                resolvedOptions() { return { locale: 'en-US', timeZone: 'UTC' }; }
+              }
+              class Collator {
+                constructor() {}
+                compare(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+                resolvedOptions() { return { locale: 'en-US' }; }
+              }
+              class PluralRules {
+                constructor() {}
+                select(n) { return n === 1 ? 'one' : 'other'; }
+                resolvedOptions() { return { locale: 'en-US' }; }
+              }
+              class RelativeTimeFormat {
+                constructor() {}
+                format(value, unit) { return value + ' ' + unit + (Math.abs(value) === 1 ? '' : 's'); }
+                formatToParts(value, unit) { return [{ type: 'literal', value: this.format(value, unit) }]; }
+                resolvedOptions() { return { locale: 'en-US' }; }
+              }
+              class ListFormat {
+                constructor() {}
+                format(list) { return Array.from(list).join(', '); }
+                resolvedOptions() { return { locale: 'en-US' }; }
+              }
+              const supported = (cls) => { cls.supportedLocalesOf = () => ['en-US']; return cls; };
+              globalThis.Intl = {
+                Segmenter: supported(Segmenter),
+                NumberFormat: supported(NumberFormat),
+                DateTimeFormat: supported(DateTimeFormat),
+                Collator: supported(Collator),
+                PluralRules: supported(PluralRules),
+                RelativeTimeFormat: supported(RelativeTimeFormat),
+                ListFormat: supported(ListFormat),
+                getCanonicalLocales: (l) => (Array.isArray(l) ? l : l ? [l] : []),
+              };
+            }
+            """.trimIndent(),
+        )
         assetRoot.resolve("package.json").writeText(
             """
             {
@@ -303,7 +477,7 @@ android {
         manifestPlaceholders["SENTRY_ENV"] = sentryEnv
         buildConfigField("boolean", "EMBEDDED_LETTACODE_NATIVE_ENABLED", embeddedLettaCodeNativeEnabled.get().toString())
         buildConfigField("boolean", "EMBEDDED_LETTACODE_ASSETS_ENABLED", embeddedLettaCodeAssetsEnabled.get().toString())
-        buildConfigField("String", "EMBEDDED_LETTACODE_VERSION", "\"$embeddedLettaCodeVersion\"")
+        buildConfigField("String", "EMBEDDED_LETTACODE_VERSION", "\"$embeddedLettaCodeVersion-r$embeddedLettaCodeAssetRevision\"")
         buildConfigField("String", "EMBEDDED_LETTACODE_INTEGRITY", "\"$embeddedLettaCodeIntegrity\"")
 
         if (embeddedLettaCodeNativeEnabled.get()) {

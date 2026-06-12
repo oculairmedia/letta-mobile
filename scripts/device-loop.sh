@@ -39,6 +39,10 @@ run_filter() {
     :app:connectedRootDebugAndroidTest
     -PembedLettaCodeNative=true
     -PembedLettaCodeAssets=true
+    # Keep the dev app + its data (3GB downloaded models!) installed after the
+    # test run. Without this, connectedAndroidTest uninstalls the app and the
+    # user has to re-download models from HF every time (learned the hard way).
+    -Pandroid.injected.androidTest.leaveApksInstalledAfterTest=true
     "-Pandroid.testInstrumentationRunnerArguments.class=$filter"
   )
 

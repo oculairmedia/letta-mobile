@@ -145,6 +145,10 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 add("node")
                 add("--max-old-space-size=384")
                 add("--max-semi-space-size=16")
+                // ICU-less V8 rejects \p{...} regexes; preload a RegExp wrapper
+                // that rewrites them through regexpu-core (see asset prep task).
+                add("--require")
+                add(File(projectDir, "regexp-polyfill.cjs").absolutePath)
                 add(entrypoint.absolutePath)
                 add("--backend")
                 add("local")
