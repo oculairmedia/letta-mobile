@@ -17,6 +17,9 @@ interface AgentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(agents: List<AgentEntity>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(agent: AgentEntity)
+
     @Query("DELETE FROM agents WHERE id NOT IN (:keepIds)")
     suspend fun deleteExcept(keepIds: List<String>)
 

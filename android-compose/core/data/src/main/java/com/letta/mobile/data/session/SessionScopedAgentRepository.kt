@@ -90,6 +90,8 @@ class SessionScopedAgentRepository internal constructor(
 
     override suspend fun createAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createAgent(params) }
 
+    override suspend fun createLocalAgent(params: AgentCreateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.createLocalAgent(params) }
+
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = sessionManager.withCurrentSession { it.agentRepository.updateAgent(id, params) }
 
     override suspend fun deleteAgent(id: AgentId) = sessionManager.withCurrentSession { it.agentRepository.deleteAgent(id) }

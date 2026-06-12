@@ -26,7 +26,7 @@ import com.letta.mobile.data.model.DomainIdConverters
         MemFsFileEntity::class,
         MemFsCommitEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)

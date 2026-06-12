@@ -18,6 +18,7 @@ import com.letta.mobile.data.paging.AgentPagingSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
+import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -207,6 +208,35 @@ open class AgentRepository(
     override open suspend fun createAgent(params: AgentCreateParams): Agent {
         val agent = agentApi.createAgent(params)
         refreshAgents()
+        return agent
+    }
+
+    override open suspend fun createLocalAgent(params: AgentCreateParams): Agent {
+        val agent = Agent(
+            id = AgentId("local-agent-${UUID.randomUUID()}"),
+            name = params.name?.takeIf { it.isNotBlank() } ?: "Local Agent",
+            description = params.description,
+            metadata = params.metadata.orEmpty(),
+            model = params.model,
+            embedding = params.embedding,
+            modelSettings = params.modelSettings,
+            llmConfig = params.llmConfig,
+            embeddingConfig = params.embeddingConfig,
+            contextWindowLimit = params.contextWindowLimit,
+            responseFormat = params.responseFormat,
+            tags = params.tags.orEmpty(),
+            system = params.system,
+            enableSleeptime = params.enableSleeptime,
+            agentType = params.agentType,
+            messageBufferAutoclear = params.messageBufferAutoclear,
+            timezone = params.timezone,
+            maxFilesOpen = params.maxFilesOpen,
+            perFileViewWindowCharLimit = params.perFileViewWindowCharLimit,
+            hidden = params.hidden,
+            compactionSettings = params.compactionSettings,
+        )
+        agentDao.upsert(AgentEntity.fromAgent(agent))
+        updateAgentInCache(agent)
         return agent
     }
 

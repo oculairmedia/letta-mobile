@@ -82,6 +82,19 @@ class FakeAgentRepository(
         return agent
     }
 
+    override suspend fun createLocalAgent(params: AgentCreateParams): Agent {
+        calls += "createLocalAgent:${params.name.orEmpty()}"
+        val agent = TestData.agent(
+            id = "local-agent-${agentsState.value.size + 1}",
+            name = params.name ?: "Local Agent",
+            model = params.model,
+            description = params.description,
+            tags = params.tags.orEmpty(),
+        ).copy(metadata = params.metadata.orEmpty(), tools = emptyList())
+        agentsState.value = agentsState.value + agent
+        return agent
+    }
+
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
         calls += "updateAgent:${id.value}"
         val current = requireAgent(id)

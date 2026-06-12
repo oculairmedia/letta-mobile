@@ -1,16 +1,25 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.local.AgentDao
+import com.letta.mobile.data.local.AgentEntity
+import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.TestData
-import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -20,12 +29,14 @@ import org.junit.jupiter.api.Tag
 class AgentRepositoryTest {
 
     private lateinit var fakeApi: FakeAgentApi
+    private lateinit var fakeDao: FakeAgentDao
     private lateinit var repository: AgentRepository
 
     @Before
     fun setup() {
         fakeApi = FakeAgentApi()
-        repository = AgentRepository(fakeApi, mockk(relaxed = true))
+        fakeDao = FakeAgentDao()
+        repository = AgentRepository(fakeApi, fakeDao)
     }
 
     @Test
@@ -85,6 +96,37 @@ class AgentRepositoryTest {
     }
 
     @Test
+    fun `createLocalAgent inserts local-bound row and emits cache without api`() = runTest {
+        val agent = repository.createLocalAgent(
+            AgentCreateParams(
+                name = "Local",
+                model = "lmstudio/local-model",
+                metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+                toolIds = listOf(com.letta.mobile.data.model.ToolId("tool-1")),
+                includeBaseTools = true,
+            )
+        )
+
+        assertTrue(agent.id.value.startsWith("local-agent-"))
+        assertTrue(AgentRuntimeBinding.isLocalBound(agent))
+        assertEquals("lmstudio/local-model", agent.model)
+        assertTrue(agent.tools.isEmpty())
+        assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
+        assertEquals(listOf(agent.id.value), fakeDao.getAllOnce().map { it.id })
+        assertEquals(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime, fakeDao.getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RuntimeKey]?.jsonPrimitive?.contentOrNull)
+        assertFalse(fakeApi.calls.any { it.startsWith("createAgent") })
+    }
+
+    @Test
+    fun `createAgent remains remote api backed`() = runTest {
+        val agent = repository.createAgent(AgentCreateParams(name = "Remote"))
+
+        assertEquals("Remote", agent.name)
+        assertEquals(listOf("createAgent:Remote", "listAgents"), fakeApi.calls)
+        assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
+    }
+
+    @Test
     fun `deleteAgent removes deleted agent from cached agents immediately`() = runTest {
         fakeApi.agents.addAll(
             listOf(
@@ -98,5 +140,29 @@ class AgentRepositoryTest {
 
         assertEquals(listOf("a2"), repository.agents.value.map { it.id.value })
         assertFalse(fakeApi.agents.any { it.id == AgentId("a1") })
+    }
+
+    private class FakeAgentDao : AgentDao {
+        private val agents = MutableStateFlow<List<AgentEntity>>(emptyList())
+
+        override fun getAll(): Flow<List<AgentEntity>> = agents
+
+        override suspend fun getAllOnce(): List<AgentEntity> = agents.value
+
+        override suspend fun insertAll(agents: List<AgentEntity>) {
+            this.agents.value = agents
+        }
+
+        override suspend fun upsert(agent: AgentEntity) {
+            agents.value = agents.value.filterNot { it.id == agent.id } + agent
+        }
+
+        override suspend fun deleteExcept(keepIds: List<String>) {
+            agents.value = agents.value.filter { it.id in keepIds }
+        }
+
+        override suspend fun deleteAll() {
+            agents.value = emptyList()
+        }
     }
 }
