@@ -425,7 +425,10 @@ class EmbeddedRuntimeDeviceLoopTest {
         localModelHandle = "local/${model.nameWithoutExtension}",
         localModelPath = model.absolutePath,
         localModelRuntime = EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_RUNTIME,
-        localModelAccelerator = "cpu",
+        // Overridable for accelerator-specific repros:
+        // -e localModelAccelerator gpu
+        localModelAccelerator = androidx.test.platform.app.InstrumentationRegistry.getArguments()
+            .getString("localModelAccelerator") ?: "cpu",
         localModelMaxTokens = 256,
     )
 
