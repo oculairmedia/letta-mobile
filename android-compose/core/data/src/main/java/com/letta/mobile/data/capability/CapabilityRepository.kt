@@ -1,8 +1,11 @@
 package com.letta.mobile.data.capability
 
+import android.util.Log
 import com.letta.mobile.data.api.ProjectApi
-import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,14 +42,14 @@ internal fun defaultCapabilityScope(): CoroutineScope =
 
 @Singleton
 class CapabilityRepository(
-    private val settingsRepository: SettingsRepository,
+    private val settingsRepository: ISettingsRepository,
     private val projectApi: ProjectApi,
     private val scope: CoroutineScope,
 ) {
     /** Hilt-friendly constructor — uses [defaultCapabilityScope]. */
     @Inject
         constructor(
-            settingsRepository: SettingsRepository,
+            settingsRepository: ISettingsRepository,
             projectApi: ProjectApi,
         ) : this(settingsRepository, projectApi, defaultCapabilityScope())
 
@@ -67,6 +70,10 @@ class CapabilityRepository(
                 .collect { config ->
                     if (config.id == lastProbedConfigId) return@collect
                     lastProbedConfigId = config.id
+                    if (config.mode == LettaConfig.Mode.LOCAL) {
+                        setProjectsUnsupported(config.id, "local-runtime")
+                        return@collect
+                    }
                     probeProjects(config.id)
                 }
         }
@@ -78,13 +85,30 @@ class CapabilityRepository(
             "capability" to "projects",
             "configId" to configId,
         )
-        val supported = projectApi.probeAvailability()
+        val supported = try {
+            projectApi.probeAvailability()
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (e: Exception) {
+            Log.w("CapabilityRepository", "Project capability probe failed", e)
+            false
+        }
         _projectsSupported.value = supported
         Telemetry.event(
             "Capability", "probe.result",
             "capability" to "projects",
             "configId" to configId,
             "supported" to supported,
+        )
+    }
+
+    private fun setProjectsUnsupported(configId: String, reason: String) {
+        _projectsSupported.value = false
+        Telemetry.event(
+            "Capability", "probe.skipped",
+            "capability" to "projects",
+            "configId" to configId,
+            "reason" to reason,
         )
     }
 }
