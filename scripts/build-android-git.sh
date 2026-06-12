@@ -10,6 +10,9 @@
 set -euo pipefail
 
 GIT_VERSION="${GIT_VERSION:-2.47.3}"
+# From https://www.kernel.org/pub/software/scm/git/sha256sums.asc — update
+# together with GIT_VERSION.
+GIT_SHA256="${GIT_SHA256:-9c2eb1250781b3e5bfef098572d07fdf132d67e6c065e4307332ade9819a1501}"
 API_LEVEL="${API_LEVEL:-26}"
 SDK_DIR="${ANDROID_SDK_ROOT:-/usr/lib/android-sdk}"
 NDK_DIR="${ANDROID_NDK_ROOT:-$(ls -d "$SDK_DIR"/ndk/* | sort -V | tail -1)}"
@@ -29,6 +32,10 @@ TARBALL="git-$GIT_VERSION.tar.xz"
 if [[ ! -f "$TARBALL" ]]; then
   curl -fsSLO "https://www.kernel.org/pub/software/scm/git/$TARBALL"
 fi
+echo "$GIT_SHA256  $TARBALL" | sha256sum -c - || {
+  echo "Checksum mismatch for $TARBALL — refusing to build from it." >&2
+  exit 1
+}
 rm -rf "git-$GIT_VERSION"
 tar xf "$TARBALL"
 cd "git-$GIT_VERSION"

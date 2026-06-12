@@ -124,8 +124,23 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                     flush()
                 }
             }
-            val body = readBody(input, headers["content-length"]?.toIntOrNull() ?: 0)
-            android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=${headers["content-length"] ?: "0"}")
+            val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+            if (contentLength < 0 || contentLength > MAX_BODY_BYTES) {
+                socket.outputStream.writeJsonResponse(
+                    400,
+                    errorBody("invalid_request", "Content-Length out of range: $contentLength"),
+                )
+                return
+            }
+            val body = readBody(input, contentLength)
+            if (body == null) {
+                socket.outputStream.writeJsonResponse(
+                    400,
+                    errorBody("invalid_request", "Request body ended before Content-Length bytes."),
+                )
+                return
+            }
+            android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$contentLength")
             when {
                 method == "GET" && path == "/v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
                 method == "POST" && path == "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
@@ -306,19 +321,25 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
 
     private companion object {
         private const val LOOPBACK_HOST = "127.0.0.1"
+
+        // Generous bound for chat-completion payloads (the full local system
+        // prompt + transcript is ~50 KB today); rejects pathological
+        // Content-Length values before allocation.
+        private const val MAX_BODY_BYTES = 8 * 1024 * 1024
     }
 }
 
-private fun readBody(input: java.io.InputStream, length: Int): String {
+/** Reads exactly [length] bytes; null when the stream ends early (truncated request). */
+private fun readBody(input: java.io.InputStream, length: Int): String? {
     if (length <= 0) return ""
     val buffer = ByteArray(length)
     var offset = 0
     while (offset < length) {
         val read = input.read(buffer, offset, length - offset)
-        if (read <= 0) break
+        if (read <= 0) return null
         offset += read
     }
-    return if (offset > 0) String(buffer, 0, offset, Charsets.UTF_8) else ""
+    return String(buffer, Charsets.UTF_8)
 }
 
 /** Reads a CRLF- (or LF-) terminated line as ISO-8859-1 bytes; null on EOF. */

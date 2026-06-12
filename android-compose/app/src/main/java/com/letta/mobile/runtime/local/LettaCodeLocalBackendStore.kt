@@ -159,13 +159,14 @@ class LettaCodeLocalBackendStore @Inject constructor(
             File(File(storageDirectory, "conversations"), base64Url("default:$agentId")).apply { mkdirs() }
         val conversationFile = File(conversationDirectory, "conversation.json")
         if (!conversationFile.isFile) {
+            val now = java.time.Instant.now().toString()
             val record = buildJsonObject {
                 put("id", "default")
                 put("agent_id", agentId)
                 put("archived", false)
                 put("archived_at", null as String?)
-                put("created_at", "2026-01-01T00:00:00.000Z")
-                put("updated_at", "2026-01-01T00:00:00.000Z")
+                put("created_at", now)
+                put("updated_at", now)
                 put("last_message_at", null as String?)
                 put("summary", null as String?)
                 putJsonArray("in_context_message_ids") {}

@@ -142,7 +142,14 @@ run_filter() {
   echo "Full logcat: $logcat_file"
 }
 
-ensure_model || { echo "device-loop: model staging failed"; exit 1; }
+# Only tier3 reads the model; don't push a multi-GB file for the default
+# tier1/2 smoke filters. Custom class filters (no tier marker) stage it too,
+# since they may run the whole class including tier3.
+if printf '%s\n' "${FILTERS[@]}" | grep -qvE "tier1|tier2"; then
+  ensure_model || { echo "device-loop: model staging failed"; exit 1; }
+else
+  echo "device-loop: tier1/2-only filters — skipping model staging"
+fi
 
 overall=0
 for filter in "${FILTERS[@]}"; do

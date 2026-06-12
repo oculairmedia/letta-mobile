@@ -425,6 +425,11 @@ class ConfigViewModel @Inject constructor(
                     localModelMaxTokens = localModelMaxTokens,
                 )
                 settingsRepository.saveConfig(config)
+                // Clear isSaving on success too: auto-persist callers
+                // (selectEmbeddedModel/importLocalModel) keep the screen open,
+                // and a stuck flag short-circuits every subsequent save.
+                val latest = (_uiState.value as? UiState.Success)?.data ?: state
+                _uiState.value = UiState.Success(latest.copy(isSaving = false))
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(state.copy(isSaving = false))
