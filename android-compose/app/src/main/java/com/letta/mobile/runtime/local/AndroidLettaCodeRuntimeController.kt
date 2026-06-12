@@ -194,6 +194,13 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 add("stream-json")
                 add("--output-format")
                 add("stream-json")
+                // The app has no approval channel yet (ToolApprovalResponse is
+                // ignored), so gated tools would stall a turn forever. The
+                // embedded runtime runs on the user's own device against the
+                // app sandbox; unrestricted is the deliberate interim policy
+                // until an approvals UI exists (letta-mobile-bm6x2).
+                add("--permission-mode")
+                add("unrestricted")
             },
             environment = buildMap {
                 put("HOME", homeDirectory.absolutePath)

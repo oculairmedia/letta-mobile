@@ -170,6 +170,71 @@ class EmbeddedRuntimeDeviceLoopTest {
     }
 
     /**
+     * letta-mobile-69i0z: full tool-call round trip on device. The scripted
+     * engine first replies with a tool_call (Bash echo); letta.js must parse
+     * it through the bridge's OpenAI translation, EXECUTE the tool in-process
+     * (sh exists on Android), feed the tool result back, and only then does
+     * the engine produce final text. Assistant text therefore proves the
+     * entire loop: prompt-format tools → tool_calls → execution → result →
+     * follow-up generation.
+     */
+    @Test
+    fun tier4LocalToolCallRoundTripExecutesToolAndCompletes() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 4 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+        val model = findLitertLmModel()
+        assumeTrue("Tier 4 requires a .litertlm under filesDir/embedded-lettacode/models", model != null)
+        requireNotNull(model)
+
+        val nodeBridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
+        val controller = AndroidLettaCodeRuntimeController(
+            context = context,
+            assetExtractor = EmbeddedLettaCodeAssetExtractor(context),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
+            localBackendStore = LettaCodeLocalBackendStore(context),
+            onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
+                engine = object : OnDeviceChatCompletionEngine {
+                    override fun generate(
+                        modelSelection: EmbeddedLettaCodeModelSelection,
+                        prompt: String,
+                    ): Result<String> = Result.success(
+                        if (prompt.contains("tool result")) {
+                            "tool-loop-ok"
+                        } else {
+                            "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"echo device-tool-roundtrip\"}}\n```"
+                        }
+                    )
+                }
+            ),
+        )
+        val backend = LocalLettaBackend(
+            descriptor = descriptor(),
+            engine = LettaCodeTurnEngine(
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper()),
+                config = config(model),
+            ),
+            outbox = InMemoryRuntimeEventOutbox(
+                eventIdFactory = { _, offset -> RuntimeEventId("device-loop-${offset.value}") },
+                clock = { EpochMillis(System.currentTimeMillis()) },
+            ),
+            memFsStore = NoopMemFsStore,
+        )
+
+        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+            backend.runTurn(command()).firstOrNull { envelope ->
+                val payload = envelope.payload
+                payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.contains("tool-loop-ok")
+            }
+        }
+
+        assertTrue(
+            "expected the post-tool assistant text to arrive (tool round trip)",
+            event != null,
+        )
+    }
+
+    /**
      * When run with -Pandroid.testInstrumentationRunnerArguments.requireAssistantText=true
      * a "clean failure" lifecycle event is NOT accepted — only real assistant text passes.
      * This is how the device loop distinguishes "runtime crashed politely" from

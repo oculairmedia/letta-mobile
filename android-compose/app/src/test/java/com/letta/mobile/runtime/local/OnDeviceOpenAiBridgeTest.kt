@@ -63,6 +63,66 @@ class OnDeviceOpenAiBridgeTest {
         }
     }
 
+    // letta-mobile-69i0z: prompt-format tool calling through the bridge.
+    @Test
+    fun `tool call reply becomes openai tool_calls with finish_reason tool_calls`() {
+        val engine = FakeEngine(
+            response = "```tool_call\n{\"name\": \"memory\", \"arguments\": {\"op\": \"view\"}}\n```",
+        )
+        val bridge = LocalOpenAiOnDeviceBridge(engine)
+        bridge.start(selection()).use { session ->
+            val response = post(
+                url = "${session.baseUrl}/chat/completions",
+                body = """
+                    {
+                      "messages": [{"role": "user", "content": "check memory"}],
+                      "tools": [{"type": "function", "function": {
+                        "name": "memory", "description": "Edit memory.",
+                        "parameters": {"type": "object"}
+                      }}]
+                    }
+                """.trimIndent(),
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(response.body.contains("\"tool_calls\""))
+            assertTrue(response.body.contains("\"name\":\"memory\""))
+            assertTrue(response.body.contains("\"finish_reason\":\"tool_calls\""))
+            // Tool schemas must reach the model through the prompt.
+            assertTrue(engine.lastPrompt.orEmpty().contains("- memory: Edit memory."))
+            assertTrue(engine.lastPrompt.orEmpty().contains("```tool_call"))
+        }
+    }
+
+    @Test
+    fun `streamed tool call emits tool_calls delta then tool_calls finish`() {
+        val engine = FakeEngine(
+            response = "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"ls\"}}\n```",
+        )
+        val bridge = LocalOpenAiOnDeviceBridge(engine)
+        bridge.start(selection()).use { session ->
+            val response = post(
+                url = "${session.baseUrl}/chat/completions",
+                body = """
+                    {
+                      "stream": true,
+                      "messages": [{"role": "user", "content": "list files"}],
+                      "tools": [{"type": "function", "function": {
+                        "name": "Bash", "description": "Run a command.",
+                        "parameters": {"type": "object"}
+                      }}]
+                    }
+                """.trimIndent(),
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(response.contentType.orEmpty().startsWith("text/event-stream"))
+            assertTrue(response.body.contains("\"tool_calls\""))
+            assertTrue(response.body.contains("\"finish_reason\":\"tool_calls\""))
+            assertTrue(response.body.contains("data: [DONE]"))
+        }
+    }
+
     @Test
     fun `streaming chat completions endpoint emits delta and done sentinel`() {
         val bridge = LocalOpenAiOnDeviceBridge(FakeEngine(response = "streamed device text"))
