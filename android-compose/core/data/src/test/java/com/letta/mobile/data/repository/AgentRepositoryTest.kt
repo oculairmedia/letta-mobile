@@ -39,6 +39,94 @@ class AgentRepositoryTest {
         repository = AgentRepository(fakeApi, fakeDao)
     }
 
+    // letta-mobile-y5c9u / yfo86 / 6oglt: local-runtime mode routes agent
+    // reads/writes to the on-device store instead of the remote API.
+    private class FakeLocalAgentSource : com.letta.mobile.data.repository.api.LocalRuntimeAgentSource {
+        val persisted = mutableListOf<com.letta.mobile.data.model.Agent>()
+        var stored = mutableListOf<com.letta.mobile.data.model.Agent>()
+        var overview: com.letta.mobile.data.model.ContextWindowOverview? = null
+
+        override suspend fun listAgents(): List<com.letta.mobile.data.model.Agent> = stored.toList()
+
+        override suspend fun persistAgent(agent: com.letta.mobile.data.model.Agent) {
+            persisted += agent
+            stored.removeAll { it.id == agent.id }
+            stored += agent
+        }
+
+        override suspend fun contextWindowOverview(agentId: AgentId) = overview
+    }
+
+    private fun localRepository(source: FakeLocalAgentSource): AgentRepository = AgentRepository(
+        agentApi = fakeApi,
+        agentDao = fakeDao,
+        localAgentSource = source,
+        settingsRepository = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "local-1",
+                mode = com.letta.mobile.data.model.LettaConfig.Mode.LOCAL,
+                serverUrl = "local-lettacode://device",
+            ),
+        ),
+    )
+
+    @Test
+    fun `refreshAgents lists from local source when local runtime active`() = runTest {
+        val source = FakeLocalAgentSource().apply {
+            stored += TestData.agent(id = "local-agent-1", name = "My Local Agent")
+        }
+        val localRepo = localRepository(source)
+
+        localRepo.refreshAgents()
+
+        assertEquals(listOf("My Local Agent"), localRepo.agents.value.map { it.name })
+        assertEquals(0, fakeApi.calls.count { it == "listAgents" })
+    }
+
+    @Test
+    fun `createLocalAgent persists to local source`() = runTest {
+        val source = FakeLocalAgentSource()
+        val localRepo = localRepository(source)
+
+        val agent = localRepo.createLocalAgent(AgentCreateParams(name = "Persisted Agent"))
+
+        assertEquals(listOf(agent.id), source.persisted.map { it.id })
+    }
+
+    @Test
+    fun `getContextWindow uses local estimate when local runtime active`() = runTest {
+        val source = FakeLocalAgentSource().apply {
+            overview = com.letta.mobile.data.model.ContextWindowOverview(
+                contextWindowSizeMax = 128_000,
+                contextWindowSizeCurrent = 420,
+            )
+        }
+        val localRepo = localRepository(source)
+
+        val overview = localRepo.getContextWindow(AgentId("local-agent-1"), null)
+
+        assertEquals(420, overview.contextWindowSizeCurrent)
+        assertTrue(fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `updateAgent on local-bound agent persists locally without remote call`() = runTest {
+        val source = FakeLocalAgentSource().apply {
+            stored += TestData.agent(id = "local-agent-1", name = "Before")
+        }
+        val localRepo = localRepository(source)
+        localRepo.refreshAgents()
+
+        val updated = localRepo.updateAgent(
+            AgentId("local-agent-1"),
+            com.letta.mobile.data.model.AgentUpdateParams(name = "After"),
+        )
+
+        assertEquals("After", updated.name)
+        assertEquals("After", source.stored.single().name)
+        assertTrue(fakeApi.calls.none { it.startsWith("updateAgent") })
+    }
+
     @Test
     fun `concurrent refreshAgentsIfStale callers share one list request`() = runTest {
         fakeApi.agents.add(TestData.agent(id = "a1", name = "Agent One"))

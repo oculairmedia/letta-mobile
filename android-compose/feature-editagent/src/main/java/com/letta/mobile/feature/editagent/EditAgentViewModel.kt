@@ -90,7 +90,11 @@ internal class EditAgentViewModel @Inject constructor(
                         readOnly = block.readOnly ?: false,
                     )
                 }
-                toolRepository.refreshTools()
+                // Tolerate tool-list failures like blocks below: local-runtime
+                // agents have no remote tool API (and tools are disabled), and
+                // a transient remote failure should not kill the whole pane.
+                runCatching { toolRepository.refreshTools() }
+                    .onFailure { android.util.Log.w("EditAgentVM", "Failed to load tools", it) }
                 val availableTools = toolRepository.getTools().value
                 val availableBlocks = runCatching { blockRepository.listAllBlocks() }
                     .onFailure { android.util.Log.w("EditAgentVM", "Failed to load available blocks", it) }

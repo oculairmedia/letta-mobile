@@ -501,18 +501,21 @@ class AgentListViewModelTest {
     }
 
     @Test
-    fun `local runtime mode does not refresh remote agent list`() = runTest {
+    fun `local runtime mode refreshes through the repository routing`() = runTest {
+        // letta-mobile-y5c9u: the no-remote-fetch invariant moved into
+        // AgentRepository (it lists from the on-device store in local mode),
+        // so the ViewModel refreshes unconditionally — local agents must
+        // repopulate after the per-session Room wipe.
         clearMocks(agentRepository, answers = false, recordedCalls = true)
         activeConfigFlow.value = localConfig()
         every { agentRepository.agents } returns MutableStateFlow(emptyList())
+        coEvery { agentRepository.refreshAgents() } returns Unit
 
         viewModel = newViewModel()
         viewModel.refresh()
 
-        assertTrue(viewModel.uiState.value.agents.isEmpty())
         assertFalse(viewModel.uiState.value.isLoading)
-        coVerify(exactly = 0) { agentRepository.refreshAgentsIfStale(any()) }
-        coVerify(exactly = 0) { agentRepository.refreshAgents() }
+        coVerify(exactly = 1) { agentRepository.refreshAgents() }
     }
 
     @Test

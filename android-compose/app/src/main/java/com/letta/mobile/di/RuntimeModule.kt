@@ -3,8 +3,11 @@ package com.letta.mobile.di
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.local.RoomMemFsStore
 import com.letta.mobile.data.local.RoomRuntimeEventOutbox
+import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.session.LocalRuntimeProvider
+import com.letta.mobile.runtime.local.EmbeddedCatalogModelSource
 import com.letta.mobile.runtime.local.LettaCodeLocalBackendStore
 import com.letta.mobile.runtime.local.AndroidLettaCodeHeadlessClient
 import com.letta.mobile.runtime.local.AndroidLettaCodeRuntimeController
@@ -68,6 +71,18 @@ object RuntimeModule {
     fun provideLocalRuntimeConversationSource(
         store: LettaCodeLocalBackendStore,
     ): LocalRuntimeConversationSource = store
+
+    @Provides
+    @Singleton
+    fun provideLocalRuntimeAgentSource(
+        store: LettaCodeLocalBackendStore,
+    ): LocalRuntimeAgentSource = store
+
+    @Provides
+    @Singleton
+    fun provideLocalRuntimeModelSource(
+        source: EmbeddedCatalogModelSource,
+    ): LocalRuntimeModelSource = source
 
     @Provides
     @Singleton

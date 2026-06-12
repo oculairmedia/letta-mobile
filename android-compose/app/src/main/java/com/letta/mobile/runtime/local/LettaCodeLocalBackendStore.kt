@@ -1,9 +1,12 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -40,11 +43,96 @@ import kotlinx.serialization.json.putJsonArray
 @Singleton
 class LettaCodeLocalBackendStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) : LocalRuntimeConversationSource {
+) : LocalRuntimeConversationSource, LocalRuntimeAgentSource {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
     val storageDirectory: File
         get() = File(context.filesDir, "embedded-lettacode/local-backend")
+
+    /**
+     * App-owned sidecar records holding the full [Agent] model. letta.js
+     * normalizes (and rewrites) its own agents/<b64>.json down to a handful
+     * of fields, so app-level state — runtime binding metadata, the
+     * user-chosen name, embedding config — must live in a sibling directory
+     * letta.js never touches.
+     */
+    private val appAgentsDirectory: File
+        get() = File(storageDirectory, "app-agents")
+
+    override suspend fun listAgents(): List<Agent> = withContext(Dispatchers.IO) {
+        val sidecars = appAgentsDirectory.listFiles { file -> file.extension == "json" }.orEmpty()
+            .mapNotNull { file ->
+                runCatching { json.decodeFromString(Agent.serializer(), file.readText()) }.getOrNull()
+            }
+        val sidecarIds = sidecars.map { it.id.value }.toSet()
+        // Agents that exist only as letta.js records (seeded before sidecars
+        // existed) still surface, with whatever name the record carries.
+        val recordOnly = File(storageDirectory, "agents").listFiles { file -> file.extension == "json" }.orEmpty()
+            .mapNotNull { file ->
+                val record = runCatching { json.parseToJsonElement(file.readText()).jsonObject }.getOrNull()
+                    ?: return@mapNotNull null
+                val id = record.stringField("id") ?: return@mapNotNull null
+                if (id in sidecarIds) return@mapNotNull null
+                Agent(
+                    id = AgentId(id),
+                    name = record.stringField("name") ?: id.take(12),
+                    model = record.stringField("model"),
+                )
+            }
+        sidecars + recordOnly
+    }
+
+    override suspend fun persistAgent(agent: Agent) = withContext(Dispatchers.IO) {
+        appAgentsDirectory.mkdirs()
+        File(appAgentsDirectory, "${base64Url(agent.id.value)}.json")
+            .writeText(json.encodeToString(Agent.serializer(), agent))
+        // Keep letta.js's own record in sync for the fields it understands,
+        // preserving anything else it has written (it normalizes unknown
+        // keys away on its own rewrites, so only known fields are merged).
+        val agentsDirectory = File(storageDirectory, "agents").apply { mkdirs() }
+        val recordFile = File(agentsDirectory, "${base64Url(agent.id.value)}.json")
+        val existing = recordFile.takeIf { it.isFile }
+            ?.let { runCatching { json.parseToJsonElement(it.readText()).jsonObject }.getOrNull() }
+        val merged = buildJsonObject {
+            existing?.forEach { (key, value) -> put(key, value) }
+            put("id", agent.id.value)
+            put("name", agent.name)
+            agent.system?.let { put("system", it) }
+            agent.model?.let { put("model", it) }
+        }
+        recordFile.writeText(json.encodeToString(JsonObject.serializer(), merged))
+    }
+
+    override suspend fun contextWindowOverview(agentId: AgentId): ContextWindowOverview? =
+        withContext(Dispatchers.IO) {
+            val recordFile =
+                File(File(storageDirectory, "agents"), "${base64Url(agentId.value)}.json")
+            val record = recordFile.takeIf { it.isFile }
+                ?.let { runCatching { json.parseToJsonElement(it.readText()).jsonObject }.getOrNull() }
+                ?: return@withContext null
+            val system = record.stringField("system").orEmpty()
+            val transcript = File(
+                File(File(storageDirectory, "conversations"), base64Url("default:${agentId.value}")),
+                "messages.jsonl",
+            )
+            val transcriptBytes = transcript.takeIf { it.isFile }?.length() ?: 0L
+            val messageCount = transcript.takeIf { it.isFile }
+                ?.useLines { lines -> lines.count { it.isNotBlank() } } ?: 0
+            // Same heuristic letta.js applies for local providers
+            // (estimateSerializedTokens): ~4 chars per token.
+            val systemTokens = system.length / 4
+            val messageTokens = (transcriptBytes / 4L).toInt()
+            ContextWindowOverview(
+                // letta.js's customOpenAICompatibleModel defaults the context
+                // window to 128k unless model_settings overrides it.
+                contextWindowSizeMax = record.intField("context_window_limit")
+                    ?: DEFAULT_LOCAL_CONTEXT_WINDOW,
+                contextWindowSizeCurrent = systemTokens + messageTokens,
+                numMessages = messageCount,
+                numTokensSystem = systemTokens,
+                numTokensMessages = messageTokens,
+            )
+        }
 
     /**
      * Seeds the minimal agent + default-conversation records letta.js needs
@@ -115,6 +203,9 @@ class LettaCodeLocalBackendStore @Inject constructor(
     private fun JsonObject.stringField(key: String): String? =
         this[key]?.jsonPrimitive?.takeIf { it.isString }?.content
 
+    private fun JsonObject.intField(key: String): Int? =
+        this[key]?.jsonPrimitive?.content?.toIntOrNull()
+
     private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
         .encodeToString(value.toByteArray(Charsets.UTF_8))
 
@@ -126,5 +217,9 @@ class LettaCodeLocalBackendStore @Inject constructor(
          * per app session (random suffixes fragment the timeline).
          */
         fun localConversationIdFor(agentId: String): String = "local-conv-$agentId"
+
+        // letta.js customOpenAICompatibleModel default when model_settings
+        // carries no context_window_limit.
+        private const val DEFAULT_LOCAL_CONTEXT_WINDOW = 128_000
     }
 }

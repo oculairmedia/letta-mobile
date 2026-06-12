@@ -66,7 +66,10 @@ class SessionScopedAgentRepository internal constructor(
 
     override suspend fun countAgents(): Int = sessionManager.withCurrentSession { it.agentRepository.countAgents() }
 
-    override suspend fun refreshAgents() = sessionManager.withCurrentSession { it.agentRepository.refreshAgents() }
+    override suspend fun refreshAgents() = sessionManager.withCurrentSession {
+        it.agentRepository.refreshAgents()
+        syncProxyState(it)
+    }
 
     override suspend fun clearForBackendSwitch() {
         _agents.value = emptyList()
@@ -75,7 +78,18 @@ class SessionScopedAgentRepository internal constructor(
         sessionManager.current.agentRepository.clearForBackendSwitch()
     }
 
-    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.agentRepository.refreshAgentsIfStale(maxAgeMs) }
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession {
+        val refreshed = it.agentRepository.refreshAgentsIfStale(maxAgeMs)
+        syncProxyState(it)
+        refreshed
+    }
+
+    // Same race as SessionScopedAllConversationsRepository: the proxy
+    // StateFlows are fed asynchronously, so refresh-then-read callers saw the
+    // pre-refresh snapshot. Copy state synchronously on refresh.
+    private fun syncProxyState(graph: SessionGraph) {
+        _agents.value = graph.agentRepository.agents.value
+    }
 
     override fun getCachedAgent(id: AgentId): Agent? = current.getCachedAgent(id)
 
