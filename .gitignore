@@ -41,3 +41,4 @@ scripts/perf/traces/*
 scripts/__pycache__/
 models-cache/
 android-compose/app/libs/embedded-git/
+android-compose/app/libs/embedded-bash/

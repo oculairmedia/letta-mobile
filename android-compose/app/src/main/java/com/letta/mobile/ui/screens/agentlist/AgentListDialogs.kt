@@ -182,6 +182,19 @@ internal fun CreateAgentDialog(
                     readiness = localReadiness,
                     onOpenLocalSettings = onOpenLocalSettings,
                 )
+                if (localReadiness.ready) {
+                    // Local-mode model options: the custom endpoint's models
+                    // and downloaded on-device models, via repository routing
+                    // (letta-mobile-3icw7). Blank = config/seed default.
+                    ModelDropdown(
+                        selectedModel = model,
+                        models = llmModels,
+                        onModelSelected = { model = it },
+                        onLoadModels = onLoadModels,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = stringResource(R.string.common_model),
+                    )
+                }
             } else {
                 ModelDropdown(
                     selectedModel = model,

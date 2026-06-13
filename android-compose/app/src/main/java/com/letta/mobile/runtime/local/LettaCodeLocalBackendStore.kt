@@ -8,6 +8,9 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
@@ -207,6 +210,20 @@ class LettaCodeLocalBackendStore @Inject constructor(
     }
 
     /**
+     * The agent's stored model handle from its letta.js record. The
+     * controller passes this back as --model on session start: letta.js
+     * overwrites the agent's model with whatever --model says
+     * (updateAgentLLMConfig on resume), so anything other than the stored
+     * value would clobber per-agent model selection.
+     */
+    fun storedModelHandle(agentId: String): String? {
+        val recordFile = File(File(storageDirectory, "agents"), "${base64Url(agentId)}.json")
+        if (!recordFile.isFile) return null
+        val record = runCatching { json.parseToJsonElement(recordFile.readText()).jsonObject }.getOrNull()
+        return record?.stringField("model")?.takeIf { it.isNotBlank() }
+    }
+
+    /**
      * Reads the agent's default-conversation transcript (messages.jsonl,
      * pi-ai local-message rows maintained by letta.js) as timeline messages,
      * so the chat screen can hydrate history across app restarts. Synthetic
@@ -220,38 +237,115 @@ class LettaCodeLocalBackendStore @Inject constructor(
         )
         if (!transcript.isFile) return@withContext emptyList()
         transcript.useLines { lines ->
-            lines.filter { it.isNotBlank() }.mapIndexedNotNull { index, line ->
+            lines.filter { it.isNotBlank() }.flatMapIndexed { index, line ->
                 val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
-                    ?: return@mapIndexedNotNull null
-                val id = row.stringField("id") ?: return@mapIndexedNotNull null
-                val role = row.stringField("role") ?: return@mapIndexedNotNull null
-                val text = (row["content"] as? JsonArray)
+                    ?: return@flatMapIndexed emptyList()
+                val id = row.stringField("id") ?: return@flatMapIndexed emptyList()
+                val role = row.stringField("role") ?: return@flatMapIndexed emptyList()
+                val date = (row["metadata"] as? JsonObject)?.stringField("created_at")
+                val contentParts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+                val text = contentParts
+                    .filter { it.stringField("type") == "text" }
+                    .mapNotNull { it.stringField("text") }
+                    .joinToString("\n")
+                    .takeIf { it.isNotBlank() }
+                when (role) {
+                    "user" -> {
+                        if (text == null || text.trimStart().startsWith("<system-reminder>")) {
+                            return@flatMapIndexed emptyList()
+                        }
+                        listOf(
+                            UserMessage(
+                                id = id,
+                                contentRaw = JsonPrimitive(text),
+                                date = date,
+                                seqId = index + 1,
+                            )
+                        )
+                    }
+                    "assistant" -> buildList {
+                        if (text != null) {
+                            add(
+                                AssistantMessage(
+                                    id = id,
+                                    contentRaw = JsonPrimitive(text),
+                                    date = date,
+                                    seqId = index + 1,
+                                )
+                            )
+                        }
+                        // pi-ai records tool invocations as toolCall content
+                        // parts on the assistant row; surface them so history
+                        // shows the same tool chips the live stream renders
+                        // (letta-mobile-bm6x2).
+                        contentParts
+                            .filter { it.stringField("type") == "toolCall" }
+                            .forEachIndexed { callIndex, part ->
+                                val callId = part.stringField("id") ?: return@forEachIndexed
+                                val name = part.stringField("name") ?: return@forEachIndexed
+                                add(
+                                    ToolCallMessage(
+                                        id = "$id-tool-$callIndex",
+                                        toolCall = ToolCall(
+                                            id = callId,
+                                            name = name,
+                                            arguments = part["arguments"]?.toString(),
+                                        ),
+                                        date = date,
+                                        seqId = index + 1,
+                                    )
+                                )
+                            }
+                    }
+                    "toolResult" -> {
+                        val callId = row.stringField("toolCallId") ?: return@flatMapIndexed emptyList()
+                        listOf(
+                            ToolReturnMessage(
+                                id = id,
+                                toolCallId = callId,
+                                status = if (row["isError"]?.jsonPrimitive?.content == "true") "error" else "success",
+                                toolReturnRaw = JsonPrimitive(text.orEmpty()),
+                                date = date,
+                                seqId = index + 1,
+                            )
+                        )
+                    }
+                    else -> emptyList()
+                }
+            }.toList()
+        }
+    }
+
+    /**
+     * Tool results letta.js has persisted for the agent's default
+     * conversation, keyed by tool_call_id. The live stream announces tool
+     * calls but never their returns, so the headless client attaches these
+     * at turn end (letta-mobile-bm6x2).
+     */
+    suspend fun readToolResults(agentId: String): Map<String, StoredToolResult> = withContext(Dispatchers.IO) {
+        val transcript = File(
+            File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
+            "messages.jsonl",
+        )
+        if (!transcript.isFile) return@withContext emptyMap()
+        transcript.useLines { lines ->
+            lines.filter { it.isNotBlank() }.mapNotNull { line ->
+                val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+                    ?: return@mapNotNull null
+                if (row.stringField("role") != "toolResult") return@mapNotNull null
+                val callId = row.stringField("toolCallId") ?: return@mapNotNull null
+                val body = (row["content"] as? JsonArray)
                     ?.mapNotNull { part ->
                         (part as? JsonObject)?.takeIf { it.stringField("type") == "text" }?.stringField("text")
                     }
                     ?.joinToString("\n")
-                    ?.takeIf { it.isNotBlank() }
-                    ?: return@mapIndexedNotNull null
-                val date = (row["metadata"] as? JsonObject)?.stringField("created_at")
-                when (role) {
-                    "user" -> {
-                        if (text.trimStart().startsWith("<system-reminder>")) return@mapIndexedNotNull null
-                        UserMessage(
-                            id = id,
-                            contentRaw = JsonPrimitive(text),
-                            date = date,
-                            seqId = index + 1,
-                        )
-                    }
-                    "assistant" -> AssistantMessage(
-                        id = id,
-                        contentRaw = JsonPrimitive(text),
-                        date = date,
-                        seqId = index + 1,
-                    )
-                    else -> null
-                }
-            }.toList()
+                    .orEmpty()
+                callId to StoredToolResult(
+                    toolCallId = callId,
+                    body = body,
+                    isError = row["isError"]?.jsonPrimitive?.content == "true",
+                )
+            }.toMap()
         }
     }
 
@@ -278,3 +372,10 @@ class LettaCodeLocalBackendStore @Inject constructor(
         private const val DEFAULT_LOCAL_CONTEXT_WINDOW = 128_000
     }
 }
+
+/** A persisted pi-ai toolResult row (see [LettaCodeLocalBackendStore.readToolResults]). */
+data class StoredToolResult(
+    val toolCallId: String,
+    val body: String,
+    val isError: Boolean,
+)

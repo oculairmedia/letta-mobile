@@ -494,12 +494,17 @@ internal fun LettaConfig?.localLettaCodeCreateReadiness(
 ): LocalLettaCodeCreateReadiness {
     val config = this
     val activeConfigIsLocal = AgentRuntimeBinding.isLocalRuntime(config)
+    // A custom OpenAI-compatible endpoint replaces the on-device model
+    // entirely (letta-mobile-3icw7) — no download/import required.
+    val customProviderConfigured = config?.localProviderBaseUrl?.trim()?.takeIf { it.isNotBlank() } != null
     val selectedModel = config?.selectedLocalModelHandle()
     val selectedImportedPath = config?.localModelPath?.trim()?.takeIf { it.isNotBlank() }
-    val modelDownloaded = selectedImportedPath != null || (selectedModel != null && selectedModel in downloadedModelHandles)
+    val modelDownloaded = customProviderConfigured ||
+        selectedImportedPath != null ||
+        (selectedModel != null && selectedModel in downloadedModelHandles)
     return LocalLettaCodeCreateReadiness(
         runtimeEnabled = runtimeRunnable,
-        modelSelected = selectedModel != null && modelDownloaded,
+        modelSelected = customProviderConfigured || (selectedModel != null && modelDownloaded),
         modelDownloaded = modelDownloaded,
         activeConfigIsLocal = activeConfigIsLocal,
     )
@@ -518,16 +523,26 @@ internal fun List<com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatal
 
 private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConfig): AgentCreateParams {
     val selection = EmbeddedLettaCodeModelSelection.from(config)
+    // A model picked in the dialog (endpoint or downloaded catalog id) wins
+    // over the config-level default; letta.js handles use the lmstudio/
+    // prefix convention for the local provider plumbing.
+    val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }?.let { picked ->
+        if (picked.startsWith("lmstudio/")) picked else "lmstudio/$picked"
+    }
+    val effectiveModel = pickedModel ?: selection.lettaCodeModelHandle
     val localMetadata = mapOf(
         LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
         LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
         LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
-        LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(selection.modelHandle),
+        // Track the effective model, not the config default — otherwise the
+        // agent record's model and its metadata handle disagree and the
+        // per-agent override could be lost on later reads (CodeRabbit).
+        LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(effectiveModel),
         LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(selection.runtime),
         LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(selection.accelerator),
     )
     return copy(
-        model = selection.lettaCodeModelHandle,
+        model = effectiveModel,
         modelSettings = (modelSettings ?: ModelSettings()).copy(
             providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
             parallelToolCalls = false,

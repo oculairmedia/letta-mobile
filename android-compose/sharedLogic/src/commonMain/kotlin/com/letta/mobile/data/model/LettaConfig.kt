@@ -17,6 +17,16 @@ data class LettaConfig(
     val localModelRuntime: String? = null,
     val localModelAccelerator: String? = null,
     val localModelMaxTokens: Int? = null,
+    /**
+     * Optional OpenAI-compatible endpoint for the embedded runtime: the
+     * letta.js agent loop (memfs, tool execution, conversations) stays on
+     * device while LLM calls go to this endpoint instead of the on-device
+     * model — native tool calling included. When set, no .litertlm model is
+     * required.
+     */
+    val localProviderBaseUrl: String? = null,
+    val localProviderApiKey: String? = null,
+    val localProviderModel: String? = null,
 ) {
     enum class Mode {
         CLOUD,

@@ -115,7 +115,12 @@ class EmbeddedRuntimeDeviceLoopTest {
 
         assertTrue("embedded assets must be enabled for runnable status", status.assetsEnabled)
         assertTrue("embedded runtime should be runnable", status.runnable)
-        assertEquals("0.26.1", status.version)
+        // The version carries the asset revision suffix (e.g. 0.26.1-r6);
+        // pin only the letta-code release.
+        assertTrue(
+            "unexpected embedded version: ${status.version}",
+            status.version.startsWith("0.26.1"),
+        )
     }
 
     @Test
@@ -145,7 +150,7 @@ class EmbeddedRuntimeDeviceLoopTest {
         val backend = LocalLettaBackend(
             descriptor = descriptor(),
             engine = LettaCodeTurnEngine(
-                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper()),
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
                 config = config(model),
             ),
             outbox = InMemoryRuntimeEventOutbox(
@@ -167,6 +172,221 @@ class EmbeddedRuntimeDeviceLoopTest {
                 payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.isNotBlank(),
             )
         }
+    }
+
+    /**
+     * letta-mobile-69i0z: full tool-call round trip on device. The scripted
+     * engine first replies with a tool_call (Bash echo); letta.js must parse
+     * it through the bridge's OpenAI translation, EXECUTE the tool in-process
+     * (sh exists on Android), feed the tool result back, and only then does
+     * the engine produce final text. Assistant text therefore proves the
+     * entire loop: prompt-format tools → tool_calls → execution → result →
+     * follow-up generation.
+     */
+    @Test
+    fun tier4LocalToolCallRoundTripExecutesToolAndCompletes() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 4 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+        val model = findLitertLmModel()
+        assumeTrue("Tier 4 requires a .litertlm under filesDir/embedded-lettacode/models", model != null)
+        requireNotNull(model)
+
+        val nodeBridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
+        val controller = AndroidLettaCodeRuntimeController(
+            context = context,
+            assetExtractor = EmbeddedLettaCodeAssetExtractor(context),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
+            localBackendStore = LettaCodeLocalBackendStore(context),
+            onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
+                engine = object : OnDeviceChatCompletionEngine {
+                    override fun generate(
+                        modelSelection: EmbeddedLettaCodeModelSelection,
+                        prompt: String,
+                    ): Result<String> = Result.success(
+                        // Require the echo's actual stdout in the follow-up
+                        // prompt: a failed exec also feeds back a (error)
+                        // tool result, and matching on that proved the loop
+                        // while Bash was silently broken on Android (no
+                        // /bin/sh — see SHELL in the controller env). The
+                        // marker is $((…))-expanded so it only exists in
+                        // real shell output, never in the echoed arguments.
+                        if (prompt.contains("device-tool-42")) {
+                            "tool-loop-ok"
+                        } else {
+                            "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"echo device-tool-$((6*7))\"}}\n```"
+                        }
+                    )
+                }
+            ),
+        )
+        val backend = LocalLettaBackend(
+            descriptor = descriptor(),
+            engine = LettaCodeTurnEngine(
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
+                config = config(model),
+            ),
+            outbox = InMemoryRuntimeEventOutbox(
+                eventIdFactory = { _, offset -> RuntimeEventId("device-loop-${offset.value}") },
+                clock = { EpochMillis(System.currentTimeMillis()) },
+            ),
+            memFsStore = NoopMemFsStore,
+        )
+
+        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+            backend.runTurn(command()).firstOrNull { envelope ->
+                val payload = envelope.payload
+                payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.contains("tool-loop-ok")
+            }
+        }
+
+        assertTrue(
+            "expected the post-tool assistant text to arrive (tool round trip)",
+            event != null,
+        )
+    }
+
+    /**
+     * letta-mobile-3icw7: custom OpenAI-compatible endpoint ("remote brain,
+     * local agent"). A second bridge instance plays the remote endpoint; the
+     * controller must route letta.js at it, require NO .litertlm model, and
+     * never start its own on-device bridge. The scripted endpoint demands a
+     * tool round trip before answering, proving native tool calling through
+     * the custom provider.
+     */
+    @Test
+    fun tier5CustomProviderTurnSkipsOnDeviceModelAndCallsTools() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 5 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+
+        // Plays the user's remote OpenAI-compatible server.
+        val remoteEndpoint = LocalOpenAiOnDeviceBridge(
+            engine = object : OnDeviceChatCompletionEngine {
+                override fun generate(
+                    modelSelection: EmbeddedLettaCodeModelSelection,
+                    prompt: String,
+                ): Result<String> = Result.success(
+                    if (prompt.contains("tool result")) {
+                        "custom-provider-ok"
+                    } else {
+                        "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"echo custom-provider-tool\"}}\n```"
+                    }
+                )
+            }
+        ).start(
+            EmbeddedLettaCodeModelSelection(
+                modelHandle = "remote-test-model",
+                modelPath = null,
+                runtime = "openai",
+                accelerator = "cpu",
+                maxTokens = 1024,
+            )
+        )
+
+        try {
+            val nodeBridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
+            val controller = AndroidLettaCodeRuntimeController(
+                context = context,
+                assetExtractor = EmbeddedLettaCodeAssetExtractor(context),
+                nodeBridge = nodeBridge,
+                runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
+                localBackendStore = LettaCodeLocalBackendStore(context),
+                onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
+                    override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
+                        error("on-device bridge must not start when a custom provider is configured")
+                },
+            )
+            val backend = LocalLettaBackend(
+                descriptor = descriptor(),
+                engine = LettaCodeTurnEngine(
+                    client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
+                    config = LettaConfig(
+                        id = BACKEND_ID.value,
+                        mode = LettaConfig.Mode.LOCAL,
+                        serverUrl = "local-lettacode://device",
+                        localProviderBaseUrl = remoteEndpoint.baseUrl,
+                        localProviderModel = "remote-test-model",
+                    ),
+                ),
+                outbox = InMemoryRuntimeEventOutbox(
+                    eventIdFactory = { _, offset -> RuntimeEventId("device-loop-${offset.value}") },
+                    clock = { EpochMillis(System.currentTimeMillis()) },
+                ),
+                memFsStore = NoopMemFsStore,
+            )
+
+            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+                backend.runTurn(command()).firstOrNull { envelope ->
+                    val payload = envelope.payload
+                    payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.contains("custom-provider-ok")
+                }
+            }
+
+            assertTrue(
+                "expected assistant text from the custom provider after a tool round trip",
+                event != null,
+            )
+        } finally {
+            remoteEndpoint.close()
+        }
+    }
+
+    /**
+     * Manual/dev-only smoke against a REAL OpenAI-compatible endpoint.
+     * Skipped unless instrumentation args provide the endpoint:
+     *   -e customProviderBaseUrl http://host:port/v1 [-e customProviderModel <id>]
+     */
+    @Test
+    fun tier6RealCustomProviderProducesAssistantText() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 6 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+        val arguments = androidx.test.platform.app.InstrumentationRegistry.getArguments()
+        val baseUrl = arguments.getString("customProviderBaseUrl")
+        assumeTrue("pass -e customProviderBaseUrl to run tier6", !baseUrl.isNullOrBlank())
+        requireNotNull(baseUrl)
+        val model = arguments.getString("customProviderModel") ?: "default"
+
+        val nodeBridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
+        val controller = AndroidLettaCodeRuntimeController(
+            context = context,
+            assetExtractor = EmbeddedLettaCodeAssetExtractor(context),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
+            localBackendStore = LettaCodeLocalBackendStore(context),
+            onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
+                override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
+                    error("on-device bridge must not start when a custom provider is configured")
+            },
+        )
+        val backend = LocalLettaBackend(
+            descriptor = descriptor(),
+            engine = LettaCodeTurnEngine(
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
+                config = LettaConfig(
+                    id = BACKEND_ID.value,
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "local-lettacode://device",
+                    localProviderBaseUrl = baseUrl,
+                    localProviderModel = model,
+                ),
+            ),
+            outbox = InMemoryRuntimeEventOutbox(
+                eventIdFactory = { _, offset -> RuntimeEventId("device-loop-${offset.value}") },
+                clock = { EpochMillis(System.currentTimeMillis()) },
+            ),
+            memFsStore = NoopMemFsStore,
+        )
+
+        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+            backend.runTurn(command()).firstOrNull { envelope ->
+                val payload = envelope.payload
+                payload is RuntimeEventPayload.RemoteStreamFrame &&
+                    payload.messageType == "assistant_message" &&
+                    payload.body.isNotBlank()
+            }
+        }
+
+        assertTrue("expected assistant text from the real custom provider", event != null)
     }
 
     /**
@@ -212,7 +432,10 @@ class EmbeddedRuntimeDeviceLoopTest {
         localModelHandle = "local/${model.nameWithoutExtension}",
         localModelPath = model.absolutePath,
         localModelRuntime = EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_RUNTIME,
-        localModelAccelerator = "cpu",
+        // Overridable for accelerator-specific repros:
+        // -e localModelAccelerator gpu
+        localModelAccelerator = androidx.test.platform.app.InstrumentationRegistry.getArguments()
+            .getString("localModelAccelerator") ?: "cpu",
         localModelMaxTokens = 256,
     )
 

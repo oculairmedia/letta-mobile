@@ -30,6 +30,23 @@ class LettaCodeStreamJsonMapperTest {
     }
 
     @Test
+    fun `streamed deltas with the same otid share one message id`() {
+        val chunks = listOf(
+            """{"type":"message","id":"letta-msg-126","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"Hey"}],"run_id":"local-run-2","seq_id":17}""",
+            """{"type":"message","id":"letta-msg-127","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"!"}],"run_id":"local-run-2","seq_id":18}""",
+        ).flatMap { mapper.mapLine(it, command()) }
+
+        val payloads = chunks.map { it.payload as RuntimeEventPayload.RemoteStreamFrame }
+        assertEquals(listOf("letta-msg-126", "letta-msg-127"), payloads.map { it.frameId })
+        assertEquals(
+            "deltas must merge into one timeline message, not one bubble per chunk",
+            listOf("provider-assistant-1-uuid", "provider-assistant-1-uuid"),
+            payloads.map { it.messageId },
+        )
+        assertEquals(listOf("Hey", "!"), payloads.map { it.body })
+    }
+
+    @Test
     fun `preserves stream event wrapper metadata`() {
         val drafts = mapper.mapLine(
             """{"type":"stream_event","run_id":"run-wrapper","event":{"type":"message","id":"msg-1","message_type":"assistant_message","content":"hello"}}""",
@@ -64,6 +81,44 @@ class LettaCodeStreamJsonMapperTest {
         val payload = drafts.single().payload as RuntimeEventPayload.RunLifecycleChanged
         assertEquals(RuntimeRunStatus.Completed, payload.status)
         assertEquals(null, payload.reason)
+    }
+
+    @Test
+    fun `maps approval request frame to tool call observed`() {
+        val drafts = mapper.mapLine(
+            """{"type":"message","id":"letta-msg-16","message_type":"approval_request_message","tool_call":{"tool_call_id":"call_00_abc","name":"Bash","arguments":"{\"command\":\"echo hi\"}"},"run_id":"local-run-1"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolCallObserved
+        assertEquals("call_00_abc", payload.toolCallId.value)
+        assertEquals("Bash", payload.toolName.value)
+        assertEquals("""{"command":"echo hi"}""", payload.argumentsJson)
+        assertEquals("local-run-1", drafts.single().runId?.value)
+    }
+
+    @Test
+    fun `maps tool return frame to tool return observed`() {
+        val drafts = mapper.mapLine(
+            """{"type":"message","id":"letta-msg-17","message_type":"tool_return_message","tool_call_id":"call_00_abc","status":"error","tool_return":"boom","run_id":"local-run-1"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolReturnObserved
+        assertEquals("call_00_abc", payload.toolCallId.value)
+        assertEquals(com.letta.mobile.runtime.ToolExecutionStatus.Failed, payload.status)
+        assertEquals("boom", payload.body)
+    }
+
+    @Test
+    fun `tool return with boolean is_err maps to failed`() {
+        val drafts = mapper.mapLine(
+            """{"type":"message","id":"m","message_type":"tool_return_message","tool_call_id":"call_b","is_err":true,"tool_return":"nope"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolReturnObserved
+        assertEquals(com.letta.mobile.runtime.ToolExecutionStatus.Failed, payload.status)
     }
 
     @Test

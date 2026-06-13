@@ -119,32 +119,41 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                         "Enable embedded native and asset prerequisites before selecting local-lettacode://device.",
                 )
             }
-            val modelPath = modelSelection.modelPath?.let(::File)
-                ?: throw IllegalStateException(
-                    "Embedded LettaCode requires an imported .litertlm model path before it can start.",
-                )
-            if (!modelPath.isFile) {
-                throw IllegalStateException(
-                    "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.",
-                )
+            // Custom OpenAI-compatible endpoint (letta-mobile-3icw7): the
+            // agent loop stays embedded but LLM calls go to the configured
+            // endpoint — no on-device model or LiteRT bridge needed.
+            if (!modelSelection.isCustomProvider) {
+                val modelPath = modelSelection.modelPath?.let(::File)
+                    ?: throw IllegalStateException(
+                        "Embedded LettaCode requires an imported .litertlm model path before it can start.",
+                    )
+                if (!modelPath.isFile) {
+                    throw IllegalStateException(
+                        "Embedded LettaCode model file was not found at ${modelPath.absolutePath}.",
+                    )
+                }
             }
 
             check(LocalLettaCodeService.start(context)) {
                 "Embedded LettaCode foreground service could not start."
             }
             val project = assetExtractor.prepare()
-            val bridgeSession = onDeviceOpenAiBridge.start(modelSelection)
+            val bridgeSession = if (modelSelection.isCustomProvider) {
+                null
+            } else {
+                onDeviceOpenAiBridge.start(modelSelection)
+            }
             activeOnDeviceBridgeSession = bridgeSession
             try {
                 nodeBridge.start(
                     project.toLettaCodeNodeStartRequest(
                         session = requestedSession,
                         modelSelection = modelSelection,
-                        onDeviceProviderBaseUrl = bridgeSession.baseUrl,
+                        onDeviceProviderBaseUrl = modelSelection.customProviderBaseUrl ?: bridgeSession?.baseUrl,
                     )
                 ).getOrThrow()
             } catch (error: Throwable) {
-                bridgeSession.close()
+                bridgeSession?.close()
                 activeOnDeviceBridgeSession = null
                 throw error
             }
@@ -161,11 +170,34 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         storageDirectory.mkdirs()
         homeDirectory.mkdirs()
         val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
-        val modelHandle =
-            if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        // Per-agent model: letta.js overwrites the agent's model with the
+        // --model argv on resume, so the stored record's handle must win;
+        // the config-level selection is only the seed default for brand-new
+        // agents (letta-mobile-3icw7). Stored handles are normalized to the
+        // lmstudio/ provider prefix: letta.js aborts the whole process on an
+        // unroutable bare id ("Invalid model" → node exit → SIGABRT), and
+        // records written by older picker builds persisted bare ids.
+        val modelHandle = localBackendStore.storedModelHandle(session.agentId)
+            ?.let { stored ->
+                if (stored.startsWith("lmstudio/")) stored
+                else "lmstudio/${stored.removePrefix("local/")}"
+            }
+            ?: if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        // One line per session start: which model letta.js was actually given.
+        // A session pinned to the wrong model (e.g. the 2026-06-12 codexmini
+        // detour) is otherwise impossible to diagnose after the fact because
+        // argv is not externally visible for the in-process node runtime.
+        Log.i(
+            TAG,
+            "Starting embedded session agent=${session.agentId} model=$modelHandle " +
+                "customProvider=${modelSelection.isCustomProvider} providerBaseUrl=$onDeviceProviderBaseUrl",
+        )
         localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
-            writeEmbeddedLettaCodeProviderAuth(onDeviceProviderBaseUrl)
+            writeEmbeddedLettaCodeProviderAuth(
+                baseUrl = onDeviceProviderBaseUrl,
+                apiKey = modelSelection.customProviderApiKey ?: "not-needed",
+            )
         }
         return LettaCodeNodeStartRequest(
             arguments = buildList {
@@ -194,6 +226,13 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 add("stream-json")
                 add("--output-format")
                 add("stream-json")
+                // The app has no approval channel yet (ToolApprovalResponse is
+                // ignored), so gated tools would stall a turn forever. The
+                // embedded runtime runs on the user's own device against the
+                // app sandbox; unrestricted is the deliberate interim policy
+                // until an approvals UI exists (letta-mobile-bm6x2).
+                add("--permission-mode")
+                add("unrestricted")
             },
             environment = buildMap {
                 put("HOME", homeDirectory.absolutePath)
@@ -208,6 +247,11 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_CACHE_DIR", modelCacheDirectory.absolutePath)
                 onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
                 modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
+                // letta.js's Bash tool resolves its shell from $SHELL first,
+                // then /bin/bash, /bin/sh, /usr/bin/env … — none of which
+                // exist on Android. Without this the Bash tool is dead on
+                // device ("there is no bash"); toybox sh handles -c fine.
+                put("SHELL", "/system/bin/sh")
                 put("NO_COLOR", "1")
                 put("UV_USE_IO_URING", "0")
                 put("UV_THREADPOOL_SIZE", "2")
@@ -227,12 +271,33 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
      * disabled so turns keep working.
      */
     private fun PreparedLettaCodeProject.memfsEnvironment(): Map<String, String> {
+        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
+        // letta.js's Bash tool spawns the literal executable "bash" via PATH
+        // on every non-Windows platform — no launcher fallback, no $SHELL
+        // (shell-runner.ts spawnCommand). Android ships no bash, so without
+        // this link every Bash tool call fails with "Executable not found:
+        // bash". Prefer the bundled real bash (libbash.so, executable in
+        // nativeLibraryDir); fall back to aliasing /system/bin/sh, which
+        // runs simple commands but with toybox/mksh semantics, not bash's.
+        val bashLib = File(context.applicationInfo.nativeLibraryDir, "libbash.so")
+        val bashTarget = if (bashLib.canExecute()) bashLib.absolutePath else "/system/bin/sh"
+        val bashLink = File(binDirectory, "bash")
+        // nativeLibraryDir changes across installs; recreate unless the link
+        // already resolves to the wanted target and is executable.
+        val bashLinkCurrent = runCatching { android.system.Os.readlink(bashLink.absolutePath) }.getOrNull()
+        if (bashLinkCurrent != bashTarget || !bashLink.canExecute()) {
+            bashLink.delete()
+            runCatching { android.system.Os.symlink(bashTarget, bashLink.absolutePath) }
+                .onFailure { error -> Log.w(TAG, "Failed to link bash; Bash tool will be unavailable", error) }
+        }
+        val pathEnvironment = mapOf(
+            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
+        )
         val gitLib = File(context.applicationInfo.nativeLibraryDir, "libgit.so")
         if (!gitLib.canExecute()) {
             Log.i(TAG, "libgit.so not packaged; local memfs disabled")
-            return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+            return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
         }
-        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
         val gitLink = File(binDirectory, "git")
         // nativeLibraryDir changes across installs, so an existing link may
         // dangle; canExecute() follows the link and catches that.
@@ -242,7 +307,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 android.system.Os.symlink(gitLib.absolutePath, gitLink.absolutePath)
             } catch (error: Exception) {
                 Log.w(TAG, "Failed to link git; local memfs disabled", error)
-                return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+                return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
             }
         }
         // letta.js memory-git installs bash pre/post-commit hooks; the repo
@@ -266,15 +331,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             	directory = *
             """.trimIndent() + "\n",
         )
-        return mapOf(
-            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
+        return pathEnvironment + mapOf(
             "GIT_EXEC_PATH" to binDirectory.absolutePath,
             "GIT_TEMPLATE_DIR" to "",
             "GIT_CONFIG_NOSYSTEM" to "1",
         )
     }
 
-    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String) {
+    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String, apiKey: String) {
         val authFile = File(storageDirectory, "providers/auth.json")
         val root = buildJsonObject {
             put("version", 1)
@@ -292,7 +356,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                                 "auth",
                                 buildJsonObject {
                                     put("type", "api")
-                                    put("key", "not-needed")
+                                    put("key", apiKey)
                                 },
                             )
                             put("base_url", baseUrl)

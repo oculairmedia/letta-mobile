@@ -151,9 +151,10 @@ class AgentListViewModelTest {
 
         var createdId: AgentId? = null
         viewModel.createAgent(
+            // No model picked in the dialog → falls back to the config-level
+            // selection (a picked model would win; see the dedicated test).
             AgentCreateParams(
                 name = "Local",
-                model = "remote/model",
                 embedding = "remote/embed",
                 toolIds = listOf(ToolId("t1")),
                 includeBaseTools = true,
@@ -179,12 +180,39 @@ class AgentListViewModelTest {
             "${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:local-config",
             captured.metadata?.get(LocalAgentRuntimeMetadata.RuntimeIdKey)?.jsonPrimitive?.contentOrNull,
         )
+        // Metadata handle now mirrors the effective model (the prefixed
+        // handle the agent actually runs), not the bare config handle, so a
+        // future reader can't disagree with the record's model (CodeRabbit).
         assertEquals(
-            "google/gemma-test-litert-lm",
+            "lmstudio/google/gemma-test-litert-lm",
             captured.metadata?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
         )
         coVerify(exactly = 0) { agentRepository.createAgent(any()) }
         coVerify(exactly = 1) { agentRepository.createLocalAgent(any()) }
+    }
+
+    // letta-mobile-3icw7: a model picked in the create dialog (endpoint or
+    // downloaded catalog id) wins over the config-level default.
+    @Test
+    fun `createAgent local picked model overrides config default`() = runTest {
+        activeConfigFlow.value = localConfig()
+        embeddedModelRepository.catalogFlow.value = listOf(downloadedModel())
+        val paramsSlot = slot<AgentCreateParams>()
+        coEvery { agentRepository.createLocalAgent(capture(paramsSlot)) } returns Agent(id = AgentId("local-agent-test"), name = "Local")
+
+        viewModel.createAgent(
+            AgentCreateParams(name = "Local", model = "MiniMax-M3"),
+            AgentCreateRuntimeOption.LOCAL_LETTACODE,
+        ) {}
+
+        assertEquals("lmstudio/MiniMax-M3", paramsSlot.captured.model)
+        // Metadata handle must track the picked model, not the config default,
+        // or the record's model and metadata disagree (CodeRabbit).
+        assertEquals(
+            "lmstudio/MiniMax-M3",
+            paramsSlot.captured.metadata
+                ?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
+        )
     }
 
     @Test

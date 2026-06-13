@@ -154,15 +154,27 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
                 return
             }
-            val prompt = request["messages"]?.let(::messagesToPrompt).orEmpty()
+            // Tool schemas ride inside the prompt and tool calls are parsed
+            // back out of the text — LiteRT-LM has no native function calling
+            // (letta-mobile-69i0z, see OnDeviceToolCallProtocol).
+            val prompt = OnDeviceToolCallProtocol.renderPrompt(request)
             val stream = request["stream"]?.jsonPrimitive?.booleanOrNull == true
             val result = engine.generate(modelSelection, prompt)
             result.fold(
-                onSuccess = { text ->
-                    if (stream) {
-                        output.writeStreamingCompletion(text)
-                    } else {
-                        output.writeJsonResponse(200, completionBody(text))
+                onSuccess = { raw ->
+                    when (val turn = OnDeviceToolCallProtocol.parseModelOutput(raw)) {
+                        is OnDeviceToolCallProtocol.ModelTurn.Text ->
+                            if (stream) {
+                                output.writeStreamingCompletion(turn.text)
+                            } else {
+                                output.writeJsonResponse(200, completionBody(turn.text))
+                            }
+                        is OnDeviceToolCallProtocol.ModelTurn.ToolCall ->
+                            if (stream) {
+                                output.writeStreamingToolCall(turn)
+                            } else {
+                                output.writeJsonResponse(200, toolCallCompletionBody(turn))
+                            }
                     }
                 },
                 onFailure = { error ->
@@ -215,6 +227,113 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             )
         }
 
+        private fun toolCallJson(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall, id: String): JsonObject =
+            buildJsonObject {
+                put("index", 0)
+                put("id", id)
+                put("type", "function")
+                put(
+                    "function",
+                    buildJsonObject {
+                        put("name", turn.name)
+                        put("arguments", turn.argumentsJson)
+                    },
+                )
+            }
+
+        private fun toolCallCompletionBody(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall): JsonObject =
+            buildJsonObject {
+                put("id", "chatcmpl-${UUID.randomUUID()}")
+                put("object", "chat.completion")
+                put("created", Instant.now().epochSecond)
+                put("model", modelSelection.openAiModelId)
+                put(
+                    "choices",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("index", 0)
+                                put(
+                                    "message",
+                                    buildJsonObject {
+                                        put("role", "assistant")
+                                        if (turn.leadingText.isNotBlank()) {
+                                            put("content", turn.leadingText)
+                                        } else {
+                                            put("content", null as String?)
+                                        }
+                                        put("tool_calls", buildJsonArray { add(toolCallJson(turn, newToolCallId())) })
+                                    },
+                                )
+                                put("finish_reason", "tool_calls")
+                            }
+                        )
+                    },
+                )
+            }
+
+        private fun OutputStream.writeStreamingToolCall(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall) {
+            val id = "chatcmpl-${UUID.randomUUID()}"
+            val created = Instant.now().epochSecond
+            writeHeaders(200, "text/event-stream; charset=utf-8")
+            if (turn.leadingText.isNotBlank()) {
+                writeSseChunk(id, created, turn.leadingText, finishReason = null)
+            }
+            // pi-ai's parser accepts the whole arguments string in one delta.
+            val toolCallChunk = buildJsonObject {
+                put("id", id)
+                put("object", "chat.completion.chunk")
+                put("created", created)
+                put("model", modelSelection.openAiModelId)
+                put(
+                    "choices",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("index", 0)
+                                put(
+                                    "delta",
+                                    buildJsonObject {
+                                        put("role", "assistant")
+                                        put("tool_calls", buildJsonArray { add(toolCallJson(turn, newToolCallId())) })
+                                    },
+                                )
+                                put("finish_reason", null as String?)
+                            }
+                        )
+                    },
+                )
+            }
+            write("data: ${json.encodeToString(JsonObject.serializer(), toolCallChunk)}\n\n".toByteArray(Charsets.UTF_8))
+            writeFinishChunk(id, created, finishReason = "tool_calls")
+            write("data: [DONE]\n\n".toByteArray(Charsets.UTF_8))
+            flush()
+        }
+
+        private fun OutputStream.writeFinishChunk(id: String, created: Long, finishReason: String) {
+            val body = buildJsonObject {
+                put("id", id)
+                put("object", "chat.completion.chunk")
+                put("created", created)
+                put("model", modelSelection.openAiModelId)
+                put(
+                    "choices",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("index", 0)
+                                put("delta", buildJsonObject {})
+                                put("finish_reason", finishReason)
+                            }
+                        )
+                    },
+                )
+            }
+            write("data: ${json.encodeToString(JsonObject.serializer(), body)}\n\n".toByteArray(Charsets.UTF_8))
+        }
+
+        private fun newToolCallId(): String = "call_${UUID.randomUUID()}"
+
         private fun OutputStream.writeStreamingCompletion(text: String) {
             val id = "chatcmpl-${UUID.randomUUID()}"
             val created = Instant.now().epochSecond
@@ -262,24 +381,6 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 )
             }
             write("data: ${json.encodeToString(JsonObject.serializer(), body)}\n\n".toByteArray(Charsets.UTF_8))
-        }
-
-        private fun messagesToPrompt(element: JsonElement): String =
-            (element as? JsonArray)
-                ?.joinToString("\n") { message ->
-                    val item = message.jsonObject
-                    val role = item["role"]?.jsonPrimitive?.contentOrNull ?: "user"
-                    val content = item["content"]?.let(::contentToText).orEmpty()
-                    "$role: $content"
-                }
-                .orEmpty()
-
-        private fun contentToText(element: JsonElement): String = when (element) {
-            is JsonArray -> element.joinToString("\n") { part ->
-                val partObject = part as? JsonObject
-                partObject?.get("text")?.jsonPrimitive?.contentOrNull ?: part.toString()
-            }
-            else -> element.jsonPrimitive.contentOrNull ?: element.toString()
         }
 
         private fun errorBody(code: String, message: String): JsonObject = buildJsonObject {
