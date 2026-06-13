@@ -7,16 +7,45 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import java.awt.Dimension
 
-fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "Letta Desktop",
-        state = rememberWindowState(width = 1280.dp, height = 820.dp),
-    ) {
-        LaunchedEffect(Unit) {
-            window.minimumSize = Dimension(960, 640)
+fun main() {
+    val activationHandler = DesktopWindowActivationHandler()
+    when (val singleInstance = DesktopSingleInstance.acquire(onCommand = activationHandler::handleCommand)) {
+        is DesktopSingleInstance.Secondary -> {
+            if (!singleInstance.notifyPrimary()) {
+                System.err.println("Letta Desktop is already running, but did not respond to the show command.")
+            }
+            return
         }
+        is DesktopSingleInstance.Primary -> runDesktopApplication(singleInstance, activationHandler)
+    }
+}
 
-        LettaDesktopApp()
+private fun runDesktopApplication(
+    singleInstance: DesktopSingleInstance.Primary,
+    activationHandler: DesktopWindowActivationHandler,
+) {
+    try {
+        application {
+            Window(
+                onCloseRequest = ::exitApplication,
+                title = "Letta Desktop",
+                state = rememberWindowState(width = 1280.dp, height = 820.dp),
+            ) {
+                LaunchedEffect(Unit) {
+                    activationHandler.attach(window)
+                    window.minimumSize = Dimension(960, 640)
+                }
+
+                LettaDesktopApp()
+            }
+        }
+    } finally {
+        singleInstance.close()
+    }
+}
+
+private fun DesktopWindowActivationHandler.handleCommand(command: DesktopIpcCommand) {
+    when (command) {
+        DesktopIpcCommand.ShowUserThatAppIsRunning -> showUserThatAppIsRunning()
     }
 }

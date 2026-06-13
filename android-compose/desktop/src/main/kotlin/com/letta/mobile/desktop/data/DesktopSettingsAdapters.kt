@@ -96,13 +96,15 @@ class DesktopFileSecureSettingsStore(
 
     companion object {
         fun defaultSettingsPath(): Path =
-            Path.of(
-                System.getProperty("user.home"),
-                ".letta-mobile",
-                "desktop-settings.properties",
-            )
+            defaultDesktopStateDirectory().resolve("desktop-settings.properties")
     }
 }
+
+internal fun defaultDesktopStateDirectory(): Path =
+    Path.of(
+        System.getProperty("user.home"),
+        ".letta-mobile",
+    )
 
 class DesktopLettaConfigStore(
     private val settingsStore: SecureSettingsStore,
