@@ -48,6 +48,18 @@ data class TurnCommand(
     val metadata: Map<String, String> = emptyMap(),
 )
 
+/**
+ * An inline image carried on a local [TurnInput.UserMessage]. `data` is the raw
+ * base64 payload with NO `data:` prefix — the embedded letta.js runtime ingests
+ * the Letta `ImageContent`/`Base64Image` union (`source.type == "base64"`,
+ * `source.media_type`, `source.data`), the same shape the remote path uses.
+ */
+@Serializable
+data class TurnImagePart(
+    val base64: String,
+    val mediaType: String,
+)
+
 @Serializable
 sealed interface TurnInput {
     @Serializable
@@ -56,6 +68,14 @@ sealed interface TurnInput {
         val localMessageId: String,
         val text: String,
         val attachments: List<AgentFileId> = emptyList(),
+        /**
+         * Inline multimodal image parts (base64 + media type). When non-empty,
+         * the local turn is sent to the embedded runtime as a content ARRAY
+         * (Letta `LettaMessageContentUnion` shape) instead of a plain text
+         * string, so a vision-capable provider receives the images
+         * (letta-mobile-aobcg). Empty = legacy text-only send.
+         */
+        val imageParts: List<TurnImagePart> = emptyList(),
     ) : TurnInput
 
     @Serializable
