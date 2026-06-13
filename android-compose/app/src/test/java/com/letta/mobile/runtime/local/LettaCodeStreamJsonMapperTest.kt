@@ -84,6 +84,33 @@ class LettaCodeStreamJsonMapperTest {
     }
 
     @Test
+    fun `maps approval request frame to tool call observed`() {
+        val drafts = mapper.mapLine(
+            """{"type":"message","id":"letta-msg-16","message_type":"approval_request_message","tool_call":{"tool_call_id":"call_00_abc","name":"Bash","arguments":"{\"command\":\"echo hi\"}"},"run_id":"local-run-1"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolCallObserved
+        assertEquals("call_00_abc", payload.toolCallId.value)
+        assertEquals("Bash", payload.toolName.value)
+        assertEquals("""{"command":"echo hi"}""", payload.argumentsJson)
+        assertEquals("local-run-1", drafts.single().runId?.value)
+    }
+
+    @Test
+    fun `maps tool return frame to tool return observed`() {
+        val drafts = mapper.mapLine(
+            """{"type":"message","id":"letta-msg-17","message_type":"tool_return_message","tool_call_id":"call_00_abc","status":"error","tool_return":"boom","run_id":"local-run-1"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolReturnObserved
+        assertEquals("call_00_abc", payload.toolCallId.value)
+        assertEquals(com.letta.mobile.runtime.ToolExecutionStatus.Failed, payload.status)
+        assertEquals("boom", payload.body)
+    }
+
+    @Test
     fun `ignores tool approval control request until approvals are supported`() {
         val drafts = mapper.mapLine(
             """{"type":"control_request","request_id":"perm-call-1","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}""",

@@ -150,7 +150,7 @@ class EmbeddedRuntimeDeviceLoopTest {
         val backend = LocalLettaBackend(
             descriptor = descriptor(),
             engine = LettaCodeTurnEngine(
-                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper()),
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
                 config = config(model),
             ),
             outbox = InMemoryRuntimeEventOutbox(
@@ -216,7 +216,7 @@ class EmbeddedRuntimeDeviceLoopTest {
         val backend = LocalLettaBackend(
             descriptor = descriptor(),
             engine = LettaCodeTurnEngine(
-                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper()),
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
                 config = config(model),
             ),
             outbox = InMemoryRuntimeEventOutbox(
@@ -292,7 +292,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             val backend = LocalLettaBackend(
                 descriptor = descriptor(),
                 engine = LettaCodeTurnEngine(
-                    client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper()),
+                    client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
                     config = LettaConfig(
                         id = BACKEND_ID.value,
                         mode = LettaConfig.Mode.LOCAL,
@@ -354,7 +354,7 @@ class EmbeddedRuntimeDeviceLoopTest {
         val backend = LocalLettaBackend(
             descriptor = descriptor(),
             engine = LettaCodeTurnEngine(
-                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper()),
+                client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
                 config = LettaConfig(
                     id = BACKEND_ID.value,
                     mode = LettaConfig.Mode.LOCAL,

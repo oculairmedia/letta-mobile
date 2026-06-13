@@ -7,7 +7,11 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.SystemMessage
+import com.letta.mobile.data.model.ToolCall
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.data.timeline.newOtid
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.LocalLettaBackend
@@ -192,8 +196,36 @@ internal class LocalRuntimeChatSendCoordinator(
                 finishTurn(error = payload.reason)
                 return true
             }
-            is RuntimeEventPayload.ToolCallObserved,
-            is RuntimeEventPayload.ToolReturnObserved,
+            // Reduced tool-progress surface (letta-mobile-bm6x2): feed tool
+            // activity through the same ToolCallMessage/ToolReturnMessage
+            // pipeline the shim stream uses, so the existing timeline chips
+            // (command, file paths, result) render for local turns too.
+            is RuntimeEventPayload.ToolCallObserved -> {
+                timelineRepository.ingestExternalTransportMessage(
+                    conversationId = conversationId,
+                    message = ToolCallMessage(
+                        id = "local-tool-call-${payload.toolCallId.value}",
+                        toolCall = ToolCall(
+                            id = payload.toolCallId.value,
+                            name = payload.toolName.value,
+                            arguments = payload.argumentsJson,
+                        ),
+                        runId = event.runId?.value,
+                    ),
+                )
+            }
+            is RuntimeEventPayload.ToolReturnObserved -> {
+                timelineRepository.ingestExternalTransportMessage(
+                    conversationId = conversationId,
+                    message = ToolReturnMessage(
+                        id = "local-tool-return-${payload.toolCallId.value}",
+                        toolCallId = payload.toolCallId.value,
+                        status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
+                        toolReturnRaw = JsonPrimitive(payload.body),
+                        runId = event.runId?.value,
+                    ),
+                )
+            }
             is RuntimeEventPayload.ApprovalRequested,
             is RuntimeEventPayload.ApprovalResolved,
             is RuntimeEventPayload.RestSnapshotReconcile,
