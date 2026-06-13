@@ -33,6 +33,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             runtimeStatusProvider = statusProvider(runnable = false),
             onDeviceOpenAiBridge = onDeviceBridge,
             localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
         val error = runCatching { controller.submit(command(), config()).first() }.exceptionOrNull()
@@ -57,6 +58,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             runtimeStatusProvider = statusProvider(runnable = true),
             onDeviceOpenAiBridge = onDeviceBridge,
             localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
         val error = runCatching { controller.submit(command(), config()).first() }.exceptionOrNull()
@@ -80,6 +82,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             runtimeStatusProvider = statusProvider(runnable = true),
             onDeviceOpenAiBridge = onDeviceBridge,
             localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
         val error = runCatching {
@@ -105,6 +108,7 @@ class AndroidLettaCodeRuntimeControllerTest {
             runtimeStatusProvider = statusProvider(runnable = true),
             onDeviceOpenAiBridge = onDeviceBridge,
             localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
         val events = mutableListOf<String>()
@@ -179,6 +183,13 @@ class AndroidLettaCodeRuntimeControllerTest {
             )
         )
     )
+
+    private class FakeAndroidNetworkBridge : AndroidNetworkBridge {
+        override fun start(): AndroidNetworkBridgeSession = AndroidNetworkBridgeSession(
+            baseUrl = "http://127.0.0.1:1",
+            closeAction = {},
+        )
+    }
 
     private class FakeNodeBridge : LettaCodeNodeBridge {
         override val outputLines = MutableSharedFlow<String>()

@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "6"
+val embeddedLettaCodeAssetRevision = "13"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -233,6 +233,56 @@ val prepareEmbeddedLettaCodeLibnode = tasks.register<PrepareEmbeddedLettaCodeLib
     expectedSha256.set(embeddedLettaCodeLibnodeSha256)
     archiveFile.set(embeddedLettaCodeLibnodeArchive)
     outputDirectory.set(embeddedLettaCodeLibnodeDir)
+}
+
+val prepareEmbeddedCurlHelper = tasks.register<Exec>("prepareEmbeddedCurlHelper") {
+    onlyIf { embeddedLettaCodeNativeEnabled.get() }
+    notCompatibleWithConfigurationCache("Builds the Android curl helper with the local NDK toolchain.")
+    val script = project.layout.projectDirectory.file("../../scripts/build-android-curl.sh")
+    val source = project.layout.projectDirectory.file("src/main/cpp/embedded_curl_bridge.c")
+    val output = project.layout.projectDirectory.file("libs/embedded-curl/arm64-v8a/libcurl.so")
+    inputs.file(script)
+    inputs.file(source)
+    outputs.file(output)
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("bash", script.asFile.absolutePath)
+}
+
+val prepareEmbeddedBashHelper = tasks.register<Exec>("prepareEmbeddedBashHelper") {
+    onlyIf { embeddedLettaCodeNativeEnabled.get() }
+    notCompatibleWithConfigurationCache("Builds GNU bash for android-arm64 with the local NDK toolchain.")
+    val script = project.layout.projectDirectory.file("../../scripts/build-android-bash.sh")
+    val output = project.layout.projectDirectory.file("libs/embedded-bash/arm64-v8a/libbash.so")
+    inputs.file(script)
+    outputs.file(output)
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("bash", script.asFile.absolutePath)
+}
+
+val prepareEmbeddedGitHelper = tasks.register<Exec>("prepareEmbeddedGitHelper") {
+    onlyIf { embeddedLettaCodeNativeEnabled.get() }
+    notCompatibleWithConfigurationCache("Builds git for android-arm64 with the local NDK toolchain.")
+    val script = project.layout.projectDirectory.file("../../scripts/build-android-git.sh")
+    val output = project.layout.projectDirectory.file("libs/embedded-git/arm64-v8a/libgit.so")
+    inputs.file(script)
+    outputs.file(output)
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("bash", script.asFile.absolutePath)
+}
+
+val prepareEmbeddedNodeCli = tasks.register<Exec>("prepareEmbeddedNodeCli") {
+    onlyIf { embeddedLettaCodeNativeEnabled.get() }
+    notCompatibleWithConfigurationCache("Builds the Android node CLI wrapper against nodejs-mobile libnode.")
+    dependsOn(prepareEmbeddedLettaCodeLibnode)
+    val script = project.layout.projectDirectory.file("../../scripts/build-android-node-cli.sh")
+    val source = project.layout.projectDirectory.file("src/main/cpp/embedded_node_cli.cpp")
+    val output = project.layout.projectDirectory.file("libs/embedded-node-cli/arm64-v8a/libnodecli.so")
+    inputs.file(script)
+    inputs.file(source)
+    inputs.dir(embeddedLettaCodeLibnodeDir)
+    outputs.file(output)
+    workingDir(rootProject.projectDir.parentFile)
+    commandLine("bash", script.asFile.absolutePath)
 }
 
 val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAssets") {
@@ -342,6 +392,37 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .inheritIO()
             .start()
         check(transform.waitFor() == 0) { "Unicode property escape transform for letta.js failed." }
+
+        // Ship npm so the on-device node can install packages. npm is pure JS
+        // (npm-cli.js) and runs on the embedded node 18 runtime. Pin the last
+        // npm that officially supports Node 18 (10.9.x). Install it into a
+        // SEPARATE staging dir (installing npm into the same tree it's part of
+        // confuses dedup), then copy node_modules/npm into the embedded tree.
+        // An `npm` PATH wrapper (created at runtime) runs node npm-cli.js. See
+        // letta-mobile-iq24j.
+        val npmStageDir = layout.buildDirectory.dir("embedded-lettacode/npm-stage").get().asFile
+        delete(npmStageDir)
+        npmStageDir.mkdirs()
+        val npmForDeviceInstall = ProcessBuilder(
+            npmCommand(),
+            "install",
+            "--no-audit",
+            "--no-fund",
+            "--ignore-scripts",
+            "--prefix",
+            npmStageDir.absolutePath,
+            "npm@10.9.2",
+        )
+            .directory(npmStageDir)
+            .inheritIO()
+            .start()
+        check(npmForDeviceInstall.waitFor() == 0) { "npm install for on-device npm failed." }
+        val stagedNpm = npmStageDir.resolve("node_modules/npm")
+        check(stagedNpm.resolve("bin/npm-cli.js").isFile) { "staged npm-cli.js missing at ${stagedNpm.absolutePath}" }
+        copy {
+            from(stagedNpm)
+            into(npmWorkDir.resolve("node_modules/npm"))
+        }
 
         copy {
             from(npmWorkDir.resolve("node_modules"))
@@ -464,6 +545,132 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             }
             """.trimIndent(),
         )
+        val androidNetworkPolyfill = assetRoot.resolve("android-network-polyfill.cjs")
+        androidNetworkPolyfill.writeText(
+            """
+            'use strict';
+            const bridgeBaseUrl = process.env.LETTA_ANDROID_NETWORK_BRIDGE_URL;
+            if (bridgeBaseUrl) {
+              const http = require('http');
+              const dns = require('dns');
+              const { Buffer } = require('buffer');
+              const { Readable } = require('stream');
+              function postJson(path, payload) {
+                return new Promise((resolve, reject) => {
+                  const body = JSON.stringify(payload || {});
+                  const url = new URL(path, bridgeBaseUrl);
+                  const req = http.request({
+                    hostname: url.hostname,
+                    port: url.port,
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Content-Length': Buffer.byteLength(body),
+                    },
+                  }, (res) => {
+                    const chunks = [];
+                    res.on('data', (chunk) => chunks.push(chunk));
+                    res.on('end', () => {
+                      const text = Buffer.concat(chunks).toString('utf8');
+                      let parsed;
+                      try { parsed = text ? JSON.parse(text) : {}; } catch (error) { reject(error); return; }
+                      if (res.statusCode >= 400) {
+                        const message = parsed && parsed.error && parsed.error.message ? parsed.error.message : 'Android bridge HTTP ' + res.statusCode;
+                        reject(new Error(message));
+                      } else {
+                        resolve(parsed);
+                      }
+                    });
+                  });
+                  req.on('error', reject);
+                  req.write(body);
+                  req.end();
+                });
+              }
+              const nativeFetch = globalThis.fetch;
+              const forceAndroidFetch = process.env.LETTA_ANDROID_NETWORK_BRIDGE_FORCE_FETCH === '1';
+              if (forceAndroidFetch || typeof nativeFetch !== 'function') {
+                globalThis.fetch = async function androidBridgeFetch(input, init = {}) {
+                  const url = typeof input === 'string' ? input : (input && input.url) ? input.url : String(input);
+                  const method = init.method || (input && input.method) || 'GET';
+                  const headers = {};
+                  const sourceHeaders = init.headers || (input && input.headers);
+                  if (sourceHeaders) {
+                    if (typeof sourceHeaders.forEach === 'function') {
+                      sourceHeaders.forEach((value, key) => { headers[key] = value; });
+                    } else if (Array.isArray(sourceHeaders)) {
+                      for (const [key, value] of sourceHeaders) headers[key] = value;
+                    } else {
+                      Object.assign(headers, sourceHeaders);
+                    }
+                  }
+                  const requestBody = init.body == null ? undefined : String(init.body);
+                  const bridged = await postJson('/fetch', { url, method, headers, body: requestBody });
+                  const responseBody = Buffer.from(bridged.bodyBase64 || '', 'base64');
+                  const rawHeaders = bridged.headers || {};
+                  const headerEntries = Object.entries(rawHeaders).map(([key, value]) => [String(key).toLowerCase(), String(value)]);
+                  const responseHeaders = {
+                    get(name) {
+                      const key = String(name).toLowerCase();
+                      const found = headerEntries.find(([entryKey]) => entryKey === key);
+                      return found ? found[1] : null;
+                    },
+                    has(name) { return this.get(name) !== null; },
+                    forEach(callback, thisArg) { headerEntries.forEach(([key, value]) => callback.call(thisArg, value, key, responseHeaders)); },
+                    entries() { return headerEntries[Symbol.iterator](); },
+                    keys() { return headerEntries.map(([key]) => key)[Symbol.iterator](); },
+                    values() { return headerEntries.map(([, value]) => value)[Symbol.iterator](); },
+                    [Symbol.iterator]() { return this.entries(); },
+                  };
+                  return {
+                    ok: bridged.status >= 200 && bridged.status < 300,
+                    status: bridged.status,
+                    statusText: bridged.statusText || '',
+                    url,
+                    headers: responseHeaders,
+                    body: Readable.from([responseBody]),
+                    arrayBuffer: async () => responseBody.buffer.slice(responseBody.byteOffset, responseBody.byteOffset + responseBody.byteLength),
+                    text: async () => responseBody.toString('utf8'),
+                    json: async () => JSON.parse(responseBody.toString('utf8')),
+                  };
+                };
+                globalThis.fetch.__androidBridgeOriginal = nativeFetch;
+              }
+              const originalLookup = dns.lookup;
+              function bridgeLookup(hostname, options, callback) {
+                if (typeof options === 'function') { callback = options; options = {}; }
+                const wantsAll = options && options.all === true;
+                postJson('/dns/lookup', { hostname }).then((result) => {
+                  const addresses = result.addresses || [];
+                  if (wantsAll) {
+                    callback(null, addresses.map((item) => ({ address: item.address, family: item.family })));
+                  } else {
+                    const first = addresses[0];
+                    if (!first) callback(new Error('No DNS records for ' + hostname));
+                    else callback(null, first.address, first.family);
+                  }
+                }, callback);
+              }
+              dns.lookup = bridgeLookup;
+              const dnsPromises = dns.promises;
+              if (dnsPromises) {
+                dnsPromises.lookup = async (hostname, options = {}) => new Promise((resolve, reject) => {
+                  bridgeLookup(hostname, options, (error, address, family) => {
+                    if (error) reject(error);
+                    else resolve(options && options.all ? address : { address, family });
+                  });
+                });
+              }
+              dns.lookup.__androidBridgeOriginal = originalLookup;
+            }
+            """.trimIndent(),
+        )
+        val shimSyntaxCheck = ProcessBuilder("node", "--check", androidNetworkPolyfill.absolutePath)
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(shimSyntaxCheck.waitFor() == 0) { "android-network-polyfill.cjs failed node --check." }
         assetRoot.resolve("package.json").writeText(
             """
             {
@@ -673,6 +880,12 @@ android {
                 // by scripts/build-android-bash.sh (gitignored); when absent,
                 // the runtime aliases /system/bin/sh under the name instead.
                 jniLibs.directories.add(file("libs/embedded-bash").absolutePath)
+                // curl-compatible helper (libcurl.so) that delegates HTTP(S)
+                // through AndroidNetworkBridge. Built by scripts/build-android-curl.sh.
+                jniLibs.directories.add(file("libs/embedded-curl").absolutePath)
+                // node CLI wrapper (libnodecli.so) linked against nodejs-mobile
+                // libnode.so so local tools can run `node -e` scripts.
+                jniLibs.directories.add(file("libs/embedded-node-cli").absolutePath)
             }
         }
         // The `benchmark` buildType (macrobenchmark target) uses the same
@@ -708,6 +921,10 @@ if (embeddedLettaCodeNativeEnabled.get()) {
             (name.startsWith("merge") && name.endsWith("JniLibFolders"))
         ) {
             dependsOn(prepareEmbeddedLettaCodeLibnode)
+            dependsOn(prepareEmbeddedBashHelper)
+            dependsOn(prepareEmbeddedGitHelper)
+            dependsOn(prepareEmbeddedCurlHelper)
+            dependsOn(prepareEmbeddedNodeCli)
         }
     }
 }

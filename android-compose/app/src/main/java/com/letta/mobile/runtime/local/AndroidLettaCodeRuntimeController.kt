@@ -44,6 +44,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val runtimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceOpenAiBridge: OnDeviceOpenAiBridge,
     private val localBackendStore: LettaCodeLocalBackendStore,
+    private val androidNetworkBridge: AndroidNetworkBridge,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -51,6 +52,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
 
     private var activeSession: EmbeddedLettaCodeSessionKey? = null
     private var activeOnDeviceBridgeSession: OnDeviceOpenAiBridgeSession? = null
+    private var activeAndroidNetworkBridgeSession: AndroidNetworkBridgeSession? = null
 
     override fun submit(command: TurnCommand, config: LettaConfig): Flow<String> = channelFlow {
         if (command.input is TurnInput.ToolApprovalResponse) {
@@ -143,18 +145,23 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             } else {
                 onDeviceOpenAiBridge.start(modelSelection)
             }
+            val networkBridgeSession = androidNetworkBridge.start()
             activeOnDeviceBridgeSession = bridgeSession
+            activeAndroidNetworkBridgeSession = networkBridgeSession
             try {
                 nodeBridge.start(
                     project.toLettaCodeNodeStartRequest(
                         session = requestedSession,
                         modelSelection = modelSelection,
                         onDeviceProviderBaseUrl = modelSelection.customProviderBaseUrl ?: bridgeSession?.baseUrl,
+                        androidNetworkBridgeBaseUrl = networkBridgeSession.baseUrl,
                     )
                 ).getOrThrow()
             } catch (error: Throwable) {
                 bridgeSession?.close()
+                networkBridgeSession.close()
                 activeOnDeviceBridgeSession = null
+                activeAndroidNetworkBridgeSession = null
                 throw error
             }
             activeSession = requestedSession
@@ -165,11 +172,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         session: EmbeddedLettaCodeSessionKey,
         modelSelection: EmbeddedLettaCodeModelSelection,
         onDeviceProviderBaseUrl: String? = null,
+        androidNetworkBridgeBaseUrl: String,
     ): LettaCodeNodeStartRequest {
         workingDirectory.mkdirs()
         storageDirectory.mkdirs()
         homeDirectory.mkdirs()
         val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
+        val tempDirectory = File(storageDirectory.parentFile, "tmp").apply { mkdirs() }
+        val backgroundDirectory = File(storageDirectory.parentFile, "background").apply { mkdirs() }
         // Per-agent model: letta.js overwrites the agent's model with the
         // --model argv on resume, so the stored record's handle must win;
         // the config-level selection is only the seed default for brand-new
@@ -208,6 +218,8 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 // that rewrites them through regexpu-core (see asset prep task).
                 add("--require")
                 add(File(projectDir, "regexp-polyfill.cjs").absolutePath)
+                add("--require")
+                add(File(projectDir, "android-network-polyfill.cjs").absolutePath)
                 add(entrypoint.absolutePath)
                 add("--backend")
                 add("local")
@@ -255,6 +267,12 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("NO_COLOR", "1")
                 put("UV_USE_IO_URING", "0")
                 put("UV_THREADPOOL_SIZE", "2")
+                put("TMPDIR", tempDirectory.absolutePath)
+                put("TMP", tempDirectory.absolutePath)
+                put("TEMP", tempDirectory.absolutePath)
+                put("LETTA_BACKGROUND_DIR", backgroundDirectory.absolutePath)
+                put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
+                put("LETTA_ANDROID_NETWORK_BRIDGE_URL", androidNetworkBridgeBaseUrl)
                 put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
             },
             workingDirectory = workingDirectory,
@@ -290,18 +308,40 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             runCatching { android.system.Os.symlink(bashTarget, bashLink.absolutePath) }
                 .onFailure { error -> Log.w(TAG, "Failed to link bash; Bash tool will be unavailable", error) }
         }
+        linkPackagedTool(binDirectory, "curl", "libcurl.so", "curl helper")
+        linkPackagedTool(binDirectory, "node", "libnodecli.so", "node CLI")
+        // npm: the data partition is noexec, so a shell-script wrapper in
+        // files/ can't be exec'd via PATH. Instead the node launcher is
+        // argv0-aware — symlink `npm` to the same native binary and point it at
+        // npm-cli.js via LETTA_NPM_CLI_JS. See letta-mobile-iq24j.
+        val npmCli = File(projectDir, "node_modules/npm/bin/npm-cli.js")
+        val nodeLink = File(binDirectory, "node")
+        val npmEnvironment = if (npmCli.isFile && nodeLink.canExecute()) {
+            linkPackagedTool(binDirectory, "npm", "libnodecli.so", "npm launcher")
+            mapOf(
+                "LETTA_NPM_CLI_JS" to npmCli.absolutePath,
+                "LETTA_NODE_BIN" to nodeLink.absolutePath,
+            )
+        } else {
+            Log.i(TAG, "npm-cli.js not bundled or node missing; npm unavailable")
+            emptyMap()
+        }
         val pathEnvironment = mapOf(
             "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
-        )
+        ) + npmEnvironment
         val gitLib = File(context.applicationInfo.nativeLibraryDir, "libgit.so")
         if (!gitLib.canExecute()) {
             Log.i(TAG, "libgit.so not packaged; local memfs disabled")
             return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
         }
         val gitLink = File(binDirectory, "git")
-        // nativeLibraryDir changes across installs, so an existing link may
-        // dangle; canExecute() follows the link and catches that.
-        if (!gitLink.canExecute()) {
+        // nativeLibraryDir changes across installs/updates, so an existing link
+        // may point at a STALE APK path. canExecute() alone is insufficient (a
+        // dangling/stale link can still resolve or falsely report executable),
+        // so recreate whenever the link target doesn't match the CURRENT lib —
+        // same self-healing behavior as linkPackagedTool (letta-mobile-s1uis).
+        val gitLinkCurrent = runCatching { android.system.Os.readlink(gitLink.absolutePath) }.getOrNull()
+        if (gitLinkCurrent != gitLib.absolutePath || !gitLink.canExecute()) {
             gitLink.delete()
             try {
                 android.system.Os.symlink(gitLib.absolutePath, gitLink.absolutePath)
@@ -367,6 +407,21 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
         authFile.parentFile?.mkdirs()
         authFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), root))
+    }
+
+    private fun linkPackagedTool(binDirectory: File, commandName: String, libraryName: String, label: String) {
+        val library = File(context.applicationInfo.nativeLibraryDir, libraryName)
+        if (!library.canExecute()) {
+            Log.i(TAG, "$libraryName not packaged; $label unavailable")
+            return
+        }
+        val link = File(binDirectory, commandName)
+        val current = runCatching { android.system.Os.readlink(link.absolutePath) }.getOrNull()
+        if (current != library.absolutePath || !link.canExecute()) {
+            link.delete()
+            runCatching { android.system.Os.symlink(library.absolutePath, link.absolutePath) }
+                .onFailure { error -> Log.w(TAG, "Failed to link $commandName; $label will be unavailable", error) }
+        }
     }
 
     private fun TurnCommand.toWireLine(): String = when (val input = input) {
