@@ -60,25 +60,75 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             return@channelFlow
         }
         submitMutex.withLock {
-            ensureStarted(command, config)
-            withTimeout(TURN_TIMEOUT_MS) {
-                val reader = launch(start = CoroutineStart.UNDISPATCHED) {
-                    try {
-                        nodeBridge.outputLines.collect { line ->
-                            Log.d(TAG, "embedded node out: ${line.take(400)}")
-                            send(line)
-                            if (line.isTerminalFrame()) {
-                                throw TerminalResultSeen()
+            val firstTurnOfSession = ensureStarted(command, config)
+            // Dangling-tool-call heal is EVENT-GATED, not run every turn — a
+            // full transcript parse per turn would be O(history) and add
+            // per-send lag that grows with the conversation. An orphan can only
+            // appear when a turn ends ABNORMALLY (no terminal frame), so we only
+            // pay the O(n) scan in that rare case. The happy path costs a single
+            // boolean check.
+            //
+            // Layer 1 — heal-on-read (belt): heal BEFORE this turn only if the
+            // store is dirty: a prior turn in this session ended abnormally, OR
+            // this is the first turn of a fresh session (a previous app process
+            // may have been killed mid-tool — the most common real cause).
+            if (firstTurnOfSession || transcriptDirty) {
+                healDanglingToolCalls(command.agentId.value, phase = "pre-turn")
+                transcriptDirty = false
+            }
+            var endedCleanly = false
+            try {
+                withTimeout(TURN_TIMEOUT_MS) {
+                    val reader = launch(start = CoroutineStart.UNDISPATCHED) {
+                        try {
+                            nodeBridge.outputLines.collect { line ->
+                                Log.d(TAG, "embedded node out: ${line.take(400)}")
+                                send(line)
+                                if (line.isTerminalFrame()) {
+                                    throw TerminalResultSeen()
+                                }
                             }
+                        } catch (_: TerminalResultSeen) {
+                            Unit
                         }
-                    } catch (_: TerminalResultSeen) {
-                        Unit
                     }
+                    nodeBridge.writeLine(command.toWireLine()).getOrThrow()
+                    reader.join()
+                    endedCleanly = true
                 }
-                nodeBridge.writeLine(command.toWireLine()).getOrThrow()
-                reader.join()
+            } finally {
+                // Layer 2 — settle-on-interrupt (suspenders): ONLY when this turn
+                // ended abnormally (timeout, cancel, node death mid-tool) — a
+                // clean turn never strands a tool call, so it pays nothing. On an
+                // abnormal end we settle immediately AND mark dirty so the next
+                // turn's Layer-1 check re-verifies before replay.
+                if (!endedCleanly) {
+                    transcriptDirty = true
+                    healDanglingToolCalls(command.agentId.value, phase = "post-turn")
+                }
             }
         }
+    }
+
+    // Set when a turn ends abnormally; gates the next turn's pre-replay heal so
+    // healthy turns do zero transcript I/O.
+    @Volatile
+    private var transcriptDirty: Boolean = false
+
+    private suspend fun healDanglingToolCalls(agentId: String, phase: String) {
+        runCatching { localBackendStore.healDanglingToolCalls(agentId) }
+            .onSuccess { report ->
+                if (report.healed) {
+                    Log.w(
+                        TAG,
+                        "Healed ${report.rowsAppended} dangling tool call(s) [$phase] for agent=$agentId " +
+                            "ids=${report.orphanCallIds}",
+                    )
+                }
+            }
+            .onFailure { error ->
+                Log.w(TAG, "Dangling-tool-call heal failed [$phase] for agent=$agentId", error)
+            }
     }
 
     override suspend fun interrupt() {
@@ -96,8 +146,15 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
-    private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig) {
-        startMutex.withLock {
+    /**
+     * Starts the embedded session if not already running. Returns true when
+     * this call started a FRESH session (first turn of the process/session) so
+     * the caller can run a one-time dangling-tool-call heal — a prior app
+     * process may have been killed mid-tool. Returns false when an existing
+     * session was reused (no heal needed unless separately marked dirty).
+     */
+    private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean {
+        return startMutex.withLock {
             val modelSelection = EmbeddedLettaCodeModelSelection.from(config)
             val requestedSession = EmbeddedLettaCodeSessionKey(
                 agentId = command.agentId.value,
@@ -112,7 +169,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                             "and conversation ${active.conversationId}. Restart the app before switching local sessions.",
                     )
                 }
-                return@withLock
+                return@withLock false
             }
 
             if (!runtimeStatusProvider.status.runnable) {
@@ -165,6 +222,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 throw error
             }
             activeSession = requestedSession
+            true
         }
     }
 

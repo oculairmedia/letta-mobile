@@ -53,6 +53,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : LocalRuntimeConversationSource, LocalRuntimeAgentSource {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val conversationHealer = LocalConversationHealer()
 
     val storageDirectory: File
         get() = File(context.filesDir, "embedded-lettacode/local-backend")
@@ -348,6 +349,23 @@ class LettaCodeLocalBackendStore @Inject constructor(
             }.toMap()
         }
     }
+
+    /**
+     * Heals the agent's default-conversation transcript by settling any
+     * dangling tool calls (an assistant toolCall part with no matching
+     * toolResult row) — the on-device analogue of the shim's lcp-ezv healer.
+     * Safe to call before every turn (belt) AND after an interrupted turn
+     * (suspenders); idempotent and a no-op on a well-formed transcript.
+     * Returns the heal report so callers can log what was settled.
+     */
+    suspend fun healDanglingToolCalls(agentId: String): LocalConversationHealer.HealReport =
+        withContext(Dispatchers.IO) {
+            val transcript = File(
+                File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
+                "messages.jsonl",
+            )
+            conversationHealer.healTranscript(transcript)
+        }
 
     private fun JsonObject.stringField(key: String): String? =
         this[key]?.jsonPrimitive?.takeIf { it.isString }?.content
