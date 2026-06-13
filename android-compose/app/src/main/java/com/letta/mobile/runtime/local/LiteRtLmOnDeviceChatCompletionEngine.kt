@@ -31,7 +31,7 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
 
             val engine = engineFor(modelSelection, modelFile)
             engine.createConversation().use { conversation ->
-                conversation.sendMessage(prompt).toString()
+                conversation.sendMessage(sanitizeForLiteRt(prompt)).toString()
             }
         }
 
@@ -83,6 +83,27 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
         return engine
     }
 }
+
+/**
+ * Strips UTF-16 surrogate code units from [input] before it crosses the
+ * LiteRT-LM native bridge.
+ *
+ * Kotlin strings are UTF-16; supplementary-plane code points (most emoji
+ * like 🗺️🎉🔥) are encoded as surrogate pairs. When serialized
+ * across the JNI boundary they become *modified* UTF-8, but nlohmann::json
+ * inside LiteRT-LM's native JNI layer parses only *standard* UTF-8 and
+ * crashes with "ill-formed UTF-8 byte" on the first surrogate.
+ *
+ * This drops only supplementary-plane characters (surrogates). All BMP
+ * code points — ASCII, accented Latin, CJK, BMP symbols like ⚔️♻️❤️ —
+ * pass through unchanged.
+ *
+ * The rest of the Kotlin/Android stack handles UTF-16 correctly, so
+ * sanitization MUST stay confined to this native boundary and MUST NOT
+ * be applied in storage, display, or any other non-LiteRT path.
+ */
+fun sanitizeForLiteRt(input: String): String =
+    input.filterNot { it.isSurrogate() }
 
 private fun String.toLiteRtLmBackend(context: Context): Backend =
     when (trim().lowercase(Locale.US)) {
