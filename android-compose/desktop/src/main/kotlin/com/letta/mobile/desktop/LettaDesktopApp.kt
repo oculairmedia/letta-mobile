@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.Button
@@ -60,6 +61,9 @@ import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
+import com.letta.mobile.desktop.memory.DesktopMemoryController
+import com.letta.mobile.desktop.memory.DesktopMemorySurface
+import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -89,6 +93,13 @@ fun LettaDesktopApp() {
         )
     }
     val chatState by chatController.state.collectAsState()
+    val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
+        DesktopMemoryController(
+            sessionGraphProvider = dataBindings.sessionGraphProvider,
+            scope = chatScope,
+        )
+    }
+    val memoryState by memoryController.state.collectAsState()
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
@@ -115,6 +126,12 @@ fun LettaDesktopApp() {
     }
     DisposableEffect(chatController) {
         onDispose { chatController.close() }
+    }
+    LaunchedEffect(memoryController) {
+        memoryController.start()
+    }
+    DisposableEffect(memoryController) {
+        onDispose { memoryController.close() }
     }
 
     MaterialTheme(
@@ -153,6 +170,7 @@ fun LettaDesktopApp() {
                     destination = selectedDestination,
                     state = bootstrapState,
                     chatState = chatState,
+                    memoryState = memoryState,
                     onChatConversationSelected = chatController::selectConversation,
                     onChatConversationDeleted = chatController::deleteConversation,
                     onChatComposerTextChanged = chatController::updateComposerText,
@@ -162,6 +180,8 @@ fun LettaDesktopApp() {
                     },
                     onChatRemoveImageAttachment = chatController::removeImageAttachment,
                     onChatRetryConnection = chatController::retryConnection,
+                    onMemoryRefresh = memoryController::reload,
+                    onMemoryAgentSelected = memoryController::selectAgent,
                     onConfigSaved = { nextConfig ->
                         configStore.save(nextConfig)
                         activeConfig = configStore.load()
@@ -257,6 +277,7 @@ private val DesktopDestination.icon: ImageVector
     get() = when (this) {
         DesktopDestination.Overview -> Icons.Outlined.Dashboard
         DesktopDestination.Agents -> Icons.Outlined.SmartToy
+        DesktopDestination.Memory -> Icons.Outlined.Memory
         DesktopDestination.Conversations -> Icons.Outlined.Forum
         DesktopDestination.Settings -> Icons.Outlined.Settings
     }
@@ -266,6 +287,7 @@ private fun DestinationContent(
     destination: DesktopDestination,
     state: DesktopBootstrapState,
     chatState: DesktopChatSurfaceState,
+    memoryState: DesktopMemorySurfaceState,
     onChatConversationSelected: (String) -> Unit,
     onChatConversationDeleted: (String) -> Unit,
     onChatComposerTextChanged: (String) -> Unit,
@@ -273,6 +295,8 @@ private fun DestinationContent(
     onChatAttachImage: () -> Unit,
     onChatRemoveImageAttachment: (Int) -> Unit,
     onChatRetryConnection: () -> Unit,
+    onMemoryRefresh: () -> Unit,
+    onMemoryAgentSelected: (String) -> Unit,
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
     modifier: Modifier = Modifier,
@@ -287,6 +311,15 @@ private fun DestinationContent(
             onAttachImage = onChatAttachImage,
             onRemoveImageAttachment = onChatRemoveImageAttachment,
             onRetryConnection = onChatRetryConnection,
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == DesktopDestination.Memory) {
+        DesktopMemorySurface(
+            state = memoryState,
+            onRefresh = onMemoryRefresh,
+            onAgentSelected = onMemoryAgentSelected,
             modifier = modifier,
         )
         return
@@ -323,10 +356,13 @@ private fun DestinationContent(
                 item {
                     PortabilityCard(
                         title = "Agent surface",
-                        body = "The desktop module already depends on shared Agent and LettaConfig contracts. The Android agent list still mixes Hilt, DataStore, and Android resources, so the next step is extracting a platform-neutral repository facade before moving the full list UI.",
+                        body = "The desktop module can read remote agents through the shared repository contract. The remaining work is turning the Android-only list management flows into reusable screen state and desktop-specific renderers.",
                         state = DesktopFeatureState.InProgress,
                     )
                 }
+            }
+            DesktopDestination.Memory -> {
+                // Rendered by the full-height branch above.
             }
             DesktopDestination.Conversations -> {
                 // Rendered by the full-height branch above.

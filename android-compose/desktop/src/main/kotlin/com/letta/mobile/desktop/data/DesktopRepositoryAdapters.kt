@@ -40,7 +40,7 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -85,27 +85,32 @@ class DesktopSessionGraph internal constructor(
     override val subagentRepository: ISubagentRepository,
     override val toolRepository: IToolRepository,
     override val vibesyncEventStreamRepository: IVibesyncEventStreamRepository,
+    private val closeables: List<AutoCloseable> = emptyList(),
 ) : SessionRepositoryGraph {
-    private val closedRef = AtomicReference(false)
+    private val closedRef = AtomicBoolean(false)
 
     val isClosed: Boolean
         get() = closedRef.get()
 
     override fun close() {
-        closedRef.set(true)
+        if (closedRef.compareAndSet(false, true)) {
+            closeables.forEach { closeable ->
+                runCatching { closeable.close() }
+            }
+        }
     }
 }
 
 class DesktopSessionGraphFactory(
     private val configProvider: () -> LettaConfig? = { null },
     private val channelTransportFactory: () -> IChannelTransport = ::NoOpChannelTransport,
-    private val repositoryAdaptersFactory: () -> DesktopRepositoryAdapters = ::DesktopRepositoryAdapters,
+    private val repositoryAdaptersFactory: (LettaConfig?) -> DesktopRepositoryAdapters = ::DesktopRepositoryAdapters,
 ) : SessionRepositoryGraphFactory<DesktopSessionGraph> {
     private val nextId = AtomicLong(0L)
 
     override fun create(): DesktopSessionGraph {
         val config = configProvider()
-        val adapters = repositoryAdaptersFactory()
+        val adapters = repositoryAdaptersFactory(config)
         return DesktopSessionGraph(
             id = nextId.incrementAndGet(),
             backendDescriptor = desktopRemoteLettaDescriptor(config),
@@ -132,6 +137,7 @@ class DesktopSessionGraphFactory(
             subagentRepository = adapters.subagentRepository,
             toolRepository = adapters.toolRepository,
             vibesyncEventStreamRepository = adapters.vibesyncEventStreamRepository,
+            closeables = adapters.closeables,
         )
     }
 }
@@ -203,8 +209,14 @@ fun defaultDesktopChatSessionGraphFactory(
         gatewayFactory = { DesktopLettaHttpChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
     )
 
-class DesktopRepositoryAdapters {
-    val agentRepository: IAgentRepository = unavailableRepository()
+class DesktopRepositoryAdapters(config: LettaConfig? = null) {
+    private val adminRepositories = config
+        ?.takeIf { it.serverUrl.isNotBlank() }
+        ?.let(::DesktopLettaHttpAdminRepositories)
+
+    val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
+
+    val agentRepository: IAgentRepository = adminRepositories ?: unavailableRepository()
     val archiveRepository: IArchiveRepository = unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = unavailableRepository()
@@ -219,11 +231,11 @@ class DesktopRepositoryAdapters {
     val projectWorkRepository: IProjectWorkRepository = unavailableRepository()
     val providerRepository: IProviderRepository = unavailableRepository()
     val runRepository: IRunRepository = unavailableRepository()
-    val scheduleRepository: IScheduleRepository = unavailableRepository()
+    val scheduleRepository: IScheduleRepository = adminRepositories ?: unavailableRepository()
     val selfTodoRepository: ISelfTodoRepository = unavailableRepository()
     val stepRepository: IStepRepository = unavailableRepository()
     val subagentRepository: ISubagentRepository = unavailableRepository()
-    val toolRepository: IToolRepository = unavailableRepository()
+    val toolRepository: IToolRepository = adminRepositories ?: unavailableRepository()
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailableRepository()
 }
 
