@@ -33,7 +33,11 @@ enum class DesktopDestination(
     ),
     Agents(
         label = "Agents",
-        summary = "Shared agent models are available; repository and persistence wiring still need desktop implementations.",
+        summary = "Shared agent models are available; desktop read repositories back the memory parity surface.",
+    ),
+    Memory(
+        label = "Memory",
+        summary = "Shared skills, memory blocks, schedules, and channels for the selected agent.",
     ),
     Conversations(
         label = "Conversations",
@@ -64,8 +68,13 @@ fun defaultDesktopBootstrapState(
         ),
         DesktopFeatureReadiness(
             title = "Desktop repository layer",
-            description = "Desktop can construct a shared session graph with JVM settings and health adapters; concrete remote repositories are still pending.",
+            description = "Desktop can construct a shared session graph with JVM settings, health adapters, and remote read repositories for agents, tools, schedules, and context.",
             state = DesktopFeatureState.InProgress,
+        ),
+        DesktopFeatureReadiness(
+            title = "Desktop memory parity",
+            description = "Skills, memory blocks, schedules, and channel state are displayed from shared common-code models in the Windows shell.",
+            state = DesktopFeatureState.Ready,
         ),
         DesktopFeatureReadiness(
             title = "Desktop chat surface",
