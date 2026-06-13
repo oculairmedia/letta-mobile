@@ -61,24 +61,55 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
         submitMutex.withLock {
             ensureStarted(command, config)
-            withTimeout(TURN_TIMEOUT_MS) {
-                val reader = launch(start = CoroutineStart.UNDISPATCHED) {
-                    try {
-                        nodeBridge.outputLines.collect { line ->
-                            Log.d(TAG, "embedded node out: ${line.take(400)}")
-                            send(line)
-                            if (line.isTerminalFrame()) {
-                                throw TerminalResultSeen()
+            // Layer 1 — heal-on-read (belt): settle any dangling tool calls a
+            // PRIOR interrupted turn left in the transcript BEFORE letta.js
+            // replays it this turn, or a strict provider 400s the request
+            // ("tool_use without tool_result"). Bulletproof regardless of how
+            // the orphan appeared (crash/kill/cancel). letta-mobile dangling-
+            // tool-call heal; on-device analogue of the shim's lcp-ezv.
+            healDanglingToolCalls(command.agentId.value, phase = "pre-turn")
+            try {
+                withTimeout(TURN_TIMEOUT_MS) {
+                    val reader = launch(start = CoroutineStart.UNDISPATCHED) {
+                        try {
+                            nodeBridge.outputLines.collect { line ->
+                                Log.d(TAG, "embedded node out: ${line.take(400)}")
+                                send(line)
+                                if (line.isTerminalFrame()) {
+                                    throw TerminalResultSeen()
+                                }
                             }
+                        } catch (_: TerminalResultSeen) {
+                            Unit
                         }
-                    } catch (_: TerminalResultSeen) {
-                        Unit
                     }
+                    nodeBridge.writeLine(command.toWireLine()).getOrThrow()
+                    reader.join()
                 }
-                nodeBridge.writeLine(command.toWireLine()).getOrThrow()
-                reader.join()
+            } finally {
+                // Layer 2 — settle-on-interrupt (suspenders): if THIS turn ended
+                // abnormally (timeout, cancel, node death mid-tool), settle any
+                // tool call it left open now, so the store is clean before the
+                // next replay instead of relying solely on Layer 1.
+                healDanglingToolCalls(command.agentId.value, phase = "post-turn")
             }
         }
+    }
+
+    private suspend fun healDanglingToolCalls(agentId: String, phase: String) {
+        runCatching { localBackendStore.healDanglingToolCalls(agentId) }
+            .onSuccess { report ->
+                if (report.healed) {
+                    Log.w(
+                        TAG,
+                        "Healed ${report.rowsAppended} dangling tool call(s) [$phase] for agent=$agentId " +
+                            "ids=${report.orphanCallIds}",
+                    )
+                }
+            }
+            .onFailure { error ->
+                Log.w(TAG, "Dangling-tool-call heal failed [$phase] for agent=$agentId", error)
+            }
     }
 
     override suspend fun interrupt() {
