@@ -247,6 +247,11 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_CACHE_DIR", modelCacheDirectory.absolutePath)
                 onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
                 modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
+                // letta.js's Bash tool resolves its shell from $SHELL first,
+                // then /bin/bash, /bin/sh, /usr/bin/env … — none of which
+                // exist on Android. Without this the Bash tool is dead on
+                // device ("there is no bash"); toybox sh handles -c fine.
+                put("SHELL", "/system/bin/sh")
                 put("NO_COLOR", "1")
                 put("UV_USE_IO_URING", "0")
                 put("UV_THREADPOOL_SIZE", "2")
@@ -266,12 +271,27 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
      * disabled so turns keep working.
      */
     private fun PreparedLettaCodeProject.memfsEnvironment(): Map<String, String> {
+        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
+        // letta.js's Bash tool spawns the literal executable "bash" via PATH
+        // on every non-Windows platform — no launcher fallback, no $SHELL
+        // (shell-runner.ts spawnCommand). Android only ships /system/bin/sh,
+        // so without this link every Bash tool call fails with "Executable
+        // not found: bash". The link resolves to the system partition, so
+        // the noexec data mount doesn't apply.
+        val bashLink = File(binDirectory, "bash")
+        if (!bashLink.canExecute()) {
+            bashLink.delete()
+            runCatching { android.system.Os.symlink("/system/bin/sh", bashLink.absolutePath) }
+                .onFailure { error -> Log.w(TAG, "Failed to link bash; Bash tool will be unavailable", error) }
+        }
+        val pathEnvironment = mapOf(
+            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
+        )
         val gitLib = File(context.applicationInfo.nativeLibraryDir, "libgit.so")
         if (!gitLib.canExecute()) {
             Log.i(TAG, "libgit.so not packaged; local memfs disabled")
-            return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+            return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
         }
-        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
         val gitLink = File(binDirectory, "git")
         // nativeLibraryDir changes across installs, so an existing link may
         // dangle; canExecute() follows the link and catches that.
@@ -281,7 +301,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 android.system.Os.symlink(gitLib.absolutePath, gitLink.absolutePath)
             } catch (error: Exception) {
                 Log.w(TAG, "Failed to link git; local memfs disabled", error)
-                return mapOf("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
+                return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
             }
         }
         // letta.js memory-git installs bash pre/post-commit hooks; the repo
@@ -305,8 +325,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             	directory = *
             """.trimIndent() + "\n",
         )
-        return mapOf(
-            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
+        return pathEnvironment + mapOf(
             "GIT_EXEC_PATH" to binDirectory.absolutePath,
             "GIT_TEMPLATE_DIR" to "",
             "GIT_CONFIG_NOSYSTEM" to "1",

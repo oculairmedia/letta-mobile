@@ -204,10 +204,17 @@ class EmbeddedRuntimeDeviceLoopTest {
                         modelSelection: EmbeddedLettaCodeModelSelection,
                         prompt: String,
                     ): Result<String> = Result.success(
-                        if (prompt.contains("tool result")) {
+                        // Require the echo's actual stdout in the follow-up
+                        // prompt: a failed exec also feeds back a (error)
+                        // tool result, and matching on that proved the loop
+                        // while Bash was silently broken on Android (no
+                        // /bin/sh — see SHELL in the controller env). The
+                        // marker is $((…))-expanded so it only exists in
+                        // real shell output, never in the echoed arguments.
+                        if (prompt.contains("device-tool-42")) {
                             "tool-loop-ok"
                         } else {
-                            "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"echo device-tool-roundtrip\"}}\n```"
+                            "```tool_call\n{\"name\": \"Bash\", \"arguments\": {\"command\": \"echo device-tool-$((6*7))\"}}\n```"
                         }
                     )
                 }
