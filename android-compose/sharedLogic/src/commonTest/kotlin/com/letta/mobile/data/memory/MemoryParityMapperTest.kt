@@ -98,6 +98,67 @@ class MemoryParityMapperTest {
         assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
     }
 
+    @Test
+    fun buildWithNoMemoryDataIsEmptyButStillReportsChannelStatus() {
+        val state = MemoryParityMapper.build(
+            agents = emptyList(),
+            selectedAgentId = null,
+            allTools = emptyList(),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Disconnected(code = 1006, reason = "Network unavailable"),
+        )
+
+        assertEquals(null, state.selectedAgentId)
+        assertEquals(0, state.summary.skillCount)
+        assertEquals(0, state.summary.memoryBlockCount)
+        assertEquals(0, state.summary.scheduleCount)
+        assertEquals(0, state.summary.totalMemoryTokens)
+        assertEquals(null, state.summary.contextWindowUsed)
+        // The memory-data sections are empty when there is nothing to show.
+        assertEquals(true, state.section(MemoryParitySectionKind.Skills).items.isEmpty())
+        assertEquals(true, state.section(MemoryParitySectionKind.Memory).items.isEmpty())
+        assertEquals(true, state.section(MemoryParitySectionKind.Schedules).items.isEmpty())
+        // The channels section always renders one descriptor row, so the overall
+        // state is NOT isEmpty — it still reports live channel status.
+        assertFalse(state.isEmpty)
+        val channel = assertIs<MemoryParityItem.Channel>(
+            state.section(MemoryParitySectionKind.Channels).items.single(),
+        )
+        assertEquals(MemoryChannelStatus.Disconnected, channel.status)
+        assertEquals("Network unavailable", channel.subtitle)
+    }
+
+    @Test
+    fun buildLabelsOneTimeSchedulesWithTheirNextRunTime() {
+        val oneTime = ScheduledMessage(
+            id = "schedule-once",
+            agentId = "agent-1",
+            message = SchedulePayload(
+                messages = listOf(ScheduleMessage(content = "Ping me later", role = "user")),
+            ),
+            schedule = ScheduleDefinition(type = "one_time"),
+            nextScheduledTime = "2026-06-20T12:00:00Z",
+        )
+
+        val state = MemoryParityMapper.build(
+            agents = listOf(sampleAgent()),
+            selectedAgentId = "agent-1",
+            allTools = emptyList(),
+            schedules = listOf(oneTime),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+        )
+
+        val schedule = assertIs<MemoryParityItem.Schedule>(
+            state.section(MemoryParitySectionKind.Schedules).items.single(),
+        )
+        assertEquals("Ping me later", schedule.title)
+        assertEquals("one_time", schedule.scheduleType)
+        assertEquals("One-time: 2026-06-20T12:00:00Z", schedule.subtitle)
+        assertEquals("2026-06-20T12:00:00Z", schedule.nextRunLabel)
+    }
+
     private fun MemoryParityState.section(kind: MemoryParitySectionKind): MemoryParitySection =
         sections.first { it.kind == kind }
 

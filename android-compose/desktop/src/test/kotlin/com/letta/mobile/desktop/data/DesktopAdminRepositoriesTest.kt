@@ -140,6 +140,75 @@ class DesktopAdminRepositoriesTest {
         assertTrue("/v1/agents/agent-1/context" in requestedPaths)
     }
 
+    @Test
+    fun refreshAgentsSurfacesHttpFailureViaRefreshError() = runTest {
+        val client = HttpClient(
+            MockEngine { _ ->
+                jsonResponse("""{"error":"boom"}""", HttpStatusCode.InternalServerError)
+            },
+        ) {
+            install(ContentNegotiation) { json(desktopChatJson) }
+        }
+        val repositories = repositories(client)
+
+        val thrown = runCatching { repositories.refreshAgents() }.exceptionOrNull()
+
+        assertTrue(thrown != null, "refreshAgents must rethrow on HTTP failure")
+        assertTrue(
+            repositories.refreshError.value != null,
+            "refreshError must hold the failure",
+        )
+        assertEquals(false, repositories.isRefreshing.value)
+        assertTrue(repositories.agents.value.isEmpty(), "agents cache stays empty on failure")
+    }
+
+    @Test
+    fun refreshAgentsIfStaleSkipsFetchWhenCacheIsFresh() = runTest {
+        var agentFetches = 0
+        var now = 1_000L
+        val client = HttpClient(
+            MockEngine { request ->
+                if (request.url.encodedPath == "/v1/agents") {
+                    agentFetches += 1
+                    jsonResponse("""[{"id":"agent-1","name":"Ada"}]""")
+                } else {
+                    jsonResponse("[]")
+                }
+            },
+        ) {
+            install(ContentNegotiation) { json(desktopChatJson) }
+        }
+        val repositories = repositories(client, nowMillis = { now })
+
+        // First call populates the cache and records the refresh time.
+        assertTrue(repositories.refreshAgentsIfStale(maxAgeMs = 10_000L), "first stale-check must fetch")
+        assertEquals(1, agentFetches)
+
+        // Still within TTL → no second fetch.
+        now += 5_000L
+        assertEquals(false, repositories.refreshAgentsIfStale(maxAgeMs = 10_000L))
+        assertEquals(1, agentFetches)
+
+        // Past TTL → refetch.
+        now += 20_000L
+        assertTrue(repositories.refreshAgentsIfStale(maxAgeMs = 10_000L), "expired cache must refetch")
+        assertEquals(2, agentFetches)
+    }
+
+    private fun repositories(
+        client: HttpClient,
+        nowMillis: () -> Long = { 0L },
+    ) = DesktopLettaHttpAdminRepositories(
+        config = LettaConfig(
+            id = "desktop-test",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8283",
+            accessToken = "token-1",
+        ),
+        httpClient = client,
+        nowMillis = nowMillis,
+    )
+
     private fun MockRequestHandleScope.jsonResponse(
         body: String,
         status: HttpStatusCode = HttpStatusCode.OK,
