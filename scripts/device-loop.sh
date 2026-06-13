@@ -158,13 +158,15 @@ run_filter() {
   echo "Full logcat: $logcat_file"
 }
 
-# Only tier3 reads the model; don't push a multi-GB file for the default
-# tier1/2 smoke filters. Custom class filters (no tier marker) stage it too,
-# since they may run the whole class including tier3.
-if printf '%s\n' "${FILTERS[@]}" | grep -qvE "tier1|tier2"; then
+# Only the on-device-model tiers need a staged .litertlm: tier3 (local turn)
+# and tier4 (tool round trip through the on-device bridge). tier5/tier6 are
+# the custom-provider path and explicitly require NO on-device model, so a
+# remote-endpoint run must not push a multi-GB file. Bare class filters are
+# already expanded to per-method tiers above, so every entry carries a marker.
+if printf '%s\n' "${FILTERS[@]}" | grep -qE "tier3|tier4"; then
   ensure_model || { echo "device-loop: model staging failed"; exit 1; }
 else
-  echo "device-loop: tier1/2-only filters — skipping model staging"
+  echo "device-loop: no model-backed tier in filter set — skipping model staging"
 fi
 
 overall=0

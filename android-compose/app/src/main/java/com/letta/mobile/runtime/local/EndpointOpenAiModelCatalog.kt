@@ -23,21 +23,19 @@ import kotlinx.serialization.json.jsonObject
 class EndpointOpenAiModelCatalog @Inject constructor() {
     private val json = Json { ignoreUnknownKeys = true }
 
-    @Volatile private var cacheKey: String? = null
-
-    @Volatile private var cached: List<LlmModel> = emptyList()
+    // Last-good list per endpoint+key, so switching endpoints (or a fetch
+    // failure for a previously used one) degrades to that endpoint's own
+    // cached models rather than a single global slot (CodeRabbit).
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, List<LlmModel>>()
 
     suspend fun listModels(baseUrl: String, apiKey: String?): List<LlmModel> = withContext(Dispatchers.IO) {
         val key = "$baseUrl|${apiKey.orEmpty()}"
         val fetched = runCatching { fetch(baseUrl, apiKey) }.getOrNull()
         if (fetched != null) {
-            cacheKey = key
-            cached = fetched
+            cache[key] = fetched
             fetched
-        } else if (cacheKey == key) {
-            cached
         } else {
-            emptyList()
+            cache[key].orEmpty()
         }
     }
 

@@ -56,8 +56,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -347,8 +347,13 @@ internal class AdminChatViewModel @Inject constructor(
         agentRepository.getAgent(agentId)
             .map<Agent, Agent?> { it }
             .catch { emit(null) },
+        // Reflect cache updates AND removals. Ignore the cache only while it
+        // is empty (cold load), so the getAgent fetch above isn't clobbered;
+        // once it is populated, a missing agent (delete / backend switch)
+        // emits null instead of leaving a stale agent in the drawer.
         agentRepository.agents
-            .mapNotNull { agents -> agents.find { it.id == agentId } },
+            .filter { agents -> agents.isNotEmpty() }
+            .map { agents -> agents.find { it.id == agentId } },
     ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId

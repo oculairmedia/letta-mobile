@@ -180,8 +180,11 @@ class AgentListViewModelTest {
             "${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:local-config",
             captured.metadata?.get(LocalAgentRuntimeMetadata.RuntimeIdKey)?.jsonPrimitive?.contentOrNull,
         )
+        // Metadata handle now mirrors the effective model (the prefixed
+        // handle the agent actually runs), not the bare config handle, so a
+        // future reader can't disagree with the record's model (CodeRabbit).
         assertEquals(
-            "google/gemma-test-litert-lm",
+            "lmstudio/google/gemma-test-litert-lm",
             captured.metadata?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
         )
         coVerify(exactly = 0) { agentRepository.createAgent(any()) }
@@ -203,6 +206,13 @@ class AgentListViewModelTest {
         ) {}
 
         assertEquals("lmstudio/MiniMax-M3", paramsSlot.captured.model)
+        // Metadata handle must track the picked model, not the config default,
+        // or the record's model and metadata disagree (CodeRabbit).
+        assertEquals(
+            "lmstudio/MiniMax-M3",
+            paramsSlot.captured.metadata
+                ?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
+        )
     }
 
     @Test

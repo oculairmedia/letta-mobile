@@ -111,6 +111,17 @@ class LettaCodeStreamJsonMapperTest {
     }
 
     @Test
+    fun `tool return with boolean is_err maps to failed`() {
+        val drafts = mapper.mapLine(
+            """{"type":"message","id":"m","message_type":"tool_return_message","tool_call_id":"call_b","is_err":true,"tool_return":"nope"}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.ToolReturnObserved
+        assertEquals(com.letta.mobile.runtime.ToolExecutionStatus.Failed, payload.status)
+    }
+
+    @Test
     fun `ignores tool approval control request until approvals are supported`() {
         val drafts = mapper.mapLine(
             """{"type":"control_request","request_id":"perm-call-1","request":{"subtype":"can_use_tool","tool_name":"Write","tool_call_id":"call-1","input":{"file_path":"README.md"}}}""",
