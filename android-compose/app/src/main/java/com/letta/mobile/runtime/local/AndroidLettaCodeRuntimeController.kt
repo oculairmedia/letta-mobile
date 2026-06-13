@@ -274,14 +274,20 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
         // letta.js's Bash tool spawns the literal executable "bash" via PATH
         // on every non-Windows platform — no launcher fallback, no $SHELL
-        // (shell-runner.ts spawnCommand). Android only ships /system/bin/sh,
-        // so without this link every Bash tool call fails with "Executable
-        // not found: bash". The link resolves to the system partition, so
-        // the noexec data mount doesn't apply.
+        // (shell-runner.ts spawnCommand). Android ships no bash, so without
+        // this link every Bash tool call fails with "Executable not found:
+        // bash". Prefer the bundled real bash (libbash.so, executable in
+        // nativeLibraryDir); fall back to aliasing /system/bin/sh, which
+        // runs simple commands but with toybox/mksh semantics, not bash's.
+        val bashLib = File(context.applicationInfo.nativeLibraryDir, "libbash.so")
+        val bashTarget = if (bashLib.canExecute()) bashLib.absolutePath else "/system/bin/sh"
         val bashLink = File(binDirectory, "bash")
-        if (!bashLink.canExecute()) {
+        // nativeLibraryDir changes across installs; recreate unless the link
+        // already resolves to the wanted target and is executable.
+        val bashLinkCurrent = runCatching { android.system.Os.readlink(bashLink.absolutePath) }.getOrNull()
+        if (bashLinkCurrent != bashTarget || !bashLink.canExecute()) {
             bashLink.delete()
-            runCatching { android.system.Os.symlink("/system/bin/sh", bashLink.absolutePath) }
+            runCatching { android.system.Os.symlink(bashTarget, bashLink.absolutePath) }
                 .onFailure { error -> Log.w(TAG, "Failed to link bash; Bash tool will be unavailable", error) }
         }
         val pathEnvironment = mapOf(

@@ -669,6 +669,10 @@ android {
                 // by scripts/build-android-git.sh (gitignored); when absent,
                 // the runtime keeps local memfs disabled instead of failing.
                 jniLibs.directories.add(file("libs/embedded-git").absolutePath)
+                // GNU bash for android-arm64 (libbash.so), same trick. Built
+                // by scripts/build-android-bash.sh (gitignored); when absent,
+                // the runtime aliases /system/bin/sh under the name instead.
+                jniLibs.directories.add(file("libs/embedded-bash").absolutePath)
             }
         }
         // The `benchmark` buildType (macrobenchmark target) uses the same
