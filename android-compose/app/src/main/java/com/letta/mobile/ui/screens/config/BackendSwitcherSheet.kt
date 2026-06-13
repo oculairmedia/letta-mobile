@@ -208,7 +208,13 @@ private fun EmbeddedRuntimeConnectAction(
             Text(stringResource(R.string.screen_config_embedded_runtime_connect))
         }
         Text(
-            text = stringResource(R.string.screen_config_embedded_runtime_disabled_placeholder),
+            text = stringResource(
+                if (status.runnable) {
+                    R.string.screen_config_embedded_runtime_enabled_placeholder
+                } else {
+                    R.string.screen_config_embedded_runtime_disabled_placeholder
+                }
+            ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

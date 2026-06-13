@@ -28,6 +28,7 @@ class EmbeddedCatalogModelSource @Inject constructor(
             ?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
             ?.let { baseUrl -> endpointCatalog.listModels(baseUrl, config.localProviderApiKey) }
             .orEmpty()
+            .map { model -> model.copy(handle = model.handle?.toLettaCodeHandle()) }
 
         embeddedModelRepository.refresh()
         val downloaded = embeddedModelRepository.catalog.value
@@ -36,7 +37,7 @@ class EmbeddedCatalogModelSource @Inject constructor(
                 LlmModel(
                     id = item.entry.modelId,
                     name = item.entry.name,
-                    handle = item.entry.modelId,
+                    handle = item.entry.modelId.toLettaCodeHandle(),
                     providerType = "local-lettacode",
                     providerName = "Embedded LettaCode",
                     contextWindow = null,
@@ -46,4 +47,11 @@ class EmbeddedCatalogModelSource @Inject constructor(
 
         return endpointModels + downloaded
     }
+
+    // Picker selections are persisted verbatim to the agent record and passed
+    // to letta.js as --model on the next session start; letta.js only routes
+    // handles with the lmstudio/ provider prefix to the local provider
+    // plumbing (bridge or custom endpoint), so bare ids would fail to resolve.
+    private fun String.toLettaCodeHandle(): String =
+        if (startsWith("lmstudio/")) this else "lmstudio/$this"
 }

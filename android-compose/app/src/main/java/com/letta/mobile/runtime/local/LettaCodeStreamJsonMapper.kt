@@ -66,7 +66,12 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
             source = RuntimeEventSource.LocalRuntime,
             payload = RuntimeEventPayload.RemoteStreamFrame(
                 frameId = frameId,
-                messageId = string("message_id") ?: string("id"),
+                // Streaming deltas: letta.js gives every streamed chunk a
+                // unique frame id ("letta-msg-N") but a stable otid per
+                // logical message — key on the otid so the timeline reducer
+                // merges chunks into one message instead of rendering each
+                // delta as its own bubble.
+                messageId = string("message_id") ?: string("otid") ?: string("id"),
                 messageType = string("message_type") ?: string("messageType"),
                 body = body,
             ),

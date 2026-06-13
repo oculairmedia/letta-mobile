@@ -57,6 +57,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -337,10 +339,17 @@ internal class AdminChatViewModel @Inject constructor(
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val activeAgent: StateFlow<Agent?> = agentRepository.getAgent(agentId)
-        .map<Agent, Agent?> { it }
-        .catch { emit(null) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    // getAgent is a one-shot fetch flow (emit + complete), so on its own the
+    // drawer's "current model" would never reflect a later updateAgent — the
+    // model picker looked like it did nothing (letta-mobile-3icw7). Merge in
+    // the repository cache, which updateAgent writes through synchronously.
+    val activeAgent: StateFlow<Agent?> = merge(
+        agentRepository.getAgent(agentId)
+            .map<Agent, Agent?> { it }
+            .catch { emit(null) },
+        agentRepository.agents
+            .mapNotNull { agents -> agents.find { it.id == agentId } },
+    ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val favoriteAgentId: StateFlow<String?> = settingsRepository.favoriteAgentId
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.favoriteAgentId.value)

@@ -532,7 +532,13 @@ private fun EmbeddedRuntimeStatusItem(
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = stringResource(R.string.screen_config_embedded_runtime_disabled_placeholder),
+                    text = stringResource(
+                        if (status.runnable) {
+                            R.string.screen_config_embedded_runtime_enabled_placeholder
+                        } else {
+                            R.string.screen_config_embedded_runtime_disabled_placeholder
+                        }
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -553,7 +559,17 @@ private fun EmbeddedRuntimeStatusItem(
             AssistChip(
                 onClick = {},
                 enabled = false,
-                label = { Text(stringResource(R.string.screen_config_embedded_runtime_execution_disabled)) },
+                label = {
+                    Text(
+                        stringResource(
+                            if (status.runnable) {
+                                R.string.screen_config_embedded_runtime_execution_enabled
+                            } else {
+                                R.string.screen_config_embedded_runtime_execution_disabled
+                            }
+                        )
+                    )
+                },
             )
         }
     }

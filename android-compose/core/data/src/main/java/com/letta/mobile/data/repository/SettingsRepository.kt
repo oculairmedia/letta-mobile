@@ -674,6 +674,9 @@ class SettingsRepository internal constructor(
         val localModelRuntime: String? = null,
         val localModelAccelerator: String? = null,
         val localModelMaxTokens: Int? = null,
+        val localProviderBaseUrl: String? = null,
+        val localProviderApiKey: String? = null,
+        val localProviderModel: String? = null,
     ) {
         fun toLettaConfig() = LettaConfig(
             id = id,
@@ -685,6 +688,9 @@ class SettingsRepository internal constructor(
             localModelRuntime = localModelRuntime,
             localModelAccelerator = localModelAccelerator,
             localModelMaxTokens = localModelMaxTokens,
+            localProviderBaseUrl = localProviderBaseUrl,
+            localProviderApiKey = localProviderApiKey,
+            localProviderModel = localProviderModel,
         )
 
         companion object {
@@ -698,6 +704,9 @@ class SettingsRepository internal constructor(
                 localModelRuntime = config.localModelRuntime,
                 localModelAccelerator = config.localModelAccelerator,
                 localModelMaxTokens = config.localModelMaxTokens,
+                localProviderBaseUrl = config.localProviderBaseUrl,
+                localProviderApiKey = config.localProviderApiKey,
+                localProviderModel = config.localProviderModel,
             )
         }
     }

@@ -173,9 +173,25 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         // Per-agent model: letta.js overwrites the agent's model with the
         // --model argv on resume, so the stored record's handle must win;
         // the config-level selection is only the seed default for brand-new
-        // agents (letta-mobile-3icw7).
+        // agents (letta-mobile-3icw7). Stored handles are normalized to the
+        // lmstudio/ provider prefix: letta.js aborts the whole process on an
+        // unroutable bare id ("Invalid model" → node exit → SIGABRT), and
+        // records written by older picker builds persisted bare ids.
         val modelHandle = localBackendStore.storedModelHandle(session.agentId)
+            ?.let { stored ->
+                if (stored.startsWith("lmstudio/")) stored
+                else "lmstudio/${stored.removePrefix("local/")}"
+            }
             ?: if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        // One line per session start: which model letta.js was actually given.
+        // A session pinned to the wrong model (e.g. the 2026-06-12 codexmini
+        // detour) is otherwise impossible to diagnose after the fact because
+        // argv is not externally visible for the in-process node runtime.
+        Log.i(
+            TAG,
+            "Starting embedded session agent=${session.agentId} model=$modelHandle " +
+                "customProvider=${modelSelection.isCustomProvider} providerBaseUrl=$onDeviceProviderBaseUrl",
+        )
         localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(

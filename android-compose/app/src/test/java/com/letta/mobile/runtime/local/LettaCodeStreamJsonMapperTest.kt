@@ -30,6 +30,23 @@ class LettaCodeStreamJsonMapperTest {
     }
 
     @Test
+    fun `streamed deltas with the same otid share one message id`() {
+        val chunks = listOf(
+            """{"type":"message","id":"letta-msg-126","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"Hey"}],"run_id":"local-run-2","seq_id":17}""",
+            """{"type":"message","id":"letta-msg-127","message_type":"assistant_message","otid":"provider-assistant-1-uuid","content":[{"type":"text","text":"!"}],"run_id":"local-run-2","seq_id":18}""",
+        ).flatMap { mapper.mapLine(it, command()) }
+
+        val payloads = chunks.map { it.payload as RuntimeEventPayload.RemoteStreamFrame }
+        assertEquals(listOf("letta-msg-126", "letta-msg-127"), payloads.map { it.frameId })
+        assertEquals(
+            "deltas must merge into one timeline message, not one bubble per chunk",
+            listOf("provider-assistant-1-uuid", "provider-assistant-1-uuid"),
+            payloads.map { it.messageId },
+        )
+        assertEquals(listOf("Hey", "!"), payloads.map { it.body })
+    }
+
+    @Test
     fun `preserves stream event wrapper metadata`() {
         val drafts = mapper.mapLine(
             """{"type":"stream_event","run_id":"run-wrapper","event":{"type":"message","id":"msg-1","message_type":"assistant_message","content":"hello"}}""",
