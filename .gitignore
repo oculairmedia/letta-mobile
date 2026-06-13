@@ -42,3 +42,6 @@ scripts/__pycache__/
 models-cache/
 android-compose/app/libs/embedded-git/
 android-compose/app/libs/embedded-bash/
+
+android-compose/app/libs/embedded-curl/
+android-compose/app/libs/embedded-node-cli/

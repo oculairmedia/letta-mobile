@@ -37,8 +37,9 @@ class EmbeddedLettaCodeAssetExtractor @Inject constructor(
         // Re-extract when the ICU regexp polyfill is missing (added after the
         // version marker scheme; same version can have newer asset contents).
         val regexpPolyfill = File(projectDir, "regexp-polyfill.cjs")
+        val androidNetworkPolyfill = File(projectDir, "android-network-polyfill.cjs")
 
-        if (marker.readTextOrNull() != expectedMarker || !entrypoint.isFile || !regexpPolyfill.isFile) {
+        if (marker.readTextOrNull() != expectedMarker || !entrypoint.isFile || !regexpPolyfill.isFile || !androidNetworkPolyfill.isFile) {
             projectDir.deleteRecursively()
             projectDir.mkdirs()
             copyAssetTree(ASSET_ROOT, projectDir)

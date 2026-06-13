@@ -138,6 +138,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
             localBackendStore = LettaCodeLocalBackendStore(context),
+            androidNetworkBridge = LocalAndroidNetworkBridge(),
             onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
                 engine = object : OnDeviceChatCompletionEngine {
                     override fun generate(
@@ -198,6 +199,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
             localBackendStore = LettaCodeLocalBackendStore(context),
+            androidNetworkBridge = LocalAndroidNetworkBridge(),
             onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
                 engine = object : OnDeviceChatCompletionEngine {
                     override fun generate(
@@ -291,6 +293,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                 nodeBridge = nodeBridge,
                 runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
                 localBackendStore = LettaCodeLocalBackendStore(context),
+                androidNetworkBridge = LocalAndroidNetworkBridge(),
                 onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
                     override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
                         error("on-device bridge must not start when a custom provider is configured")
@@ -353,6 +356,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
             localBackendStore = LettaCodeLocalBackendStore(context),
+            androidNetworkBridge = LocalAndroidNetworkBridge(),
             onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
                 override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
                     error("on-device bridge must not start when a custom provider is configured")
@@ -387,6 +391,253 @@ class EmbeddedRuntimeDeviceLoopTest {
         }
 
         assertTrue("expected assistant text from the real custom provider", event != null)
+    }
+
+    @Test
+    fun tier7AndroidNetworkBridgeProvidesDnsAndFetchInsideNode() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 7 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+        val project = EmbeddedLettaCodeAssetExtractor(context).prepare()
+        val networkSession = LocalAndroidNetworkBridge().start()
+        val bridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
+        val output = async(Dispatchers.Default) {
+            withTimeoutOrNull(NODE_SMOKE_TIMEOUT_MS) {
+                bridge.outputLines.first { line -> line.contains("android-network-ok") }
+            }
+        }
+        try {
+            val started = bridge.start(
+                LettaCodeNodeStartRequest(
+                    arguments = listOf(
+                        "node",
+                        "--max-old-space-size=384",
+                        "--max-semi-space-size=16",
+                        "--require",
+                        File(project.projectDir, "regexp-polyfill.cjs").absolutePath,
+                        "--require",
+                        File(project.projectDir, "android-network-polyfill.cjs").absolutePath,
+                        "-e",
+                        """
+                        (async () => {
+                          const dns = require('dns').promises;
+                          const lookup = await dns.lookup('example.com');
+                          const response = await fetch('https://example.com/');
+                          if (typeof response.headers.entries !== 'function') {
+                            throw new Error('response.headers.entries missing');
+                          }
+                          const headerEntries = Array.from(response.headers.entries());
+                          if (!headerEntries.length) {
+                            throw new Error('response.headers.entries returned no headers');
+                          }
+                          if (!response.body || typeof response.body[Symbol.asyncIterator] !== 'function') {
+                            throw new Error('response.body async iterator missing');
+                          }
+                          let streamed = '';
+                          for await (const chunk of response.body) {
+                            streamed += Buffer.from(chunk).toString('utf8');
+                          }
+                          if (!lookup.address || response.status !== 200 || !streamed.includes('Example Domain')) {
+                            throw new Error('unexpected bridge result ' + JSON.stringify({ lookup, status: response.status, text: streamed.slice(0, 40), headers: headerEntries.slice(0, 3) }));
+                          }
+                          console.log('android-network-ok ' + lookup.address + ' ' + response.status + ' headers=' + headerEntries.length);
+                        })().catch(error => { console.error(error && error.stack ? error.stack : String(error)); process.exit(1); });
+                        """.trimIndent(),
+                    ),
+                    environment = mapOf(
+                        "HOME" to File(project.homeDirectory, "network-smoke").apply { mkdirs() }.absolutePath,
+                        "LETTA_ANDROID_NETWORK_BRIDGE_URL" to networkSession.baseUrl,
+                        "LETTA_ANDROID_NETWORK_BRIDGE_FORCE_FETCH" to "1",
+                        "NO_COLOR" to "1",
+                        "UV_USE_IO_URING" to "0",
+                        "UV_THREADPOOL_SIZE" to "2",
+                        "NODE_OPTIONS" to "--max-old-space-size=384 --max-semi-space-size=16",
+                    ),
+                    workingDirectory = project.workingDirectory,
+                )
+            )
+
+            assertTrue(started.exceptionOrNull()?.stackTraceToString(), started.isSuccess)
+            assertTrue("expected android-network-ok from node", output.await() != null)
+            SystemClock.sleep(NODE_EXIT_SETTLE_MS)
+            val stopped = bridge.stop()
+            assertTrue(stopped.exceptionOrNull()?.stackTraceToString(), stopped.isSuccess)
+        } finally {
+            networkSession.close()
+        }
+    }
+
+    @Test
+    fun tier8CurlHelperWorksThroughAndroidNetworkBridge() = runBlocking {
+        assumeEmbeddedNative()
+        val networkSession = LocalAndroidNetworkBridge().start()
+        val nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+        val curlBinary = File(nativeLibraryDir, "libcurl.so")
+        assumeTrue("Tier 8 requires packaged libcurl.so helper", curlBinary.canExecute())
+        try {
+            val process = ProcessBuilder(curlBinary.absolutePath, "-sS", "https://example.com/")
+                .directory(context.filesDir)
+                .redirectErrorStream(true)
+                .apply {
+                    environment()["LETTA_ANDROID_NETWORK_BRIDGE_URL"] = networkSession.baseUrl
+                }
+                .start()
+            val output = withTimeoutOrNull(30_000L) {
+                process.inputStream.bufferedReader().readText()
+            }
+            val exitCode = if (output == null) {
+                process.destroyForcibly()
+                -1
+            } else {
+                process.waitFor()
+            }
+            assertEquals("curl helper output: $output", 0, exitCode)
+            assertTrue("curl helper should fetch Example Domain, got: $output", output?.contains("Example Domain") == true)
+        } finally {
+            networkSession.close()
+        }
+    }
+
+    @Test
+    fun tier9NodeCliIsAvailableForLocalToolScripting() = runBlocking {
+        assumeEmbeddedNative()
+        val project = EmbeddedLettaCodeAssetExtractor(context).prepare()
+        val binDirectory = File(project.storageDirectory.parentFile, "bin").apply { mkdirs() }
+        val nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+        val nodeBinary = File(nativeLibraryDir, "libnodecli.so")
+        assumeTrue("Tier 9 requires packaged libnodecli.so", nodeBinary.canExecute())
+        val nodeLink = File(binDirectory, "node")
+        nodeLink.delete()
+        android.system.Os.symlink(nodeBinary.absolutePath, nodeLink.absolutePath)
+        val process = ProcessBuilder(
+            "sh",
+            "-c",
+            "node -e 'const data = JSON.parse(process.argv[1]); console.log(data.items.reduce((sum, item) => sum + item.value, 0));' '{\"items\":[{\"value\":2},{\"value\":5}]}'"
+        )
+            .directory(context.filesDir)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["PATH"] = "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}"
+            }
+            .start()
+        val output = withTimeoutOrNull(30_000L) {
+            process.inputStream.bufferedReader().readText()
+        }
+        val exitCode = if (output == null) {
+            process.destroyForcibly()
+            -1
+        } else {
+            process.waitFor()
+        }
+        assertEquals("node CLI output: $output", 0, exitCode)
+        assertEquals("7", output?.trim())
+    }
+
+    @Test
+    fun tier10GitHelperCommitsAfterStaleSymlink() = runBlocking {
+        assumeEmbeddedNative()
+        val nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+        val gitBinary = File(nativeLibraryDir, "libgit.so")
+        assumeTrue("Tier 10 requires packaged libgit.so", gitBinary.canExecute())
+        val bashBinary = File(nativeLibraryDir, "libbash.so")
+        val binDirectory = File(context.filesDir, "embedded-lettacode/bin").apply { mkdirs() }
+
+        // Simulate a stale symlink from a previous install (the s1uis bug):
+        // point git at a non-existent old APK path, then prove the self-heal
+        // recreates it against the current nativeLibraryDir.
+        val gitLink = File(binDirectory, "git")
+        gitLink.delete()
+        android.system.Os.symlink("/data/app/~~stale-old-install/lib/arm64/libgit.so", gitLink.absolutePath)
+
+        val gitLinkCurrent = runCatching { android.system.Os.readlink(gitLink.absolutePath) }.getOrNull()
+        if (gitLinkCurrent != gitBinary.absolutePath || !gitLink.canExecute()) {
+            gitLink.delete()
+            android.system.Os.symlink(gitBinary.absolutePath, gitLink.absolutePath)
+        }
+        if (bashBinary.canExecute()) {
+            val bashLink = File(binDirectory, "bash")
+            val bashLinkCurrent = runCatching { android.system.Os.readlink(bashLink.absolutePath) }.getOrNull()
+            if (bashLinkCurrent != bashBinary.absolutePath || !bashLink.canExecute()) {
+                bashLink.delete()
+                android.system.Os.symlink(bashBinary.absolutePath, bashLink.absolutePath)
+            }
+        }
+        assertEquals("git link should self-heal to current lib", gitBinary.absolutePath, android.system.Os.readlink(gitLink.absolutePath))
+
+        val repo = File(context.filesDir, "embedded-lettacode/memfs-test-${UUID.randomUUID()}").apply { mkdirs() }
+        val path = "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}"
+        fun git(vararg args: String): Pair<Int, String> {
+            val process = ProcessBuilder(listOf(gitLink.absolutePath) + args)
+                .directory(repo)
+                .redirectErrorStream(true)
+                .apply {
+                    environment()["PATH"] = path
+                    environment()["HOME"] = repo.absolutePath
+                    environment()["GIT_CONFIG_NOSYSTEM"] = "1"
+                    environment()["GIT_AUTHOR_NAME"] = "t"
+                    environment()["GIT_AUTHOR_EMAIL"] = "t@t"
+                    environment()["GIT_COMMITTER_NAME"] = "t"
+                    environment()["GIT_COMMITTER_EMAIL"] = "t@t"
+                }
+                .start()
+            val out = process.inputStream.bufferedReader().readText()
+            return process.waitFor() to out
+        }
+        try {
+            assertEquals("git init failed", 0, git("init").first)
+            File(repo, "memory.md").writeText("# memory\n")
+            assertEquals("git add failed", 0, git("add", "memory.md").first)
+            val (commitCode, commitOut) = git("-c", "core.hooksPath=", "commit", "-m", "seed")
+            assertEquals("git commit failed: $commitOut", 0, commitCode)
+            val (logCode, logOut) = git("log", "--oneline")
+            assertEquals("git log failed: $logOut", 0, logCode)
+            assertTrue("commit should be present: $logOut", logOut.contains("seed"))
+        } finally {
+            repo.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun tier11NpmIsAvailableThroughEmbeddedNode() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 11 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+        val project = EmbeddedLettaCodeAssetExtractor(context).prepare()
+        val nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+        val nodeBinary = File(nativeLibraryDir, "libnodecli.so")
+        assumeTrue("Tier 11 requires packaged libnodecli.so", nodeBinary.canExecute())
+        val npmCli = File(project.projectDir, "node_modules/npm/bin/npm-cli.js")
+        assumeTrue("Tier 11 requires bundled npm-cli.js", npmCli.isFile)
+
+        val binDirectory = File(context.filesDir, "embedded-lettacode/bin").apply { mkdirs() }
+        val nodeLink = File(binDirectory, "node")
+        nodeLink.delete()
+        android.system.Os.symlink(nodeBinary.absolutePath, nodeLink.absolutePath)
+        // npm uses the argv0-aware node launcher: symlink `npm` to the same
+        // native binary and point it at npm-cli.js via LETTA_NPM_CLI_JS.
+        val npmLink = File(binDirectory, "npm")
+        npmLink.delete()
+        android.system.Os.symlink(nodeBinary.absolutePath, npmLink.absolutePath)
+
+        val process = ProcessBuilder("sh", "-c", "npm --version")
+            .directory(context.filesDir)
+            .redirectErrorStream(true)
+            .apply {
+                environment()["PATH"] = "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}"
+                environment()["HOME"] = File(context.filesDir, "embedded-lettacode/home").apply { mkdirs() }.absolutePath
+                environment()["LETTA_NPM_CLI_JS"] = npmCli.absolutePath
+                environment()["LETTA_NODE_BIN"] = nodeLink.absolutePath
+            }
+            .start()
+        val output = withTimeoutOrNull(60_000L) {
+            process.inputStream.bufferedReader().readText()
+        }
+        val exitCode = if (output == null) {
+            process.destroyForcibly()
+            -1
+        } else {
+            process.waitFor()
+        }
+        assertEquals("npm --version output: $output", 0, exitCode)
+        assertTrue("npm should print a semver version, got: $output", output?.trim()?.matches(Regex("\\d+\\.\\d+\\.\\d+")) == true)
     }
 
     /**
