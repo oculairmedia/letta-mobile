@@ -1,8 +1,8 @@
-package com.letta.mobile.desktop.data
+package com.letta.mobile.data.repository.http
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.chat.desktopChatJson
+import kotlinx.serialization.json.Json
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.MockRequestHandleScope
@@ -19,7 +19,9 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
-class DesktopAdminRepositoriesTest {
+class LettaHttpAdminRepositoriesTest {
+    private val testJson = Json { ignoreUnknownKeys = true }
+
     @Test
     fun refreshesSharedAdminModelsFromDesktopHttpEndpoints() = runTest {
         val requestedPaths = mutableListOf<String>()
@@ -109,10 +111,10 @@ class DesktopAdminRepositoriesTest {
             },
         ) {
             install(ContentNegotiation) {
-                json(desktopChatJson)
+                json(testJson)
             }
         }
-        val repositories = DesktopLettaHttpAdminRepositories(
+        val repositories = LettaHttpAdminRepositories(
             config = LettaConfig(
                 id = "desktop-test",
                 mode = LettaConfig.Mode.SELF_HOSTED,
@@ -120,6 +122,7 @@ class DesktopAdminRepositoriesTest {
                 accessToken = "token-1",
             ),
             httpClient = client,
+            nowMillis = { 0L },
         )
 
         repositories.refreshAgents()
@@ -147,7 +150,7 @@ class DesktopAdminRepositoriesTest {
                 jsonResponse("""{"error":"boom"}""", HttpStatusCode.InternalServerError)
             },
         ) {
-            install(ContentNegotiation) { json(desktopChatJson) }
+            install(ContentNegotiation) { json(testJson) }
         }
         val repositories = repositories(client)
 
@@ -176,7 +179,7 @@ class DesktopAdminRepositoriesTest {
                 }
             },
         ) {
-            install(ContentNegotiation) { json(desktopChatJson) }
+            install(ContentNegotiation) { json(testJson) }
         }
         val repositories = repositories(client, nowMillis = { now })
 
@@ -198,7 +201,7 @@ class DesktopAdminRepositoriesTest {
     private fun repositories(
         client: HttpClient,
         nowMillis: () -> Long = { 0L },
-    ) = DesktopLettaHttpAdminRepositories(
+    ) = LettaHttpAdminRepositories(
         config = LettaConfig(
             id = "desktop-test",
             mode = LettaConfig.Mode.SELF_HOSTED,
