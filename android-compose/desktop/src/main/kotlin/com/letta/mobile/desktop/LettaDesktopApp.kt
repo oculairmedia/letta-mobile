@@ -2,9 +2,11 @@ package com.letta.mobile.desktop
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -15,10 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.Button
@@ -28,13 +32,11 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
@@ -72,7 +75,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LettaDesktopApp() {
-    var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Overview) }
+    var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }
@@ -135,26 +138,34 @@ fun LettaDesktopApp() {
     }
 
     MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary = Color(0xFF365E4D),
-            onPrimary = Color.White,
-            primaryContainer = Color(0xFFD3E8DC),
-            onPrimaryContainer = Color(0xFF092016),
-            secondary = Color(0xFF5A5F72),
-            onSecondary = Color.White,
-            secondaryContainer = Color(0xFFDEE3F8),
-            onSecondaryContainer = Color(0xFF171B2C),
-            tertiary = Color(0xFF76546A),
-            onTertiary = Color.White,
-            tertiaryContainer = Color(0xFFFFD7EE),
-            onTertiaryContainer = Color(0xFF2D1225),
-            surface = Color(0xFFFAFBF8),
-            surfaceVariant = Color(0xFFE0E5DD),
-            onSurface = Color(0xFF191C1A),
-            onSurfaceVariant = Color(0xFF43483F),
+        colorScheme = darkColorScheme(
+            primary = Color(0xFFE8E3DA),
+            onPrimary = Color(0xFF171512),
+            primaryContainer = Color(0xFF2A2926),
+            onPrimaryContainer = Color(0xFFF4EFE7),
+            secondary = Color(0xFFA9B1AA),
+            onSecondary = Color(0xFF151816),
+            secondaryContainer = Color(0xFF242824),
+            onSecondaryContainer = Color(0xFFE6EAE4),
+            tertiary = Color(0xFFD2A55F),
+            onTertiary = Color(0xFF24180A),
+            tertiaryContainer = Color(0xFF352817),
+            onTertiaryContainer = Color(0xFFFFDFA5),
+            error = Color(0xFFFFB4AB),
+            errorContainer = Color(0xFF4F1718),
+            onErrorContainer = Color(0xFFFFDAD6),
+            surface = Color(0xFF11110F),
+            surfaceVariant = Color(0xFF20211E),
+            onSurface = Color(0xFFEDEBE6),
+            onSurfaceVariant = Color(0xFFAAA8A1),
+            outline = Color(0xFF76746D),
+            outlineVariant = Color(0xFF30322E),
         ),
     ) {
-        Surface(Modifier.fillMaxSize()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
             Row(Modifier.fillMaxSize()) {
                 DesktopNavigation(
                     selectedDestination = selectedDestination,
@@ -164,7 +175,7 @@ fun LettaDesktopApp() {
                     modifier = Modifier
                         .fillMaxHeight()
                         .width(1.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
                 )
                 DestinationContent(
                     destination = selectedDestination,
@@ -209,67 +220,181 @@ private fun DesktopNavigation(
 ) {
     Column(
         modifier = Modifier
-            .width(280.dp)
+            .width(232.dp)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .background(Color(0xFF090A09))
+            .padding(horizontal = 14.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(28.dp)
                     .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        shape = MaterialTheme.shapes.small,
                     ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.SmartToy,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(17.dp),
                 )
             }
             Column {
                 Text(
                     text = "Letta Desktop",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Windows preview",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "Workspace",
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        DesktopDestination.entries.forEach { destination ->
-            NavigationDrawerItem(
-                selected = destination == selectedDestination,
-                onClick = { onDestinationSelected(destination) },
-                icon = { Icon(destination.icon, contentDescription = null) },
-                label = { Text(destination.label) },
-                colors = NavigationDrawerItemDefaults.colors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                ),
-            )
-        }
+        DesktopNavRow(
+            label = "New session",
+            icon = Icons.Outlined.Add,
+            selected = false,
+            onClick = { onDestinationSelected(DesktopDestination.Conversations) },
+        )
+        DesktopNavRow(
+            label = "Search sessions...",
+            icon = Icons.Outlined.Search,
+            selected = false,
+            subdued = true,
+            onClick = { onDestinationSelected(DesktopDestination.Conversations) },
+        )
+
+        SidebarSection("Workspace")
+        DesktopNavRow(
+            label = "Messaging",
+            icon = DesktopDestination.Conversations.icon,
+            selected = selectedDestination == DesktopDestination.Conversations,
+            onClick = { onDestinationSelected(DesktopDestination.Conversations) },
+        )
+        DesktopNavRow(
+            label = "Memory",
+            icon = DesktopDestination.Memory.icon,
+            selected = selectedDestination == DesktopDestination.Memory,
+            onClick = { onDestinationSelected(DesktopDestination.Memory) },
+        )
+        DesktopNavRow(
+            label = "Skills & Tools",
+            icon = DesktopDestination.Agents.icon,
+            selected = selectedDestination == DesktopDestination.Agents,
+            onClick = { onDestinationSelected(DesktopDestination.Agents) },
+        )
+        DesktopNavRow(
+            label = "Artifacts",
+            icon = DesktopDestination.Overview.icon,
+            selected = selectedDestination == DesktopDestination.Overview,
+            onClick = { onDestinationSelected(DesktopDestination.Overview) },
+        )
+
+        SidebarSection("System")
+        DesktopNavRow(
+            label = "Settings",
+            icon = DesktopDestination.Settings.icon,
+            selected = selectedDestination == DesktopDestination.Settings,
+            onClick = { onDestinationSelected(DesktopDestination.Settings) },
+        )
 
         Spacer(Modifier.weight(1f))
 
-        Text(
-            text = "Desktop target uses the shared KMP model layer and a JVM Compose shell.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Surface(
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(MaterialTheme.colorScheme.tertiary, MaterialTheme.shapes.small),
+                )
+                Text(
+                    text = "Gateway ready",
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SidebarSection(label: String) {
+    Text(
+        text = label.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 10.dp, start = 4.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun DesktopNavRow(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    subdued: Boolean = false,
+) {
+    val container = when {
+        selected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f)
+        else -> Color.Transparent
+    }
+    val content = when {
+        selected -> MaterialTheme.colorScheme.onSurface
+        subdued -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(34.dp)
+            .clickable(onClick = onClick),
+        color = container,
+        contentColor = content,
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(17.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

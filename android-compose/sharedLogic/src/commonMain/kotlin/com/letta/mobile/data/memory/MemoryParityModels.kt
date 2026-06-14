@@ -234,23 +234,22 @@ object MemoryParityMapper {
             subtitle = "Tools and callable skills attached to the active agent.",
             emptyMessage = "No skills attached.",
             items = tools.map { tool ->
+                val detailText = tool.description?.takeIf { it.isNotBlank() }
+                    ?: tool.sourceType?.takeIf { it.isNotBlank() }
+                    ?: "Skill"
                 MemoryParityItem.Skill(
                     id = tool.id.value,
                     title = tool.name,
                     subtitle = tool.description?.takeIf { it.isNotBlank() }
                         ?: tool.sourceType?.takeIf { it.isNotBlank() }
                         ?: "Skill",
-                    detailText = tool.description?.takeIf { it.isNotBlank() }
-                        ?: tool.sourceType?.takeIf { it.isNotBlank() }
-                        ?: "Skill",
+                    detailText = detailText,
                     metadataLabels = listOf(
                         tool.toolType?.takeIf { it.isNotBlank() }
                             ?: tool.sourceType?.takeIf { it.isNotBlank() }
                             ?: "tool",
                     ) + tool.tags.take(MAX_METADATA_TAGS),
-                    links = MemoryTextLinkParser.parse(
-                        listOfNotNull(tool.name, tool.description, tool.sourceType).joinToString(" "),
-                    ),
+                    links = MemoryTextLinkParser.parse(detailText),
                     type = tool.toolType?.takeIf { it.isNotBlank() }
                         ?: tool.sourceType?.takeIf { it.isNotBlank() }
                         ?: "tool",
@@ -281,7 +280,7 @@ object MemoryParityMapper {
                         block.limit?.let { "Limit $it" },
                         "Read-only".takeIf { block.readOnly == true },
                     ),
-                    links = MemoryTextLinkParser.parse(block.value),
+                    links = MemoryTextLinkParser.parse(preview.ifBlank { subtitle }),
                     preview = preview,
                     limit = block.limit,
                     readOnly = block.readOnly == true,
@@ -312,7 +311,7 @@ object MemoryParityMapper {
                     subtitle = subtitle,
                     detailText = subtitle,
                     metadataLabels = listOf(schedule.schedule.type, nextRunLabel),
-                    links = MemoryTextLinkParser.parse(message),
+                    links = MemoryTextLinkParser.parse(subtitle),
                     scheduleType = schedule.schedule.type,
                     nextRunLabel = nextRunLabel,
                 )
@@ -324,23 +323,23 @@ object MemoryParityMapper {
         channelTransportState: ChannelTransportState,
     ): MemoryParitySection =
         channelTransportState.describe().let { subtitle ->
-        MemoryParitySection(
-            kind = MemoryParitySectionKind.Channels,
-            title = "Channels",
-            subtitle = "Live channel and backend delivery status.",
-            emptyMessage = "No channels available.",
-            items = listOf(
-                MemoryParityItem.Channel(
-                    id = backendDescriptor.backendId.value,
-                    title = backendDescriptor.label,
-                    subtitle = subtitle,
-                    detailText = subtitle,
-                    metadataLabels = listOf(channelTransportState.toMemoryStatus().name),
-                    links = MemoryTextLinkParser.parse(backendDescriptor.label),
-                    status = channelTransportState.toMemoryStatus(),
+            MemoryParitySection(
+                kind = MemoryParitySectionKind.Channels,
+                title = "Channels",
+                subtitle = "Live channel and backend delivery status.",
+                emptyMessage = "No channels available.",
+                items = listOf(
+                    MemoryParityItem.Channel(
+                        id = backendDescriptor.backendId.value,
+                        title = backendDescriptor.label,
+                        subtitle = subtitle,
+                        detailText = subtitle,
+                        metadataLabels = listOf(channelTransportState.toMemoryStatus().name),
+                        links = MemoryTextLinkParser.parse(subtitle),
+                        status = channelTransportState.toMemoryStatus(),
+                    ),
                 ),
-            ),
-        )
+            )
         }
 
     private fun memoryGraph(

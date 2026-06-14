@@ -50,6 +50,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.DropdownMenu
@@ -69,9 +70,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.projection.runStepDotIcon
@@ -103,23 +107,26 @@ fun DesktopChatSurface(
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val showConversationPane = state.conversations.isNotEmpty()
     Row(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        ConversationPane(
-            state = state,
-            onConversationSelected = onConversationSelected,
-            onDeleteConversation = onDeleteConversation,
-            onRetryConnection = onRetryConnection,
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-        )
+        if (showConversationPane) {
+            ConversationPane(
+                state = state,
+                onConversationSelected = onConversationSelected,
+                onDeleteConversation = onDeleteConversation,
+                onRetryConnection = onRetryConnection,
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+        }
         ChatDetailPane(
             state = state,
             onComposerTextChanged = onComposerTextChanged,
@@ -388,18 +395,21 @@ private fun ChatDetailPane(
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val showHeader = !state.shouldShowStatePanel || state.selectedConversation != null
     Column(
         modifier = modifier
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        ChatHeader(state)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-        )
+        if (showHeader) {
+            ChatHeader(state)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+        }
         if (state.shouldShowStatePanel) {
             ChatStatePanel(
                 state = state,
@@ -441,36 +451,32 @@ private fun ChatStatePanel(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 22.dp),
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 40.dp, vertical = 28.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.widthIn(max = 520.dp),
+            modifier = Modifier.widthIn(max = 680.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Surface(
-                modifier = Modifier.size(52.dp),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = screenStatus.statusIcon(),
-                        contentDescription = null,
-                    )
-                }
-            }
             Text(
-                text = screenStatus.panelTitle(),
-                style = MaterialTheme.typography.titleLarge,
+                text = "LETTA DESKTOP",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontFamily = FontFamily.Serif,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    letterSpacing = 0.sp,
+                ),
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = state.errorMessage ?: screenStatus.panelBody(),
-                style = MaterialTheme.typography.bodyMedium,
+                text = state.errorMessage ?: screenStatus.heroBody(),
+                style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 520.dp),
             )
             if (screenStatus.isConnectionRetryable) {
                 Button(
@@ -487,6 +493,19 @@ private fun ChatStatePanel(
                 }
             }
         }
+    }
+}
+
+private fun ChatScreenStatus.heroBody(): String = when (this) {
+    is ChatScreenStatus.ConfigNeeded -> "Configure a backend, then ask questions, inspect tools, and continue work across sessions."
+    is ChatScreenStatus.BackendOffline -> "The configured backend could not be reached. Check the gateway, then retry the connection."
+    is ChatScreenStatus.NoConversations -> "Ask a question, paste an error, or point me at a repo. I can read code, run tools, and help you ship."
+    is ChatScreenStatus.Loading -> "Loading conversations from the configured Letta backend."
+    is ChatScreenStatus.SendFailed -> "The last send failed. You can edit the message and try again."
+    is ChatScreenStatus.Ready -> if (isSending) {
+        "Sending your message to the active conversation."
+    } else {
+        "Connected to the configured backend."
     }
 }
 
@@ -919,10 +938,12 @@ private fun ComposerBar(
     onAttachImage: () -> Unit,
     onRemoveImageAttachment: (Int) -> Unit,
 ) {
+    val canSend = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty())
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 28.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (pendingImageAttachments.isNotEmpty()) {
@@ -938,50 +959,75 @@ private fun ComposerBar(
                 }
             }
         }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Bottom,
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 820.dp),
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Surface(
-                modifier = Modifier.size(56.dp),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    onClick = onAttachImage,
-                    enabled = enabled,
+                Surface(
+                    modifier = Modifier.size(38.dp),
+                    shape = MaterialTheme.shapes.small,
+                    color = Color.Transparent,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.AddPhotoAlternate,
-                        contentDescription = "Attach image",
-                    )
+                    IconButton(
+                        onClick = onAttachImage,
+                        enabled = enabled,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.AddPhotoAlternate,
+                            contentDescription = "Attach image",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
-            }
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChanged,
-                enabled = enabled,
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 56.dp, max = 132.dp),
-                placeholder = { Text("Message") },
-                minLines = 1,
-                maxLines = 5,
-            )
-            Button(
-                onClick = onSend,
-                enabled = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty()),
-                modifier = Modifier.height(56.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.Send,
-                    contentDescription = "Send message",
-                    modifier = Modifier.size(18.dp),
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = onTextChanged,
+                    enabled = enabled,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 46.dp, max = 120.dp),
+                    placeholder = { Text("What are we building?") },
+                    minLines = 1,
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        disabledBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        disabledContainerColor = Color.Transparent,
+                    ),
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("Send")
+                Surface(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clickable(
+                            enabled = canSend,
+                            onClick = onSend,
+                        ),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canSend) 1f else 0.16f),
+                    contentColor = MaterialTheme.colorScheme.surface.copy(alpha = if (canSend) 1f else 0.54f),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Send,
+                            contentDescription = "Send message",
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
             }
         }
     }

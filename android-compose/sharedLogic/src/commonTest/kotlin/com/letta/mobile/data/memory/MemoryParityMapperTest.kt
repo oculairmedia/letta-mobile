@@ -89,7 +89,7 @@ class MemoryParityMapperTest {
         assertEquals("Keeps a concise research voice.", memory.preview)
         assertEquals("Keeps a concise research voice.", memory.detailText)
         assertEquals(listOf("Limit 2000"), memory.metadataLabels)
-        assertEquals(MemoryTextLinkKind.Skill, memory.links.single { it.label == "tool:search_docs" }.kind)
+        assertEquals(emptyList(), memory.links)
 
         val schedule = assertIs<MemoryParityItem.Schedule>(state.section(MemoryParitySectionKind.Schedules).items.single())
         assertEquals("Summarize the latest project memory", schedule.title)
@@ -100,6 +100,13 @@ class MemoryParityMapperTest {
         assertEquals(MemoryChannelStatus.Connected, channel.status)
         assertEquals("Connected via websocket", channel.subtitle)
         assertEquals(listOf("Connected"), channel.metadataLabels)
+
+        state.sections.flatMap { it.items }.forEach { item ->
+            item.links.forEach { link ->
+                assertEquals(true, link.start >= 0)
+                assertEquals(true, link.end <= item.detailText.length)
+            }
+        }
     }
 
     @Test
@@ -161,7 +168,7 @@ class MemoryParityMapperTest {
         assertEquals(true, state.section(MemoryParitySectionKind.Memory).items.isEmpty())
         assertEquals(true, state.section(MemoryParitySectionKind.Schedules).items.isEmpty())
         // The channels section always renders one descriptor row, so the overall
-        // state is NOT isEmpty — it still reports live channel status.
+        // state is NOT isEmpty - it still reports live channel status.
         assertFalse(state.isEmpty)
         val channel = assertIs<MemoryParityItem.Channel>(
             state.section(MemoryParitySectionKind.Channels).items.single(),

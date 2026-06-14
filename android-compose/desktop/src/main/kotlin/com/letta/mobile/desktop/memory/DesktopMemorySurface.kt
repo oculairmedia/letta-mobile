@@ -539,7 +539,14 @@ private fun LinkedDetailText(
     text: String,
     links: List<MemoryTextLink>,
 ) {
-    val annotatedText = if (links.isEmpty()) {
+    val validLinks = remember(text, links) {
+        links.filter { link ->
+            link.start >= 0 &&
+                link.start < link.end &&
+                link.end <= text.length
+        }
+    }
+    val annotatedText = if (validLinks.isEmpty()) {
         AnnotatedString(text)
     } else {
         val linkStyle = TextLinkStyles(
@@ -548,10 +555,10 @@ private fun LinkedDetailText(
                 textDecoration = TextDecoration.Underline,
             ),
         )
-        val linkRule = remember(links, linkStyle) {
+        val linkRule = remember(validLinks, linkStyle) {
             TextRule.Styleable(
                 textMatcher = TextMatcher.FunctionMatcher<Any?> {
-                    links.map { link ->
+                    validLinks.map { link ->
                         SimpleTextMatchResult(link.start, link.end, link)
                     }
                 },
