@@ -313,6 +313,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
                 put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
                 putAll(memfsEnvironment())
+                // letta-mobile-nojhc: declare which custom-provider models are
+                // image-capable. Consumed by the build-time letta.js patch on
+                // customOpenAICompatibleModel (matched as case-insensitive
+                // substrings against the model id), mirroring the shim's
+                // LETTA_VISION_MODELS so both surfaces share one list. Without
+                // this, a vision model like MiniMax-M3 resolves to
+                // input:["text"] and user images are silently dropped.
+                put("LETTA_CODE_VISION_MODEL_IDS", VISION_MODEL_PATTERNS.joinToString(","))
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelSelection.modelHandle)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
@@ -509,6 +517,31 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private companion object {
         private const val TAG = "LettaCodeRuntime"
         private const val TURN_TIMEOUT_MS = 120_000L
+
+        /**
+         * Vision-capable model id substrings (case-insensitive). KEEP IN SYNC
+         * with the shim's VISION_MODEL_PATTERNS (admin-shim/lib/model-catalog.ts
+         * → LETTA_VISION_MODELS) so the embedded runtime and the remote shim
+         * agree on which custom models accept images. Adding a vision-capable
+         * model = one entry here (letta-mobile-nojhc).
+         */
+        private val VISION_MODEL_PATTERNS = listOf(
+            "llava",
+            "vision",
+            "opus",
+            "sonnet",
+            "haiku",
+            "claude",
+            "fable",
+            "gpt-",
+            "gpt5",
+            "gemini",
+            "grok",
+            "minimax",
+            "qwen-vl",
+            "qwen2-vl",
+            "qwen2.5-vl",
+        )
     }
 }
 
