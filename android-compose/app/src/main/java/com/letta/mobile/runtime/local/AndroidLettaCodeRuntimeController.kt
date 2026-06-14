@@ -317,9 +317,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 // image-capable. Consumed by the build-time letta.js patch on
                 // customOpenAICompatibleModel (matched as case-insensitive
                 // substrings against the model id), mirroring the shim's
-                // LETTA_VISION_MODELS so both surfaces share one list. Without
-                // this, a vision model like MiniMax-M3 resolves to
-                // input:["text"] and user images are silently dropped.
+                // LETTA_VISION_MODELS so both surfaces share one list.
                 put("LETTA_CODE_VISION_MODEL_IDS", VISION_MODEL_PATTERNS.joinToString(","))
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelSelection.modelHandle)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
@@ -522,25 +520,12 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
          * Vision-capable model id substrings (case-insensitive). KEEP IN SYNC
          * with the shim's VISION_MODEL_PATTERNS (admin-shim/lib/model-catalog.ts
          * → LETTA_VISION_MODELS) so the embedded runtime and the remote shim
-         * agree on which custom models accept images. Adding a vision-capable
-         * model = one entry here (letta-mobile-nojhc).
+         * agree on which custom models accept images (letta-mobile-nojhc).
          */
         private val VISION_MODEL_PATTERNS = listOf(
-            "llava",
-            "vision",
-            "opus",
-            "sonnet",
-            "haiku",
-            "claude",
-            "fable",
-            "gpt-",
-            "gpt5",
-            "gemini",
-            "grok",
-            "minimax",
-            "qwen-vl",
-            "qwen2-vl",
-            "qwen2.5-vl",
+            "llava", "vision", "opus", "sonnet", "haiku", "claude", "fable",
+            "gpt-", "gpt5", "gemini", "grok", "minimax",
+            "qwen-vl", "qwen2-vl", "qwen2.5-vl",
         )
     }
 }
@@ -558,18 +543,12 @@ data class EmbeddedLettaCodeSessionKey(
  * When [TurnInput.UserMessage.imageParts] is non-empty, `content` becomes an
  * ARRAY `[{type:text}?, {type:image, mimeType, data}...]`.
  *
- * CRITICAL: the embedded letta.js STDIN/internal image shape is **FLAT**
- * (`item.mimeType` + `item.data`, which it turns into
- * `data:${mimeType};base64,<data>`), NOT the nested
- * `{source:{type:base64, media_type, data}}` server/remote union. Emitting the
- * nested shape here makes letta.js read empty `mimeType`/`data` and silently
- * drop the image (verified on-device: the persisted part came out as
- * `{type, mimeType, data}` with empty `source={}`). This is the same flat-vs-
- * nested image-shape mismatch class as the inbound pipeline (letta-mobile-aobcg).
- *
- * Text part first, then images. Extracted as a top-level fn so the wire
- * encoding is unit-testable without a controller instance.
- */
+ * The embedded letta.js inbound normalization gate isBase64ImageContentPart()
+ * requires the NESTED Letta union: {type:"image", source:{type:"base64",
+ * media_type:<non-empty>, data:<non-empty base64>}}. The flat
+ * {type,mimeType,data} shape is NOT recognized and the image is silently
+ * dropped (proven by Tier 12: captured=0). Emit the nested shape.
+*/
 fun encodeUserTurnWireLine(input: TurnInput.UserMessage): String =
     buildJsonObject {
         put("type", "user")
@@ -600,13 +579,25 @@ private fun encodeUserContentArray(
         )
     }
     imageParts.forEach { part ->
-        // FLAT shape — letta.js stdin reads item.mimeType + item.data directly
-        // (NOT a nested source union). See encodeUserTurnWireLine KDoc.
+        // NESTED source shape — letta.js's isBase64ImageContentPart() (the
+        // inbound stdin normalization gate) requires EXACTLY
+        // {type:"image", source:{type:"base64", media_type:<non-empty>,
+        // data:<non-empty>}}. Verified against the bundle + proven by the
+        // Tier 12 device-loop test: the flat {type,mimeType,data} shape is NOT
+        // recognized, so the image is passed through un-normalized and never
+        // forwarded as image_url to the provider (captured=0). See
+        // encodeUserTurnWireLine KDoc (letta-mobile-aobcg/nojhc).
         add(
             buildJsonObject {
                 put("type", "image")
-                put("mimeType", part.mediaType)
-                put("data", part.base64)
+                put(
+                    "source",
+                    buildJsonObject {
+                        put("type", "base64")
+                        put("media_type", part.mediaType)
+                        put("data", part.base64)
+                    },
+                )
             },
         )
     }

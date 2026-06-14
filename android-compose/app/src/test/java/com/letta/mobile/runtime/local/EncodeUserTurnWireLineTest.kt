@@ -47,15 +47,14 @@ class EncodeUserTurnWireLineTest {
         assertEquals("text", textPart["type"]!!.jsonPrimitive.content)
         assertEquals("what is this?", textPart["text"]!!.jsonPrimitive.content)
 
-        // image part as the FLAT letta.js stdin shape: {type:image, mimeType, data}
-        // (NOT the nested {source:{type:base64,...}} server union, and NOT openai image_url)
+        // image part as the NESTED Letta union (isBase64ImageContentPart gate)
         val imagePart = parts[1].jsonObject
         assertEquals("image", imagePart["type"]!!.jsonPrimitive.content)
-        assertEquals("image/png", imagePart["mimeType"]!!.jsonPrimitive.content)
-        assertEquals("QUJD", imagePart["data"]!!.jsonPrimitive.content)
-        // no nested source; raw base64, no data: prefix
-        assertTrue("must not nest under source", imagePart["source"] == null)
-        assertTrue(!imagePart["data"]!!.jsonPrimitive.content.startsWith("data:"))
+        val source = imagePart["source"]!!.jsonObject
+        assertEquals("base64", source["type"]!!.jsonPrimitive.content)
+        assertEquals("image/png", source["media_type"]!!.jsonPrimitive.content)
+        assertEquals("QUJD", source["data"]!!.jsonPrimitive.content)
+        assertTrue(!source["data"]!!.jsonPrimitive.content.startsWith("data:"))
     }
 
     @Test
@@ -87,7 +86,7 @@ class EncodeUserTurnWireLineTest {
         val parts = obj["message"]!!.jsonObject["content"]!!.jsonArray
         assertEquals(3, parts.size)
         assertEquals("text", parts[0].jsonObject["type"]!!.jsonPrimitive.content)
-        assertEquals("AAA", parts[1].jsonObject["data"]!!.jsonPrimitive.content)
-        assertEquals("BBB", parts[2].jsonObject["data"]!!.jsonPrimitive.content)
+        assertEquals("AAA", parts[1].jsonObject["source"]!!.jsonObject["data"]!!.jsonPrimitive.content)
+        assertEquals("BBB", parts[2].jsonObject["source"]!!.jsonObject["data"]!!.jsonPrimitive.content)
     }
 }
