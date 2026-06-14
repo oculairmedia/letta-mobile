@@ -789,8 +789,23 @@ internal fun ModelPickerSheet(
         if (models.isEmpty()) onRefresh()
     }
 
-    val grouped = remember(models) {
-        val sorted = models.sortedWith(compareBy({ it.providerType }, { it.displayName.lowercase() }))
+    var modelQuery by rememberSaveable { mutableStateOf("") }
+
+    val grouped = remember(models, modelQuery) {
+        val q = modelQuery.trim().lowercase()
+        val filtered = if (q.isEmpty()) {
+            models
+        } else {
+            models.filter { model ->
+                model.displayName.lowercase().contains(q) ||
+                    model.providerType.lowercase().contains(q) ||
+                    (model.providerName?.lowercase()?.contains(q) == true) ||
+                    (model.handle?.lowercase()?.contains(q) == true) ||
+                    model.name.lowercase().contains(q) ||
+                    model.id.lowercase().contains(q)
+            }
+        }
+        val sorted = filtered.sortedWith(compareBy({ it.providerType }, { it.displayName.lowercase() }))
         sorted.groupBy { it.providerType.ifBlank { "Other" } }
     }
 
@@ -827,9 +842,25 @@ internal fun ModelPickerSheet(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            if (models.isNotEmpty()) {
+                LettaSearchBar(
+                    query = modelQuery,
+                    onQueryChange = { modelQuery = it },
+                    onClear = { modelQuery = "" },
+                    placeholder = stringResource(R.string.screen_drawer_model_picker_search_hint),
+                    compact = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             if (grouped.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.screen_drawer_model_picker_empty),
+                    text = if (modelQuery.isBlank()) {
+                        stringResource(R.string.screen_drawer_model_picker_empty)
+                    } else {
+                        stringResource(R.string.screen_drawer_model_picker_no_match, modelQuery)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 16.dp),
