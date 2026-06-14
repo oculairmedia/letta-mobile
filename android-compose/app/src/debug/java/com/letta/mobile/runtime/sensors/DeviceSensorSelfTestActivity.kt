@@ -6,6 +6,7 @@ import android.util.Log
 import com.letta.mobile.BuildConfig
 import java.io.File
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.put
 
 /**
  * Dev-only no-display Activity for ADB validation of Stage 1→2 without user
@@ -35,10 +36,18 @@ class DeviceSensorSelfTestActivity : Activity() {
                         outputFile = grounding,
                     ).writeSnapshot(snapshot.capturedAtMillis)
                 }
+                val bridgeOut = File(filesDir, READ_SENSORS_OUTPUT_FILE)
+                val toolResponse = DeviceSensorReadTool(
+                    provider = object : DeviceSensorSnapshotProvider {
+                        override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = snapshot
+                    },
+                ).handleJson(kotlinx.serialization.json.buildJsonObject { put("mode", "summary") }, snapshot.capturedAtMillis)
+                bridgeOut.writeText(toolResponse)
                 Log.w(
                     TAG,
-                    "[device-sensor-self-test] wrote ${out.absolutePath} and ${grounding.absolutePath} " +
-                        "sensors=${snapshot.sensorCount} summary=${DeviceSensorSnapshotFormatter.toCompactString(snapshot)}",
+                    "[device-sensor-self-test] wrote ${out.absolutePath}, ${grounding.absolutePath}, " +
+                        "and ${bridgeOut.absolutePath} sensors=${snapshot.sensorCount} " +
+                        "summary=${DeviceSensorSnapshotFormatter.toCompactString(snapshot)}",
                 )
             }.onFailure { error ->
                 Log.e(TAG, "[device-sensor-self-test] failed", error)
@@ -48,7 +57,9 @@ class DeviceSensorSelfTestActivity : Activity() {
         overridePendingTransition(0, 0)
     }
 
+
     companion object {
+        const val READ_SENSORS_OUTPUT_FILE = "device-sensor-read-tool.json"
         private const val TAG = "DeviceSensorSelfTest"
     }
 }

@@ -1,5 +1,7 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
+import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
 import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
@@ -38,7 +40,9 @@ data class AndroidNetworkBridgeSession(
 }
 
 @Singleton
-class LocalAndroidNetworkBridge @Inject constructor() : AndroidNetworkBridge {
+class LocalAndroidNetworkBridge @Inject constructor(
+    private val sensorSnapshotProvider: DeviceSensorSnapshotProvider,
+) : AndroidNetworkBridge {
     private val json = Json { ignoreUnknownKeys = true }
 
     override fun start(): AndroidNetworkBridgeSession {
@@ -46,7 +50,7 @@ class LocalAndroidNetworkBridge @Inject constructor() : AndroidNetworkBridge {
         val executor = Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "android-network-bridge").apply { isDaemon = true }
         }
-        val session = BridgeServerSession(serverSocket, executor, json)
+        val session = BridgeServerSession(serverSocket, executor, json, DeviceSensorReadTool(sensorSnapshotProvider))
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
             baseUrl = "http://$LOOPBACK_HOST:${serverSocket.localPort}",
@@ -58,6 +62,7 @@ class LocalAndroidNetworkBridge @Inject constructor() : AndroidNetworkBridge {
         private val serverSocket: ServerSocket,
         private val executor: ExecutorService,
         private val json: Json,
+        private val sensorReadTool: DeviceSensorReadTool,
     ) {
         @Volatile private var closed = false
 
@@ -107,8 +112,28 @@ class LocalAndroidNetworkBridge @Inject constructor() : AndroidNetworkBridge {
             when {
                 method == "POST" && path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
                 method == "POST" && path == "/fetch" -> handleFetch(socket.outputStream, body)
+                method == "POST" && path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
+        }
+
+        private fun handleReadSensors(output: OutputStream, body: String) {
+            val request = runCatching { json.parseToJsonElement(body).jsonObject }.getOrNull()
+            if (request == null) {
+                output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
+                return
+            }
+            val responseText = runCatching { sensorReadTool.handleJson(request) }
+                .getOrElse { error ->
+                    output.writeJsonResponse(500, errorBody("read_sensors_failed", error.message ?: "Unable to read sensors."))
+                    return
+                }
+            val response = runCatching { json.parseToJsonElement(responseText).jsonObject }
+                .getOrElse {
+                    output.writeJsonResponse(500, errorBody("read_sensors_failed", "Tool response was not valid JSON."))
+                    return
+                }
+            output.writeJsonResponse(200, response)
         }
 
         private fun handleDnsLookup(output: OutputStream, body: String) {
