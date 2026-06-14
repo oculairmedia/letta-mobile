@@ -41,6 +41,11 @@ git push --force-with-lease                 # safe force-push to your branch
 - **CI gates merges, not pushes.** Required status checks: `test`, `build-apk`, and `shared-multiplatform`. All must be green before squash-merge.
 - **`sharedLogic` commonMain/commonTest must stay platform-neutral.** No JVM-only APIs (`String.format`, `StringBuilder.delete(start, end)`, `String.toByteArray()`, …) — the code must compile for every configured KMP target (Android, JVM/desktop, host-native for Windows). The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) enforces this; see bead letta-mobile-kx1r3 for the leaks that motivated it.
 - **First-time setup in a fresh clone:** run `./scripts/install-hooks.sh` to activate the local hooks via `core.hooksPath`.
+- **Feature LOGIC goes in `sharedLogic/commonMain`; platform modules add only the binding.** State, transforms, caching, TTL, retry/cache policy, request/response shaping, mappers, and reducers are platform-neutral — they belong in `sharedLogic`, implemented once, consumed by every host (Android `app`, `desktop`, future iOS). A platform module (`desktop/`, `app/`) should contain ONLY what genuinely cannot be shared:
+  - **Legit-platform:** windowing/Compose-host wiring (AWT/Swing on desktop, Activity on Android), OS single-instance lock, file-storage backend, Ktor **engine** creation, installer/`Main`, platform permissions.
+  - **Must-be-shared (never duplicate per platform):** repositories, view-state reducers, data mappers, formatters, caching/TTL/error-flow, request shaping.
+  - **Anti-pattern to reject in review:** a platform module re-implementing a `sharedLogic` interface (e.g. `IAgentRepository`) with its own logic. If you need a shared interface implemented, implement the platform-neutral core in `commonMain` and inject the platform bit (e.g. the Ktor `HttpClient` engine). Duplicated implementations across `desktop/` and `core/data`/`app/` WILL drift — that is the regression this rule prevents (audit 2026-06-13, beads `letta-mobile-mqzkc`/`8h463`).
+  - The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) backstops this; keep it green.
 
 **When CI fails on your PR:**
 
