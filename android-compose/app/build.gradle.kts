@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "20"
+val embeddedLettaCodeAssetRevision = "21"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -761,9 +761,19 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                 globalThis.fetch.__androidBridgeOriginal = nativeFetch;
               }
               const originalLookup = dns.lookup;
+              // IP literals need no DNS — resolving them through the bridge adds
+              // an HTTP round-trip per request (e.g. every call to a LAN provider
+              // like 192.168.50.90). Short-circuit them locally.
+              const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}${'$'}/;
               function bridgeLookup(hostname, options, callback) {
                 if (typeof options === 'function') { callback = options; options = {}; }
                 const wantsAll = options && options.all === true;
+                if (typeof hostname === 'string' && (IPV4_RE.test(hostname) || hostname.indexOf(':') !== -1)) {
+                  const family = hostname.indexOf(':') !== -1 ? 6 : 4;
+                  if (wantsAll) { callback(null, [{ address: hostname, family }]); }
+                  else { callback(null, hostname, family); }
+                  return;
+                }
                 postJson('/dns/lookup', { hostname }).then((result) => {
                   const addresses = result.addresses || [];
                   if (wantsAll) {
