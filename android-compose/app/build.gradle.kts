@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "13"
+val embeddedLettaCodeAssetRevision = "14"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -288,6 +288,7 @@ val prepareEmbeddedNodeCli = tasks.register<Exec>("prepareEmbeddedNodeCli") {
 val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAssets") {
     onlyIf { embeddedLettaCodeAssetsEnabled.get() }
     notCompatibleWithConfigurationCache("Runs npm install and copies embedded LettaCode assets.")
+    inputs.dir(project.layout.projectDirectory.dir("src/main/embedded-lettacode"))
     outputs.dir(embeddedLettaCodeAssetsDir)
     doLast {
         val npmWorkDir = layout.buildDirectory.dir("embedded-lettacode/npm").get().asFile
@@ -392,6 +393,45 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .inheritIO()
             .start()
         check(transform.waitFor() == 0) { "Unicode property escape transform for letta.js failed." }
+
+        // letta-mobile-84a59: @letta-ai/letta-code 0.26.1 has generic system-reminders
+        // but not the shim's runtime-introspection strings ("Context utilization",
+        // "Serving model", "Session role", "Model changed"). Ship the canonical shim
+        // module and patch the embedded stream-json turn boundary to call it.
+        copy {
+            from(project.layout.projectDirectory.dir("src/main/embedded-lettacode"))
+            into(assetRoot)
+        }
+        val introspectionPatchNeedle =
+            "        const enrichedContent = prependReminderPartsToContent(userContent, sharedReminderParts);\n" +
+                "        let currentInput = [{"
+        val introspectionPatchReplacement =
+            "        let enrichedContent = prependReminderPartsToContent(userContent, sharedReminderParts);\n" +
+                "        if (typeof globalThis.__lettaMobileBuildRuntimeIntrospectionContent === \"function\") {\n" +
+                "          enrichedContent = await globalThis.__lettaMobileBuildRuntimeIntrospectionContent(agent2.id, conversationId, enrichedContent);\n" +
+                "        }\n" +
+                "        let currentInput = [{"
+        val originalLettaJsForIntrospection = lettaJs.readText()
+        val patchedLettaJsForIntrospection = originalLettaJsForIntrospection.replace(
+            introspectionPatchNeedle,
+            introspectionPatchReplacement,
+        )
+        check(patchedLettaJsForIntrospection != originalLettaJsForIntrospection) {
+            "Failed to patch letta.js runtime-introspection turn boundary."
+        }
+        lettaJs.writeText(patchedLettaJsForIntrospection)
+        listOf(
+            assetRoot.resolve("letta-mobile-runtime-introspection/store.js"),
+            assetRoot.resolve("letta-mobile-runtime-introspection/runtime-introspection.js"),
+            assetRoot.resolve("embedded-runtime-introspection-preload.cjs"),
+            lettaJs,
+        ).forEach { file ->
+            val checkProcess = ProcessBuilder("node", "--check", file.absolutePath)
+                .directory(npmWorkDir)
+                .inheritIO()
+                .start()
+            check(checkProcess.waitFor() == 0) { "${file.name} failed node --check." }
+        }
 
         // Ship npm so the on-device node can install packages. npm is pure JS
         // (npm-cli.js) and runs on the embedded node 18 runtime. Pin the last
