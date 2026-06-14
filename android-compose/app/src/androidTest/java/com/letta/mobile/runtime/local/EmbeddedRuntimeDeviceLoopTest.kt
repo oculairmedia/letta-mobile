@@ -144,6 +144,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                     override fun generate(
                         modelSelection: EmbeddedLettaCodeModelSelection,
                         prompt: String,
+                        images: List<OnDeviceImage>,
                     ): Result<String> = Result.success("device-loop-ok")
                 }
             ),
@@ -205,6 +206,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                     override fun generate(
                         modelSelection: EmbeddedLettaCodeModelSelection,
                         prompt: String,
+                        images: List<OnDeviceImage>,
                     ): Result<String> = Result.success(
                         // Require the echo's actual stdout in the follow-up
                         // prompt: a failed exec also feeds back a (error)
@@ -267,6 +269,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                 override fun generate(
                     modelSelection: EmbeddedLettaCodeModelSelection,
                     prompt: String,
+                    images: List<OnDeviceImage>,
                 ): Result<String> = Result.success(
                     if (prompt.contains("tool result")) {
                         "custom-provider-ok"
@@ -660,6 +663,113 @@ class EmbeddedRuntimeDeviceLoopTest {
     private fun findLitertLmModel(): File? = File(context.filesDir, "embedded-lettacode/models")
         .walkTopDown()
         .firstOrNull { file -> file.isFile && file.extension == "litertlm" }
+
+    /**
+     * Tier 12 — end-to-end multimodal: drives a REAL local turn carrying an
+     * inline image through the embedded letta.js, and asserts the image
+     * survives the full chain (flat {type:image,mimeType,data} input →
+     * letta.js ingest + sharp-resize bypass → OpenAI image_url request →
+     * on-device bridge extractImages → engine.generate). The capturing engine
+     * records the images it received; a non-empty capture proves the on-device
+     * image path works without a human in the loop (letta-mobile-nojhc/aobcg).
+     */
+    @Test
+    fun tier12LocalImageTurnReachesProviderWithImage() = runBlocking {
+        assumeEmbeddedNative()
+        assumeTrue("Tier 12 requires embedded LettaCode assets", BuildConfig.EMBEDDED_LETTACODE_ASSETS_ENABLED)
+
+        val capturedImages = java.util.concurrent.CopyOnWriteArrayList<OnDeviceImage>()
+        val remoteEndpoint = LocalOpenAiOnDeviceBridge(
+            engine = object : OnDeviceChatCompletionEngine {
+                override fun generate(
+                    modelSelection: EmbeddedLettaCodeModelSelection,
+                    prompt: String,
+                    images: List<OnDeviceImage>,
+                ): Result<String> {
+                    capturedImages.addAll(images)
+                    return Result.success("image-seen:${images.size}")
+                }
+            }
+        ).start(
+            EmbeddedLettaCodeModelSelection(
+                modelHandle = "remote-test-model",
+                modelPath = null,
+                runtime = "openai",
+                accelerator = "cpu",
+                maxTokens = 1024,
+            )
+        )
+        try {
+            val nodeBridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
+            val controller = AndroidLettaCodeRuntimeController(
+                context = context,
+                assetExtractor = EmbeddedLettaCodeAssetExtractor(context),
+                nodeBridge = nodeBridge,
+                runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
+                localBackendStore = LettaCodeLocalBackendStore(context),
+                androidNetworkBridge = LocalAndroidNetworkBridge(),
+                onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
+                    override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
+                        error("on-device bridge must not start when a custom provider is configured")
+                },
+            )
+            val backend = LocalLettaBackend(
+                descriptor = descriptor(),
+                engine = LettaCodeTurnEngine(
+                    client = AndroidLettaCodeHeadlessClient(controller, LettaCodeStreamJsonMapper(), LettaCodeLocalBackendStore(context)),
+                    config = LettaConfig(
+                        id = BACKEND_ID.value,
+                        mode = LettaConfig.Mode.LOCAL,
+                        serverUrl = "local-lettacode://device",
+                        localProviderBaseUrl = remoteEndpoint.baseUrl,
+                        localProviderModel = "remote-test-model",
+                    ),
+                ),
+                outbox = InMemoryRuntimeEventOutbox(
+                    eventIdFactory = { _, offset -> RuntimeEventId("device-loop-${offset.value}") },
+                    clock = { EpochMillis(System.currentTimeMillis()) },
+                ),
+                memFsStore = NoopMemFsStore,
+            )
+
+            // A tiny valid 1x1 PNG (base64), the same flat shape the composer produces.
+            val onePxPng =
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+                backend.runTurn(imageCommand(text = "What is in this image?", base64Png = onePxPng))
+                    .firstOrNull { envelope ->
+                        val payload = envelope.payload
+                        payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.contains("image-seen:")
+                    }
+            }
+
+            assertTrue("expected a provider reply for the image turn", event != null)
+            assertTrue(
+                "the image must reach the provider end-to-end (captured=${capturedImages.size})",
+                capturedImages.isNotEmpty(),
+            )
+            assertTrue(
+                "captured image must carry real bytes",
+                capturedImages.first().bytes.isNotEmpty(),
+            )
+        } finally {
+            remoteEndpoint.close()
+        }
+    }
+
+    private fun imageCommand(text: String, base64Png: String): TurnCommand = TurnCommand(
+        backendId = BACKEND_ID,
+        runtimeId = RUNTIME_ID,
+        agentId = AgentId("device-loop-agent-${UUID.randomUUID()}".also(seededAgentIds::add)),
+        conversationId = ConversationId("device-loop-conversation-${UUID.randomUUID()}"),
+        input = TurnInput.UserMessage(
+            localMessageId = "device-loop-message-${UUID.randomUUID()}",
+            text = text,
+            imageParts = listOf(
+                com.letta.mobile.runtime.TurnImagePart(base64 = base64Png, mediaType = "image/png"),
+            ),
+        ),
+    )
 
     private fun descriptor(): BackendDescriptor = BackendDescriptor(
         backendId = BACKEND_ID,
