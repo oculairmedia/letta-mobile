@@ -7,11 +7,13 @@ import com.letta.mobile.data.chat.projection.buildChatRenderModel
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.data.chat.runtime.ChatConversationGroup
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.chatScreenStatusOf
+import com.letta.mobile.data.chat.runtime.groupConversationsByAgentName
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -22,6 +24,7 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopBootstrapState
 
 typealias DesktopConversationSummary = ChatConversationSummary
+typealias DesktopConversationGroup = ChatConversationGroup
 typealias DesktopChatConnectionState = ChatConnectionState
 
 @Immutable
@@ -64,6 +67,9 @@ data class DesktopChatSurfaceState(
 
     val selectedConversation: DesktopConversationSummary?
         get() = conversations.firstOrNull { it.id == selectedConversationId }
+
+    val conversationGroups: List<DesktopConversationGroup>
+        get() = groupConversationsByAgentName(conversations)
 
     val selectedMessages: List<UiMessage>
         get() = selectedConversationId?.let { messagesByConversationId[it] }.orEmpty()

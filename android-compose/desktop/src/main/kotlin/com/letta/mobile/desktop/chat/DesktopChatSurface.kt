@@ -203,17 +203,46 @@ private fun ConversationPane(
                     )
                 }
             }
-            items(
-                items = state.conversations,
-                key = { it.id },
-            ) { conversation ->
-                ConversationRow(
-                    conversation = conversation,
-                    selected = conversation.id == state.selectedConversationId,
-                    onClick = { onConversationSelected(conversation.id) },
-                    onDelete = { onDeleteConversation(conversation.id) },
-                )
+            state.conversationGroups.forEach { group ->
+                item(key = "agent:${group.key}") {
+                    ConversationGroupHeader(group)
+                }
+                items(
+                    items = group.conversations,
+                    key = { it.id },
+                ) { conversation ->
+                    ConversationRow(
+                        conversation = conversation,
+                        selected = conversation.id == state.selectedConversationId,
+                        onClick = { onConversationSelected(conversation.id) },
+                        onDelete = { onDeleteConversation(conversation.id) },
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun ConversationGroupHeader(group: DesktopConversationGroup) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp, start = 4.dp, end = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = group.agentName.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (group.unreadCount > 0) {
+            CountPill(group.unreadCount)
         }
     }
 }

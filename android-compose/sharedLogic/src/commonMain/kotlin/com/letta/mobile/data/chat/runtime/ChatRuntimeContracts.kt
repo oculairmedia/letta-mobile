@@ -28,6 +28,16 @@ data class ChatConversationSummary(
 )
 
 @Immutable
+data class ChatConversationGroup(
+    val key: String,
+    val agentName: String,
+    val conversations: List<ChatConversationSummary>,
+) {
+    val unreadCount: Int
+        get() = conversations.sumOf { it.unreadCount }
+}
+
+@Immutable
 data class ChatComposerState(
     val text: String = "",
     val pendingImageAttachments: List<MessageContentPart.Image> = emptyList(),
@@ -36,6 +46,28 @@ data class ChatComposerState(
     val hasPayload: Boolean
         get() = text.isNotBlank() || pendingImageAttachments.isNotEmpty()
 }
+
+fun groupConversationsByAgentName(
+    conversations: List<ChatConversationSummary>,
+): List<ChatConversationGroup> =
+    conversations
+        .groupBy { it.agentGroupKey() }
+        .map { (key, groupedConversations) ->
+            ChatConversationGroup(
+                key = key,
+                agentName = groupedConversations.first().agentDisplayName(),
+                conversations = groupedConversations,
+            )
+        }
+        .sortedBy { it.agentName.lowercase() }
+
+private fun ChatConversationSummary.agentDisplayName(): String =
+    agentName.trim().ifBlank { UNKNOWN_AGENT_LABEL }
+
+private fun ChatConversationSummary.agentGroupKey(): String =
+    agentDisplayName().lowercase()
+
+private const val UNKNOWN_AGENT_LABEL = "Unknown agent"
 
 @Immutable
 enum class ChatComposerError {

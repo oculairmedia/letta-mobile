@@ -45,6 +45,23 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun groupsConversationsByAgentNameForNavigation() {
+        val groups = groupConversationsByAgentName(
+            listOf(
+                conversation("newer-alpha", agentName = "Alpha", unreadCount = 1),
+                conversation("beta", agentName = "Beta", unreadCount = 3),
+                conversation("older-alpha", agentName = " alpha ", unreadCount = 2),
+                conversation("unknown", agentName = " "),
+            ),
+        )
+
+        assertEquals(listOf("Alpha", "Beta", "Unknown agent"), groups.map { it.agentName })
+        assertEquals(listOf("newer-alpha", "older-alpha"), groups[0].conversations.map { it.id })
+        assertEquals(3, groups[0].unreadCount)
+        assertEquals(3, groups[1].unreadCount)
+    }
+
+    @Test
     fun selectingRemoteConversationClearsComposerAndStartsHydrateGeneration() {
         val state = ChatSessionState(
             conversations = listOf(conversation("a"), conversation("b", unreadCount = 3)),
@@ -189,11 +206,12 @@ class ChatSessionReducerTest {
     private fun conversation(
         id: String,
         unreadCount: Int = 0,
+        agentName: String = "agent-$id",
     ): ChatConversationSummary =
         ChatConversationSummary(
             id = id,
             title = "Conversation $id",
-            agentName = "agent-$id",
+            agentName = agentName,
             updatedAtLabel = "now",
             lastMessagePreview = "preview",
             unreadCount = unreadCount,
