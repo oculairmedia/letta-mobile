@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Debug/self-test hooks for ADB validation. These components live only
+             in the debug source set and are not packaged in release builds. -->
+        <receiver
+            android:name=".runtime.sensors.DeviceSensorSelfTestReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.letta.mobile.DEVICE_SENSOR_SELF_TEST" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".runtime.sensors.DeviceSensorSelfTestService"
+            android:enabled="true"
+            android:exported="true" />
+
+        <activity
+            android:name=".runtime.sensors.DeviceSensorSelfTestActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.LettaMobile.Starting" />
+    </application>
+</manifest>
