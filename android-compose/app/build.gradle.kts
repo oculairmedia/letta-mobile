@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "13"
+val embeddedLettaCodeAssetRevision = "14"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -392,6 +392,57 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .inheritIO()
             .start()
         check(transform.waitFor() == 0) { "Unicode property escape transform for letta.js failed." }
+
+        // letta-mobile-nojhc: neutralize letta.js's image-resize path on device.
+        // resizeImageIfNeeded() calls getImageDimensions() (sharp) and, for
+        // actual resizing, the `magick` CLI via execSync — neither exists on
+        // nodejs-mobile (we ship only x64 sharp + a wasm32 fallback that fails
+        // to load), so any image send dies with "unknown error, 999 (1000)" in
+        // failureMode:"strict" BEFORE reaching the provider. The mobile composer
+        // already downsamples client-side (≤1568px / ≤2MB / JPEG), so the
+        // image is already within bounds and the resize is redundant. Rewrite
+        // resizeImageIfNeeded to a pure passthrough that returns the canonical
+        // {data, mediaType, width, height, resized} result without touching
+        // sharp or magick. width/height are only used for a downstream bounds
+        // assertion the client already enforces, so 0/0 is safe.
+        val sharpBypassScript = npmWorkDir.resolve("bypass-image-resize.mjs")
+        sharpBypassScript.writeText(
+            """
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            let src = readFileSync(file, 'utf8');
+            const marker = 'async function resizeImageIfNeeded(buffer, inputMediaType) {';
+            const idx = src.indexOf(marker);
+            if (idx === -1) {
+              throw new Error('bypass-image-resize: resizeImageIfNeeded marker not found — letta.js shape changed');
+            }
+            // Find the matching close brace for the function body.
+            let i = idx + marker.length;
+            let depth = 1;
+            while (i < src.length && depth > 0) {
+              const ch = src[i];
+              if (ch === '{') depth++;
+              else if (ch === '}') depth--;
+              i++;
+            }
+            if (depth !== 0) throw new Error('bypass-image-resize: unbalanced braces');
+            const replacement = marker +
+              '\n  // letta-mobile-nojhc: device passthrough, no sharp/magick.\n' +
+              '  return { data: buffer.toString("base64"), mediaType: inputMediaType, width: 0, height: 0, resized: false };\n}';
+            src = src.slice(0, idx) + replacement + src.slice(i);
+            writeFileSync(file, src);
+            console.log('[embedded-lettacode] bypassed resizeImageIfNeeded (sharp/magick) for on-device images');
+            """.trimIndent(),
+        )
+        val sharpBypass = ProcessBuilder(
+            "node",
+            sharpBypassScript.absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(sharpBypass.waitFor() == 0) { "Image-resize bypass transform for letta.js failed." }
 
         // Ship npm so the on-device node can install packages. npm is pure JS
         // (npm-cli.js) and runs on the embedded node 18 runtime. Pin the last
