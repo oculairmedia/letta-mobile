@@ -41,12 +41,12 @@ class LocalImageContextStripperTest {
         assertEquals(1, report.partsStripped)
         assertEquals("QUJDREVGR0g=".length, report.bytesFreed)
 
-        val img = rows(file).single()["content"]!!.jsonArray
-            .map { it.jsonObject }.single { it["type"]?.jsonPrimitive?.content == "image" }
-        assertEquals("", img["data"]!!.jsonPrimitive.content)
-        assertEquals("true", img["stripped"]!!.jsonPrimitive.content)
-        // mimeType preserved
-        assertEquals("image/jpeg", img["mimeType"]!!.jsonPrimitive.content)
+        // stripped image becomes a TEXT placeholder, not an empty image_url
+        val parts = rows(file).single()["content"]!!.jsonArray.map { it.jsonObject }
+        assertTrue("no image parts should remain", parts.none { it["type"]?.jsonPrimitive?.content == "image" })
+        val placeholder = parts.single { it["stripped"]?.jsonPrimitive?.content == "true" }
+        assertEquals("text", placeholder["type"]!!.jsonPrimitive.content)
+        assertTrue(placeholder["text"]!!.jsonPrimitive.content.contains("image/jpeg"))
     }
 
     @Test
@@ -54,11 +54,11 @@ class LocalImageContextStripperTest {
         val file = write(nestedImageRow("SEVMTE8="))
         val report = stripper.stripTranscript(file)
         assertEquals(1, report.partsStripped)
-        val img = rows(file).single()["content"]!!.jsonArray
-            .map { it.jsonObject }.single { it["type"]?.jsonPrimitive?.content == "image" }
-        assertEquals("", img["source"]!!.jsonObject["data"]!!.jsonPrimitive.content)
-        assertEquals("base64", img["source"]!!.jsonObject["type"]!!.jsonPrimitive.content)
-        assertEquals("true", img["stripped"]!!.jsonPrimitive.content)
+        val parts = rows(file).single()["content"]!!.jsonArray.map { it.jsonObject }
+        assertTrue(parts.none { it["type"]?.jsonPrimitive?.content == "image" })
+        val placeholder = parts.single { it["stripped"]?.jsonPrimitive?.content == "true" }
+        assertEquals("text", placeholder["type"]!!.jsonPrimitive.content)
+        assertTrue(placeholder["text"]!!.jsonPrimitive.content.contains("image/png"))
     }
 
     @Test
@@ -74,7 +74,7 @@ class LocalImageContextStripperTest {
     @Test
     fun `already-stripped image is a no-op`() {
         val file = write(
-            """{"id":"u1","role":"user","content":[{"type":"image","mimeType":"image/jpeg","data":"","stripped":true}]}""",
+            """{"id":"u1","role":"user","content":[{"type":"text","text":"[image omitted from context: image/jpeg]","stripped":true}]}""",
         )
         val before = file.readText()
         val report = stripper.stripTranscript(file)

@@ -6,8 +6,10 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Removes the heavy base64 `data` from image content parts already persisted in
@@ -81,12 +83,17 @@ class LocalImageContextStripper(
         return StripReport(partsStripped, bytesFreed)
     }
 
-    /** A non-empty image part whose data has not already been stripped. */
+    /**
+     * Any `type:"image"` part that should be replaced with a text placeholder —
+     * whether it still has base64 data OR is an empty image shell left by an
+     * earlier (buggy) strip pass. Empty shells MUST be converted too: an empty
+     * image_url is rejected by strict providers (MiniMax 2013). A part that is
+     * already a text placeholder (type:text) is not an image and is skipped, so
+     * this stays idempotent.
+     */
     private fun isStrippableImage(part: Any?): Boolean {
         val p = part as? JsonObject ?: return false
-        if (p["type"]?.jsonStr() != "image") return false
-        if (p["stripped"]?.jsonPrimitive?.content == "true") return false
-        return imageDataLength(p) > 0
+        return p["type"]?.jsonStr() == "image"
     }
 
     private fun imageDataLength(p: JsonObject): Int {
@@ -95,18 +102,24 @@ class LocalImageContextStripper(
         return 0
     }
 
+    /**
+     * Replace a sent image with a TEXT placeholder part — NOT an empty
+     * `{type:image}`. An empty image part is still serialized to the provider
+     * as an image_url with empty base64, which a strict provider rejects with
+     * "invalid image content: decode image config: unknown format" (MiniMax
+     * code 2013). A text placeholder keeps the context small, leaves a
+     * human/agent-readable trace that an image was here, and never reaches the
+     * provider as a malformed image.
+     */
     private fun strippedImage(p: JsonObject): JsonObject {
-        val map = LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(p)
-        // flat shape
-        if (map.containsKey("data")) map["data"] = JsonPrimitive("")
-        // nested source shape
-        (map["source"] as? JsonObject)?.let { src ->
-            val srcMap = LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(src)
-            srcMap["data"] = JsonPrimitive("")
-            map["source"] = JsonObject(srcMap)
+        val mediaType = p["mimeType"]?.jsonStr()
+            ?: (p["source"] as? JsonObject)?.get("media_type")?.jsonStr()
+            ?: "image"
+        return buildJsonObject {
+            put("type", JsonPrimitive("text"))
+            put("text", JsonPrimitive("[image omitted from context: $mediaType]"))
+            put("stripped", JsonPrimitive(true))
         }
-        map["stripped"] = JsonPrimitive(true)
-        return JsonObject(map)
     }
 
     private fun atomicWrite(target: File, contents: String) {
