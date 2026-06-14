@@ -2,6 +2,7 @@ package com.letta.mobile.runtime.local
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,6 +62,36 @@ class OnDeviceToolCallProtocolTest {
         assertTrue(prompt.contains("assistant called tool (call_1)"))
         assertTrue(prompt.contains("\"Bash\""))
         assertTrue(prompt.contains("tool result (call_1): file-a\nfile-b"))
+    }
+
+
+    @Test
+    fun `extractImages decodes OpenAI data URL image parts`() {
+        val images = OnDeviceToolCallProtocol.extractImages(
+            request(
+                """
+                {
+                  "messages": [{"role": "user", "content": [
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,AQID"}},
+                    {"type": "text", "text": "what is this"}
+                  ]}]
+                }
+                """.trimIndent(),
+            ),
+        )
+
+        assertEquals(1, images.size)
+        assertEquals("image/png", images.single().mediaType)
+        assertArrayEquals(byteArrayOf(1, 2, 3), images.single().bytes)
+    }
+
+    @Test
+    fun `decodeOpenAiImageUrl accepts raw base64 and rejects invalid payloads`() {
+        val image = OnDeviceToolCallProtocol.decodeOpenAiImageUrl("AQID")
+
+        assertEquals(null, image?.mediaType)
+        assertArrayEquals(byteArrayOf(1, 2, 3), image?.bytes)
+        assertEquals(null, OnDeviceToolCallProtocol.decodeOpenAiImageUrl("not base64!"))
     }
 
     @Test

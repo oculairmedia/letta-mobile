@@ -4,7 +4,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import java.util.Base64
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -89,6 +91,47 @@ object OnDeviceToolCallProtocol {
         }
     }.trimEnd()
 
+
+
+    fun extractImages(request: JsonObject): List<OnDeviceImage> =
+        (request["messages"] as? JsonArray)
+            ?.flatMap { message ->
+                ((message as? JsonObject)?.get("content") as? JsonArray)
+                    ?.mapNotNull(::imageFromContentPart)
+                    .orEmpty()
+            }
+            .orEmpty()
+
+    private fun imageFromContentPart(part: JsonElement): OnDeviceImage? {
+        val item = part as? JsonObject ?: return null
+        if (item.stringField("type") != "image_url") return null
+        val imageUrl = item["image_url"]
+        val url = when (imageUrl) {
+            is JsonPrimitive -> imageUrl.contentOrNull
+            is JsonObject -> imageUrl.stringField("url")
+            else -> null
+        } ?: return null
+        return decodeOpenAiImageUrl(url)
+    }
+
+    fun decodeOpenAiImageUrl(url: String): OnDeviceImage? {
+        val trimmed = url.trim()
+        val dataPrefix = "data:"
+        val base64Marker = ";base64,"
+        return if (trimmed.startsWith(dataPrefix, ignoreCase = true)) {
+            val markerIndex = trimmed.indexOf(base64Marker, ignoreCase = true)
+            if (markerIndex < 0) return null
+            val mediaType = trimmed.substring(dataPrefix.length, markerIndex).takeIf { it.isNotBlank() }
+            val payload = trimmed.substring(markerIndex + base64Marker.length)
+            decodeBase64Image(payload, mediaType)
+        } else {
+            decodeBase64Image(trimmed, mediaType = null)
+        }
+    }
+
+    private fun decodeBase64Image(payload: String, mediaType: String?): OnDeviceImage? =
+        runCatching { OnDeviceImage(Base64.getDecoder().decode(payload), mediaType) }.getOrNull()
+
     /**
      * Parses a model reply: a `tool_call` fenced block (or a bare JSON object
      * with name+arguments as the whole reply) becomes [ModelTurn.ToolCall];
@@ -139,7 +182,7 @@ object OnDeviceToolCallProtocol {
         else -> content.toString()
     }
 
-    private fun JsonPrimitive.contentOrEmpty(): String = if (this is JsonPrimitive) content else ""
+    private fun JsonPrimitive.contentOrEmpty(): String = content
 
     // Tolerates ```tool_call and ```json fences; gemma-class models drift.
     private val FENCE_REGEX = Regex(

@@ -26,6 +26,16 @@ import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class OnDeviceImage(
+    val bytes: ByteArray,
+    val mediaType: String?,
+) {
+    override fun equals(other: Any?): Boolean =
+        this === other || other is OnDeviceImage && bytes.contentEquals(other.bytes) && mediaType == other.mediaType
+
+    override fun hashCode(): Int = 31 * bytes.contentHashCode() + mediaType.hashCode()
+}
+
 data class OnDeviceOpenAiBridgeSession(
     val baseUrl: String,
     private val closeAction: () -> Unit,
@@ -45,7 +55,11 @@ class DisabledOnDeviceOpenAiBridge @Inject constructor() : OnDeviceOpenAiBridge 
 }
 
 interface OnDeviceChatCompletionEngine {
-    fun generate(modelSelection: EmbeddedLettaCodeModelSelection, prompt: String): Result<String>
+    fun generate(
+        modelSelection: EmbeddedLettaCodeModelSelection,
+        prompt: String,
+        images: List<OnDeviceImage> = emptyList(),
+    ): Result<String>
 }
 
 @Singleton
@@ -158,8 +172,9 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             // back out of the text — LiteRT-LM has no native function calling
             // (letta-mobile-69i0z, see OnDeviceToolCallProtocol).
             val prompt = OnDeviceToolCallProtocol.renderPrompt(request)
+            val images = OnDeviceToolCallProtocol.extractImages(request)
             val stream = request["stream"]?.jsonPrimitive?.booleanOrNull == true
-            val result = engine.generate(modelSelection, prompt)
+            val result = engine.generate(modelSelection, prompt, images)
             result.fold(
                 onSuccess = { raw ->
                     when (val turn = OnDeviceToolCallProtocol.parseModelOutput(raw)) {

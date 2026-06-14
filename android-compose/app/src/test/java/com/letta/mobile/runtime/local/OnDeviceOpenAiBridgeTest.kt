@@ -6,6 +6,7 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +44,33 @@ class OnDeviceOpenAiBridgeTest {
             assertEquals(200, response.code)
             assertTrue(response.body.contains("Hello from device"))
             assertEquals("system: Be direct.\nuser: Say hello", engine.lastPrompt)
+        }
+    }
+
+
+    @Test
+    fun `chat completions endpoint passes image content parts to engine`() {
+        val engine = FakeEngine(response = "saw image")
+        val bridge = LocalOpenAiOnDeviceBridge(engine)
+        bridge.start(selection()).use { session ->
+            val response = post(
+                url = "${session.baseUrl}/chat/completions",
+                body = """
+                    {
+                      "messages": [{"role": "user", "content": [
+                        {"type": "image_url", "image_url": {"url": "data:image/png;base64,AQIDBA=="}},
+                        {"type": "text", "text": "Describe this"}
+                      ]}]
+                    }
+                """.trimIndent(),
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(engine.lastPrompt.orEmpty().contains("user:"))
+            assertTrue(engine.lastPrompt.orEmpty().contains("Describe this"))
+            assertEquals(1, engine.lastImages.size)
+            assertEquals("image/png", engine.lastImages.single().mediaType)
+            assertArrayEquals(byteArrayOf(1, 2, 3, 4), engine.lastImages.single().bytes)
         }
     }
 
@@ -211,8 +239,15 @@ class OnDeviceOpenAiBridgeTest {
     ) : OnDeviceChatCompletionEngine {
         var lastPrompt: String? = null
 
-        override fun generate(modelSelection: EmbeddedLettaCodeModelSelection, prompt: String): Result<String> {
+        var lastImages: List<OnDeviceImage> = emptyList()
+
+        override fun generate(
+            modelSelection: EmbeddedLettaCodeModelSelection,
+            prompt: String,
+            images: List<OnDeviceImage>,
+        ): Result<String> {
             lastPrompt = prompt
+            lastImages = images
             return result ?: Result.success(response)
         }
     }
