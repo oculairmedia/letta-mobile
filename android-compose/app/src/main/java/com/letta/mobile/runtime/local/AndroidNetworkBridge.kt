@@ -277,7 +277,12 @@ class LocalAndroidNetworkBridge @Inject constructor() : AndroidNetworkBridge {
 
     companion object {
         private const val LOOPBACK_HOST = "127.0.0.1"
-        private const val MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024
+        // Raised from 2MB to accommodate multimodal requests: the composer
+        // allows up to 4 images at ≤2MB raw each, which become ~1.33x larger
+        // as base64 inside the provider JSON. 2MB rejected image-bearing
+        // provider requests at the bridge before they reached the upstream
+        // (letta-mobile-nojhc). 24MB comfortably covers the worst case.
+        private const val MAX_REQUEST_BODY_BYTES = 24 * 1024 * 1024
         private const val MAX_RESPONSE_BYTES = 5 * 1024 * 1024
         private const val FETCH_TIMEOUT_MS = 120_000
         private val ALLOWED_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")

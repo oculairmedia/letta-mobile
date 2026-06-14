@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "15"
+val embeddedLettaCodeAssetRevision = "20"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -435,6 +435,43 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .start()
         check(visionFlag.waitFor() == 0) { "Vision-model-input transform for letta.js failed." }
 
+        // letta-mobile-nojhc: letta.js's chat/completions image builder emits a
+        // NON-STANDARD camelCase `imageUrl: "data:..."` part. OpenAI-compatible
+        // providers (MiniMax, lmstudio, etc.) expect the standard
+        // `image_url: { url: "data:..." }` and reject the camelCase form
+        // ("invalid params, image_url is empty"), surfacing as the opaque
+        // "999 (1000)" turn error. Rewrite both camelCase emit sites to the
+        // standard shape so images actually reach the provider. PROVEN against
+        // the live :8082 proxy: standard shape → 200 + description; camelCase →
+        // bad_request "image_url is empty".
+        val imageUrlScript = npmWorkDir.resolve("patch-image-url-shape.mjs")
+        imageUrlScript.writeText(
+            """
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            let src = readFileSync(file, 'utf8');
+            // Whitespace-agnostic: convert every chat/completions camelCase
+            // image_url part into the OpenAI-standard
+            // type:"image_url", image_url:{ url: <data-url-template> }.
+            // Matches the data-URL template body without pinning indentation,
+            // so both emit sites convert regardless of minifier whitespace.
+            const re = /type:\s*"image_url",\s*imageUrl:\s*(`data:[^`]*`)/g;
+            let changed = 0;
+            src = src.replace(re, (_m, urlExpr) => {
+              changed++;
+              return 'type: "image_url", image_url: { url: ' + urlExpr + ' }';
+            });
+            if (changed === 0) {
+              throw new Error('patch-image-url-shape: no camelCase imageUrl tokens found — letta.js shape changed');
+            }
+            writeFileSync(file, src);
+            console.log('[embedded-lettacode] rewrote ' + changed + ' camelCase imageUrl -> standard image_url{url}');
+            """.trimIndent(),
+        )
+        val imageUrlFix = ProcessBuilder("node", imageUrlScript.absolutePath, lettaJs.absolutePath)
+            .directory(npmWorkDir).inheritIO().start()
+        check(imageUrlFix.waitFor() == 0) { "image_url-shape transform for letta.js failed." }
+
         // letta-mobile-nojhc: neutralize letta.js's image-resize path on device.
         // resizeImageIfNeeded() calls getImageDimensions() (sharp) + the magick
         // CLI — neither loads on nodejs-mobile, so an image send would die with
@@ -477,6 +514,7 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .inheritIO()
             .start()
         check(sharpBypass.waitFor() == 0) { "Image-resize bypass transform for letta.js failed." }
+
 
         // Ship npm so the on-device node can install packages. npm is pure JS
         // (npm-cli.js) and runs on the embedded node 18 runtime. Pin the last
