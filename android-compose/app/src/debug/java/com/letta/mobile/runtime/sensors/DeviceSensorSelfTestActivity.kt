@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.util.Log
 import com.letta.mobile.BuildConfig
 import java.io.File
+import kotlinx.coroutines.runBlocking
 
 /**
  * Dev-only no-display Activity for ADB validation of Stage 1→2 without user
@@ -25,9 +26,18 @@ class DeviceSensorSelfTestActivity : Activity() {
                 val payload = DeviceSensorSelfTestService.buildSelfTestPayload(snapshot)
                 val out = File(filesDir, DeviceSensorSelfTestReceiver.OUTPUT_FILE)
                 out.writeText(payload)
+                val grounding = File(filesDir, DeviceSensorGroundingWriter.FILE_NAME)
+                runBlocking {
+                    DeviceSensorGroundingWriter(
+                        provider = object : DeviceSensorSnapshotProvider {
+                            override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = snapshot
+                        },
+                        outputFile = grounding,
+                    ).writeSnapshot(snapshot.capturedAtMillis)
+                }
                 Log.w(
                     TAG,
-                    "[device-sensor-self-test] wrote ${out.absolutePath} " +
+                    "[device-sensor-self-test] wrote ${out.absolutePath} and ${grounding.absolutePath} " +
                         "sensors=${snapshot.sensorCount} summary=${DeviceSensorSnapshotFormatter.toCompactString(snapshot)}",
                 )
             }.onFailure { error ->

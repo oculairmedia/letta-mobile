@@ -31,11 +31,17 @@ import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
+import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
+import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
+import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
+import android.content.Context
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.multibindings.IntoSet
+import java.io.File
 import javax.inject.Singleton
 
 @Module
@@ -59,6 +65,22 @@ object RuntimeModule {
     @Singleton
     fun provideLettaCodeRuntimeController(controller: AndroidLettaCodeRuntimeController): LettaCodeRuntimeController =
         controller
+
+    @Provides
+    @Singleton
+    fun provideDeviceSensorSnapshotProvider(
+        @ApplicationContext context: Context,
+    ): DeviceSensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context)
+
+    @Provides
+    @Singleton
+    fun provideDeviceSensorGroundingWriter(
+        @ApplicationContext context: Context,
+        provider: DeviceSensorSnapshotProvider,
+    ): DeviceSensorGroundingWriter = DeviceSensorGroundingWriter(
+        provider = provider,
+        outputFile = File(context.filesDir, DeviceSensorGroundingWriter.FILE_NAME),
+    )
 
     @Provides
     @Singleton
