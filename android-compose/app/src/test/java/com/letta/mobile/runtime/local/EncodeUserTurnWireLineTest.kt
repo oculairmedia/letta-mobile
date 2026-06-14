@@ -2,6 +2,7 @@ package com.letta.mobile.runtime.local
 
 import com.letta.mobile.runtime.TurnImagePart
 import com.letta.mobile.runtime.TurnInput
+import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -14,6 +15,22 @@ import org.junit.Test
 
 class EncodeUserTurnWireLineTest {
     private val json = Json
+
+    @Test
+    fun `embedded node preloads include runtime introspection bridge after platform polyfills`() {
+        val projectDir = File("/tmp/embedded-lettacode")
+
+        val files = embeddedLettaCodePreloadRequireFiles(projectDir).map { it.name }
+
+        assertEquals(
+            listOf(
+                "regexp-polyfill.cjs",
+                "android-network-polyfill.cjs",
+                "embedded-runtime-introspection-preload.cjs",
+            ),
+            files,
+        )
+    }
 
     private fun wire(input: TurnInput.UserMessage) =
         json.parseToJsonElement(encodeUserTurnWireLine(input)).jsonObject
