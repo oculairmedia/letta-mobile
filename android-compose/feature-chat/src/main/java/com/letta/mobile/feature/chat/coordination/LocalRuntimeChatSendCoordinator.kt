@@ -59,12 +59,6 @@ internal class LocalRuntimeChatSendCoordinator(
                 timer.stop("accepted" to false, "reason" to "missing_backend")
                 return@launch
             }
-            if (attachments.isNotEmpty()) {
-                failSend("Local runtime does not support image attachments yet")
-                timer.stop("accepted" to false, "reason" to "attachments_unsupported")
-                return@launch
-            }
-
             val activeId = activeConversationId()
             if (activeId != null && !activeId.isLocalRuntimeConversationId()) {
                 failSend("Local runtime setup required for this conversation")
@@ -103,6 +97,16 @@ internal class LocalRuntimeChatSendCoordinator(
                         input = TurnInput.UserMessage(
                             localMessageId = otid,
                             text = text,
+                            // Forward downsampled composer images as inline
+                            // multimodal parts; a vision-capable provider
+                            // receives them via the embedded letta.js content
+                            // array (letta-mobile-aobcg).
+                            imageParts = attachments.map { image ->
+                                com.letta.mobile.runtime.TurnImagePart(
+                                    base64 = image.base64,
+                                    mediaType = image.mediaType,
+                                )
+                            },
                         ),
                     )
                 ).collect { event ->

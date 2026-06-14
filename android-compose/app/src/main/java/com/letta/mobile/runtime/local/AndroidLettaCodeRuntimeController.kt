@@ -18,7 +18,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -483,18 +486,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     }
 
     private fun TurnCommand.toWireLine(): String = when (val input = input) {
-        is TurnInput.UserMessage -> buildJsonObject {
-            put("type", "user")
-            put(
-                "message",
-                buildJsonObject {
-                    put("role", "user")
-                    put("content", input.text)
-                    put("otid", input.localMessageId)
-                },
-            )
-        }.toString()
-
+        is TurnInput.UserMessage -> encodeUserTurnWireLine(input)
         is TurnInput.ToolApprovalResponse -> error("Tool approvals are not supported by embedded LettaCode.")
     }
 
@@ -525,3 +517,61 @@ data class EmbeddedLettaCodeSessionKey(
     val conversationId: String,
     val modelKey: String,
 )
+
+/**
+ * Encodes a local user turn into the embedded letta.js stdin wire line.
+ *
+ * Text-only sends keep the legacy plain-string `content` for back-compat.
+ * When [TurnInput.UserMessage.imageParts] is non-empty, `content` becomes a
+ * Letta content-union ARRAY `[{type:text}?, {type:image, source:{type:base64,
+ * media_type, data}}...]` — the shape the embedded letta.js ingests
+ * (`source.type == "base64"` / `media_type`), identical to the remote path.
+ * Text part first, then images, mirroring the remote `buildContentParts`
+ * ordering (letta-mobile-aobcg). Extracted as a top-level internal fn so the
+ * wire encoding is unit-testable without a controller instance.
+ */
+fun encodeUserTurnWireLine(input: TurnInput.UserMessage): String =
+    buildJsonObject {
+        put("type", "user")
+        put(
+            "message",
+            buildJsonObject {
+                put("role", "user")
+                if (input.imageParts.isEmpty()) {
+                    put("content", JsonPrimitive(input.text))
+                } else {
+                    put("content", encodeUserContentArray(input.text, input.imageParts))
+                }
+                put("otid", input.localMessageId)
+            },
+        )
+    }.toString()
+
+private fun encodeUserContentArray(
+    text: String,
+    imageParts: List<com.letta.mobile.runtime.TurnImagePart>,
+): JsonArray = buildJsonArray {
+    if (text.isNotBlank()) {
+        add(
+            buildJsonObject {
+                put("type", "text")
+                put("text", text)
+            },
+        )
+    }
+    imageParts.forEach { part ->
+        add(
+            buildJsonObject {
+                put("type", "image")
+                put(
+                    "source",
+                    buildJsonObject {
+                        put("type", "base64")
+                        put("media_type", part.mediaType)
+                        put("data", part.base64)
+                    },
+                )
+            },
+        )
+    }
+}
