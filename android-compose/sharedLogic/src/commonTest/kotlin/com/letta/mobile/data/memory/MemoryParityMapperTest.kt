@@ -64,22 +64,42 @@ class MemoryParityMapperTest {
         assertEquals(1, state.summary.channelCount)
         assertEquals(185, state.summary.totalMemoryTokens)
         assertEquals(512, state.summary.contextWindowUsed)
+        assertEquals(
+            listOf(
+                "agent:agent-1",
+                "skills:tool-1",
+                "memory:block-1",
+                "schedules:schedule-1",
+                "channels:backend",
+            ),
+            state.graph.nodes.map { it.id },
+        )
+        assertEquals(
+            listOf("uses", "remembers", "runs", "delivers"),
+            state.graph.edges.map { it.label },
+        )
 
         val skill = assertIs<MemoryParityItem.Skill>(state.section(MemoryParitySectionKind.Skills).items.single())
         assertEquals("search_docs", skill.title)
         assertEquals(listOf("research"), skill.tags)
+        assertEquals(listOf("python", "research"), skill.metadataLabels)
 
         val memory = assertIs<MemoryParityItem.MemoryBlock>(state.section(MemoryParitySectionKind.Memory).items.single())
         assertEquals("persona", memory.title)
         assertEquals("Keeps a concise research voice.", memory.preview)
+        assertEquals("Keeps a concise research voice.", memory.detailText)
+        assertEquals(listOf("Limit 2000"), memory.metadataLabels)
+        assertEquals(MemoryTextLinkKind.Skill, memory.links.single { it.label == "tool:search_docs" }.kind)
 
         val schedule = assertIs<MemoryParityItem.Schedule>(state.section(MemoryParitySectionKind.Schedules).items.single())
         assertEquals("Summarize the latest project memory", schedule.title)
         assertEquals("recurring", schedule.scheduleType)
+        assertEquals(listOf("recurring", "2026-06-14T08:00:00Z"), schedule.metadataLabels)
 
         val channel = assertIs<MemoryParityItem.Channel>(state.section(MemoryParitySectionKind.Channels).items.single())
         assertEquals(MemoryChannelStatus.Connected, channel.status)
         assertEquals("Connected via websocket", channel.subtitle)
+        assertEquals(listOf("Connected"), channel.metadataLabels)
     }
 
     @Test
@@ -96,6 +116,27 @@ class MemoryParityMapperTest {
         val skill = assertIs<MemoryParityItem.Skill>(state.section(MemoryParitySectionKind.Skills).items.single())
         assertEquals("fallback", skill.id)
         assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
+    }
+
+    @Test
+    fun parsesMemoryTextLinksInCommonCode() {
+        val links = MemoryTextLinkParser.parse(
+            "Ask @Ada to refresh tool:search_docs from https://docs.example/test and schedule:daily.",
+        )
+
+        assertEquals(
+            listOf(
+                MemoryTextLinkKind.Mention,
+                MemoryTextLinkKind.Skill,
+                MemoryTextLinkKind.Url,
+                MemoryTextLinkKind.Schedule,
+            ),
+            links.map { it.kind },
+        )
+        assertEquals("@Ada", links[0].label)
+        assertEquals("search_docs", links[1].target)
+        assertEquals("https://docs.example/test", links[2].target)
+        assertEquals("daily", links[3].target)
     }
 
     @Test
@@ -169,7 +210,7 @@ class MemoryParityMapperTest {
             Block(
                 id = BlockId("block-1"),
                 label = "persona",
-                value = "Keeps a concise research voice.\nSecond line.",
+                value = "Keeps a concise research voice.\nUse tool:search_docs when grounded research is needed.",
                 limit = 2_000,
             ),
         ),
