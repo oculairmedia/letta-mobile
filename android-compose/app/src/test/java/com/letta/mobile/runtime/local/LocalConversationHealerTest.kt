@@ -50,6 +50,61 @@ class LocalConversationHealerTest {
     }
 
     @Test
+    fun `orphaned tool result with no preceding tool call is removed`() {
+        // The OpenAI/GPT-5.x corruption: a toolResult whose toolCallId has no
+        // declaring toolCall. Provider 400s "role tool must be a response to a
+        // preceding message with tool_calls" until it is removed.
+        val file = writeTranscript(
+            userRow("u1", "hi"),
+            toolResult("call_orphan_result"),
+            userRow("u2", "still here"),
+        )
+        val report = healer.healTranscript(file)
+        assertTrue(report.healed)
+        assertEquals(1, report.rowsRemoved)
+        assertEquals(listOf("call_orphan_result"), report.orphanResultIds)
+        // the orphaned toolResult row is gone; the user rows remain
+        val rows = parseRows(file)
+        assertTrue(rows.none { it["role"]?.jsonPrimitive?.content == "toolResult" })
+        assertEquals(2, rows.size)
+    }
+
+    @Test
+    fun `paired tool result is kept and only the orphan is removed`() {
+        val file = writeTranscript(
+            assistantWithToolCall("a1", "call_paired"),
+            toolResult("call_paired"),
+            toolResult("call_orphan"),
+        )
+        val report = healer.healTranscript(file)
+        assertEquals(1, report.rowsRemoved)
+        assertEquals(listOf("call_orphan"), report.orphanResultIds)
+        val resultIds = parseRows(file)
+            .filter { it["role"]?.jsonPrimitive?.content == "toolResult" }
+            .map { it["toolCallId"]!!.jsonPrimitive.content }
+        assertEquals(listOf("call_paired"), resultIds)
+    }
+
+    @Test
+    fun `both directions heal together - dangling call settled and orphan result removed`() {
+        val file = writeTranscript(
+            assistantWithToolCall("a1", "call_dangling"), // needs a synthetic result
+            toolResult("call_orphan"),                    // must be removed
+        )
+        val report = healer.healTranscript(file)
+        assertTrue(report.healed)
+        assertEquals(1, report.rowsAppended)
+        assertEquals(1, report.rowsRemoved)
+        assertEquals(listOf("call_dangling"), report.orphanCallIds)
+        assertEquals(listOf("call_orphan"), report.orphanResultIds)
+        val resultIds = parseRows(file)
+            .filter { it["role"]?.jsonPrimitive?.content == "toolResult" }
+            .map { it["toolCallId"]!!.jsonPrimitive.content }
+        // orphan gone, dangling now satisfied
+        assertEquals(listOf("call_dangling"), resultIds)
+    }
+
+    @Test
     fun `dangling tool call gets a synthetic interrupted tool result appended`() {
         val file = writeTranscript(
             userRow("u1", "run a command"),

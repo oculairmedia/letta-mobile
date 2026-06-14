@@ -79,6 +79,12 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 healDanglingToolCalls(command.agentId.value, phase = "pre-turn")
                 transcriptDirty = false
             }
+            // Strip heavy base64 from images already on disk (sent on prior
+            // turns) so they don't re-bloat the context / re-send every turn
+            // (letta-mobile-87itk). The current turn's new image rides in the
+            // wire line, not yet on disk, so it is never stripped in-flight.
+            // No-ops cheaply once everything is stripped.
+            stripPersistedImages(command.agentId.value)
             var endedCleanly = false
             try {
                 withTimeout(TURN_TIMEOUT_MS) {
@@ -117,6 +123,22 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     // healthy turns do zero transcript I/O.
     @Volatile
     private var transcriptDirty: Boolean = false
+
+    private suspend fun stripPersistedImages(agentId: String) {
+        runCatching { localBackendStore.stripPersistedImageData(agentId) }
+            .onSuccess { report ->
+                if (report.stripped) {
+                    Log.w(
+                        TAG,
+                        "Stripped ${report.partsStripped} persisted image(s) " +
+                            "(~${report.bytesFreed / 1024}KB base64 freed) for agent=$agentId",
+                    )
+                }
+            }
+            .onFailure { error ->
+                Log.w(TAG, "Image-context strip failed for agent=$agentId", error)
+            }
+    }
 
     private suspend fun healDanglingToolCalls(agentId: String, phase: String) {
         runCatching { localBackendStore.healDanglingToolCalls(agentId) }
