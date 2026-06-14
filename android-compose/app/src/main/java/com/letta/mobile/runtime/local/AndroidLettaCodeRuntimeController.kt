@@ -522,13 +522,20 @@ data class EmbeddedLettaCodeSessionKey(
  * Encodes a local user turn into the embedded letta.js stdin wire line.
  *
  * Text-only sends keep the legacy plain-string `content` for back-compat.
- * When [TurnInput.UserMessage.imageParts] is non-empty, `content` becomes a
- * Letta content-union ARRAY `[{type:text}?, {type:image, source:{type:base64,
- * media_type, data}}...]` — the shape the embedded letta.js ingests
- * (`source.type == "base64"` / `media_type`), identical to the remote path.
- * Text part first, then images, mirroring the remote `buildContentParts`
- * ordering (letta-mobile-aobcg). Extracted as a top-level internal fn so the
- * wire encoding is unit-testable without a controller instance.
+ * When [TurnInput.UserMessage.imageParts] is non-empty, `content` becomes an
+ * ARRAY `[{type:text}?, {type:image, mimeType, data}...]`.
+ *
+ * CRITICAL: the embedded letta.js STDIN/internal image shape is **FLAT**
+ * (`item.mimeType` + `item.data`, which it turns into
+ * `data:${mimeType};base64,<data>`), NOT the nested
+ * `{source:{type:base64, media_type, data}}` server/remote union. Emitting the
+ * nested shape here makes letta.js read empty `mimeType`/`data` and silently
+ * drop the image (verified on-device: the persisted part came out as
+ * `{type, mimeType, data}` with empty `source={}`). This is the same flat-vs-
+ * nested image-shape mismatch class as the inbound pipeline (letta-mobile-aobcg).
+ *
+ * Text part first, then images. Extracted as a top-level fn so the wire
+ * encoding is unit-testable without a controller instance.
  */
 fun encodeUserTurnWireLine(input: TurnInput.UserMessage): String =
     buildJsonObject {
@@ -560,17 +567,13 @@ private fun encodeUserContentArray(
         )
     }
     imageParts.forEach { part ->
+        // FLAT shape — letta.js stdin reads item.mimeType + item.data directly
+        // (NOT a nested source union). See encodeUserTurnWireLine KDoc.
         add(
             buildJsonObject {
                 put("type", "image")
-                put(
-                    "source",
-                    buildJsonObject {
-                        put("type", "base64")
-                        put("media_type", part.mediaType)
-                        put("data", part.base64)
-                    },
-                )
+                put("mimeType", part.mediaType)
+                put("data", part.base64)
             },
         )
     }
