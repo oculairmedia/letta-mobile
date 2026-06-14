@@ -12,6 +12,7 @@ data class DeviceSensorSnapshot(
     val network: NetworkSnapshot? = null,
     val display: DisplaySnapshot? = null,
     val sensors: List<SensorDescriptor> = emptyList(),
+    val gatedCapabilities: List<DeviceSensorGatedCapability> = emptyList(),
 ) {
     val sensorCount: Int get() = sensors.size
 }
