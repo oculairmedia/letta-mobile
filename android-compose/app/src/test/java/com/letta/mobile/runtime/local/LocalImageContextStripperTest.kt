@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import java.io.File
+import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -9,6 +10,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -19,7 +21,7 @@ class LocalImageContextStripperTest {
     val tempFolder = TemporaryFolder()
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val stripper = LocalImageContextStripper(json)
+    private val stripper = LocalImageContextStripper(blobStore = null, json = json)
 
     private fun write(vararg lines: String): File =
         tempFolder.newFile("messages.jsonl").apply { writeText(lines.joinToString("\n") + "\n") }
@@ -223,5 +225,151 @@ class LocalImageContextStripperTest {
         val persisted = file.readText()
         assertFalse(persisted.contains(d1))
         assertFalse(persisted.contains(d2))
+    }
+
+    // ── tests for blob-store integration (image_ref persistence) ─────────────────
+
+    @Test
+    fun `older image persisted to blob store and becomes image_ref`() {
+        val blobStore = LocalImageBlobStore(tempFolder.root)
+        val stripperWithBlobs = LocalImageContextStripper(blobStore = blobStore, json = json)
+
+        val olderData = Base64.getEncoder().encodeToString("older image bytes".toByteArray())
+        val latestData = Base64.getEncoder().encodeToString("latest image bytes".toByteArray())
+        val file = write(flatImageRow(olderData), flatImageRow(latestData))
+
+        val report = stripperWithBlobs.stripTranscript(file)
+
+        assertEquals(1, report.partsStripped)
+        assertTrue(report.stripped)
+
+        val all = rows(file)
+        assertEquals(2, all.size)
+
+        // Older image becomes a TEXT placeholder carrying an image_ref pointer
+        // (NOT a type:image_ref part — letta.js replays this file to the
+        // provider and must only ever see a sendable text part).
+        val olderParts = all[0]["content"]!!.jsonArray.map { it.jsonObject }
+        val imageRefPart = olderParts.find {
+            it["type"]?.jsonPrimitive?.content == "text" && it["image_ref"] != null
+        }
+        assertNotNull("older image should become text placeholder with image_ref", imageRefPart)
+        val ref = imageRefPart!!["image_ref"]?.jsonPrimitive?.content
+        assertNotNull("placeholder should carry an image_ref field", ref)
+        assertTrue("ref should start with sha256:", ref!!.startsWith("sha256:"))
+        assertEquals("image/jpeg", imageRefPart["mediaType"]?.jsonPrimitive?.content)
+        // strict-provider safety: it is a text part, never an image part.
+        assertEquals("text", imageRefPart["type"]?.jsonPrimitive?.content)
+
+        // Blob should exist in store
+        assertTrue("blob should exist in store", blobStore.has(ref))
+        val retrievedBytes = blobStore.getBytes(ref)
+        assertNotNull("blob bytes should be retrievable", retrievedBytes)
+
+        // Latest image should still be inline
+        val latestParts = all[1]["content"]!!.jsonArray.map { it.jsonObject }
+        val latestImagePart = latestParts.find { it["type"]?.jsonPrimitive?.content == "image" }
+        assertNotNull("latest image should still be inline", latestImagePart)
+        assertEquals(latestData, latestImagePart!!["data"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `image_ref parts from previous pass are left untouched - idempotent`() {
+        val blobStore = LocalImageBlobStore(tempFolder.root)
+        val stripperWithBlobs = LocalImageContextStripper(blobStore = blobStore, json = json)
+
+        val olderData = Base64.getEncoder().encodeToString("old".toByteArray())
+        val latestData = Base64.getEncoder().encodeToString("new".toByteArray())
+        val file = write(flatImageRow(olderData), flatImageRow(latestData))
+
+        // First pass: older image becomes image_ref
+        stripperWithBlobs.stripTranscript(file)
+        val afterFirst = file.readText()
+
+        // Second pass: should be no-op
+        val report2 = stripperWithBlobs.stripTranscript(file)
+        assertFalse("second pass should be no-op", report2.stripped)
+        assertEquals("file should be unchanged", afterFirst, file.readText())
+    }
+
+    @Test
+    fun `fallback to text placeholder when blobStore is null`() {
+        val stripperNoBlobs = LocalImageContextStripper(blobStore = null, json = json)
+        val olderData = Base64.getEncoder().encodeToString("fallback test".toByteArray())
+        val latestData = Base64.getEncoder().encodeToString("latest".toByteArray())
+        val file = write(flatImageRow(olderData), flatImageRow(latestData))
+
+        val report = stripperNoBlobs.stripTranscript(file)
+        assertEquals(1, report.partsStripped)
+
+        val all = rows(file)
+        val olderParts = all[0]["content"]!!.jsonArray.map { it.jsonObject }
+
+        // Should be text placeholder, NOT image_ref
+        val placeholderPart = olderParts.find { 
+            it["type"]?.jsonPrimitive?.content == "text" && 
+            it["text"]?.jsonPrimitive?.content?.contains("image omitted") == true 
+        }
+        assertNotNull("should have text placeholder", placeholderPart)
+        assertEquals("true", placeholderPart!!["stripped"]?.jsonPrimitive?.content)
+        assertTrue("text should mention image", placeholderPart["text"]?.jsonPrimitive?.content?.contains("image") == true)
+
+        // With no blob store, the placeholder carries NO image_ref pointer.
+        assertTrue("should not carry image_ref when blobStore is null", placeholderPart["image_ref"] == null)
+    }
+
+    @Test
+    fun `nested source image persisted to blob store correctly`() {
+        val blobStore = LocalImageBlobStore(tempFolder.root)
+        val stripperWithBlobs = LocalImageContextStripper(blobStore = blobStore, json = json)
+
+        val olderData = Base64.getEncoder().encodeToString("nested older".toByteArray())
+        val latestData = Base64.getEncoder().encodeToString("nested latest".toByteArray())
+        val file = write(nestedImageRow(olderData), nestedImageRow(latestData))
+
+        val report = stripperWithBlobs.stripTranscript(file)
+        assertEquals(1, report.partsStripped)
+
+        val all = rows(file)
+        val olderParts = all[0]["content"]!!.jsonArray.map { it.jsonObject }
+        val imageRefPart = olderParts.find {
+            it["type"]?.jsonPrimitive?.content == "text" && it["image_ref"] != null
+        }
+        assertNotNull("nested image should become text placeholder with image_ref", imageRefPart)
+        assertEquals("image/png", imageRefPart!!["mediaType"]?.jsonPrimitive?.content)
+
+        val ref = imageRefPart["image_ref"]?.jsonPrimitive?.content
+        assertTrue("blob should be retrievable", blobStore.has(ref!!))
+    }
+
+    @Test
+    fun `no empty image_url ever emitted - strict provider safety`() {
+        val blobStore = LocalImageBlobStore(tempFolder.root)
+        val stripperWithBlobs = LocalImageContextStripper(blobStore = blobStore, json = json)
+
+        val data = Base64.getEncoder().encodeToString("test".toByteArray())
+        val file = write(flatImageRow(data), flatImageRow(data))
+
+        stripperWithBlobs.stripTranscript(file)
+        val persisted = file.readText()
+
+        // Parse all parts and verify no image part has empty/missing data
+        val all = rows(file)
+        for (row in all) {
+            val parts = row["content"]?.jsonArray?.map { it.jsonObject } ?: continue
+            for (part in parts) {
+                val type = part["type"]?.jsonPrimitive?.content
+                if (type == "image") {
+                    // If it's an image type, it must have data (not empty)
+                    val data = part["data"]?.jsonPrimitive?.content
+                    val sourceData = (part["source"] as? JsonObject)?.get("data")?.jsonPrimitive?.content
+                    assertTrue("image parts must have data", data?.isNotEmpty() == true || sourceData?.isNotEmpty() == true)
+                }
+            }
+        }
+
+        // Should only have image_ref (for older) or image (for latest), never empty image
+        assertFalse("should not contain empty image shell", persisted.contains(""""type":"image","data":""""))
+        assertFalse("should not contain image with empty source", persisted.contains(""""type":"image","source":{}"""))
     }
 }

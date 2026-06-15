@@ -16,6 +16,7 @@ import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.util.Base64
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -54,7 +56,6 @@ class LettaCodeLocalBackendStore @Inject constructor(
 ) : LocalRuntimeConversationSource, LocalRuntimeAgentSource {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val conversationHealer = LocalConversationHealer()
-    private val imageContextStripper = LocalImageContextStripper()
 
     val storageDirectory: File
         get() = File(context.filesDir, "embedded-lettacode/local-backend")
@@ -231,13 +232,16 @@ class LettaCodeLocalBackendStore @Inject constructor(
      * so the chat screen can hydrate history across app restarts. Synthetic
      * context rows (system-reminder user messages letta.js injects) are
      * skipped — they were never user-visible.
+     *
+     * Resolves image_ref pointers back to normal image parts before typed
+     * parsing (letta-mobile-xybm2 embedded image hydration). The typed model
+     * never sees image_ref — it's a JSON-only persistence concept.
      */
     suspend fun readTranscript(agentId: String): List<LettaMessage> = withContext(Dispatchers.IO) {
-        val transcript = File(
-            File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
-            "messages.jsonl",
-        )
+        val conversationDir = File(File(storageDirectory, "conversations"), base64Url("default:$agentId"))
+        val transcript = File(conversationDir, "messages.jsonl")
         if (!transcript.isFile) return@withContext emptyList()
+        val blobStore = LocalImageBlobStore(conversationDir)
         transcript.useLines { lines ->
             lines.filter { it.isNotBlank() }.flatMapIndexed { index, line ->
                 val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
@@ -245,7 +249,9 @@ class LettaCodeLocalBackendStore @Inject constructor(
                 val id = row.stringField("id") ?: return@flatMapIndexed emptyList()
                 val role = row.stringField("role") ?: return@flatMapIndexed emptyList()
                 val date = (row["metadata"] as? JsonObject)?.stringField("created_at")
-                val contentParts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+                // Resolve image_ref parts before typed parsing
+                val rawContentParts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+                val contentParts = rawContentParts.map { part -> resolveImageRef(part, blobStore) }
                 val text = contentParts
                     .filter { it.stringField("type") == "text" }
                     .mapNotNull { it.stringField("text") }
@@ -370,17 +376,18 @@ class LettaCodeLocalBackendStore @Inject constructor(
 
     /**
      * Strips heavy base64 image data from the agent's persisted default
-     * conversation, leaving a placeholder + `stripped: true` marker. Prevents
-     * already-sent images from re-bloating the context and re-sending every
-     * turn (letta-mobile-87itk). Idempotent; safe to call pre-turn.
+     * conversation, persisting bytes to the blob store and leaving an image_ref
+     * pointer (or text placeholder as fallback). Prevents already-sent images
+     * from re-bloating the context and re-sending every turn (letta-mobile-87itk).
+     * Idempotent; safe to call pre-turn.
      */
     suspend fun stripPersistedImageData(agentId: String): LocalImageContextStripper.StripReport =
         withContext(Dispatchers.IO) {
-            val transcript = File(
-                File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
-                "messages.jsonl",
-            )
-            imageContextStripper.stripTranscript(transcript)
+            val conversationDir = File(File(storageDirectory, "conversations"), base64Url("default:$agentId"))
+            val transcript = File(conversationDir, "messages.jsonl")
+            val blobStore = LocalImageBlobStore(conversationDir)
+            val stripper = LocalImageContextStripper(blobStore = blobStore)
+            stripper.stripTranscript(transcript)
         }
 
     private fun JsonObject.stringField(key: String): String? =
@@ -388,6 +395,36 @@ class LettaCodeLocalBackendStore @Inject constructor(
 
     private fun JsonObject.intField(key: String): Int? =
         this[key]?.jsonPrimitive?.content?.toIntOrNull()
+
+    /**
+     * Resolve an image_ref part back to a normal image part by loading bytes
+     * from the blob store. Falls open to "[image unavailable]" text if the blob
+     * is missing (never crashes, never produces empty image).
+     */
+    private fun resolveImageRef(part: JsonObject, blobStore: LocalImageBlobStore): JsonObject {
+        // The on-disk rehydration pointer is a TEXT placeholder carrying an
+        // "image_ref" metadata field (NOT a type:"image_ref" part — letta.js
+        // replays messages.jsonl to the provider and would mangle an unknown
+        // image part into data:undefined → strict-provider 2013). Detect the
+        // text-part-with-image_ref and restore the original image for the UI.
+        val ref = part["image_ref"]?.jsonPrimitive?.content ?: return part
+        val mediaType = part["mediaType"]?.jsonPrimitive?.content ?: "image/jpeg"
+        val bytes = blobStore.getBytes(ref) ?: return unavailableImagePlaceholder()
+        val base64Data = Base64.getEncoder().encodeToString(bytes)
+        // Reconstruct the flat image shape letta.js persists/reads on disk
+        // ({type:image, mimeType, data}) so downstream typed mapping produces a
+        // normal image attachment with no model/timeline changes.
+        return buildJsonObject {
+            put("type", JsonPrimitive("image"))
+            put("mimeType", JsonPrimitive(mediaType))
+            put("data", JsonPrimitive(base64Data))
+        }
+    }
+
+    private fun unavailableImagePlaceholder(): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive("text"))
+        put("text", JsonPrimitive("[image unavailable]"))
+    }
 
     private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
         .encodeToString(value.toByteArray(Charsets.UTF_8))
