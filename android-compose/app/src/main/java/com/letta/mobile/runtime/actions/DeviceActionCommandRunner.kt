@@ -36,6 +36,10 @@ class DeviceActionCommandRunner @Inject constructor(
             "mobile.capabilities" -> ok(command, mobileActionRegistry.matrixJson())
             "intent.dry_run" -> ok(command, mobileIntentActionTool.handleJson(input.withDryRun()))
             "hardware.capabilities" -> ok(command, hardwareControlTool.capabilitiesJson())
+            "hardware.flashlight" -> runFlashlightCommand(command, input)
+            "hardware.flashlight_on" -> ok(command, hardwareControlTool.setFlashlightJson(input.withDefaults(mapOf("enabled" to true, "dryRun" to false))))
+            "hardware.flashlight_off" -> ok(command, hardwareControlTool.setFlashlightJson(input.withDefaults(mapOf("enabled" to false, "dryRun" to false))))
+            "set_flashlight" -> runFlashlightCommand(command, input)
             "hardware.flashlight_probe" -> ok(
                 command,
                 hardwareControlTool.setFlashlightJson(
@@ -46,6 +50,13 @@ class DeviceActionCommandRunner @Inject constructor(
             "hardware.audio_status" -> ok(command, hardwareControlTool.audioStatusJson())
             else -> errorResult(command.ifBlank { "unknown" }, "unknown_command", "Unknown device action command: $command")
         }
+    }
+
+    private fun runFlashlightCommand(command: String, input: JsonObject): DeviceActionCommandResult {
+        if (input["enabled"]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() == null) {
+            return errorResult(command, "invalid_input", "hardware.flashlight requires input.enabled true or false.")
+        }
+        return ok(command, hardwareControlTool.setFlashlightJson(input.withDefaults(mapOf("dryRun" to false))))
     }
 
     private fun ok(command: String, payloadJson: String): DeviceActionCommandResult {

@@ -69,6 +69,14 @@ object DeviceActionCommandCatalog {
                 example = "{\"command\":\"hardware.capabilities\"}",
             ),
             DeviceActionCommandDescriptor(
+                command = "hardware.flashlight",
+                summary = "Enable or disable the Android flashlight/torch when available.",
+                riskTier = "medium",
+                executionMode = "direct",
+                input = "required: {enabled: boolean}; optional: {dryRun?: boolean}",
+                example = "{\"command\":\"hardware.flashlight\",\"input\":{\"enabled\":true}}",
+            ),
+            DeviceActionCommandDescriptor(
                 command = "hardware.flashlight_probe",
                 summary = "Probe flashlight/torch control support without changing torch state.",
                 riskTier = "low",
