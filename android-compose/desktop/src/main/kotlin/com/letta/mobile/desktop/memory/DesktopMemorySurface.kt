@@ -94,9 +94,10 @@ fun DesktopMemorySurface(
                 onRefresh = onRefresh,
             )
         }
-        if (state.errorMessage != null) {
+        val errorMessage = state.errorMessage
+        if (errorMessage != null) {
             item {
-                MemoryErrorBanner(state.errorMessage)
+                MemoryErrorBanner(errorMessage)
             }
         }
         if (state.agents.isNotEmpty()) {
