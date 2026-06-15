@@ -50,15 +50,24 @@ class LocalImageContextStripper(
         val lines = transcript.readLines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return StripReport(0, 0)
 
+        // Pre-parse to locate the most-recent image-bearing user message —
+        // that row is preserved so follow-up turns can still reason about the
+        // just-posted image (re-port of PR #481 behaviour).
+        val rows: List<JsonObject?> = lines.map { line ->
+            runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+        }
+        val latestImageUserIndex = rows.indexOfLast { row -> row?.isUserImageMessage() == true }
+
         var partsStripped = 0
         var bytesFreed = 0
         var changed = false
 
-        val rebuilt = lines.map { line ->
-            val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
-                ?: return@map line
-            val content = row["content"] as? JsonArray ?: return@map line
-            if (content.none { isStrippableImage(it) }) return@map line
+        val rebuilt = lines.mapIndexed { index, line ->
+            if (index == latestImageUserIndex) return@mapIndexed line
+
+            val row = rows.getOrNull(index) ?: return@mapIndexed line
+            val content = row["content"] as? JsonArray ?: return@mapIndexed line
+            if (content.none { isStrippableImage(it) }) return@mapIndexed line
 
             val newContent = buildJsonArray {
                 content.forEach { part ->
@@ -129,6 +138,17 @@ class LocalImageContextStripper(
             target.writeText(contents)
             tmp.delete()
         }
+    }
+
+    /**
+     * A user image row = role == "user" AND content array has at least one
+     * part with type == "image" (and that image part carries real data —
+     * i.e. isStrippableImage returns true).
+     */
+    private fun JsonObject.isUserImageMessage(): Boolean {
+        if (this["role"]?.jsonStr() != "user") return false
+        val content = this["content"] as? JsonArray ?: return false
+        return content.any { isStrippableImage(it) }
     }
 
     private fun kotlinx.serialization.json.JsonElement.jsonStr(): String? =
