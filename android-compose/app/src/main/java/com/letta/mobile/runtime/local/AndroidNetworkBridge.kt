@@ -1,5 +1,7 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
 import java.io.Closeable
@@ -42,6 +44,7 @@ data class AndroidNetworkBridgeSession(
 @Singleton
 class LocalAndroidNetworkBridge @Inject constructor(
     private val sensorSnapshotProvider: DeviceSensorSnapshotProvider,
+    private val hardwareControlProvider: DeviceHardwareControlProvider,
 ) : AndroidNetworkBridge {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -50,7 +53,13 @@ class LocalAndroidNetworkBridge @Inject constructor(
         val executor = Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "android-network-bridge").apply { isDaemon = true }
         }
-        val session = BridgeServerSession(serverSocket, executor, json, DeviceSensorReadTool(sensorSnapshotProvider))
+        val session = BridgeServerSession(
+            serverSocket,
+            executor,
+            json,
+            DeviceSensorReadTool(sensorSnapshotProvider),
+            DeviceHardwareControlTool(hardwareControlProvider),
+        )
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
             baseUrl = "http://$LOOPBACK_HOST:${serverSocket.localPort}",
@@ -63,6 +72,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val executor: ExecutorService,
         private val json: Json,
         private val sensorReadTool: DeviceSensorReadTool,
+        private val hardwareControlTool: DeviceHardwareControlTool,
     ) {
         @Volatile private var closed = false
 
@@ -113,6 +123,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 method == "POST" && path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
                 method == "POST" && path == "/fetch" -> handleFetch(socket.outputStream, body)
                 method == "POST" && path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
+                method == "POST" && path.startsWith("/device/hardware/") -> handleHardwareControl(socket.outputStream, path, body)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
         }
@@ -131,6 +142,40 @@ class LocalAndroidNetworkBridge @Inject constructor(
             val response = runCatching { json.parseToJsonElement(responseText).jsonObject }
                 .getOrElse {
                     output.writeJsonResponse(500, errorBody("read_sensors_failed", "Tool response was not valid JSON."))
+                    return
+                }
+            output.writeJsonResponse(200, response)
+        }
+
+
+        private fun handleHardwareControl(output: OutputStream, path: String, body: String) {
+            val request = runCatching {
+                if (body.isBlank()) JsonObject(emptyMap()) else json.parseToJsonElement(body).jsonObject
+            }.getOrNull()
+            if (request == null) {
+                output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
+                return
+            }
+            val responseText = runCatching {
+                when (path) {
+                    "/device/hardware/capabilities" -> hardwareControlTool.capabilitiesJson()
+                    "/device/hardware/set_flashlight" -> hardwareControlTool.setFlashlightJson(request)
+                    "/device/hardware/vibrate" -> hardwareControlTool.vibrateJson(request)
+                    "/device/hardware/audio_status" -> hardwareControlTool.audioStatusJson()
+                    "/device/hardware/adjust_music_volume" -> hardwareControlTool.adjustMusicVolumeJson(request)
+                    else -> null
+                }
+            }.getOrElse { error ->
+                output.writeJsonResponse(500, errorBody("hardware_control_failed", error.message ?: "Hardware control failed."))
+                return
+            }
+            if (responseText == null) {
+                output.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
+                return
+            }
+            val response = runCatching { json.parseToJsonElement(responseText).jsonObject }
+                .getOrElse {
+                    output.writeJsonResponse(500, errorBody("hardware_control_failed", "Tool response was not valid JSON."))
                     return
                 }
             output.writeJsonResponse(200, response)

@@ -27,6 +27,8 @@ import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
+import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
 import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.MemFsStore
@@ -71,6 +73,12 @@ object RuntimeModule {
     fun provideDeviceSensorSnapshotProvider(
         @ApplicationContext context: Context,
     ): DeviceSensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context)
+
+    @Provides
+    @Singleton
+    fun provideDeviceHardwareControlProvider(
+        @ApplicationContext context: Context,
+    ): DeviceHardwareControlProvider = AndroidDeviceHardwareControlProvider(context)
 
     @Provides
     @Singleton
