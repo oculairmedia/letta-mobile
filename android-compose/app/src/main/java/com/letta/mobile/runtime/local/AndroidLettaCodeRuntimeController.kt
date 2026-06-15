@@ -438,26 +438,8 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         val pathEnvironment = mapOf(
             "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
         ) + npmEnvironment
-        val gitLib = File(context.applicationInfo.nativeLibraryDir, "libgit.so")
-        if (!gitLib.canExecute()) {
-            Log.i(TAG, "libgit.so not packaged; local memfs disabled")
+        if (!linkPackagedTool(binDirectory, "git", "libgit.so", "git-backed local memfs")) {
             return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
-        }
-        val gitLink = File(binDirectory, "git")
-        // nativeLibraryDir changes across installs/updates, so an existing link
-        // may point at a STALE APK path. canExecute() alone is insufficient (a
-        // dangling/stale link can still resolve or falsely report executable),
-        // so recreate whenever the link target doesn't match the CURRENT lib —
-        // same self-healing behavior as linkPackagedTool (letta-mobile-s1uis).
-        val gitLinkCurrent = runCatching { android.system.Os.readlink(gitLink.absolutePath) }.getOrNull()
-        if (gitLinkCurrent != gitLib.absolutePath || !gitLink.canExecute()) {
-            gitLink.delete()
-            try {
-                android.system.Os.symlink(gitLib.absolutePath, gitLink.absolutePath)
-            } catch (error: Exception) {
-                Log.w(TAG, "Failed to link git; local memfs disabled", error)
-                return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
-            }
         }
         // letta.js memory-git installs bash pre/post-commit hooks; the repo
         // lives on the noexec data partition (and Android has no bash), so
@@ -518,19 +500,23 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         authFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), root))
     }
 
-    private fun linkPackagedTool(binDirectory: File, commandName: String, libraryName: String, label: String) {
+    private fun linkPackagedTool(binDirectory: File, commandName: String, libraryName: String, label: String): Boolean {
         val library = File(context.applicationInfo.nativeLibraryDir, libraryName)
         if (!library.canExecute()) {
             Log.i(TAG, "$libraryName not packaged; $label unavailable")
-            return
+            return false
         }
         val link = File(binDirectory, commandName)
         val current = runCatching { android.system.Os.readlink(link.absolutePath) }.getOrNull()
         if (current != library.absolutePath || !link.canExecute()) {
             link.delete()
             runCatching { android.system.Os.symlink(library.absolutePath, link.absolutePath) }
-                .onFailure { error -> Log.w(TAG, "Failed to link $commandName; $label will be unavailable", error) }
+                .onFailure { error ->
+                    Log.w(TAG, "Failed to link $commandName; $label will be unavailable", error)
+                    return false
+                }
         }
+        return link.canExecute()
     }
 
     private fun TurnCommand.toWireLine(): String = when (val input = input) {
