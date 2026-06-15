@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
 import com.letta.mobile.runtime.actions.MobileActionRegistry
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
@@ -49,6 +50,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
     private val mobileActionRegistry: MobileActionRegistry,
     private val mobileIntentActionTool: MobileIntentActionTool,
     private val hardwareControlProvider: DeviceHardwareControlProvider,
+    private val deviceActionCommandRunner: DeviceActionCommandRunner,
 ) : AndroidNetworkBridge {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -65,6 +67,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
             mobileActionRegistry = mobileActionRegistry,
             mobileIntentActionTool = mobileIntentActionTool,
             hardwareControlTool = DeviceHardwareControlTool(hardwareControlProvider),
+            deviceActionCommandRunner = deviceActionCommandRunner,
         )
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
@@ -81,6 +84,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val mobileActionRegistry: MobileActionRegistry,
         private val mobileIntentActionTool: MobileIntentActionTool,
         private val hardwareControlTool: DeviceHardwareControlTool,
+        private val deviceActionCommandRunner: DeviceActionCommandRunner,
     ) {
         @Volatile private var closed = false
 
@@ -131,12 +135,22 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 method == "POST" && path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
                 method == "POST" && path == "/fetch" -> handleFetch(socket.outputStream, body)
                 method == "POST" && path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
+                method == "POST" && path == "/device/actions/command" -> handleDeviceActionCommand(socket.outputStream, body)
                 method == "GET" && path == "/device/mobile-actions/capabilities" -> handleMobileActionCapabilities(socket.outputStream)
                 method == "POST" && path == "/device/mobile-actions/execute" -> handleMobileActionExecute(socket.outputStream, body)
                 method == "POST" && path == "/device/mobile-actions/intent" -> handleMobileIntentAction(socket.outputStream, body)
                 method == "POST" && path.startsWith("/device/hardware/") -> handleHardwareControl(socket.outputStream, path, body)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
+        }
+
+        private fun handleDeviceActionCommand(output: OutputStream, body: String) {
+            val response = runCatching { json.parseToJsonElement(deviceActionCommandRunner.runJson(body)).jsonObject }
+                .getOrElse { error ->
+                    output.writeJsonResponse(500, errorBody("device_action_failed", error.message ?: "Device action command failed."))
+                    return
+                }
+            output.writeJsonResponse(200, response)
         }
 
         private fun handleMobileActionCapabilities(output: OutputStream) {

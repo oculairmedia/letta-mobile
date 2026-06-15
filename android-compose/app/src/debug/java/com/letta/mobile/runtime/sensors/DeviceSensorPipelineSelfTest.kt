@@ -150,9 +150,9 @@ object DeviceSensorPipelineSelfTest {
             artifact = preloadArtifact,
         )
         stages += stage(
-            id = "stage8.hardware_tool_transport_preload",
-            passed = preloadText.contains("set_flashlight") && preloadText.contains("/device/hardware/set_flashlight") && preloadText.contains("audio_status"),
-            details = "Embedded preload registers hardware control tools and routes to Android bridge endpoints.",
+            id = "stage8.device_action_tool_transport_preload",
+            passed = preloadText.contains("device_action") && preloadText.contains("/device/actions/command") && preloadText.contains("hardware.capabilities"),
+            details = "Embedded preload registers compact device_action tool and routes command payloads to the Android bridge endpoint.",
             artifact = preloadArtifact,
         )
 
