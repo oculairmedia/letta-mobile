@@ -81,6 +81,27 @@ class DeviceActionCommandRunnerTest {
     }
 
     @Test
+    fun `flashlight write command routes to hardware tool`() {
+        val result = Json.parseToJsonElement(
+            runner.runJson("""{"command":"hardware.flashlight","input":{"enabled":true}}""")
+        ).jsonObject
+
+        assertEquals("true", result["success"]!!.jsonPrimitive.content)
+        val payload = result["payload"]!!.jsonObject
+        assertEquals("set_flashlight", payload["tool"]!!.jsonPrimitive.content)
+        assertEquals("false", payload["supported"]!!.jsonPrimitive.content)
+        assertTrue(payload.containsKey("flashlight"))
+    }
+
+    @Test
+    fun `flashlight write command requires enabled input`() {
+        val result = Json.parseToJsonElement(runner.runJson("""{"command":"hardware.flashlight"}""")).jsonObject
+
+        assertEquals("false", result["success"]!!.jsonPrimitive.content)
+        assertEquals("invalid_input", result["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `hardware capabilities routes to hardware tool`() {
         val result = Json.parseToJsonElement(runner.runJson("""{"command":"hardware.capabilities"}""")).jsonObject
 
