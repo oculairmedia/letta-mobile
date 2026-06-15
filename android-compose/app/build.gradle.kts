@@ -394,6 +394,129 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .start()
         check(transform.waitFor() == 0) { "Unicode property escape transform for letta.js failed." }
 
+        // letta-mobile-nojhc: make custom OpenAI-compatible (lmstudio/*) models
+        // image-capable when they match a data-driven vision-model list. The
+        // embedded letta.js customOpenAICompatibleModel() hardcodes
+        // `input.modelId.includes("llava"|"vision"|"vl") ? ["text","image"] :
+        // ["text"]`, so a vision-capable custom model like MiniMax-M3 gets
+        // input:["text"] and the image is DROPPED before the provider request
+        // (model.input.includes("image") gate). This patch routes the
+        // capability through LETTA_CODE_VISION_MODEL_IDS (comma-separated,
+        // case-insensitive SUBSTRINGS — so "minimax" matches "MiniMax-M3"),
+        // mirroring the shim's LETTA_VISION_MODELS pattern so both surfaces
+        // stay consistent. Adding a vision model = one list entry, no code edit.
+        val visionFlagScript = npmWorkDir.resolve("patch-vision-model-input.mjs")
+        visionFlagScript.writeText(
+            """
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            let src = readFileSync(file, 'utf8');
+            const token = 'input: input.modelId.includes("llava") || input.modelId.includes("vision") || input.modelId.includes("vl") ? ["text", "image"] : ["text"],';
+            if (!src.includes(token)) {
+              throw new Error('patch-vision-model-input: customOpenAICompatibleModel input token not found — letta.js shape changed');
+            }
+            const replacement =
+              'input: ((() => { try { ' +
+              'const h = String(input.modelId || "").toLowerCase(); ' +
+              'const env = String(process.env.LETTA_CODE_VISION_MODEL_IDS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean); ' +
+              'if (env.some((p) => h.includes(p)) || /\\bvl\\b/.test(h) || h.includes("llava") || h.includes("vision")) return ["text", "image"]; ' +
+              '} catch {} return ["text"]; })()),';
+            src = src.replace(token, replacement);
+            writeFileSync(file, src);
+            console.log('[embedded-lettacode] patched customOpenAICompatibleModel for env-driven vision capability');
+            """.trimIndent(),
+        )
+        val visionFlag = ProcessBuilder(
+            "node",
+            visionFlagScript.absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(visionFlag.waitFor() == 0) { "Vision-model-input transform for letta.js failed." }
+
+        // letta-mobile-nojhc: letta.js's chat/completions image builder emits a
+        // NON-STANDARD camelCase `imageUrl: "data:..."` part. OpenAI-compatible
+        // providers (MiniMax, lmstudio, etc.) expect the standard
+        // `image_url: { url: "data:..." }` and reject the camelCase form
+        // ("invalid params, image_url is empty"), surfacing as the opaque
+        // "999 (1000)" turn error. Rewrite both camelCase emit sites to the
+        // standard shape so images actually reach the provider. PROVEN against
+        // the live :8082 proxy: standard shape → 200 + description; camelCase →
+        // bad_request "image_url is empty".
+        val imageUrlScript = npmWorkDir.resolve("patch-image-url-shape.mjs")
+        imageUrlScript.writeText(
+            """
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            let src = readFileSync(file, 'utf8');
+            // Whitespace-agnostic: convert every chat/completions camelCase
+            // image_url part into the OpenAI-standard
+            // type:"image_url", image_url:{ url: <data-url-template> }.
+            // Matches the data-URL template body without pinning indentation,
+            // so both emit sites convert regardless of minifier whitespace.
+            const re = /type:\s*"image_url",\s*imageUrl:\s*(`data:[^`]*`)/g;
+            let changed = 0;
+            src = src.replace(re, (_m, urlExpr) => {
+              changed++;
+              return 'type: "image_url", image_url: { url: ' + urlExpr + ' }';
+            });
+            if (changed === 0) {
+              throw new Error('patch-image-url-shape: no camelCase imageUrl tokens found — letta.js shape changed');
+            }
+            writeFileSync(file, src);
+            console.log('[embedded-lettacode] rewrote ' + changed + ' camelCase imageUrl -> standard image_url{url}');
+            """.trimIndent(),
+        )
+        val imageUrlFix = ProcessBuilder("node", imageUrlScript.absolutePath, lettaJs.absolutePath)
+            .directory(npmWorkDir).inheritIO().start()
+        check(imageUrlFix.waitFor() == 0) { "image_url-shape transform for letta.js failed." }
+
+        // letta-mobile-nojhc: neutralize letta.js's image-resize path on device.
+        // resizeImageIfNeeded() calls getImageDimensions() (sharp) + the magick
+        // CLI — neither loads on nodejs-mobile, so an image send would die with
+        // "999 (1000)" in failureMode:strict. The composer already downsamples
+        // client-side, so the resize is redundant — rewrite it to a passthrough.
+        val sharpBypassScript = npmWorkDir.resolve("bypass-image-resize.mjs")
+        sharpBypassScript.writeText(
+            """
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            let src = readFileSync(file, 'utf8');
+            const marker = 'async function resizeImageIfNeeded(buffer, inputMediaType) {';
+            const idx = src.indexOf(marker);
+            if (idx === -1) {
+              throw new Error('bypass-image-resize: resizeImageIfNeeded marker not found — letta.js shape changed');
+            }
+            let i = idx + marker.length;
+            let depth = 1;
+            while (i < src.length && depth > 0) {
+              const ch = src[i];
+              if (ch === '{') depth++;
+              else if (ch === '}') depth--;
+              i++;
+            }
+            if (depth !== 0) throw new Error('bypass-image-resize: unbalanced braces');
+            const replacement = marker +
+              '\n  // letta-mobile-nojhc: device passthrough, no sharp/magick.\n' +
+              '  return { data: buffer.toString("base64"), mediaType: inputMediaType, width: 0, height: 0, resized: false };\n}';
+            src = src.slice(0, idx) + replacement + src.slice(i);
+            writeFileSync(file, src);
+            console.log('[embedded-lettacode] bypassed resizeImageIfNeeded (sharp/magick) for on-device images');
+            """.trimIndent(),
+        )
+        val sharpBypass = ProcessBuilder(
+            "node",
+            sharpBypassScript.absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(sharpBypass.waitFor() == 0) { "Image-resize bypass transform for letta.js failed." }
+
+        // origin/main #478: keep tool-call groups intact during trimming.
         val toolGroupPatch = ProcessBuilder(
             "node",
             project.rootDir.parentFile.resolve("scripts/patch-embedded-letta-code-tool-groups.cjs").absolutePath,
@@ -688,9 +811,19 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                 globalThis.fetch.__androidBridgeOriginal = nativeFetch;
               }
               const originalLookup = dns.lookup;
+              // IP literals need no DNS — resolving them through the bridge adds
+              // an HTTP round-trip per request (e.g. every call to a LAN provider
+              // like 192.168.50.90). Short-circuit them locally.
+              const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}${'$'}/;
               function bridgeLookup(hostname, options, callback) {
                 if (typeof options === 'function') { callback = options; options = {}; }
                 const wantsAll = options && options.all === true;
+                if (typeof hostname === 'string' && (IPV4_RE.test(hostname) || hostname.indexOf(':') !== -1)) {
+                  const family = hostname.indexOf(':') !== -1 ? 6 : 4;
+                  if (wantsAll) { callback(null, [{ address: hostname, family }]); }
+                  else { callback(null, hostname, family); }
+                  return;
+                }
                 postJson('/dns/lookup', { hostname }).then((result) => {
                   const addresses = result.addresses || [];
                   if (wantsAll) {

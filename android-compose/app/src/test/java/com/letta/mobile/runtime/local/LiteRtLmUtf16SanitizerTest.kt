@@ -15,6 +15,14 @@ class LiteRtLmUtf16SanitizerTest {
     }
 
     @Test
+    fun `removes non-emoji supplementary-plane characters`() {
+        // 𝄞 (U+1D11E) is encoded as a surrogate pair.
+        val input = "music \uD834\uDD1E note"
+        val sanitized = sanitizeForLiteRt(input)
+        assertEquals("music  note", sanitized)
+    }
+
+    @Test
     fun `preserves BMP text unchanged`() {
         val input = "héllo \u2694\uFE0F 你好"  // ⚔️ with VS16
         val sanitized = sanitizeForLiteRt(input)
