@@ -5,6 +5,7 @@ import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
+import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -48,6 +49,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val onDeviceOpenAiBridge: OnDeviceOpenAiBridge,
     private val localBackendStore: LettaCodeLocalBackendStore,
     private val androidNetworkBridge: AndroidNetworkBridge,
+    private val deviceSensorGroundingWriter: DeviceSensorGroundingWriter? = null,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -79,6 +81,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 healDanglingToolCalls(command.agentId.value, phase = "pre-turn")
                 transcriptDirty = false
             }
+            writeDeviceSensorGrounding()
             var endedCleanly = false
             try {
                 withTimeout(TURN_TIMEOUT_MS) {
@@ -117,6 +120,17 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     // healthy turns do zero transcript I/O.
     @Volatile
     private var transcriptDirty: Boolean = false
+
+    private suspend fun writeDeviceSensorGrounding() {
+        val writer = deviceSensorGroundingWriter ?: return
+        runCatching { writer.writeSnapshot() }
+            .onSuccess { report ->
+                Log.d(TAG, "Device sensor grounding wrote ${report.bytes}B sensors=${report.sensorCount}")
+            }
+            .onFailure { error ->
+                Log.w(TAG, "Device sensor grounding failed", error)
+            }
+    }
 
     private suspend fun healDanglingToolCalls(agentId: String, phase: String) {
         runCatching { localBackendStore.healDanglingToolCalls(agentId) }
@@ -334,6 +348,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_BACKGROUND_DIR", backgroundDirectory.absolutePath)
                 put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
                 put("LETTA_ANDROID_NETWORK_BRIDGE_URL", androidNetworkBridgeBaseUrl)
+                deviceSensorGroundingWriter?.let {
+                    put("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH", it.outputFile.absolutePath)
+                }
                 put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
             },
             workingDirectory = workingDirectory,
