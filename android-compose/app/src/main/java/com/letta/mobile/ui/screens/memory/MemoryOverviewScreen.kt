@@ -58,6 +58,7 @@ import com.letta.mobile.data.memory.MemoryParitySection
 import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParityState
 import com.letta.mobile.data.memory.MemoryParitySummary
+import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
@@ -168,9 +169,7 @@ private fun MemoryOverviewHeader(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            text = state.memory.selectedAgentName?.let {
-                stringResource(R.string.screen_memory_subtitle_agent, it)
-            } ?: stringResource(R.string.screen_memory_subtitle_backend),
+            text = state.memory.scopeSubtitle,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
@@ -271,21 +270,19 @@ private fun MemorySummaryCard(summary: MemoryParitySummary) {
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                item { SummaryMetric(stringResource(R.string.screen_memory_skills_metric), summary.skillCount.toString()) }
-                item { SummaryMetric(stringResource(R.string.screen_memory_blocks_metric), summary.memoryBlockCount.toString()) }
-                item { SummaryMetric(stringResource(R.string.screen_memory_schedules_metric), summary.scheduleCount.toString()) }
-                item { SummaryMetric(stringResource(R.string.screen_memory_channels_metric), summary.channelCount.toString()) }
-                item { SummaryMetric(stringResource(R.string.screen_memory_context_metric), summary.contextUsageLabel) }
+                items(
+                    items = summary.metrics,
+                    key = { metric -> metric.kind.name },
+                ) { metric ->
+                    SummaryMetric(metric)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun SummaryMetric(
-    label: String,
-    value: String,
-) {
+private fun SummaryMetric(metric: MemorySummaryMetric) {
     Surface(
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
         shape = MaterialTheme.shapes.small,
@@ -295,7 +292,7 @@ private fun SummaryMetric(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = value,
+                text = metric.value,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -303,7 +300,7 @@ private fun SummaryMetric(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = label,
+                text = metric.label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

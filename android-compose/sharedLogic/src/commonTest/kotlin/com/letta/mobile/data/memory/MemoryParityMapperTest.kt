@@ -48,6 +48,7 @@ class MemoryParityMapperTest {
 
         assertEquals("agent-1", state.selectedAgentId)
         assertEquals("Ada", state.selectedAgentName)
+        assertEquals("Skills, memory, schedules, and channels for Ada.", state.scopeSubtitle)
         assertFalse(state.isEmpty)
         assertEquals(
             listOf(
@@ -64,6 +65,11 @@ class MemoryParityMapperTest {
         assertEquals(1, state.summary.channelCount)
         assertEquals(185, state.summary.totalMemoryTokens)
         assertEquals(512, state.summary.contextWindowUsed)
+        assertEquals(
+            listOf("Skills" to "1", "Blocks" to "1", "Schedules" to "1", "Channels" to "1", "Context" to "512 / 8000"),
+            state.summary.metrics.map { it.label to it.value },
+        )
+        assertEquals("5 nodes / 4 links", state.graph.summaryLabel)
         assertEquals(
             listOf(
                 "agent:agent-1",
@@ -192,6 +198,7 @@ class MemoryParityMapperTest {
         )
 
         assertEquals(null, state.selectedAgentId)
+        assertEquals("Skills, memory, schedules, and channels for the active backend.", state.scopeSubtitle)
         assertEquals(0, state.summary.skillCount)
         assertEquals(0, state.summary.memoryBlockCount)
         assertEquals(0, state.summary.scheduleCount)

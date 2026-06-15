@@ -19,6 +19,11 @@ data class MemoryParityState(
 ) {
     val isEmpty: Boolean
         get() = sections.all { it.items.isEmpty() }
+
+    val scopeSubtitle: String
+        get() = selectedAgentName
+            ?.let { "Skills, memory, schedules, and channels for $it." }
+            ?: "Skills, memory, schedules, and channels for the active backend."
 }
 
 @Immutable
@@ -31,13 +36,35 @@ data class MemoryParitySummary(
     val contextWindowUsed: Int? = null,
     val contextWindowLimit: Int? = null,
 ) {
-    val contextUsageLabel: String
-        get() = when {
-            contextWindowUsed != null && contextWindowLimit != null -> "$contextWindowUsed / $contextWindowLimit"
-            contextWindowUsed != null -> contextWindowUsed.toString()
-            totalMemoryTokens > 0 -> "$totalMemoryTokens tokens"
-            else -> "Not loaded"
-        }
+    val contextUsageLabel: String = when {
+        contextWindowUsed != null && contextWindowLimit != null -> "$contextWindowUsed / $contextWindowLimit"
+        contextWindowUsed != null -> contextWindowUsed.toString()
+        totalMemoryTokens > 0 -> "$totalMemoryTokens tokens"
+        else -> "Not loaded"
+    }
+
+    val metrics: List<MemorySummaryMetric> = listOf(
+        MemorySummaryMetric(MemorySummaryMetricKind.Skills, "Skills", skillCount.toString()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Blocks, "Blocks", memoryBlockCount.toString()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Schedules, "Schedules", scheduleCount.toString()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Channels, "Channels", channelCount.toString()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Context, "Context", contextUsageLabel),
+    )
+}
+
+@Immutable
+data class MemorySummaryMetric(
+    val kind: MemorySummaryMetricKind,
+    val label: String,
+    val value: String,
+)
+
+enum class MemorySummaryMetricKind {
+    Skills,
+    Blocks,
+    Schedules,
+    Channels,
+    Context,
 }
 
 @Immutable
@@ -63,6 +90,9 @@ data class MemoryParityGraph(
 ) {
     val isEmpty: Boolean
         get() = nodes.isEmpty()
+
+    val summaryLabel: String
+        get() = "${nodes.size} nodes / ${edges.size} links"
 }
 
 @Immutable

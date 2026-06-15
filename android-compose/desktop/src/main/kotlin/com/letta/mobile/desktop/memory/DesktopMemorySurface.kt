@@ -68,6 +68,8 @@ import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.MemoryParitySection
 import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParitySummary
+import com.letta.mobile.data.memory.MemorySummaryMetric
+import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.data.memory.MemoryTextLink
 import sh.calvin.autolinktext.SimpleTextMatchResult
 import sh.calvin.autolinktext.TextMatcher
@@ -147,9 +149,7 @@ private fun MemoryHeader(
                 ),
             )
             Text(
-                text = state.memory.selectedAgentName
-                    ?.let { "Skills, memory, schedules, and channels for $it." }
-                    ?: "Skills, memory, schedules, and channels for the active backend.",
+                text = state.memory.scopeSubtitle,
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -230,19 +230,19 @@ private fun MemorySummaryCard(summary: MemoryParitySummary) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            SummaryMetric("Skills", summary.skillCount.toString(), Modifier.weight(1f))
-            SummaryMetric("Blocks", summary.memoryBlockCount.toString(), Modifier.weight(1f))
-            SummaryMetric("Schedules", summary.scheduleCount.toString(), Modifier.weight(1f))
-            SummaryMetric("Channels", summary.channelCount.toString(), Modifier.weight(1f))
-            SummaryMetric("Context", summary.contextUsageLabel, Modifier.weight(1.2f))
+            summary.metrics.forEach { metric ->
+                SummaryMetric(
+                    metric = metric,
+                    modifier = Modifier.weight(if (metric.kind == MemorySummaryMetricKind.Context) 1.2f else 1f),
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun SummaryMetric(
-    label: String,
-    value: String,
+    metric: MemorySummaryMetric,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -250,13 +250,13 @@ private fun SummaryMetric(
         modifier = modifier,
     ) {
         Text(
-            text = value,
+            text = metric.value,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         Text(
-            text = label,
+            text = metric.label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
         )
@@ -349,8 +349,7 @@ private fun MemoryGraphPanel(graph: MemoryParityGraph) {
             )
 
             GraphLegend(
-                nodeCount = graph.nodes.size,
-                edgeCount = graph.edges.size,
+                summaryLabel = graph.summaryLabel,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(14.dp),
@@ -361,8 +360,7 @@ private fun MemoryGraphPanel(graph: MemoryParityGraph) {
 
 @Composable
 private fun GraphLegend(
-    nodeCount: Int,
-    edgeCount: Int,
+    summaryLabel: String,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -386,7 +384,7 @@ private fun GraphLegend(
                 ),
             )
             Text(
-                text = "$nodeCount nodes / $edgeCount links",
+                text = summaryLabel,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
             )
