@@ -54,6 +54,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
 ) : LocalRuntimeConversationSource, LocalRuntimeAgentSource {
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
     private val conversationHealer = LocalConversationHealer()
+    private val imageContextStripper = LocalImageContextStripper()
 
     val storageDirectory: File
         get() = File(context.filesDir, "embedded-lettacode/local-backend")
@@ -365,6 +366,21 @@ class LettaCodeLocalBackendStore @Inject constructor(
                 "messages.jsonl",
             )
             conversationHealer.healTranscript(transcript)
+        }
+
+    /**
+     * Strips heavy base64 image data from the agent's persisted default
+     * conversation, leaving a placeholder + `stripped: true` marker. Prevents
+     * already-sent images from re-bloating the context and re-sending every
+     * turn (letta-mobile-87itk). Idempotent; safe to call pre-turn.
+     */
+    suspend fun stripPersistedImageData(agentId: String): LocalImageContextStripper.StripReport =
+        withContext(Dispatchers.IO) {
+            val transcript = File(
+                File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
+                "messages.jsonl",
+            )
+            imageContextStripper.stripTranscript(transcript)
         }
 
     private fun JsonObject.stringField(key: String): String? =
