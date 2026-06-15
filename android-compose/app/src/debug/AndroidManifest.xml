@@ -12,6 +12,15 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".runtime.mobileactions.MobileIntentActionsSelfTestReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.letta.mobile.MOBILE_INTENT_ACTIONS_SELF_TEST" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".runtime.sensors.DeviceSensorSelfTestService"
             android:enabled="true"
