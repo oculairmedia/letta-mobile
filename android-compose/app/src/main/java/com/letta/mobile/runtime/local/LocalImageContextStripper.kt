@@ -107,6 +107,8 @@ class LocalImageContextStripper(
      */
     private fun isStrippableImage(part: Any?): Boolean {
         val p = part as? JsonObject ?: return false
+        // Only real image parts are strippable. A text placeholder (even one
+        // carrying an image_ref pointer) is already stripped → idempotent no-op.
         return p["type"]?.jsonStr() == "image"
     }
 
@@ -117,35 +119,49 @@ class LocalImageContextStripper(
     }
 
     /**
-     * Persist image bytes to the blob store and replace the sent image with an
-     * image_ref pointer. If blob store is unavailable or bytes can't be decoded,
-     * falls back to a TEXT placeholder (never crashes, never leaves empty image).
+     * Persist image bytes to the blob store and replace the sent image with a
+     * TEXT placeholder that CARRIES the blob ref as extra metadata fields.
      *
-     * STRICT-PROVIDER SAFETY: image_ref parts only live in persisted JSON and
-     * are resolved away before reaching the typed model or provider wire format.
-     * An image_ref must never become an empty image_url on the wire.
+     * CRITICAL (letta-mobile-xybm2 fix): the embedded letta.js runtime OWNS
+     * messages.jsonl and REPLAYS it to the provider on every turn. So whatever
+     * part type we leave on disk is what letta.js sends. An {type:"image_ref"}
+     * part is unknown to letta.js — its chat/completions image builder reads
+     * `item.mimeType` (undefined) and emits `data:undefined;base64,...`, which a
+     * strict provider rejects ("image data url media type undefined", code 2013).
+     *
+     * THEREFORE the on-disk replacement MUST be a plain {type:"text"} part that
+     * letta.js can send harmlessly. We attach the rehydration pointer as EXTRA
+     * fields (image_ref, mediaType) on that text part: letta.js ignores unknown
+     * fields and only forwards `text`, while the mobile timeline resolver reads
+     * image_ref to restore the image for the UI. Falls back to a bare text
+     * placeholder if the blob store is unavailable or bytes can't be decoded.
      */
     private fun strippedImage(p: JsonObject): JsonObject {
         val mediaType = p["mimeType"]?.jsonStr()
             ?: (p["source"] as? JsonObject)?.get("media_type")?.jsonStr()
             ?: "image"
 
-        // Try to persist to blob store and emit image_ref
+        // Persist to blob store; embed the ref in the text placeholder's metadata.
         blobStore?.let { store ->
             val imageBytes = extractImageBytes(p)
             if (imageBytes != null) {
                 val ref = runCatching { store.putBytes(mediaType, imageBytes) }.getOrNull()
                 if (ref != null) {
                     return buildJsonObject {
-                        put("type", JsonPrimitive("image_ref"))
-                        put("ref", JsonPrimitive(ref))
+                        put("type", JsonPrimitive("text"))
+                        put("text", JsonPrimitive("[image omitted from context: $mediaType]"))
+                        put("stripped", JsonPrimitive(true))
+                        // Rehydration pointer — letta.js ignores these extra
+                        // fields and only sends `text`; the mobile resolver
+                        // reads image_ref to restore the image for the UI.
+                        put("image_ref", JsonPrimitive(ref))
                         put("mediaType", JsonPrimitive(mediaType))
                     }
                 }
             }
         }
 
-        // Fallback: text placeholder (existing behavior)
+        // Fallback: bare text placeholder (existing behavior, no rehydration).
         return buildJsonObject {
             put("type", JsonPrimitive("text"))
             put("text", JsonPrimitive("[image omitted from context: $mediaType]"))

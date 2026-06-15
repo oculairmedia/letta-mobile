@@ -402,12 +402,18 @@ class LettaCodeLocalBackendStore @Inject constructor(
      * is missing (never crashes, never produces empty image).
      */
     private fun resolveImageRef(part: JsonObject, blobStore: LocalImageBlobStore): JsonObject {
-        if (part["type"]?.jsonPrimitive?.content != "image_ref") return part
-        val ref = part["ref"]?.jsonPrimitive?.content ?: return unavailableImagePlaceholder()
+        // The on-disk rehydration pointer is a TEXT placeholder carrying an
+        // "image_ref" metadata field (NOT a type:"image_ref" part — letta.js
+        // replays messages.jsonl to the provider and would mangle an unknown
+        // image part into data:undefined → strict-provider 2013). Detect the
+        // text-part-with-image_ref and restore the original image for the UI.
+        val ref = part["image_ref"]?.jsonPrimitive?.content ?: return part
         val mediaType = part["mediaType"]?.jsonPrimitive?.content ?: "image/jpeg"
         val bytes = blobStore.getBytes(ref) ?: return unavailableImagePlaceholder()
         val base64Data = Base64.getEncoder().encodeToString(bytes)
-        // Reconstruct flat image shape (matching what existing code expects)
+        // Reconstruct the flat image shape letta.js persists/reads on disk
+        // ({type:image, mimeType, data}) so downstream typed mapping produces a
+        // normal image attachment with no model/timeline changes.
         return buildJsonObject {
             put("type", JsonPrimitive("image"))
             put("mimeType", JsonPrimitive(mediaType))

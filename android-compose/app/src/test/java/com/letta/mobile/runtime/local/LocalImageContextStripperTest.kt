@@ -246,14 +246,20 @@ class LocalImageContextStripperTest {
         val all = rows(file)
         assertEquals(2, all.size)
 
-        // Older image should become image_ref
+        // Older image becomes a TEXT placeholder carrying an image_ref pointer
+        // (NOT a type:image_ref part — letta.js replays this file to the
+        // provider and must only ever see a sendable text part).
         val olderParts = all[0]["content"]!!.jsonArray.map { it.jsonObject }
-        val imageRefPart = olderParts.find { it["type"]?.jsonPrimitive?.content == "image_ref" }
-        assertNotNull("older image should become image_ref", imageRefPart)
-        val ref = imageRefPart!!["ref"]?.jsonPrimitive?.content
-        assertNotNull("image_ref should have a ref field", ref)
+        val imageRefPart = olderParts.find {
+            it["type"]?.jsonPrimitive?.content == "text" && it["image_ref"] != null
+        }
+        assertNotNull("older image should become text placeholder with image_ref", imageRefPart)
+        val ref = imageRefPart!!["image_ref"]?.jsonPrimitive?.content
+        assertNotNull("placeholder should carry an image_ref field", ref)
         assertTrue("ref should start with sha256:", ref!!.startsWith("sha256:"))
         assertEquals("image/jpeg", imageRefPart["mediaType"]?.jsonPrimitive?.content)
+        // strict-provider safety: it is a text part, never an image part.
+        assertEquals("text", imageRefPart["type"]?.jsonPrimitive?.content)
 
         // Blob should exist in store
         assertTrue("blob should exist in store", blobStore.has(ref))
@@ -308,9 +314,8 @@ class LocalImageContextStripperTest {
         assertEquals("true", placeholderPart!!["stripped"]?.jsonPrimitive?.content)
         assertTrue("text should mention image", placeholderPart["text"]?.jsonPrimitive?.content?.contains("image") == true)
 
-        // Should NOT have image_ref
-        val imageRefPart = olderParts.find { it["type"]?.jsonPrimitive?.content == "image_ref" }
-        assertTrue("should not have image_ref when blobStore is null", imageRefPart == null)
+        // With no blob store, the placeholder carries NO image_ref pointer.
+        assertTrue("should not carry image_ref when blobStore is null", placeholderPart["image_ref"] == null)
     }
 
     @Test
@@ -327,11 +332,13 @@ class LocalImageContextStripperTest {
 
         val all = rows(file)
         val olderParts = all[0]["content"]!!.jsonArray.map { it.jsonObject }
-        val imageRefPart = olderParts.find { it["type"]?.jsonPrimitive?.content == "image_ref" }
-        assertNotNull("nested image should become image_ref", imageRefPart)
+        val imageRefPart = olderParts.find {
+            it["type"]?.jsonPrimitive?.content == "text" && it["image_ref"] != null
+        }
+        assertNotNull("nested image should become text placeholder with image_ref", imageRefPart)
         assertEquals("image/png", imageRefPart!!["mediaType"]?.jsonPrimitive?.content)
 
-        val ref = imageRefPart["ref"]?.jsonPrimitive?.content
+        val ref = imageRefPart["image_ref"]?.jsonPrimitive?.content
         assertTrue("blob should be retrievable", blobStore.has(ref!!))
     }
 

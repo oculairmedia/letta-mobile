@@ -11,6 +11,7 @@ import java.io.File
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -114,8 +115,9 @@ class LettaCodeLocalBackendStoreTest {
         val imageBytes = "test image content".toByteArray()
         val ref = blobStore.putBytes("image/png", imageBytes)
 
-        // Write transcript with text and image_ref
-        val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"look at this"},{"type":"image_ref","ref":"$ref","mediaType":"image/png"}]}"""
+        // Write transcript with a text placeholder carrying an image_ref pointer
+        // (the on-disk rehydration shape — a text part letta.js can safely send).
+        val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"look at this"},{"type":"text","text":"[image omitted from context: image/png]","stripped":true,"image_ref":"$ref","mediaType":"image/png"}]}"""
         File(conversationDir, "messages.jsonl").writeText(imageRefRow + "\n")
 
         val messages = store().readTranscript(agentId)
@@ -136,8 +138,8 @@ class LettaCodeLocalBackendStoreTest {
         val conversationDir = File(temp.root, "embedded-lettacode/local-backend/conversations/$key")
         conversationDir.mkdirs()
 
-        // Write transcript with text and image_ref pointing to non-existent blob
-        val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"missing image"},{"type":"image_ref","ref":"sha256:nonexistent","mediaType":"image/png"}]}"""
+        // Text placeholder carrying an image_ref pointing to a non-existent blob.
+        val imageRefRow = """{"id":"u1","role":"user","content":[{"type":"text","text":"missing image"},{"type":"text","text":"[image omitted from context: image/png]","stripped":true,"image_ref":"sha256:nonexistent","mediaType":"image/png"}]}"""
         File(conversationDir, "messages.jsonl").writeText(imageRefRow + "\n")
 
         // Should not crash
@@ -207,9 +209,10 @@ class LettaCodeLocalBackendStoreTest {
         val blobFiles = blobsDir.listFiles() ?: emptyArray()
         assertTrue("at least one blob should exist", blobFiles.isNotEmpty())
 
-        // Verify transcript contains image_ref
+        // Verify transcript carries the image_ref pointer on a TEXT part (the
+        // on-disk shape letta.js can safely send — never a type:image_ref).
         val content = transcript.readText()
-        assertTrue("transcript should contain image_ref", content.contains("\"type\":\"image_ref\""))
-        assertTrue("transcript should contain sha256 ref", content.contains("\"ref\":\"sha256:"))
+        assertFalse("must NOT persist a type:image_ref part", content.contains("\"type\":\"image_ref\""))
+        assertTrue("transcript should carry an image_ref pointer field", content.contains("\"image_ref\":\"sha256:"))
     }
 }
