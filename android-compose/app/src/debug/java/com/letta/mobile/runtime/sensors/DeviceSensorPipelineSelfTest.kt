@@ -1,6 +1,9 @@
 package com.letta.mobile.runtime.sensors
 
 import android.content.Context
+import com.letta.mobile.runtime.actions.AndroidMobileActionCapabilityProvider
+import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
+import com.letta.mobile.runtime.actions.MobileActionRegistry
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -14,6 +17,7 @@ import kotlinx.serialization.json.putJsonArray
 
 object DeviceSensorPipelineSelfTest {
     const val REPORT_FILE = "device-sensor-pipeline-report.json"
+    const val ACTION_CAPABILITY_MATRIX_FILE = "mobile-action-capability-matrix.json"
 
     private val json = Json { encodeDefaults = true; explicitNulls = false; prettyPrint = true }
 
@@ -72,16 +76,32 @@ object DeviceSensorPipelineSelfTest {
             artifact = readToolOut.name,
         )
 
+        val actionMatrixOut = File(filesDir, ACTION_CAPABILITY_MATRIX_FILE)
+        val actionRegistry = MobileActionRegistry(
+            providers = setOf(AndroidMobileActionCapabilityProvider(context.applicationContext)),
+            handlers = emptySet(),
+            auditSink = InMemoryMobileActionAuditSink(),
+        )
+        actionMatrixOut.writeText(json.encodeToString(actionRegistry.matrix()))
+        val actionMatrixPayload = runCatching { json.parseToJsonElement(actionMatrixOut.readText()).jsonObject }.getOrNull()
+        stages += stage(
+            id = "stage5.mobile_action_capability_matrix",
+            passed = actionMatrixPayload?.get("platform")?.jsonPrimitive?.content == "android" &&
+                actionRegistry.matrix().capabilities.isNotEmpty(),
+            details = "Wrote ${actionRegistry.matrix().capabilities.size} mobile action capability descriptors for future tools.",
+            artifact = actionMatrixOut.name,
+        )
+
         val preload = File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
         val preloadText = runCatching { preload.readText() }.getOrDefault("")
         stages += stage(
-            id = "stage5.passive_transport_preload",
+            id = "stage6.passive_transport_preload",
             passed = preloadText.contains("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH") && preloadText.contains("Device context:"),
             details = "Embedded preload includes device grounding file transport and Device context injection.",
             artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
         )
         stages += stage(
-            id = "stage6.active_tool_transport_preload",
+            id = "stage7.active_tool_transport_preload",
             passed = preloadText.contains("read_sensors") && preloadText.contains("/device/sensors/read") && preloadText.contains("@letta/externalTools"),
             details = "Embedded preload registers read_sensors external tool and routes to Android bridge endpoint.",
             artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
@@ -96,6 +116,7 @@ object DeviceSensorPipelineSelfTest {
                 snapshotOut.name,
                 groundingOut.name,
                 readToolOut.name,
+                actionMatrixOut.name,
                 REPORT_FILE,
             ),
         )

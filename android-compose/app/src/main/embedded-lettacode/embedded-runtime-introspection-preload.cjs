@@ -6,9 +6,46 @@ const modulePromise = import('./letta-mobile-runtime-introspection/runtime-intro
 const EXTERNAL_TOOLS_KEY = Symbol.for('@letta/externalTools');
 const EXTERNAL_EXECUTOR_KEY = Symbol.for('@letta/externalToolExecutor');
 
-function registerReadSensorsTool() {
+function getExternalToolRegistry() {
   const registry = globalThis[EXTERNAL_TOOLS_KEY] || new Map();
-  registry.set('read_sensors', {
+  globalThis[EXTERNAL_TOOLS_KEY] = registry;
+  return registry;
+}
+
+function registerAndroidBridgeTool(tool, route) {
+  const registry = getExternalToolRegistry();
+  registry.set(tool.name, tool);
+
+  const previousExecutor = globalThis[EXTERNAL_EXECUTOR_KEY];
+  globalThis[EXTERNAL_EXECUTOR_KEY] = async function(toolCallId, toolName, input) {
+    if (toolName !== tool.name) {
+      if (typeof previousExecutor === 'function') return previousExecutor(toolCallId, toolName, input);
+      return { isError: true, content: [{ type: 'text', text: `External tool not handled: ${toolName}` }] };
+    }
+    const bridge = process.env.LETTA_ANDROID_NETWORK_BRIDGE_URL;
+    if (!bridge) {
+      return { isError: true, content: [{ type: 'text', text: 'Android bridge unavailable: LETTA_ANDROID_NETWORK_BRIDGE_URL is not set.' }] };
+    }
+    try {
+      const response = await fetch(`${bridge}${route}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input || {})
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        return { isError: true, content: [{ type: 'text', text: `${tool.name} failed (${response.status}): ${text}` }] };
+      }
+      return { isError: false, content: [{ type: 'text', text }] };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { isError: true, content: [{ type: 'text', text: `${tool.name} bridge error: ${message}` }] };
+    }
+  };
+}
+
+function registerReadSensorsTool() {
+  registerAndroidBridgeTool({
     name: 'read_sensors',
     description: 'Read no-permission device context from the Android device: battery, thermal state, memory, storage, network, display when available, and the available sensor catalog.',
     parameters: {
@@ -32,35 +69,7 @@ function registerReadSensorsTool() {
       },
       additionalProperties: false
     }
-  });
-  globalThis[EXTERNAL_TOOLS_KEY] = registry;
-
-  const previousExecutor = globalThis[EXTERNAL_EXECUTOR_KEY];
-  globalThis[EXTERNAL_EXECUTOR_KEY] = async function(toolCallId, toolName, input) {
-    if (toolName !== 'read_sensors') {
-      if (typeof previousExecutor === 'function') return previousExecutor(toolCallId, toolName, input);
-      return { isError: true, content: [{ type: 'text', text: `External tool not handled: ${toolName}` }] };
-    }
-    const bridge = process.env.LETTA_ANDROID_NETWORK_BRIDGE_URL;
-    if (!bridge) {
-      return { isError: true, content: [{ type: 'text', text: 'Android bridge unavailable: LETTA_ANDROID_NETWORK_BRIDGE_URL is not set.' }] };
-    }
-    try {
-      const response = await fetch(`${bridge}/device/sensors/read`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(input || {})
-      });
-      const text = await response.text();
-      if (!response.ok) {
-        return { isError: true, content: [{ type: 'text', text: `read_sensors failed (${response.status}): ${text}` }] };
-      }
-      return { isError: false, content: [{ type: 'text', text }] };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { isError: true, content: [{ type: 'text', text: `read_sensors bridge error: ${message}` }] };
-    }
-  };
+  }, '/device/sensors/read');
 }
 
 registerReadSensorsTool();

@@ -1,5 +1,7 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
+import com.letta.mobile.runtime.actions.MobileActionRegistry
 import com.letta.mobile.runtime.sensors.BatterySnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
@@ -23,7 +25,8 @@ class AndroidNetworkBridgeReadSensorsTest {
         val bridge = LocalAndroidNetworkBridge(
             sensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
                 override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = sampleSnapshot(nowMillis)
-            }
+            },
+            mobileActionRegistry = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink()),
         )
 
         bridge.start().use { session ->
