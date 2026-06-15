@@ -1,5 +1,18 @@
 package com.letta.mobile.runtime.local
 
+import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.runtime.actions.DeviceActionCommandRunner
+import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
+import com.letta.mobile.runtime.actions.MobileActionRegistry
+import com.letta.mobile.runtime.hardware.AudioStatus
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
+import com.letta.mobile.runtime.hardware.FlashlightCapability
+import com.letta.mobile.runtime.hardware.HardwareCapabilities
+import com.letta.mobile.runtime.hardware.HardwareControlResponse
+import com.letta.mobile.runtime.hardware.HardwareControlStatus
+import com.letta.mobile.runtime.hardware.VibrationCapability
+import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.BatterySnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
@@ -16,14 +29,23 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
 class AndroidNetworkBridgeReadSensorsTest {
     @Test
     fun `device sensors endpoint returns read_sensors response`() {
         val bridge = LocalAndroidNetworkBridge(
             sensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
                 override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = sampleSnapshot(nowMillis)
-            }
+            },
+            mobileActionRegistry = mobileActionRegistry(),
+            mobileIntentActionTool = mobileIntentTool(),
+            hardwareControlProvider = fakeHardwareProvider(),
+            deviceActionCommandRunner = commandRunner(),
         )
 
         bridge.start().use { session ->
@@ -33,6 +55,54 @@ class AndroidNetworkBridgeReadSensorsTest {
             assertEquals("summary", obj["mode"]!!.jsonPrimitive.content)
             assertEquals("1", obj["sensorCount"]!!.jsonPrimitive.content)
             assertTrue(obj["summary"]!!.jsonPrimitive.content.contains("sensors=1"))
+        }
+    }
+
+    @Test
+    fun `mobile action endpoint returns truthful dry-run response`() {
+        val bridge = LocalAndroidNetworkBridge(
+            sensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
+                override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = sampleSnapshot(nowMillis)
+            },
+            mobileActionRegistry = mobileActionRegistry(),
+            mobileIntentActionTool = mobileIntentTool(),
+            hardwareControlProvider = fakeHardwareProvider(),
+            deviceActionCommandRunner = commandRunner(),
+        )
+
+        bridge.start().use { session ->
+            val response = post(
+                session.baseUrl,
+                "/device/mobile-actions/intent",
+                "{\"tool\":\"compose_email\",\"to\":\"ada@example.com\",\"subject\":\"Hi\",\"body\":\"Body\",\"dryRun\":true}",
+            )
+            val body = response.substringAfter("\r\n\r\n")
+            val obj = Json.parseToJsonElement(body).jsonObject
+            assertEquals("compose_email", obj["tool"]!!.jsonPrimitive.content)
+            assertTrue(obj["status"]!!.jsonPrimitive.content in setOf("resolved", "not_resolved"))
+            assertEquals("true", obj["userActionRequired"]!!.jsonPrimitive.content)
+            assertEquals("false", obj["launched"]!!.jsonPrimitive.content)
+            assertEquals("android.intent.action.SENDTO", obj["intent"]!!.jsonObject["action"]!!.jsonPrimitive.content)
+        }
+    }
+
+    @Test
+    fun `device action command endpoint returns command envelope`() {
+        val bridge = LocalAndroidNetworkBridge(
+            sensorSnapshotProvider = sensorProvider(),
+            mobileActionRegistry = mobileActionRegistry(),
+            mobileIntentActionTool = mobileIntentTool(),
+            hardwareControlProvider = fakeHardwareProvider(),
+            deviceActionCommandRunner = commandRunner(),
+        )
+
+        bridge.start().use { session ->
+            val response = post(session.baseUrl, "/device/actions/command", "{\"command\":\"sensors.summary\"}")
+            val body = response.substringAfter("\r\n\r\n")
+            val obj = Json.parseToJsonElement(body).jsonObject
+            assertEquals("sensors.summary", obj["command"]!!.jsonPrimitive.content)
+            assertEquals("true", obj["success"]!!.jsonPrimitive.content)
+            assertEquals("summary", obj["payload"]!!.jsonObject["mode"]!!.jsonPrimitive.content)
         }
     }
 
@@ -53,6 +123,41 @@ class AndroidNetworkBridgeReadSensorsTest {
             out.flush()
             return socket.getInputStream().bufferedReader().use { it.readText() }
         }
+    }
+
+    private fun sensorProvider(): DeviceSensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
+        override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = sampleSnapshot(nowMillis)
+    }
+
+    private fun mobileActionRegistry(): MobileActionRegistry =
+        MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink())
+
+    private fun mobileIntentTool(): MobileIntentActionTool =
+        MobileIntentActionTool(ApplicationProvider.getApplicationContext())
+
+    private fun commandRunner(): DeviceActionCommandRunner = DeviceActionCommandRunner(
+        sensorReadTool = com.letta.mobile.runtime.sensors.DeviceSensorReadTool(sensorProvider()),
+        mobileActionRegistry = mobileActionRegistry(),
+        mobileIntentActionTool = mobileIntentTool(),
+        hardwareControlTool = DeviceHardwareControlTool(fakeHardwareProvider()),
+    )
+
+    private fun fakeHardwareProvider(): DeviceHardwareControlProvider = object : DeviceHardwareControlProvider {
+        private val caps = HardwareCapabilities(
+            flashlight = FlashlightCapability(HardwareControlStatus.UnsupportedHardware, false, reason = "test"),
+            vibration = VibrationCapability(HardwareControlStatus.UnsupportedHardware, false, reason = "test"),
+            audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test"),
+        )
+
+        override fun capabilities(): HardwareCapabilities = caps
+        override fun setFlashlight(enabled: Boolean, dryRun: Boolean): HardwareControlResponse =
+            HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)
+        override fun vibrate(durationMs: Long?, patternMs: List<Long>?): HardwareControlResponse =
+            HardwareControlResponse("vibrate", HardwareControlStatus.UnsupportedHardware, false, "test")
+        override fun readAudioStatus(): HardwareControlResponse =
+            HardwareControlResponse("audio_status", HardwareControlStatus.Available, true, "test", audio = caps.audio)
+        override fun adjustMusicVolume(delta: Int?, level: Int?): HardwareControlResponse =
+            HardwareControlResponse("adjust_music_volume", HardwareControlStatus.Success, true, "test", audio = caps.audio)
     }
 
     private fun sampleSnapshot(now: Long): DeviceSensorSnapshot = DeviceSensorSnapshot(

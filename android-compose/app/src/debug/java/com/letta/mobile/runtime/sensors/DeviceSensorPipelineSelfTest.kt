@@ -1,6 +1,12 @@
 package com.letta.mobile.runtime.sensors
 
 import android.content.Context
+import com.letta.mobile.runtime.actions.AndroidMobileActionCapabilityProvider
+import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
+import com.letta.mobile.runtime.actions.MobileActionRegistry
+import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
+import com.letta.mobile.runtime.hardware.HardwareControlStatus
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -14,6 +20,7 @@ import kotlinx.serialization.json.putJsonArray
 
 object DeviceSensorPipelineSelfTest {
     const val REPORT_FILE = "device-sensor-pipeline-report.json"
+    const val ACTION_CAPABILITY_MATRIX_FILE = "mobile-action-capability-matrix.json"
 
     private val json = Json { encodeDefaults = true; explicitNulls = false; prettyPrint = true }
 
@@ -72,19 +79,81 @@ object DeviceSensorPipelineSelfTest {
             artifact = readToolOut.name,
         )
 
-        val preload = File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
-        val preloadText = runCatching { preload.readText() }.getOrDefault("")
+        val actionMatrixOut = File(filesDir, ACTION_CAPABILITY_MATRIX_FILE)
+        val actionRegistry = MobileActionRegistry(
+            providers = setOf(AndroidMobileActionCapabilityProvider(context.applicationContext)),
+            handlers = emptySet(),
+            auditSink = InMemoryMobileActionAuditSink(),
+        )
+        actionMatrixOut.writeText(json.encodeToString(actionRegistry.matrix()))
+        val actionMatrixPayload = runCatching { json.parseToJsonElement(actionMatrixOut.readText()).jsonObject }.getOrNull()
         stages += stage(
-            id = "stage5.passive_transport_preload",
-            passed = preloadText.contains("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH") && preloadText.contains("Device context:"),
-            details = "Embedded preload includes device grounding file transport and Device context injection.",
-            artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
+            id = "stage5.mobile_action_capability_matrix",
+            passed = actionMatrixPayload?.get("platform")?.jsonPrimitive?.content == "android" &&
+                actionRegistry.matrix().capabilities.isNotEmpty(),
+            details = "Wrote ${actionRegistry.matrix().capabilities.size} mobile action capability descriptors for future tools.",
+            artifact = actionMatrixOut.name,
+        )
+
+        val hardwareToolOut = File(filesDir, DeviceSensorSelfTestActivity.HARDWARE_CONTROLS_OUTPUT_FILE)
+        val hardwareTool = DeviceHardwareControlTool(AndroidDeviceHardwareControlProvider(context.applicationContext))
+        val capabilitiesText = hardwareTool.capabilitiesJson()
+        val vibrationText = hardwareTool.vibrateJson(buildJsonObject { put("durationMs", 100) })
+        val flashlightProbeText = hardwareTool.setFlashlightJson(
+            buildJsonObject {
+                put("enabled", false)
+                put("dryRun", true)
+            }
+        )
+        hardwareToolOut.writeText(
+            """{"capabilities":$capabilitiesText,"vibration":$vibrationText,"flashlightProbe":$flashlightProbeText}"""
+        )
+        val vibrationPayload = runCatching { json.parseToJsonElement(vibrationText).jsonObject }.getOrNull()
+        val flashlightPayload = runCatching { json.parseToJsonElement(flashlightProbeText).jsonObject }.getOrNull()
+        val safeVibration = vibrationPayload?.get("status")?.jsonPrimitive?.content in setOf(
+            HardwareControlStatus.Success.name,
+            HardwareControlStatus.UnsupportedHardware.name,
+            HardwareControlStatus.BlockedByAndroidPolicy.name,
+        )
+        val dryRunFlashlight = flashlightPayload?.get("status")?.jsonPrimitive?.content in setOf(
+            HardwareControlStatus.DryRun.name,
+            HardwareControlStatus.UnsupportedHardware.name,
+            HardwareControlStatus.NotAvailable.name,
+            HardwareControlStatus.BlockedByAndroidPolicy.name,
         )
         stages += stage(
-            id = "stage6.active_tool_transport_preload",
+            id = "stage6.hardware_controls_safe_probe",
+            passed = safeVibration && dryRunFlashlight,
+            details = "Hardware controls probed; vibration status=${vibrationPayload?.get("status")?.jsonPrimitive?.content}, flashlight status=${flashlightPayload?.get("status")?.jsonPrimitive?.content}.",
+            artifact = hardwareToolOut.name,
+        )
+
+        val preloadArtifact = "letta-code/nodejs-project/embedded-runtime-introspection-preload.cjs"
+        val preloadText = runCatching {
+            context.assets.open(preloadArtifact).bufferedReader().use { it.readText() }
+        }.getOrElse {
+            File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
+                .takeIf { file -> file.isFile }
+                ?.readText()
+                .orEmpty()
+        }
+        stages += stage(
+            id = "stage6.passive_transport_preload",
+            passed = preloadText.contains("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH") && preloadText.contains("Device context:"),
+            details = "Embedded packaged preload includes device grounding file transport and Device context injection.",
+            artifact = preloadArtifact,
+        )
+        stages += stage(
+            id = "stage7.active_tool_transport_preload",
             passed = preloadText.contains("read_sensors") && preloadText.contains("/device/sensors/read") && preloadText.contains("@letta/externalTools"),
             details = "Embedded preload registers read_sensors external tool and routes to Android bridge endpoint.",
-            artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
+            artifact = preloadArtifact,
+        )
+        stages += stage(
+            id = "stage8.device_action_tool_transport_preload",
+            passed = preloadText.contains("device_action") && preloadText.contains("/device/actions/command") && preloadText.contains("hardware.capabilities"),
+            details = "Embedded preload registers compact device_action tool and routes command payloads to the Android bridge endpoint.",
+            artifact = preloadArtifact,
         )
 
         val report = PipelineSelfTestReport(
@@ -96,6 +165,8 @@ object DeviceSensorPipelineSelfTest {
                 snapshotOut.name,
                 groundingOut.name,
                 readToolOut.name,
+                actionMatrixOut.name,
+                hardwareToolOut.name,
                 REPORT_FILE,
             ),
         )
