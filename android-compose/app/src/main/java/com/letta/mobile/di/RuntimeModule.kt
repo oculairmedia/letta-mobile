@@ -27,6 +27,9 @@ import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
+import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
 import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.MemFsStore
@@ -38,6 +41,7 @@ import com.letta.mobile.runtime.actions.MobileActionCapabilityProvider
 import com.letta.mobile.runtime.actions.MobileExternalToolHandler
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
+import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
 import android.content.Context
 import dagger.Module
@@ -77,6 +81,22 @@ object RuntimeModule {
     fun provideDeviceSensorSnapshotProvider(
         @ApplicationContext context: Context,
     ): DeviceSensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context)
+
+    @Provides
+    @Singleton
+    fun provideDeviceHardwareControlProvider(
+        @ApplicationContext context: Context,
+    ): DeviceHardwareControlProvider = AndroidDeviceHardwareControlProvider(context)
+
+    @Provides
+    @Singleton
+    fun provideDeviceSensorReadTool(provider: DeviceSensorSnapshotProvider): DeviceSensorReadTool =
+        DeviceSensorReadTool(provider)
+
+    @Provides
+    @Singleton
+    fun provideDeviceHardwareControlTool(provider: DeviceHardwareControlProvider): DeviceHardwareControlTool =
+        DeviceHardwareControlTool(provider)
 
     @Provides
     @Singleton
