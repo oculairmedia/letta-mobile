@@ -21,11 +21,13 @@ class DeviceSensorReadTool(
                 mode = mode,
                 summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
                 sensorCount = snapshot.sensorCount,
+                gatedCapabilities = snapshot.gatedCapabilities,
             )
             "catalog" -> ReadSensorsToolResponse(
                 mode = mode,
                 summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
                 sensorCount = snapshot.sensorCount,
+                gatedCapabilities = snapshot.gatedCapabilities,
                 sensors = snapshot.sensors.filterSensors(query).take(limit),
                 truncated = snapshot.sensors.filterSensors(query).size > limit,
             )
@@ -35,6 +37,7 @@ class DeviceSensorReadTool(
                     mode = mode,
                     summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
                     sensorCount = snapshot.sensorCount,
+                    gatedCapabilities = snapshot.gatedCapabilities,
                     sensors = matching,
                     truncated = snapshot.sensors.filterSensors(query).size > limit,
                 )
@@ -43,6 +46,7 @@ class DeviceSensorReadTool(
                 mode = mode,
                 summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
                 sensorCount = snapshot.sensorCount,
+                gatedCapabilities = snapshot.gatedCapabilities,
                 snapshot = snapshot.copy(sensors = snapshot.sensors.take(limit)),
                 truncated = snapshot.sensors.size > limit,
             )
@@ -50,6 +54,7 @@ class DeviceSensorReadTool(
                 mode = mode,
                 summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
                 sensorCount = snapshot.sensorCount,
+                gatedCapabilities = snapshot.gatedCapabilities,
                 error = "Unsupported mode '$mode'. Use summary, catalog, sensor, or snapshot.",
             )
         }
@@ -84,6 +89,7 @@ data class ReadSensorsToolResponse(
     val mode: String,
     val summary: String,
     val sensorCount: Int,
+    val gatedCapabilities: List<DeviceSensorGatedCapability> = emptyList(),
     val sensors: List<SensorDescriptor>? = null,
     val snapshot: DeviceSensorSnapshot? = null,
     val truncated: Boolean = false,
