@@ -128,25 +128,32 @@ object DeviceSensorPipelineSelfTest {
             artifact = hardwareToolOut.name,
         )
 
-        val preload = File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
-        val preloadText = runCatching { preload.readText() }.getOrDefault("")
+        val preloadArtifact = "letta-code/nodejs-project/embedded-runtime-introspection-preload.cjs"
+        val preloadText = runCatching {
+            context.assets.open(preloadArtifact).bufferedReader().use { it.readText() }
+        }.getOrElse {
+            File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
+                .takeIf { file -> file.isFile }
+                ?.readText()
+                .orEmpty()
+        }
         stages += stage(
             id = "stage6.passive_transport_preload",
             passed = preloadText.contains("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH") && preloadText.contains("Device context:"),
-            details = "Embedded preload includes device grounding file transport and Device context injection.",
-            artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
+            details = "Embedded packaged preload includes device grounding file transport and Device context injection.",
+            artifact = preloadArtifact,
         )
         stages += stage(
             id = "stage7.active_tool_transport_preload",
             passed = preloadText.contains("read_sensors") && preloadText.contains("/device/sensors/read") && preloadText.contains("@letta/externalTools"),
             details = "Embedded preload registers read_sensors external tool and routes to Android bridge endpoint.",
-            artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
+            artifact = preloadArtifact,
         )
         stages += stage(
             id = "stage8.hardware_tool_transport_preload",
             passed = preloadText.contains("set_flashlight") && preloadText.contains("/device/hardware/set_flashlight") && preloadText.contains("audio_status"),
             details = "Embedded preload registers hardware control tools and routes to Android bridge endpoints.",
-            artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
+            artifact = preloadArtifact,
         )
 
         val report = PipelineSelfTestReport(
