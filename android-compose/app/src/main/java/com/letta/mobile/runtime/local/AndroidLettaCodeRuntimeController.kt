@@ -229,6 +229,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                         modelSelection = modelSelection,
                         onDeviceProviderBaseUrl = modelSelection.customProviderBaseUrl ?: bridgeSession?.baseUrl,
                         androidNetworkBridgeBaseUrl = networkBridgeSession.baseUrl,
+                        androidNetworkBridgeToken = networkBridgeSession.authToken,
                     )
                 ).getOrThrow()
             } catch (error: Throwable) {
@@ -248,6 +249,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         modelSelection: EmbeddedLettaCodeModelSelection,
         onDeviceProviderBaseUrl: String? = null,
         androidNetworkBridgeBaseUrl: String,
+        androidNetworkBridgeToken: String,
     ): LettaCodeNodeStartRequest {
         workingDirectory.mkdirs()
         storageDirectory.mkdirs()
@@ -348,6 +350,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_BACKGROUND_DIR", backgroundDirectory.absolutePath)
                 put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
                 put("LETTA_ANDROID_NETWORK_BRIDGE_URL", androidNetworkBridgeBaseUrl)
+                put("LETTA_ANDROID_NETWORK_BRIDGE_TOKEN", androidNetworkBridgeToken)
                 deviceSensorGroundingWriter?.let {
                     put("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH", it.outputFile.absolutePath)
                 }

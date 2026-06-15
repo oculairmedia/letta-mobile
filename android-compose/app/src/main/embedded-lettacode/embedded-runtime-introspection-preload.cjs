@@ -15,10 +15,14 @@ async function postAndroidBridge(path, input, toolName) {
   if (!bridge) {
     return { isError: true, content: [{ type: 'text', text: 'Android bridge unavailable: LETTA_ANDROID_NETWORK_BRIDGE_URL is not set.' }] };
   }
+  const token = process.env.LETTA_ANDROID_NETWORK_BRIDGE_TOKEN;
+  if (!token) {
+    return { isError: true, content: [{ type: 'text', text: 'Android bridge unavailable: LETTA_ANDROID_NETWORK_BRIDGE_TOKEN is not set.' }] };
+  }
   try {
     const response = await fetch(`${bridge}${path}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
       body: JSON.stringify(input || {})
     });
     const text = await response.text();

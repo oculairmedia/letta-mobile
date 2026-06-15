@@ -49,7 +49,7 @@ class AndroidNetworkBridgeReadSensorsTest {
         )
 
         bridge.start().use { session ->
-            val response = post(session.baseUrl, "/device/sensors/read", "{\"mode\":\"summary\"}")
+            val response = post(session.baseUrl, session.authToken, "/device/sensors/read", "{\"mode\":\"summary\"}")
             val body = response.substringAfter("\r\n\r\n")
             val obj = Json.parseToJsonElement(body).jsonObject
             assertEquals("summary", obj["mode"]!!.jsonPrimitive.content)
@@ -73,6 +73,7 @@ class AndroidNetworkBridgeReadSensorsTest {
         bridge.start().use { session ->
             val response = post(
                 session.baseUrl,
+                session.authToken,
                 "/device/mobile-actions/intent",
                 "{\"tool\":\"compose_email\",\"to\":\"ada@example.com\",\"subject\":\"Hi\",\"body\":\"Body\",\"dryRun\":true}",
             )
@@ -97,7 +98,7 @@ class AndroidNetworkBridgeReadSensorsTest {
         )
 
         bridge.start().use { session ->
-            val response = post(session.baseUrl, "/device/actions/command", "{\"command\":\"sensors.summary\"}")
+            val response = post(session.baseUrl, session.authToken, "/device/actions/command", "{\"command\":\"sensors.summary\"}")
             val body = response.substringAfter("\r\n\r\n")
             val obj = Json.parseToJsonElement(body).jsonObject
             assertEquals("sensors.summary", obj["command"]!!.jsonPrimitive.content)
@@ -106,7 +107,25 @@ class AndroidNetworkBridgeReadSensorsTest {
         }
     }
 
-    private fun post(baseUrl: String, path: String, body: String): String {
+    @Test
+    fun `bridge rejects missing and wrong auth token`() {
+        val bridge = LocalAndroidNetworkBridge(
+            sensorSnapshotProvider = sensorProvider(),
+            mobileActionRegistry = mobileActionRegistry(),
+            mobileIntentActionTool = mobileIntentTool(),
+            hardwareControlProvider = fakeHardwareProvider(),
+            deviceActionCommandRunner = commandRunner(),
+        )
+
+        bridge.start().use { session ->
+            val missing = post(session.baseUrl, null, "/device/actions/command", "{\"command\":\"sensors.summary\"}")
+            val wrong = post(session.baseUrl, "wrong-token", "/device/actions/command", "{\"command\":\"sensors.summary\"}")
+            assertTrue(missing.startsWith("HTTP/1.1 401"))
+            assertTrue(wrong.startsWith("HTTP/1.1 401"))
+        }
+    }
+
+    private fun post(baseUrl: String, authToken: String?, path: String, body: String): String {
         val uri = java.net.URI(baseUrl)
         Socket(uri.host, uri.port).use { socket ->
             val bytes = body.toByteArray(Charsets.UTF_8)
@@ -114,6 +133,7 @@ class AndroidNetworkBridgeReadSensorsTest {
                 append("POST $path HTTP/1.1\r\n")
                 append("Host: ${uri.host}:${uri.port}\r\n")
                 append("Content-Type: application/json\r\n")
+                authToken?.let { append("Authorization: Bearer $it\r\n") }
                 append("Content-Length: ${bytes.size}\r\n")
                 append("Connection: close\r\n\r\n")
             }
