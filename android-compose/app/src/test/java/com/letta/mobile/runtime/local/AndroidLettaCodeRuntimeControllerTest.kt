@@ -1,6 +1,8 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.BackendId
@@ -14,8 +16,11 @@ import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.flow.MutableSharedFlow
+import io.mockk.mockkStatic
+import java.io.File
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -120,6 +125,30 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
+    fun `on-device bridge token is injected as lmstudio api key`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val modelFile = File.createTempFile("model", ".litertlm").apply { deleteOnExit() }
+        val baseDir = requireNotNull(modelFile.parentFile)
+        val nodeBridge = FakeNodeBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = FakeOnDeviceBridge(),
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        runCatching { controller.submit(command(), config(localModelPath = modelFile.absolutePath)).first() }
+
+        assertEquals("http://127.0.0.1:2/v1", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"))
+        assertEquals("openai-loopback-token", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_API_KEY"))
+    }
+
+    @Test
     fun `model selection normalizes config defaults and handles`() {
         val selection = EmbeddedLettaCodeModelSelection.from(
             LettaConfig(
@@ -184,6 +213,29 @@ class AndroidLettaCodeRuntimeControllerTest {
         )
     )
 
+    private class FakeAssetExtractor(private val baseDir: File) : EmbeddedLettaCodeAssetExtractor(mockk(relaxed = true)) {
+        override suspend fun prepare(): PreparedLettaCodeProject {
+            val projectDir = File(baseDir, "nodejs-project").apply { mkdirs() }
+            val entrypoint = File(projectDir, "letta.js").apply { writeText("") }
+            return PreparedLettaCodeProject(
+                projectDir = projectDir,
+                entrypoint = entrypoint,
+                workingDirectory = File(baseDir, "workdir"),
+                storageDirectory = File(baseDir, "storage"),
+                homeDirectory = File(baseDir, "home"),
+            )
+        }
+    }
+
+    private class FakeOnDeviceBridge : OnDeviceOpenAiBridge {
+        override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
+            OnDeviceOpenAiBridgeSession(
+                baseUrl = "http://127.0.0.1:2/v1",
+                authToken = "openai-loopback-token",
+                closeAction = {},
+            )
+    }
+
     private class FakeAndroidNetworkBridge : AndroidNetworkBridge {
         override fun start(): AndroidNetworkBridgeSession = AndroidNetworkBridgeSession(
             baseUrl = "http://127.0.0.1:1",
@@ -193,11 +245,13 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     private class FakeNodeBridge : LettaCodeNodeBridge {
-        override val outputLines = MutableSharedFlow<String>()
+        override val outputLines = flowOf("""{"type":"result"}""")
         var started = false
+        var lastRequest: LettaCodeNodeStartRequest? = null
 
         override suspend fun start(request: LettaCodeNodeStartRequest): Result<Unit> {
             started = true
+            lastRequest = request
             return Result.success(Unit)
         }
 
