@@ -11,6 +11,7 @@ import java.io.File
 import java.util.Base64
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -26,12 +27,16 @@ class LettaCodeLocalBackendStoreTest {
         return LettaCodeLocalBackendStore(context)
     }
 
-    private fun writeTranscript(agentId: String, vararg rows: String) {
+    private fun transcriptFile(agentId: String): File {
         val key = Base64.getUrlEncoder().withoutPadding()
             .encodeToString("default:$agentId".toByteArray(Charsets.UTF_8))
         val dir = File(temp.root, "embedded-lettacode/local-backend/conversations/$key")
         dir.mkdirs()
-        File(dir, "messages.jsonl").writeText(rows.joinToString("\n") + "\n")
+        return File(dir, "messages.jsonl")
+    }
+
+    private fun writeTranscript(agentId: String, vararg rows: String) {
+        transcriptFile(agentId).writeText(rows.joinToString("\n") + "\n")
     }
 
     // pi-ai rows as letta.js writes them: tool call as an assistant content
@@ -97,5 +102,42 @@ class LettaCodeLocalBackendStoreTest {
         assertEquals("hi\n", results.getValue("call_1").body)
         assertEquals(false, results.getValue("call_1").isError)
         assertEquals(true, results.getValue("call_2").isError)
+    }
+
+    @Test
+    fun `stripPersistedImagePayloads replaces base64 image content with compact metadata`() = runTest {
+        val rawBase64 = "A".repeat(1_200)
+        writeTranscript(
+            "agent-4",
+            """{"id":"m1","role":"user","content":[{"type":"text","text":"describe this"},{"type":"image","mimeType":"image/png","data":"$rawBase64"}]}""",
+        )
+
+        store().stripPersistedImagePayloads("agent-4")
+
+        val persisted = transcriptFile("agent-4").readText()
+        assertFalse(persisted.contains(rawBase64))
+        assertFalse(persisted.contains("\"data\""))
+        assertTrue(persisted.length < rawBase64.length)
+        assertTrue(persisted.contains("image omitted from persisted history"))
+        assertTrue(persisted.contains("\"omitted\": true"))
+        assertTrue(persisted.contains("\"media_type\": \"image/png\""))
+        assertTrue(persisted.contains("\"approx_bytes\": 900"))
+    }
+
+    @Test
+    fun `stripPersistedImagePayloads replaces data image urls in persisted text`() = runTest {
+        val rawBase64 = "AQIDBAUGBwgJCgsMDQ4PEA=="
+        writeTranscript(
+            "agent-5",
+            """{"id":"m1","role":"user","content":[{"type":"text","text":"inline data:image/jpeg;base64,$rawBase64 done"}]}""",
+        )
+
+        store().stripPersistedImagePayloads("agent-5")
+
+        val persisted = transcriptFile("agent-5").readText()
+        assertFalse(persisted.contains(rawBase64))
+        assertFalse(persisted.contains("data:image/jpeg;base64"))
+        assertTrue(persisted.contains("inline [image omitted from persisted history: image/jpeg"))
+        assertTrue(persisted.contains(" done"))
     }
 }

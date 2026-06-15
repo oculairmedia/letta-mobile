@@ -16,15 +16,18 @@ import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -366,6 +369,203 @@ class LettaCodeLocalBackendStore @Inject constructor(
             )
             conversationHealer.healTranscript(transcript)
         }
+
+    /**
+     * Rewrites letta.js's persisted transcript so historical image payloads do
+     * not bloat context replay. This runs only after a turn has been submitted
+     * to letta.js, so live in-flight model input still receives the full image.
+     */
+    suspend fun stripPersistedImagePayloads(agentId: String) = withContext(Dispatchers.IO) {
+        val transcript = File(
+            File(File(storageDirectory, "conversations"), base64Url("default:$agentId")),
+            "messages.jsonl",
+        )
+        if (!transcript.isFile) return@withContext
+        val lines = transcript.readLines()
+        var changed = false
+        val stripped = lines.map { line ->
+            if (line.isBlank()) return@map line
+            val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+                ?: return@map line
+            val scrubbed = row.stripImagePayloads()
+            if (scrubbed !== row) {
+                changed = true
+                json.encodeToString(JsonObject.serializer(), scrubbed)
+            } else {
+                line
+            }
+        }
+        if (changed) {
+            transcript.writeText(stripped.joinToString("\n") + "\n")
+        }
+    }
+
+    private fun JsonObject.stripImagePayloads(): JsonObject {
+        var changed = false
+        val scrubbed = buildJsonObject {
+            this@stripImagePayloads.forEach { (key, value) ->
+                val replacement = when (key) {
+                    "content" -> value.stripContentPayloads()
+                    else -> value
+                }
+                if (replacement !== value) changed = true
+                put(key, replacement)
+            }
+        }
+        return if (changed) scrubbed else this
+    }
+
+    private fun JsonElement.stripContentPayloads(): JsonElement = when (this) {
+        is JsonArray -> {
+            var changed = false
+            val scrubbed = JsonArray(map { part ->
+                val replacement = (part as? JsonObject)?.stripImagePart() ?: part
+                if (replacement !== part) changed = true
+                replacement
+            })
+            if (changed) scrubbed else this
+        }
+        is JsonPrimitive -> {
+            val text = contentOrNull ?: return this
+            val stripped = replaceDataImageUrls(text)
+            if (stripped == text) this else JsonPrimitive(stripped)
+        }
+        else -> this
+    }
+
+    private fun JsonObject.stripImagePart(): JsonElement {
+        if (stringField("type") == "text") {
+            val text = stringField("text") ?: return this
+            val stripped = replaceDataImageUrls(text)
+            if (stripped != text) {
+                return buildJsonObject {
+                    this@stripImagePart.forEach { (key, value) ->
+                        put(key, if (key == "text") JsonPrimitive(stripped) else value)
+                    }
+                }
+            }
+            return this
+        }
+        if (stringField("type") == "image") {
+            stringField("data")?.takeIf { looksLikeBase64Payload(it) }?.let { data ->
+                return imagePlaceholderTextPart(
+                    mediaType = stringField("mimeType") ?: stringField("media_type"),
+                    base64 = data,
+                )
+            }
+            val source = this["source"] as? JsonObject
+            if (source?.stringField("type") == "base64") {
+                val data = source.stringField("data")
+                if (data != null && looksLikeBase64Payload(data)) {
+                    return imagePlaceholderTextPart(mediaType = source.stringField("media_type"), base64 = data)
+                }
+            }
+        }
+        if (stringField("type") == "image_url") {
+            val url = ((this["image_url"] as? JsonObject)?.stringField("url")) ?: stringField("url")
+            val dataUrl = parseImageDataUrl(url)
+            if (dataUrl != null) return imagePlaceholderTextPart(dataUrl.mediaType, dataUrl.base64)
+        }
+        return this
+    }
+
+    private fun imagePlaceholderTextPart(mediaType: String?, base64: String): JsonObject {
+        val metadata = omittedImageMetadata(mediaType, base64)
+        val summary = "[image omitted from persisted history: " +
+            "${metadata.mediaType}, approx ${metadata.approxBytes} bytes, sha256=${metadata.sha256Prefix}]"
+        return buildJsonObject {
+            put("type", "text")
+            put("text", summary)
+            put("omitted_image", buildJsonObject {
+                put("omitted", true)
+                put("media_type", metadata.mediaType)
+                put("approx_bytes", metadata.approxBytes)
+                put("sha256", metadata.sha256Prefix)
+                put("base64_chars", base64.length)
+            })
+        }
+    }
+
+    private data class OmittedImageMetadata(
+        val mediaType: String,
+        val approxBytes: Int,
+        val sha256Prefix: String,
+    )
+
+    private data class ImageDataUrl(val mediaType: String, val base64: String)
+
+    private fun omittedImageMetadata(mediaType: String?, base64: String): OmittedImageMetadata = OmittedImageMetadata(
+        mediaType = mediaType?.takeIf { it.isNotBlank() } ?: "image/unknown",
+        approxBytes = approximateBase64Bytes(base64),
+        sha256Prefix = sha256Prefix(base64),
+    )
+
+    private fun parseImageDataUrl(value: String?): ImageDataUrl? {
+        val text = value ?: return null
+        if (!text.startsWith("data:image/", ignoreCase = true)) return null
+        val separator = ";base64,"
+        val separatorIndex = text.indexOf(separator, ignoreCase = true)
+        if (separatorIndex <= "data:".length) return null
+        val mediaType = text.substring("data:".length, separatorIndex)
+        val base64 = text.substring(separatorIndex + separator.length)
+        if (base64.isBlank() || !looksLikeBase64Payload(base64)) return null
+        return ImageDataUrl(mediaType, base64)
+    }
+
+    private fun replaceDataImageUrls(text: String): String {
+        var cursor = 0
+        val out = StringBuilder()
+        var changed = false
+        while (cursor < text.length) {
+            val start = text.indexOf("data:image/", cursor, ignoreCase = true)
+            if (start < 0) {
+                out.append(text.substring(cursor))
+                break
+            }
+            val marker = text.indexOf(";base64,", start, ignoreCase = true)
+            if (marker < 0) {
+                out.append(text.substring(cursor))
+                break
+            }
+            var end = marker + ";base64,".length
+            while (end < text.length && isBase64Char(text[end])) end++
+            val parsed = parseImageDataUrl(text.substring(start, end))
+            if (parsed == null) {
+                out.append(text.substring(cursor, end))
+                cursor = end
+                continue
+            }
+            val metadata = omittedImageMetadata(parsed.mediaType, parsed.base64)
+            out.append(text.substring(cursor, start))
+            out.append("[image omitted from persisted history: ")
+            out.append(metadata.mediaType)
+            out.append(", approx ")
+            out.append(metadata.approxBytes)
+            out.append(" bytes, sha256=")
+            out.append(metadata.sha256Prefix)
+            out.append("]")
+            cursor = end
+            changed = true
+        }
+        return if (changed) out.toString() else text
+    }
+
+    private fun looksLikeBase64Payload(value: String): Boolean = value.isNotBlank() && value.all(::isBase64Char)
+
+    private fun isBase64Char(char: Char): Boolean =
+        char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' ||
+            char == '+' || char == '/' || char == '=' || char == '-' || char == '_'
+
+    private fun approximateBase64Bytes(base64: String): Int {
+        val cleanLength = base64.count { it != '\n' && it != '\r' && it != ' ' && it != '\t' }
+        val padding = base64.takeLast(2).count { it == '=' }
+        return ((cleanLength * 3) / 4 - padding).coerceAtLeast(0)
+    }
+
+    private fun sha256Prefix(value: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray(Charsets.UTF_8))
+        .take(6)
+        .joinToString("") { byte -> byte.toUByte().toString(16).padStart(2, '0') }
 
     private fun JsonObject.stringField(key: String): String? =
         this[key]?.jsonPrimitive?.takeIf { it.isString }?.content

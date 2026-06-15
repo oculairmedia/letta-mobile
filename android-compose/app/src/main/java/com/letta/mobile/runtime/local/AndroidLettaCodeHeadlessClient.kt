@@ -35,8 +35,11 @@ class AndroidLettaCodeHeadlessClient @Inject constructor(
                     is RuntimeEventPayload.ToolReturnObserved ->
                         pendingToolCallIds -= payload.toolCallId.value
                     is RuntimeEventPayload.RunLifecycleChanged ->
-                        if (payload.status.isTerminal && pendingToolCallIds.isNotEmpty()) {
-                            emitStoredToolReturns(command, pendingToolCallIds)
+                        if (payload.status.isTerminal) {
+                            if (pendingToolCallIds.isNotEmpty()) {
+                                emitStoredToolReturns(command, pendingToolCallIds)
+                            }
+                            localBackendStore.stripPersistedImagePayloads(command.agentId.value)
                         }
                     else -> Unit
                 }
