@@ -1,3 +1,5 @@
+'use strict';
+
 const fs = require('fs');
 const modulePromise = import('./letta-mobile-runtime-introspection/runtime-introspection.js');
 

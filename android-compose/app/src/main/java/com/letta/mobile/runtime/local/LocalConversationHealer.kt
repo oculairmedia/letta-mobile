@@ -52,30 +52,156 @@ class LocalConversationHealer(
     data class HealReport(
         val orphanCallIds: List<String>,
         val rowsAppended: Int,
+        val orphanResultIds: List<String> = emptyList(),
+        val rowsRemoved: Int = 0,
     ) {
-        val healed: Boolean get() = rowsAppended > 0
+        val healed: Boolean get() = rowsAppended > 0 || rowsRemoved > 0
     }
 
     /**
      * Heals the transcript file in place. Returns a report of what was settled.
-     * No-op (rowsAppended = 0) when the file is missing or already well-formed.
+     * No-op when the file is missing or already well-formed. Two corruption
+     * directions are handled:
+     *  1. DANGLING tool CALL — an assistant `toolCall` with no matching
+     *     `toolResult`. Settled by appending a synthetic interrupted result.
+     *     (Anthropic: "tool_use ids without tool_result".)
+     *  2. ORPHANED tool RESULT — a `toolResult` row whose `toolCallId` has NO
+     *     preceding `toolCall`. Removed, because a strict OpenAI-shaped provider
+     *     rejects it: "Messages with role 'tool' must be a response to a
+     *     preceding message with 'tool_calls'" (letta-mobile-5spje). This shows
+     *     up on GPT-5.x / OpenAI-compatible providers where the dangling-CALL
+     *     direction alone is insufficient.
      */
     fun healTranscript(transcript: File): HealReport {
         if (!transcript.isFile) return HealReport(emptyList(), 0)
         val lines = transcript.readLines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return HealReport(emptyList(), 0)
 
-        val rows = lines.mapNotNull { line ->
-            runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+        // Parse each line EXACTLY ONCE. All passes below operate on this single
+        // parsed list — a transcript can be megabytes (image-bearing turns), so
+        // re-parsing per pass on the turn hot path was a real regression.
+        val parsed: List<Pair<String, JsonObject?>> = lines.map { line ->
+            line to runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
         }
 
-        val orphans = findOrphanToolCalls(rows)
-        if (orphans.isEmpty()) return HealReport(emptyList(), 0)
+        // ── Cheap detection pass (no allocation of new lists): decide whether
+        //    anything needs healing BEFORE doing any O(n) rewrite of a possibly
+        //    huge file. Most turns are well-formed and must pay ~one scan only.
+        val declaredCallIds = HashSet<String>()
+        val callIdToName = HashMap<String, String>()
+        var hasStaleHealRow = false
+        for ((_, row) in parsed) {
+            row ?: continue
+            if (row.stringField("role") == "assistant") {
+                (row["content"] as? JsonArray)?.forEach { part ->
+                    val p = part as? JsonObject ?: return@forEach
+                    if (p.stringField("type") == "toolCall") {
+                        p.stringField("id")?.let { id ->
+                            declaredCallIds += id
+                            callIdToName[id] = p.stringField("name") ?: "unknown"
+                        }
+                    }
+                }
+            } else if (row.stringField("role") == "toolResult" &&
+                row.stringField("id").orEmpty().startsWith("heal-")
+            ) {
+                hasStaleHealRow = true
+            }
+        }
+        // toolResult ids present, and orphans (no declaring call).
+        val resultCallIds = HashSet<String>()
+        val orphanResultIds = HashSet<String>()
+        for ((_, row) in parsed) {
+            row ?: continue
+            if (row.stringField("role") != "toolResult") continue
+            val cid = row.stringField("toolCallId") ?: continue
+            resultCallIds += cid
+            if (cid !in declaredCallIds) orphanResultIds += cid
+        }
+        val danglingCallIds = declaredCallIds.filter { it !in resultCallIds }
 
-        val syntheticRows = orphans.map { orphan -> syntheticToolResultRow(orphan) }
-        val newLines = lines + syntheticRows.map { json.encodeToString(JsonObject.serializer(), it) }
-        atomicWrite(transcript, newLines.joinToString("\n") + "\n")
-        return HealReport(orphans.map { it.callId }, syntheticRows.size)
+        if (!hasStaleHealRow && orphanResultIds.isEmpty() && danglingCallIds.isEmpty()) {
+            // Well-formed: O(n) scan only, no rewrite. The common fast path.
+            return HealReport(emptyList(), 0)
+        }
+
+        // ── Repair (only reached when there is real corruption). Build the
+        //    output in one pass over the already-parsed rows.
+        // Strip stale "heal-" rows + truly-orphaned results; recompute which
+        // calls become dangling once a stale heal row is removed.
+        val keptParsed = parsed.filter { (_, row) ->
+            row ?: return@filter true
+            val role = row.stringField("role")
+            if (role != "toolResult") return@filter true
+            val id = row.stringField("id").orEmpty()
+            val cid = row.stringField("toolCallId")
+            if (id.startsWith("heal-")) return@filter false      // strip stale heal rows
+            if (cid != null && cid in orphanResultIds) return@filter false // drop orphan results
+            true
+        }
+        // After stripping, recompute dangling calls (a removed heal/result row
+        // re-surfaces its call as dangling → to be re-inserted in position).
+        val keptResultIds = HashSet<String>()
+        for ((_, row) in keptParsed) {
+            if (row?.stringField("role") == "toolResult") {
+                row.stringField("toolCallId")?.let(keptResultIds::add)
+            }
+        }
+        val finalDangling = declaredCallIds.filter { it !in keptResultIds }
+        val callIdToSynthetic: Map<String, JsonObject> = finalDangling.associateWith { callId ->
+            syntheticToolResultRow(OrphanToolCall(callId, callIdToName[callId] ?: "unknown"))
+        }
+
+        val rebuilt = ArrayList<String>(keptParsed.size + callIdToSynthetic.size)
+        for ((line, row) in keptParsed) {
+            rebuilt += line
+            if (row?.stringField("role") != "assistant") continue
+            (row["content"] as? JsonArray)?.forEach { part ->
+                val p = part as? JsonObject ?: return@forEach
+                if (p.stringField("type") != "toolCall") return@forEach
+                val callId = p.stringField("id") ?: return@forEach
+                callIdToSynthetic[callId]?.let { rebuilt += json.encodeToString(JsonObject.serializer(), it) }
+            }
+        }
+
+        val newContent = rebuilt.joinToString("\n") + "\n"
+        if (newContent == lines.joinToString("\n") + "\n") {
+            return HealReport(emptyList(), 0) // byte-identical → true no-op
+        }
+
+        atomicWrite(transcript, newContent)
+        return HealReport(
+            orphanCallIds = finalDangling,
+            rowsAppended = callIdToSynthetic.size,
+            orphanResultIds = orphanResultIds.toList(),
+            rowsRemoved = lines.size - keptParsed.size,
+        )
+    }
+
+    /**
+     * Pure detection: `toolResult` rows whose `toolCallId` has NO `toolCall`
+     * with that id anywhere in the transcript. These orphaned results make a
+     * strict OpenAI-shaped provider 400 ("role 'tool' must be a response to a
+     * preceding message with 'tool_calls'") on every replay.
+     */
+    internal fun findOrphanToolResultIds(rows: List<JsonObject>): Set<String> {
+        val declaredCallIds = mutableSetOf<String>()
+        for (row in rows) {
+            if (row.stringField("role") != "assistant") continue
+            val parts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            for (part in parts) {
+                if (part.stringField("type") == "toolCall") {
+                    part.stringField("id")?.let(declaredCallIds::add)
+                }
+            }
+        }
+        val orphans = mutableSetOf<String>()
+        for (row in rows) {
+            if (row.stringField("role") != "toolResult") continue
+            val callId = row.stringField("toolCallId") ?: continue
+            if (callId !in declaredCallIds) orphans += callId
+        }
+        return orphans
     }
 
     /**
