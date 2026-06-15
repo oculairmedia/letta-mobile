@@ -37,6 +37,7 @@ class DeviceSensorSelfTestActivity : Activity() {
 
     companion object {
         const val READ_SENSORS_OUTPUT_FILE = "device-sensor-read-tool.json"
+        const val HARDWARE_CONTROLS_OUTPUT_FILE = "device-hardware-controls-self-test.json"
         private const val TAG = "DeviceSensorSelfTest"
     }
 }

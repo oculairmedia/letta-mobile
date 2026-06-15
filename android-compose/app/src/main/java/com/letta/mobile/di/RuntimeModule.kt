@@ -27,12 +27,21 @@ import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
+import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
 import com.letta.mobile.runtime.local.modelcatalog.AssetEmbeddedModelRepository
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeEventOutbox
+import com.letta.mobile.runtime.actions.AndroidMobileActionCapabilityProvider
+import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
+import com.letta.mobile.runtime.actions.MobileActionAuditSink
+import com.letta.mobile.runtime.actions.MobileActionCapabilityProvider
+import com.letta.mobile.runtime.actions.MobileExternalToolHandler
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
+import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
 import android.content.Context
 import dagger.Module
@@ -40,6 +49,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoSet
 import java.io.File
 import javax.inject.Singleton
@@ -74,6 +84,22 @@ object RuntimeModule {
 
     @Provides
     @Singleton
+    fun provideDeviceHardwareControlProvider(
+        @ApplicationContext context: Context,
+    ): DeviceHardwareControlProvider = AndroidDeviceHardwareControlProvider(context)
+
+    @Provides
+    @Singleton
+    fun provideDeviceSensorReadTool(provider: DeviceSensorSnapshotProvider): DeviceSensorReadTool =
+        DeviceSensorReadTool(provider)
+
+    @Provides
+    @Singleton
+    fun provideDeviceHardwareControlTool(provider: DeviceHardwareControlProvider): DeviceHardwareControlTool =
+        DeviceHardwareControlTool(provider)
+
+    @Provides
+    @Singleton
     fun provideDeviceSensorGroundingWriter(
         @ApplicationContext context: Context,
         provider: DeviceSensorSnapshotProvider,
@@ -93,6 +119,22 @@ object RuntimeModule {
     @Provides
     @Singleton
     fun provideAndroidNetworkBridge(bridge: LocalAndroidNetworkBridge): AndroidNetworkBridge = bridge
+
+    @Provides
+    @Singleton
+    fun provideMobileActionAuditSink(): MobileActionAuditSink = InMemoryMobileActionAuditSink()
+
+    @Provides
+    @IntoSet
+    @Singleton
+    fun provideAndroidMobileActionCapabilityProvider(
+        @ApplicationContext context: Context,
+    ): MobileActionCapabilityProvider = AndroidMobileActionCapabilityProvider(context)
+
+    @Provides
+    @ElementsIntoSet
+    @Singleton
+    fun provideMobileExternalToolHandlers(): Set<MobileExternalToolHandler> = emptySet()
 
     @Provides
     @Singleton
