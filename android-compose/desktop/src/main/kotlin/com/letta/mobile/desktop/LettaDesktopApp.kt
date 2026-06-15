@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
@@ -67,6 +68,9 @@ import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.memory.DesktopMemoryController
 import com.letta.mobile.desktop.memory.DesktopMemorySurface
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
+import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
+import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
+import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
@@ -113,6 +117,13 @@ fun LettaDesktopApp() {
         )
     }
     val memoryState by memoryController.state.collectAsState()
+    val scheduleLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
+        DesktopScheduleLibraryController(
+            sessionGraphProvider = dataBindings.sessionGraphProvider,
+            scope = chatScope,
+        )
+    }
+    val scheduleLibraryState by scheduleLibraryController.state.collectAsState()
     val toolLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopToolLibraryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -150,6 +161,9 @@ fun LettaDesktopApp() {
     LaunchedEffect(memoryController) {
         memoryController.start()
     }
+    LaunchedEffect(scheduleLibraryController) {
+        scheduleLibraryController.start()
+    }
     LaunchedEffect(toolLibraryController) {
         toolLibraryController.start()
     }
@@ -158,8 +172,16 @@ fun LettaDesktopApp() {
             chatState.selectedConversation?.agentId?.let(memoryController::selectAgent)
         }
     }
+    LaunchedEffect(selectedDestination, chatState.selectedConversation?.agentId, scheduleLibraryController) {
+        if (selectedDestination == DesktopDestination.Schedules) {
+            chatState.selectedConversation?.agentId?.let(scheduleLibraryController::selectAgent)
+        }
+    }
     DisposableEffect(memoryController) {
         onDispose { memoryController.close() }
+    }
+    DisposableEffect(scheduleLibraryController) {
+        onDispose { scheduleLibraryController.close() }
     }
     DisposableEffect(toolLibraryController) {
         onDispose { toolLibraryController.close() }
@@ -210,6 +232,7 @@ fun LettaDesktopApp() {
                     state = bootstrapState,
                     chatState = chatState,
                     memoryState = memoryState,
+                    scheduleLibraryState = scheduleLibraryState,
                     toolLibraryState = toolLibraryState,
                     onChatConversationSelected = chatController::selectConversation,
                     onChatConversationDeleted = chatController::deleteConversation,
@@ -222,6 +245,8 @@ fun LettaDesktopApp() {
                     onChatRetryConnection = chatController::retryConnection,
                     onMemoryRefresh = memoryController::reload,
                     onMemoryAgentSelected = memoryController::selectAgent,
+                    onSchedulesRefresh = scheduleLibraryController::reload,
+                    onScheduleAgentSelected = scheduleLibraryController::selectAgent,
                     onToolsRefresh = toolLibraryController::reload,
                     onToolsSearchQueryChanged = toolLibraryController::updateSearchQuery,
                     onToolsTagToggled = toolLibraryController::toggleTag,
@@ -322,6 +347,12 @@ private fun DesktopNavigation(
             icon = DesktopDestination.Memory.icon,
             selected = selectedDestination == DesktopDestination.Memory,
             onClick = { onDestinationSelected(DesktopDestination.Memory) },
+        )
+        DesktopNavRow(
+            label = "Schedules",
+            icon = DesktopDestination.Schedules.icon,
+            selected = selectedDestination == DesktopDestination.Schedules,
+            onClick = { onDestinationSelected(DesktopDestination.Schedules) },
         )
         DesktopNavRow(
             label = "Skills & Tools",
@@ -437,6 +468,7 @@ private val DesktopDestination.icon: ImageVector
         DesktopDestination.Overview -> Icons.Outlined.Dashboard
         DesktopDestination.Agents -> Icons.Outlined.SmartToy
         DesktopDestination.Memory -> Icons.Outlined.Memory
+        DesktopDestination.Schedules -> Icons.Outlined.Schedule
         DesktopDestination.Conversations -> Icons.Outlined.Forum
         DesktopDestination.Settings -> Icons.Outlined.Settings
     }
@@ -447,6 +479,7 @@ private fun DestinationContent(
     state: DesktopBootstrapState,
     chatState: DesktopChatSurfaceState,
     memoryState: DesktopMemorySurfaceState,
+    scheduleLibraryState: DesktopScheduleLibraryState,
     toolLibraryState: DesktopToolLibraryState,
     onChatConversationSelected: (String) -> Unit,
     onChatConversationDeleted: (String) -> Unit,
@@ -457,6 +490,8 @@ private fun DestinationContent(
     onChatRetryConnection: () -> Unit,
     onMemoryRefresh: () -> Unit,
     onMemoryAgentSelected: (String) -> Unit,
+    onSchedulesRefresh: () -> Unit,
+    onScheduleAgentSelected: (String) -> Unit,
     onToolsRefresh: () -> Unit,
     onToolsSearchQueryChanged: (String) -> Unit,
     onToolsTagToggled: (String) -> Unit,
@@ -485,6 +520,15 @@ private fun DestinationContent(
             state = memoryState,
             onRefresh = onMemoryRefresh,
             onAgentSelected = onMemoryAgentSelected,
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == DesktopDestination.Schedules) {
+        DesktopScheduleLibrarySurface(
+            state = scheduleLibraryState,
+            onRefresh = onSchedulesRefresh,
+            onAgentSelected = onScheduleAgentSelected,
             modifier = modifier,
         )
         return
@@ -533,6 +577,9 @@ private fun DestinationContent(
                 // Rendered by the full-height branch above.
             }
             DesktopDestination.Memory -> {
+                // Rendered by the full-height branch above.
+            }
+            DesktopDestination.Schedules -> {
                 // Rendered by the full-height branch above.
             }
             DesktopDestination.Conversations -> {
