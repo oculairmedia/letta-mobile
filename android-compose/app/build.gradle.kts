@@ -394,6 +394,16 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .start()
         check(transform.waitFor() == 0) { "Unicode property escape transform for letta.js failed." }
 
+        val toolGroupPatch = ProcessBuilder(
+            "node",
+            project.rootDir.parentFile.resolve("scripts/patch-embedded-letta-code-tool-groups.cjs").absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(toolGroupPatch.waitFor() == 0) { "Tool-call group trimming patch for letta.js failed." }
+
         // letta-mobile-84a59: @letta-ai/letta-code 0.26.1 has generic system-reminders
         // but not the shim's runtime-introspection strings ("Context utilization",
         // "Serving model", "Session role", "Model changed"). Ship the canonical shim
@@ -724,6 +734,19 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             """.trimIndent(),
         )
     }
+}
+
+val testEmbeddedLettaCodeToolGroupPatch = tasks.register<Exec>("testEmbeddedLettaCodeToolGroupPatch") {
+    description = "Runs regression tests for embedded LettaCode tool-call group trimming."
+    group = "verification"
+    commandLine(
+        "node",
+        project.rootDir.parentFile.resolve("scripts/patch-embedded-letta-code-tool-groups.test.cjs").absolutePath,
+    )
+}
+
+tasks.named("check") {
+    dependsOn(testEmbeddedLettaCodeToolGroupPatch)
 }
 
 android {
