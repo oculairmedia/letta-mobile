@@ -382,11 +382,14 @@ class LettaCodeLocalBackendStore @Inject constructor(
         )
         if (!transcript.isFile) return@withContext
         val lines = transcript.readLines()
+        val rows = lines.map { line ->
+            if (line.isBlank()) null else runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+        }
+        val latestImageUserIndex = rows.indexOfLast { row -> row?.isUserImageMessage() == true }
         var changed = false
-        val stripped = lines.map { line ->
-            if (line.isBlank()) return@map line
-            val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
-                ?: return@map line
+        val stripped = lines.mapIndexed { index, line ->
+            val row = rows.getOrNull(index) ?: return@mapIndexed line
+            if (index == latestImageUserIndex) return@mapIndexed line
             val scrubbed = row.stripImagePayloads()
             if (scrubbed !== row) {
                 changed = true
@@ -398,6 +401,29 @@ class LettaCodeLocalBackendStore @Inject constructor(
         if (changed) {
             transcript.writeText(stripped.joinToString("\n") + "\n")
         }
+    }
+
+    private fun JsonObject.isUserImageMessage(): Boolean =
+        stringField("role") == "user" && (this["content"]?.hasImagePayload() == true)
+
+    private fun JsonElement.hasImagePayload(): Boolean = when (this) {
+        is JsonArray -> any { it.hasImagePayload() }
+        is JsonObject -> {
+            when {
+                stringField("type") == "image" && (
+                    stringField("data")?.let { looksLikeBase64Payload(it) } == true ||
+                        ((this["source"] as? JsonObject)?.stringField("type") == "base64" &&
+                            (this["source"] as? JsonObject)?.stringField("data")?.let { looksLikeBase64Payload(it) } == true)
+                    ) -> true
+                stringField("type") == "image_url" &&
+                    parseImageDataUrl(((this["image_url"] as? JsonObject)?.stringField("url")) ?: stringField("url")) != null -> true
+                stringField("type") == "text" &&
+                    stringField("text")?.contains("data:image/", ignoreCase = true) == true -> true
+                else -> values.any { it.hasImagePayload() }
+            }
+        }
+        is JsonPrimitive -> contentOrNull?.contains("data:image/", ignoreCase = true) == true
+        else -> false
     }
 
     private fun JsonObject.stripImagePayloads(): JsonObject {
