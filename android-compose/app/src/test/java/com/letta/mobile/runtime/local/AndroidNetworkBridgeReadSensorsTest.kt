@@ -3,6 +3,13 @@ package com.letta.mobile.runtime.local
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionRegistry
+import com.letta.mobile.runtime.hardware.AudioStatus
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.FlashlightCapability
+import com.letta.mobile.runtime.hardware.HardwareCapabilities
+import com.letta.mobile.runtime.hardware.HardwareControlResponse
+import com.letta.mobile.runtime.hardware.HardwareControlStatus
+import com.letta.mobile.runtime.hardware.VibrationCapability
 import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.BatterySnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
@@ -35,6 +42,7 @@ class AndroidNetworkBridgeReadSensorsTest {
             },
             mobileActionRegistry = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink()),
             mobileIntentActionTool = MobileIntentActionTool(ApplicationProvider.getApplicationContext()),
+            hardwareControlProvider = fakeHardwareProvider(),
         )
 
         bridge.start().use { session ->
@@ -55,6 +63,7 @@ class AndroidNetworkBridgeReadSensorsTest {
             },
             mobileActionRegistry = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink()),
             mobileIntentActionTool = MobileIntentActionTool(ApplicationProvider.getApplicationContext()),
+            hardwareControlProvider = fakeHardwareProvider(),
         )
 
         bridge.start().use { session ->
@@ -90,6 +99,25 @@ class AndroidNetworkBridgeReadSensorsTest {
             out.flush()
             return socket.getInputStream().bufferedReader().use { it.readText() }
         }
+    }
+
+
+    private fun fakeHardwareProvider(): DeviceHardwareControlProvider = object : DeviceHardwareControlProvider {
+        private val caps = HardwareCapabilities(
+            flashlight = FlashlightCapability(HardwareControlStatus.UnsupportedHardware, false, reason = "test"),
+            vibration = VibrationCapability(HardwareControlStatus.UnsupportedHardware, false, reason = "test"),
+            audio = AudioStatus(HardwareControlStatus.Available, currentMusicVolume = 1, maxMusicVolume = 10, ringerMode = "normal", fixedVolume = false, reason = "test"),
+        )
+
+        override fun capabilities(): HardwareCapabilities = caps
+        override fun setFlashlight(enabled: Boolean, dryRun: Boolean): HardwareControlResponse =
+            HardwareControlResponse("set_flashlight", HardwareControlStatus.UnsupportedHardware, false, "test", flashlight = caps.flashlight)
+        override fun vibrate(durationMs: Long?, patternMs: List<Long>?): HardwareControlResponse =
+            HardwareControlResponse("vibrate", HardwareControlStatus.UnsupportedHardware, false, "test")
+        override fun readAudioStatus(): HardwareControlResponse =
+            HardwareControlResponse("audio_status", HardwareControlStatus.Available, true, "test", audio = caps.audio)
+        override fun adjustMusicVolume(delta: Int?, level: Int?): HardwareControlResponse =
+            HardwareControlResponse("adjust_music_volume", HardwareControlStatus.Success, true, "test", audio = caps.audio)
     }
 
     private fun sampleSnapshot(now: Long): DeviceSensorSnapshot = DeviceSensorSnapshot(

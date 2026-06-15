@@ -4,6 +4,9 @@ import android.content.Context
 import com.letta.mobile.runtime.actions.AndroidMobileActionCapabilityProvider
 import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionRegistry
+import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
+import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
+import com.letta.mobile.runtime.hardware.HardwareControlStatus
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.encodeToString
@@ -92,6 +95,39 @@ object DeviceSensorPipelineSelfTest {
             artifact = actionMatrixOut.name,
         )
 
+        val hardwareToolOut = File(filesDir, DeviceSensorSelfTestActivity.HARDWARE_CONTROLS_OUTPUT_FILE)
+        val hardwareTool = DeviceHardwareControlTool(AndroidDeviceHardwareControlProvider(context.applicationContext))
+        val capabilitiesText = hardwareTool.capabilitiesJson()
+        val vibrationText = hardwareTool.vibrateJson(buildJsonObject { put("durationMs", 100) })
+        val flashlightProbeText = hardwareTool.setFlashlightJson(
+            buildJsonObject {
+                put("enabled", false)
+                put("dryRun", true)
+            }
+        )
+        hardwareToolOut.writeText(
+            """{"capabilities":$capabilitiesText,"vibration":$vibrationText,"flashlightProbe":$flashlightProbeText}"""
+        )
+        val vibrationPayload = runCatching { json.parseToJsonElement(vibrationText).jsonObject }.getOrNull()
+        val flashlightPayload = runCatching { json.parseToJsonElement(flashlightProbeText).jsonObject }.getOrNull()
+        val safeVibration = vibrationPayload?.get("status")?.jsonPrimitive?.content in setOf(
+            HardwareControlStatus.Success.name,
+            HardwareControlStatus.UnsupportedHardware.name,
+            HardwareControlStatus.BlockedByAndroidPolicy.name,
+        )
+        val dryRunFlashlight = flashlightPayload?.get("status")?.jsonPrimitive?.content in setOf(
+            HardwareControlStatus.DryRun.name,
+            HardwareControlStatus.UnsupportedHardware.name,
+            HardwareControlStatus.NotAvailable.name,
+            HardwareControlStatus.BlockedByAndroidPolicy.name,
+        )
+        stages += stage(
+            id = "stage6.hardware_controls_safe_probe",
+            passed = safeVibration && dryRunFlashlight,
+            details = "Hardware controls probed; vibration status=${vibrationPayload?.get("status")?.jsonPrimitive?.content}, flashlight status=${flashlightPayload?.get("status")?.jsonPrimitive?.content}.",
+            artifact = hardwareToolOut.name,
+        )
+
         val preload = File(filesDir, "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs")
         val preloadText = runCatching { preload.readText() }.getOrDefault("")
         stages += stage(
@@ -106,6 +142,12 @@ object DeviceSensorPipelineSelfTest {
             details = "Embedded preload registers read_sensors external tool and routes to Android bridge endpoint.",
             artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
         )
+        stages += stage(
+            id = "stage8.hardware_tool_transport_preload",
+            passed = preloadText.contains("set_flashlight") && preloadText.contains("/device/hardware/set_flashlight") && preloadText.contains("audio_status"),
+            details = "Embedded preload registers hardware control tools and routes to Android bridge endpoints.",
+            artifact = if (preload.isFile) "embedded-lettacode/nodejs-project/embedded-runtime-introspection-preload.cjs" else null,
+        )
 
         val report = PipelineSelfTestReport(
             passed = stages.all { it.passed },
@@ -117,6 +159,7 @@ object DeviceSensorPipelineSelfTest {
                 groundingOut.name,
                 readToolOut.name,
                 actionMatrixOut.name,
+                hardwareToolOut.name,
                 REPORT_FILE,
             ),
         )

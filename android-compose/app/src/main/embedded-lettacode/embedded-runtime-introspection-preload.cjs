@@ -73,9 +73,25 @@ function registerMobileIntentTools() {
   }
 }
 
+const HARDWARE_TOOL_DEFINITIONS = [
+  { name: 'hardware_capabilities', route: '/device/hardware/capabilities', description: 'Report Android hardware-control capability status for flashlight, vibration, and audio volume without changing device state.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'set_flashlight', route: '/device/hardware/set_flashlight', description: 'Safely enable or disable the Android camera torch when supported. Use dryRun to only probe capability.', parameters: { type: 'object', properties: { enabled: { type: 'boolean', description: 'True to enable torch, false to disable.' }, dryRun: { type: 'boolean', description: 'If true, only probe support and do not change torch state.' } }, required: ['enabled'], additionalProperties: false } },
+  { name: 'vibrate', route: '/device/hardware/vibrate', description: 'Trigger a short Android vibration with safe clamped duration or pattern limits.', parameters: { type: 'object', properties: { durationMs: { type: 'integer', minimum: 1, maximum: 1000, description: 'Single vibration duration; clamped to 1000ms.' }, patternMs: { type: 'array', items: { type: 'integer', minimum: 0, maximum: 500 }, maxItems: 8, description: 'Optional waveform pattern in milliseconds; each segment is clamped.' } }, additionalProperties: false } },
+  { name: 'audio_status', route: '/device/hardware/audio_status', description: 'Read current Android music volume, max music volume, ringer mode, and fixed-volume policy status.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'adjust_music_volume', route: '/device/hardware/adjust_music_volume', description: 'Adjust Android STREAM_MUSIC volume if permissionless policy allows, with delta clamped to +/-3 or explicit safe level.', parameters: { type: 'object', properties: { delta: { type: 'integer', minimum: -3, maximum: 3, description: 'Relative volume change; clamped to +/-3.' }, level: { type: 'integer', minimum: 0, description: 'Absolute music volume level clamped to stream bounds.' } }, additionalProperties: false } }
+];
+
+function registerHardwareControlTools() {
+  for (const tool of HARDWARE_TOOL_DEFINITIONS) {
+    const { route, ...definition } = tool;
+    registerExternalTool(definition, (input, toolName) => postAndroidBridge(route, input, toolName));
+  }
+}
+
 function registerEmbeddedExternalTools() {
   registerReadSensorsTool();
   registerMobileIntentTools();
+  registerHardwareControlTools();
 }
 
 registerEmbeddedExternalTools();
