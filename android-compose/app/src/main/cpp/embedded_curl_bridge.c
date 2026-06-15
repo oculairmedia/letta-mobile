@@ -213,6 +213,11 @@ int main(int argc, char **argv) {
     fprintf(stderr, "curl: LETTA_ANDROID_NETWORK_BRIDGE_URL is not set\n");
     return 7;
   }
+  const char *bridge_token = getenv("LETTA_ANDROID_NETWORK_BRIDGE_TOKEN");
+  if (!bridge_token || !*bridge_token) {
+    fprintf(stderr, "curl: LETTA_ANDROID_NETWORK_BRIDGE_TOKEN is not set\n");
+    return 7;
+  }
   char host[256];
   int port = 0;
   if (parse_bridge(bridge, host, sizeof(host), &port) != 0) {
@@ -258,8 +263,8 @@ int main(int argc, char **argv) {
   int fd = connect_tcp(host, port);
   if (fd < 0) { fprintf(stderr, "curl: could not connect to Android network bridge\n"); return 7; }
   dprintf(fd,
-          "POST /fetch HTTP/1.1\r\nHost: %s:%d\r\nContent-Type: application/json\r\nContent-Length: %ld\r\nConnection: close\r\n\r\n",
-          host, port, body_len);
+          "POST /fetch HTTP/1.1\r\nHost: %s:%d\r\nContent-Type: application/json\r\nAuthorization: Bearer %s\r\nContent-Length: %ld\r\nConnection: close\r\n\r\n",
+          host, port, bridge_token, body_len);
   write(fd, body, (size_t)body_len);
   free(body);
   size_t response_len = 0;

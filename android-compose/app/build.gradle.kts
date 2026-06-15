@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "22"
+val embeddedLettaCodeAssetRevision = "26"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -516,6 +516,17 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             .start()
         check(sharpBypass.waitFor() == 0) { "Image-resize bypass transform for letta.js failed." }
 
+        // origin/main #478: keep tool-call groups intact during trimming.
+        val toolGroupPatch = ProcessBuilder(
+            "node",
+            project.rootDir.parentFile.resolve("scripts/patch-embedded-letta-code-tool-groups.cjs").absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(toolGroupPatch.waitFor() == 0) { "Tool-call group trimming patch for letta.js failed." }
+
         // letta-mobile-84a59: @letta-ai/letta-code 0.26.1 has generic system-reminders
         // but not the shim's runtime-introspection strings ("Context utilization",
         // "Serving model", "Session role", "Model changed"). Ship the canonical shim
@@ -856,6 +867,19 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
             """.trimIndent(),
         )
     }
+}
+
+val testEmbeddedLettaCodeToolGroupPatch = tasks.register<Exec>("testEmbeddedLettaCodeToolGroupPatch") {
+    description = "Runs regression tests for embedded LettaCode tool-call group trimming."
+    group = "verification"
+    commandLine(
+        "node",
+        project.rootDir.parentFile.resolve("scripts/patch-embedded-letta-code-tool-groups.test.cjs").absolutePath,
+    )
+}
+
+tasks.named("check") {
+    dependsOn(testEmbeddedLettaCodeToolGroupPatch)
 }
 
 android {

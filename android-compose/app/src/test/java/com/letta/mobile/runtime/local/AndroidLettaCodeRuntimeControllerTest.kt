@@ -187,6 +187,7 @@ class AndroidLettaCodeRuntimeControllerTest {
     private class FakeAndroidNetworkBridge : AndroidNetworkBridge {
         override fun start(): AndroidNetworkBridgeSession = AndroidNetworkBridgeSession(
             baseUrl = "http://127.0.0.1:1",
+            authToken = "test-token",
             closeAction = {},
         )
     }

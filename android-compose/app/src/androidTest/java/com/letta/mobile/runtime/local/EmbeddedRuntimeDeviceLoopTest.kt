@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.SystemClock
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.BuildConfig
+import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
+import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.BackendCapabilities
@@ -138,7 +140,10 @@ class EmbeddedRuntimeDeviceLoopTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
             localBackendStore = LettaCodeLocalBackendStore(context),
-            androidNetworkBridge = LocalAndroidNetworkBridge(),
+            androidNetworkBridge = LocalAndroidNetworkBridge(
+                sensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context),
+                hardwareControlProvider = AndroidDeviceHardwareControlProvider(context),
+            ),
             onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
                 engine = object : OnDeviceChatCompletionEngine {
                     override fun generate(
@@ -200,7 +205,10 @@ class EmbeddedRuntimeDeviceLoopTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
             localBackendStore = LettaCodeLocalBackendStore(context),
-            androidNetworkBridge = LocalAndroidNetworkBridge(),
+            androidNetworkBridge = LocalAndroidNetworkBridge(
+                sensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context),
+                hardwareControlProvider = AndroidDeviceHardwareControlProvider(context),
+            ),
             onDeviceOpenAiBridge = LocalOpenAiOnDeviceBridge(
                 engine = object : OnDeviceChatCompletionEngine {
                     override fun generate(
@@ -296,7 +304,10 @@ class EmbeddedRuntimeDeviceLoopTest {
                 nodeBridge = nodeBridge,
                 runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
                 localBackendStore = LettaCodeLocalBackendStore(context),
-                androidNetworkBridge = LocalAndroidNetworkBridge(),
+                androidNetworkBridge = LocalAndroidNetworkBridge(
+                sensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context),
+                hardwareControlProvider = AndroidDeviceHardwareControlProvider(context),
+            ),
                 onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
                     override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
                         error("on-device bridge must not start when a custom provider is configured")
@@ -359,7 +370,10 @@ class EmbeddedRuntimeDeviceLoopTest {
             nodeBridge = nodeBridge,
             runtimeStatusProvider = BuildConfigEmbeddedLettaCodeRuntimeStatusProvider(),
             localBackendStore = LettaCodeLocalBackendStore(context),
-            androidNetworkBridge = LocalAndroidNetworkBridge(),
+            androidNetworkBridge = LocalAndroidNetworkBridge(
+                sensorSnapshotProvider = AndroidDeviceSensorSnapshotProvider(context),
+                hardwareControlProvider = AndroidDeviceHardwareControlProvider(context),
+            ),
             onDeviceOpenAiBridge = object : OnDeviceOpenAiBridge {
                 override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
                     error("on-device bridge must not start when a custom provider is configured")
