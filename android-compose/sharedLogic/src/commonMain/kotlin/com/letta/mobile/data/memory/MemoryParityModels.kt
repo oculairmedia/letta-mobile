@@ -175,6 +175,56 @@ enum class MemoryTextLinkKind {
 }
 
 @Immutable
+data class MemoryTextSegment(
+    val text: String,
+    val link: MemoryTextLink? = null,
+)
+
+fun MemoryTextLink.isValidForText(text: String): Boolean =
+    start >= 0 && start < end && end <= text.length
+
+fun List<MemoryTextLink>.validForText(text: String): List<MemoryTextLink> {
+    val accepted = mutableListOf<MemoryTextLink>()
+    sortedWith(
+        compareBy<MemoryTextLink> { it.start }.thenByDescending { it.end },
+    ).forEach { candidate ->
+        if (candidate.isValidForText(text) && accepted.none { it.overlaps(candidate) }) {
+            accepted += candidate
+        }
+    }
+    return accepted
+}
+
+fun List<MemoryTextLink>.segmentsForText(text: String): List<MemoryTextSegment> {
+    val validLinks = validForText(text)
+    if (validLinks.isEmpty()) {
+        return text.takeIf { it.isNotEmpty() }
+            ?.let { listOf(MemoryTextSegment(it)) }
+            ?: emptyList()
+    }
+
+    val segments = mutableListOf<MemoryTextSegment>()
+    var cursor = 0
+    validLinks.forEach { link ->
+        if (cursor < link.start) {
+            segments += MemoryTextSegment(text.substring(cursor, link.start))
+        }
+        segments += MemoryTextSegment(
+            text = text.substring(link.start, link.end),
+            link = link,
+        )
+        cursor = link.end
+    }
+    if (cursor < text.length) {
+        segments += MemoryTextSegment(text.substring(cursor))
+    }
+    return segments
+}
+
+private fun MemoryTextLink.overlaps(other: MemoryTextLink): Boolean =
+    start < other.end && other.start < end
+
+@Immutable
 sealed interface MemoryParityItem {
     val id: String
     val title: String
@@ -528,9 +578,7 @@ object MemoryParityMapper {
 
 object MemoryTextLinkParser {
     fun parse(text: String): List<MemoryTextLink> =
-        (urlLinks(text) + entityLinks(text) + mentionLinks(text))
-            .sortedWith(compareBy<MemoryTextLink> { it.start }.thenBy { it.end })
-            .dedupeOverlaps()
+        (urlLinks(text) + entityLinks(text) + mentionLinks(text)).validForText(text)
 
     private fun urlLinks(text: String): List<MemoryTextLink> =
         URL_REGEX.findAll(text).map { match ->
@@ -579,19 +627,6 @@ object MemoryTextLinkParser {
                 kind = MemoryTextLinkKind.Mention,
             )
         }.toList()
-
-    private fun List<MemoryTextLink>.dedupeOverlaps(): List<MemoryTextLink> {
-        val accepted = mutableListOf<MemoryTextLink>()
-        forEach { candidate ->
-            if (accepted.none { it.overlaps(candidate) }) {
-                accepted += candidate
-            }
-        }
-        return accepted
-    }
-
-    private fun MemoryTextLink.overlaps(other: MemoryTextLink): Boolean =
-        start < other.end && other.start < end
 
     private fun MatchResult.trimmedRange(text: String): Pair<Int, Int> {
         var endExclusive = range.last + 1

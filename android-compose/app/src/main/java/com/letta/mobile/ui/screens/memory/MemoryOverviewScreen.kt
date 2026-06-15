@@ -43,8 +43,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -60,7 +64,10 @@ import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParityState
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetric
+import com.letta.mobile.data.memory.MemoryTextLink
+import com.letta.mobile.data.memory.MemoryTextLinkParser
 import com.letta.mobile.data.memory.accentRole
+import com.letta.mobile.data.memory.segmentsForText
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
@@ -401,12 +408,9 @@ private fun MemoryItemRow(item: MemoryParityItem) {
                 }
             }
             item.detailText.takeIf { it.isNotBlank() }?.let { detail ->
-                Text(
+                LinkedDetailText(
                     text = detail,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
+                    links = item.links,
                 )
             }
             if (item.metadataLabels.isNotEmpty()) {
@@ -424,6 +428,40 @@ private fun MemoryItemRow(item: MemoryParityItem) {
             }
         }
     }
+}
+
+@Composable
+private fun LinkedDetailText(
+    text: String,
+    links: List<MemoryTextLink>,
+) {
+    val linkColor = MaterialTheme.colorScheme.primary
+    val annotatedText = remember(text, links, linkColor) {
+        val linkStyle = SpanStyle(
+            color = linkColor,
+            textDecoration = TextDecoration.Underline,
+        )
+        buildAnnotatedString {
+            links.segmentsForText(text).forEach { segment ->
+                val link = segment.link
+                if (link == null) {
+                    append(segment.text)
+                } else {
+                    withStyle(linkStyle) {
+                        append(segment.text)
+                    }
+                }
+            }
+        }
+    }
+
+    Text(
+        text = annotatedText,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 4,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private fun MemoryParitySectionKind.icon(): ImageVector = when (this) {
@@ -487,7 +525,7 @@ private fun previewMemoryState(): MemoryParityControllerState =
                             subtitle = "Search the web for current sources.",
                             detailText = "Uses https://example.com and @research for retrieval.",
                             metadataLabels = listOf("tool", "search"),
-                            links = emptyList(),
+                            links = MemoryTextLinkParser.parse("Uses https://example.com and @research for retrieval."),
                             type = "tool",
                             tags = listOf("search"),
                         ),

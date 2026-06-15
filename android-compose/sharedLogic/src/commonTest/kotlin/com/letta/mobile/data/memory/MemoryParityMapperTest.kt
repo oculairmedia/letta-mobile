@@ -196,6 +196,41 @@ class MemoryParityMapperTest {
     }
 
     @Test
+    fun validatesAndSegmentsMemoryTextLinksInCommonCode() {
+        val text = "Open https://example.com and ask @Ada"
+        val urlStart = text.indexOf("https://example.com")
+        val mentionStart = text.indexOf("@Ada")
+        val url = MemoryTextLink(
+            start = urlStart,
+            end = urlStart + "https://example.com".length,
+            target = "https://example.com",
+            label = "https://example.com",
+            kind = MemoryTextLinkKind.Url,
+        )
+        val mention = MemoryTextLink(
+            start = mentionStart,
+            end = mentionStart + "@Ada".length,
+            target = "Ada",
+            label = "@Ada",
+            kind = MemoryTextLinkKind.Mention,
+        )
+        val partialOverlap = url.copy(end = url.start + 8)
+        val outOfBounds = mention.copy(end = text.length + 20)
+
+        val links = listOf(outOfBounds, partialOverlap, mention, url)
+
+        assertEquals(listOf(url, mention), links.validForText(text))
+        assertEquals(
+            listOf("Open ", "https://example.com", " and ask ", "@Ada"),
+            links.segmentsForText(text).map { it.text },
+        )
+        assertEquals(
+            listOf(null, MemoryTextLinkKind.Url, null, MemoryTextLinkKind.Mention),
+            links.segmentsForText(text).map { it.link?.kind },
+        )
+    }
+
+    @Test
     fun buildWithNoMemoryDataIsEmptyButStillReportsChannelStatus() {
         val state = MemoryParityMapper.build(
             agents = emptyList(),

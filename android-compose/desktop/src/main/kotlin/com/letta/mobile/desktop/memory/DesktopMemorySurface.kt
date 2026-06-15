@@ -71,6 +71,7 @@ import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.data.memory.MemoryTextLink
 import com.letta.mobile.data.memory.accentRole
+import com.letta.mobile.data.memory.validForText
 import sh.calvin.autolinktext.SimpleTextMatchResult
 import sh.calvin.autolinktext.TextMatcher
 import sh.calvin.autolinktext.TextRule
@@ -539,11 +540,7 @@ private fun LinkedDetailText(
     links: List<MemoryTextLink>,
 ) {
     val validLinks = remember(text, links) {
-        links.filter { link ->
-            link.start >= 0 &&
-                link.start < link.end &&
-                link.end <= text.length
-        }
+        links.validForText(text)
     }
     val annotatedText = if (validLinks.isEmpty()) {
         AnnotatedString(text)
