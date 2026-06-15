@@ -1334,3 +1334,30 @@ tasks.register<Test>("testScreenshot") {
         isFailOnNoMatchingTests = false
     }
 }
+
+// letta-mobile-8ll0c: Higher-fidelity image-pipeline test that drives the REAL
+// bundled letta.js provider-request builder (defense in depth over the JVM
+// floor test from #486). Requires the bundle to be built first.
+tasks.register<Exec>("testLettaJsImageRequest") {
+    description = "Runs letta.js image-request schema test against the real bundle"
+    group = "verification"
+    
+    dependsOn(prepareEmbeddedLettaCodeAssets)
+    
+    workingDir = file("src/test")
+    commandLine = listOf("node", "letta-js-image-request-test.mjs")
+    
+    // Set the bundle path explicitly to avoid path resolution issues
+    environment("LETTA_JS_BUNDLE_PATH", 
+        file("build/embedded-lettacode/npm/node_modules/@letta-ai/letta-code/letta.js").absolutePath)
+    
+    doFirst {
+        val bundlePath = file("build/embedded-lettacode/npm/node_modules/@letta-ai/letta-code/letta.js")
+        if (!bundlePath.exists()) {
+            throw GradleException(
+                "letta.js bundle not found at ${bundlePath.absolutePath}. " +
+                "Build with -PembedLettaCodeNative=true -PembedLettaCodeAssets=true first."
+            )
+        }
+    }
+}
