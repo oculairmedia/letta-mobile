@@ -29,6 +29,7 @@ class DeviceActionCommandRunner @Inject constructor(
         val command = root.string("command")?.trim().orEmpty()
         val input = root["input"]?.jsonObject ?: JsonObject(emptyMap())
         return when (command) {
+            "device.catalog" -> ok(command, DeviceActionCommandCatalog.toJson())
             "sensors.summary" -> ok(command, sensorReadTool.handleJson(jsonObject("mode" to "summary")))
             "sensors.catalog" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("catalog")))
             "sensors.snapshot" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("snapshot")))
