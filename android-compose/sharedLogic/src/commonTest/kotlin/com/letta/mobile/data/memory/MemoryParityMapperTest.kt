@@ -89,6 +89,8 @@ class MemoryParityMapperTest {
         assertEquals("search_docs", skill.title)
         assertEquals(listOf("research"), skill.tags)
         assertEquals(listOf("python", "research"), skill.metadataLabels)
+        assertEquals(MemoryAccentRole.Primary, skill.accentRole)
+        assertEquals(MemoryAccentRole.Primary, state.section(MemoryParitySectionKind.Skills).kind.accentRole)
 
         val memory = assertIs<MemoryParityItem.MemoryBlock>(state.section(MemoryParitySectionKind.Memory).items.single())
         assertEquals("persona", memory.title)
@@ -96,16 +98,23 @@ class MemoryParityMapperTest {
         assertEquals("Keeps a concise research voice.", memory.detailText)
         assertEquals(listOf("Limit 2000"), memory.metadataLabels)
         assertEquals(emptyList(), memory.links)
+        assertEquals(MemoryAccentRole.Secondary, memory.accentRole)
+        assertEquals(MemoryAccentRole.Secondary, state.section(MemoryParitySectionKind.Memory).kind.accentRole)
 
         val schedule = assertIs<MemoryParityItem.Schedule>(state.section(MemoryParitySectionKind.Schedules).items.single())
         assertEquals("Summarize the latest project memory", schedule.title)
         assertEquals("recurring", schedule.scheduleType)
         assertEquals(listOf("recurring", "2026-06-14T08:00:00Z"), schedule.metadataLabels)
+        assertEquals(MemoryAccentRole.Tertiary, schedule.accentRole)
+        assertEquals(MemoryAccentRole.Tertiary, state.section(MemoryParitySectionKind.Schedules).kind.accentRole)
 
         val channel = assertIs<MemoryParityItem.Channel>(state.section(MemoryParitySectionKind.Channels).items.single())
         assertEquals(MemoryChannelStatus.Connected, channel.status)
         assertEquals("Connected via websocket", channel.subtitle)
         assertEquals(listOf("Connected"), channel.metadataLabels)
+        assertEquals(MemoryAccentRole.Tertiary, channel.accentRole)
+        assertEquals(MemoryAccentRole.Tertiary, MemoryGraphNodeKind.Channel.accentRole(channel.status))
+        assertEquals(MemoryAccentRole.Neutral, state.section(MemoryParitySectionKind.Channels).kind.accentRole)
 
         state.sections.flatMap { it.items }.forEach { item ->
             item.links.forEach { link ->
@@ -215,7 +224,17 @@ class MemoryParityMapperTest {
             state.section(MemoryParitySectionKind.Channels).items.single(),
         )
         assertEquals(MemoryChannelStatus.Disconnected, channel.status)
+        assertEquals(MemoryAccentRole.Error, channel.accentRole)
         assertEquals("Network unavailable", channel.subtitle)
+    }
+
+    @Test
+    fun channelAccentRolesRepresentTransportStateInCommonCode() {
+        assertEquals(MemoryAccentRole.Tertiary, MemoryChannelStatus.Connected.accentRole)
+        assertEquals(MemoryAccentRole.Primary, MemoryChannelStatus.Connecting.accentRole)
+        assertEquals(MemoryAccentRole.Neutral, MemoryChannelStatus.Idle.accentRole)
+        assertEquals(MemoryAccentRole.Error, MemoryChannelStatus.Disconnected.accentRole)
+        assertEquals(MemoryAccentRole.Neutral, MemoryGraphNodeKind.Channel.accentRole(null))
     }
 
     @Test

@@ -83,6 +83,22 @@ enum class MemoryParitySectionKind {
     Channels,
 }
 
+enum class MemoryAccentRole {
+    Primary,
+    Secondary,
+    Tertiary,
+    Neutral,
+    Error,
+}
+
+val MemoryParitySectionKind.accentRole: MemoryAccentRole
+    get() = when (this) {
+        MemoryParitySectionKind.Skills -> MemoryAccentRole.Primary
+        MemoryParitySectionKind.Memory -> MemoryAccentRole.Secondary
+        MemoryParitySectionKind.Schedules -> MemoryAccentRole.Tertiary
+        MemoryParitySectionKind.Channels -> MemoryAccentRole.Neutral
+    }
+
 @Immutable
 data class MemoryParityGraph(
     val nodes: List<MemoryGraphNode> = emptyList(),
@@ -121,6 +137,15 @@ enum class MemoryGraphNodeKind {
     Memory,
     Schedule,
     Channel,
+}
+
+fun MemoryGraphNodeKind.accentRole(status: MemoryChannelStatus?): MemoryAccentRole = when (this) {
+    MemoryGraphNodeKind.Agent -> MemoryAccentRole.Primary
+    MemoryGraphNodeKind.Backend -> MemoryAccentRole.Primary
+    MemoryGraphNodeKind.Skill -> MemoryAccentRole.Primary
+    MemoryGraphNodeKind.Memory -> MemoryAccentRole.Secondary
+    MemoryGraphNodeKind.Schedule -> MemoryAccentRole.Tertiary
+    MemoryGraphNodeKind.Channel -> status?.accentRole ?: MemoryAccentRole.Neutral
 }
 
 enum class MemoryGraphEdgeKind {
@@ -213,6 +238,22 @@ enum class MemoryChannelStatus {
     Idle,
     Disconnected,
 }
+
+val MemoryChannelStatus.accentRole: MemoryAccentRole
+    get() = when (this) {
+        MemoryChannelStatus.Connected -> MemoryAccentRole.Tertiary
+        MemoryChannelStatus.Connecting -> MemoryAccentRole.Primary
+        MemoryChannelStatus.Idle -> MemoryAccentRole.Neutral
+        MemoryChannelStatus.Disconnected -> MemoryAccentRole.Error
+    }
+
+val MemoryParityItem.accentRole: MemoryAccentRole
+    get() = when (this) {
+        is MemoryParityItem.Skill -> MemoryAccentRole.Primary
+        is MemoryParityItem.MemoryBlock -> MemoryAccentRole.Secondary
+        is MemoryParityItem.Schedule -> MemoryAccentRole.Tertiary
+        is MemoryParityItem.Channel -> status.accentRole
+    }
 
 object MemoryParityMapper {
     fun build(

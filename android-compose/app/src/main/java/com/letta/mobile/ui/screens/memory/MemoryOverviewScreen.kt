@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.memory.MemoryAccentRole
 import com.letta.mobile.data.memory.MemoryChannelStatus
 import com.letta.mobile.data.memory.MemoryParityAgentOption
 import com.letta.mobile.data.memory.MemoryParityControllerState
@@ -59,6 +60,7 @@ import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParityState
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetric
+import com.letta.mobile.data.memory.accentRole
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
@@ -432,12 +434,7 @@ private fun MemoryParitySectionKind.icon(): ImageVector = when (this) {
 }
 
 @Composable
-private fun MemoryParitySectionKind.tint(): Color = when (this) {
-    MemoryParitySectionKind.Skills -> MaterialTheme.colorScheme.primary
-    MemoryParitySectionKind.Memory -> MaterialTheme.colorScheme.secondary
-    MemoryParitySectionKind.Schedules -> MaterialTheme.colorScheme.tertiary
-    MemoryParitySectionKind.Channels -> MaterialTheme.colorScheme.onSurfaceVariant
-}
+private fun MemoryParitySectionKind.tint(): Color = accentRole.color()
 
 private fun MemoryParityItem.icon(): ImageVector = when (this) {
     is MemoryParityItem.Skill -> LettaIcons.Tool
@@ -447,19 +444,15 @@ private fun MemoryParityItem.icon(): ImageVector = when (this) {
 }
 
 @Composable
-private fun MemoryParityItem.tint(): Color = when (this) {
-    is MemoryParityItem.Skill -> MaterialTheme.colorScheme.primary
-    is MemoryParityItem.MemoryBlock -> MaterialTheme.colorScheme.secondary
-    is MemoryParityItem.Schedule -> MaterialTheme.colorScheme.tertiary
-    is MemoryParityItem.Channel -> status.tint()
-}
+private fun MemoryParityItem.tint(): Color = accentRole.color()
 
 @Composable
-private fun MemoryChannelStatus.tint(): Color = when (this) {
-    MemoryChannelStatus.Connected -> MaterialTheme.colorScheme.tertiary
-    MemoryChannelStatus.Connecting -> MaterialTheme.colorScheme.primary
-    MemoryChannelStatus.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
-    MemoryChannelStatus.Disconnected -> MaterialTheme.colorScheme.error
+private fun MemoryAccentRole.color(): Color = when (this) {
+    MemoryAccentRole.Primary -> MaterialTheme.colorScheme.primary
+    MemoryAccentRole.Secondary -> MaterialTheme.colorScheme.secondary
+    MemoryAccentRole.Tertiary -> MaterialTheme.colorScheme.tertiary
+    MemoryAccentRole.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+    MemoryAccentRole.Error -> MaterialTheme.colorScheme.error
 }
 
 @PreviewLightDark

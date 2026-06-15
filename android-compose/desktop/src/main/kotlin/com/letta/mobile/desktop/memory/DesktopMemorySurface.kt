@@ -60,9 +60,8 @@ import com.dk.kuiver.renderer.KuiverViewerConfig
 import com.dk.kuiver.ui.EdgeLabelStyle
 import com.dk.kuiver.ui.LabelPlacement
 import com.dk.kuiver.ui.StyledEdgeContent
-import com.letta.mobile.data.memory.MemoryChannelStatus
+import com.letta.mobile.data.memory.MemoryAccentRole
 import com.letta.mobile.data.memory.MemoryGraphNode
-import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
 import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.MemoryParitySection
@@ -71,6 +70,7 @@ import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.data.memory.MemoryTextLink
+import com.letta.mobile.data.memory.accentRole
 import sh.calvin.autolinktext.SimpleTextMatchResult
 import sh.calvin.autolinktext.TextMatcher
 import sh.calvin.autolinktext.TextRule
@@ -395,7 +395,7 @@ private fun GraphLegend(
 @Composable
 private fun MemoryGraphNodeChip(node: MemoryGraphNode?) {
     val resolvedNode = node ?: return
-    val accentColor = resolvedNode.kind.accentColor(resolvedNode.status)
+    val accentColor = resolvedNode.kind.accentRole(resolvedNode.status).color()
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
@@ -616,27 +616,13 @@ private fun MemoryParitySectionKind.icon(): ImageVector = when (this) {
 }
 
 @Composable
-private fun MemoryGraphNodeKind.accentColor(status: MemoryChannelStatus?): Color = when (this) {
-    MemoryGraphNodeKind.Agent -> MaterialTheme.colorScheme.primary
-    MemoryGraphNodeKind.Backend -> MaterialTheme.colorScheme.primary
-    MemoryGraphNodeKind.Skill -> MaterialTheme.colorScheme.primary
-    MemoryGraphNodeKind.Memory -> MaterialTheme.colorScheme.secondary
-    MemoryGraphNodeKind.Schedule -> MaterialTheme.colorScheme.tertiary
-    MemoryGraphNodeKind.Channel -> status.channelColor()
-}
+private fun MemoryParityItem.accentColor(): Color = accentRole.color()
 
 @Composable
-private fun MemoryParityItem.accentColor(): Color = when (this) {
-    is MemoryParityItem.Skill -> MaterialTheme.colorScheme.primary
-    is MemoryParityItem.MemoryBlock -> MaterialTheme.colorScheme.secondary
-    is MemoryParityItem.Schedule -> MaterialTheme.colorScheme.tertiary
-    is MemoryParityItem.Channel -> status.channelColor()
-}
-
-@Composable
-private fun MemoryChannelStatus?.channelColor(): Color = when (this) {
-    MemoryChannelStatus.Connected -> MaterialTheme.colorScheme.primary
-    MemoryChannelStatus.Connecting -> MaterialTheme.colorScheme.tertiary
-    MemoryChannelStatus.Idle, null -> MaterialTheme.colorScheme.secondary
-    MemoryChannelStatus.Disconnected -> MaterialTheme.colorScheme.error
+private fun MemoryAccentRole.color(): Color = when (this) {
+    MemoryAccentRole.Primary -> MaterialTheme.colorScheme.primary
+    MemoryAccentRole.Secondary -> MaterialTheme.colorScheme.secondary
+    MemoryAccentRole.Tertiary -> MaterialTheme.colorScheme.tertiary
+    MemoryAccentRole.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+    MemoryAccentRole.Error -> MaterialTheme.colorScheme.error
 }
