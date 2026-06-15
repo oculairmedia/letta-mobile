@@ -33,6 +33,10 @@ object DeviceSensorSnapshotFormatter {
         }
         snapshot.display?.let { parts += "↻${it.orientation}/${it.rotation}" }
         parts += "sensors=${snapshot.sensorCount}"
+        if (snapshot.gatedCapabilities.isNotEmpty()) {
+            val enabled = snapshot.gatedCapabilities.count { it.status == DeviceSensorGatedStatus.Granted }
+            parts += "gated=$enabled/${snapshot.gatedCapabilities.size}"
+        }
         return parts.joinToString(" | ")
     }
 
