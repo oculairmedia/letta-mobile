@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -57,6 +58,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
+import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
+import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurface
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -124,6 +128,13 @@ fun LettaDesktopApp() {
         )
     }
     val scheduleLibraryState by scheduleLibraryController.state.collectAsState()
+    val channelLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
+        DesktopChannelLibraryController(
+            sessionGraphProvider = dataBindings.sessionGraphProvider,
+            scope = chatScope,
+        )
+    }
+    val channelLibraryState by channelLibraryController.state.collectAsState()
     val toolLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopToolLibraryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -164,6 +175,9 @@ fun LettaDesktopApp() {
     LaunchedEffect(scheduleLibraryController) {
         scheduleLibraryController.start()
     }
+    LaunchedEffect(channelLibraryController) {
+        channelLibraryController.start()
+    }
     LaunchedEffect(toolLibraryController) {
         toolLibraryController.start()
     }
@@ -182,6 +196,9 @@ fun LettaDesktopApp() {
     }
     DisposableEffect(scheduleLibraryController) {
         onDispose { scheduleLibraryController.close() }
+    }
+    DisposableEffect(channelLibraryController) {
+        onDispose { channelLibraryController.close() }
     }
     DisposableEffect(toolLibraryController) {
         onDispose { toolLibraryController.close() }
@@ -233,6 +250,7 @@ fun LettaDesktopApp() {
                     chatState = chatState,
                     memoryState = memoryState,
                     scheduleLibraryState = scheduleLibraryState,
+                    channelLibraryState = channelLibraryState,
                     toolLibraryState = toolLibraryState,
                     onChatConversationSelected = chatController::selectConversation,
                     onChatConversationDeleted = chatController::deleteConversation,
@@ -247,6 +265,7 @@ fun LettaDesktopApp() {
                     onMemoryAgentSelected = memoryController::selectAgent,
                     onSchedulesRefresh = scheduleLibraryController::reload,
                     onScheduleAgentSelected = scheduleLibraryController::selectAgent,
+                    onChannelsRefresh = channelLibraryController::refresh,
                     onToolsRefresh = toolLibraryController::reload,
                     onToolsSearchQueryChanged = toolLibraryController::updateSearchQuery,
                     onToolsTagToggled = toolLibraryController::toggleTag,
@@ -353,6 +372,12 @@ private fun DesktopNavigation(
             icon = DesktopDestination.Schedules.icon,
             selected = selectedDestination == DesktopDestination.Schedules,
             onClick = { onDestinationSelected(DesktopDestination.Schedules) },
+        )
+        DesktopNavRow(
+            label = "Channels",
+            icon = DesktopDestination.Channels.icon,
+            selected = selectedDestination == DesktopDestination.Channels,
+            onClick = { onDestinationSelected(DesktopDestination.Channels) },
         )
         DesktopNavRow(
             label = "Skills & Tools",
@@ -469,6 +494,7 @@ private val DesktopDestination.icon: ImageVector
         DesktopDestination.Agents -> Icons.Outlined.SmartToy
         DesktopDestination.Memory -> Icons.Outlined.Memory
         DesktopDestination.Schedules -> Icons.Outlined.Schedule
+        DesktopDestination.Channels -> Icons.Outlined.Hub
         DesktopDestination.Conversations -> Icons.Outlined.Forum
         DesktopDestination.Settings -> Icons.Outlined.Settings
     }
@@ -480,6 +506,7 @@ private fun DestinationContent(
     chatState: DesktopChatSurfaceState,
     memoryState: DesktopMemorySurfaceState,
     scheduleLibraryState: DesktopScheduleLibraryState,
+    channelLibraryState: DesktopChannelLibraryState,
     toolLibraryState: DesktopToolLibraryState,
     onChatConversationSelected: (String) -> Unit,
     onChatConversationDeleted: (String) -> Unit,
@@ -492,6 +519,7 @@ private fun DestinationContent(
     onMemoryAgentSelected: (String) -> Unit,
     onSchedulesRefresh: () -> Unit,
     onScheduleAgentSelected: (String) -> Unit,
+    onChannelsRefresh: () -> Unit,
     onToolsRefresh: () -> Unit,
     onToolsSearchQueryChanged: (String) -> Unit,
     onToolsTagToggled: (String) -> Unit,
@@ -529,6 +557,14 @@ private fun DestinationContent(
             state = scheduleLibraryState,
             onRefresh = onSchedulesRefresh,
             onAgentSelected = onScheduleAgentSelected,
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == DesktopDestination.Channels) {
+        DesktopChannelLibrarySurface(
+            state = channelLibraryState,
+            onRefresh = onChannelsRefresh,
             modifier = modifier,
         )
         return
@@ -580,6 +616,9 @@ private fun DestinationContent(
                 // Rendered by the full-height branch above.
             }
             DesktopDestination.Schedules -> {
+                // Rendered by the full-height branch above.
+            }
+            DesktopDestination.Channels -> {
                 // Rendered by the full-height branch above.
             }
             DesktopDestination.Conversations -> {

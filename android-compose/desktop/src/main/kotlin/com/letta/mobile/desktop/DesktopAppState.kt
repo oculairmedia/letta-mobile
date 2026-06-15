@@ -43,6 +43,10 @@ enum class DesktopDestination(
         label = "Schedules",
         summary = "Shared schedule state lists scheduled messages by agent in the desktop shell.",
     ),
+    Channels(
+        label = "Channels",
+        summary = "Shared channel state shows live backend transport, delivery, and A2UI capability status.",
+    ),
     Conversations(
         label = "Conversations",
         summary = "Desktop chat uses a persistent conversation list, shared render models, and a JVM Compose detail pane.",

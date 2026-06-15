@@ -1,6 +1,9 @@
 package com.letta.mobile.data.memory
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.channel.ChannelDisplayItem
+import com.letta.mobile.data.channel.ChannelDisplayMapper
+import com.letta.mobile.data.channel.ChannelDisplayStatus
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -447,8 +450,11 @@ object MemoryParityMapper {
     private fun channelsSection(
         backendDescriptor: BackendDescriptor,
         channelTransportState: ChannelTransportState,
-    ): MemoryParitySection =
-        channelTransportState.describe().let { subtitle ->
+    ): MemoryParitySection {
+        val channel = ChannelDisplayMapper.build(backendDescriptor, channelTransportState)
+            .channels
+            .single()
+        return channel.let { item ->
             MemoryParitySection(
                 kind = MemoryParitySectionKind.Channels,
                 title = "Channels",
@@ -456,17 +462,18 @@ object MemoryParityMapper {
                 emptyMessage = "No channels available.",
                 items = listOf(
                     MemoryParityItem.Channel(
-                        id = backendDescriptor.backendId.value,
-                        title = backendDescriptor.label,
-                        subtitle = subtitle,
-                        detailText = subtitle,
-                        metadataLabels = listOf(channelTransportState.toMemoryStatus().name),
-                        links = MemoryTextLinkParser.parse(subtitle),
-                        status = channelTransportState.toMemoryStatus(),
+                        id = item.id,
+                        title = item.title,
+                        subtitle = item.subtitle,
+                        detailText = item.detailText,
+                        metadataLabels = item.metadataLabels,
+                        links = MemoryTextLinkParser.parse(item.detailText),
+                        status = item.toMemoryStatus(),
                     ),
                 ),
             )
         }
+    }
 
     private fun memoryGraph(
         selectedAgent: Agent?,
@@ -555,25 +562,15 @@ object MemoryParityMapper {
                 overview.numTokensSummaryMemory
         } ?: 0
 
-    private fun ChannelTransportState.describe(): String = when (this) {
-        ChannelTransportState.Idle -> "Idle"
-        ChannelTransportState.Connecting -> "Connecting"
-        is ChannelTransportState.Connected -> buildString {
-            append("Connected")
-            canonicalLiveTransport?.takeIf { it.isNotBlank() }?.let { append(" via $it") }
-        }
-        is ChannelTransportState.Disconnected -> reason.ifBlank { "Disconnected" }
-    }
-
-    private fun ChannelTransportState.toMemoryStatus(): MemoryChannelStatus = when (this) {
-        ChannelTransportState.Idle -> MemoryChannelStatus.Idle
-        ChannelTransportState.Connecting -> MemoryChannelStatus.Connecting
-        is ChannelTransportState.Connected -> MemoryChannelStatus.Connected
-        is ChannelTransportState.Disconnected -> MemoryChannelStatus.Disconnected
-    }
-
     private const val MAX_MEMORY_PREVIEW_CHARS = 160
     private const val MAX_METADATA_TAGS = 2
+}
+
+private fun ChannelDisplayItem.toMemoryStatus(): MemoryChannelStatus = when (status) {
+    ChannelDisplayStatus.Connected -> MemoryChannelStatus.Connected
+    ChannelDisplayStatus.Connecting -> MemoryChannelStatus.Connecting
+    ChannelDisplayStatus.Idle -> MemoryChannelStatus.Idle
+    ChannelDisplayStatus.Disconnected -> MemoryChannelStatus.Disconnected
 }
 
 object MemoryTextLinkParser {

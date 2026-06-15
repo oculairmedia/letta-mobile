@@ -111,7 +111,7 @@ class MemoryParityMapperTest {
         val channel = assertIs<MemoryParityItem.Channel>(state.section(MemoryParitySectionKind.Channels).items.single())
         assertEquals(MemoryChannelStatus.Connected, channel.status)
         assertEquals("Connected via websocket", channel.subtitle)
-        assertEquals(listOf("Connected"), channel.metadataLabels)
+        assertEquals(listOf("Connected", "websocket", "Device device"), channel.metadataLabels)
         assertEquals(MemoryAccentRole.Tertiary, channel.accentRole)
         assertEquals(MemoryAccentRole.Tertiary, MemoryGraphNodeKind.Channel.accentRole(channel.status))
         assertEquals(MemoryAccentRole.Neutral, state.section(MemoryParitySectionKind.Channels).kind.accentRole)
