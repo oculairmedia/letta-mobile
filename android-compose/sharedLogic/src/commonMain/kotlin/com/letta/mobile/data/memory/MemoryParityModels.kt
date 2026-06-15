@@ -194,9 +194,14 @@ object MemoryParityMapper {
         channelTransportState: ChannelTransportState,
         contextWindowOverview: ContextWindowOverview? = null,
     ): MemoryParityState {
-        val selectedAgent = agents.firstOrNull { it.id.value == selectedAgentId }
-            ?: agents.firstOrNull()
-        val selectedTools = selectedAgent?.tools?.takeIf { it.isNotEmpty() } ?: allTools
+        val selectedAgent = if (selectedAgentId != null) {
+            agents.firstOrNull { it.id.value == selectedAgentId }
+        } else {
+            agents.firstOrNull()
+        }
+        val selectedTools = selectedAgent?.tools
+            ?: allTools.takeIf { selectedAgentId == null && agents.isEmpty() }
+            ?: emptyList()
         val selectedBlocks = selectedAgent?.blocks.orEmpty()
         val channelSection = channelsSection(backendDescriptor, channelTransportState)
         val sections = listOf(

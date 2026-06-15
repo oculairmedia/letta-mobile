@@ -110,7 +110,7 @@ class MemoryParityMapperTest {
     }
 
     @Test
-    fun buildFallsBackToAllToolsWhenSelectedAgentHasNoAttachedTools() {
+    fun buildKeepsSelectedAgentSkillsScopedWhenAgentHasNoAttachedTools() {
         val state = MemoryParityMapper.build(
             agents = listOf(Agent(id = AgentId("agent-1"), name = "No tools")),
             selectedAgentId = "agent-1",
@@ -120,9 +120,43 @@ class MemoryParityMapperTest {
             channelTransportState = ChannelTransportState.Idle,
         )
 
+        assertEquals(0, state.summary.skillCount)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Skills).items)
+        assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
+    }
+
+    @Test
+    fun buildUsesAllToolsOnlyWhenNoAgentIsSelected() {
+        val state = MemoryParityMapper.build(
+            agents = emptyList(),
+            selectedAgentId = null,
+            allTools = listOf(sampleTool("fallback")),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+        )
+
         val skill = assertIs<MemoryParityItem.Skill>(state.section(MemoryParitySectionKind.Skills).items.single())
         assertEquals("fallback", skill.id)
-        assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
+    }
+
+    @Test
+    fun buildDoesNotFallbackToAnotherAgentWhenRequestedAgentIsMissing() {
+        val state = MemoryParityMapper.build(
+            agents = listOf(sampleAgent()),
+            selectedAgentId = "missing-agent",
+            allTools = listOf(sampleTool("fallback")),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+        )
+
+        assertEquals(null, state.selectedAgentId)
+        assertEquals(null, state.selectedAgentName)
+        assertEquals(0, state.summary.skillCount)
+        assertEquals(0, state.summary.memoryBlockCount)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Skills).items)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Memory).items)
     }
 
     @Test

@@ -73,6 +73,8 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
 
+private const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
+
 @Composable
 fun LettaDesktopApp() {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
@@ -89,10 +91,15 @@ fun LettaDesktopApp() {
         mutableStateOf(defaultDesktopBootstrapState(dataBindings, activeConfig))
     }
     val chatScope = rememberCoroutineScope()
-    val chatController = remember(bootstrapState, chatScope) {
+    val chatController = remember(bootstrapState, chatScope, dataBindings.sessionGraphProvider) {
         DesktopChatController(
             bootstrapState = bootstrapState,
             scope = chatScope,
+            agentNamesByIdProvider = {
+                val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
+                agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
+                agentRepository.agents.value.associate { agent -> agent.id.value to agent.name }
+            },
         )
     }
     val chatState by chatController.state.collectAsState()
@@ -132,6 +139,11 @@ fun LettaDesktopApp() {
     }
     LaunchedEffect(memoryController) {
         memoryController.start()
+    }
+    LaunchedEffect(selectedDestination, chatState.selectedConversation?.agentId, memoryController) {
+        if (selectedDestination == DesktopDestination.Memory) {
+            chatState.selectedConversation?.agentId?.let(memoryController::selectAgent)
+        }
     }
     DisposableEffect(memoryController) {
         onDispose { memoryController.close() }

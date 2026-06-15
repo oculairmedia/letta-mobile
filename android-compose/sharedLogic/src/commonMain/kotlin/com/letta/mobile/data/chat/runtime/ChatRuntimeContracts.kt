@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.runtime
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 
@@ -25,6 +26,7 @@ data class ChatConversationSummary(
     val updatedAtLabel: String,
     val lastMessagePreview: String,
     val unreadCount: Int = 0,
+    val agentId: String? = null,
 )
 
 @Immutable
@@ -60,6 +62,25 @@ fun groupConversationsByAgentName(
             )
         }
         .sortedBy { it.agentName.lowercase() }
+
+fun Conversation.toChatConversationSummary(
+    agentNamesById: Map<String, String> = emptyMap(),
+): ChatConversationSummary {
+    val agentIdValue = agentId.value
+    val agentDisplayName = agentNamesById[agentIdValue]
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: agentIdValue
+    val updatedLabel = lastMessageAt ?: updatedAt ?: createdAt ?: "Remote"
+    return ChatConversationSummary(
+        id = id.value,
+        title = summary?.takeIf { it.isNotBlank() } ?: "Conversation ${id.value.takeLast(6)}",
+        agentName = agentDisplayName,
+        updatedAtLabel = updatedLabel,
+        lastMessagePreview = "Loaded from backend",
+        agentId = agentIdValue,
+    )
+}
 
 private fun ChatConversationSummary.agentDisplayName(): String =
     agentName.trim().ifBlank { UNKNOWN_AGENT_LABEL }

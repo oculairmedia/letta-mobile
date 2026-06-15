@@ -115,7 +115,11 @@ class DesktopMemoryController(
     }
 
     private fun List<Agent>.resolveSelection(requestedAgentId: String?): Agent? =
-        firstOrNull { it.id.value == requestedAgentId } ?: firstOrNull()
+        if (requestedAgentId != null) {
+            firstOrNull { it.id.value == requestedAgentId }
+        } else {
+            firstOrNull()
+        }
 
     private fun Throwable.toDesktopMemoryMessage(): String =
         when (this) {

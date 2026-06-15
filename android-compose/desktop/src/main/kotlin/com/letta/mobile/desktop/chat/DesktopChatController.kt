@@ -5,7 +5,7 @@ import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
-import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.chat.runtime.toChatConversationSummary
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
@@ -26,6 +26,7 @@ class DesktopChatController(
     private val gatewayFactory: () -> DesktopChatGateway = {
         DesktopLettaHttpChatGateway(bootstrapState.config)
     },
+    private val agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
     private val loopFactory: (
         gateway: DesktopChatGateway,
         conversationId: String,
@@ -221,7 +222,8 @@ class DesktopChatController(
             val nextGateway = gatewayFactory()
             gateway = nextGateway
             val conversations = nextGateway.listConversations()
-            val summaries = conversations.map { it.toDesktopSummary() }
+            val agentNamesById = runCatching { agentNamesByIdProvider() }.getOrDefault(emptyMap())
+            val summaries = conversations.map { it.toChatConversationSummary(agentNamesById) }
             val selectedId = summaries.firstOrNull()?.id
 
             if (closed) return
@@ -309,17 +311,6 @@ class DesktopChatController(
             )
         }
     }
-}
-
-private fun Conversation.toDesktopSummary(): DesktopConversationSummary {
-    val updatedLabel = lastMessageAt ?: updatedAt ?: createdAt ?: "Remote"
-    return DesktopConversationSummary(
-        id = id.value,
-        title = summary?.takeIf { it.isNotBlank() } ?: "Conversation ${id.value.takeLast(6)}",
-        agentName = agentId.value,
-        updatedAtLabel = updatedLabel,
-        lastMessagePreview = "Loaded from backend",
-    )
 }
 
 private fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
