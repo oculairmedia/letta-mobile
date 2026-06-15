@@ -32,8 +32,8 @@ enum class DesktopDestination(
         summary = "Windows desktop launch status and backend configuration.",
     ),
     Agents(
-        label = "Agents",
-        summary = "Shared agent models are available; desktop read repositories back the memory parity surface.",
+        label = "Skills & Tools",
+        summary = "Shared tool library state backs desktop search, tag filters, paging, and MCP merge behavior.",
     ),
     Memory(
         label = "Memory",

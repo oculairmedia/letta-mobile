@@ -67,6 +67,9 @@ import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.memory.DesktopMemoryController
 import com.letta.mobile.desktop.memory.DesktopMemorySurface
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
+import com.letta.mobile.desktop.tools.DesktopToolLibraryController
+import com.letta.mobile.desktop.tools.DesktopToolLibraryState
+import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -110,6 +113,13 @@ fun LettaDesktopApp() {
         )
     }
     val memoryState by memoryController.state.collectAsState()
+    val toolLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
+        DesktopToolLibraryController(
+            sessionGraphProvider = dataBindings.sessionGraphProvider,
+            scope = chatScope,
+        )
+    }
+    val toolLibraryState by toolLibraryController.state.collectAsState()
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
@@ -140,6 +150,9 @@ fun LettaDesktopApp() {
     LaunchedEffect(memoryController) {
         memoryController.start()
     }
+    LaunchedEffect(toolLibraryController) {
+        toolLibraryController.start()
+    }
     LaunchedEffect(selectedDestination, chatState.selectedConversation?.agentId, memoryController) {
         if (selectedDestination == DesktopDestination.Memory) {
             chatState.selectedConversation?.agentId?.let(memoryController::selectAgent)
@@ -147,6 +160,9 @@ fun LettaDesktopApp() {
     }
     DisposableEffect(memoryController) {
         onDispose { memoryController.close() }
+    }
+    DisposableEffect(toolLibraryController) {
+        onDispose { toolLibraryController.close() }
     }
 
     MaterialTheme(
@@ -194,6 +210,7 @@ fun LettaDesktopApp() {
                     state = bootstrapState,
                     chatState = chatState,
                     memoryState = memoryState,
+                    toolLibraryState = toolLibraryState,
                     onChatConversationSelected = chatController::selectConversation,
                     onChatConversationDeleted = chatController::deleteConversation,
                     onChatComposerTextChanged = chatController::updateComposerText,
@@ -205,6 +222,11 @@ fun LettaDesktopApp() {
                     onChatRetryConnection = chatController::retryConnection,
                     onMemoryRefresh = memoryController::reload,
                     onMemoryAgentSelected = memoryController::selectAgent,
+                    onToolsRefresh = toolLibraryController::reload,
+                    onToolsSearchQueryChanged = toolLibraryController::updateSearchQuery,
+                    onToolsTagToggled = toolLibraryController::toggleTag,
+                    onToolsClearTags = toolLibraryController::clearTags,
+                    onToolsLoadMore = toolLibraryController::loadMore,
                     onConfigSaved = { nextConfig ->
                         configStore.save(nextConfig)
                         activeConfig = configStore.load()
@@ -425,6 +447,7 @@ private fun DestinationContent(
     state: DesktopBootstrapState,
     chatState: DesktopChatSurfaceState,
     memoryState: DesktopMemorySurfaceState,
+    toolLibraryState: DesktopToolLibraryState,
     onChatConversationSelected: (String) -> Unit,
     onChatConversationDeleted: (String) -> Unit,
     onChatComposerTextChanged: (String) -> Unit,
@@ -434,6 +457,11 @@ private fun DestinationContent(
     onChatRetryConnection: () -> Unit,
     onMemoryRefresh: () -> Unit,
     onMemoryAgentSelected: (String) -> Unit,
+    onToolsRefresh: () -> Unit,
+    onToolsSearchQueryChanged: (String) -> Unit,
+    onToolsTagToggled: (String) -> Unit,
+    onToolsClearTags: () -> Unit,
+    onToolsLoadMore: () -> Unit,
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
     modifier: Modifier = Modifier,
@@ -457,6 +485,18 @@ private fun DestinationContent(
             state = memoryState,
             onRefresh = onMemoryRefresh,
             onAgentSelected = onMemoryAgentSelected,
+            modifier = modifier,
+        )
+        return
+    }
+    if (destination == DesktopDestination.Agents) {
+        DesktopToolLibrarySurface(
+            state = toolLibraryState,
+            onRefresh = onToolsRefresh,
+            onSearchQueryChanged = onToolsSearchQueryChanged,
+            onTagToggled = onToolsTagToggled,
+            onClearTags = onToolsClearTags,
+            onLoadMore = onToolsLoadMore,
             modifier = modifier,
         )
         return
@@ -490,13 +530,7 @@ private fun DestinationContent(
                 item { StartupReadinessCard(state.featureReadiness) }
             }
             DesktopDestination.Agents -> {
-                item {
-                    PortabilityCard(
-                        title = "Agent surface",
-                        body = "The desktop module can read remote agents through the shared repository contract. The remaining work is turning the Android-only list management flows into reusable screen state and desktop-specific renderers.",
-                        state = DesktopFeatureState.InProgress,
-                    )
-                }
+                // Rendered by the full-height branch above.
             }
             DesktopDestination.Memory -> {
                 // Rendered by the full-height branch above.
