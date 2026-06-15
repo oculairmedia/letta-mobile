@@ -20,6 +20,7 @@ import com.letta.mobile.runtime.sensors.SensorDescriptor
 import com.letta.mobile.runtime.sensors.StorageSnapshot
 import com.letta.mobile.runtime.sensors.ThermalSnapshot
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -41,6 +42,18 @@ class DeviceActionCommandRunnerTest {
         mobileIntentActionTool = MobileIntentActionTool(ApplicationProvider.getApplicationContext()),
         hardwareControlTool = DeviceHardwareControlTool(fakeHardwareProvider()),
     )
+
+    @Test
+    fun `device catalog returns command descriptors`() {
+        val result = Json.parseToJsonElement(runner.runJson("""{"command":"device.catalog"}""")).jsonObject
+
+        assertEquals("device.catalog", result["command"]!!.jsonPrimitive.content)
+        assertEquals("true", result["success"]!!.jsonPrimitive.content)
+        val commands = result["payload"]!!.jsonObject["commands"]!!.jsonArray
+        assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "sensors.summary" })
+        assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "hardware.capabilities" })
+        assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "intent.dry_run" })
+    }
 
     @Test
     fun `sensors summary returns command envelope with payload`() {
