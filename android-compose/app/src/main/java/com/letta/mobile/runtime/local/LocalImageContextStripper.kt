@@ -1,6 +1,8 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.data.storage.ImageBlobStore
 import java.io.File
+import java.util.Base64
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -39,6 +41,7 @@ import kotlinx.serialization.json.put
  * is left untouched → no-op once stripped).
  */
 class LocalImageContextStripper(
+    private val blobStore: ImageBlobStore? = null,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     data class StripReport(val partsStripped: Int, val bytesFreed: Int) {
@@ -93,12 +96,14 @@ class LocalImageContextStripper(
     }
 
     /**
-     * Any `type:"image"` part that should be replaced with a text placeholder —
-     * whether it still has base64 data OR is an empty image shell left by an
-     * earlier (buggy) strip pass. Empty shells MUST be converted too: an empty
-     * image_url is rejected by strict providers (MiniMax 2013). A part that is
-     * already a text placeholder (type:text) is not an image and is skipped, so
-     * this stays idempotent.
+     * Any `type:"image"` part that should be replaced with an image_ref or text
+     * placeholder — whether it still has base64 data OR is an empty image shell
+     * left by an earlier (buggy) strip pass. Empty shells MUST be converted too:
+     * an empty image_url is rejected by strict providers (MiniMax 2013).
+     *
+     * Parts that are already image_ref or text placeholders are NOT images and
+     * are skipped, so this stays idempotent (image_ref parts from a prior pass
+     * are left untouched).
      */
     private fun isStrippableImage(part: Any?): Boolean {
         val p = part as? JsonObject ?: return false
@@ -112,23 +117,53 @@ class LocalImageContextStripper(
     }
 
     /**
-     * Replace a sent image with a TEXT placeholder part — NOT an empty
-     * `{type:image}`. An empty image part is still serialized to the provider
-     * as an image_url with empty base64, which a strict provider rejects with
-     * "invalid image content: decode image config: unknown format" (MiniMax
-     * code 2013). A text placeholder keeps the context small, leaves a
-     * human/agent-readable trace that an image was here, and never reaches the
-     * provider as a malformed image.
+     * Persist image bytes to the blob store and replace the sent image with an
+     * image_ref pointer. If blob store is unavailable or bytes can't be decoded,
+     * falls back to a TEXT placeholder (never crashes, never leaves empty image).
+     *
+     * STRICT-PROVIDER SAFETY: image_ref parts only live in persisted JSON and
+     * are resolved away before reaching the typed model or provider wire format.
+     * An image_ref must never become an empty image_url on the wire.
      */
     private fun strippedImage(p: JsonObject): JsonObject {
         val mediaType = p["mimeType"]?.jsonStr()
             ?: (p["source"] as? JsonObject)?.get("media_type")?.jsonStr()
             ?: "image"
+
+        // Try to persist to blob store and emit image_ref
+        blobStore?.let { store ->
+            val imageBytes = extractImageBytes(p)
+            if (imageBytes != null) {
+                val ref = runCatching { store.putBytes(mediaType, imageBytes) }.getOrNull()
+                if (ref != null) {
+                    return buildJsonObject {
+                        put("type", JsonPrimitive("image_ref"))
+                        put("ref", JsonPrimitive(ref))
+                        put("mediaType", JsonPrimitive(mediaType))
+                    }
+                }
+            }
+        }
+
+        // Fallback: text placeholder (existing behavior)
         return buildJsonObject {
             put("type", JsonPrimitive("text"))
             put("text", JsonPrimitive("[image omitted from context: $mediaType]"))
             put("stripped", JsonPrimitive(true))
         }
+    }
+
+    /**
+     * Extract raw image bytes from either flat or nested image JSON shape.
+     * Returns null if base64 data is missing or can't be decoded.
+     */
+    private fun extractImageBytes(p: JsonObject): ByteArray? {
+        val base64Data = p["data"]?.jsonStr()
+            ?: (p["source"] as? JsonObject)?.get("data")?.jsonStr()
+            ?: return null
+        return runCatching {
+            Base64.getDecoder().decode(base64Data)
+        }.getOrNull()
     }
 
     private fun atomicWrite(target: File, contents: String) {
