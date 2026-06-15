@@ -133,8 +133,10 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
  * sanitization MUST stay confined to this native boundary and MUST NOT
  * be applied in storage, display, or any other non-LiteRT path.
  */
-fun sanitizeForLiteRt(input: String): String =
-    input.filterNot { it.isSurrogate() }
+fun sanitizeForLiteRt(input: String): String {
+    if (input.none { it.isSurrogate() }) return input
+    return input.filterNot { it.isSurrogate() }
+}
 
 fun liteRtLmEngineCacheKey(modelSelection: EmbeddedLettaCodeModelSelection, visionEnabled: Boolean): String =
     "${modelSelection.startKey}|vision=$visionEnabled"
