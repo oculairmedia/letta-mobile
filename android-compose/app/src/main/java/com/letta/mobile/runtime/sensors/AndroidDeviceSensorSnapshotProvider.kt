@@ -19,6 +19,7 @@ import kotlin.math.roundToInt
 
 class AndroidDeviceSensorSnapshotProvider(
     private val context: Context,
+    private val gatedCapabilityProvider: DeviceSensorGatedCapabilityProvider = AndroidDeviceSensorGatedCapabilityProvider(context),
 ) : DeviceSensorSnapshotProvider {
     override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = DeviceSensorSnapshot(
         capturedAtMillis = nowMillis,
@@ -29,6 +30,7 @@ class AndroidDeviceSensorSnapshotProvider(
         network = readNetwork(),
         display = readDisplay(),
         sensors = readSensors(),
+        gatedCapabilities = gatedCapabilityProvider.listCapabilities(),
     )
 
     private fun readBattery(): BatterySnapshot? {
