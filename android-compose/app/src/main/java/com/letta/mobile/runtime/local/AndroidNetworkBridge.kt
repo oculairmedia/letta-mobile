@@ -16,6 +16,8 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
 import java.net.URL
+import java.security.SecureRandom
+import java.util.Base64
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -39,6 +41,7 @@ interface AndroidNetworkBridge {
 
 data class AndroidNetworkBridgeSession(
     val baseUrl: String,
+    val authToken: String,
     private val closeAction: () -> Unit,
 ) : Closeable {
     override fun close() = closeAction()
@@ -56,6 +59,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
 
     override fun start(): AndroidNetworkBridgeSession {
         val serverSocket = ServerSocket(0, 50, InetAddress.getByName(LOOPBACK_HOST))
+        val authToken = newBridgeToken()
         val executor = Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "android-network-bridge").apply { isDaemon = true }
         }
@@ -63,6 +67,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
             serverSocket = serverSocket,
             executor = executor,
             json = json,
+            authToken = authToken,
             sensorReadTool = DeviceSensorReadTool(sensorSnapshotProvider),
             mobileActionRegistry = mobileActionRegistry,
             mobileIntentActionTool = mobileIntentActionTool,
@@ -72,6 +77,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
             baseUrl = "http://$LOOPBACK_HOST:${serverSocket.localPort}",
+            authToken = authToken,
             closeAction = session::close,
         )
     }
@@ -80,6 +86,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val serverSocket: ServerSocket,
         private val executor: ExecutorService,
         private val json: Json,
+        private val authToken: String,
         private val sensorReadTool: DeviceSensorReadTool,
         private val mobileActionRegistry: MobileActionRegistry,
         private val mobileIntentActionTool: MobileIntentActionTool,
@@ -129,6 +136,10 @@ class LocalAndroidNetworkBridge @Inject constructor(
             val body = readBody(input, contentLength)
             if (body == null) {
                 socket.outputStream.writeJsonResponse(400, errorBody("invalid_request", "Request body ended early."))
+                return
+            }
+            if (!headers.isAuthorized(authToken)) {
+                socket.outputStream.writeJsonResponse(401, errorBody("unauthorized", "Android bridge authorization token is missing or invalid."))
                 return
             }
             when {
@@ -404,6 +415,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
             val reason = when (status) {
                 200 -> "OK"
                 400 -> "Bad Request"
+                401 -> "Unauthorized"
                 403 -> "Forbidden"
                 404 -> "Not Found"
                 502 -> "Bad Gateway"
@@ -428,8 +440,17 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val ALLOWED_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
         private val METHODS_WITH_BODY = setOf("POST", "PUT", "PATCH", "DELETE")
         private val BLOCKED_REQUEST_HEADERS = setOf("host", "connection", "content-length", "transfer-encoding")
+
+        private fun newBridgeToken(): String {
+            val bytes = ByteArray(32)
+            SecureRandom().nextBytes(bytes)
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+        }
     }
 }
+
+private fun Map<String, String>.isAuthorized(expectedToken: String): Boolean =
+    this["authorization"]?.trim() == "Bearer $expectedToken"
 
 private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
