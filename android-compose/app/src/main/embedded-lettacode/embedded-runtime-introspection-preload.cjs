@@ -59,39 +59,25 @@ function registerReadSensorsTool() {
   }, (input, toolName) => postAndroidBridge('/device/sensors/read', input, toolName));
 }
 
-const MOBILE_INTENT_TOOL_DEFINITIONS = [
-  { name: 'open_wifi_settings', description: 'Open Android Wi-Fi settings. User action is required; this tool only launches settings UI.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'show_location_on_map', description: 'Show a location query in a maps app. User action is required in the launched app.', parameters: { type: 'object', properties: { location: { type: 'string', description: 'Address, place name, or latitude/longitude query to show on a map.' } }, required: ['location'], additionalProperties: false } },
-  { name: 'compose_email', description: 'Open an email compose UI with recipient, subject, and body prefilled. Does not send email.', parameters: { type: 'object', properties: { to: { type: 'string', description: 'Recipient email address.' }, subject: { type: 'string', description: 'Draft email subject.' }, body: { type: 'string', description: 'Draft email body.' } }, required: ['to'], additionalProperties: false } },
-  { name: 'insert_contact', description: 'Open Android contact insert UI with fields prefilled. Does not write a contact silently.', parameters: { type: 'object', properties: { firstName: { type: 'string' }, lastName: { type: 'string' }, phoneNumber: { type: 'string' }, email: { type: 'string' } }, additionalProperties: false } },
-  { name: 'insert_calendar_event', description: 'Open Android calendar event insert UI with date/time and title prefilled. Does not write an event silently.', parameters: { type: 'object', properties: { datetime: { type: 'string', description: 'Event start time, preferably ISO-8601.' }, title: { type: 'string', description: 'Calendar event title.' } }, required: ['datetime', 'title'], additionalProperties: false } }
-];
-
-function registerMobileIntentTools() {
-  for (const tool of MOBILE_INTENT_TOOL_DEFINITIONS) {
-    registerExternalTool(tool, (input, toolName) => postAndroidBridge('/device/mobile-actions/intent', { ...input, tool: toolName }, toolName));
-  }
-}
-
-const HARDWARE_TOOL_DEFINITIONS = [
-  { name: 'hardware_capabilities', route: '/device/hardware/capabilities', description: 'Report Android hardware-control capability status for flashlight, vibration, and audio volume without changing device state.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'set_flashlight', route: '/device/hardware/set_flashlight', description: 'Safely enable or disable the Android camera torch when supported. Use dryRun to only probe capability.', parameters: { type: 'object', properties: { enabled: { type: 'boolean', description: 'True to enable torch, false to disable.' }, dryRun: { type: 'boolean', description: 'If true, only probe support and do not change torch state.' } }, required: ['enabled'], additionalProperties: false } },
-  { name: 'vibrate', route: '/device/hardware/vibrate', description: 'Trigger a short Android vibration with safe clamped duration or pattern limits.', parameters: { type: 'object', properties: { durationMs: { type: 'integer', minimum: 1, maximum: 1000, description: 'Single vibration duration; clamped to 1000ms.' }, patternMs: { type: 'array', items: { type: 'integer', minimum: 0, maximum: 500 }, maxItems: 8, description: 'Optional waveform pattern in milliseconds; each segment is clamped.' } }, additionalProperties: false } },
-  { name: 'audio_status', route: '/device/hardware/audio_status', description: 'Read current Android music volume, max music volume, ringer mode, and fixed-volume policy status.', parameters: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'adjust_music_volume', route: '/device/hardware/adjust_music_volume', description: 'Adjust Android STREAM_MUSIC volume if permissionless policy allows, with delta clamped to +/-3 or explicit safe level.', parameters: { type: 'object', properties: { delta: { type: 'integer', minimum: -3, maximum: 3, description: 'Relative volume change; clamped to +/-3.' }, level: { type: 'integer', minimum: 0, description: 'Absolute music volume level clamped to stream bounds.' } }, additionalProperties: false } }
-];
-
-function registerHardwareControlTools() {
-  for (const tool of HARDWARE_TOOL_DEFINITIONS) {
-    const { route, ...definition } = tool;
-    registerExternalTool(definition, (input, toolName) => postAndroidBridge(route, input, toolName));
-  }
+function registerDeviceActionTool() {
+  registerExternalTool({
+    name: 'device_action',
+    description: 'Run a compact Android device-action command. Prefer this over individual device tools to avoid prompt/tool-list bloat. Commands include sensors.summary, sensors.catalog, sensors.snapshot, mobile.capabilities, intent.dry_run, hardware.capabilities, hardware.flashlight_probe, hardware.vibrate, and hardware.audio_status.',
+    parameters: {
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'Device action command, e.g. sensors.summary, hardware.capabilities, intent.dry_run.' },
+        input: { type: 'object', description: 'Optional command-specific JSON input.' }
+      },
+      required: ['command'],
+      additionalProperties: false
+    }
+  }, (input, toolName) => postAndroidBridge('/device/actions/command', input, toolName));
 }
 
 function registerEmbeddedExternalTools() {
   registerReadSensorsTool();
-  registerMobileIntentTools();
-  registerHardwareControlTools();
+  registerDeviceActionTool();
 }
 
 registerEmbeddedExternalTools();
