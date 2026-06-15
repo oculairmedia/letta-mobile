@@ -6,7 +6,10 @@ import java.io.OutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.time.Instant
+import java.util.Base64
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ExecutorService
@@ -38,6 +41,7 @@ data class OnDeviceImage(
 
 data class OnDeviceOpenAiBridgeSession(
     val baseUrl: String,
+    val authToken: String,
     private val closeAction: () -> Unit,
 ) : Closeable {
     override fun close() = closeAction()
@@ -67,9 +71,11 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
     private val engine: OnDeviceChatCompletionEngine,
 ) : OnDeviceOpenAiBridge {
     private val json = Json { ignoreUnknownKeys = true }
+    private val secureRandom = SecureRandom()
 
     override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession {
         val serverSocket = ServerSocket(0, 50, InetAddress.getByName(LOOPBACK_HOST))
+        val authToken = newSessionToken()
         val executor = Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "on-device-openai-bridge").apply { isDaemon = true }
         }
@@ -79,12 +85,20 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             modelSelection = modelSelection,
             engine = engine,
             json = json,
+            authToken = authToken,
         )
         executor.execute(session::acceptLoop)
         return OnDeviceOpenAiBridgeSession(
             baseUrl = "http://$LOOPBACK_HOST:${serverSocket.localPort}/v1",
+            authToken = authToken,
             closeAction = session::close,
         )
+    }
+
+    private fun newSessionToken(): String {
+        val bytes = ByteArray(32)
+        secureRandom.nextBytes(bytes)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
     private class BridgeServerSession(
@@ -93,6 +107,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
         private val modelSelection: EmbeddedLettaCodeModelSelection,
         private val engine: OnDeviceChatCompletionEngine,
         private val json: Json,
+        private val authToken: String,
     ) {
         @Volatile private var closed = false
 
@@ -138,6 +153,14 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                     flush()
                 }
             }
+            if (!isAuthorized(headers["authorization"])) {
+                socket.outputStream.writeJsonResponse(
+                    401,
+                    errorBody("unauthorized", "Missing or invalid bearer token."),
+                    extraHeaders = mapOf("WWW-Authenticate" to "Bearer"),
+                )
+                return
+            }
             val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
             if (contentLength < 0 || contentLength > MAX_BODY_BYTES) {
                 socket.outputStream.writeJsonResponse(
@@ -160,6 +183,16 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 method == "POST" && path == "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
+        }
+
+        private fun isAuthorized(authorization: String?): Boolean {
+            val value = authorization?.trim() ?: return false
+            if (!value.regionMatches(0, "Bearer ", 0, "Bearer ".length, ignoreCase = true)) return false
+            val supplied = value.substring("Bearer ".length).trim()
+            return MessageDigest.isEqual(
+                supplied.toByteArray(Charsets.UTF_8),
+                authToken.toByteArray(Charsets.UTF_8),
+            )
         }
 
         private fun handleChatCompletion(output: OutputStream, body: String) {
@@ -409,17 +442,27 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             )
         }
 
-        private fun OutputStream.writeJsonResponse(status: Int, body: JsonObject) {
+        private fun OutputStream.writeJsonResponse(
+            status: Int,
+            body: JsonObject,
+            extraHeaders: Map<String, String> = emptyMap(),
+        ) {
             val bytes = json.encodeToString(JsonObject.serializer(), body).toByteArray(Charsets.UTF_8)
-            writeHeaders(status, "application/json; charset=utf-8", bytes.size)
+            writeHeaders(status, "application/json; charset=utf-8", bytes.size, extraHeaders)
             write(bytes)
             flush()
         }
 
-        private fun OutputStream.writeHeaders(status: Int, contentType: String, contentLength: Int? = null) {
+        private fun OutputStream.writeHeaders(
+            status: Int,
+            contentType: String,
+            contentLength: Int? = null,
+            extraHeaders: Map<String, String> = emptyMap(),
+        ) {
             val reason = when (status) {
                 200 -> "OK"
                 400 -> "Bad Request"
+                401 -> "Unauthorized"
                 404 -> "Not Found"
                 503 -> "Service Unavailable"
                 else -> "OK"
@@ -428,6 +471,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 append("HTTP/1.1 $status $reason\r\n")
                 append("Content-Type: $contentType\r\n")
                 contentLength?.let { append("Content-Length: $it\r\n") }
+                extraHeaders.forEach { (name, value) -> append("$name: $value\r\n") }
                 append("Connection: close\r\n")
                 append("\r\n")
             }

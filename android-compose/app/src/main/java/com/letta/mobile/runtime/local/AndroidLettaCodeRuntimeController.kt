@@ -228,6 +228,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                         session = requestedSession,
                         modelSelection = modelSelection,
                         onDeviceProviderBaseUrl = modelSelection.customProviderBaseUrl ?: bridgeSession?.baseUrl,
+                        onDeviceProviderApiKey = modelSelection.customProviderApiKey ?: bridgeSession?.authToken,
                         androidNetworkBridgeBaseUrl = networkBridgeSession.baseUrl,
                         androidNetworkBridgeToken = networkBridgeSession.authToken,
                     )
@@ -248,6 +249,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         session: EmbeddedLettaCodeSessionKey,
         modelSelection: EmbeddedLettaCodeModelSelection,
         onDeviceProviderBaseUrl: String? = null,
+        onDeviceProviderApiKey: String? = null,
         androidNetworkBridgeBaseUrl: String,
         androidNetworkBridgeToken: String,
     ): LettaCodeNodeStartRequest {
@@ -283,7 +285,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(
                 baseUrl = onDeviceProviderBaseUrl,
-                apiKey = modelSelection.customProviderApiKey ?: "not-needed",
+                apiKey = onDeviceProviderApiKey ?: "not-needed",
             )
         }
         return LettaCodeNodeStartRequest(
@@ -335,6 +337,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_MAX_TOKENS", modelSelection.maxTokens.toString())
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_CACHE_DIR", modelCacheDirectory.absolutePath)
                 onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
+                onDeviceProviderApiKey?.let { put("LMSTUDIO_API_KEY", it) }
                 modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
                 // letta.js's Bash tool resolves its shell from $SHELL first,
                 // then /bin/bash, /bin/sh, /usr/bin/env … — none of which

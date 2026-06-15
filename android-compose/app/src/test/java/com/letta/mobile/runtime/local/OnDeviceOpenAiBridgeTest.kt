@@ -7,6 +7,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -15,11 +16,43 @@ class OnDeviceOpenAiBridgeTest {
     fun `models endpoint exposes selected model id`() {
         val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
         bridge.start(selection()).use { session ->
-            val response = get("${session.baseUrl}/models")
+            val response = get("${session.baseUrl}/models", session.authToken)
 
             assertEquals(200, response.code)
             assertTrue(response.body.contains("gemma-3n"))
             assertTrue(response.body.contains("letta-mobile"))
+        }
+    }
+
+    @Test
+    fun `models endpoint rejects missing bearer token`() {
+        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
+        bridge.start(selection()).use { session ->
+            val response = get("${session.baseUrl}/models")
+
+            assertEquals(401, response.code)
+            assertTrue(response.body.contains("unauthorized"))
+        }
+    }
+
+    @Test
+    fun `models endpoint rejects wrong bearer token`() {
+        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
+        bridge.start(selection()).use { session ->
+            val response = get("${session.baseUrl}/models", "wrong-token")
+
+            assertEquals(401, response.code)
+            assertTrue(response.body.contains("unauthorized"))
+        }
+    }
+
+    @Test
+    fun `bridge sessions receive distinct bearer tokens`() {
+        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
+        bridge.start(selection()).use { first ->
+            bridge.start(selection()).use { second ->
+                assertNotEquals(first.authToken, second.authToken)
+            }
         }
     }
 
@@ -39,6 +72,7 @@ class OnDeviceOpenAiBridgeTest {
                       ]
                     }
                 """.trimIndent(),
+                bearerToken = session.authToken,
             )
 
             assertEquals(200, response.code)
@@ -63,6 +97,7 @@ class OnDeviceOpenAiBridgeTest {
                       ]}]
                     }
                 """.trimIndent(),
+                bearerToken = session.authToken,
             )
 
             assertEquals(200, response.code)
@@ -83,6 +118,7 @@ class OnDeviceOpenAiBridgeTest {
             val response = post(
                 url = "${session.baseUrl}/chat/completions",
                 body = """{"messages":[{"role":"user","content":"Hello"}]}""",
+                bearerToken = session.authToken,
             )
 
             assertEquals(503, response.code)
@@ -110,6 +146,7 @@ class OnDeviceOpenAiBridgeTest {
                       }}]
                     }
                 """.trimIndent(),
+                bearerToken = session.authToken,
             )
 
             assertEquals(200, response.code)
@@ -141,6 +178,7 @@ class OnDeviceOpenAiBridgeTest {
                       }}]
                     }
                 """.trimIndent(),
+                bearerToken = session.authToken,
             )
 
             assertEquals(200, response.code)
@@ -167,6 +205,7 @@ class OnDeviceOpenAiBridgeTest {
                       ]
                     }
                 """.trimIndent(),
+                bearerToken = session.authToken,
             )
 
             assertEquals(200, response.code)
@@ -206,17 +245,19 @@ class OnDeviceOpenAiBridgeTest {
         maxTokens = 4096,
     )
 
-    private fun get(url: String): Response {
+    private fun get(url: String, bearerToken: String? = null): Response {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = "GET"
+        bearerToken?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
         return connection.readResponse()
     }
 
-    private fun post(url: String, body: String): Response {
+    private fun post(url: String, body: String, bearerToken: String? = null): Response {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
         connection.doOutput = true
         connection.setRequestProperty("Content-Type", "application/json")
+        bearerToken?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
         return connection.readResponse()
     }
