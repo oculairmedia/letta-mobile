@@ -77,6 +77,7 @@
   <string name="screen_conversations_unnamed">Conversation</string>
   <string name="screen_drawer_agent_icon_description">Agent</string>
   <string name="screen_drawer_backend_unknown">No backend configured</string>
+  <string name="screen_drawer_admin">Admin</string>
   <string name="screen_drawer_chat_mode_debug">Debug</string>
   <string name="screen_drawer_chat_mode_interactive">Interactive</string>
   <string name="screen_drawer_chat_mode_label">Chat mode</string>
@@ -89,7 +90,9 @@
   <string name="screen_drawer_model_picker_search_hint">Search models…</string>
   <string name="screen_drawer_model_picker_no_match">No models match “%1$s”</string>
   <string name="screen_drawer_edit_agent">Edit Agent</string>
+  <string name="screen_drawer_memory">Memory</string>
   <string name="screen_drawer_reset_icon_description">Reset</string>
+  <string name="screen_drawer_schedules">Schedules</string>
   <string name="screen_home_search_messages_section">Messages</string>
   <string name="screen_home_search_no_results">No results found</string>
   <string name="screen_project_agents_empty">No linked coding agents are currently visible for this project.</string>

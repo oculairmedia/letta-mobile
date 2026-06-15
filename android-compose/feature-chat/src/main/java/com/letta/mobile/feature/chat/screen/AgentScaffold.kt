@@ -157,6 +157,7 @@ fun AgentScaffold(
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
+    onNavigateToMemory: ((String) -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
@@ -169,6 +170,7 @@ fun AgentScaffold(
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToArchival = onNavigateToArchival,
         onNavigateToTools = onNavigateToTools,
+        onNavigateToMemory = onNavigateToMemory,
         onSwitchConversation = onSwitchConversation,
         onNavigateToAdmin = onNavigateToAdmin,
         onNavigateToConversationList = onNavigateToConversationList,
@@ -186,6 +188,7 @@ internal fun AgentScaffoldContent(
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: ((String) -> Unit)? = null,
     onNavigateToTools: (() -> Unit)? = null,
+    onNavigateToMemory: ((String) -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
@@ -321,6 +324,10 @@ internal fun AgentScaffoldContent(
                     onNavigateToConversations = {
                         scope.launch { drawerState.close() }
                         onNavigateToConversationList?.invoke()
+                    },
+                    onNavigateToMemory = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToMemory?.invoke(agentIdValue)
                     },
                     onNavigateToSchedules = {
                         scope.launch { drawerState.close() }

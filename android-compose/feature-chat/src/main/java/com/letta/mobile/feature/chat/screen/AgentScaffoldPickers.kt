@@ -995,6 +995,7 @@ internal fun DrawerContent(
     onRefreshContextWindow: () -> Unit,
     onNavigateToAdmin: () -> Unit = {},
     onNavigateToConversations: () -> Unit = {},
+    onNavigateToMemory: () -> Unit = {},
     onNavigateToSchedules: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1148,8 +1149,18 @@ internal fun DrawerContent(
             colors = drawerItemColors,
         )
         NavigationDrawerItem(
+            icon = { Icon(LettaIcons.Psychology, contentDescription = null) },
+            label = { Text(stringResource(R.string.screen_drawer_memory)) },
+            selected = false,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onNavigateToMemory()
+            },
+            colors = drawerItemColors,
+        )
+        NavigationDrawerItem(
             icon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
-            label = { Text("Schedules") },
+            label = { Text(stringResource(R.string.screen_drawer_schedules)) },
             selected = false,
             onClick = {
                 HapticEffects.segmentTick(haptic, view)
@@ -1159,7 +1170,7 @@ internal fun DrawerContent(
         )
         NavigationDrawerItem(
             icon = { Icon(LettaIcons.Settings, contentDescription = null) },
-            label = { Text("Admin") },
+            label = { Text(stringResource(R.string.screen_drawer_admin)) },
             selected = false,
             onClick = {
                 HapticEffects.segmentTick(haptic, view)

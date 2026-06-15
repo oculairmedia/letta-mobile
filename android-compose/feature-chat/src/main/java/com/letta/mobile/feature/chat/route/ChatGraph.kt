@@ -17,6 +17,7 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToSettings: (String) -> Unit,
     onNavigateToArchival: (String) -> Unit,
     onNavigateToTools: () -> Unit,
+    onNavigateToMemory: (String) -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToConversationList: () -> Unit,
     onSwitchConversation: (AgentChatRoute) -> Unit,
@@ -34,6 +35,7 @@ fun NavGraphBuilder.chatGraph(
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToArchival = onNavigateToArchival,
             onNavigateToTools = onNavigateToTools,
+            onNavigateToMemory = onNavigateToMemory,
             onNavigateToAdmin = onNavigateToAdmin,
             onNavigateToConversationList = onNavigateToConversationList,
             onSwitchConversation = { agentId, conversationId, agentName ->

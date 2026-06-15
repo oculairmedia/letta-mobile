@@ -1,5 +1,6 @@
 package com.letta.mobile.data.memory
 
+import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+@Immutable
 data class MemoryParityControllerState(
     val memory: MemoryParityState = MemoryParityState(),
     val agents: List<MemoryParityAgentOption> = emptyList(),
@@ -19,6 +21,7 @@ data class MemoryParityControllerState(
     val errorMessage: String? = null,
 )
 
+@Immutable
 data class MemoryParityAgentOption(
     val id: String,
     val name: String,
