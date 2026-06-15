@@ -1,7 +1,9 @@
 package com.letta.mobile.runtime.local
 
+import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionRegistry
+import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.BatterySnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
@@ -18,7 +20,12 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
 class AndroidNetworkBridgeReadSensorsTest {
     @Test
     fun `device sensors endpoint returns read_sensors response`() {
@@ -27,6 +34,7 @@ class AndroidNetworkBridgeReadSensorsTest {
                 override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = sampleSnapshot(nowMillis)
             },
             mobileActionRegistry = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink()),
+            mobileIntentActionTool = MobileIntentActionTool(ApplicationProvider.getApplicationContext()),
         )
 
         bridge.start().use { session ->
@@ -36,6 +44,32 @@ class AndroidNetworkBridgeReadSensorsTest {
             assertEquals("summary", obj["mode"]!!.jsonPrimitive.content)
             assertEquals("1", obj["sensorCount"]!!.jsonPrimitive.content)
             assertTrue(obj["summary"]!!.jsonPrimitive.content.contains("sensors=1"))
+        }
+    }
+
+    @Test
+    fun `mobile action endpoint returns truthful dry-run response`() {
+        val bridge = LocalAndroidNetworkBridge(
+            sensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
+                override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = sampleSnapshot(nowMillis)
+            },
+            mobileActionRegistry = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink()),
+            mobileIntentActionTool = MobileIntentActionTool(ApplicationProvider.getApplicationContext()),
+        )
+
+        bridge.start().use { session ->
+            val response = post(
+                session.baseUrl,
+                "/device/mobile-actions/intent",
+                "{\"tool\":\"compose_email\",\"to\":\"ada@example.com\",\"subject\":\"Hi\",\"body\":\"Body\",\"dryRun\":true}",
+            )
+            val body = response.substringAfter("\r\n\r\n")
+            val obj = Json.parseToJsonElement(body).jsonObject
+            assertEquals("compose_email", obj["tool"]!!.jsonPrimitive.content)
+            assertTrue(obj["status"]!!.jsonPrimitive.content in setOf("resolved", "not_resolved"))
+            assertEquals("true", obj["userActionRequired"]!!.jsonPrimitive.content)
+            assertEquals("false", obj["launched"]!!.jsonPrimitive.content)
+            assertEquals("android.intent.action.SENDTO", obj["intent"]!!.jsonObject["action"]!!.jsonPrimitive.content)
         }
     }
 
