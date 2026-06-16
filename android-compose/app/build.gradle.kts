@@ -1334,3 +1334,23 @@ tasks.register<Test>("testScreenshot") {
         isFailOnNoMatchingTests = false
     }
 }
+
+tasks.register<Exec>("lettaJsImageRequestTest") {
+    description = "Tests the real bundled letta.js image-request builder via onPayload interception"
+    group = "verification"
+    notCompatibleWithConfigurationCache("Runs node script to test embedded letta.js bundle.")
+    dependsOn(prepareEmbeddedLettaCodeAssets)
+    
+    workingDir(projectDir)
+    commandLine("node", "scripts/test-letta-js-real-image-request.mjs")
+    
+    doFirst {
+        val bundlePath = layout.buildDirectory.file(
+            "embedded-lettacode/npm/node_modules/@letta-ai/letta-code/letta.js"
+        ).get().asFile
+        check(bundlePath.isFile) {
+            "letta.js bundle not found at ${bundlePath.absolutePath}. " +
+            "Run assembleRootDebug with -PembedLettaCodeAssets=true first."
+        }
+    }
+}
