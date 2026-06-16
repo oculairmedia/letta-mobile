@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.feature.chat.render.ProjectBriefSectionKey
-import com.letta.mobile.feature.chat.render.ProjectBugReportDraft
+import com.letta.mobile.ui.chat.render.ProjectBriefSectionKey
+import com.letta.mobile.ui.chat.render.ProjectBugReportDraft
 
 internal interface ChatProjectBindings {
     fun refreshContextWindow()

@@ -79,10 +79,10 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
-import com.letta.mobile.feature.chat.render.A2uiDebugFrameUi
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
-import com.letta.mobile.feature.chat.render.buildToolCallTemplate
+import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentRings

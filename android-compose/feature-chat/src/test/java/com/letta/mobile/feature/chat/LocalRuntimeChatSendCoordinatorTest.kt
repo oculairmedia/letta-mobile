@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
@@ -29,7 +30,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeChatSendCoordinator
-import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalRuntimeChatSendCoordinatorTest {

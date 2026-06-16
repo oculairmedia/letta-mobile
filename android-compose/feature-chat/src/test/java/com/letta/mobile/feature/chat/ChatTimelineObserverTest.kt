@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
@@ -42,7 +43,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
-import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatTimelineObserverTest {

@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentId
@@ -24,7 +25,6 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import com.letta.mobile.data.chat.runtime.ChatSessionState
-import com.letta.mobile.feature.chat.render.toConversationState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -42,8 +42,6 @@ import com.letta.mobile.feature.chat.coordination.InitialRouteMessageDeliveryGua
 import com.letta.mobile.feature.chat.coordination.LOCAL_RUNTIME_REMOTE_AGENT_ERROR
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatConversationCoordinatorTest {

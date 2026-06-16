@@ -73,12 +73,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
-import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
+import com.letta.mobile.ui.chat.render.ChatRenderItemGeometrySignature
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
-import com.letta.mobile.feature.chat.render.chatGeometrySignature
+import com.letta.mobile.ui.chat.render.chatGeometrySignature
 
 internal fun chatRenderItemSeesLiveScale(
     isPinching: Boolean,

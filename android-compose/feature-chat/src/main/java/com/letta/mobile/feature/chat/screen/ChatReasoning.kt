@@ -30,7 +30,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
-import com.letta.mobile.feature.chat.render.rememberSmoothedStreamingText
+import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 
 private const val REASONING_PREVIEW_MAX_LENGTH = 96
 

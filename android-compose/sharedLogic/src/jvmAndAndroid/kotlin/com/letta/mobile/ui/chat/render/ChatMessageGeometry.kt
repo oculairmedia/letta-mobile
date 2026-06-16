@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -14,7 +14,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 private const val GeometryFullHashMaxChars = 96
 private const val GeometrySampleWindowChars = 24
 
-internal data class ChatMessageGeometryBucket(
+data class ChatMessageGeometryBucket(
     val renderKey: String,
     val widthPx: Int,
     val densityBucket: Int,
@@ -25,13 +25,13 @@ internal data class ChatMessageGeometryBucket(
     val expansionHash: Int,
 )
 
-internal data class ChatRenderItemGeometrySignature(
+data class ChatRenderItemGeometrySignature(
     val bucket: ChatMessageGeometryBucket,
     val contentLength: Int,
     val contentHash: Int,
 )
 
-internal class ChatMessageGeometryState(
+class ChatMessageGeometryState(
     private val maxEntries: Int = 240,
 ) {
     private val exactHeights = object : LinkedHashMap<ChatRenderItemGeometrySignature, Int>(maxEntries, 0.75f, true) {
@@ -68,7 +68,7 @@ internal class ChatMessageGeometryState(
     /**
      * letta-mobile-<collapse-floor>: drop ALL monotone-up streaming floors so
      * they re-seed from the next measurement. Called ONCE per collapse/expand
-     * toggle (a rare, deliberate user action) at the toggle chokepoint â€” an
+     * toggle (a rare, deliberate user action) at the toggle chokepoint — an
      * intentional shrink that must not stay floored at the previous, larger
      * (expanded) height. O(streamingFloors) on a rare event; zero per-frame
      * cost (the streaming hot path never touches this).
@@ -88,7 +88,7 @@ internal class ChatMessageGeometryState(
     fun exactSize(): Int = exactHeights.size
 }
 
-internal fun ChatRenderItem.chatGeometrySignature(
+fun ChatRenderItem.chatGeometrySignature(
     state: ChatUiState,
     chatMode: String,
     widthPx: Int,

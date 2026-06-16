@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.AgentId
@@ -19,8 +20,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineSendCoordinatorTest {

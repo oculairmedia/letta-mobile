@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat.state
 
 import com.letta.mobile.feature.chat.coordination.ChatComposerController
-import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.util.mapErrorToUserMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update

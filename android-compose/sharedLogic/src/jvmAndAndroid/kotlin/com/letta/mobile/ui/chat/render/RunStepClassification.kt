@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -14,7 +14,7 @@ import com.letta.mobile.data.model.UiMessage
  */
 @Composable
 @ReadOnlyComposable
-internal fun UiMessage.runStepDotColor(): Color = when (runStepDotIcon()) {
+fun UiMessage.runStepDotColor(): Color = when (runStepDotIcon()) {
     StepDotIcon.Reasoning -> MaterialTheme.colorScheme.tertiary
     StepDotIcon.ToolCall -> MaterialTheme.colorScheme.primary
     StepDotIcon.Approval -> MaterialTheme.colorScheme.secondary

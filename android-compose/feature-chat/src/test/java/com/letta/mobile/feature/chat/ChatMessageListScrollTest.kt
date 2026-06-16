@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
@@ -9,11 +10,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.feature.chat.render.ChatMessageGeometryBucket
-import com.letta.mobile.feature.chat.render.ChatMessageGeometryState
-import com.letta.mobile.feature.chat.render.ChatRenderItemGeometrySignature
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.chatGeometrySignature
 import com.letta.mobile.feature.chat.screen.ChatAutoScrollAction
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem

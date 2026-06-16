@@ -5,7 +5,7 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
-import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope

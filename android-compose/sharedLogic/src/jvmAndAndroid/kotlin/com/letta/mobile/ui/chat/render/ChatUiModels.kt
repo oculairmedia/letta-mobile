@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
@@ -15,7 +15,7 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.persistentSetOf
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectChatContext(
+data class ProjectChatContext(
     val identifier: String,
     val name: String,
     val lettaFolderId: String? = null,
@@ -26,14 +26,14 @@ internal data class ProjectChatContext(
 )
 
 @androidx.compose.runtime.Immutable
-internal data class PendingToolCall(
+data class PendingToolCall(
     val id: String,
     val name: String,
     val startedAt: Long = System.currentTimeMillis(),
 )
 
 @androidx.compose.runtime.Immutable
-internal data class A2uiDebugFrameUi(
+data class A2uiDebugFrameUi(
     val id: String,
     val transport: String,
     val messageType: String,
@@ -43,7 +43,7 @@ internal data class A2uiDebugFrameUi(
 )
 
 @androidx.compose.runtime.Immutable
-internal data class A2uiActionSnackbarUi(
+data class A2uiActionSnackbarUi(
     val id: Long,
     val message: String,
     val actionLabel: String? = null,
@@ -51,7 +51,7 @@ internal data class A2uiActionSnackbarUi(
     val retryAction: com.letta.mobile.data.a2ui.A2uiAction? = null,
 )
 
-internal enum class ProjectBriefSectionKey {
+enum class ProjectBriefSectionKey {
     Description,
     KeyDecisions,
     TechStack,
@@ -60,7 +60,7 @@ internal enum class ProjectBriefSectionKey {
 }
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectBriefSection(
+data class ProjectBriefSection(
     val key: ProjectBriefSectionKey,
     val blockLabel: String,
     val content: String,
@@ -68,10 +68,10 @@ internal data class ProjectBriefSection(
 )
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectBriefUiState(
+data class ProjectBriefUiState(
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
-    // ImmutableMap so Compose treats this whole state as stable â€” raw
+    // ImmutableMap so Compose treats this whole state as stable — raw
     // kotlin.collections.Map is an unstable interface type to the
     // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
     val sections: kotlinx.collections.immutable.ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
@@ -79,7 +79,7 @@ internal data class ProjectBriefUiState(
     val error: String? = null,
 )
 
-internal enum class BugSeverity(val wireValue: String) {
+enum class BugSeverity(val wireValue: String) {
     Critical("critical"),
     High("high"),
     Medium("medium"),
@@ -87,7 +87,7 @@ internal enum class BugSeverity(val wireValue: String) {
 }
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectBugReportDraft(
+data class ProjectBugReportDraft(
     val title: String = "",
     val description: String = "",
     val severity: BugSeverity = BugSeverity.Medium,
@@ -96,14 +96,14 @@ internal data class ProjectBugReportDraft(
 )
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectBugReportUiState(
+data class ProjectBugReportUiState(
     val isSubmitting: Boolean = false,
     val recentReports: ImmutableList<ProjectBugReport> = persistentListOf(),
     val lastSubmittedPrompt: String? = null,
     val error: String? = null,
 )
 
-internal enum class ProjectAgentStatusTone {
+enum class ProjectAgentStatusTone {
     Neutral,
     Good,
     Busy,
@@ -111,7 +111,7 @@ internal enum class ProjectAgentStatusTone {
 }
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectAgentActivity(
+data class ProjectAgentActivity(
     val id: String,
     val name: String,
     val statusLabel: String,
@@ -122,14 +122,14 @@ internal data class ProjectAgentActivity(
 )
 
 @androidx.compose.runtime.Immutable
-internal data class ProjectAgentsUiState(
+data class ProjectAgentsUiState(
     val isLoading: Boolean = false,
     val agents: ImmutableList<ProjectAgentActivity> = persistentListOf(),
     val error: String? = null,
 )
 
 @androidx.compose.runtime.Immutable
-internal data class ContextWindowUiState(
+data class ContextWindowUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val maxTokens: Int = 0,
@@ -156,7 +156,7 @@ internal data class ContextWindowUiState(
  * against a REST-bound agent silently produce blank blocks. See
  * letta-mobile-cbjh.
  */
-internal sealed interface ChatTransport {
+sealed interface ChatTransport {
     @androidx.compose.runtime.Immutable
     data object Rest : ChatTransport
 
@@ -176,7 +176,7 @@ internal sealed interface ChatTransport {
     data class WsDisconnected(val code: Int, val reason: String) : ChatTransport
 }
 
-internal sealed interface ConversationState {
+sealed interface ConversationState {
     @androidx.compose.runtime.Immutable
     data object Loading : ConversationState
 
@@ -201,7 +201,7 @@ internal sealed interface ConversationState {
  * re-defines what "loading", "offline", "config needed", or "ready" mean —
  * that logic lives in the shared [chatScreenStatusOf] function.
  */
-internal fun com.letta.mobile.data.chat.runtime.ChatSessionState.toConversationState(): ConversationState {
+fun com.letta.mobile.data.chat.runtime.ChatSessionState.toConversationState(): ConversationState {
     return when (val status = chatScreenStatusOf(this)) {
         is ChatScreenStatus.Loading -> ConversationState.Loading
         is ChatScreenStatus.ConfigNeeded ->
@@ -226,7 +226,7 @@ internal fun com.letta.mobile.data.chat.runtime.ChatSessionState.toConversationS
  * and error message as separate parameters.  Delegates to the [ChatSessionState]
  * overload so both call sites go through [chatScreenStatusOf].
  */
-internal fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversationState(
+fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversationState(
     selectedConversationId: String?,
     errorMessage: String?,
 ): ConversationState {
@@ -239,7 +239,7 @@ internal fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversati
 }
 
 @androidx.compose.runtime.Immutable
-internal data class ChatUiState(
+data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,
     val messages: ImmutableList<UiMessage> = persistentListOf(),
     val messageListChange: ChatMessageListChange = ChatMessageListChange.Full,

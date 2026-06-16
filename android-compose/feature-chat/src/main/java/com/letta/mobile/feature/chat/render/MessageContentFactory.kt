@@ -26,6 +26,7 @@ import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import com.letta.mobile.feature.chat.screen.SubagentNotificationCard
+import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import androidx.annotation.VisibleForTesting
 import kotlinx.collections.immutable.toImmutableList
 

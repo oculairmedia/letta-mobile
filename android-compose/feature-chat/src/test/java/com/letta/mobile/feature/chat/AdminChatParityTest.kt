@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
@@ -10,9 +11,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
-import com.letta.mobile.feature.chat.render.toConversationState
 import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every

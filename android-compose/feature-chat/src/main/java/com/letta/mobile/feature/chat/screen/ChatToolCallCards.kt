@@ -76,8 +76,8 @@ import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
 import java.util.LinkedHashMap
 import kotlinx.collections.immutable.toImmutableList
-import com.letta.mobile.feature.chat.render.ToolDisplayInfo
-import com.letta.mobile.feature.chat.render.ToolDisplayRegistry
+import com.letta.mobile.ui.chat.render.ToolDisplayInfo
+import com.letta.mobile.ui.chat.render.ToolDisplayRegistry
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
