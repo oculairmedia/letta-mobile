@@ -1106,6 +1106,19 @@ if (embeddedLettaCodeAssetsEnabled.get()) {
         if (name.startsWith("merge") && name.endsWith("Assets")) {
             dependsOn(prepareEmbeddedLettaCodeAssets)
         }
+        // Release builds run lint-vital, whose model/analyze tasks read the
+        // merged-assets output (which now includes the embedded LettaCode
+        // assets). Gradle's strict task-dependency validation fails the build
+        // ("uses this output ... without declaring an explicit or implicit
+        // dependency") unless the lint-vital tasks also depend on the asset
+        // prep. Wire them so :app:assemble*Release works with
+        // -PembedLettaCodeAssets=true (and so the CI release path is clean).
+        if (
+            (name.startsWith("lintVital") || name.startsWith("generate") && name.contains("LintVital")) &&
+            name.contains("Release")
+        ) {
+            dependsOn(prepareEmbeddedLettaCodeAssets)
+        }
     }
 }
 
