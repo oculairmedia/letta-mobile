@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import com.letta.mobile.feature.chat.render.ChatTransport
 import com.letta.mobile.feature.chat.screen.ChatTransportChip
 
 @RunWith(RobolectricTestRunner::class)

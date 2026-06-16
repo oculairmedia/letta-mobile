@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,8 +25,6 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
 import com.letta.mobile.feature.chat.screen.ChatImageViewer
 import com.letta.mobile.feature.chat.screen.ChatImageViewerScaleKey
 import com.letta.mobile.feature.chat.screen.ChatMessageList

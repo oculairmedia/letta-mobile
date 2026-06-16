@@ -1,12 +1,12 @@
 package com.letta.mobile.feature.chat.session
+import com.letta.mobile.feature.chat.render.*
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ProjectChatContext
 import com.letta.mobile.feature.chat.coordination.ChatComposerController
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import io.mockk.coEvery

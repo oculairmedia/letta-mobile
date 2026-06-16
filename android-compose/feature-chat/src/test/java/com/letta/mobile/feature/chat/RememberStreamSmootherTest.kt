@@ -1,8 +1,6 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
-import com.letta.mobile.feature.chat.render.ENABLE_HEADLESS_STREAMING_REVEAL
-import com.letta.mobile.feature.chat.render.STREAMING_TEXT_PAINT_INTERVAL_MS
-import com.letta.mobile.feature.chat.render.StreamingDisplayTextSmoother
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

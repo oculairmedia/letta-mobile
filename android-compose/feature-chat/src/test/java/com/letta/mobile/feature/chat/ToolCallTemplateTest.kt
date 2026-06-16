@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import com.letta.mobile.feature.chat.render.buildToolCallTemplate
+import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 
 @Tag("unit")
 class ToolCallTemplateTest {

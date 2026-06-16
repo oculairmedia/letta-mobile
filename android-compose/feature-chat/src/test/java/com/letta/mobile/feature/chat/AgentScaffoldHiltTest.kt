@@ -1,4 +1,6 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.feature.chat.render.*
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
@@ -40,9 +42,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ContextWindowUiState
-import com.letta.mobile.feature.chat.render.ProjectChatContext
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
 

@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
@@ -21,7 +22,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
-import com.letta.mobile.feature.chat.render.ChatUiState
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatHistoryPagerTest {

@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.feature.chat.coordination.ChatComposerController
-import com.letta.mobile.feature.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
