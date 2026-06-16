@@ -80,7 +80,10 @@ class AndroidNetworkBridgeReadSensorsTest {
             val body = response.substringAfter("\r\n\r\n")
             val obj = Json.parseToJsonElement(body).jsonObject
             assertEquals("compose_email", obj["tool"]!!.jsonPrimitive.content)
-            assertTrue(obj["status"]!!.jsonPrimitive.content in setOf("resolved", "not_resolved"))
+            // dry-run reports intent CONSTRUCTION; the resolving status is environment-dependent
+            // (CI emulators have no email app → "no_handler"; a device with one → "resolved").
+            // Both are valid dry-run outcomes; intent/userActionRequired/launched are stable either way.
+            assertTrue(obj["status"]!!.jsonPrimitive.content in setOf("resolved", "no_handler"))
             assertEquals("true", obj["userActionRequired"]!!.jsonPrimitive.content)
             assertEquals("false", obj["launched"]!!.jsonPrimitive.content)
             assertEquals("android.intent.action.SENDTO", obj["intent"]!!.jsonObject["action"]!!.jsonPrimitive.content)

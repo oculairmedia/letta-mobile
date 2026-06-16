@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +49,7 @@ import com.letta.mobile.ui.components.ToolAffordanceRow
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.image.decodeImageBitmap
 import com.letta.mobile.feature.chat.voice.VoiceInputUiState
 import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -388,6 +387,6 @@ private fun AttachmentPreviewDialog(
 private fun rememberAttachmentImageBitmap(base64: String) = remember(base64) {
     runCatching {
         val bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+        decodeImageBitmap(bytes)
     }.getOrNull()
 }

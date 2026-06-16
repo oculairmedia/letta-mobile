@@ -34,7 +34,8 @@ class DeviceActionCommandRunner @Inject constructor(
             "sensors.catalog" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("catalog")))
             "sensors.snapshot" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("snapshot")))
             "mobile.capabilities" -> ok(command, mobileActionRegistry.matrixJson())
-            "intent.dry_run" -> ok(command, mobileIntentActionTool.handleJson(input.withDryRun()))
+            "intent.dry_run" -> ok(command, mobileIntentActionTool.handleJson(input.withDryRun(true)))
+            "intent.execute" -> ok(command, mobileIntentActionTool.handleJson(input.withDryRun(false)))
             "hardware.capabilities" -> ok(command, hardwareControlTool.capabilitiesJson())
             "hardware.flashlight" -> runFlashlightCommand(command, input)
             "hardware.flashlight_on" -> ok(command, hardwareControlTool.setFlashlightJson(input.withDefaults(mapOf("enabled" to true, "dryRun" to false))))
@@ -72,7 +73,10 @@ class DeviceActionCommandRunner @Inject constructor(
     private fun JsonObject.withDefaultMode(mode: String): JsonObject =
         if (containsKey("mode")) this else withDefaults(mapOf("mode" to mode))
 
-    private fun JsonObject.withDryRun(): JsonObject = withDefaults(mapOf("dryRun" to true))
+    private fun JsonObject.withDryRun(dryRun: Boolean): JsonObject = kotlinx.serialization.json.buildJsonObject {
+        this@withDryRun.forEach { (key, value) -> put(key, value) }
+        put("dryRun", kotlinx.serialization.json.JsonPrimitive(dryRun))
+    }
 
     private fun JsonObject.withDefaults(defaults: Map<String, Any>): JsonObject = kotlinx.serialization.json.buildJsonObject {
         defaults.forEach { (key, value) ->
