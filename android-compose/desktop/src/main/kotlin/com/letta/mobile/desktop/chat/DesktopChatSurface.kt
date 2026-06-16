@@ -224,7 +224,7 @@ private fun ConversationPane(
 }
 
 @Composable
-private fun ConversationGroupHeader(group: DesktopConversationGroup) {
+internal fun ConversationGroupHeader(group: DesktopConversationGroup) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -248,7 +248,7 @@ private fun ConversationGroupHeader(group: DesktopConversationGroup) {
 }
 
 @Composable
-private fun ConversationPaneStateCard(
+internal fun ConversationPaneStateCard(
     state: DesktopChatSurfaceState,
     onRetryConnection: () -> Unit,
 ) {
@@ -304,7 +304,7 @@ private fun ConversationPaneStateCard(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationRow(
+internal fun ConversationRow(
     conversation: DesktopConversationSummary,
     selected: Boolean,
     onClick: () -> Unit,
@@ -399,7 +399,7 @@ private fun CountPill(count: Int) {
 }
 
 @Composable
-private fun ChatDetailPane(
+internal fun ChatDetailPane(
     state: DesktopChatSurfaceState,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
