@@ -53,6 +53,7 @@ class DeviceActionCommandRunnerTest {
         assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "sensors.summary" })
         assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "hardware.capabilities" })
         assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "intent.dry_run" })
+        assertTrue(commands.any { it.jsonObject["command"]!!.jsonPrimitive.content == "intent.execute" })
     }
 
     @Test
@@ -78,6 +79,20 @@ class DeviceActionCommandRunnerTest {
         assertEquals("compose_email", payload["tool"]!!.jsonPrimitive.content)
         assertEquals("true", payload["dryRun"]!!.jsonPrimitive.content)
         assertEquals("false", payload["launched"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `intent execute preserves dryRun false`() {
+        val result = Json.parseToJsonElement(
+            runner.runJson(
+                """{"command":"intent.execute","input":{"tool":"compose_email","to":"ada@example.com","dryRun":true}}"""
+            )
+        ).jsonObject
+
+        assertEquals("true", result["success"]!!.jsonPrimitive.content)
+        val payload = result["payload"]!!.jsonObject
+        assertEquals("compose_email", payload["tool"]!!.jsonPrimitive.content)
+        assertEquals("false", payload["dryRun"]!!.jsonPrimitive.content)
     }
 
     @Test

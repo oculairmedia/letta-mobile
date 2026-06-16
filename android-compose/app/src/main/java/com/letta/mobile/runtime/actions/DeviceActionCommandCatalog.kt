@@ -61,6 +61,14 @@ object DeviceActionCommandCatalog {
                 example = "{\"command\":\"intent.dry_run\",\"input\":{\"tool\":\"compose_email\",\"to\":\"ada@example.com\"}}",
             ),
             DeviceActionCommandDescriptor(
+                command = "intent.execute",
+                summary = "Open a user-mediated Android UI intent. The user must confirm send/save/settings changes; the app never completes them silently.",
+                riskTier = "medium",
+                executionMode = "user_mediated_ui",
+                input = "required: {tool: open_wifi_settings|show_location_on_map|compose_email|insert_contact|insert_calendar_event, ...toolFields}; returns opened UI awaiting user confirmation",
+                example = "{\"command\":\"intent.execute\",\"input\":{\"tool\":\"compose_email\",\"to\":\"ada@example.com\",\"subject\":\"Hello\"}}",
+            ),
+            DeviceActionCommandDescriptor(
                 command = "hardware.capabilities",
                 summary = "Return hardware-control capability status for flashlight, vibration, and audio volume.",
                 riskTier = "low",
