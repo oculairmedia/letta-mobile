@@ -42,6 +42,7 @@ import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
+import com.letta.mobile.feature.chat.subagent.LocalAwareActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.runtime.RuntimeEventOutbox
@@ -143,8 +144,28 @@ internal class AdminChatViewModel @Inject constructor(
      * defaults to the fake for previews/tests but gets the real per-socket
      * registry in production. Hot-shared off [viewModelScope].
      */
-    val activeSubagentSource: ActiveSubagentSource =
-        WsActiveSubagentSource(subagentRepository, viewModelScope)
+    // letta-mobile-7vs4s: the bar's WS-backed feed reads the shim's per-socket
+    // subagent registry. On the LOCAL embedded runtime there is no shim WS
+    // subagent feed, so the WS source can never deliver the terminal
+    // transitions its linger accumulator needs — phantom chips would appear on
+    // every prompt and never clear. Wrap the WS source so it is GATED to empty
+    // while the active agent is local-bound, and passes the real registry
+    // through on remote/shim. `by lazy` because the gate reads [activeAgent]
+    // (declared below), so construction must happen after field init.
+    val activeSubagentSource: ActiveSubagentSource by lazy {
+        val localBound: StateFlow<Boolean> = activeAgent
+            .map { AgentRuntimeBinding.isLocalBound(it) }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5000),
+                AgentRuntimeBinding.isLocalBound(activeAgent.value),
+            )
+        LocalAwareActiveSubagentSource(
+            delegate = WsActiveSubagentSource(subagentRepository, viewModelScope),
+            isLocalBoundFlow = localBound,
+            scope = viewModelScope,
+        )
+    }
 
     /**
      * letta-mobile-lgm98: WS-backed feed for the MAIN agent's OWN TodoWrite
