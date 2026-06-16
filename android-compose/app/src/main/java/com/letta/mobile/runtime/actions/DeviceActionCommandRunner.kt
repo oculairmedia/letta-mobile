@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.actions
 
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
+import com.letta.mobile.runtime.mobileactions.AndroidProviderReadTool
 import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import javax.inject.Inject
@@ -17,6 +18,7 @@ class DeviceActionCommandRunner @Inject constructor(
     private val mobileActionRegistry: MobileActionRegistry,
     private val mobileIntentActionTool: MobileIntentActionTool,
     private val hardwareControlTool: DeviceHardwareControlTool,
+    private val providerReadTool: AndroidProviderReadTool,
 ) {
     private val json = Json { encodeDefaults = true; explicitNulls = false }
 
@@ -48,6 +50,8 @@ class DeviceActionCommandRunner @Inject constructor(
             )
             "hardware.vibrate" -> ok(command, hardwareControlTool.vibrateJson(input))
             "hardware.audio_status" -> ok(command, hardwareControlTool.audioStatusJson())
+            "contacts.read" -> ok(command, providerReadTool.handleJson(command, input))
+            "calendar.read" -> ok(command, providerReadTool.handleJson(command, input))
             else -> errorResult(command.ifBlank { "unknown" }, "unknown_command", "Unknown device action command: $command")
         }
     }
