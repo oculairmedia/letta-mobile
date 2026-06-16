@@ -20,7 +20,17 @@ import kotlinx.serialization.json.jsonPrimitive
 class AndroidProviderReadTool @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
+    constructor(
+        context: Context,
+        permissionChecker: (String) -> Int,
+    ) : this(context) {
+        this.permissionChecker = permissionChecker
+    }
+
     private val json = Json { encodeDefaults = true; explicitNulls = false }
+    private var permissionChecker: (String) -> Int = { permission ->
+        ContextCompat.checkSelfPermission(context, permission)
+    }
 
     fun handleJson(command: String, input: JsonObject): String = json.encodeToString(handle(command, input))
 
@@ -223,7 +233,7 @@ class AndroidProviderReadTool @Inject constructor(
     }
 
     private fun checkPermission(permission: String): String {
-        return when (ContextCompat.checkSelfPermission(context, permission)) {
+        return when (permissionChecker(permission)) {
             PackageManager.PERMISSION_GRANTED -> "available"
             PackageManager.PERMISSION_DENIED -> "permission_required"
             else -> "not_granted"

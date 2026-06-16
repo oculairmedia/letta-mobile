@@ -9,6 +9,7 @@ import com.letta.mobile.runtime.hardware.HardwareCapabilities
 import com.letta.mobile.runtime.hardware.HardwareControlResponse
 import com.letta.mobile.runtime.hardware.HardwareControlStatus
 import com.letta.mobile.runtime.hardware.VibrationCapability
+import com.letta.mobile.runtime.mobileactions.AndroidProviderReadTool
 import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.BatterySnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
@@ -41,6 +42,7 @@ class DeviceActionCommandRunnerTest {
         mobileActionRegistry = MobileActionRegistry(emptySet(), emptySet(), InMemoryMobileActionAuditSink()),
         mobileIntentActionTool = MobileIntentActionTool(ApplicationProvider.getApplicationContext()),
         hardwareControlTool = DeviceHardwareControlTool(fakeHardwareProvider()),
+        providerReadTool = AndroidProviderReadTool(ApplicationProvider.getApplicationContext()),
     )
 
     @Test

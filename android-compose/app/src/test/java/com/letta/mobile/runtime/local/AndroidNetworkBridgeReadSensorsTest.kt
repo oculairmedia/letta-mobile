@@ -12,6 +12,7 @@ import com.letta.mobile.runtime.hardware.HardwareCapabilities
 import com.letta.mobile.runtime.hardware.HardwareControlResponse
 import com.letta.mobile.runtime.hardware.HardwareControlStatus
 import com.letta.mobile.runtime.hardware.VibrationCapability
+import com.letta.mobile.runtime.mobileactions.AndroidProviderReadTool
 import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.BatterySnapshot
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshot
@@ -163,6 +164,7 @@ class AndroidNetworkBridgeReadSensorsTest {
         mobileActionRegistry = mobileActionRegistry(),
         mobileIntentActionTool = mobileIntentTool(),
         hardwareControlTool = DeviceHardwareControlTool(fakeHardwareProvider()),
+        providerReadTool = AndroidProviderReadTool(ApplicationProvider.getApplicationContext()),
     )
 
     private fun fakeHardwareProvider(): DeviceHardwareControlProvider = object : DeviceHardwareControlProvider {
