@@ -35,6 +35,7 @@ import com.letta.mobile.ui.theme.chatTypography
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.ui.chat.render.bubbleStyle
+import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import com.letta.mobile.feature.chat.render.resolveRenderer
 import com.letta.mobile.feature.chat.render.MessageContentRenderer
 
@@ -66,26 +67,6 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
     if (attachments.isNotEmpty()) return false
     return true
 }
-
-/**
- * Multiplier applied to the platform long-press timeout for chat-timeline
- * long-press handlers (message bubbles, tool cards).
- *
- * letta-mobile-y1ogc: the default Compose long-press timeout (~400-500ms) fired
- * far too easily on the chat timeline, triggering on incidental touches and
- * scroll-intent. Doubling it requires a deliberate hold without affecting normal
- * taps or scrolling (scroll movement still cancels the gesture via child scroll
- * consumption / pointer lift).
- */
-internal const val CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER: Long = 2L
-
-/**
- * The long-press hold duration (ms) used by chat-timeline long-press handlers,
- * derived from the platform [viewConfiguration]'s long-press timeout scaled by
- * [CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER].
- */
-internal fun chatLongPressTimeoutMillis(platformLongPressTimeoutMillis: Long): Long =
-    platformLongPressTimeoutMillis * CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER
 
 /**
  * A modifier that detects long-press gestures without consuming short taps.

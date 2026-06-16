@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -23,7 +23,7 @@ private val toolOutputHighlightCache =
         TOOL_OUTPUT_HIGHLIGHT_CACHE_ENTRIES,
     )
 
-internal object ToolOutputCaches {
+object ToolOutputCaches {
     fun getDocument(key: ToolOutputContentKey): ToolOutputDocument? =
         toolOutputDocumentCache.get(key)
 
@@ -31,13 +31,13 @@ internal object ToolOutputCaches {
         toolOutputHighlightCache.get(key)
 }
 
-internal data class ToolOutputHighlightCacheKey(
+data class ToolOutputHighlightCacheKey(
     val content: ToolOutputContentKey,
     val mode: ToolOutputHighlightMode,
     val languageHint: String?,
 )
 
-internal enum class ToolOutputHighlightMode {
+enum class ToolOutputHighlightMode {
     None,
     Json,
     Code,
@@ -46,7 +46,7 @@ internal enum class ToolOutputHighlightMode {
     Table,
 }
 
-internal enum class ToolOutputHighlightKind {
+enum class ToolOutputHighlightKind {
     Key,
     StringLiteral,
     Number,
@@ -62,20 +62,20 @@ internal enum class ToolOutputHighlightKind {
     Header,
 }
 
-internal data class ToolOutputHighlightSpan(
+data class ToolOutputHighlightSpan(
     val start: Int,
     val end: Int,
     val kind: ToolOutputHighlightKind,
 )
 
-internal data class ToolOutputContentKey(
+data class ToolOutputContentKey(
     val length: Int,
     val hash: Int,
     val prefix: String,
     val suffix: String,
 )
 
-internal fun String.toolOutputContentKey(): ToolOutputContentKey =
+fun String.toolOutputContentKey(): ToolOutputContentKey =
     ToolOutputContentKey(
         length = length,
         hash = hashCode(),
@@ -83,7 +83,7 @@ internal fun String.toolOutputContentKey(): ToolOutputContentKey =
         suffix = takeLast(TOOL_OUTPUT_CACHE_FINGERPRINT_CHARS),
     )
 
-internal fun cachedToolOutputDocument(raw: String): ToolOutputDocument {
+fun cachedToolOutputDocument(raw: String): ToolOutputDocument {
     if (raw.length > ToolOutputDocumentMaxCacheableRawChars) {
         return ToolOutputParser.parse(raw)
     }
@@ -92,7 +92,7 @@ internal fun cachedToolOutputDocument(raw: String): ToolOutputDocument {
     }
 }
 
-internal fun cachedToolOutputHighlightSpans(
+fun cachedToolOutputHighlightSpans(
     text: String,
     mode: ToolOutputHighlightMode,
     languageHint: String? = null,
@@ -140,7 +140,7 @@ private class ToolOutputLruCache<K, V>(
     }
 }
 
-internal data class ToolOutputSyntaxColors(
+data class ToolOutputSyntaxColors(
     val default: Color,
     val key: Color,
     val stringLiteral: Color,
@@ -158,7 +158,7 @@ internal data class ToolOutputSyntaxColors(
 )
 
 @Composable
-internal fun toolOutputSyntaxColors(isError: Boolean): ToolOutputSyntaxColors {
+fun toolOutputSyntaxColors(isError: Boolean): ToolOutputSyntaxColors {
     val customColors = MaterialTheme.customColors
     val scheme = MaterialTheme.colorScheme
     return ToolOutputSyntaxColors(
@@ -179,7 +179,7 @@ internal fun toolOutputSyntaxColors(isError: Boolean): ToolOutputSyntaxColors {
     )
 }
 
-internal fun highlightToolOutputText(
+fun highlightToolOutputText(
     text: String,
     mode: ToolOutputHighlightMode,
     languageHint: String? = null,
@@ -554,18 +554,18 @@ private val shellKeywords = setOf(
     "yarn",
 )
 
-internal data class LimitedText(
+data class LimitedText(
     val text: String,
     val omittedLines: Int,
     val omittedChars: Int,
 )
 
-internal data class LimitedDiffFiles(
+data class LimitedDiffFiles(
     val files: List<DiffFile>,
     val omittedLines: Int,
 )
 
-internal fun limitDiffFilesForRendering(
+fun limitDiffFilesForRendering(
     files: List<DiffFile>,
     maxLines: Int = ToolOutputMaxRenderedLines,
 ): LimitedDiffFiles {
@@ -592,7 +592,7 @@ internal fun limitDiffFilesForRendering(
     return LimitedDiffFiles(files = limitedFiles, omittedLines = omittedLines)
 }
 
-internal fun limitRenderedText(
+fun limitRenderedText(
     text: String,
     maxLines: Int = ToolOutputMaxRenderedLines,
     maxChars: Int = ToolOutputMaxRenderedChars,
@@ -607,7 +607,7 @@ internal fun limitRenderedText(
     return LimitedText(text = rendered, omittedLines = omittedLines, omittedChars = omittedChars)
 }
 
-internal fun formatTable(rows: List<List<String>>): String {
+fun formatTable(rows: List<List<String>>): String {
     if (rows.isEmpty()) return ""
     val width = rows.maxOf { it.size }
     val columnWidths = (0 until width).map { column ->
@@ -620,7 +620,7 @@ internal fun formatTable(rows: List<List<String>>): String {
     }
 }
 
-internal fun ToolOutputBlock.previewText(): String = when (this) {
+fun ToolOutputBlock.previewText(): String = when (this) {
     is ToolOutputBlock.Json -> pretty
     is ToolOutputBlock.Diff -> raw
     is ToolOutputBlock.StackTrace -> headline
@@ -631,7 +631,7 @@ internal fun ToolOutputBlock.previewText(): String = when (this) {
     is ToolOutputBlock.PlainText -> raw
 }
 
-internal fun ToolOutputBlock.highlightMode(): ToolOutputHighlightMode = when (this) {
+fun ToolOutputBlock.highlightMode(): ToolOutputHighlightMode = when (this) {
     is ToolOutputBlock.Json -> ToolOutputHighlightMode.Json
     is ToolOutputBlock.Diff -> ToolOutputHighlightMode.None
     is ToolOutputBlock.StackTrace -> ToolOutputHighlightMode.Log
