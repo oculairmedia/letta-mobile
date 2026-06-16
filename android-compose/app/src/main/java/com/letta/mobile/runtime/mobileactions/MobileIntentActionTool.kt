@@ -81,12 +81,13 @@ class MobileIntentActionTool @Inject constructor(
         when {
             !resolved -> MobileIntentActionResponse(
                 tool = toolName,
-                status = "not_resolved",
+                status = "no_handler",
                 userActionRequired = userActionRequired,
                 dryRun = dryRun,
                 resolved = false,
                 launched = false,
                 intent = mapping,
+                message = "No Android app can handle this user-mediated intent action.",
             )
             dryRun -> MobileIntentActionResponse(
                 tool = toolName,
@@ -101,12 +102,13 @@ class MobileIntentActionTool @Inject constructor(
                 context.startActivity(intent)
                 MobileIntentActionResponse(
                     tool = toolName,
-                    status = "launched",
+                    status = "opened_ui_awaiting_user_confirmation",
                     userActionRequired = userActionRequired,
                     dryRun = false,
                     resolved = true,
                     launched = true,
                     intent = mapping,
+                    message = openedUiMessage(toolName),
                 )
             }
         }
@@ -121,12 +123,22 @@ class MobileIntentActionTool @Inject constructor(
     } catch (error: ActivityNotFoundException) {
         MobileIntentActionResponse(
             tool = toolName,
-            status = "not_resolved",
+            status = "not_available",
             userActionRequired = userActionRequired,
             dryRun = dryRun,
             resolved = false,
             launched = false,
             error = error.message ?: "No activity could handle the intent.",
+        )
+    } catch (error: SecurityException) {
+        MobileIntentActionResponse(
+            tool = toolName,
+            status = "blocked_by_android_policy",
+            userActionRequired = userActionRequired,
+            dryRun = dryRun,
+            resolved = true,
+            launched = false,
+            error = error.message ?: "Android policy blocked this user-mediated intent action.",
         )
     } catch (error: Exception) {
         MobileIntentActionResponse(
@@ -196,6 +208,15 @@ private fun parseEventStartMillis(datetime: String): Long? {
 
 private fun Intent.withNewTaskFlag(): Intent = apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
 
+private fun openedUiMessage(toolName: String): String = when (toolName) {
+    MobileIntentActionTool.OPEN_WIFI_SETTINGS -> "Opened Android Wi-Fi settings. The user must confirm any settings changes in Android UI."
+    MobileIntentActionTool.SHOW_LOCATION_ON_MAP -> "Opened Android maps UI for this location. The user remains in control of navigation or follow-up actions."
+    MobileIntentActionTool.COMPOSE_EMAIL -> "Opened Android email composer. The user must review and tap send; the app did not send the email."
+    MobileIntentActionTool.INSERT_CONTACT -> "Opened Android contact insert UI. The user must confirm save; the app did not save the contact."
+    MobileIntentActionTool.INSERT_CALENDAR_EVENT -> "Opened Android calendar event editor. The user must confirm save; the app did not save the event."
+    else -> "Opened Android UI for this user-mediated action. The user must confirm before anything is completed."
+}
+
 private fun Intent.toMapping(): IntentMapping = IntentMapping(
     action = action,
     data = data?.toString(),
@@ -228,6 +249,7 @@ data class MobileIntentActionResponse(
     val resolved: Boolean? = null,
     val launched: Boolean? = null,
     val intent: IntentMapping? = null,
+    val message: String? = null,
     val error: String? = null,
 )
 

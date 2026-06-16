@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat.screen
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
 import android.util.Base64
@@ -52,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -73,6 +71,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.image.decodeImageBitmap
 import com.letta.mobile.ui.icons.LettaIcons
 import java.io.File
 import kotlinx.collections.immutable.ImmutableList
@@ -365,7 +364,7 @@ private fun ZoomableAttachmentImage(
     val imageBitmap = remember(attachment.base64) {
         runCatching {
             val bytes = Base64.decode(attachment.base64, Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            decodeImageBitmap(bytes)
         }.getOrNull()
     }
 

@@ -88,6 +88,12 @@ kotlin {
             dependsOn(jvmAndAndroid)
         }
 
+        getByName("jvmTest") {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+            }
+        }
+
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
