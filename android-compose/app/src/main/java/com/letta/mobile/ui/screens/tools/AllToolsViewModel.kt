@@ -6,15 +6,18 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.data.tools.ToolLibraryController
+import com.letta.mobile.data.tools.ToolLibraryState
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -33,179 +36,88 @@ data class AllToolsUiState(
 @HiltViewModel
 class AllToolsViewModel @Inject constructor(
     private val toolRepository: IToolRepository,
-    private val mcpServerRepository: IMcpServerRepository,
+    mcpServerRepository: IMcpServerRepository,
 ) : ViewModel() {
+    private val controller = ToolLibraryController(
+        toolRepository = toolRepository,
+        mcpServerRepository = mcpServerRepository,
+        scope = viewModelScope,
+        errorMessageMapper = { throwable ->
+            (throwable as? Exception)?.let { mapErrorToUserMessage(it, "Failed to load tools") }
+                ?: throwable.message
+                ?: "Failed to load tools"
+        },
+    )
 
-    private val _uiState = MutableStateFlow<UiState<AllToolsUiState>>(UiState.Loading)
-    val uiState: StateFlow<UiState<AllToolsUiState>> = _uiState.asStateFlow()
-    private var loadGeneration: Int = 0
-
-    companion object {
-        const val PAGE_SIZE = 50
-    }
+    val uiState: StateFlow<UiState<AllToolsUiState>> = controller.state
+        .map { it.toUiState() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
 
     init {
-        loadTools()
+        controller.start()
     }
 
     fun loadTools() {
-        viewModelScope.launch {
-            val generation = ++loadGeneration
-            val previousState = (_uiState.value as? UiState.Success)?.data
-            val searchQuery = previousState?.searchQuery.orEmpty()
-            val selectedTags = previousState?.selectedTags.orEmpty()
-            if (previousState == null) {
-                _uiState.value = UiState.Loading
-            }
-            try {
-                val regularTools = toolRepository.fetchToolsPage(limit = PAGE_SIZE, offset = 0)
-
-                _uiState.value = UiState.Success(
-                    AllToolsUiState(
-                        tools = regularTools.toImmutableList(),
-                        mcpToolIds = emptySet(),
-                        searchQuery = searchQuery,
-                        selectedTags = selectedTags,
-                        isLoadingMore = false,
-                        isLoadingMcpTools = true,
-                        hasMorePages = regularTools.size >= PAGE_SIZE,
-                        currentOffset = regularTools.size,
-                    )
-                )
-
-                loadMcpTools(generation)
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(
-                    mapErrorToUserMessage(e, "Failed to load tools")
-                )
-            }
-        }
-    }
-
-    private fun loadMcpTools(generation: Int) {
-        viewModelScope.launch {
-            val currentState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-            try {
-                val mcpTools = mcpServerRepository.fetchAllMcpTools()
-                if (generation != loadGeneration) return@launch
-
-                val latestState = (_uiState.value as? UiState.Success)?.data ?: currentState
-                val mcpToolIds = mcpTools.map { it.id }.toSet()
-                val dedupedRegular = latestState.tools.filter { it.id !in mcpToolIds }
-
-                _uiState.value = UiState.Success(
-                    latestState.copy(
-                        tools = (mcpTools + dedupedRegular).toImmutableList(),
-                        mcpToolIds = mcpToolIds.map { it.value }.toSet(),
-                        isLoadingMcpTools = false,
-                    )
-                )
-            } catch (_: Exception) {
-                if (generation != loadGeneration) return@launch
-                val latestState = (_uiState.value as? UiState.Success)?.data ?: currentState
-                _uiState.value = UiState.Success(latestState.copy(isLoadingMcpTools = false))
-            }
-        }
+        controller.loadTools()
     }
 
     fun loadMoreTools() {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        if (currentState.isLoadingMore || !currentState.hasMorePages) return
-        val generation = loadGeneration
-        val requestedOffset = currentState.currentOffset
-
-        _uiState.value = UiState.Success(currentState.copy(isLoadingMore = true))
-
-        viewModelScope.launch {
-            try {
-                val newPage = toolRepository.fetchToolsPage(
-                    limit = PAGE_SIZE,
-                    offset = requestedOffset,
-                )
-
-                if (generation != loadGeneration) return@launch
-
-                val latestState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-                val existingIds = latestState.tools.mapTo(mutableSetOf()) { it.id.value }
-                val dedupedNew = newPage.filter { tool ->
-                    tool.id.value !in latestState.mcpToolIds && existingIds.add(tool.id.value)
-                }
-
-                _uiState.value = UiState.Success(
-                    latestState.copy(
-                        tools = (latestState.tools + dedupedNew).toImmutableList(),
-                        isLoadingMore = false,
-                        hasMorePages = newPage.size >= PAGE_SIZE,
-                        currentOffset = maxOf(latestState.currentOffset, requestedOffset + newPage.size),
-                    )
-                )
-            } catch (_: Exception) {
-                if (generation != loadGeneration) return@launch
-                val latestState = (_uiState.value as? UiState.Success)?.data ?: currentState
-                _uiState.value = UiState.Success(
-                    latestState.copy(isLoadingMore = false)
-                )
-            }
-        }
+        controller.loadMoreTools()
     }
 
     fun createTool(sourceCode: String) {
         viewModelScope.launch {
             try {
                 toolRepository.upsertTool(ToolCreateParams(sourceCode = sourceCode))
-                loadTools()
+                controller.loadTools()
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to create tool"))
+                controller.showError(mapErrorToUserMessage(e, "Failed to create tool"))
             }
         }
     }
 
     fun updateSearchQuery(query: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(searchQuery = query))
+        controller.updateSearchQuery(query)
     }
 
     fun getFilteredTools(): List<Tool> {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
-        var result: List<Tool> = currentState.tools
-
-        if (currentState.selectedTags.isNotEmpty()) {
-            result = result.filter { tool ->
-                currentState.selectedTags.all { tag -> tag in tool.tags }
-            }
-        }
-
-        if (currentState.searchQuery.isNotBlank()) {
-            val q = currentState.searchQuery.trim().lowercase()
-            result = result.filter { tool ->
-                tool.name.lowercase().contains(q) ||
-                    (tool.description?.lowercase()?.contains(q) == true) ||
-                    (tool.toolType?.lowercase()?.contains(q) == true) ||
-                    (tool.sourceType?.lowercase()?.contains(q) == true) ||
-                    tool.tags.any { it.lowercase().contains(q) }
-            }
-        }
-
-        return result.distinctBy { it.id }
+        return controller.state.value.filteredTools
     }
 
     fun getAllTags(): List<String> {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return emptyList()
-        return currentState.tools
-            .flatMap { it.tags }
-            .distinct()
-            .sorted()
+        return controller.state.value.allTags
     }
 
     fun toggleTag(tag: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        val current = currentState.selectedTags
-        val updated = if (tag in current) current - tag else current + tag
-        _uiState.value = UiState.Success(currentState.copy(selectedTags = updated))
+        controller.toggleTag(tag)
     }
 
     fun clearTags() {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(selectedTags = emptySet()))
+        controller.clearTags()
+    }
+
+    override fun onCleared() {
+        controller.close()
+        super.onCleared()
+    }
+}
+
+private fun ToolLibraryState.toUiState(): UiState<AllToolsUiState> {
+    val message = errorMessage
+    return when {
+        isLoading && tools.isEmpty() -> UiState.Loading
+        message != null && tools.isEmpty() -> UiState.Error(message)
+        else -> UiState.Success(
+            AllToolsUiState(
+                tools = tools.toImmutableList(),
+                mcpToolIds = mcpToolIds,
+                searchQuery = searchQuery,
+                selectedTags = selectedTags,
+                isLoadingMore = isLoadingMore,
+                isLoadingMcpTools = isLoadingMcpTools,
+                hasMorePages = hasMorePages,
+                currentOffset = currentOffset,
+            ),
+        )
     }
 }

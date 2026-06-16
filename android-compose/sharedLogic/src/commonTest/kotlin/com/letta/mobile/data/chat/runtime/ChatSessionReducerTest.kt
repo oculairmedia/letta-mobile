@@ -1,5 +1,8 @@
 package com.letta.mobile.data.chat.runtime
 
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import kotlin.test.Test
@@ -42,6 +45,41 @@ class ChatSessionReducerTest {
         assertEquals(ChatConnectionState.NoConversations, empty.connectionState)
         assertEquals(null, empty.selectedConversationId)
         assertEquals(4, empty.selectionGeneration)
+    }
+
+    @Test
+    fun groupsConversationsByAgentNameForNavigation() {
+        val groups = groupConversationsByAgentName(
+            listOf(
+                conversation("newer-alpha", agentName = "Alpha", unreadCount = 1),
+                conversation("beta", agentName = "Beta", unreadCount = 3),
+                conversation("older-alpha", agentName = " alpha ", unreadCount = 2),
+                conversation("unknown", agentName = " "),
+            ),
+        )
+
+        assertEquals(listOf("Alpha", "Beta", "Unknown agent"), groups.map { it.agentName })
+        assertEquals(listOf("newer-alpha", "older-alpha"), groups[0].conversations.map { it.id })
+        assertEquals(3, groups[0].unreadCount)
+        assertEquals(3, groups[1].unreadCount)
+    }
+
+    @Test
+    fun mapsConversationSummaryWithResolvedAgentNameAndAgentId() {
+        val summary = Conversation(
+            id = ConversationId("conversation-abcdef"),
+            agentId = AgentId("agent-1"),
+            summary = "",
+            createdAt = "2026-06-01T00:00:00Z",
+            updatedAt = "2026-06-02T00:00:00Z",
+            lastMessageAt = "2026-06-03T00:00:00Z",
+        ).toChatConversationSummary(agentNamesById = mapOf("agent-1" to "Ada"))
+
+        assertEquals("conversation-abcdef", summary.id)
+        assertEquals("agent-1", summary.agentId)
+        assertEquals("Ada", summary.agentName)
+        assertEquals("Conversation abcdef", summary.title)
+        assertEquals("2026-06-03T00:00:00Z", summary.updatedAtLabel)
     }
 
     @Test
@@ -189,11 +227,12 @@ class ChatSessionReducerTest {
     private fun conversation(
         id: String,
         unreadCount: Int = 0,
+        agentName: String = "agent-$id",
     ): ChatConversationSummary =
         ChatConversationSummary(
             id = id,
             title = "Conversation $id",
-            agentName = "agent-$id",
+            agentName = agentName,
             updatedAtLabel = "now",
             lastMessagePreview = "preview",
             unreadCount = unreadCount,

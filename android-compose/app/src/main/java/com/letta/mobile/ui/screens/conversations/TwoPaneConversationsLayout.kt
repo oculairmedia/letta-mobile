@@ -25,6 +25,7 @@ import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.navigation.AllToolsRoute
 import com.letta.mobile.ui.navigation.AdminRoute
 import com.letta.mobile.ui.navigation.ConversationsRoute
+import com.letta.mobile.ui.navigation.MemoryRoute
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isWideWidth
 
@@ -114,6 +115,9 @@ fun TwoPaneConversationsLayout(
                         },
                         onNavigateToTools = {
                             outerNavController.navigate(AllToolsRoute)
+                        },
+                        onNavigateToMemory = { agentId ->
+                            outerNavController.navigate(MemoryRoute(agentId))
                         },
                         onNavigateToAdmin = {
                             outerNavController.navigate(AdminRoute)

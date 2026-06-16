@@ -32,12 +32,20 @@ enum class DesktopDestination(
         summary = "Windows desktop launch status and backend configuration.",
     ),
     Agents(
-        label = "Agents",
-        summary = "Shared agent models are available; desktop read repositories back the memory parity surface.",
+        label = "Skills & Tools",
+        summary = "Shared tool library state backs desktop search, tag filters, paging, and MCP merge behavior.",
     ),
     Memory(
         label = "Memory",
         summary = "Shared skills, memory blocks, schedules, and channels for the selected agent.",
+    ),
+    Schedules(
+        label = "Schedules",
+        summary = "Shared schedule state lists scheduled messages by agent in the desktop shell.",
+    ),
+    Channels(
+        label = "Channels",
+        summary = "Shared channel state shows live backend transport, delivery, and A2UI capability status.",
     ),
     Conversations(
         label = "Conversations",

@@ -33,6 +33,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object AboutRoute
 @Serializable data object ModelsRoute
 @Serializable data object AllToolsRoute
+@Serializable data class MemoryRoute(val agentId: String? = null)
 @Serializable data object UsageRoute
 @Serializable data class ShareToAgentRoute(val sharedText: String)
 @Serializable data object ProjectsRoute

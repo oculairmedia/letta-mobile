@@ -20,6 +20,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import java.io.File
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -90,12 +91,16 @@ class AndroidLettaCodeRuntimeControllerTest {
             androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
+        val missingModel = File(
+            System.getProperty("java.io.tmpdir"),
+            "letta-missing-model-${System.nanoTime()}.litertlm",
+        )
         val error = runCatching {
-            controller.submit(command(), config(localModelPath = "/tmp/does-not-exist.litertlm")).first()
+            controller.submit(command(), config(localModelPath = missingModel.absolutePath)).first()
         }.exceptionOrNull()
 
         assertEquals(
-            "Embedded LettaCode model file was not found at /tmp/does-not-exist.litertlm.",
+            "Embedded LettaCode model file was not found at ${missingModel.absolutePath}.",
             error?.message,
         )
         assertFalse(nodeBridge.started)

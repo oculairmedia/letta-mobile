@@ -797,6 +797,12 @@
     <string name="screen_models_title">Models</string>
     <string name="screen_models_search_hint">Search models…</string>
     <string name="screen_models_filter_all">All</string>
+    <string name="screen_memory_title">Memory</string>
+    <string name="screen_memory_agent_label">Agent</string>
+    <string name="screen_memory_summary_title">Overview</string>
+    <string name="screen_memory_refresh">Refresh</string>
+    <string name="screen_memory_refreshing">Refreshing</string>
+    <string name="screen_memory_empty">No memory data yet</string>
     <string name="screen_archival_title">Archival Memory</string>
     <string name="screen_archival_search_hint">Search archival memory…</string>
     <string name="screen_archival_search_action">Search archival passages</string>

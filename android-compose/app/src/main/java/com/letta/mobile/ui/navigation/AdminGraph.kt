@@ -22,6 +22,7 @@ import com.letta.mobile.ui.screens.identities.IdentityListScreen
 import com.letta.mobile.ui.screens.jobs.JobMonitorScreen
 import com.letta.mobile.ui.screens.mcp.McpScreen
 import com.letta.mobile.ui.screens.mcp.McpServerToolsScreen
+import com.letta.mobile.ui.screens.memory.MemoryOverviewScreen
 import com.letta.mobile.ui.screens.messagebatches.MessageBatchMonitorScreen
 import com.letta.mobile.ui.screens.models.ModelBrowserScreen
 import com.letta.mobile.ui.screens.providers.ProviderAdminScreen
@@ -171,6 +172,12 @@ fun NavGraphBuilder.adminGraph(
 
     composable<SchedulesRoute> {
         ScheduleListScreen(
+            onNavigateBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<MemoryRoute> {
+        MemoryOverviewScreen(
             onNavigateBack = { navController.popBackStack() },
         )
     }

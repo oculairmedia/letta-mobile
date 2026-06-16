@@ -7,6 +7,9 @@ val composeDesktopMaterial3Version = "1.9.0"
 val composeDesktopMaterialIconsVersion = "1.7.3"
 val coroutinesVersion = "1.11.0"
 val ktorVersion = "3.5.0"
+val kuiverVersion = "0.3.0"
+val autoLinkTextVersion = "2.0.2"
+val textyVersion = "1.0.0-alpha"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -59,6 +62,9 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
+    implementation("io.github.justdeko:kuiver:$kuiverVersion")
+    implementation("sh.calvin.autolinktext:autolinktext:$autoLinkTextVersion")
+    implementation("com.arjunjadeja:texty:$textyVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")

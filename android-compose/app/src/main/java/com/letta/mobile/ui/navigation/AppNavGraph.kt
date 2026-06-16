@@ -182,6 +182,9 @@ fun AppNavGraph(
             onNavigateToTools = {
                 navController.navigate(AllToolsRoute)
             },
+            onNavigateToMemory = { agentId ->
+                navController.navigate(MemoryRoute(agentId))
+            },
             onNavigateToAdmin = {
                 navController.navigate(AdminRoute)
             },

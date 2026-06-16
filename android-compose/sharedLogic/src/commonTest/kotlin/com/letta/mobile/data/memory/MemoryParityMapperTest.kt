@@ -48,6 +48,7 @@ class MemoryParityMapperTest {
 
         assertEquals("agent-1", state.selectedAgentId)
         assertEquals("Ada", state.selectedAgentName)
+        assertEquals("Skills, memory, schedules, and channels for Ada.", state.scopeSubtitle)
         assertFalse(state.isEmpty)
         assertEquals(
             listOf(
@@ -64,26 +65,67 @@ class MemoryParityMapperTest {
         assertEquals(1, state.summary.channelCount)
         assertEquals(185, state.summary.totalMemoryTokens)
         assertEquals(512, state.summary.contextWindowUsed)
+        assertEquals(
+            listOf("Skills" to "1", "Blocks" to "1", "Schedules" to "1", "Channels" to "1", "Context" to "512 / 8000"),
+            state.summary.metrics.map { it.label to it.value },
+        )
+        assertEquals("5 nodes / 4 links", state.graph.summaryLabel)
+        assertEquals(
+            listOf(
+                "agent:agent-1",
+                "skills:tool-1",
+                "memory:block-1",
+                "schedules:schedule-1",
+                "channels:backend",
+            ),
+            state.graph.nodes.map { it.id },
+        )
+        assertEquals(
+            listOf("uses", "remembers", "runs", "delivers"),
+            state.graph.edges.map { it.label },
+        )
 
         val skill = assertIs<MemoryParityItem.Skill>(state.section(MemoryParitySectionKind.Skills).items.single())
         assertEquals("search_docs", skill.title)
         assertEquals(listOf("research"), skill.tags)
+        assertEquals(listOf("python", "research"), skill.metadataLabels)
+        assertEquals(MemoryAccentRole.Primary, skill.accentRole)
+        assertEquals(MemoryAccentRole.Primary, state.section(MemoryParitySectionKind.Skills).kind.accentRole)
 
         val memory = assertIs<MemoryParityItem.MemoryBlock>(state.section(MemoryParitySectionKind.Memory).items.single())
         assertEquals("persona", memory.title)
         assertEquals("Keeps a concise research voice.", memory.preview)
+        assertEquals("Keeps a concise research voice.", memory.detailText)
+        assertEquals(listOf("Limit 2000"), memory.metadataLabels)
+        assertEquals(emptyList(), memory.links)
+        assertEquals(MemoryAccentRole.Secondary, memory.accentRole)
+        assertEquals(MemoryAccentRole.Secondary, state.section(MemoryParitySectionKind.Memory).kind.accentRole)
 
         val schedule = assertIs<MemoryParityItem.Schedule>(state.section(MemoryParitySectionKind.Schedules).items.single())
         assertEquals("Summarize the latest project memory", schedule.title)
         assertEquals("recurring", schedule.scheduleType)
+        assertEquals(listOf("recurring", "2026-06-14T08:00:00Z"), schedule.metadataLabels)
+        assertEquals(MemoryAccentRole.Tertiary, schedule.accentRole)
+        assertEquals(MemoryAccentRole.Tertiary, state.section(MemoryParitySectionKind.Schedules).kind.accentRole)
 
         val channel = assertIs<MemoryParityItem.Channel>(state.section(MemoryParitySectionKind.Channels).items.single())
         assertEquals(MemoryChannelStatus.Connected, channel.status)
         assertEquals("Connected via websocket", channel.subtitle)
+        assertEquals(listOf("Connected", "websocket", "Device device"), channel.metadataLabels)
+        assertEquals(MemoryAccentRole.Tertiary, channel.accentRole)
+        assertEquals(MemoryAccentRole.Tertiary, MemoryGraphNodeKind.Channel.accentRole(channel.status))
+        assertEquals(MemoryAccentRole.Neutral, state.section(MemoryParitySectionKind.Channels).kind.accentRole)
+
+        state.sections.flatMap { it.items }.forEach { item ->
+            item.links.forEach { link ->
+                assertEquals(true, link.start >= 0)
+                assertEquals(true, link.end <= item.detailText.length)
+            }
+        }
     }
 
     @Test
-    fun buildFallsBackToAllToolsWhenSelectedAgentHasNoAttachedTools() {
+    fun buildKeepsSelectedAgentSkillsScopedWhenAgentHasNoAttachedTools() {
         val state = MemoryParityMapper.build(
             agents = listOf(Agent(id = AgentId("agent-1"), name = "No tools")),
             selectedAgentId = "agent-1",
@@ -93,9 +135,99 @@ class MemoryParityMapperTest {
             channelTransportState = ChannelTransportState.Idle,
         )
 
+        assertEquals(0, state.summary.skillCount)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Skills).items)
+        assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
+    }
+
+    @Test
+    fun buildUsesAllToolsOnlyWhenNoAgentIsSelected() {
+        val state = MemoryParityMapper.build(
+            agents = emptyList(),
+            selectedAgentId = null,
+            allTools = listOf(sampleTool("fallback")),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+        )
+
         val skill = assertIs<MemoryParityItem.Skill>(state.section(MemoryParitySectionKind.Skills).items.single())
         assertEquals("fallback", skill.id)
-        assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
+    }
+
+    @Test
+    fun buildDoesNotFallbackToAnotherAgentWhenRequestedAgentIsMissing() {
+        val state = MemoryParityMapper.build(
+            agents = listOf(sampleAgent()),
+            selectedAgentId = "missing-agent",
+            allTools = listOf(sampleTool("fallback")),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+        )
+
+        assertEquals(null, state.selectedAgentId)
+        assertEquals(null, state.selectedAgentName)
+        assertEquals(0, state.summary.skillCount)
+        assertEquals(0, state.summary.memoryBlockCount)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Skills).items)
+        assertEquals(emptyList(), state.section(MemoryParitySectionKind.Memory).items)
+    }
+
+    @Test
+    fun parsesMemoryTextLinksInCommonCode() {
+        val links = MemoryTextLinkParser.parse(
+            "Ask @Ada to refresh tool:search_docs from https://docs.example/test and schedule:daily.",
+        )
+
+        assertEquals(
+            listOf(
+                MemoryTextLinkKind.Mention,
+                MemoryTextLinkKind.Skill,
+                MemoryTextLinkKind.Url,
+                MemoryTextLinkKind.Schedule,
+            ),
+            links.map { it.kind },
+        )
+        assertEquals("@Ada", links[0].label)
+        assertEquals("search_docs", links[1].target)
+        assertEquals("https://docs.example/test", links[2].target)
+        assertEquals("daily", links[3].target)
+    }
+
+    @Test
+    fun validatesAndSegmentsMemoryTextLinksInCommonCode() {
+        val text = "Open https://example.com and ask @Ada"
+        val urlStart = text.indexOf("https://example.com")
+        val mentionStart = text.indexOf("@Ada")
+        val url = MemoryTextLink(
+            start = urlStart,
+            end = urlStart + "https://example.com".length,
+            target = "https://example.com",
+            label = "https://example.com",
+            kind = MemoryTextLinkKind.Url,
+        )
+        val mention = MemoryTextLink(
+            start = mentionStart,
+            end = mentionStart + "@Ada".length,
+            target = "Ada",
+            label = "@Ada",
+            kind = MemoryTextLinkKind.Mention,
+        )
+        val partialOverlap = url.copy(end = url.start + 8)
+        val outOfBounds = mention.copy(end = text.length + 20)
+
+        val links = listOf(outOfBounds, partialOverlap, mention, url)
+
+        assertEquals(listOf(url, mention), links.validForText(text))
+        assertEquals(
+            listOf("Open ", "https://example.com", " and ask ", "@Ada"),
+            links.segmentsForText(text).map { it.text },
+        )
+        assertEquals(
+            listOf(null, MemoryTextLinkKind.Url, null, MemoryTextLinkKind.Mention),
+            links.segmentsForText(text).map { it.link?.kind },
+        )
     }
 
     @Test
@@ -110,6 +242,7 @@ class MemoryParityMapperTest {
         )
 
         assertEquals(null, state.selectedAgentId)
+        assertEquals("Skills, memory, schedules, and channels for the active backend.", state.scopeSubtitle)
         assertEquals(0, state.summary.skillCount)
         assertEquals(0, state.summary.memoryBlockCount)
         assertEquals(0, state.summary.scheduleCount)
@@ -120,13 +253,23 @@ class MemoryParityMapperTest {
         assertEquals(true, state.section(MemoryParitySectionKind.Memory).items.isEmpty())
         assertEquals(true, state.section(MemoryParitySectionKind.Schedules).items.isEmpty())
         // The channels section always renders one descriptor row, so the overall
-        // state is NOT isEmpty — it still reports live channel status.
+        // state is NOT isEmpty - it still reports live channel status.
         assertFalse(state.isEmpty)
         val channel = assertIs<MemoryParityItem.Channel>(
             state.section(MemoryParitySectionKind.Channels).items.single(),
         )
         assertEquals(MemoryChannelStatus.Disconnected, channel.status)
+        assertEquals(MemoryAccentRole.Error, channel.accentRole)
         assertEquals("Network unavailable", channel.subtitle)
+    }
+
+    @Test
+    fun channelAccentRolesRepresentTransportStateInCommonCode() {
+        assertEquals(MemoryAccentRole.Tertiary, MemoryChannelStatus.Connected.accentRole)
+        assertEquals(MemoryAccentRole.Primary, MemoryChannelStatus.Connecting.accentRole)
+        assertEquals(MemoryAccentRole.Neutral, MemoryChannelStatus.Idle.accentRole)
+        assertEquals(MemoryAccentRole.Error, MemoryChannelStatus.Disconnected.accentRole)
+        assertEquals(MemoryAccentRole.Neutral, MemoryGraphNodeKind.Channel.accentRole(null))
     }
 
     @Test
@@ -169,7 +312,7 @@ class MemoryParityMapperTest {
             Block(
                 id = BlockId("block-1"),
                 label = "persona",
-                value = "Keeps a concise research voice.\nSecond line.",
+                value = "Keeps a concise research voice.\nUse tool:search_docs when grounded research is needed.",
                 limit = 2_000,
             ),
         ),

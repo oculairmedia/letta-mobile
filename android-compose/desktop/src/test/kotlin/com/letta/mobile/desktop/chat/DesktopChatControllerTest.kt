@@ -55,6 +55,24 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun startResolvesAgentNamesForConversationNavigation() = runTest {
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            agentNamesByIdProvider = { mapOf("agent-0" to "Ada") },
+        )
+
+        controller.start()
+        runCurrent()
+
+        val conversation = controller.state.value.conversations.single()
+        assertEquals("agent-0", conversation.agentId)
+        assertEquals("Ada", conversation.agentName)
+        assertEquals(listOf("Ada"), controller.state.value.conversationGroups.map { it.agentName })
+
+        controller.close()
+    }
+
+    @Test
     fun sendUsesRemoteTimelineTransportAndUpdatesMessages() = runTest {
         val gateway = FakeDesktopChatGateway()
         val controller = testController(gateway)
@@ -384,6 +402,7 @@ class DesktopChatControllerTest {
 
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
+        agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
         loopFactory: (
             gateway: DesktopChatGateway,
             conversationId: String,
@@ -394,21 +413,30 @@ class DesktopChatControllerTest {
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
+            agentNamesByIdProvider = agentNamesByIdProvider,
             loopFactory = loopFactory,
         )
 
-    private fun TestScope.testController(gateway: DesktopChatGateway): DesktopChatController =
+    private fun TestScope.testController(
+        gateway: DesktopChatGateway,
+        agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+    ): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
+            agentNamesByIdProvider = agentNamesByIdProvider,
         )
 
-    private fun TestScope.testController(gatewayFactory: () -> DesktopChatGateway): DesktopChatController =
+    private fun TestScope.testController(
+        gatewayFactory: () -> DesktopChatGateway,
+        agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+    ): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = gatewayFactory,
+            agentNamesByIdProvider = agentNamesByIdProvider,
         )
 }
 

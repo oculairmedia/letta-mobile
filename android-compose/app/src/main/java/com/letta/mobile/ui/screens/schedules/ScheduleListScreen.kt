@@ -46,6 +46,8 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.schedules.ScheduleLibraryItem
+import com.letta.mobile.data.schedules.ScheduleTiming
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -179,11 +181,11 @@ private fun ScheduleListContent(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                itemsIndexed(state.schedules, key = { _, it -> it.id }) { index, schedule ->
+                itemsIndexed(state.displayItems, key = { _, item -> item.schedule.id }) { index, item ->
                     StaggeredListItem(index = index) {
                         ScheduleCard(
-                            schedule = schedule,
-                            onDelete = { onDeleteSchedule(schedule) },
+                            item = item,
+                            onDelete = { onDeleteSchedule(item.schedule) },
                         )
                     }
                 }
@@ -239,7 +241,7 @@ private fun AgentSelector(
 
 @Composable
 private fun ScheduleCard(
-    schedule: ScheduledMessage,
+    item: ScheduleLibraryItem,
     onDelete: () -> Unit,
 ) {
     Card(
@@ -254,18 +256,14 @@ private fun ScheduleCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = schedule.message.messages.firstOrNull()?.content.orEmpty(),
+                        text = item.messagePreview,
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (schedule.schedule.type == "recurring") {
-                            stringResource(R.string.screen_schedules_recurring_label, schedule.schedule.cronExpression.orEmpty())
-                        } else {
-                            stringResource(R.string.screen_schedules_one_time_label, schedule.nextScheduledTime ?: schedule.schedule.scheduledAt?.toString().orEmpty())
-                        },
+                        text = item.timing.label(),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -279,6 +277,13 @@ private fun ScheduleCard(
         }
     }
 }
+
+@Composable
+private fun ScheduleTiming.label(): String =
+    when (this) {
+        is ScheduleTiming.Recurring -> stringResource(R.string.screen_schedules_recurring_label, cronExpression)
+        is ScheduleTiming.OneTime -> stringResource(R.string.screen_schedules_one_time_label, displayTime)
+    }
 
 @Composable
 private fun CreateScheduleDialog(
