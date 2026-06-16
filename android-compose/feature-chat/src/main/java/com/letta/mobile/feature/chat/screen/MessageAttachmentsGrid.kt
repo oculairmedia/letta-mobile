@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,7 +13,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -22,6 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.image.decodeImageBitmap
 
 /**
  * Renders attached images for a chat bubble. Up to 4 images per row in a wrap-
@@ -113,7 +112,7 @@ private fun AttachmentImage(
     val imageBitmap = remember(attachment.base64) {
         runCatching {
             val bytes = android.util.Base64.decode(attachment.base64, android.util.Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            decodeImageBitmap(bytes)
         }.getOrNull()
     }
 
