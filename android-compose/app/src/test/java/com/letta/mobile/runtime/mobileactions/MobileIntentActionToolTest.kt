@@ -1,9 +1,20 @@
 package com.letta.mobile.runtime.mobileactions
 
+import android.app.Application
+import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
+import android.net.Uri
 import android.provider.CalendarContract
 import android.provider.ContactsContract
 import android.provider.Settings
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -14,6 +25,60 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 class MobileIntentActionToolTest {
+    @Test
+    fun `execute opens Android UI and reports user confirmation required`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val expected = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=Coffee"))
+        org.robolectric.Shadows.shadowOf(context.packageManager).addResolveInfoForIntent(
+            expected,
+            ResolveInfo().apply {
+                activityInfo = ActivityInfo().apply {
+                    packageName = "com.example.maps"
+                    name = "MapActivity"
+                }
+            },
+        )
+        val tool = MobileIntentActionTool(context)
+
+        val response = Json.parseToJsonElement(
+            tool.handleJson(
+                buildJsonObject {
+                    put("tool", "show_location_on_map")
+                    put("location", "Coffee")
+                    put("dryRun", false)
+                }
+            )
+        ).jsonObject
+
+        assertEquals("opened_ui_awaiting_user_confirmation", response["status"]!!.jsonPrimitive.content)
+        assertEquals("true", response["launched"]!!.jsonPrimitive.content)
+        assertTrue(response["message"]!!.jsonPrimitive.content.contains("Opened Android maps UI"))
+        val startedIntent = org.robolectric.Shadows.shadowOf(context as Application).nextStartedActivity
+        assertEquals(Intent.ACTION_VIEW, startedIntent.action)
+        assertEquals("geo:0,0?q=Coffee", startedIntent.data.toString())
+        assertTrue(startedIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+    }
+
+    @Test
+    fun `execute reports no handler without launching`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tool = MobileIntentActionTool(context)
+
+        val response = Json.parseToJsonElement(
+            tool.handleJson(
+                buildJsonObject {
+                    put("tool", "show_location_on_map")
+                    put("location", "Coffee")
+                    put("dryRun", false)
+                }
+            )
+        ).jsonObject
+
+        assertEquals("no_handler", response["status"]!!.jsonPrimitive.content)
+        assertEquals("false", response["launched"]!!.jsonPrimitive.content)
+        assertTrue(response["message"]!!.jsonPrimitive.content.contains("No Android app can handle"))
+    }
+
     @Test
     fun `open wifi settings maps to settings intent with new task flag`() {
         val intent = openWifiSettingsIntent().apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
