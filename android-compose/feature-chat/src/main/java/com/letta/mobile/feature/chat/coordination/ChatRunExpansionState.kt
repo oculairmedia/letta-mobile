@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.model.UiMessage
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.flow.MutableStateFlow
-import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
 internal fun runIdsEligibleForCompletionAutoCollapse(messages: List<UiMessage>): Set<String> {

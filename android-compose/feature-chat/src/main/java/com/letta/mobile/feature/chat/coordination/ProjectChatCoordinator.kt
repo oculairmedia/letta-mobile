@@ -15,13 +15,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ContextWindowUiState
-import com.letta.mobile.feature.chat.render.ProjectBriefSection
-import com.letta.mobile.feature.chat.render.ProjectBriefSectionKey
-import com.letta.mobile.feature.chat.render.ProjectBriefUiState
-import com.letta.mobile.feature.chat.render.ProjectBugReportDraft
-import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ContextWindowUiState
+import com.letta.mobile.ui.chat.render.ProjectBriefSection
+import com.letta.mobile.ui.chat.render.ProjectBriefSectionKey
+import com.letta.mobile.ui.chat.render.ProjectBriefUiState
+import com.letta.mobile.ui.chat.render.ProjectBugReportDraft
+import com.letta.mobile.ui.chat.render.ProjectChatContext
 
 internal class ProjectChatCoordinator(
     private val scope: CoroutineScope,

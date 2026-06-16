@@ -48,7 +48,7 @@ class ChatBannerControllerTest {
     }
 
     private class Harness(initialState: ChatUiState = ChatUiState()) {
-        val uiState = MutableStateFlow(initialState)
+        val uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(initialState)
         val composerController = ChatComposerController()
         val controller = ChatBannerController(uiState, composerController)
     }

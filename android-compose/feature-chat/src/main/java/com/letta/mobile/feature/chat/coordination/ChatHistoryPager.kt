@@ -11,7 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
-import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
 /** Handles older-message backfill without letting live timeline emissions drop the prefix. */

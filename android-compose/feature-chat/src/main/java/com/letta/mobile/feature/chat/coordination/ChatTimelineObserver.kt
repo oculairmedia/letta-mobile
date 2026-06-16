@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.letta.mobile.feature.chat.a2ui.A2uiHistoryExtractor
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
-import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 

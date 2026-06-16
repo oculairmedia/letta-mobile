@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.timeline.headless.HeadlessStreamingRevealState
 
@@ -9,7 +9,7 @@ import com.letta.mobile.data.timeline.headless.HeadlessStreamingRevealState
  * full canonical assistant text through [updateTarget], and this class only controls how much of
  * that buffer is visible while the assistant message is actively streaming.
  */
-internal class StreamingDisplayTextSmoother(
+class StreamingDisplayTextSmoother(
     private val revealCodePointsPerStep: Int = DEFAULT_REVEAL_CODE_POINTS_PER_STEP,
     private val enabled: Boolean = ENABLE_HEADLESS_STREAMING_REVEAL,
 ) {
@@ -94,7 +94,7 @@ internal class StreamingDisplayTextSmoother(
     }
 }
 
-internal const val ENABLE_HEADLESS_STREAMING_REVEAL = true
+const val ENABLE_HEADLESS_STREAMING_REVEAL = true
 
 private fun String.codePointCountCompat(): Int {
     var count = 0

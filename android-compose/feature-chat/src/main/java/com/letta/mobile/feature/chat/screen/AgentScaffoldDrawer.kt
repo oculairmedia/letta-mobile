@@ -93,14 +93,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
-import com.letta.mobile.feature.chat.render.BugSeverity
-import com.letta.mobile.feature.chat.render.ProjectAgentStatusTone
-import com.letta.mobile.feature.chat.render.ProjectAgentsUiState
-import com.letta.mobile.feature.chat.render.ProjectBriefSectionKey
-import com.letta.mobile.feature.chat.render.ProjectBriefUiState
-import com.letta.mobile.feature.chat.render.ProjectBugReportDraft
-import com.letta.mobile.feature.chat.render.ProjectBugReportUiState
-import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.ui.chat.render.BugSeverity
+import com.letta.mobile.ui.chat.render.ProjectAgentStatusTone
+import com.letta.mobile.ui.chat.render.ProjectAgentsUiState
+import com.letta.mobile.ui.chat.render.ProjectBriefSectionKey
+import com.letta.mobile.ui.chat.render.ProjectBriefUiState
+import com.letta.mobile.ui.chat.render.ProjectBugReportDraft
+import com.letta.mobile.ui.chat.render.ProjectBugReportUiState
+import com.letta.mobile.ui.chat.render.ProjectChatContext
 
 @Composable
 internal fun ProjectAgentsCard(

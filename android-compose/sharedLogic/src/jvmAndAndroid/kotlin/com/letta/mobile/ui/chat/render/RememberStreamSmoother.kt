@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +31,7 @@ import kotlinx.coroutines.isActive
  * wasted frames at rest.
  */
 @Composable
-internal fun rememberSmoothedStreamingText(
+fun rememberSmoothedStreamingText(
     rawText: String,
     isStreaming: Boolean,
     seedText: String = "",
@@ -86,4 +86,4 @@ internal fun rememberSmoothedStreamingText(
 }
 
 /** Shared visible streaming-text cadence, aligned with StreamingMarkdownText. */
-internal const val STREAMING_TEXT_PAINT_INTERVAL_MS = 50L
+const val STREAMING_TEXT_PAINT_INTERVAL_MS = 50L

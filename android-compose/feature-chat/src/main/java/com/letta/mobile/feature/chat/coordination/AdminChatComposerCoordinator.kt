@@ -14,8 +14,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 
 
 internal class AdminChatComposerCoordinator(

@@ -6,8 +6,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.UiState
 import kotlinx.collections.immutable.persistentListOf
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 
 internal val sampleMessages = persistentListOf(
     UiMessage(id = "1", role = "user", content = "Hello! Can you help me?", timestamp = "2024-03-15T10:00:00Z"),

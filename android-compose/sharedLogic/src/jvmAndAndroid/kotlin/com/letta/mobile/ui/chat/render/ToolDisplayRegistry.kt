@@ -1,12 +1,12 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
-internal data class ToolDisplayInfo(
+data class ToolDisplayInfo(
     val emoji: String,
     val label: String,
     val detailLine: String? = null,
 )
 
-internal class ToolDisplayRegistry {
+class ToolDisplayRegistry {
     init {
         // letta-mobile-rnyg: do not fail on reassignment — tests construct
         // multiple instances. Last writer wins.

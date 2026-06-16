@@ -22,9 +22,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import com.letta.mobile.feature.chat.render.A2uiActionSnackbarUi
-import com.letta.mobile.feature.chat.render.A2uiDebugFrameUi
-import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi
+import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.a2ui.toToolApprovalSubmission
 
 internal class AdminChatA2uiCoordinator(

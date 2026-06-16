@@ -56,7 +56,7 @@ import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.ui.theme.LettaSpacing
-import com.letta.mobile.feature.chat.render.buildToolCallTemplate
+import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
 internal val ChatComposerAttachButtonSize = LettaSpacing.composerAttachButtonSize
