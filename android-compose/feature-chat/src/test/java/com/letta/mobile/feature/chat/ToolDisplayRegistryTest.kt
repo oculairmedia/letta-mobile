@@ -1,9 +1,9 @@
 package com.letta.mobile.feature.chat
+import com.letta.mobile.ui.chat.render.*
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
-import com.letta.mobile.feature.chat.render.ToolDisplayRegistry
 
 class ToolDisplayRegistryTest {
 

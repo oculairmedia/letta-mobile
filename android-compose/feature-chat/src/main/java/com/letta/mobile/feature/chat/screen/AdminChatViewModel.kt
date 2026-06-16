@@ -93,11 +93,11 @@ import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
 import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
 import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
-import com.letta.mobile.feature.chat.render.ChatTransport
-import com.letta.mobile.feature.chat.render.ChatUiState
-import com.letta.mobile.feature.chat.render.ConversationState
-import com.letta.mobile.feature.chat.render.toConversationState
-import com.letta.mobile.feature.chat.render.ProjectChatContext
+import com.letta.mobile.ui.chat.render.ChatTransport
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.toConversationState
+import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer

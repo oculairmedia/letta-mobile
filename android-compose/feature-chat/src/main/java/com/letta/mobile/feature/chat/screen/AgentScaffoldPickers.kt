@@ -89,7 +89,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
-import com.letta.mobile.feature.chat.render.ContextWindowUiState
+import com.letta.mobile.ui.chat.render.ContextWindowUiState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -643,8 +643,9 @@ internal fun ContextWindowCard(
                 )
             } else if (state.error != null) {
                 Spacer(modifier = Modifier.height(4.dp))
+                val errorText = state.error
                 Text(
-                    text = state.error,
+                    text = errorText ?: "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )

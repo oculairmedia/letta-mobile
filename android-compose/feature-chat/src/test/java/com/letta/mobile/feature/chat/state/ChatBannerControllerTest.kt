@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat.state
+import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.feature.chat.coordination.ChatComposerController
-import com.letta.mobile.feature.chat.render.ChatUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -48,7 +48,7 @@ class ChatBannerControllerTest {
     }
 
     private class Harness(initialState: ChatUiState = ChatUiState()) {
-        val uiState = MutableStateFlow(initialState)
+        val uiState: MutableStateFlow<ChatUiState> = MutableStateFlow(initialState)
         val composerController = ChatComposerController()
         val controller = ChatBannerController(uiState, composerController)
     }

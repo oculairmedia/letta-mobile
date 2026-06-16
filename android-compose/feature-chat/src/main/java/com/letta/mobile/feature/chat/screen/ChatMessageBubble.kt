@@ -34,7 +34,7 @@ import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.withTimeoutOrNull
-import com.letta.mobile.feature.chat.render.bubbleStyle
+import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.feature.chat.render.resolveRenderer
 import com.letta.mobile.feature.chat.render.MessageContentRenderer
 

@@ -1,4 +1,4 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.model.Tool
 import kotlinx.serialization.json.JsonElement

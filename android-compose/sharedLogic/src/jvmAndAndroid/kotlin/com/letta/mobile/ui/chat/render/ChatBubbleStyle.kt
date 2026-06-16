@@ -1,10 +1,10 @@
-package com.letta.mobile.feature.chat.render
+package com.letta.mobile.ui.chat.render
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-internal data class ChatBubbleStyle(
+data class ChatBubbleStyle(
     val alignEnd: Boolean,
     val containerColor: Color,
     val roleColor: Color,
@@ -12,7 +12,7 @@ internal data class ChatBubbleStyle(
 )
 
 @Composable
-internal fun bubbleStyle(role: String, isStreaming: Boolean = false, isError: Boolean = false): ChatBubbleStyle {
+fun bubbleStyle(role: String, isStreaming: Boolean = false, isError: Boolean = false): ChatBubbleStyle {
     val colorScheme = MaterialTheme.colorScheme
     val accent = colorScheme.primary
 

@@ -8,7 +8,7 @@ import com.letta.mobile.data.repository.MessageRepository
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
-import com.letta.mobile.feature.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ChatUiState
 internal class ChatSearchController(
     private val messageRepository: MessageRepository,
 ) {
