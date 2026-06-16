@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class DeviceSensorReadTool(
     private val provider: DeviceSensorSnapshotProvider,
+    private val sampler: DeviceSensorSampler = NoopDeviceSensorSampler,
     private val json: Json = Json { encodeDefaults = true; explicitNulls = false },
 ) {
     fun handle(input: JsonObject, nowMillis: Long = System.currentTimeMillis()): ReadSensorsToolResponse {
@@ -42,6 +43,36 @@ class DeviceSensorReadTool(
                     truncated = snapshot.sensors.filterSensors(query).size > limit,
                 )
             }
+            "sample" -> {
+                val matching = snapshot.sensors.filterSensors(query)
+                val descriptor = matching.firstOrNull()
+                if (descriptor == null) {
+                    ReadSensorsToolResponse(
+                        mode = mode,
+                        summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
+                        sensorCount = snapshot.sensorCount,
+                        gatedCapabilities = snapshot.gatedCapabilities,
+                        sample = SensorSampleResponse(
+                            status = "no_match",
+                            requestedSamples = input.string("samples")?.toIntOrNull()?.coerceIn(1, MAX_SAMPLE_COUNT) ?: 1,
+                            timeoutMs = input.string("timeoutMs")?.toLongOrNull()?.coerceIn(MIN_SAMPLE_TIMEOUT_MS, MAX_SAMPLE_TIMEOUT_MS) ?: DEFAULT_SAMPLE_TIMEOUT_MS,
+                            error = "No catalog sensor matched the query.",
+                        ),
+                    )
+                } else {
+                    val samples = input.string("samples")?.toIntOrNull()?.coerceIn(1, MAX_SAMPLE_COUNT) ?: 1
+                    val timeoutMs = input.string("timeoutMs")?.toLongOrNull()?.coerceIn(MIN_SAMPLE_TIMEOUT_MS, MAX_SAMPLE_TIMEOUT_MS) ?: DEFAULT_SAMPLE_TIMEOUT_MS
+                    ReadSensorsToolResponse(
+                        mode = mode,
+                        summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
+                        sensorCount = snapshot.sensorCount,
+                        gatedCapabilities = snapshot.gatedCapabilities,
+                        sensors = listOf(descriptor),
+                        truncated = matching.size > 1,
+                        sample = sampler.sample(descriptor, samples, timeoutMs),
+                    )
+                }
+            }
             "snapshot" -> ReadSensorsToolResponse(
                 mode = mode,
                 summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
@@ -55,7 +86,7 @@ class DeviceSensorReadTool(
                 summary = DeviceSensorSnapshotFormatter.toCompactString(snapshot),
                 sensorCount = snapshot.sensorCount,
                 gatedCapabilities = snapshot.gatedCapabilities,
-                error = "Unsupported mode '$mode'. Use summary, catalog, sensor, or snapshot.",
+                error = "Unsupported mode '$mode'. Use summary, catalog, sensor, sample, or snapshot.",
             )
         }
     }
@@ -81,6 +112,10 @@ class DeviceSensorReadTool(
         const val TOOL_NAME = "read_sensors"
         const val DEFAULT_SENSOR_LIMIT = 64
         const val MAX_SENSOR_RESULTS = 256
+        const val DEFAULT_SAMPLE_TIMEOUT_MS = 2_000L
+        const val MIN_SAMPLE_TIMEOUT_MS = 100L
+        const val MAX_SAMPLE_TIMEOUT_MS = 10_000L
+        const val MAX_SAMPLE_COUNT = 16
     }
 }
 
@@ -92,6 +127,7 @@ data class ReadSensorsToolResponse(
     val gatedCapabilities: List<DeviceSensorGatedCapability> = emptyList(),
     val sensors: List<SensorDescriptor>? = null,
     val snapshot: DeviceSensorSnapshot? = null,
+    val sample: SensorSampleResponse? = null,
     val truncated: Boolean = false,
     val error: String? = null,
 )
