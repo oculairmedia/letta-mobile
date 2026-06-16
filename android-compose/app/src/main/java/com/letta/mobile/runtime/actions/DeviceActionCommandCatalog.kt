@@ -37,6 +37,14 @@ object DeviceActionCommandCatalog {
                 example = "{\"command\":\"sensors.catalog\",\"input\":{\"query\":\"accelerometer\",\"limit\":8}}",
             ),
             DeviceActionCommandDescriptor(
+                command = "sensors.sample",
+                summary = "Read live values from one matched Android SensorManager sensor; optional query, samples, and timeout.",
+                riskTier = "low",
+                executionMode = "read_only",
+                input = "required: {query: string}; optional: {samples?: number, timeoutMs?: number}",
+                example = "{\"command\":\"sensors.sample\",\"input\":{\"query\":\"MLX90632\",\"samples\":1,\"timeoutMs\":2000}}",
+            ),
+            DeviceActionCommandDescriptor(
                 command = "sensors.snapshot",
                 summary = "Return bounded typed snapshot with no-permission telemetry and sensor descriptors.",
                 riskTier = "low",

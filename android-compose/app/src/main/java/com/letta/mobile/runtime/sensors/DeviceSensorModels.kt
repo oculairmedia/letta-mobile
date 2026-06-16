@@ -77,3 +77,20 @@ data class SensorDescriptor(
     val minDelayMicros: Int,
     val maxDelayMicros: Int,
 )
+
+@Serializable
+data class SensorSampleResponse(
+    val status: String,
+    val sensor: SensorDescriptor? = null,
+    val samples: List<SensorSample> = emptyList(),
+    val requestedSamples: Int = 1,
+    val timeoutMs: Long? = null,
+    val error: String? = null,
+)
+
+@Serializable
+data class SensorSample(
+    val timestampNanos: Long,
+    val accuracy: Int,
+    val values: List<Float>,
+)

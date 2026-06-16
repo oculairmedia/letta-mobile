@@ -72,4 +72,3 @@ value class McpServerId(val value: String) {
 value class GroupId(val value: String) {
     override fun toString(): String = value
 }
-

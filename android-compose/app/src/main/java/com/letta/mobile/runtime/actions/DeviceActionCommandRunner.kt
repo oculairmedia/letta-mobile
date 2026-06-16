@@ -34,6 +34,7 @@ class DeviceActionCommandRunner @Inject constructor(
             "device.catalog" -> ok(command, DeviceActionCommandCatalog.toJson())
             "sensors.summary" -> ok(command, sensorReadTool.handleJson(jsonObject("mode" to "summary")))
             "sensors.catalog" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("catalog")))
+            "sensors.sample" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("sample")))
             "sensors.snapshot" -> ok(command, sensorReadTool.handleJson(input.withDefaultMode("snapshot")))
             "mobile.capabilities" -> ok(command, mobileActionRegistry.matrixJson())
             "intent.dry_run" -> ok(command, mobileIntentActionTool.handleJson(input.withDryRun(true)))

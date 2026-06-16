@@ -50,6 +50,8 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
+                api(project(":core:ids"))
+                api(project(":core:runtime"))
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
