@@ -84,6 +84,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core:data"))
+    implementation(project(":sharedLogic"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     implementation("io.github.vinceglb:filekit-core:0.14.1")
