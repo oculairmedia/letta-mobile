@@ -224,7 +224,7 @@ private fun ConversationPane(
 }
 
 @Composable
-private fun ConversationGroupHeader(group: DesktopConversationGroup) {
+internal fun ConversationGroupHeader(group: DesktopConversationGroup) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -248,7 +248,7 @@ private fun ConversationGroupHeader(group: DesktopConversationGroup) {
 }
 
 @Composable
-private fun ConversationPaneStateCard(
+internal fun ConversationPaneStateCard(
     state: DesktopChatSurfaceState,
     onRetryConnection: () -> Unit,
 ) {
@@ -304,7 +304,7 @@ private fun ConversationPaneStateCard(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationRow(
+internal fun ConversationRow(
     conversation: DesktopConversationSummary,
     selected: Boolean,
     onClick: () -> Unit,
@@ -342,18 +342,17 @@ private fun ConversationRow(
                 color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
             ),
         ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
                     text = conversation.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -361,27 +360,12 @@ private fun ConversationRow(
                 if (conversation.unreadCount > 0) {
                     CountPill(conversation.unreadCount)
                 }
+                Text(
+                    text = conversation.updatedAtLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = content.copy(alpha = 0.6f),
+                )
             }
-            Text(
-                text = conversation.agentName,
-                style = MaterialTheme.typography.labelMedium,
-                color = content.copy(alpha = 0.72f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = conversation.lastMessagePreview,
-                style = MaterialTheme.typography.bodySmall,
-                color = content.copy(alpha = 0.78f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = conversation.updatedAtLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = content.copy(alpha = 0.62f),
-            )
-        }
     }
     DropdownMenu(
         expanded = showMenu,
@@ -415,7 +399,7 @@ private fun CountPill(count: Int) {
 }
 
 @Composable
-private fun ChatDetailPane(
+internal fun ChatDetailPane(
     state: DesktopChatSurfaceState,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
