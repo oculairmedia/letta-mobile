@@ -26,7 +26,7 @@ class LocalRuntimeProvidersTest {
     }
 
     @Test
-    fun `local lettacode does not advertise unprojected tool or approval events`() {
+    fun `local lettacode advertises honest tool and approval capabilities`() {
         val provider = localLettaCodeProvider()
 
         val capabilities = provider.descriptor(
@@ -39,8 +39,13 @@ class LocalRuntimeProvidersTest {
 
         assertTrue(capabilities.supportsStreaming)
         assertTrue(capabilities.supportsMemFs)
-        assertFalse(capabilities.supportsTools)
+        // Local runtime projects AND executes tools (letta-mobile-nq1le)
+        assertTrue(capabilities.supportsToolEvents)
+        assertTrue(capabilities.supportsToolExecution)
+        // But turns are auto-approved — no approval round-trip UI
         assertFalse(capabilities.supportsApprovals)
+        // The legacy compat flag should be true (tools do work)
+        assertTrue(capabilities.supportsTools)
     }
 
     @Test
@@ -65,6 +70,38 @@ class LocalRuntimeProvidersTest {
                 )
             )
         )
+    }
+
+    @Test
+    fun `local runtime capability invariant - approvals false means no approval affordance`() {
+        // Invariant (letta-mobile-nq1le): when supportsApprovals=false, the runtime
+        // does not emit ApprovalRequested events, so no UiApprovalRequest is ever created,
+        // and thus no approval UI (approve/reject buttons) is shown. Tool cards (from
+        // ToolCallObserved/ToolReturnObserved) still render, because supportsToolEvents=true.
+        val provider = localLettaCodeProvider()
+        val descriptor = provider.descriptor(
+            LettaConfig(
+                id = "local-lettacode",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "local-lettacode://device",
+            )
+        )
+
+        // The local runtime says approvals are not supported
+        assertFalse(descriptor.capabilities.supportsApprovals)
+        // Tool events ARE supported — tool cards will render
+        assertTrue(descriptor.capabilities.supportsToolEvents)
+
+        // The invariant is enforced by data flow: LocalRuntimeChatSendCoordinator
+        // handles ApprovalRequested as a no-op (lines 233-240), so no approvalRequestId
+        // reaches the timeline mapper, thus UiApprovalRequest is never constructed,
+        // and ApprovalRequestControls (which only renders when UiApprovalRequest != null)
+        // never displays approve/reject buttons for local turns.
+        //
+        // This test documents the invariant; the actual enforcement is in:
+        // - LocalRuntimeChatSendCoordinator.handleRuntimeEvent (no-op for ApprovalRequested)
+        // - TimelineEventToUiMessage mapper (UiApprovalRequest only when approvalRequestId exists)
+        // - ChatApprovals.ApprovalRequestControls (only renders when approval != null)
     }
 
     private fun localLettaCodeProvider(): LocalLettaCodeRuntimeProvider = LocalLettaCodeRuntimeProvider(

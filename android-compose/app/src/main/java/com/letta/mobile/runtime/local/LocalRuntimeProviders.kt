@@ -41,7 +41,8 @@ class LocalLettaCodeRuntimeProvider @Inject constructor(
             capabilities = BackendCapabilities(
                 supportsStreaming = true,
                 supportsMemFs = true,
-                supportsTools = false,
+                supportsToolEvents = true,
+                supportsToolExecution = true,
                 supportsApprovals = false,
                 supportsAgentFileImport = false,
                 supportsAgentFileExport = false,
@@ -74,7 +75,8 @@ class LocalKoogRuntimeProvider @Inject constructor() : LocalRuntimeProvider {
             capabilities = BackendCapabilities(
                 supportsStreaming = true,
                 supportsMemFs = true,
-                supportsTools = false,
+                supportsToolEvents = true,
+                supportsToolExecution = true,
                 supportsApprovals = false,
                 supportsAgentFileImport = false,
                 supportsAgentFileExport = false,
