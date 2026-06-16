@@ -30,7 +30,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -41,8 +40,8 @@ import com.letta.mobile.data.tooloutput.DiffLineType
 import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
-import com.letta.mobile.feature.chat.R
 import com.letta.mobile.feature.chat.screen.chatLongPressTimeoutMillis
+import com.letta.mobile.ui.chat.render.ChatRenderStrings
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.ChatTextVisualClip
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
@@ -184,10 +183,7 @@ private fun ToolOutputBody(
         }
         if (expanded && document.isTruncated) {
             ToolOutputLimitNotice(
-                text = stringResource(
-                    R.string.screen_chat_tool_output_truncated,
-                    document.omittedCharCount,
-                ),
+                text = ChatRenderStrings.truncated(document.omittedCharCount),
             )
         }
     }
@@ -408,10 +404,10 @@ private fun CodeOutputSurface(
                 if (showLimitNotice) {
                     when {
                         limited.omittedLines > 0 -> ToolOutputLimitNotice(
-                            text = stringResource(R.string.screen_chat_tool_output_lines_omitted, limited.omittedLines),
+                            text = ChatRenderStrings.linesOmitted(limited.omittedLines),
                         )
                         limited.omittedChars > 0 -> ToolOutputLimitNotice(
-                            text = stringResource(R.string.screen_chat_tool_output_chars_omitted, limited.omittedChars),
+                            text = ChatRenderStrings.charsOmitted(limited.omittedChars),
                         )
                     }
                 }
@@ -441,7 +437,7 @@ private fun DiffOutputSurface(block: ToolOutputBlock.Diff) {
             ) {
                 limited.files.forEach { file ->
                     Text(
-                        text = file.newPath ?: file.oldPath ?: stringResource(R.string.screen_chat_tool_output_diff_file),
+                        text = file.newPath ?: file.oldPath ?: ChatRenderStrings.diffFile(),
                         style = MaterialTheme.typography.labelSmall.copy(fontFamily = LettaCodeFont)
                             .scaledBy(LocalChatFontScale.current),
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.86f),
@@ -454,7 +450,7 @@ private fun DiffOutputSurface(block: ToolOutputBlock.Diff) {
             }
             if (limited.omittedLines > 0) {
                 ToolOutputLimitNotice(
-                    text = stringResource(R.string.screen_chat_tool_output_lines_omitted, limited.omittedLines),
+                    text = ChatRenderStrings.linesOmitted(limited.omittedLines),
                 )
             }
         }
@@ -507,10 +503,7 @@ private fun StackTraceOutputSurface(block: ToolOutputBlock.StackTrace) {
             }
             if (block.frames.size > ToolOutputMaxRenderedLines) {
                 ToolOutputLimitNotice(
-                    text = stringResource(
-                        R.string.screen_chat_tool_output_lines_omitted,
-                        block.frames.size - ToolOutputMaxRenderedLines,
-                    ),
+                    text = ChatRenderStrings.linesOmitted(block.frames.size - ToolOutputMaxRenderedLines),
                 )
             }
         }
