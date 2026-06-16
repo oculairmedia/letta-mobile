@@ -40,8 +40,25 @@ import com.letta.mobile.data.tooloutput.DiffLineType
 import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
-import com.letta.mobile.feature.chat.screen.chatLongPressTimeoutMillis
+import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import com.letta.mobile.ui.chat.render.ChatRenderStrings
+import com.letta.mobile.ui.chat.render.LimitedText
+import com.letta.mobile.ui.chat.render.ToolOutputCaches
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightCacheKey
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightKind
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightMode
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightSpan
+import com.letta.mobile.ui.chat.render.ToolOutputSyntaxColors
+import com.letta.mobile.ui.chat.render.cachedToolOutputHighlightSpans
+import com.letta.mobile.ui.chat.render.cachedToolOutputDocument
+import com.letta.mobile.ui.chat.render.formatTable
+import com.letta.mobile.ui.chat.render.highlightMode
+import com.letta.mobile.ui.chat.render.highlightToolOutputText
+import com.letta.mobile.ui.chat.render.limitDiffFilesForRendering
+import com.letta.mobile.ui.chat.render.limitRenderedText
+import com.letta.mobile.ui.chat.render.previewText
+import com.letta.mobile.ui.chat.render.toolOutputContentKey
+import com.letta.mobile.ui.chat.render.toolOutputSyntaxColors
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.ChatTextVisualClip
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
@@ -55,14 +72,14 @@ import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedChars
+import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
+import com.letta.mobile.ui.chat.render.ToolOutputMaxHighlightSpans
+import com.letta.mobile.ui.chat.render.ToolOutputDocumentMaxCacheableRawChars
 
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000
-internal const val ToolOutputMaxRenderedChars = 20_000
-internal const val ToolOutputMaxRenderedLines = 320
 internal const val ToolOutputPreviewMaxRenderedChars = 1_200
-internal const val ToolOutputMaxHighlightSpans = 800
-internal const val ToolOutputDocumentMaxCacheableRawChars = ToolOutputParser.MaxAnalyzedChars
 
 internal data class ToolCardBodyRenderEligibility(
     val expanded: Boolean,

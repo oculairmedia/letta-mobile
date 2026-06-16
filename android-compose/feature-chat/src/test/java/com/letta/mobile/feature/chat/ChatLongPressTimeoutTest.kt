@@ -1,7 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.feature.chat.screen.CHAT_LONG_PRESS_TIMEOUT_MULTIPLIER
-import com.letta.mobile.feature.chat.screen.chatLongPressTimeoutMillis
+import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
