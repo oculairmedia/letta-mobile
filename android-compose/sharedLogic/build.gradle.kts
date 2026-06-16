@@ -2,6 +2,8 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover")
 }
@@ -62,6 +64,28 @@ kotlin {
                 // duplicated per platform (letta-mobile-mqzkc).
                 api("io.ktor:ktor-client-core:3.5.0")
             }
+        }
+
+        // Intermediate source set for UI platforms (android + jvm/desktop).
+        // Compose-Multiplatform UI doesn't support native targets, so we create
+        // a jvmAndAndroid source set for shared chat UI (slice 1).
+        val jvmAndAndroid by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                // Compose-Multiplatform UI dependencies for shared chat UI (slice 1)
+                api("org.jetbrains.compose.foundation:foundation:1.9.0")
+                api("org.jetbrains.compose.material3:material3:1.9.0")
+                api("org.jetbrains.compose.ui:ui:1.9.0")
+            }
+        }
+
+        // Wire android and jvm source sets to jvmAndAndroid
+        getByName("androidMain") {
+            dependsOn(jvmAndAndroid)
+        }
+
+        getByName("jvmMain") {
+            dependsOn(jvmAndAndroid)
         }
 
         commonTest {
