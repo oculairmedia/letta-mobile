@@ -250,7 +250,8 @@ fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
         capabilities = BackendCapabilities(
             supportsStreaming = true,
             supportsMemFs = true,
-            supportsTools = true,
+            supportsToolEvents = true,
+            supportsToolExecution = true,
             supportsApprovals = true,
             supportsAgentFileImport = true,
             supportsAgentFileExport = true,

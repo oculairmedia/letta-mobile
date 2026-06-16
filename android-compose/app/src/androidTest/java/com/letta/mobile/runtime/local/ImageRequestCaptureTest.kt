@@ -95,7 +95,8 @@ class ImageRequestCaptureTest {
                     capabilities = BackendCapabilities(
                         supportsStreaming = true,
                         supportsMemFs = true,
-                        supportsTools = true,
+                supportsToolEvents = true,
+                supportsToolExecution = true,
                         supportsApprovals = false,
                         supportsAgentFileImport = false,
                         supportsAgentFileExport = false,

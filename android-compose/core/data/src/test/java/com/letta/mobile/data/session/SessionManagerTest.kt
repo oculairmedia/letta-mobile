@@ -260,6 +260,7 @@ class SessionManagerTest {
                     kind = BackendKind.LocalKoog,
                     label = "Local Koog runtime",
                     supportsTools = false,
+                    supportsApprovals = false,
                     priority = 10,
                 ),
             ),
@@ -1140,6 +1141,7 @@ class SessionManagerTest {
         kind: BackendKind = BackendKind.LocalLettaCode,
         label: String = "Local LettaCode",
         supportsTools: Boolean = true,
+        supportsApprovals: Boolean = supportsTools,
         priority: Int = 100,
     ): LocalRuntimeProvider = object : LocalRuntimeProvider {
         override val providerId: String = providerId
@@ -1158,8 +1160,9 @@ class SessionManagerTest {
                 capabilities = BackendCapabilities(
                     supportsStreaming = true,
                     supportsMemFs = true,
-                    supportsTools = supportsTools,
-                    supportsApprovals = supportsTools,
+                    supportsToolEvents = supportsTools,
+                    supportsToolExecution = supportsTools,
+                    supportsApprovals = supportsApprovals,
                     supportsAgentFileImport = false,
                     supportsAgentFileExport = false,
                 ),
