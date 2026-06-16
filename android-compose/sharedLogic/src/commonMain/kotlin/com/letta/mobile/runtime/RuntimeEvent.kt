@@ -147,7 +147,25 @@ sealed interface RuntimeEventPayload {
     data class AgentFileExported(
         val file: AgentFile,
     ) : RuntimeEventPayload
+
+    @Serializable
+    @SerialName("subagent_state_changed")
+    data class SubagentStateChanged(
+        val subagents: List<SubagentDescriptor>,
+    ) : RuntimeEventPayload
 }
+
+@Serializable
+data class SubagentDescriptor(
+    val subagentId: String,
+    val subagentType: String,
+    val description: String,
+    val status: String,
+    val toolCallId: String,
+    val startTime: Long,
+    val isBackground: Boolean,
+    val agentId: String,
+)
 
 @Serializable
 enum class RuntimeRunStatus {

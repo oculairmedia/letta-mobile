@@ -188,6 +188,37 @@ class LettaCodeStreamJsonMapperTest {
         )
     }
 
+    @Test
+    fun `maps subagent_state frame to SubagentStateChanged payload`() {
+        val drafts = mapper.mapLine(
+            """{"type":"subagent_state","subagents":[{"subagent_id":"sub-1","subagent_type":"researcher","description":"investigating bug","status":"running","tool_call_id":"call_abc","start_time":1234567890,"is_background":false,"agent_id":"agent-local-worker"}]}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.SubagentStateChanged
+        assertEquals(1, payload.subagents.size)
+        val subagent = payload.subagents.first()
+        assertEquals("sub-1", subagent.subagentId)
+        assertEquals("researcher", subagent.subagentType)
+        assertEquals("investigating bug", subagent.description)
+        assertEquals("running", subagent.status)
+        assertEquals("call_abc", subagent.toolCallId)
+        assertEquals(1234567890L, subagent.startTime)
+        assertEquals(false, subagent.isBackground)
+        assertEquals("agent-local-worker", subagent.agentId)
+    }
+
+    @Test
+    fun `maps empty subagent_state frame`() {
+        val drafts = mapper.mapLine(
+            """{"type":"subagent_state","subagents":[]}""",
+            command(),
+        )
+
+        val payload = drafts.single().payload as RuntimeEventPayload.SubagentStateChanged
+        assertTrue(payload.subagents.isEmpty())
+    }
+
     private fun command(): TurnCommand = TurnCommand(
         backendId = BackendId("local-lettacode:test"),
         runtimeId = RuntimeId("local-lettacode:test"),

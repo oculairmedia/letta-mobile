@@ -5,6 +5,7 @@ import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.SubagentDescriptor
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
@@ -59,6 +60,7 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
                 )
             )
             "result" -> listOf(root.resultDraft(command))
+            "subagent_state" -> root.subagentStateDraft(command)?.let(::listOf).orEmpty()
             else -> emptyList()
         }
     }
@@ -156,6 +158,32 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
             string("stop_reason") ?: string("result") ?: "LettaCode turn ended with $subtype."
         }
         return command.runStatus(status, reason, runId())
+    }
+
+    private fun JsonObject.subagentStateDraft(command: TurnCommand): RuntimeEventDraft? {
+        val subagentsArray = (this["subagents"] as? JsonArray) ?: return null
+        val subagents = subagentsArray.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            SubagentDescriptor(
+                subagentId = obj.string("subagent_id") ?: "",
+                subagentType = obj.string("subagent_type") ?: "",
+                description = obj.string("description") ?: "",
+                status = obj.string("status") ?: "running",
+                toolCallId = obj.string("tool_call_id") ?: "",
+                startTime = (obj["start_time"] as? JsonPrimitive)?.contentOrNull?.toLongOrNull() ?: 0L,
+                isBackground = (obj["is_background"] as? JsonPrimitive)?.booleanOrNull ?: false,
+                agentId = obj.string("agent_id") ?: "",
+            )
+        }
+        return RuntimeEventDraft(
+            backendId = command.backendId,
+            runtimeId = command.runtimeId,
+            agentId = command.agentId,
+            conversationId = command.conversationId,
+            runId = null,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.SubagentStateChanged(subagents = subagents),
+        )
     }
 
     private fun TurnCommand.runStatus(

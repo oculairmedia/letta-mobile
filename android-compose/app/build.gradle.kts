@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "27"
+val embeddedLettaCodeAssetRevision = "28"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -565,6 +565,71 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                 .start()
             check(checkProcess.waitFor() == 0) { "${file.name} failed node --check." }
         }
+
+        // letta-mobile-d9a7p: emit subagent_state stream-json messages on registry changes
+        // AND register a snapshot getter for the runtime-introspection reminder line.
+        // The embedded bundle's subagent_state store (~letta.js:173700) has a
+        // notifyListeners() helper called on every registry mutation. Wrap it to:
+        //  1. Emit a stream-json line to stdout (fed to LocalActiveSubagentSource).
+        //  2. Register globalThis.__lettaMobileGetSubagentSnapshot for the reminder.
+        val subagentStatePatchScript = npmWorkDir.resolve("patch-subagent-state-emit.mjs")
+        subagentStatePatchScript.writeText(
+            """
+            import { readFileSync, writeFileSync } from 'fs';
+            const file = process.argv[2];
+            let src = readFileSync(file, 'utf8');
+            // Locate the notifyListeners() definition in the subagent_state module.
+            // The bundle shape is: function notifyListeners() { for (const listener of listeners) listener(); }
+            const marker = 'function notifyListeners() {';
+            const idx = src.indexOf(marker);
+            if (idx === -1) {
+              throw new Error('patch-subagent-state-emit: notifyListeners marker not found — letta.js shape changed');
+            }
+            // Find the opening brace after the marker.
+            let i = idx + marker.length;
+            while (i < src.length && src[i] !== '{') i++;
+            if (i >= src.length) {
+              throw new Error('patch-subagent-state-emit: notifyListeners body not found');
+            }
+            i++; // move past the opening brace
+            // Inject the stdout emit + snapshot getter registration at the start of notifyListeners() body.
+            const injection = `
+              try {
+                const snapshot = getSnapshot();
+                // Register the snapshot getter for the runtime-introspection reminder.
+                if (typeof globalThis.__lettaMobileGetSubagentSnapshot !== "function") {
+                  globalThis.__lettaMobileGetSubagentSnapshot = () => getSnapshot();
+                }
+                const subagents = (snapshot.agents || []).map(a => ({
+                  subagent_id: a.id || '',
+                  subagent_type: a.type || '',
+                  description: a.description || '',
+                  status: a.status || 'running',
+                  tool_call_id: a.toolCallId || '',
+                  start_time: a.startTime || 0,
+                  is_background: !!a.isBackground,
+                  agent_id: a.agentId || ''
+                }));
+                const msg = JSON.stringify({ type: 'subagent_state', subagents });
+                console.log(msg);
+              } catch (err) {
+                // Fail-open: subagent introspection is non-critical; never crash the turn.
+              }
+            `;
+            src = src.slice(0, i) + injection + src.slice(i);
+            writeFileSync(file, src);
+            console.log('[embedded-lettacode] patched notifyListeners to emit subagent_state + register snapshot getter');
+            """.trimIndent(),
+        )
+        val subagentStatePatch = ProcessBuilder(
+            "node",
+            subagentStatePatchScript.absolutePath,
+            lettaJs.absolutePath,
+        )
+            .directory(npmWorkDir)
+            .inheritIO()
+            .start()
+        check(subagentStatePatch.waitFor() == 0) { "subagent_state-emit patch for letta.js failed." }
 
         // Ship npm so the on-device node can install packages. npm is pure JS
         // (npm-cli.js) and runs on the embedded node 18 runtime. Pin the last

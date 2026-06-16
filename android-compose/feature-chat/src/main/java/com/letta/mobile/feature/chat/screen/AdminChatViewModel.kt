@@ -42,12 +42,15 @@ import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
+import com.letta.mobile.feature.chat.subagent.LocalActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.LocalAwareActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
+import com.letta.mobile.runtime.RuntimeEventOffset
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableList
@@ -138,20 +141,20 @@ internal class AdminChatViewModel @Inject constructor(
     val agentId: AgentId = AgentId(routeArgs.agentId)
 
     /**
-     * letta-mobile-73o2h.3: WS-backed feed for the active-subagent status
-     * bar. Bound here (rather than at the [ChatScreen] call site) so the
-     * screen's `activeSubagentSource` parameter stays a single seam that
-     * defaults to the fake for previews/tests but gets the real per-socket
-     * registry in production. Hot-shared off [viewModelScope].
+     * letta-mobile-d9a7p (embedded half): active-subagent feed that switches
+     * between [LocalActiveSubagentSource] (embedded runtime, fed by
+     * subagent_state stream-json events) and [WsActiveSubagentSource]
+     * (remote/shim, fed by the WS subagent registry). Bound here (rather than
+     * at the [ChatScreen] call site) so the screen's `activeSubagentSource`
+     * parameter stays a single seam that defaults to the fake for
+     * previews/tests but gets the real per-runtime source in production.
+     * Hot-shared off [viewModelScope].
+     *
+     * The previous [LocalAwareActiveSubagentSource] suppressed subagents to
+     * empty on local (letta-mobile-7vs4s phantom-chip fix). Now that the
+     * embedded runtime emits subagent_state, local shows REAL subagents
+     * instead of being gated.
      */
-    // letta-mobile-7vs4s: the bar's WS-backed feed reads the shim's per-socket
-    // subagent registry. On the LOCAL embedded runtime there is no shim WS
-    // subagent feed, so the WS source can never deliver the terminal
-    // transitions its linger accumulator needs — phantom chips would appear on
-    // every prompt and never clear. Wrap the WS source so it is GATED to empty
-    // while the active agent is local-bound, and passes the real registry
-    // through on remote/shim. `by lazy` because the gate reads [activeAgent]
-    // (declared below), so construction must happen after field init.
     val activeSubagentSource: ActiveSubagentSource by lazy {
         val localBound: StateFlow<Boolean> = activeAgent
             .map { AgentRuntimeBinding.isLocalBound(it) }
@@ -160,9 +163,33 @@ internal class AdminChatViewModel @Inject constructor(
                 SharingStarted.WhileSubscribed(5000),
                 AgentRuntimeBinding.isLocalBound(activeAgent.value),
             )
+        // Switch between local and remote sources based on runtime binding.
+        // The sources are hot (stateIn'd internally), so we merge them by
+        // gating one flow to empty and passing the other through.
+        val localSource = LocalActiveSubagentSource(
+            runtimeEventsFlow = runtimeEventOutbox.events(RuntimeEventOffset(0L))
+                .map { it.payload },
+            scope = viewModelScope,
+        )
+        val remoteSource = WsActiveSubagentSource(subagentRepository, viewModelScope)
         LocalAwareActiveSubagentSource(
-            delegate = WsActiveSubagentSource(subagentRepository, viewModelScope),
-            isLocalBoundFlow = localBound,
+            delegate = object : ActiveSubagentSource {
+                override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
+                    combine(localSource.activeSubagents, remoteSource.activeSubagents, localBound) { local, remote, isLocal ->
+                        if (isLocal) local else remote
+                    }.stateIn(
+                        viewModelScope,
+                        SharingStarted.WhileSubscribed(5000),
+                        persistentListOf(),
+                    )
+                override suspend fun todos(toolCallId: String) =
+                    if (localBound.value) localSource.todos(toolCallId) else remoteSource.todos(toolCallId)
+                override suspend fun resolveConversationId(subagent: ActiveSubagent) =
+                    if (localBound.value) localSource.resolveConversationId(subagent) else remoteSource.resolveConversationId(subagent)
+                override suspend fun resolveSubagent(id: String) =
+                    if (localBound.value) localSource.resolveSubagent(id) else remoteSource.resolveSubagent(id)
+            },
+            isLocalBoundFlow = localBound.map { false }, // Never gate; we're already switching sources
             scope = viewModelScope,
         )
     }

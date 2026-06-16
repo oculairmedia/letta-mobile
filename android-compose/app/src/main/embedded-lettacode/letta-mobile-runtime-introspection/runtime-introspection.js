@@ -147,9 +147,9 @@ export function seedModelHandle(agentId, conversationId, model) {
 // ──────────────────────────────────────────────────────────────────────
 /**
  * Build the connection system-reminder injected at turn start.
- * Includes serving model, context utilization, and session role.
- * Callers prepend this to the user message before sending to the
- * agent pool.
+ * Includes serving model, context utilization, session role, and
+ * subagent activity. Callers prepend this to the user message before
+ * sending to the agent pool.
  *
  * **Fail-open**: this function must NEVER throw or block. The
  * reminder is an enhancement — if any lookup fails (missing agent
@@ -161,12 +161,15 @@ export function buildConnectionReminder(agentId, conversationId) {
         const role = getSessionRole(agentId, conversationId);
         const model = getServingModelHandle(agentId);
         const ctx = getContextUtilizationSummary(agentId, conversationId);
+        const subagents = buildSubagentSummaryLine();
         const lines = [];
         if (model)
             lines.push(`Serving model: ${model}`);
         if (ctx)
             lines.push(`Context utilization: ${ctx}`);
         lines.push(`Session role: ${role}`);
+        if (subagents)
+            lines.push(subagents);
         if (lines.length === 0)
             return "";
         return `<system-reminder>\n${lines.join("\n")}\n</system-reminder>`;
@@ -176,6 +179,82 @@ export function buildConnectionReminder(agentId, conversationId) {
         console.error(`[runtime-introspection] buildConnectionReminder failed (fail-open): ${msg}`);
         return "";
     }
+}
+// ──────────────────────────────────────────────────────────────────────
+// Subagent activity summary
+// ──────────────────────────────────────────────────────────────────────
+/**
+ * letta-mobile-d9a7p: build the subagent activity summary line for the
+ * connection reminder. Matches the SHIM wording (admin-shim PR #53):
+ *   "Subagents: 2 running — worker (feat/x, 4m), tester (test/y, 1m); ⚠ 1 stuck-suspected — builder (12m)"
+ *
+ * Omit when no subagents. Fail-open: if getSubagentSnapshot throws or
+ * returns unexpected shape, return null so the reminder proceeds without
+ * the subagent line.
+ */
+export function buildSubagentSummaryLine() {
+    try {
+        if (typeof globalThis.__lettaMobileGetSubagentSnapshot !== "function")
+            return null;
+        const snapshot = globalThis.__lettaMobileGetSubagentSnapshot();
+        if (!snapshot || !Array.isArray(snapshot.agents) || snapshot.agents.length === 0)
+            return null;
+        const running = snapshot.agents.filter((a) => a.status === "running" || a.status === "pending");
+        if (running.length === 0)
+            return null;
+        const now = Date.now();
+        const STUCK_THRESHOLD_MS = 5 * 60 * 1000;
+        const stuck = running.filter((a) => {
+            const start = typeof a.startTime === "number" ? a.startTime : 0;
+            return start > 0 && now - start > STUCK_THRESHOLD_MS;
+        });
+        const healthy = running.filter((a) => !stuck.includes(a));
+        const parts = [];
+        if (healthy.length > 0) {
+            const summaries = healthy.map((a) => {
+                const desc = typeof a.description === "string" && a.description.trim()
+                    ? a.description.trim()
+                    : a.type || "subagent";
+                const elapsed = typeof a.startTime === "number" && a.startTime > 0
+                    ? formatElapsed(now - a.startTime)
+                    : "";
+                return elapsed ? `${desc} (${elapsed})` : desc;
+            });
+            parts.push(`${healthy.length} running — ${summaries.join(", ")}`);
+        }
+        if (stuck.length > 0) {
+            const summaries = stuck.map((a) => {
+                const desc = typeof a.description === "string" && a.description.trim()
+                    ? a.description.trim()
+                    : a.type || "subagent";
+                const elapsed = typeof a.startTime === "number" && a.startTime > 0
+                    ? formatElapsed(now - a.startTime)
+                    : "";
+                return elapsed ? `${desc} (${elapsed})` : desc;
+            });
+            parts.push(`⚠ ${stuck.length} stuck-suspected (>5m) — ${summaries.join(", ")}`);
+        }
+        return parts.length > 0 ? `Subagents: ${parts.join("; ")}` : null;
+    }
+    catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[runtime-introspection] buildSubagentSummaryLine failed (fail-open): ${msg}`);
+        return null;
+    }
+}
+/**
+ * Format elapsed milliseconds as a compact duration string (e.g. "4m", "12m").
+ */
+function formatElapsed(ms) {
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60)
+        return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60)
+        return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h${remainingMinutes}m` : `${hours}h`;
 }
 // ──────────────────────────────────────────────────────────────────────
 // Test helpers
