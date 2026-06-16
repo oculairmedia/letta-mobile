@@ -68,12 +68,12 @@ function registerReadSensorsTool() {
 function registerDeviceActionTool() {
   registerExternalTool({
     name: 'device_action',
-    description: 'Run a compact Android device-action command. Prefer this over individual device tools to avoid prompt/tool-list bloat. Commands include sensors.summary, sensors.catalog, sensors.snapshot, mobile.capabilities, intent.dry_run, hardware.capabilities, hardware.flashlight_probe, hardware.vibrate, and hardware.audio_status.',
+    description: 'Run a compact Android device-action command. Prefer this over individual device tools to avoid prompt/tool-list bloat. Commands include sensors.summary, sensors.catalog, sensors.snapshot, mobile.capabilities, intent.dry_run, hardware.capabilities, hardware.flashlight (CONTROL the torch: input {enabled: true|false}), hardware.flashlight_on, hardware.flashlight_off, hardware.flashlight_probe (capability check only, does not change the torch), hardware.vibrate, and hardware.audio_status.',
     parameters: {
       type: 'object',
       properties: {
-        command: { type: 'string', description: 'Device action command, e.g. sensors.summary, hardware.capabilities, intent.dry_run.' },
-        input: { type: 'object', description: 'Optional command-specific JSON input.' }
+        command: { type: 'string', description: 'Device action command, e.g. sensors.summary, hardware.capabilities, intent.dry_run, or hardware.flashlight to turn the torch on/off.' },
+        input: { type: 'object', description: 'Optional command-specific JSON input. For hardware.flashlight, pass {enabled: true} to turn the torch ON or {enabled: false} to turn it OFF (the change is applied immediately, not a dry run).' }
       },
       required: ['command'],
       additionalProperties: false
