@@ -6,7 +6,9 @@ import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
 import com.letta.mobile.runtime.mobileactions.MobileIntentActionTool
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
+import com.letta.mobile.runtime.sensors.DeviceSensorSampler
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
+import com.letta.mobile.runtime.sensors.NoopDeviceSensorSampler
 import java.io.Closeable
 import java.io.InputStream
 import java.io.OutputStream
@@ -50,6 +52,7 @@ data class AndroidNetworkBridgeSession(
 @Singleton
 class LocalAndroidNetworkBridge @Inject constructor(
     private val sensorSnapshotProvider: DeviceSensorSnapshotProvider,
+    private val sensorSampler: DeviceSensorSampler = NoopDeviceSensorSampler,
     private val mobileActionRegistry: MobileActionRegistry,
     private val mobileIntentActionTool: MobileIntentActionTool,
     private val hardwareControlProvider: DeviceHardwareControlProvider,
@@ -68,7 +71,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
             executor = executor,
             json = json,
             authToken = authToken,
-            sensorReadTool = DeviceSensorReadTool(sensorSnapshotProvider),
+            sensorReadTool = DeviceSensorReadTool(sensorSnapshotProvider, sensorSampler),
             mobileActionRegistry = mobileActionRegistry,
             mobileIntentActionTool = mobileIntentActionTool,
             hardwareControlTool = DeviceHardwareControlTool(hardwareControlProvider),

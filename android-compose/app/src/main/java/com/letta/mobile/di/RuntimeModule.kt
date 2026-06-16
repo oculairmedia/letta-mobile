@@ -39,9 +39,11 @@ import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionCapabilityProvider
 import com.letta.mobile.runtime.actions.MobileExternalToolHandler
+import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSampler
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
+import com.letta.mobile.runtime.sensors.DeviceSensorSampler
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
 import android.content.Context
 import dagger.Module
@@ -90,8 +92,14 @@ object RuntimeModule {
 
     @Provides
     @Singleton
-    fun provideDeviceSensorReadTool(provider: DeviceSensorSnapshotProvider): DeviceSensorReadTool =
-        DeviceSensorReadTool(provider)
+    fun provideDeviceSensorSampler(sampler: AndroidDeviceSensorSampler): DeviceSensorSampler = sampler
+
+    @Provides
+    @Singleton
+    fun provideDeviceSensorReadTool(
+        provider: DeviceSensorSnapshotProvider,
+        sampler: DeviceSensorSampler,
+    ): DeviceSensorReadTool = DeviceSensorReadTool(provider, sampler)
 
     @Provides
     @Singleton

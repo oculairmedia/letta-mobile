@@ -68,12 +68,12 @@ function registerReadSensorsTool() {
 function registerDeviceActionTool() {
   registerExternalTool({
     name: 'device_action',
-    description: 'Run a compact Android device-action command. Prefer this over individual device tools to avoid prompt/tool-list bloat. Commands include sensors.summary, sensors.catalog, sensors.snapshot, mobile.capabilities, intent.dry_run, intent.execute (opens Android UI; user must confirm send/save/settings changes; never claim sent/saved), hardware.capabilities, hardware.flashlight (CONTROL the torch: input {enabled: true|false}), hardware.flashlight_on, hardware.flashlight_off, hardware.flashlight_probe (capability check only, does not change the torch), hardware.vibrate, and hardware.audio_status.',
+    description: 'Run a compact Android device-action command. Prefer this over individual device tools to avoid prompt/tool-list bloat. Commands include sensors.summary, sensors.catalog, sensors.sample (live SensorManager values for a matched sensor), sensors.snapshot, mobile.capabilities, intent.dry_run, intent.execute (opens Android UI; user must confirm send/save/settings changes; never claim sent/saved), hardware.capabilities, hardware.flashlight (CONTROL the torch: input {enabled: true|false}), hardware.flashlight_on, hardware.flashlight_off, hardware.flashlight_probe (capability check only, does not change the torch), hardware.vibrate, and hardware.audio_status.',
     parameters: {
       type: 'object',
       properties: {
-        command: { type: 'string', description: 'Device action command, e.g. sensors.summary, hardware.capabilities, intent.dry_run, intent.execute, or hardware.flashlight to turn the torch on/off.' },
-        input: { type: 'object', description: 'Optional command-specific JSON input. For intent.execute, pass {tool: open_wifi_settings|show_location_on_map|compose_email|insert_contact|insert_calendar_event, ...toolFields}; it opens Android UI and the user must confirm before anything is sent, saved, or changed. For hardware.flashlight, pass {enabled: true} to turn the torch ON or {enabled: false} to turn it OFF (the change is applied immediately, not a dry run).' }
+        command: { type: 'string', description: 'Device action command, e.g. sensors.summary, sensors.catalog, sensors.sample, hardware.capabilities, intent.dry_run, intent.execute, or hardware.flashlight to turn the torch on/off.' },
+        input: { type: 'object', description: 'Optional command-specific JSON input. For sensors.sample, pass {query: "MLX90632", samples: 1, timeoutMs: 2000} to read live values from a matched SensorManager sensor. For intent.execute, pass {tool: open_wifi_settings|show_location_on_map|compose_email|insert_contact|insert_calendar_event, ...toolFields}; it opens Android UI and the user must confirm before anything is sent, saved, or changed. For hardware.flashlight, pass {enabled: true} to turn the torch ON or {enabled: false} to turn it OFF (the change is applied immediately, not a dry run).' }
       },
       required: ['command'],
       additionalProperties: false
