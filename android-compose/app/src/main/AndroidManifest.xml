@@ -33,6 +33,11 @@
         </intent>
     </queries>
 
+    <!-- Provider read CRUD (capability epic riq2i P3): runtime-gated normal
+         dangerous permissions for reading contacts and calendar data. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
     <application
         android:name=".LettaApplication"
         android:allowBackup="true"

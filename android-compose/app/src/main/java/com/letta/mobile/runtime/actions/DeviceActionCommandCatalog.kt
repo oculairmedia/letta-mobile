@@ -116,6 +116,22 @@ object DeviceActionCommandCatalog {
                 input = "none",
                 example = "{\"command\":\"hardware.audio_status\"}",
             ),
+            DeviceActionCommandDescriptor(
+                command = "contacts.read",
+                summary = "Query ContactsContract for contacts (display name, phone, email) with optional query filter, bounded to ~50 rows. Requires READ_CONTACTS permission.",
+                riskTier = "medium",
+                executionMode = "read_only",
+                input = "optional: {query?: string, limit?: number (max 50)}",
+                example = "{\"command\":\"contacts.read\",\"input\":{\"query\":\"John\",\"limit\":10}}",
+            ),
+            DeviceActionCommandDescriptor(
+                command = "calendar.read",
+                summary = "Query CalendarContract.Events for calendar events (title, dtstart, dtend, location) within a time window, bounded to ~50 rows. Requires READ_CALENDAR permission.",
+                riskTier = "medium",
+                executionMode = "read_only",
+                input = "optional: {startTimeMillis?: number, endTimeMillis?: number, limit?: number (max 50)}",
+                example = "{\"command\":\"calendar.read\",\"input\":{\"limit\":20}}",
+            ),
         ),
     )
 }
