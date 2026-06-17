@@ -151,6 +151,25 @@ object RuntimeModule {
     fun provideMobileActionAuditSink(): MobileActionAuditSink = InMemoryMobileActionAuditSink()
 
     @Provides
+    @Singleton
+    fun provideNotificationStore(): com.letta.mobile.runtime.notifications.NotificationStore =
+        com.letta.mobile.runtime.notifications.InMemoryNotificationStore()
+
+    @Provides
+    @IntoSet
+    @Singleton
+    fun provideNotificationPollTool(
+        @ApplicationContext context: Context,
+        store: com.letta.mobile.runtime.notifications.NotificationStore,
+    ): MobileExternalToolHandler = com.letta.mobile.runtime.notifications.NotificationPollTool(
+        store = store,
+        isAccessGranted = {
+            com.letta.mobile.runtime.notifications.LettaNotificationListenerService
+                .isNotificationAccessGranted(context)
+        },
+    )
+
+    @Provides
     @IntoSet
     @Singleton
     fun provideAndroidMobileActionCapabilityProvider(
