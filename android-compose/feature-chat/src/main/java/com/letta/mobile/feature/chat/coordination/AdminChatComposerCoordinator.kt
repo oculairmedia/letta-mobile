@@ -1,9 +1,11 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
 
 
@@ -30,6 +33,7 @@ internal class AdminChatComposerCoordinator(
     private val isShimBackend: () -> Boolean,
     private val sessionManager: SessionManager,
     private val messageRepository: MessageRepository,
+    private val slashCommandRepository: ISlashCommandRepository,
     private val timelineChatSendStrategy: TimelineChatSendStrategy,
     private val isStreaming: () -> Boolean,
     private val projectContextAvailable: Boolean,
@@ -45,6 +49,14 @@ internal class AdminChatComposerCoordinator(
 
     fun updateInputText(text: String) {
         composerController.updateText(text)
+    }
+
+    fun setSlashCommands(commands: List<com.letta.mobile.data.model.SlashCommand>) {
+        composerController.setSlashCommands(commands)
+    }
+
+    fun insertSlashCommand(command: com.letta.mobile.data.model.SlashCommand) {
+        composerController.insertSlashCommand(command)
     }
 
     fun reportComposerError(message: String) {
@@ -66,6 +78,21 @@ internal class AdminChatComposerCoordinator(
     }
 
     fun submitComposer(text: String = state.value.inputText): ChatComposerEffect? {
+        val trimmed = text.trim()
+        if (trimmed.startsWith("/goal") && isShimBackend()) {
+            composerController.clearText()
+            scope.launch {
+                slashCommandRepository.executeGoalCommand(agentId.value, trimmed)
+                    .onSuccess { message ->
+                        chatBannerController.showComposerError("Goal: $message")
+                        slashCommandRepository.getGoalStatus(agentId.value).onSuccess { status ->
+                            uiState.update { it.copy(goalStatus = status.goal?.toUi(), isGoalStatusLoading = false) }
+                        }
+                    }
+                    .onFailure { err -> chatBannerController.showComposerError(err.message ?: "Goal command failed") }
+            }
+            return null
+        }
         return when (ChatSlashCommandParser.parse(text, projectContextAvailable = projectContextAvailable)) {
             ChatSlashCommand.Bug -> {
                 composerController.clearText()
@@ -122,6 +149,14 @@ internal class AdminChatComposerCoordinator(
         explicitConversationId = explicitConversationId,
         isShimBackend = isShimBackend(),
         isLocalRuntime = sessionManager.current.localRuntimeBackend != null,
+    )
+
+    private fun GoalStatus.toUi() = GoalStatusUi(
+        objective = objective,
+        status = status,
+        activeTimeSeconds = activeTimeSeconds,
+        tokensUsed = tokensUsed,
+        tokenBudget = tokenBudget,
     )
 
     fun interruptRun(clearA2uiThinkingOnResponse: () -> Unit) {

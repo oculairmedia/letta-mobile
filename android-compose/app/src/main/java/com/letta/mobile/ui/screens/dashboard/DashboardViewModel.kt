@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.Tool
@@ -410,7 +411,11 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    private fun isLocalRuntimeActive(): Boolean =
+        settingsRepository.activeConfig.value?.mode == LettaConfig.Mode.LOCAL
+
     fun loadProgressively() {
+        val localRuntimeActive = isLocalRuntimeActive()
         viewModelScope.launch {
             try {
                 val count = agentRepository.countAgents()
@@ -455,6 +460,13 @@ class DashboardViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            if (localRuntimeActive) {
+                _uiState.value = _uiState.value.copy(
+                    toolCount = 0,
+                    isToolCountLoading = false,
+                )
+                return@launch
+            }
             try {
                 val count = toolRepository.countTools()
                 _uiState.value = _uiState.value.copy(
@@ -471,6 +483,14 @@ class DashboardViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            if (localRuntimeActive) {
+                _cachedBlocks.value = emptyList()
+                _uiState.value = _uiState.value.copy(
+                    blockCount = 0,
+                    isBlockCountLoading = false,
+                )
+                return@launch
+            }
             try {
                 val count = blockRepository.countBlocks()
                 _uiState.value = _uiState.value.copy(
@@ -489,6 +509,13 @@ class DashboardViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            if (localRuntimeActive) {
+                _uiState.value = _uiState.value.copy(
+                    usageSummary = DashboardUsageCalculator.calculate(emptyList()),
+                    isUsageLoading = false,
+                )
+                return@launch
+            }
             try {
                 val windowEnd = Instant.now()
                 val windowStart = windowEnd.minus(24, ChronoUnit.HOURS)

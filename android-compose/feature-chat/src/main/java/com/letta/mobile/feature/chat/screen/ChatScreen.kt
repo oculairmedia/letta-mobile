@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,6 +34,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -81,6 +84,7 @@ import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
 import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
@@ -537,6 +541,17 @@ internal fun ChatScreen(
                         }
                 ) {
 
+                    GoalStatusCard(
+                        goal = state.goalStatus,
+                        loading = state.isGoalStatusLoading,
+                        onRefresh = viewModel::refreshGoalStatus,
+                        onContinue = viewModel::continueGoal,
+                        onPause = { viewModel.sendGoalCommand("/goal pause") },
+                        onResume = { viewModel.sendGoalCommand("/goal resume") },
+                        onComplete = { viewModel.sendGoalCommand("/goal complete") },
+                        onClear = { viewModel.sendGoalCommand("/goal clear") },
+                    )
+
                     // letta-mobile-ndtc.3: gradient "thinking" text token —
                     // ephemeral subtitle that appears between the message list /
                     // A2UI surfaces and the composer while awaiting the agent's
@@ -572,6 +587,9 @@ internal fun ChatScreen(
                         onStop = { viewModel.interruptRun() },
                         onRemoveAttachment = { viewModel.removeAttachment(it) },
                         onAttachImage = launchPicker,
+                        slashCommands = composerState.slashCommands,
+                        onSlashCommandSelected = viewModel::selectSlashCommand,
+                        onSlashCommandUninstall = viewModel::uninstallSlashCommand,
                         availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
                             activeAgent?.tools.orEmpty()
                         } else {
@@ -624,6 +642,7 @@ internal fun ChatScreen(
                 text = floatingBannerMessage,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(LettaSpacing.lg),
             )
 
@@ -706,6 +725,77 @@ private fun A2uiDebugOverlay(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoalStatusCard(
+    goal: GoalStatusUi?,
+    loading: Boolean,
+    onRefresh: () -> Unit,
+    onContinue: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onComplete: () -> Unit,
+    onClear: () -> Unit,
+) {
+    if (goal == null && !loading) return
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 3.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (loading) "Goal" else "Goal • ${goal?.status.orEmpty()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onRefresh) { Text("Refresh") }
+            }
+            if (goal != null) {
+                Text(
+                    text = goal.objective,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val budget = goal.tokenBudget?.let { " / $it" }.orEmpty()
+                Text(
+                    text = "Tokens ${goal.tokensUsed}$budget • active ${goal.activeTimeSeconds}s",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (goal.status == "complete") {
+                        TextButton(onClick = onClear) { Text("Clear") }
+                    } else {
+                        Button(onClick = onContinue, enabled = goal.status == "active") { Text("Continue") }
+                        if (goal.status == "paused") TextButton(onClick = onResume) { Text("Resume") }
+                        else TextButton(onClick = onPause, enabled = goal.status == "active") { Text("Pause") }
+                        TextButton(onClick = onComplete) { Text("Done") }
+                        TextButton(onClick = onClear) { Text("Clear") }
+                    }
+                }
+            } else {
+                Text(
+                    text = "Loading goal status…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

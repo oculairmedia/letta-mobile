@@ -127,6 +127,7 @@ fun WsTimelineEvent.toRuntimeEventDrafts(
         ),
     )
 
+    is WsTimelineEvent.GoalsUpdated,
     is WsTimelineEvent.Disconnected -> emptyList()
 }
 

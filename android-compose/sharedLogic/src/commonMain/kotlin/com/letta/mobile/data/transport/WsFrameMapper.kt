@@ -91,6 +91,7 @@ object WsFrameMapper {
         is ServerFrame.CronDeleteResponse,
         is ServerFrame.CronDeleteAllResponse,
         is ServerFrame.CronsUpdated,
+        is ServerFrame.GoalsUpdated,
         // letta-mobile-73o2h: active-subagent registry frames are
         // routing-only — they drive the SubagentRepository state machine
         // (active-bar), not the chat timeline. Same treatment as crons.

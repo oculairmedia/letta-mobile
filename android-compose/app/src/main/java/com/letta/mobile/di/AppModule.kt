@@ -14,6 +14,7 @@ import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.repository.SlashCommandRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -23,6 +24,7 @@ import com.letta.mobile.data.repository.api.IConversationInspectorMessageReposit
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
+import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.api.IGroupRepository
@@ -155,6 +157,10 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindSelfTodoRepository(impl: SessionScopedSelfTodoRepository): ISelfTodoRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSlashCommandRepository(impl: SlashCommandRepository): ISlashCommandRepository
 
     @Binds
     @Singleton
