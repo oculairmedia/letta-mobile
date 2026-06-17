@@ -125,6 +125,21 @@
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
 
+        <!--
+            Notification listener for the notification.poll tool
+            (feat/mobile-notification-tool). OPT-IN ONLY: inert until the user
+            grants "Notification access" in Settings; the tool reports
+            SettingsRequired until then.
+        -->
+        <service
+            android:name=".runtime.notifications.LettaNotificationListenerService"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
     </application>
 
 </manifest>

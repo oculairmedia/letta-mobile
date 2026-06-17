@@ -82,6 +82,13 @@ data class MobileActionToolResponse(
     val intentAction: String? = null,
     val data: JsonObject? = null,
     val error: String? = null,
+    /**
+     * Optional structured result payload (raw JSON) for tools that return data
+     * rather than just a status — e.g. `notification.poll` returns the recent
+     * notifications here. Null for status-only actions. Backward-compatible:
+     * existing tools omit it.
+     */
+    val payloadJson: String? = null,
 )
 
 @Serializable
