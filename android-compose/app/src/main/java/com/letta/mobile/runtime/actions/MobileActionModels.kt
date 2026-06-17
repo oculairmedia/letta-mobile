@@ -2,6 +2,7 @@ package com.letta.mobile.runtime.actions
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 enum class MobileActionCapabilityStatus {
@@ -79,6 +80,7 @@ data class MobileActionToolResponse(
     val actionId: String,
     val requiresUserAction: Boolean = false,
     val intentAction: String? = null,
+    val data: JsonObject? = null,
     val error: String? = null,
 )
 
