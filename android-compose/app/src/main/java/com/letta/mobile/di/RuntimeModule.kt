@@ -27,6 +27,9 @@ import com.letta.mobile.runtime.local.OnDeviceChatCompletionEngine
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.OnDeviceOpenAiBridge
 import com.letta.mobile.runtime.local.SafOnDeviceModelImporter
+import com.letta.mobile.runtime.clipboard.AndroidClipboardProvider
+import com.letta.mobile.runtime.clipboard.ClipboardProvider
+import com.letta.mobile.runtime.clipboard.ClipboardTool
 import com.letta.mobile.runtime.hardware.AndroidDeviceHardwareControlProvider
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlProvider
 import com.letta.mobile.runtime.hardware.DeviceHardwareControlTool
@@ -96,6 +99,12 @@ object RuntimeModule {
 
     @Provides
     @Singleton
+    fun provideClipboardProvider(
+        @ApplicationContext context: Context,
+    ): ClipboardProvider = AndroidClipboardProvider(context)
+
+    @Provides
+    @Singleton
     fun provideDeviceSensorSampler(sampler: AndroidDeviceSensorSampler): DeviceSensorSampler = sampler
 
     @Provides
@@ -153,6 +162,11 @@ object RuntimeModule {
     @Singleton
     fun provideScreenCaptureTool(provider: ScreenCaptureProvider): MobileExternalToolHandler =
         ScreenCaptureTool(provider)
+
+    @Provides
+    @IntoSet
+    @Singleton
+    fun provideClipboardTool(tool: ClipboardTool): MobileExternalToolHandler = tool
 
     @Provides
     @ElementsIntoSet
