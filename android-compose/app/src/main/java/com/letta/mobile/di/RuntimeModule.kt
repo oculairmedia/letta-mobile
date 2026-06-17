@@ -39,12 +39,16 @@ import com.letta.mobile.runtime.actions.InMemoryMobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionAuditSink
 import com.letta.mobile.runtime.actions.MobileActionCapabilityProvider
 import com.letta.mobile.runtime.actions.MobileExternalToolHandler
+import com.letta.mobile.runtime.screen.AndroidScreenCaptureProvider
+import com.letta.mobile.runtime.screen.ScreenCaptureProvider
+import com.letta.mobile.runtime.screen.ScreenCaptureTool
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSampler
 import com.letta.mobile.runtime.sensors.AndroidDeviceSensorSnapshotProvider
 import com.letta.mobile.runtime.sensors.DeviceSensorGroundingWriter
 import com.letta.mobile.runtime.sensors.DeviceSensorReadTool
 import com.letta.mobile.runtime.sensors.DeviceSensorSampler
 import com.letta.mobile.runtime.sensors.DeviceSensorSnapshotProvider
+import android.app.Application
 import android.content.Context
 import dagger.Module
 import dagger.Provides
@@ -96,6 +100,11 @@ object RuntimeModule {
 
     @Provides
     @Singleton
+    fun provideScreenCaptureProvider(application: Application): ScreenCaptureProvider =
+        AndroidScreenCaptureProvider(application)
+
+    @Provides
+    @Singleton
     fun provideDeviceSensorReadTool(
         provider: DeviceSensorSnapshotProvider,
         sampler: DeviceSensorSampler,
@@ -138,6 +147,12 @@ object RuntimeModule {
     fun provideAndroidMobileActionCapabilityProvider(
         @ApplicationContext context: Context,
     ): MobileActionCapabilityProvider = AndroidMobileActionCapabilityProvider(context)
+
+    @Provides
+    @IntoSet
+    @Singleton
+    fun provideScreenCaptureTool(provider: ScreenCaptureProvider): MobileExternalToolHandler =
+        ScreenCaptureTool(provider)
 
     @Provides
     @ElementsIntoSet
