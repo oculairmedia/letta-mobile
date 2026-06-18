@@ -72,25 +72,28 @@ internal class ChatTimelineObserver(
      */
     private var olderMessagesPrefix: Pair<String, List<UiMessage>> = "" to emptyList()
 
-    /** Conversation id the current observer job is bound to. */
-    private var observerConversationId: String? = null
+    /** Agent/conversation id pair the current observer job is bound to. */
+    private var observerBinding: TimelineObserverBinding? = null
 
     fun stop() {
         observerJob?.cancel()
         observerJob = null
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
-        observerConversationId = null
+        observerBinding = null
         projectionCache = mutableMapOf()
         lastProjectionSnapshot = null
         projectionTelemetryTick = 0
         suppressedProjectionTick = 0
     }
 
-    fun start(conversationId: String) {
-        val convIdSame = observerConversationId == conversationId
+    fun start(conversationId: String) = start(agentId = null, conversationId = conversationId)
+
+    fun start(agentId: String?, conversationId: String) {
+        val binding = TimelineObserverBinding(agentId = agentId, conversationId = conversationId)
+        val bindingSame = observerBinding == binding
         val jobActive = observerJob?.isActive == true
-        if (convIdSame && jobActive) return
+        if (bindingSame && jobActive) return
 
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
@@ -99,17 +102,17 @@ internal class ChatTimelineObserver(
         lastProjectionSnapshot = null
         projectionTelemetryTick = 0
         suppressedProjectionTick = 0
-        observerConversationId = conversationId
+        observerBinding = binding
         observerJob = scope.launch {
             val flow = try {
-                timelineRepository.observe(conversationId)
+                timelineRepository.observe(agentId, conversationId)
             } catch (e: Exception) {
                 android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
                 uiState.value = uiState.value.copy(error = "Timeline init failed: ${e.message}")
                 return@launch
             }
 
-            val loop = timelineRepository.getOrCreate(conversationId)
+            val loop = timelineRepository.getOrCreate(agentId, conversationId)
             currentConversationTracker.setCurrent(conversationId)
             hydrateSignalJob = scope.launch {
                 loop.events.collect { ev ->
@@ -630,6 +633,11 @@ internal class ChatTimelineObserver(
             approvalRequest == null &&
             approvalResponse == null &&
             attachments.isEmpty()
+
+    private data class TimelineObserverBinding(
+        val agentId: String?,
+        val conversationId: String,
+    )
 
     private data class TimelineProjection(
         val ui: ImmutableList<UiMessage>,
