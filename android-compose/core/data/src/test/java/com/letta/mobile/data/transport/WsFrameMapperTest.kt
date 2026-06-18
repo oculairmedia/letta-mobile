@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.model.UserMessage
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -28,6 +29,25 @@ class WsFrameMapperTest : WordSpec({
     }
 
     "WsFrameMapper" should {
+        "map replayed user_message frames into user timeline messages" {
+            val frame = json.decodeFromString(
+                ServerFrameSerializer,
+                """
+                {"v":1,"type":"user_message","id":"user-msg-1","ts":"t","agent_id":"a","conversation_id":"c","run_id":"R","content":"hello local runtime","otid":"cm-local-1","seq":7}
+                """.trimIndent(),
+            ).shouldBeInstanceOf<ServerFrame.UserMessage>()
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            mapped.id shouldBe "user-msg-1"
+            mapped.content shouldBe "hello local runtime"
+            mapped.messageType shouldBe "user_message"
+            mapped.runId shouldBe "R"
+            mapped.otid shouldBe "cm-local-1"
+            mapped.seqId shouldBe 7
+        }
+
         "preserve the cm-stream- prefix on assistant_message ids" {
             val frame = ServerFrame.AssistantMessage(
                 id = "cm-stream-letta-msg-3",

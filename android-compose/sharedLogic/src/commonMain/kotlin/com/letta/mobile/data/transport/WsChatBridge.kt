@@ -299,6 +299,7 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     } else {
         WsFrameMapper.toLettaMessage(this)?.let { WsTimelineEvent.MessageDelta(it) }
     }
+    is ServerFrame.UserMessage,
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,
     is ServerFrame.ToolReturnMessage -> WsFrameMapper.toLettaMessage(this)?.let {

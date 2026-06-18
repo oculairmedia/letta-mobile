@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.model.UserMessage
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -30,6 +31,15 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 object WsFrameMapper {
     fun toLettaMessage(frame: ServerFrame): LettaMessage? = when (frame) {
+        is ServerFrame.UserMessage -> UserMessage(
+            id = frame.id,
+            contentRaw = JsonPrimitive(frame.content),
+            date = frame.ts,
+            runId = frame.runId,
+            otid = frame.otid,
+            seqId = frame.seqId ?: frame.seq.toSeqId(),
+        )
+
         is ServerFrame.AssistantMessage -> AssistantMessage(
             id = frame.id,
             // The wire shape carries content as a bare string; the

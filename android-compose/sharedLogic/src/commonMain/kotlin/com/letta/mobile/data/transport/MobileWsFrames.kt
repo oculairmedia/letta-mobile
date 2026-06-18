@@ -562,6 +562,22 @@ sealed interface ServerFrame {
      * stream-vs-disk twins on reconcile.
      */
     @Serializable
+    data class UserMessage(
+        override val v: Int = 1,
+        val type: String = "user_message",
+        override val id: String,
+        override val ts: String = "",
+        @SerialName("agent_id") val agentId: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
+        @SerialName("turn_id") val turnId: String? = null,
+        @SerialName("run_id") val runId: String? = null,
+        val content: String,
+        val otid: String? = null,
+        val seq: Long? = null,
+        @SerialName("seq_id") val seqId: Int? = null,
+    ) : ServerFrame
+
+    @Serializable
     data class AssistantMessage(
         override val v: Int = 1,
         val type: String = "assistant_message",
@@ -872,6 +888,7 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "turn_done" -> ServerFrame.TurnDone.serializer()
             "stop_reason" -> ServerFrame.StopReason.serializer()
             "usage_statistics" -> ServerFrame.UsageStatistics.serializer()
+            "user_message" -> ServerFrame.UserMessage.serializer()
             "assistant_message" -> ServerFrame.AssistantMessage.serializer()
             "reasoning_message" -> ServerFrame.ReasoningMessage.serializer()
             "tool_call_message",
