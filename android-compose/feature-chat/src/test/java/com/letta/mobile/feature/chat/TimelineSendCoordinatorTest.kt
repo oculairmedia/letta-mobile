@@ -124,8 +124,9 @@ class TimelineSendCoordinatorTest {
         )
 
         init {
-            coEvery { timelineRepository.sendMessage(any(), any()) } returns "otid"
-            coEvery { timelineRepository.sendMessage(any(), any(), any()) } returns "otid"
+            coEvery { timelineRepository.sendMessage(any<String>(), any<String>()) } returns "otid"
+            coEvery { timelineRepository.sendMessage(any<String>(), any<String>(), any<String>()) } returns "otid"
+            coEvery { timelineRepository.sendMessage(any<String>(), any<String>(), any<String>(), any()) } returns "otid"
             coEvery { conversationRepository.updateConversation(any<ConversationId>(), any<AgentId>(), any()) } returns Unit
             coEvery { conversationRepository.createConversation(any<AgentId>(), any<String>()) } returns
                 TestData.conversation(id = "new-conv", agentId = "agent-1")

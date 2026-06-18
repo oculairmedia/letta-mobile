@@ -111,9 +111,9 @@ internal class TimelineSendCoordinator(
         text: String,
         attachments: List<MessageContentPart.Image>,
     ): String = if (attachments.isEmpty()) {
-        timelineRepository.sendMessage(conversationId, text)
+        timelineRepository.sendMessage(agentId, conversationId, text)
     } else {
-        timelineRepository.sendMessage(conversationId, text, attachments)
+        timelineRepository.sendMessage(agentId, conversationId, text, attachments)
     }
 
     private fun String.conversationSummary(): String = take(SUMMARY_MAX_LENGTH).let { summary ->

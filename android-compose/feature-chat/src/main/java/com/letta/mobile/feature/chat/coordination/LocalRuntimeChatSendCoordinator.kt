@@ -73,6 +73,7 @@ internal class LocalRuntimeChatSendCoordinator(
             setActiveConversationId(conversationId)
             startTimelineObserver(conversationId)
             timelineRepository.appendExternalTransportLocal(
+                agentId = agentId,
                 conversationId = conversationId,
                 content = text,
                 otid = otid,
@@ -116,7 +117,7 @@ internal class LocalRuntimeChatSendCoordinator(
                 }
 
                 if (!terminalStatusSeen) {
-                    timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+                    timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
                     finishTurn(error = null)
                 }
                 timer.stop(
@@ -125,22 +126,23 @@ internal class LocalRuntimeChatSendCoordinator(
                     "otid" to otid,
                 )
             } catch (cancelled: CancellationException) {
-                timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+                timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, otid)
                 finishTurn(error = null)
                 timer.stop("accepted" to true, "cancelled" to true)
                 throw cancelled
             } catch (error: Exception) {
                 val message = error.message ?: "Local runtime turn failed"
                 Telemetry.error("AdminChatVM", "send.local.failed", error)
-                timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+                timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, otid)
                 timelineRepository.ingestExternalTransportMessage(
+                    agentId = agentId,
                     conversationId = conversationId,
                     message = localErrorMessage(message),
                 )
                 finishTurn(error = message)
                 timer.stopError(error)
             } finally {
-                timelineRepository.clearExternalTransportActive(conversationId)
+                timelineRepository.clearExternalTransportActive(agentId, conversationId)
                 activeConversation = null
                 activeOtid = null
             }
@@ -173,11 +175,12 @@ internal class LocalRuntimeChatSendCoordinator(
             is RuntimeEventPayload.LocalUserAppend -> Unit
             is RuntimeEventPayload.RemoteStreamFrame -> {
                 payload.toLettaMessage(event)?.let { message ->
-                    timelineRepository.ingestExternalTransportMessage(conversationId, message)
+                    timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message)
                 }
             }
             is RuntimeEventPayload.ExternalTransportFrame -> {
                 timelineRepository.ingestExternalTransportMessage(
+                    agentId = agentId,
                     conversationId = conversationId,
                     message = AssistantMessage(
                         id = payload.transportMessageId ?: payload.frameId,
@@ -193,10 +196,10 @@ internal class LocalRuntimeChatSendCoordinator(
                 payload = payload,
             )
             is RuntimeEventPayload.SendMarkedSent -> {
-                timelineRepository.markExternalTransportLocalSent(conversationId, payload.localMessageId)
+                timelineRepository.markExternalTransportLocalSent(agentId, conversationId, payload.localMessageId)
             }
             is RuntimeEventPayload.SendMarkedFailed -> {
-                timelineRepository.markExternalTransportLocalFailed(conversationId, payload.localMessageId)
+                timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, payload.localMessageId)
                 finishTurn(error = payload.reason)
                 return true
             }
@@ -206,6 +209,7 @@ internal class LocalRuntimeChatSendCoordinator(
             // (command, file paths, result) render for local turns too.
             is RuntimeEventPayload.ToolCallObserved -> {
                 timelineRepository.ingestExternalTransportMessage(
+                    agentId = agentId,
                     conversationId = conversationId,
                     message = ToolCallMessage(
                         id = "local-tool-call-${payload.toolCallId.value}",
@@ -220,6 +224,7 @@ internal class LocalRuntimeChatSendCoordinator(
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
                 timelineRepository.ingestExternalTransportMessage(
+                    agentId = agentId,
                     conversationId = conversationId,
                     message = ToolReturnMessage(
                         id = "local-tool-return-${payload.toolCallId.value}",
@@ -258,14 +263,15 @@ internal class LocalRuntimeChatSendCoordinator(
                 error = null,
             )
             RuntimeRunStatus.Completed -> {
-                timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+                timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
                 finishTurn(error = null)
                 return true
             }
             RuntimeRunStatus.Failed -> {
                 val reason = payload.reason ?: "Local runtime turn failed"
-                timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+                timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, otid)
                 timelineRepository.ingestExternalTransportMessage(
+                    agentId = agentId,
                     conversationId = conversationId,
                     message = localErrorMessage(reason, runId = event.runId?.value),
                 )
@@ -273,7 +279,7 @@ internal class LocalRuntimeChatSendCoordinator(
                 return true
             }
             RuntimeRunStatus.Cancelled -> {
-                timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+                timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, otid)
                 finishTurn(error = null)
                 return true
             }

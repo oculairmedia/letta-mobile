@@ -503,7 +503,7 @@ internal class AdminChatViewModel @Inject constructor(
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
         reconcileRecentMessages = { convId, reason ->
-            timelineRepository.reconcileRecentMessages(convId, reason)
+            timelineRepository.reconcileRecentMessages(agentId.value, convId, reason)
         },
         sendMessageViaClientMode = { message ->
             timelineChatSendStrategy.send(
@@ -765,7 +765,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
-        chatTimelineObserver.start(conversationId)
+        chatTimelineObserver.start(agentId.value, conversationId)
     }
 
     private fun stopTimelineObserver() {

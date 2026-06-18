@@ -78,6 +78,51 @@ class ChatTimelineObserverTest {
         assertEquals("conv-2", harness.currentConversationTracker.current)
     }
 
+
+    @Test
+    fun `scoped observer projects new material for bound agent conversation`() = runTest {
+        val harness = Harness(backgroundScope)
+        val flow = harness.seedTimeline(agentId = "agent-a", conversationId = "default")
+
+        harness.observer.start(agentId = "agent-a", conversationId = "default")
+        runCurrent()
+
+        flow.value = Timeline(
+            "default",
+            events = persistentListOf(confirmed("assistant-1", "done", TimelineMessageType.ASSISTANT)),
+        )
+        runCurrent()
+
+        assertEquals(listOf("assistant-1"), harness.uiState.value.messages.map { it.id })
+        assertEquals("done", harness.uiState.value.messages.single().content)
+        coVerify(exactly = 1) { harness.timelineRepository.observe("agent-a", "default") }
+        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate("agent-a", "default") }
+    }
+
+    @Test
+    fun `same default conversation id is isolated by agent scope`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline(
+            agentId = "agent-a",
+            conversationId = "default",
+            events = listOf(confirmed("assistant-a", "agent a", TimelineMessageType.ASSISTANT)),
+        )
+        val agentBFlow = harness.seedTimeline(agentId = "agent-b", conversationId = "default")
+
+        harness.observer.start(agentId = "agent-a", conversationId = "default")
+        runCurrent()
+        assertEquals(listOf("assistant-a"), harness.uiState.value.messages.map { it.id })
+
+        agentBFlow.value = Timeline(
+            "default",
+            events = persistentListOf(confirmed("assistant-b", "agent b", TimelineMessageType.ASSISTANT)),
+        )
+        runCurrent()
+
+        assertEquals(listOf("assistant-a"), harness.uiState.value.messages.map { it.id })
+        coVerify(exactly = 0) { harness.timelineRepository.observe("agent-b", "default") }
+    }
+
     @Test
     fun `older page prefix is prepended to subsequent live timeline emissions`() = runTest {
         val harness = Harness(backgroundScope)
@@ -561,7 +606,7 @@ class ChatTimelineObserverTest {
         val currentConversationTracker = CurrentConversationTracker()
         val activeReplyStreams = MutableStateFlow(activeReplyConversationIds)
         val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf()))
-        val timelineFlows = mutableMapOf<String, MutableStateFlow<Timeline>>()
+        val timelineFlows = mutableMapOf<TimelineHarnessKey, MutableStateFlow<Timeline>>()
         private val syncEvents = MutableSharedFlow<TimelineSyncEvent>()
         private val loop: TimelineSyncLoop = mockk {
             every { events } returns syncEvents
@@ -587,23 +632,43 @@ class ChatTimelineObserverTest {
         )
 
         init {
-            coEvery { timelineRepository.observe(any()) } answers {
-                timelineFlows.getValue(firstArg())
+            coEvery { timelineRepository.observe(any<String>()) } answers {
+                timelineFlows.getValue(TimelineHarnessKey(null, firstArg()))
             }
-            coEvery { timelineRepository.getOrCreate(any()) } returns loop
+            coEvery { timelineRepository.observe(any<String>(), any()) } answers {
+                timelineFlows.getValue(TimelineHarnessKey(firstArg(), secondArg()))
+            }
+            coEvery { timelineRepository.getOrCreate(any<String>()) } returns loop
+            coEvery { timelineRepository.getOrCreate(any<String>(), any()) } returns loop
         }
 
         fun seedTimeline(
             conversationId: String,
             events: List<TimelineEvent> = emptyList(),
-        ): MutableStateFlow<Timeline> = seedTimeline(Timeline(conversationId = conversationId, events = events.toPersistentList()))
+        ): MutableStateFlow<Timeline> = seedTimeline(agentId = null, conversationId = conversationId, events = events)
 
-        fun seedTimeline(timeline: Timeline): MutableStateFlow<Timeline> {
+        fun seedTimeline(
+            agentId: String?,
+            conversationId: String,
+            events: List<TimelineEvent> = emptyList(),
+        ): MutableStateFlow<Timeline> = seedTimeline(
+            agentId = agentId,
+            timeline = Timeline(conversationId = conversationId, events = events.toPersistentList()),
+        )
+
+        fun seedTimeline(timeline: Timeline): MutableStateFlow<Timeline> = seedTimeline(agentId = null, timeline = timeline)
+
+        fun seedTimeline(agentId: String?, timeline: Timeline): MutableStateFlow<Timeline> {
             val flow = MutableStateFlow(timeline)
-            timelineFlows[timeline.conversationId] = flow
+            timelineFlows[TimelineHarnessKey(agentId, timeline.conversationId)] = flow
             return flow
         }
     }
+
+    private data class TimelineHarnessKey(
+        val agentId: String?,
+        val conversationId: String,
+    )
 
     private fun uiMessage(id: String, content: String) = UiMessage(
         id = id,

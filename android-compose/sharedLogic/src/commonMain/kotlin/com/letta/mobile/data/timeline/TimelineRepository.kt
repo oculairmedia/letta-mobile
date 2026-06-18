@@ -44,13 +44,13 @@ open class TimelineRepository(
     // emulate access order manually: getLoopLocked() re-inserts on hit so
     // the eldest entry is always first. Every access goes through
     // [loopsMutex], which makes the remove+reinsert touch safe.
-    private val loops = LinkedHashMap<String, TimelineSyncLoop>()
+    private val loops = LinkedHashMap<TimelineCacheKey, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
 
     /** Mutex-guarded LRU get: touches the entry so eviction stays correct. */
-    private fun getLoopLocked(conversationId: String): TimelineSyncLoop? {
-        val loop = loops.remove(conversationId) ?: return null
-        loops[conversationId] = loop
+    private fun getLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
+        val loop = loops.remove(key) ?: return null
+        loops[key] = loop
         return loop
     }
 
@@ -69,17 +69,21 @@ open class TimelineRepository(
      * The first call creates the loop and hydrates it from the server.
      * Subsequent calls return the cached loop without re-hydrating.
      */
-    suspend fun getOrCreate(conversationId: String): TimelineSyncLoop {
+    suspend fun getOrCreate(conversationId: String): TimelineSyncLoop = getOrCreate(agentId = null, conversationId = conversationId)
+
+    suspend fun getOrCreate(agentId: String?, conversationId: String): TimelineSyncLoop {
+        val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
-        loopsMutex.withLock { getLoopLocked(conversationId) }?.let {
+        loopsMutex.withLock { getLoopLocked(key) }?.let {
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
+                "agentId" to agentId.orEmpty(),
                 "conversationId" to conversationId,
             )
             return it
         }
-        val loop = getOrCreateLoopWithoutHydrate(conversationId)
+        val loop = getOrCreateLoopWithoutHydrate(key)
         // Hydrate OUTSIDE the mutex so parallel callers don't block each other.
         // If two callers race on the same conversationId, the second will find
         // the loop in the map and short-circuit at the fast path — hydrate
@@ -92,6 +96,7 @@ open class TimelineRepository(
         }.onFailure { t ->
             Telemetry.error(
                 "TimelineRepo", "hydrate.failed", t,
+                "agentId" to agentId.orEmpty(),
                 "conversationId" to conversationId,
             )
             runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
@@ -99,27 +104,28 @@ open class TimelineRepository(
         return loop
     }
 
-    private suspend fun getOrCreateLoopWithoutHydrate(conversationId: String): TimelineSyncLoop =
+    private suspend fun getOrCreateLoopWithoutHydrate(key: TimelineCacheKey): TimelineSyncLoop =
         // Mutex protects the map-insert critical section only (not hydrate).
         // Hydrate used to run inside the mutex which serialized all concurrent
         // warmup calls — an observed cause of "oldish state": conv-1598043a
         // wasn't hydrated until ~15s after app start because earlier slots in
         // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
         loopsMutex.withLock {
-            getLoopLocked(conversationId)?.let { return@withLock it }
+            getLoopLocked(key)?.let { return@withLock it }
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheMiss",
-                "conversationId" to conversationId,
+                "agentId" to key.agentId.orEmpty(),
+                "conversationId" to key.conversationId,
             )
             val created = TimelineSyncLoop(
                 messageApi = timelineTransport,
-                conversationId = conversationId,
+                conversationId = key.conversationId,
                 scope = scope,
                 ingestedListenerProvider = { ingestedListener },
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
             )
-            loops[conversationId] = created
+            loops[key] = created
             evictEldestLoopsIfNeededLocked()
             created
         }
@@ -146,9 +152,15 @@ open class TimelineRepository(
     suspend fun observe(conversationId: String): StateFlow<Timeline> =
         getOrCreate(conversationId).state
 
+    suspend fun observe(agentId: String?, conversationId: String): StateFlow<Timeline> =
+        getOrCreate(agentId, conversationId).state
+
     /** Send a user message. Returns the client-generated otid. */
     suspend fun sendMessage(conversationId: String, content: String): String =
         getOrCreate(conversationId).send(content)
+
+    suspend fun sendMessage(agentId: String?, conversationId: String, content: String): String =
+        getOrCreate(agentId, conversationId).send(content)
 
     /**
      * Send a user message with attached images. The text body may be blank if
@@ -159,6 +171,13 @@ open class TimelineRepository(
         content: String,
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     ): String = getOrCreate(conversationId).send(content, attachments)
+
+    suspend fun sendMessage(
+        agentId: String?,
+        conversationId: String,
+        content: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    ): String = getOrCreate(agentId, conversationId).send(content, attachments)
 
     /** Retry a failed send. */
     suspend fun retry(conversationId: String, otid: String) {
@@ -178,11 +197,26 @@ open class TimelineRepository(
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     ): String = getOrCreate(conversationId).appendExternalTransportLocal(content, otid, attachments)
 
+    override suspend fun appendExternalTransportLocal(
+        agentId: String?,
+        conversationId: String,
+        content: String,
+        otid: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    ): String = getOrCreate(agentId, conversationId).appendExternalTransportLocal(content, otid, attachments)
+
     suspend fun appendExternalTransportLocal(
         conversationId: String,
         content: String,
         otid: String,
     ): String = appendExternalTransportLocal(conversationId, content, otid, emptyList())
+
+    suspend fun appendExternalTransportLocal(
+        agentId: String?,
+        conversationId: String,
+        content: String,
+        otid: String,
+    ): String = appendExternalTransportLocal(agentId, conversationId, content, otid, emptyList())
 
     /** Ingest a LettaMessage projected from an external live transport. */
     override suspend fun ingestExternalTransportMessage(
@@ -192,8 +226,21 @@ open class TimelineRepository(
         getOrCreate(conversationId).ingestStreamEvent(message)
     }
 
+    override suspend fun ingestExternalTransportMessage(
+        agentId: String?,
+        conversationId: String,
+        message: com.letta.mobile.data.model.LettaMessage,
+    ) {
+        getOrCreate(agentId, conversationId).ingestStreamEvent(message)
+    }
+
     suspend fun postHandlerCollapse(conversationId: String) {
-        val loop = loopsMutex.withLock { getLoopLocked(conversationId) }
+        val loop = loopsMutex.withLock { getLoopLocked(TimelineCacheKey(null, conversationId)) }
+        loop?.postHandlerCollapse()
+    }
+
+    suspend fun postHandlerCollapse(agentId: String?, conversationId: String) {
+        val loop = loopsMutex.withLock { getLoopLocked(TimelineCacheKey(agentId, conversationId)) }
         loop?.postHandlerCollapse()
     }
 
@@ -211,6 +258,15 @@ open class TimelineRepository(
         getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
+    suspend fun reconcileRecentMessages(
+        agentId: String?,
+        conversationId: String,
+        reason: String,
+        forceRefresh: Boolean = false,
+    ) {
+        getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
+    }
+
     /**
      * letta-mobile-9hcg: flip the external-transport user-bubble Local
      * to SENT. Called from WsChatSendCoordinator on every TurnDone so
@@ -223,9 +279,17 @@ open class TimelineRepository(
         getOrCreate(conversationId).markExternalTransportLocalSent(otid)
     }
 
+    override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) {
+        getOrCreate(agentId, conversationId).markExternalTransportLocalSent(otid)
+    }
+
     /** Mark an externally-queued optimistic user bubble as failed before it was dispatched. */
     override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) {
         getOrCreate(conversationId).markExternalTransportLocalFailed(otid)
+    }
+
+    override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) {
+        getOrCreate(agentId, conversationId).markExternalTransportLocalFailed(otid)
     }
 
     /**
@@ -234,7 +298,11 @@ open class TimelineRepository(
      * stream subscriber resumes ingesting messages for idle-period coverage.
      */
     override suspend fun clearExternalTransportActive(conversationId: String) {
-        loopsMutex.withLock { getLoopLocked(conversationId) }?.clearExternalTransportActive()
+        loopsMutex.withLock { getLoopLocked(TimelineCacheKey(null, conversationId)) }?.clearExternalTransportActive()
+    }
+
+    override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) {
+        loopsMutex.withLock { getLoopLocked(TimelineCacheKey(agentId, conversationId)) }?.clearExternalTransportActive()
     }
 
     /**
@@ -255,9 +323,22 @@ open class TimelineRepository(
         )
     }
 
+    override suspend fun reconcileExternalTransportSendScoped(
+        agentId: String?,
+        conversationId: String,
+        externalConversationId: String,
+        otid: String,
+    ) {
+        getOrCreate(agentId, conversationId).reconcileExternalTransportSend(
+            agentId = agentId.orEmpty(),
+            externalConversationId = externalConversationId,
+            otid = otid,
+        )
+    }
+
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) {
         conversationCursorStore.clearCursor(conversationId)
-        val loop = getOrCreateLoopWithoutHydrate(conversationId)
+        val loop = getOrCreateLoopWithoutHydrate(TimelineCacheKey(null, conversationId))
         runCatching {
             withContext(timelineIoDispatcher) {
                 loop.hydrate(
@@ -284,7 +365,7 @@ open class TimelineRepository(
 
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
-        loops.remove(conversationId)?.let { loop ->
+        loops.remove(TimelineCacheKey(null, conversationId))?.let { loop ->
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
@@ -293,14 +374,26 @@ open class TimelineRepository(
         }
     }
 
+    suspend fun clear(agentId: String?, conversationId: String) = loopsMutex.withLock {
+        loops.remove(TimelineCacheKey(agentId, conversationId))?.let { loop ->
+            loop.close()
+            Telemetry.event(
+                "TimelineRepo", "loop.cleared",
+                "agentId" to agentId.orEmpty(),
+                "conversationId" to conversationId,
+            )
+        }
+    }
+
     private fun evictEldestLoopsIfNeededLocked() {
         while (loops.size > maxCachedLoops) {
-            val eldestConversationId = loops.entries.firstOrNull()?.key ?: return
-            loops.remove(eldestConversationId)?.let { loop ->
+            val eldestKey = loops.entries.firstOrNull()?.key ?: return
+            loops.remove(eldestKey)?.let { loop ->
                 loop.close()
                 Telemetry.event(
                     "TimelineRepo", "loop.evicted",
-                    "conversationId" to eldestConversationId,
+                    "agentId" to eldestKey.agentId.orEmpty(),
+                    "conversationId" to eldestKey.conversationId,
                     "cachedLoopCount" to loops.size,
                     "maxCachedLoops" to maxCachedLoops,
                 )
@@ -312,4 +405,9 @@ open class TimelineRepository(
         const val DEFAULT_MAX_CACHED_LOOPS = 32
         const val CURSOR_REPAIR_HYDRATE_LIMIT = 100
     }
+
+    private data class TimelineCacheKey(
+        val agentId: String?,
+        val conversationId: String,
+    )
 }

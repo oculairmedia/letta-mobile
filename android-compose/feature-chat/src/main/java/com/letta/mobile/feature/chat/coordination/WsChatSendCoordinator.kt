@@ -181,6 +181,7 @@ internal class WsChatSendCoordinator(
                 pendingConversationBootstrapLocal = pending
             } else {
                 timelineRepository.appendExternalTransportLocal(
+                    agentId = agentId,
                     conversationId = pending.conversationId,
                     content = pending.text,
                     otid = pending.otid,
@@ -220,6 +221,7 @@ internal class WsChatSendCoordinator(
             return false
         }
         timelineRepository.appendExternalTransportLocal(
+            agentId = agentId,
             conversationId = pending.conversationId,
             content = pending.text,
             otid = pending.otid,
@@ -306,7 +308,7 @@ internal class WsChatSendCoordinator(
     ) {
         if (dropped.isEmpty()) return
         dropped.forEach { pending ->
-            timelineRepository.markExternalTransportLocalFailed(pending.conversationId, pending.otid)
+            timelineRepository.markExternalTransportLocalFailed(agentId, pending.conversationId, pending.otid)
         }
         val attrs = buildList<Pair<String, Any?>> {
             add("reason" to reason)
@@ -359,6 +361,7 @@ internal class WsChatSendCoordinator(
                 )
                 pendingConversationBootstrapLocal?.let { pending ->
                     timelineRepository.appendExternalTransportLocal(
+                        agentId = agentId,
                         conversationId = event.conversationId,
                         content = pending.text,
                         otid = pending.otid,
@@ -375,7 +378,7 @@ internal class WsChatSendCoordinator(
                     return
                 }
                 recordRuntimeEvent(event, conversationIdOverride = conversationId)
-                timelineRepository.ingestExternalTransportMessage(conversationId, event.message)
+                timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
             }
             is WsTimelineEvent.StopReason -> {
                 recordRuntimeEvent(event)
@@ -439,7 +442,7 @@ internal class WsChatSendCoordinator(
                     )
                 }
                 if (event.lossy) activeWsOtid?.let { otid ->
-                    timelineRepository.reconcileExternalTransportSend(
+                    timelineRepository.reconcileExternalTransportSendScoped(
                         conversationId = conversationId,
                         agentId = agentId,
                         externalConversationId = conversationId,
@@ -453,7 +456,7 @@ internal class WsChatSendCoordinator(
                 // keeps ChatTimelineObserver's isStreaming gate latched
                 // and produces a typing-indicator flap on the next emit.
                 activeWsOtid?.let { otid ->
-                    timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+                    timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
                 }
                 // lcp-axv: error-then-turn_done arrives in lock-step on failed
                 // turns. Prefer the buffered error message from the preceding
@@ -491,7 +494,7 @@ internal class WsChatSendCoordinator(
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
-                timelineRepository.clearExternalTransportActive(conversationId)
+                timelineRepository.clearExternalTransportActive(agentId, conversationId)
                 drainPendingSend()
             }
             is WsTimelineEvent.Error -> {
@@ -542,7 +545,7 @@ internal class WsChatSendCoordinator(
                 val conversationId = activeWsConversationId ?: activeConversationId()
                 activeWsOtid?.let { otid ->
                     if (conversationId != null) {
-                        timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+                        timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, otid)
                     } else {
                         Telemetry.event(
                             "AdminChatVM", "ws.activeSend.failedWithoutConversation",
@@ -554,7 +557,7 @@ internal class WsChatSendCoordinator(
                 preConversationMessageDeltas.clear()
                 clearPendingSends("disconnect")
                 if (conversationId != null) {
-                    timelineRepository.clearExternalTransportActive(conversationId)
+                    timelineRepository.clearExternalTransportActive(agentId, conversationId)
                 }
                 val nextError = if (event.code == ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
                     null
@@ -590,9 +593,9 @@ internal class WsChatSendCoordinator(
             ?: activeConversationId()
             ?: defaultShimConversationId(agentId)
         activeWsOtid?.let { otid ->
-            timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+            timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
         }
-        timelineRepository.clearExternalTransportActive(conversationId)
+        timelineRepository.clearExternalTransportActive(agentId, conversationId)
         uiState.value = uiState.value.copy(
             isStreaming = false,
             isAgentTyping = false,
@@ -629,7 +632,7 @@ internal class WsChatSendCoordinator(
         while (true) {
             val message = preConversationMessageDeltas.removeFirstOrNull() ?: return
             recordRuntimeEvent(WsTimelineEvent.MessageDelta(message), conversationIdOverride = conversationId)
-            timelineRepository.ingestExternalTransportMessage(conversationId, message)
+            timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message)
         }
     }
 
