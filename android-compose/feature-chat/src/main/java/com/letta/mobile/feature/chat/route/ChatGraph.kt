@@ -49,6 +49,25 @@ fun NavGraphBuilder.chatGraph(
                     )
                 )
             },
+            // letta-mobile-aw0dv: open a subagent's OWN conversation, pinning
+            // its conversation id (never a fresh route — a subagent always has
+            // a real transcript) and defaulting to INTERACTIVE mode so the
+            // user sees the full tool/turn detail of the subagent's work.
+            onViewSubagentConversation = { subagentAgentId, subagentConversationId ->
+                val normalizedConversationId = subagentConversationId.takeIf { it.isNotBlank() }
+                onSwitchConversation(
+                    AgentChatRoute(
+                        agentId = subagentAgentId,
+                        conversationId = normalizedConversationId,
+                        // Never mint a fresh route for a subagent view — it has
+                        // a real conversation. If the id is somehow blank, still
+                        // avoid freshRouteKey so resolution targets the agent's
+                        // existing transcript rather than a new conversation.
+                        freshRouteKey = null,
+                        initialChatMode = "interactive",
+                    )
+                )
+            },
             viewModelKey = route.toViewModelKey(),
         )
     }

@@ -185,6 +185,9 @@ internal class AdminChatViewModel @Inject constructor(
 
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
+    // letta-mobile-aw0dv: the display mode the route asked to open in (e.g.
+    // subagent-chip nav requests "interactive"); null = screen default.
+    val initialChatMode: String? = routeArgs.initialChatMode
     private val explicitConversationId: String?
         get() = routeArgs.explicitConversationId
     private val isFreshRoute: Boolean

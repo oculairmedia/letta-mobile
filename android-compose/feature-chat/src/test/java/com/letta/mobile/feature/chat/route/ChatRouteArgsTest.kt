@@ -41,6 +41,37 @@ class ChatRouteArgsTest {
     }
 
     @Test
+    fun `parses initialChatMode from saved state`() {
+        // letta-mobile-aw0dv: subagent-chip nav passes initialChatMode=interactive
+        // so the subagent's conversation opens with full tool/turn detail.
+        val args = ChatRouteArgs(
+            SavedStateHandle(
+                mapOf(
+                    "agentId" to "agent-local-sub",
+                    "conversationId" to "default",
+                    "initialChatMode" to "interactive",
+                )
+            )
+        )
+
+        assertEquals("interactive", args.initialChatMode)
+        // a subagent route pins its conversation, never fresh
+        assertFalse(args.isFreshRoute)
+        assertEquals("default", args.pinnedExplicitConversationId)
+    }
+
+    @Test
+    fun `initialChatMode is null when absent or blank`() {
+        val absent = ChatRouteArgs(SavedStateHandle(mapOf("agentId" to "agent-1")))
+        assertNull(absent.initialChatMode)
+
+        val blank = ChatRouteArgs(
+            SavedStateHandle(mapOf("agentId" to "agent-1", "initialChatMode" to ""))
+        )
+        assertNull(blank.initialChatMode)
+    }
+
+    @Test
     fun `pins explicit conversation id at construction and survives later route writes`() {
         // letta-mobile-9cb37: the explicit route arg must be snapshotted so a
         // later setRouteConversationId (resolved/last conversation) can't erase
