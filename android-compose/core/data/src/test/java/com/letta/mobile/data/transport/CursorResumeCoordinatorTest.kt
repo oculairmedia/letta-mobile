@@ -229,5 +229,37 @@ class CursorResumeCoordinatorTest : WordSpec({
                 "run-2" to 20L
             )
         }
+
+        "skip user-cancelled runs and clear their cursor" {
+            val testScope = TestScope()
+            val cursorStore = RunCursorStore.inMemory()
+            val conversationCursorStore = mockk<ConversationCursorStore>()
+
+            val coordinator = CursorResumeCoordinator(
+                scope = testScope,
+                cursorStore = cursorStore,
+                conversationCursorStore = conversationCursorStore,
+                json = json
+            )
+
+            cursorStore.record("conv-1", "run-cancelled", 10L)
+            cursorStore.record("conv-1", "run-active", 20L)
+            coordinator.markUserCancelled("conv-1", "run-cancelled")
+
+            val subscribedRuns = mutableListOf<Pair<String, Long>>()
+            coordinator.resumeActiveRuns(
+                subscribeFn = { runId, lastSeq ->
+                    subscribedRuns.add(runId to lastSeq)
+                    true
+                },
+                stateValueSimpleName = { "SimpleState" }
+            )
+
+            subscribedRuns shouldBe listOf("run-active" to 20L)
+            cursorStore.activeRuns("conv-1") shouldContainExactly mapOf("run-active" to 20L)
+            coordinator.getResumedRunConversationId("run-cancelled") shouldBe null
+            coordinator.getResumedRunConversationId("run-active") shouldBe "conv-1"
+        }
+
     }
 })
