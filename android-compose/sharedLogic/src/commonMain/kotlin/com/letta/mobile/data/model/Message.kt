@@ -190,8 +190,7 @@ private fun extractObjectAttachments(obj: JsonObject): List<MessageContentPart.I
             "image_url" -> {
                 val url = (obj["image_url"] as? JsonObject)
                     ?.fieldContent("url")
-                    ?: return emptyList()
-                parseImageDataUrl(url)
+                url?.let { parseImageDataUrl(it) }
             }
             else -> null
     }

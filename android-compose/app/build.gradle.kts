@@ -162,8 +162,11 @@ val embeddedLettaCodeNativeEnabled = providers.gradleProperty("embedLettaCodeNat
     .orElse(embedNativeLocalDefault)
 val embeddedLettaCodeAssetsEnabled = providers.gradleProperty("embedLettaCodeAssets")
     .map { it.equals("true", ignoreCase = true) }
-    .orElse(embedAssetsLocalDefault || embedNativeLocalDefault)
-    .orElse(embeddedLettaCodeNativeEnabled)
+    .orElse(
+        providers.provider { localProps.getProperty("embedLettaCodeAssets") }
+            .map { it.equals("true", ignoreCase = true) }
+            .orElse(embeddedLettaCodeNativeEnabled)
+    )
 val embeddedLettaCodeAssetsDir = layout.buildDirectory.dir("generated/embedded-lettacode-assets")
 val embeddedLettaCodeLibnodeDir = layout.buildDirectory.dir("generated/embedded-lettacode-libnode")
 val embeddedLettaCodeLibnodeArchive = layout.buildDirectory.file("embedded-lettacode/libnode/$embeddedLettaCodeLibnodeArchiveName")

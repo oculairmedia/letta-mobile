@@ -79,7 +79,8 @@ internal class AdminChatComposerCoordinator(
 
     fun submitComposer(text: String = state.value.inputText): ChatComposerEffect? {
         val trimmed = text.trim()
-        if (trimmed.startsWith("/goal") && isShimBackend()) {
+        val firstToken = trimmed.substringBefore(' ').substringBefore('\n')
+        if (firstToken == "/goal" && isShimBackend()) {
             composerController.clearText()
             scope.launch {
                 slashCommandRepository.executeGoalCommand(agentId.value, trimmed)
@@ -87,6 +88,8 @@ internal class AdminChatComposerCoordinator(
                         chatBannerController.showComposerError("Goal: $message")
                         slashCommandRepository.getGoalStatus(agentId.value).onSuccess { status ->
                             uiState.update { it.copy(goalStatus = status.goal?.toUi(), isGoalStatusLoading = false) }
+                        }.onFailure {
+                            uiState.update { it.copy(isGoalStatusLoading = false) }
                         }
                     }
                     .onFailure { err -> chatBannerController.showComposerError(err.message ?: "Goal command failed") }

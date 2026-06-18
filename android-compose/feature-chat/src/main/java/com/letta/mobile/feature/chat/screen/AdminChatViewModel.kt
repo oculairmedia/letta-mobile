@@ -141,6 +141,7 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
+    private var slashCommandsLoadVersion: Long = 0L
 
     /**
      * letta-mobile-73o2h.3: WS-backed feed for the active-subagent status
@@ -645,6 +646,7 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun loadSlashCommands() {
         viewModelScope.launch {
+            val loadVersion = ++slashCommandsLoadVersion
             val builtIns = buildList {
                 if (projectContext != null) {
                     add(
@@ -682,9 +684,11 @@ internal class AdminChatViewModel @Inject constructor(
                 .sortedWith(compareByDescending<com.letta.mobile.data.model.SlashCommand> { it.installed }
                     .thenBy { it.command })
             Log.d(TAG, "Slash commands loaded: total=${merged.size} installed=${merged.count { it.installed }}")
-            composerCoordinator.setSlashCommands(merged)
-            if (merged.any { it.source == "builtin_goal" || it.command.startsWith("/goal") }) {
-                refreshGoalStatus()
+            if (loadVersion == slashCommandsLoadVersion) {
+                composerCoordinator.setSlashCommands(merged)
+                if (merged.any { it.source == "builtin_goal" || it.command.startsWith("/goal") }) {
+                    refreshGoalStatus()
+                }
             }
         }
     }
