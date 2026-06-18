@@ -65,7 +65,13 @@ class WsChatBridge(
             .filter { it is ChannelTransportState.Disconnected }
             .map { state ->
                 val d = state as ChannelTransportState.Disconnected
-                WsTimelineEvent.Disconnected(d.code, d.reason, d.isAuthFailure)
+                WsTimelineEvent.Disconnected(
+                    code = d.code,
+                    reason = d.reason,
+                    isAuthFailure = d.isAuthFailure,
+                    willReconnect = d.willReconnect,
+                    reconnectAttempt = d.reconnectAttempt,
+                )
             },
     )
 
@@ -132,6 +138,8 @@ sealed interface WsConnectionState {
         val code: Int,
         val reason: String,
         val isAuthFailure: Boolean = false,
+        val willReconnect: Boolean = false,
+        val reconnectAttempt: Int = 0,
     ) : WsConnectionState
 }
 
@@ -143,6 +151,8 @@ private fun ChannelTransportState.toConnectionState(): WsConnectionState = when 
         code = code,
         reason = reason,
         isAuthFailure = isAuthFailure,
+        willReconnect = willReconnect,
+        reconnectAttempt = reconnectAttempt,
     )
 }
 
@@ -204,6 +214,12 @@ sealed interface WsTimelineEvent {
         val dropCount: Long = 0L,
     ) : WsTimelineEvent
 
+    data class SubscribeDone(
+        val runId: String,
+        val lastSeq: Long,
+        val status: String,
+    ) : WsTimelineEvent
+
     data class Error(
         val code: String,
         val message: String,
@@ -219,6 +235,8 @@ sealed interface WsTimelineEvent {
         val code: Int,
         val reason: String,
         val isAuthFailure: Boolean = false,
+        val willReconnect: Boolean = false,
+        val reconnectAttempt: Int = 0,
     ) : WsTimelineEvent
 
     data class GoalsUpdated(
@@ -337,9 +355,14 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     // directly — the inner BridgeFrame is unwrapped and re-routed
     // through the normal handler upstream of this mapper, so by the
     // time we'd see one here it's already been handled. SubscribeDone
-    // is a cursor cleanup signal, not chat content.
-    is ServerFrame.SubscribeFrameMessage,
-    is ServerFrame.SubscribeDone,
+    // remains visible as a resume terminal fallback when no turn_done
+    // arrived in the replay.
+    is ServerFrame.SubscribeFrameMessage -> null
+    is ServerFrame.SubscribeDone -> WsTimelineEvent.SubscribeDone(
+        runId = runId,
+        lastSeq = lastSeq,
+        status = status,
+    )
     is ServerFrame.Unknown -> null
 }
 

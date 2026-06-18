@@ -8,7 +8,10 @@ sealed interface A2uiActionDispatchResult {
 
 sealed interface ChannelTransportState {
     data object Idle : ChannelTransportState
-    data object Connecting : ChannelTransportState
+    data class Connecting(
+        val reconnecting: Boolean = false,
+        val attempt: Int = 0,
+    ) : ChannelTransportState
     data class Connected(
         val serverId: String,
         val sessionId: String,
@@ -25,6 +28,8 @@ sealed interface ChannelTransportState {
         val code: Int,
         val reason: String,
         val isAuthFailure: Boolean = false,
+        val willReconnect: Boolean = false,
+        val reconnectAttempt: Int = 0,
     ) : ChannelTransportState
 }
 

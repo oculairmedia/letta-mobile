@@ -18,7 +18,7 @@ class WsChatBridgeTest {
         assertEquals(WsConnectionState.Idle, bridge.connection.first())
         assertFalse(bridge.isConnected())
 
-        transport.state.value = ChannelTransportState.Connecting
+        transport.state.value = ChannelTransportState.Connecting()
 
         assertEquals(WsConnectionState.Connecting, bridge.connection.first())
         assertFalse(bridge.isConnected())
@@ -52,7 +52,7 @@ class WsChatBridgeTest {
 
     @Test
     fun `awaitConnected resumes with semantic connected state`() = runTest {
-        val transport = FakeChannelTransport(initialState = ChannelTransportState.Connecting)
+        val transport = FakeChannelTransport(initialState = ChannelTransportState.Connecting())
         val bridge = WsChatBridge(transport)
 
         val connected = async { bridge.awaitConnected() }
