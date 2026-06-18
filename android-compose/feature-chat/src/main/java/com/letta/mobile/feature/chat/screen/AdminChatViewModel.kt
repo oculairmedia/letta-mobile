@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -29,6 +30,7 @@ import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
@@ -45,6 +47,7 @@ import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.LocalAwareActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
+import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -96,6 +99,7 @@ import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.ui.chat.render.ChatTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
@@ -123,6 +127,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val subagentRepository: ISubagentRepository,
+    private val slashCommandRepository: ISlashCommandRepository,
     private val clientVersionProvider: ChatClientVersionProvider,
     private val selfTodoRepository: com.letta.mobile.data.repository.api.ISelfTodoRepository,
     private val modelRepository: IModelRepository,
@@ -136,6 +141,7 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
+    private var slashCommandsLoadVersion: Long = 0L
 
     /**
      * letta-mobile-73o2h.3: WS-backed feed for the active-subagent status
@@ -337,6 +343,7 @@ internal class AdminChatViewModel @Inject constructor(
             isShimBackend = { isShimBackend.value },
             sessionManager = sessionManager,
             messageRepository = messageRepository,
+            slashCommandRepository = slashCommandRepository,
             timelineChatSendStrategy = timelineChatSendStrategy,
             isStreaming = { _uiState.value.isStreaming },
             projectContextAvailable = projectContext != null,
@@ -627,10 +634,80 @@ internal class AdminChatViewModel @Inject constructor(
             }
         }
         observeTransportState()
+        observeGoalPushEvents()
+        observeGoalStatusRefreshes()
+        loadSlashCommands()
+        refreshGoalStatus()
         // Force eager initialization of lazy coordinators to start flow subscriptions
         adminChatA2uiCoordinator
         composerCoordinator
         chatSessionInitializer.run()
+    }
+
+    private fun loadSlashCommands() {
+        viewModelScope.launch {
+            val loadVersion = ++slashCommandsLoadVersion
+            val builtIns = buildList {
+                if (projectContext != null) {
+                    add(
+                        com.letta.mobile.data.model.SlashCommand(
+                            name = "bug",
+                            command = "/bug",
+                            description = "Open a project bug report",
+                            source = "local",
+                            installed = true,
+                        )
+                    )
+                }
+            }
+            // Always expose the FULL global catalog for discovery, marking
+            // which are already installed on this agent. Installed ones appear
+            // first and styled differently; selecting an uninstalled one
+            // installs it to the agent (see selectSlashCommand).
+            val agentCommands = slashCommandRepository.listForAgent(agentId.value)
+                .getOrElse { e ->
+                    Log.d(TAG, "Agent slash commands unavailable: ${e.message}")
+                    emptyList()
+                }
+            val installedNames = agentCommands.map { it.skillName ?: it.name }.toSet()
+            val globalCommands = slashCommandRepository.listGlobal()
+                .getOrElse { e ->
+                    Log.d(TAG, "Global slash commands unavailable: ${e.message}")
+                    emptyList()
+                }
+                .map { it.copy(installed = (it.skillName ?: it.name) in installedNames) }
+            // Merge: built-ins + agent-installed + global discovery, deduped by
+            // command (installed entries win so the flag stays true).
+            val merged = (builtIns + agentCommands + globalCommands)
+                .groupBy { it.command }
+                .map { (_, dupes) -> dupes.maxByOrNull { it.installed } ?: dupes.first() }
+                .sortedWith(compareByDescending<com.letta.mobile.data.model.SlashCommand> { it.installed }
+                    .thenBy { it.command })
+            Log.d(TAG, "Slash commands loaded: total=${merged.size} installed=${merged.count { it.installed }}")
+            if (loadVersion == slashCommandsLoadVersion) {
+                composerCoordinator.setSlashCommands(merged)
+                if (merged.any { it.source == "builtin_goal" || it.command.startsWith("/goal") }) {
+                    refreshGoalStatus()
+                }
+            }
+        }
+    }
+
+    private fun observeGoalPushEvents() {
+        viewModelScope.launch {
+            wsChatBridge.events.collect { event ->
+                if (event is WsTimelineEvent.GoalsUpdated) refreshGoalStatus()
+            }
+        }
+    }
+
+    private fun observeGoalStatusRefreshes() {
+        viewModelScope.launch {
+            isShimBackend
+                .filter { it }
+                .distinctUntilChanged()
+                .collect { refreshGoalStatus() }
+        }
     }
 
     private fun observeTransportState() {
@@ -757,14 +834,78 @@ internal class AdminChatViewModel @Inject constructor(
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
 
+    fun selectSlashCommand(command: com.letta.mobile.data.model.SlashCommand) {
+        composerCoordinator.insertSlashCommand(command)
+        // Tapping an uninstalled skill command installs it to this agent so
+        // the skill becomes available, then refreshes the picker.
+        val skillName = command.skillName
+        if (skillName != null && !command.installed) {
+            viewModelScope.launch {
+                slashCommandRepository.installToAgent(agentId.value, skillName)
+                    .onSuccess {
+                        Log.d(TAG, "Installed skill $skillName to ${agentId.value}")
+                        loadSlashCommands()
+                    }
+                    .onFailure { e -> Log.d(TAG, "Skill install failed for $skillName: ${e.message}") }
+            }
+        }
+    }
+
+    fun uninstallSlashCommand(command: com.letta.mobile.data.model.SlashCommand) {
+        val skillName = command.skillName ?: return
+        if (!command.installed) return
+        viewModelScope.launch {
+            slashCommandRepository.uninstallFromAgent(agentId.value, skillName)
+                .onSuccess {
+                    Log.d(TAG, "Uninstalled skill $skillName from ${agentId.value}")
+                    loadSlashCommands()
+                }
+                .onFailure { e -> Log.d(TAG, "Skill uninstall failed for $skillName: ${e.message}") }
+        }
+    }
+
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
         composerCoordinator.submitComposer(text)
 
     fun sendMessage(text: String) = composerCoordinator.sendMessage(text)
 
+    fun refreshGoalStatus() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isGoalStatusLoading = true) }
+            slashCommandRepository.getGoalStatus(agentId.value)
+                .onSuccess { status -> _uiState.update { it.copy(goalStatus = status.goal?.toUi(), isGoalStatusLoading = false) } }
+                .onFailure { _uiState.update { it.copy(isGoalStatusLoading = false) } }
+        }
+    }
+
+    fun sendGoalCommand(command: String) {
+        if (!isShimBackend.value) return
+        viewModelScope.launch {
+            slashCommandRepository.executeGoalCommand(agentId.value, command)
+                .onSuccess { message ->
+                    chatBannerController.showComposerError("Goal: $message")
+                    refreshGoalStatus()
+                }
+                .onFailure { error -> chatBannerController.showComposerError(error.message ?: "Goal command failed") }
+        }
+    }
+
+    fun continueGoal() {
+        val objective = _uiState.value.goalStatus?.objective?.takeIf { it.isNotBlank() } ?: return
+        composerCoordinator.sendMessage("Continue working on the active goal: $objective. Take the next concrete step, and update or complete the goal when appropriate.")
+    }
+
     fun rerunMessage(message: UiMessage) = composerCoordinator.rerunMessage(message)
 
     fun interruptRun() = composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
+
+    private fun GoalStatus.toUi() = GoalStatusUi(
+        objective = objective,
+        status = status,
+        activeTimeSeconds = activeTimeSeconds,
+        tokensUsed = tokensUsed,
+        tokenBudget = tokenBudget,
+    )
 
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)

@@ -779,6 +779,16 @@ sealed interface ServerFrame {
         val at: String,
     ) : ServerFrame
 
+    @Serializable
+    data class GoalsUpdated(
+        override val v: Int = 1,
+        val type: String = "goals_updated",
+        override val id: String,
+        override val ts: String,
+        val reason: String = "",
+        val at: String = "",
+    ) : ServerFrame
+
     // ─── Subagent server frames (letta-mobile-73o2h.3) ──────────────
     //
     // `request_id` echoes the client's outbound request so the repo
@@ -906,6 +916,7 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
             "cron_delete_response" -> ServerFrame.CronDeleteResponse.serializer()
             "cron_delete_all_response" -> ServerFrame.CronDeleteAllResponse.serializer()
             "crons_updated" -> ServerFrame.CronsUpdated.serializer()
+            "goals_updated" -> ServerFrame.GoalsUpdated.serializer()
             "subagent_list_response" -> ServerFrame.SubagentListResponse.serializer()
             "subagent_todos_response" -> ServerFrame.SubagentTodosResponse.serializer()
             "subagents_updated" -> ServerFrame.SubagentsUpdated.serializer()

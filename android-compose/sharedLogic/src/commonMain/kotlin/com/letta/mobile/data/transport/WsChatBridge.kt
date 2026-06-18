@@ -221,6 +221,11 @@ sealed interface WsTimelineEvent {
         val isAuthFailure: Boolean = false,
     ) : WsTimelineEvent
 
+    data class GoalsUpdated(
+        val reason: String,
+        val at: String,
+    ) : WsTimelineEvent
+
     data class UserActionOutcome(
         val frameId: String,
         val outcome: String,
@@ -269,6 +274,10 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
         afterSeq = afterSeq,
         oldestSeq = oldestSeq,
         lastSeq = lastSeq,
+    )
+    is ServerFrame.GoalsUpdated -> WsTimelineEvent.GoalsUpdated(
+        reason = reason,
+        at = at,
     )
     is ServerFrame.UserActionOutcome -> WsTimelineEvent.UserActionOutcome(
         frameId = frameId,

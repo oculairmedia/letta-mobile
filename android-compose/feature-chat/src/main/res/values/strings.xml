@@ -20,6 +20,7 @@
   <string name="action_search">Search</string>
   <string name="action_send_message">Send message</string>
   <string name="action_stop_run">Stop run</string>
+  <string name="chat_slash_uninstall_label">Uninstall %1$s</string>
   <string name="common_agents">Agents</string>
   <string name="common_conversations">Conversations</string>
   <string name="common_details">Details</string>

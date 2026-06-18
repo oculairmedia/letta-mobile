@@ -140,6 +140,20 @@ private fun extractAttachments(raw: JsonElement?): List<MessageContentPart.Image
     }
 }
 
+/**
+ * Safe primitive-content accessor. `.jsonPrimitive` THROWS
+ * IllegalArgumentException when the element is a JsonObject/JsonArray (e.g. a
+ * tool return whose `type`/`source` field is itself a nested object). Tool
+ * returns are arbitrary JSON, so every field read during attachment/content
+ * extraction must tolerate non-primitive shapes instead of crashing the
+ * timeline reducer. Returns null for objects, arrays, and JSON null.
+ */
+private fun JsonElement?.primitiveContentOrNull(): String? =
+    (this as? JsonPrimitive)?.contentOrNull
+
+private fun JsonObject.fieldContent(key: String): String? =
+    this[key].primitiveContentOrNull()
+
 private fun JsonElement?.parseJsonStringPayload(): JsonElement? {
     val content = (this as? JsonPrimitive)
         ?.takeIf { it.isString }
@@ -151,8 +165,8 @@ private fun JsonElement?.parseJsonStringPayload(): JsonElement? {
 }
 
 private fun extractObjectContent(obj: JsonObject): String? {
-    return when (obj["type"]?.jsonPrimitive?.contentOrNull) {
-        "text" -> obj["text"]?.jsonPrimitive?.contentOrNull
+    return when (obj.fieldContent("type")) {
+        "text" -> obj.fieldContent("text")
         "tool_return" -> firstNestedContent(obj, "content", "tool_return", "func_response", "response", "result", "text")
         else -> firstNestedContent(obj, "content", "tool_return", "func_response", "response", "result", "text")
     }?.takeIf { it.isNotBlank() }
@@ -168,19 +182,15 @@ private fun firstNestedContent(obj: JsonObject, vararg keys: String): String? {
 }
 
 private fun extractObjectAttachments(obj: JsonObject): List<MessageContentPart.Image> {
-    val current = when (obj["type"]?.jsonPrimitive?.contentOrNull) {
+    val current = when (obj.fieldContent("type")) {
             // Letta's native shape: { type:"image", source:{ type:"base64", media_type, data } | { type:"url", url } }
             "image" -> parseLettaImagePart(obj)
             // Legacy / OpenAI-style shape kept for backward compatibility with
             // anything previously persisted or echoed by older server builds.
             "image_url" -> {
-                val url = obj["image_url"]
-                    ?.let { it as? JsonObject }
-                    ?.get("url")
-                    ?.jsonPrimitive
-                    ?.contentOrNull
-                    ?: return emptyList()
-                parseImageDataUrl(url)
+                val url = (obj["image_url"] as? JsonObject)
+                    ?.fieldContent("url")
+                url?.let { parseImageDataUrl(it) }
             }
             else -> null
     }
@@ -193,16 +203,16 @@ private fun extractContentPartResponse(raw: JsonElement?): String? {
 
 private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
     val source = obj["source"] as? JsonObject ?: return null
-    return when (source["type"]?.jsonPrimitive?.contentOrNull) {
+    return when (source.fieldContent("type")) {
         "base64" -> {
-            val mediaType = source["media_type"]?.jsonPrimitive?.contentOrNull
-            val data = source["data"]?.jsonPrimitive?.contentOrNull
+            val mediaType = source.fieldContent("media_type")
+            val data = source.fieldContent("data")
             if (mediaType.isNullOrBlank() || data.isNullOrBlank()) null
             else MessageContentPart.Image(base64 = data, mediaType = mediaType)
         }
         "url" -> {
             // Remote URL: only retain if it's an inline data: URL we can decode.
-            val url = source["url"]?.jsonPrimitive?.contentOrNull ?: return null
+            val url = source.fieldContent("url") ?: return null
             parseImageDataUrl(url)
         }
         // "letta" — server-managed file reference. Empirically the server
@@ -211,8 +221,8 @@ private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
         // already present, decode it directly and render inline (no extra
         // network roundtrip). See bead letta-mobile-mge5.24.
         "letta" -> {
-            val mediaType = source["media_type"]?.jsonPrimitive?.contentOrNull
-            val data = source["data"]?.jsonPrimitive?.contentOrNull
+            val mediaType = source.fieldContent("media_type")
+            val data = source.fieldContent("data")
             if (mediaType.isNullOrBlank() || data.isNullOrBlank()) null
             else MessageContentPart.Image(base64 = data, mediaType = mediaType)
         }

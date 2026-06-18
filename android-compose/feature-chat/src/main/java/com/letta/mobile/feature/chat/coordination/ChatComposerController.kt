@@ -5,6 +5,7 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
@@ -36,6 +37,7 @@ internal data class ChatComposerState(
     val pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
     val inputHistory: ImmutableList<String> = persistentListOf(),
     val error: String? = null,
+    val slashCommands: ImmutableList<SlashCommand> = persistentListOf(),
     val sharedComposerState: com.letta.mobile.data.chat.runtime.ChatComposerState = com.letta.mobile.data.chat.runtime.ChatComposerState(),
 ) {
     val hasSendableContent: Boolean
@@ -112,6 +114,16 @@ internal class ChatComposerController(
         _state.update { current ->
             current.copy(error = null)
         }
+    }
+
+    fun setSlashCommands(commands: List<SlashCommand>) {
+        _state.update { current ->
+            current.copy(slashCommands = commands.toPersistentList())
+        }
+    }
+
+    fun insertSlashCommand(command: SlashCommand) {
+        updateText("${command.command} ")
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.SlashCommand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -50,6 +51,18 @@ class ChatComposerControllerTest {
 
         assertEquals("hello", payload?.text)
         assertEquals(emptyList<MessageContentPart.Image>(), payload?.attachments)
+    }
+
+    @Test
+    fun `slash commands are stored and inserted into input`() {
+        val controller = ChatComposerController(telemetry = noTelemetry)
+        val command = SlashCommand(name = "pdf", command = "/pdf", description = "PDF helper")
+
+        controller.setSlashCommands(listOf(command))
+        controller.insertSlashCommand(command)
+
+        assertEquals(listOf(command), controller.state.value.slashCommands)
+        assertEquals("/pdf ", controller.state.value.inputText)
     }
 
     @Test

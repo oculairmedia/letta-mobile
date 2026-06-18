@@ -572,6 +572,7 @@ internal class WsChatSendCoordinator(
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
             }
+            is WsTimelineEvent.GoalsUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event)
         }
     }

@@ -147,12 +147,26 @@ val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf43
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
 val embeddedLettaCodeLibnodeUrl =
     "https://github.com/nodejs-mobile/nodejs-mobile/releases/download/$embeddedLettaCodeLibnodeVersion/$embeddedLettaCodeLibnodeArchiveName"
+// Embedded-runtime opt-in resolves in this order:
+//   1. -PembedLettaCodeNative=<bool>  (explicit; CI/release pass false)
+//   2. local.properties `embedLettaCodeNative=true` (machine-local default —
+//      gitignored, so dev machines can always build the embedded runtime into
+//      debug APKs without burdening CI, which never sets it)
+//   3. false
+val embedNativeLocalDefault = (localProps.getProperty("embedLettaCodeNative") ?: "")
+    .equals("true", ignoreCase = true)
+val embedAssetsLocalDefault = (localProps.getProperty("embedLettaCodeAssets") ?: "")
+    .equals("true", ignoreCase = true)
 val embeddedLettaCodeNativeEnabled = providers.gradleProperty("embedLettaCodeNative")
     .map { it.equals("true", ignoreCase = true) }
-    .orElse(false)
+    .orElse(embedNativeLocalDefault)
 val embeddedLettaCodeAssetsEnabled = providers.gradleProperty("embedLettaCodeAssets")
     .map { it.equals("true", ignoreCase = true) }
-    .orElse(embeddedLettaCodeNativeEnabled)
+    .orElse(
+        providers.provider { localProps.getProperty("embedLettaCodeAssets") }
+            .map { it.equals("true", ignoreCase = true) }
+            .orElse(embeddedLettaCodeNativeEnabled)
+    )
 val embeddedLettaCodeAssetsDir = layout.buildDirectory.dir("generated/embedded-lettacode-assets")
 val embeddedLettaCodeLibnodeDir = layout.buildDirectory.dir("generated/embedded-lettacode-libnode")
 val embeddedLettaCodeLibnodeArchive = layout.buildDirectory.file("embedded-lettacode/libnode/$embeddedLettaCodeLibnodeArchiveName")

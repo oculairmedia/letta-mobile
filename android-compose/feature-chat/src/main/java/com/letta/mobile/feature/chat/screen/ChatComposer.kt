@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +45,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.feature.chat.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ToolAffordanceRow
@@ -90,6 +93,9 @@ internal fun ChatComposer(
     onRemoveAttachment: (Int) -> Unit,
     onAttachImage: () -> Unit,
     modifier: Modifier = Modifier,
+    slashCommands: ImmutableList<SlashCommand> = kotlinx.collections.immutable.persistentListOf(),
+    onSlashCommandSelected: (SlashCommand) -> Unit = {},
+    onSlashCommandUninstall: (SlashCommand) -> Unit = {},
     availableTools: List<Tool> = emptyList(),
 ) {
     val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
@@ -136,6 +142,23 @@ internal fun ChatComposer(
             ToolAffordanceRow(
                 tools = availableTools,
                 onToolSelected = { tool -> onTextChange(buildToolCallTemplate(tool)) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+
+        val slashQuery = inputText.trimStart()
+        val matchingSlashCommands = if (slashQuery.startsWith("/")) {
+            slashCommands
+                .filter { command -> command.command.startsWith(slashQuery) }
+                .take(8)
+        } else {
+            emptyList()
+        }
+        if (matchingSlashCommands.isNotEmpty()) {
+            SlashCommandSuggestionRow(
+                commands = matchingSlashCommands,
+                onSelected = onSlashCommandSelected,
+                onUninstall = onSlashCommandUninstall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
@@ -230,6 +253,82 @@ internal fun ChatComposer(
             image = image,
             onDismiss = { previewAttachment = null },
         )
+    }
+}
+
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+private fun SlashCommandSuggestionRow(
+    commands: List<SlashCommand>,
+    onSelected: (SlashCommand) -> Unit,
+    onUninstall: (SlashCommand) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(vertical = 4.dp),
+    ) {
+        items(items = commands, key = { it.command }) { command ->
+            var menuOpen by remember(command.command) { mutableStateOf(false) }
+            // Use a Surface + combinedClickable instead of Material3 InputChip:
+            // InputChip owns its own onClick gesture, which swallowed the
+            // combinedClickable modifier so tap/long-press never fired
+            // (regression). A plain clickable Surface handles both reliably.
+            val containerColor = if (command.installed) {
+                MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+            val contentColor = if (command.installed) {
+                MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Box {
+                Surface(
+                    modifier = Modifier.combinedClickable(
+                        onClick = { onSelected(command) },
+                        onLongClick = { if (command.installed) menuOpen = true },
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    color = containerColor,
+                    contentColor = contentColor,
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant,
+                    ),
+                ) {
+                    androidx.compose.foundation.layout.Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (command.installed) LettaIcons.Check else LettaIcons.Add,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        androidx.compose.material3.Text(
+                            text = command.command,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+                androidx.compose.material3.DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                ) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { androidx.compose.material3.Text(stringResource(R.string.chat_slash_uninstall_label, command.command)) },
+                        onClick = {
+                            menuOpen = false
+                            onUninstall(command)
+                        },
+                    )
+                }
+            }
+        }
     }
 }
 

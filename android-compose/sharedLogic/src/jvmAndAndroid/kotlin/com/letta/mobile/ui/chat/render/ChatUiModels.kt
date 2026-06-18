@@ -239,6 +239,15 @@ fun com.letta.mobile.data.chat.runtime.ChatConnectionState.toConversationState(
 }
 
 @androidx.compose.runtime.Immutable
+data class GoalStatusUi(
+    val objective: String = "",
+    val status: String = "",
+    val activeTimeSeconds: Long = 0,
+    val tokensUsed: Long = 0,
+    val tokenBudget: Long? = null,
+)
+
+@androidx.compose.runtime.Immutable
 data class ChatUiState(
     val conversationState: ConversationState = ConversationState.Loading,
     val messages: ImmutableList<UiMessage> = persistentListOf(),
@@ -271,5 +280,7 @@ data class ChatUiState(
     val a2uiActionSnackbar: A2uiActionSnackbarUi? = null,
     val a2uiThinkingDelayMessage: String? = null,
     val transport: ChatTransport = ChatTransport.Rest,
+    val goalStatus: GoalStatusUi? = null,
+    val isGoalStatusLoading: Boolean = false,
     val a2uiFrameCount: Int = 0,
 )
