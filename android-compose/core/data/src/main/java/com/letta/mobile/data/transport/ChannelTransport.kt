@@ -248,6 +248,7 @@ class ChannelTransport internal constructor(
         val conversationKey = requireConversationKey(conversationId) ?: return false
         clearPendingA2uiActions(conversationKey, reason = "user cancel")
         val rid = conversationStateManager.currentRunId(conversationKey) ?: return false
+        cursorCoordinator.markRunUserStopped(conversationKey, rid)
         return connection.sendFrame(
             CancelFrame(
                 id = UUID.randomUUID().toString(),
@@ -542,10 +543,17 @@ class ChannelTransport internal constructor(
             }
 
             is ServerFrame.SubscribeDone -> {
-                cursorCoordinator.clearResumedRunFromAllActive(frame.runId)
+                if (frame.userStopped || frame.status == "cancelled") {
+                    cursorCoordinator.markRunUserStopped(
+                        cursorCoordinator.getResumedRunConversationId(frame.runId),
+                        frame.runId,
+                    )
+                } else {
+                    cursorCoordinator.clearResumedRunFromAllActive(frame.runId)
+                }
                 Log.i(
                     TAG,
-                    "subscribe_done runId=${frame.runId} lastSeq=${frame.lastSeq} status=${frame.status}",
+                    "subscribe_done runId=${frame.runId} lastSeq=${frame.lastSeq} status=${frame.status} userStopped=${frame.userStopped}",
                 )
             }
 

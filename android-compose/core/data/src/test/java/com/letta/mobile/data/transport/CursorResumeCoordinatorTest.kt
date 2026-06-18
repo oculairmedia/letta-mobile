@@ -229,5 +229,62 @@ class CursorResumeCoordinatorTest : WordSpec({
                 "run-2" to 20L
             )
         }
+
+        "skip and clear cursors for known user-stopped runs" {
+            val testScope = TestScope()
+            val cursorStore = RunCursorStore.inMemory()
+            val conversationCursorStore = mockk<ConversationCursorStore>()
+
+            val coordinator = CursorResumeCoordinator(
+                scope = testScope,
+                cursorStore = cursorStore,
+                conversationCursorStore = conversationCursorStore,
+                json = json
+            )
+
+            cursorStore.record("conv-1", "run-stopped", 10L)
+            cursorStore.record("conv-1", "run-active", 20L)
+            coordinator.markRunUserStopped("conv-1", "run-stopped")
+
+            val subscribedRuns = mutableListOf<Pair<String, Long>>()
+            coordinator.resumeActiveRuns(
+                subscribeFn = { runId, lastSeq ->
+                    subscribedRuns.add(runId to lastSeq)
+                    true
+                },
+                stateValueSimpleName = { "SimpleState" }
+            )
+
+            subscribedRuns shouldBe listOf("run-active" to 20L)
+            cursorStore.allActiveRuns() shouldContainExactly mapOf("conv-1" to mapOf("run-active" to 20L))
+        }
+
+        "clear a user-cancelled run cursor before reconnect can resubscribe it" {
+            val testScope = TestScope()
+            val cursorStore = RunCursorStore.inMemory()
+            val conversationCursorStore = mockk<ConversationCursorStore>()
+
+            val coordinator = CursorResumeCoordinator(
+                scope = testScope,
+                cursorStore = cursorStore,
+                conversationCursorStore = conversationCursorStore,
+                json = json
+            )
+
+            cursorStore.record("conv-1", "run-cancelled", 42L)
+            coordinator.markRunUserStopped("conv-1", "run-cancelled")
+
+            val subscribedRuns = mutableListOf<Pair<String, Long>>()
+            coordinator.resumeActiveRuns(
+                subscribeFn = { runId, lastSeq ->
+                    subscribedRuns.add(runId to lastSeq)
+                    true
+                },
+                stateValueSimpleName = { "SimpleState" }
+            )
+
+            subscribedRuns.shouldBeEmpty()
+            cursorStore.allActiveRuns().shouldBeEmpty()
+        }
     }
 })

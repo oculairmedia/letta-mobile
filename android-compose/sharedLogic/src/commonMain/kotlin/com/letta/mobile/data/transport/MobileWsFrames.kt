@@ -689,6 +689,7 @@ sealed interface ServerFrame {
         @SerialName("run_id") val runId: String,
         @SerialName("last_seq") val lastSeq: Long,
         val status: String,
+        @SerialName("user_stopped") val userStopped: Boolean = false,
     ) : ServerFrame
 
     // ─── Cron server frames (letta-mobile-d52f.1) ───────────────────

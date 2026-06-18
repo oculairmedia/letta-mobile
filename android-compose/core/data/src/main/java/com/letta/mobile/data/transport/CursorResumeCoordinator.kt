@@ -9,6 +9,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -22,6 +23,7 @@ internal class CursorResumeCoordinator(
     private val json: Json,
 ) {
     private val resumedRunConversationIds = ConcurrentHashMap<String, String>()
+    private val userStoppedRunIds = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val helloResumeAfterSeqByConversation = ConcurrentHashMap<String, Long>()
     private val helloResumeReplayCountsByConversation = ConcurrentHashMap<String, Long>()
 
@@ -47,6 +49,18 @@ internal class CursorResumeCoordinator(
 
     fun clearCursor(conversationId: String, runId: String) {
         cursorStore.clear(conversationId, runId)
+    }
+
+    fun markRunUserStopped(conversationId: String?, runId: String) {
+        if (runId.isEmpty()) return
+        userStoppedRunIds.add(runId)
+        val knownConversationId = conversationId ?: resumedRunConversationIds[runId]
+        if (!knownConversationId.isNullOrEmpty()) {
+            cursorStore.clear(knownConversationId, runId)
+        } else {
+            clearResumedRunFromAllActive(runId)
+        }
+        resumedRunConversationIds.remove(runId)
     }
 
     fun clearResumedRunFromAllActive(runId: String) {
@@ -197,6 +211,11 @@ internal class CursorResumeCoordinator(
         var dispatched = 0
         snapshot.forEach { (convId, runs) ->
             runs.forEach { (runId, lastSeq) ->
+                if (userStoppedRunIds.contains(runId)) {
+                    cursorStore.clear(convId, runId)
+                    Log.i(TAG, "skipping user-stopped run resume convId=$convId runId=$runId")
+                    return@forEach
+                }
                 resumedRunConversationIds[runId] = convId
                 if (subscribeFn(runId, lastSeq)) {
                     dispatched++
