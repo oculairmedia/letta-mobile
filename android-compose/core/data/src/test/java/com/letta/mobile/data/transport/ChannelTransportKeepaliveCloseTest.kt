@@ -18,11 +18,102 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private const val KEEPALIVE_CLOSE_TEST_TIMEOUT_MS = 5_000L
 
 class ChannelTransportKeepaliveCloseTest {
+    @Test
+    fun `after welcome resumes stored active run cursor`() = runBlocking {
+        val shim = KeepaliveCloseShimServer()
+        val cursorStore = RunCursorStore.inMemory().also { it.record("conv-1", "run-1", 7L) }
+        val transport = ChannelTransport(cursorStore)
+
+        try {
+            transport.connect(
+                baseShimUrl = shim.baseUrl(),
+                token = "token",
+                deviceId = "device",
+                clientVersion = "test",
+            )
+
+            shim.frames.receiveType("hello")
+            val subscribe = shim.frames.receiveType("subscribe")
+
+            assertEquals("run-1", subscribe.stringValue("run_id"))
+            assertEquals(7L, subscribe.longValue("cursor"))
+        } finally {
+            transport.disconnect()
+            shim.close()
+        }
+    }
+
+    @Test
+    fun `client normal close does not reconnect`() = runBlocking {
+        val shim = KeepaliveCloseShimServer()
+        val transport = ChannelTransport(RunCursorStore.inMemory())
+
+        try {
+            transport.connect(
+                baseShimUrl = shim.baseUrl(),
+                token = "token",
+                deviceId = "device",
+                clientVersion = "test",
+            )
+            shim.frames.receiveType("hello")
+
+            transport.disconnect()
+            kotlinx.coroutines.delay(1_500L)
+            assertEquals(1, shim.helloCount.get())
+        } finally {
+            transport.disconnect()
+            shim.close()
+        }
+    }
+
+    @Test
+    fun `auth close does not reconnect`() = runBlocking {
+        val shim = KeepaliveCloseShimServer()
+        val transport = ChannelTransport(RunCursorStore.inMemory())
+
+        try {
+            transport.connect(
+                baseShimUrl = shim.baseUrl(),
+                token = "token",
+                deviceId = "device",
+                clientVersion = "test",
+            )
+            shim.frames.receiveType("hello")
+            shim.closeFirstSocket(4401, "unauthorized")
+            val disconnected = withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+                transport.state.first { it is ChannelTransportState.Disconnected } as ChannelTransportState.Disconnected
+            }
+
+            kotlinx.coroutines.delay(1_500L)
+            assertEquals(false, disconnected.willReconnect)
+            assertEquals(1, shim.helloCount.get())
+        } finally {
+            transport.disconnect()
+            shim.close()
+        }
+    }
+
+    @Test
+    fun `backoff sequence increases and resets on welcome`() = runBlocking {
+        val connection = WebSocketConnection(this, Json { ignoreUnknownKeys = true })
+        val first = connection.backoffDelayMs(1)
+        val second = connection.backoffDelayMs(2)
+        val third = connection.backoffDelayMs(3)
+
+        assertTrue(first in 1_000L..1_200L)
+        assertTrue(second in 2_000L..2_400L)
+        assertTrue(third in 4_000L..4_800L)
+
+        connection.resetReconnectBackoff()
+        assertTrue(connection.backoffDelayMs(1) in 1_000L..1_200L)
+    }
+
     @Test
     fun `redials when shim closes for protocol keepalive timeout`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
@@ -41,6 +132,10 @@ class ChannelTransportKeepaliveCloseTest {
                 transport.state.first { it is ChannelTransportState.Connected }
             }
             shim.closeFirstSocketAsKeepaliveTimeout()
+            val disconnected = withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+                transport.state.first { it is ChannelTransportState.Disconnected } as ChannelTransportState.Disconnected
+            }
+            assertEquals(true, disconnected.willReconnect)
             val secondHello = shim.frames.receiveType("hello")
 
             withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
@@ -98,12 +193,13 @@ class ChannelTransportKeepaliveCloseTest {
         fun baseUrl(): String = server.url("/").toString().removeSuffix("/")
 
         suspend fun closeFirstSocketAsKeepaliveTimeout() {
+            closeFirstSocket(ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE, "pong timeout")
+        }
+
+        suspend fun closeFirstSocket(code: Int, reason: String) {
             withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
                 sockets.receive()
-            }.close(
-                ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE,
-                "pong timeout",
-            )
+            }.close(code, reason)
         }
 
         fun close() {
@@ -131,3 +227,6 @@ private suspend fun Channel<JsonObject>.receiveType(type: String): JsonObject =
 
 private fun JsonObject.stringValue(key: String): String? =
     this[key]?.jsonPrimitive?.contentOrNull
+
+private fun JsonObject.longValue(key: String): Long? =
+    this[key]?.jsonPrimitive?.contentOrNull?.toLongOrNull()

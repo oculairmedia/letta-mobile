@@ -128,6 +128,7 @@ internal class WebSocketConnection(
         reason: String,
         isConnecting: () -> Boolean,
         connectFn: suspend (baseShimUrl: String, token: String, deviceId: String, clientVersion: String) -> Unit,
+        onAttemptScheduled: (attempt: Int, delayMs: Long) -> Unit = { _, _ -> },
     ) {
         val config = lastConnectionConfig
         if (config == null) {
