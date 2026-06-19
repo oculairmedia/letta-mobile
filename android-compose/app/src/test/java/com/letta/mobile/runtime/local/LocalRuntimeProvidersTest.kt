@@ -113,6 +113,7 @@ class LocalRuntimeProvidersTest {
         runtimeController = object : LettaCodeRuntimeController {
             override fun submit(command: TurnCommand, config: LettaConfig): Flow<String> = emptyFlow()
             override suspend fun interrupt() = Unit
+            override suspend fun releaseActiveSession() = Unit
         },
     )
 }

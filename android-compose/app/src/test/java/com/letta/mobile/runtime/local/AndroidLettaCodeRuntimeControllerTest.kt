@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
 import org.junit.Test
 class AndroidLettaCodeRuntimeControllerTest {
     @Test
@@ -368,8 +367,10 @@ class AndroidLettaCodeRuntimeControllerTest {
         }
     }
 
-    private fun List<String>.after(flag: String): String? {
-        val index = indexOf(flag)
-        return if (index >= 0) getOrNull(index + 1) else null
+    private companion object {
+        fun List<String>.after(flag: String): String? {
+            val index = indexOf(flag)
+            return if (index >= 0) getOrNull(index + 1) else null
+        }
     }
 }
