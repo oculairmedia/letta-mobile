@@ -46,6 +46,7 @@ class DataStoreRunCursorStore @Inject constructor(
     }
 
     private val active = ConcurrentHashMap<String, ConcurrentHashMap<String, Long>>()
+    private val terminal = ConcurrentHashMap<String, MutableSet<String>>()
 
     @Volatile private var loaded: Boolean = false
 
@@ -61,6 +62,9 @@ class DataStoreRunCursorStore @Inject constructor(
                     decoded.byConv.forEach { (conv, runs) ->
                         active[conv] = ConcurrentHashMap(runs)
                     }
+                    decoded.terminalByConv.forEach { (conv, runs) ->
+                        terminal[conv] = ConcurrentHashMap.newKeySet<String>().also { it.addAll(runs) }
+                    }
                 }.onFailure {
                     Log.w(TAG, "Failed to load persisted run cursors: ${it.message}", it)
                 }
@@ -69,8 +73,16 @@ class DataStoreRunCursorStore @Inject constructor(
         }
     }
 
-    override fun record(conversationId: String, runId: String, seq: Long) {
+    override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
+        if (isTerminal) {
+            active[conversationId]?.remove(runId)
+            if (active[conversationId]?.isEmpty() == true) active.remove(conversationId)
+            terminal.getOrPut(conversationId) { ConcurrentHashMap.newKeySet() }.add(runId)
+            flushAsync()
+            return
+        }
+        if (terminal[conversationId]?.contains(runId) == true) return
         val perConv = active.getOrPut(conversationId) { ConcurrentHashMap() }
         var advanced = false
         perConv.compute(runId) { _, existing ->
@@ -86,10 +98,18 @@ class DataStoreRunCursorStore @Inject constructor(
 
     override fun clear(conversationId: String, runId: String) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
-        val perConv = active[conversationId] ?: return
-        if (perConv.remove(runId) == null) return
-        if (perConv.isEmpty()) active.remove(conversationId, perConv)
-        flushAsync()
+        var changed = false
+        val terminalRuns = terminal[conversationId]
+        if (terminalRuns?.remove(runId) == true) {
+            changed = true
+            if (terminalRuns.isEmpty()) terminal.remove(conversationId, terminalRuns)
+        }
+        val perConv = active[conversationId]
+        if (perConv?.remove(runId) != null) {
+            changed = true
+            if (perConv.isEmpty()) active.remove(conversationId, perConv)
+        }
+        if (changed) flushAsync()
     }
 
     override fun allActiveRuns(): Map<String, Map<String, Long>> =
@@ -103,6 +123,7 @@ class DataStoreRunCursorStore @Inject constructor(
             mutex.withLock {
                 val snapshot = SerializedMap(
                     byConv = active.mapValues { (_, runs) -> HashMap(runs) },
+                    terminalByConv = terminal.mapValues { (_, runs) -> runs.toList() },
                 )
                 runCatching {
                     val encoded = json.encodeToString(SerializedMap.serializer(), snapshot)
@@ -117,6 +138,7 @@ class DataStoreRunCursorStore @Inject constructor(
     @Serializable
     private data class SerializedMap(
         val byConv: Map<String, Map<String, Long>> = emptyMap(),
+        val terminalByConv: Map<String, List<String>> = emptyMap(),
     )
 
     companion object {

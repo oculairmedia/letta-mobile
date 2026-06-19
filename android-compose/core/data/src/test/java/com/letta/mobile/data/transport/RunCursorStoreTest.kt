@@ -67,6 +67,17 @@ class RunCursorStoreTest : WordSpec({
             store.record("conv-a", "run-1", -1L)
             store.allActiveRuns().shouldBeEmpty()
         }
+
+        "remove active cursor and block future resume records once terminal is saved" {
+            val store = RunCursorStore.inMemory()
+            store.record("conv-a", "run-1", 5L)
+            store.record("conv-a", "run-1", 12L, isTerminal = true)
+            store.record("conv-a", "run-1", 13L)
+
+            store.activeRuns("conv-a").shouldBeEmpty()
+            store.allActiveRuns().shouldBeEmpty()
+        }
+
     }
 
     "clear" should {

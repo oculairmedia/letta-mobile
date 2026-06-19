@@ -261,5 +261,62 @@ class CursorResumeCoordinatorTest : WordSpec({
             coordinator.getResumedRunConversationId("run-active") shouldBe "conv-1"
         }
 
+        "skip terminal runs saved before cold-start resume" {
+            val testScope = TestScope()
+            val cursorStore = RunCursorStore.inMemory()
+            val conversationCursorStore = mockk<ConversationCursorStore>()
+
+            val coordinator = CursorResumeCoordinator(
+                scope = testScope,
+                cursorStore = cursorStore,
+                conversationCursorStore = conversationCursorStore,
+                json = json
+            )
+
+            cursorStore.record("conv-1", "run-terminal", 10L)
+            cursorStore.record("conv-1", "run-terminal", 11L, isTerminal = true)
+
+            val subscribedRuns = mutableListOf<Pair<String, Long>>()
+            coordinator.resumeActiveRuns(
+                subscribeFn = { runId, lastSeq ->
+                    subscribedRuns.add(runId to lastSeq)
+                    true
+                },
+                stateValueSimpleName = { "SimpleState" }
+            )
+
+            subscribedRuns shouldBe emptyList()
+            cursorStore.allActiveRuns().shouldBeEmpty()
+            coordinator.getResumedRunConversationId("run-terminal") shouldBe null
+        }
+
+        "still resumes non-terminal runs so live tail can continue" {
+            val testScope = TestScope()
+            val cursorStore = RunCursorStore.inMemory()
+            val conversationCursorStore = mockk<ConversationCursorStore>()
+
+            val coordinator = CursorResumeCoordinator(
+                scope = testScope,
+                cursorStore = cursorStore,
+                conversationCursorStore = conversationCursorStore,
+                json = json
+            )
+
+            cursorStore.record("conv-1", "run-active", 20L)
+
+            val subscribedRuns = mutableListOf<Pair<String, Long>>()
+            coordinator.resumeActiveRuns(
+                subscribeFn = { runId, lastSeq ->
+                    subscribedRuns.add(runId to lastSeq)
+                    true
+                },
+                stateValueSimpleName = { "SimpleState" }
+            )
+
+            subscribedRuns shouldBe listOf("run-active" to 20L)
+            coordinator.getResumedRunConversationId("run-active") shouldBe "conv-1"
+        }
+
+
     }
 })

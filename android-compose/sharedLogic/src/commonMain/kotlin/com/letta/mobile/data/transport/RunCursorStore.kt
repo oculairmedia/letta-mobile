@@ -18,7 +18,7 @@ interface RunCursorStore {
      * Record that [seq] was received for [runId] in [conversationId].
      * No-op if [seq] is not strictly greater than the recorded value.
      */
-    fun record(conversationId: String, runId: String, seq: Long)
+    fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean = false)
 
     /**
      * Drop the cursor for [runId] in [conversationId].
@@ -39,11 +39,18 @@ interface RunCursorStore {
 
 internal class InMemoryRunCursorStore : RunCursorStore {
     private val active = mutableMapOf<String, MutableMap<String, Long>>()
+    private val terminal = mutableMapOf<String, MutableSet<String>>()
 
     override fun ensureLoaded() { /* no-op */ }
 
-    override fun record(conversationId: String, runId: String, seq: Long) {
+    override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
+        if (isTerminal) {
+            clear(conversationId, runId)
+            terminal.getOrPut(conversationId) { mutableSetOf() }.add(runId)
+            return
+        }
+        if (terminal[conversationId]?.contains(runId) == true) return
         val perConversation = active.getOrPut(conversationId) { mutableMapOf() }
         val existing = perConversation[runId]
         if (existing == null || seq > existing) {
@@ -53,6 +60,8 @@ internal class InMemoryRunCursorStore : RunCursorStore {
 
     override fun clear(conversationId: String, runId: String) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
+        terminal[conversationId]?.remove(runId)
+        if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
         val perConversation = active[conversationId] ?: return
         if (perConversation.remove(runId) == null) return
         if (perConversation.isEmpty()) active.remove(conversationId)

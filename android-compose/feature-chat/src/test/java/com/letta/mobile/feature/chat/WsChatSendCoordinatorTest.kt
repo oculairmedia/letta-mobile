@@ -670,6 +670,44 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `replayed message delta ingests silently without setting streaming indicators`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+        val replayed = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("old answer"))
+
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(replayed, isReplay = true))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(FakeTimelineExternalTransportWriter.IngestedMessage("conv-1", replayed)),
+            timelineRepository.ingestedMessages,
+        )
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+
+        val live = AssistantMessage(id = "assistant-2", contentRaw = JsonPrimitive("new answer"))
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(live, isReplay = false))
+        advanceUntilIdle()
+
+        assertEquals(true, uiState.value.isStreaming)
+        assertEquals(true, uiState.value.isAgentTyping)
+    }
+
+    @Test
     fun `websocket lifecycle and tool events are recorded into shared runtime outbox`() = runTest {
         val recorded = mutableListOf<RuntimeEventDraft>()
         val coordinator = WsChatSendCoordinator(

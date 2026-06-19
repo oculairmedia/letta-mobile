@@ -1,8 +1,10 @@
 package com.letta.mobile.data.transport
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.testutil.FakeChannelTransport
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -69,4 +71,34 @@ class WsChatBridgeTest {
             connected.await(),
         )
     }
+
+    @Test
+    fun `message deltas preserve replay metadata from transport frame events`() = runTest {
+        val transport = FakeChannelTransport()
+        val bridge = WsChatBridge(transport)
+        val received = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } as WsTimelineEvent.MessageDelta }
+        runCurrent()
+
+        transport.frameEvents.emit(
+            TransportFrameEvent(
+                frame = ServerFrame.AssistantMessage(
+                    id = "cm-stream-old",
+                    ts = "t",
+                    agentId = "agent-1",
+                    conversationId = "conv-1",
+                    turnId = "turn-1",
+                    runId = "run-1",
+                    content = "old answer",
+                ),
+                isReplay = true,
+            )
+        )
+
+        val delta = received.await()
+        assertTrue(delta.isReplay)
+        val message = delta.message as AssistantMessage
+        assertEquals("cm-stream-old", message.id)
+        assertEquals("old answer", message.content)
+    }
+
 }

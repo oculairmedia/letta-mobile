@@ -57,7 +57,7 @@ class WsChatBridge(
 
     /** High-level event stream tailored for chat consumers. */
     val events: Flow<WsTimelineEvent> = merge(
-        transport.events.mapNotNull { it.toTimelineEvent() },
+        transport.frameEvents.mapNotNull { it.toTimelineEvent() },
         // Surface terminal disconnects as their own event so the
         // ViewModel can show a banner / re-enable retry without
         // having to re-implement a state-collector.
@@ -185,7 +185,10 @@ sealed interface WsTimelineEvent {
      * by date). The id prefixes (`cm-stream-`, `toolcall-`,
      * `toolreturn-`) are preserved verbatim so dedup fires correctly.
      */
-    data class MessageDelta(val message: LettaMessage) : WsTimelineEvent
+    data class MessageDelta(
+        val message: LettaMessage,
+        val isReplay: Boolean = false,
+    ) : WsTimelineEvent
 
     data class StopReason(
         val turnId: String,
@@ -257,7 +260,9 @@ sealed interface WsTimelineEvent {
     ) : WsTimelineEvent
 }
 
-private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
+private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? = frame.toTimelineEvent(isReplay)
+
+private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEvent? = when (this) {
     is ServerFrame.TurnStarted -> WsTimelineEvent.TurnStarted(
         turnId = turnId,
         agentId = agentId,
@@ -324,13 +329,13 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.ToolCallMessage -> if (isSelfTodoChipFrame()) {
         null
     } else {
-        WsFrameMapper.toLettaMessage(this)?.let { WsTimelineEvent.MessageDelta(it) }
+        WsFrameMapper.toLettaMessage(this)?.let { WsTimelineEvent.MessageDelta(it, isReplay = isReplay) }
     }
     is ServerFrame.UserMessage,
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,
     is ServerFrame.ToolReturnMessage -> WsFrameMapper.toLettaMessage(this)?.let {
-        WsTimelineEvent.MessageDelta(it)
+        WsTimelineEvent.MessageDelta(it, isReplay = isReplay)
     }
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
