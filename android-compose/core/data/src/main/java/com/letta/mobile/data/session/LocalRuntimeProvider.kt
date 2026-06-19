@@ -27,4 +27,7 @@ interface LocalRuntimeProvider {
      * (letta-mobile-p2mmd). Default no-op for runtimes without one.
      */
     suspend fun interruptActiveTurn() {}
+
+    /** Releases any active local runtime binding when the owning graph closes. */
+    suspend fun releaseActiveSession() {}
 }

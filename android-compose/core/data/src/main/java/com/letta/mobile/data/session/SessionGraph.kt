@@ -27,6 +27,7 @@ import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LocalLettaBackend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 
 class SessionGraph internal constructor(
     override val id: Long,
@@ -58,6 +59,7 @@ class SessionGraph internal constructor(
     override val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
 ) : SessionRepositoryGraph {
     override fun close() {
+        runBlocking { localRuntimeBackend?.releaseActiveSession() }
         scope.cancel()
     }
 }

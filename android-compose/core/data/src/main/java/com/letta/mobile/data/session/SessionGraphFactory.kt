@@ -263,6 +263,7 @@ class SessionGraphFactory internal constructor(
                     outbox = runtimeEventOutbox,
                     memFsStore = memFsStore,
                     onInterrupt = provider::interruptActiveTurn,
+                    onRelease = provider::releaseActiveSession,
                 )
             }
         }

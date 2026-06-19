@@ -25,6 +25,10 @@ class LocalLettaCodeRuntimeProvider @Inject constructor(
         runtimeController.interrupt()
     }
 
+    override suspend fun releaseActiveSession() {
+        runtimeController.releaseActiveSession()
+    }
+
     override val providerId: String = "local-lettacode"
     override val priority: Int = 100
 

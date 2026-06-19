@@ -23,9 +23,11 @@ import java.io.File
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 class AndroidLettaCodeRuntimeControllerTest {
     @Test
@@ -153,6 +155,94 @@ class AndroidLettaCodeRuntimeControllerTest {
         assertEquals("openai-loopback-token", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_API_KEY"))
     }
 
+
+    @Test
+    fun `different local session stops active binding and starts requested session`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val modelFile = File.createTempFile("model", ".litertlm").apply { deleteOnExit() }
+        val baseDir = requireNotNull(modelFile.parentFile)
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = FakeOnDeviceBridge()
+        val networkBridge = FakeAndroidNetworkBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = networkBridge,
+        )
+
+        controller.submit(command(agentId = "agent-1", conversationId = "conv-1"), config(modelFile.absolutePath)).toList()
+        controller.submit(command(agentId = "agent-2", conversationId = "conv-2"), config(modelFile.absolutePath)).toList()
+
+        assertEquals(listOf("agent-1", "agent-2"), nodeBridge.startedAgents)
+        assertEquals(2, nodeBridge.startCalls)
+        assertEquals(1, nodeBridge.stopCalls)
+        assertEquals("agent-2", nodeBridge.lastRequest?.arguments?.after("--agent"))
+        assertEquals(1, onDeviceBridge.closedSessions)
+        assertEquals(1, networkBridge.closedSessions)
+    }
+
+    @Test
+    fun `same local session reuses binding without teardown`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val modelFile = File.createTempFile("model", ".litertlm").apply { deleteOnExit() }
+        val baseDir = requireNotNull(modelFile.parentFile)
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = FakeOnDeviceBridge()
+        val networkBridge = FakeAndroidNetworkBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = networkBridge,
+        )
+
+        controller.submit(command(agentId = "agent-1", conversationId = "conv-1"), config(modelFile.absolutePath)).toList()
+        controller.submit(command(agentId = "agent-1", conversationId = "conv-1"), config(modelFile.absolutePath)).toList()
+
+        assertEquals(1, nodeBridge.startCalls)
+        assertEquals(0, nodeBridge.stopCalls)
+        assertEquals(0, onDeviceBridge.closedSessions)
+        assertEquals(0, networkBridge.closedSessions)
+    }
+
+    @Test
+    fun `released stale binding does not block new session`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val modelFile = File.createTempFile("model", ".litertlm").apply { deleteOnExit() }
+        val baseDir = requireNotNull(modelFile.parentFile)
+        val nodeBridge = FakeNodeBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = FakeOnDeviceBridge(),
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(command(agentId = "agent-1", conversationId = "conv-1"), config(modelFile.absolutePath)).toList()
+        controller.releaseActiveSession()
+        controller.submit(command(agentId = "agent-2", conversationId = "conv-2"), config(modelFile.absolutePath)).toList()
+
+        assertEquals(listOf("agent-1", "agent-2"), nodeBridge.startedAgents)
+        assertEquals(2, nodeBridge.startCalls)
+        assertEquals(1, nodeBridge.stopCalls)
+    }
+
     @Test
     fun `model selection normalizes config defaults and handles`() {
         val selection = EmbeddedLettaCodeModelSelection.from(
@@ -196,11 +286,11 @@ class AndroidLettaCodeRuntimeControllerTest {
         localModelPath = localModelPath,
     )
 
-    private fun command(): TurnCommand = TurnCommand(
+    private fun command(agentId: String = "agent-1", conversationId: String = "conv-1"): TurnCommand = TurnCommand(
         backendId = BackendId("local-lettacode:test"),
         runtimeId = RuntimeId("local-lettacode:test"),
-        agentId = AgentId("agent-1"),
-        conversationId = ConversationId("conv-1"),
+        agentId = AgentId(agentId),
+        conversationId = ConversationId(conversationId),
         input = TurnInput.UserMessage(
             localMessageId = "local-1",
             text = "hello",
@@ -233,35 +323,53 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     private class FakeOnDeviceBridge : OnDeviceOpenAiBridge {
+        var closedSessions = 0
+
         override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
             OnDeviceOpenAiBridgeSession(
                 baseUrl = "http://127.0.0.1:2/v1",
                 authToken = "openai-loopback-token",
-                closeAction = {},
+                closeAction = { closedSessions += 1 },
             )
     }
 
     private class FakeAndroidNetworkBridge : AndroidNetworkBridge {
+        var closedSessions = 0
+
         override fun start(): AndroidNetworkBridgeSession = AndroidNetworkBridgeSession(
             baseUrl = "http://127.0.0.1:1",
             authToken = "test-token",
-            closeAction = {},
+            closeAction = { closedSessions += 1 },
         )
     }
 
     private class FakeNodeBridge : LettaCodeNodeBridge {
         override val outputLines = flowOf("""{"type":"result"}""")
         var started = false
+        var startCalls = 0
+        var stopCalls = 0
         var lastRequest: LettaCodeNodeStartRequest? = null
+        val startedAgents = mutableListOf<String>()
 
         override suspend fun start(request: LettaCodeNodeStartRequest): Result<Unit> {
             started = true
+            startCalls += 1
             lastRequest = request
+            request.arguments.after("--agent")?.let(startedAgents::add)
             return Result.success(Unit)
         }
 
         override suspend fun writeLine(line: String): Result<Unit> = Result.success(Unit)
 
-        override suspend fun stop(): Result<Unit> = Result.success(Unit)
+        override suspend fun stop(): Result<Unit> {
+            stopCalls += 1
+            started = false
+            return Result.success(Unit)
+        }
+    }
+
+    private fun List<String>.after(flag: String): String? {
+        val index = indexOf(flag)
+        return if (index >= 0) getOrNull(index + 1) else null
     }
 }

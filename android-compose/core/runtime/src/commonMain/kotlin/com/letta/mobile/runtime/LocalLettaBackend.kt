@@ -10,6 +10,7 @@ class LocalLettaBackend(
     private val outbox: RuntimeEventOutbox,
     private val memFsStore: MemFsStore,
     private val onInterrupt: (suspend () -> Unit)? = null,
+    private val onRelease: (suspend () -> Unit)? = null,
 ) : LettaBackend {
     init {
         require(descriptor.kind.isLocalRuntime()) {
@@ -24,6 +25,10 @@ class LocalLettaBackend(
      */
     suspend fun interrupt() {
         onInterrupt?.invoke()
+    }
+
+    suspend fun releaseActiveSession() {
+        onRelease?.invoke()
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventEnvelope> = flow {

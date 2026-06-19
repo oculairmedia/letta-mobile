@@ -38,6 +38,9 @@ interface LettaCodeRuntimeController {
      * session is running.
      */
     suspend fun interrupt()
+
+    /** Releases any active embedded session binding so a future local session can bind cleanly. */
+    suspend fun releaseActiveSession()
 }
 
 @Singleton
@@ -185,6 +188,12 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
+    override suspend fun releaseActiveSession() {
+        startMutex.withLock {
+            stopActiveSessionLocked(reason = "release")
+        }
+    }
+
     /**
      * Starts the embedded session if not already running. Returns true when
      * this call started a FRESH session (first turn of the process/session) so
@@ -202,13 +211,16 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             )
             val active = activeSession
             if (active != null) {
-                if (active != requestedSession) {
-                    throw IllegalStateException(
-                        "Embedded LettaCode is already bound to agent ${active.agentId} " +
-                            "and conversation ${active.conversationId}. Restart the app before switching local sessions.",
-                    )
+                if (active == requestedSession) {
+                    return@withLock false
                 }
-                return@withLock false
+                Log.i(
+                    TAG,
+                    "Switching embedded session from agent=${active.agentId} conversation=${active.conversationId} " +
+                        "to agent=${requestedSession.agentId} conversation=${requestedSession.conversationId}",
+                )
+                stopActiveSessionLocked(reason = "switch")
+                transcriptDirty = true
             }
 
             if (!runtimeStatusProvider.status.runnable) {
@@ -265,6 +277,23 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             activeSession = requestedSession
             true
         }
+    }
+
+    private suspend fun stopActiveSessionLocked(reason: String) {
+        val session = activeSession ?: return
+        val bridgeSession = activeOnDeviceBridgeSession
+        val networkBridgeSession = activeAndroidNetworkBridgeSession
+        activeSession = null
+        activeOnDeviceBridgeSession = null
+        activeAndroidNetworkBridgeSession = null
+        Log.i(TAG, "Stopping embedded session ($reason) agent=${session.agentId} conversation=${session.conversationId}")
+        nodeBridge.stop().onFailure { error ->
+            Log.w(TAG, "Failed to stop embedded node session during $reason", error)
+        }
+        runCatching { bridgeSession?.close() }
+            .onFailure { error -> Log.w(TAG, "Failed to close on-device bridge session during $reason", error) }
+        runCatching { networkBridgeSession?.close() }
+            .onFailure { error -> Log.w(TAG, "Failed to close Android network bridge session during $reason", error) }
     }
 
     private fun PreparedLettaCodeProject.toLettaCodeNodeStartRequest(
