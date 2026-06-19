@@ -117,7 +117,7 @@ class TimelineRepositoryTest {
     @Test
     fun `cursor repair hydrates the scoped loop when agent is present`() = runBlocking {
         val api = CancellableStreamApi()
-        val cursorStore = RecordingConversationCursorStore()
+        val cursorStore = RepositoryRecordingConversationCursorStore()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore)
 
         repository.getOrCreate("agent-a", "default")
@@ -133,24 +133,24 @@ class TimelineRepositoryTest {
     @Test
     fun `cursor repair keeps reused conversation ids isolated by agent scope`() = runBlocking {
         val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RepositoryRecordingConversationCursorStore())
+
+        val agentATimeline = repository.observe("agent-a", "default")
+        val agentBTimeline = repository.observe("agent-b", "default")
         api.messagesByConversation["default"] = listOf(
             UserMessage(id = "msg-a", contentRaw = JsonPrimitive("agent scoped"), seqId = 42),
         )
-        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RecordingConversationCursorStore())
-
-        val agentALoop = repository.getOrCreate("agent-a", "default")
-        val agentBLoop = repository.getOrCreate("agent-b", "default")
         repository.repairExpiredConversationCursorScoped("agent-a", "default", fallbackSeq = 42L)
 
-        assertTrue("agent-a scoped loop should receive repaired message", agentALoop.messages.value.any { it.id == "msg-a" })
-        assertFalse("agent-b scoped loop should not receive agent-a repair", agentBLoop.messages.value.any { it.id == "msg-a" })
+        assertTrue("agent-a scoped loop should receive repaired message", agentATimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })
+        assertFalse("agent-b scoped loop should not receive agent-a repair", agentBTimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })
         assertEquals(2, repository.cachedLoopCount())
 
         repository.clearAll()
     }
 }
 
-private class RecordingConversationCursorStore : ConversationCursorStore {
+private class RepositoryRecordingConversationCursorStore : ConversationCursorStore {
     val cleared = mutableListOf<String>()
 
     override suspend fun recordFrame(conversationId: String, seq: Long) = Unit
