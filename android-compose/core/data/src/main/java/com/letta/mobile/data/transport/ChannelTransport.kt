@@ -88,6 +88,13 @@ class ChannelTransport internal constructor(
     )
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
+    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(
+        replay = 0,
+        extraBufferCapacity = 64,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
+
     private val conversationStateManager = PerConversationStateManager()
     private val cronCorrelator = CronRequestCorrelator()
     private val cursorCoordinator = CursorResumeCoordinator(scope, cursorStore, conversationCursorStore, json)
@@ -447,7 +454,7 @@ class ChannelTransport internal constructor(
         cronCorrelator.cancelPendingRequests("WS teardown: $reason")
     }
 
-    private fun handleInbound(text: String) {
+    private fun handleInbound(text: String, isReplay: Boolean = false) {
         val frame = runCatching {
             json.decodeFromString(ServerFrameSerializer, text)
         }.getOrElse {
@@ -547,7 +554,7 @@ class ChannelTransport internal constructor(
                 runCatching {
                     json.decodeFromString(ServerFrameSerializer, innerText)
                 }.onSuccess { inner ->
-                    handleInbound(innerText)
+                    handleInbound(innerText, isReplay = true)
                     Log.d(
                         TAG,
                         "subscribe_frame unwrapped runId=${frame.runId} seq=${frame.seq} " +
@@ -588,7 +595,10 @@ class ChannelTransport internal constructor(
             }
         }
 
-        scope.launch { _events.emit(frame) }
+        scope.launch {
+            _events.emit(frame)
+            _frameEvents.emit(TransportFrameEvent(frame = frame, isReplay = isReplay))
+        }
     }
 
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult {

@@ -4,6 +4,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TransportFrameEvent
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,6 +19,7 @@ class NoOpChannelTransport : IChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state
     override val events: SharedFlow<ServerFrame> = MutableSharedFlow()
+    override val frameEvents: SharedFlow<TransportFrameEvent> = MutableSharedFlow()
 
     override suspend fun connect(
         baseShimUrl: String,

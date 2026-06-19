@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,6 +43,10 @@ class SessionScopedChannelTransport internal constructor(
 
     override val events: SharedFlow<ServerFrame> = sessionManager.currentGraph
         .flatMapLatest { it.channelTransport.events }
+        .shareIn(proxyScope, SharingStarted.Eagerly, replay = 0)
+
+    override val frameEvents: SharedFlow<TransportFrameEvent> = sessionManager.currentGraph
+        .flatMapLatest { it.channelTransport.frameEvents }
         .shareIn(proxyScope, SharingStarted.Eagerly, replay = 0)
 
     init {

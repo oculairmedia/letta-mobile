@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TransportFrameEvent
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonArray
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.JsonArray
 interface IChannelTransport {
     val state: StateFlow<ChannelTransportState>
     val events: SharedFlow<ServerFrame>
+    val frameEvents: SharedFlow<TransportFrameEvent>
 
     suspend fun connect(
         baseShimUrl: String,

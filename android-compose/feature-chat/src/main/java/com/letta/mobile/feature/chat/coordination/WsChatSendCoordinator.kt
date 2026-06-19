@@ -379,6 +379,14 @@ internal class WsChatSendCoordinator(
                 }
                 recordRuntimeEvent(event, conversationIdOverride = conversationId)
                 timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
+                if (!event.isReplay) {
+                    uiState.value = uiState.value.copy(
+                        conversationState = ConversationState.Ready(conversationId),
+                        isStreaming = true,
+                        isAgentTyping = true,
+                        error = null,
+                    )
+                }
             }
             is WsTimelineEvent.StopReason -> {
                 recordRuntimeEvent(event)

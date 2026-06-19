@@ -4,6 +4,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,6 +26,10 @@ class FakeChannelTransport(
 ) : IChannelTransport {
     override val state: MutableStateFlow<ChannelTransportState> = MutableStateFlow(initialState)
     override val events: MutableSharedFlow<ServerFrame> = MutableSharedFlow(
+        replay = 0,
+        extraBufferCapacity = 16,
+    )
+    override val frameEvents: MutableSharedFlow<TransportFrameEvent> = MutableSharedFlow(
         replay = 0,
         extraBufferCapacity = 16,
     )

@@ -42,8 +42,8 @@ internal class CursorResumeCoordinator(
         return resumedRunConversationIds[runId]
     }
 
-    fun recordCursor(conversationId: String, runId: String, seq: Long) {
-        cursorStore.record(conversationId, runId, seq)
+    fun recordCursor(conversationId: String, runId: String, seq: Long, isTerminal: Boolean = false) {
+        cursorStore.record(conversationId, runId, seq, isTerminal)
     }
 
     fun clearCursor(conversationId: String, runId: String) {
@@ -107,7 +107,7 @@ internal class CursorResumeCoordinator(
             ?: activeConversationForRun(runId)
             ?: resumedRunConversationIds[runId]
             ?: return
-        cursorStore.record(convId, runId, seq)
+        cursorStore.record(convId, runId, seq, isTerminalFrameType(type))
     }
 
     /**
@@ -231,6 +231,8 @@ internal class CursorResumeCoordinator(
 
     companion object {
         private const val TAG = "CursorResumeCoordinator"
+
+        private fun isTerminalFrameType(type: String): Boolean = type == "turn_done"
 
         private val SKIP_CURSOR_TYPES: Set<String> = setOf(
             "welcome",
