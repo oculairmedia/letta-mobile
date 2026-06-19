@@ -141,3 +141,23 @@
     public static int d(...);
     public static int i(...);
 }
+
+# ---------------------------------------------------------------------------
+# Embedded LettaCode runtime — JNI native bridge (letta-mobile-esoaw).
+# NativeLettaCodeNodeBridge has @JvmStatic companion callbacks
+# (onNativeStdoutLine/onNativeStderrLine) invoked FROM native code via JNI,
+# plus external native methods (nativeStart/nativeWriteStdin/nativeStop).
+# R8 sees no Kotlin-side caller of the onNative* callbacks and strips/renames
+# them, so the native lib's JNI lookup fails -> NoSuchMethodError -> SIGABRT
+# on launch (release/minified only; debug works). DO NOT REMOVE these keeps —
+# removing them crashes every production user on app open.
+-keep class com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge { *; }
+-keepclassmembers class com.letta.mobile.runtime.local.NativeLettaCodeNodeBridge {
+    public static *** onNativeStdoutLine(java.lang.String);
+    public static *** onNativeStderrLine(java.lang.String);
+}
+# Keep any native method declarations in the runtime.local package (JNI side
+# resolves these by name+signature too).
+-keepclasseswithmembernames class com.letta.mobile.runtime.local.** {
+    native <methods>;
+}
