@@ -431,71 +431,28 @@ internal class WsChatSendCoordinator(
                 }
             }
             is WsTimelineEvent.TurnDone -> {
-                val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
-                recordRuntimeEvent(event, conversationIdOverride = conversationId)
-                if (event.lossy) {
-                    Telemetry.event(
-                        "AdminChatVM", "ws.turnDone.lossy",
-                        "dropCount" to event.dropCount,
-                        "turnId" to event.turnId,
-                        "runId" to event.runId,
+                finishActiveTurn(
+                    status = event.status,
+                    runId = event.runId,
+                    turnId = event.turnId,
+                    lossy = event.lossy,
+                    dropCount = event.dropCount,
+                    reason = "turnDone",
+                    recordEvent = event,
+                )
+            }
+            is WsTimelineEvent.SubscribeDone -> {
+                if (activeWsOtid != null || uiState.value.isStreaming) {
+                    finishActiveTurn(
+                        status = event.status,
+                        runId = event.runId,
+                        turnId = activeWsTurnId.orEmpty(),
+                        lossy = false,
+                        dropCount = 0L,
+                        reason = "subscribeDone",
+                        recordEvent = null,
                     )
                 }
-                if (event.lossy) activeWsOtid?.let { otid ->
-                    timelineRepository.reconcileExternalTransportSendScoped(
-                        conversationId = conversationId,
-                        agentId = agentId,
-                        externalConversationId = conversationId,
-                        otid = otid,
-                    )
-                }
-                // letta-mobile-9hcg: flip the optimistic Local user bubble
-                // from SENDING→SENT on every TurnDone. Without this, the
-                // Local appended in [appendExternalTransportLocal] stays
-                // SENDING for the lifetime of the cached timeline, which
-                // keeps ChatTimelineObserver's isStreaming gate latched
-                // and produces a typing-indicator flap on the next emit.
-                activeWsOtid?.let { otid ->
-                    timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
-                }
-                // lcp-axv: error-then-turn_done arrives in lock-step on failed
-                // turns. Prefer the buffered error message from the preceding
-                // Error frame when status="failed"; fall back to a generic
-                // string if upstream skipped the error frame. Cancellation is
-                // user-initiated and explicitly never sets an error banner.
-                val stopReasonError = stopReasonForTurn.equals("error", ignoreCase = true)
-                val nextError = when (event.status) {
-                    "completed" -> bufferedErrorMessage
-                        ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else uiState.value.error
-                    "cancelled" -> uiState.value.error
-                    "failed" -> bufferedErrorMessage ?: "Turn failed"
-                    else -> bufferedErrorMessage
-                        ?: if (stopReasonError) {
-                            BARE_STOP_REASON_ERROR_MESSAGE
-                        } else {
-                            "Turn ended unexpectedly (${event.status})"
-                        }
-                }
-                uiState.value = uiState.value.copy(
-                    isStreaming = false,
-                    isAgentTyping = false,
-                    error = nextError,
-                )
-                Telemetry.event(
-                    "AdminChatVM", "ws.turnDone",
-                    "status" to event.status,
-                    "turnId" to event.turnId,
-                    "runId" to event.runId,
-                    "stopReason" to (stopReasonForTurn ?: ""),
-                    "lossy" to event.lossy,
-                )
-                activeWsOtid = null
-                activeWsTurnId = null
-                stopReasonForTurn = null
-                usageRecordedForTurn = false
-                bufferedErrorMessage = null
-                timelineRepository.clearExternalTransportActive(agentId, conversationId)
-                drainPendingSend()
             }
             is WsTimelineEvent.Error -> {
                 if (event.code == CURSOR_EXPIRED_ERROR_CODE) {
@@ -542,42 +499,118 @@ internal class WsChatSendCoordinator(
                 )
             }
             is WsTimelineEvent.Disconnected -> {
-                val conversationId = activeWsConversationId ?: activeConversationId()
-                activeWsOtid?.let { otid ->
-                    if (conversationId != null) {
-                        timelineRepository.markExternalTransportLocalFailed(agentId, conversationId, otid)
-                    } else {
-                        Telemetry.event(
-                            "AdminChatVM", "ws.activeSend.failedWithoutConversation",
-                            "otid" to otid,
-                            "disconnectCode" to event.code,
-                        )
-                    }
+                if (event.willReconnect && !event.isAuthFailure) {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.disconnected.transient",
+                        "code" to event.code,
+                        "attempt" to event.reconnectAttempt,
+                    )
+                    uiState.value = uiState.value.copy(
+                        error = null,
+                        isStreaming = uiState.value.isStreaming || activeWsOtid != null,
+                        isAgentTyping = uiState.value.isAgentTyping || activeWsOtid != null,
+                    )
+                    return
                 }
-                preConversationMessageDeltas.clear()
-                clearPendingSends("disconnect")
-                if (conversationId != null) {
-                    timelineRepository.clearExternalTransportActive(agentId, conversationId)
-                }
-                val nextError = if (event.code == ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
-                    null
-                } else {
-                    event.reason.ifBlank { "WebSocket disconnected" }
-                }
-                uiState.value = uiState.value.copy(
-                    error = nextError,
-                    isStreaming = false,
-                    isAgentTyping = false,
-                )
-                activeWsOtid = null
-                activeWsTurnId = null
-                stopReasonForTurn = null
-                usageRecordedForTurn = false
-                bufferedErrorMessage = null
+                failActiveTurnForDisconnect(event)
             }
             is WsTimelineEvent.GoalsUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event)
         }
+    }
+
+    private suspend fun finishActiveTurn(
+        status: String,
+        runId: String,
+        turnId: String,
+        lossy: Boolean,
+        dropCount: Long,
+        reason: String,
+        recordEvent: WsTimelineEvent.TurnDone?,
+    ) {
+        val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+        if (recordEvent != null) {
+            recordRuntimeEvent(recordEvent, conversationIdOverride = conversationId)
+        }
+        if (lossy) {
+            Telemetry.event(
+                "AdminChatVM", "ws.turnDone.lossy",
+                "dropCount" to dropCount,
+                "turnId" to turnId,
+                "runId" to runId,
+            )
+            activeWsOtid?.let { otid ->
+                timelineRepository.reconcileExternalTransportSend(
+                    conversationId = conversationId,
+                    agentId = agentId,
+                    externalConversationId = conversationId,
+                    otid = otid,
+                )
+            }
+        }
+        activeWsOtid?.let { otid ->
+            timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+        }
+        val stopReasonError = stopReasonForTurn.equals("error", ignoreCase = true)
+        val nextError = when (status) {
+            "completed" -> bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else uiState.value.error
+            "cancelled" -> uiState.value.error
+            "failed" -> bufferedErrorMessage ?: "Turn failed"
+            else -> bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly ($status)"
+        }
+        uiState.value = uiState.value.copy(
+            isStreaming = false,
+            isAgentTyping = false,
+            error = nextError,
+        )
+        Telemetry.event(
+            "AdminChatVM", "ws.turnComplete",
+            "status" to status,
+            "turnId" to turnId,
+            "runId" to runId,
+            "stopReason" to (stopReasonForTurn ?: ""),
+            "lossy" to lossy,
+            "reason" to reason,
+        )
+        activeWsOtid = null
+        activeWsTurnId = null
+        stopReasonForTurn = null
+        usageRecordedForTurn = false
+        bufferedErrorMessage = null
+        timelineRepository.clearExternalTransportActive(conversationId)
+        drainPendingSend()
+    }
+
+    private suspend fun failActiveTurnForDisconnect(event: WsTimelineEvent.Disconnected) {
+        val conversationId = activeWsConversationId ?: activeConversationId()
+        activeWsOtid?.let { otid ->
+            if (conversationId != null) {
+                timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+            } else {
+                Telemetry.event(
+                    "AdminChatVM", "ws.activeSend.failedWithoutConversation",
+                    "otid" to otid,
+                    "disconnectCode" to event.code,
+                )
+            }
+        }
+        preConversationMessageDeltas.clear()
+        clearPendingSends("disconnect")
+        if (conversationId != null) {
+            timelineRepository.clearExternalTransportActive(conversationId)
+        }
+        uiState.value = uiState.value.copy(
+            error = event.reason.ifBlank { "WebSocket disconnected" },
+            isStreaming = false,
+            isAgentTyping = false,
+        )
+        activeWsOtid = null
+        activeWsTurnId = null
+        stopReasonForTurn = null
+        usageRecordedForTurn = false
+        bufferedErrorMessage = null
     }
 
     private fun failSend(message: String) {

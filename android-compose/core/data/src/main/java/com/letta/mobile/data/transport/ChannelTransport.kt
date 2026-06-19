@@ -115,7 +115,7 @@ class ChannelTransport internal constructor(
         clientVersion: String,
     ): Unit = socketMutex.withLock {
         teardownLocked(reason = "reconnect")
-        _state.value = ChannelTransportState.Connecting
+        _state.value = ChannelTransportState.Connecting()
         conversationStateManager.clearAllTurnState()
         cursorCoordinator.ensureLoaded()
         val helloResume = cursorCoordinator.loadHelloResumeCursors()
@@ -159,16 +159,24 @@ class ChannelTransport internal constructor(
                     Log.i(TAG, "Ignoring close from superseded WS socket")
                     return
                 }
-                _state.value = ChannelTransportState.Disconnected(code, reason)
-                conversationStateManager.clearAllTurnState()
-                cronCorrelator.cancelPendingRequests("WS closed: code=$code reason=$reason")
-                if (!wasClientInitiatedClose && code == KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
+                val shouldReconnect = shouldReconnectOnClose(code, wasClientInitiatedClose)
+                if (shouldReconnect && code == KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE) {
                     Telemetry.event(
                         "ChannelTransport", "keepalive.pongTimeout",
                         "code" to code,
                         "reason" to reason,
                     )
-                    requestReconnect("shim keepalive pong timeout")
+                }
+                _state.value = ChannelTransportState.Disconnected(
+                    code = code,
+                    reason = reason,
+                    willReconnect = shouldReconnect,
+                )
+                cronCorrelator.cancelPendingRequests("WS closed: code=$code reason=$reason")
+                if (shouldReconnect) {
+                    requestReconnect("WS closed: code=$code reason=$reason")
+                } else {
+                    conversationStateManager.clearAllTurnState()
                 }
             }
 
@@ -180,13 +188,19 @@ class ChannelTransport internal constructor(
                     return
                 }
                 val isAuth = httpCode == 401 || httpCode == 403
+                val shouldReconnect = !isAuth
                 _state.value = ChannelTransportState.Disconnected(
                     code = httpCode ?: -1,
                     reason = t.message ?: t::class.java.simpleName,
                     isAuthFailure = isAuth,
+                    willReconnect = shouldReconnect,
                 )
-                conversationStateManager.clearAllTurnState()
                 cronCorrelator.cancelPendingRequests("WS failure: ${t.message ?: t::class.java.simpleName}")
+                if (shouldReconnect) {
+                    requestReconnect("WS failure: ${t.message ?: t::class.java.simpleName}")
+                } else {
+                    conversationStateManager.clearAllTurnState()
+                }
             }
         }
 
@@ -450,6 +464,7 @@ class ChannelTransport internal constructor(
 
         when (frame) {
             is ServerFrame.Welcome -> {
+                connection.resetReconnectBackoff()
                 _state.value = ChannelTransportState.Connected(
                     serverId = frame.serverId,
                     sessionId = frame.sessionId,
@@ -670,8 +685,22 @@ class ChannelTransport internal constructor(
         connection.requestReconnect(
             reason = reason,
             isConnecting = { state.value is ChannelTransportState.Connecting },
-            connectFn = ::connect
+            connectFn = ::connect,
+            onAttemptScheduled = { attempt, _ ->
+                val disconnected = state.value as? ChannelTransportState.Disconnected
+                _state.value = ChannelTransportState.Connecting(reconnecting = true, attempt = attempt)
+                if (disconnected != null) {
+                    _state.value = disconnected.copy(willReconnect = true, reconnectAttempt = attempt)
+                }
+            }
         )
+    }
+
+    private fun shouldReconnectOnClose(code: Int, wasClientInitiatedClose: Boolean): Boolean {
+        if (wasClientInitiatedClose) return false
+        if (code == NORMAL_CLOSE) return false
+        if (code in AUTH_FAILURE_CLOSE_CODES) return false
+        return true
     }
 
     private fun drainPendingA2uiActions(conversationId: String) {
@@ -719,6 +748,7 @@ class ChannelTransport internal constructor(
         private const val MAX_PENDING_A2UI_ACTIONS = 16
         private const val NEW_CONVERSATION_STATE_KEY = "__new_conversation__"
         const val KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE = 4001
+        private val AUTH_FAILURE_CLOSE_CODES = setOf(4003, 4401, 4403)
 
         private val SKIP_CURSOR_TYPES: Set<String> = setOf(
             "welcome",

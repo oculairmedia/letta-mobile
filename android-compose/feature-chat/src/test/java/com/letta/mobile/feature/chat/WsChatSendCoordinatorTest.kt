@@ -297,7 +297,7 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
-    fun `keepalive disconnect marks active send failed without timeout banner`() = runTest {
+    fun `transient keepalive disconnect keeps active send streaming`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
@@ -323,18 +323,61 @@ class WsChatSendCoordinatorTest {
             WsTimelineEvent.Disconnected(
                 code = ChannelTransport.KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE,
                 reason = "pong timeout",
+                willReconnect = true,
+                reconnectAttempt = 1,
             )
         )
         advanceUntilIdle()
 
         assertNull(uiState.value.error)
+        assertEquals(true, uiState.value.isStreaming)
+        assertEquals(true, uiState.value.isAgentTyping)
+        assertEquals(emptyList<FakeTimelineExternalTransportWriter.LocalMarker>(), timelineRepository.failedLocals)
+        assertEquals(emptyList<String>(), timelineRepository.clearedActiveConversations)
+
+        coordinator.handleEvent(WsTimelineEvent.SubscribeDone(runId = "run-1", lastSeq = 42L, status = "failed"))
+        advanceUntilIdle()
+
+        assertEquals("Turn failed", uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
         assertEquals(false, uiState.value.isAgentTyping)
         assertEquals(
             listOf(FakeTimelineExternalTransportWriter.LocalMarker("conv-1", local.otid)),
-            timelineRepository.failedLocals,
+            timelineRepository.sentLocals,
         )
         assertEquals(listOf("conv-1"), timelineRepository.clearedActiveConversations)
+    }
+
+    @Test
+    fun `transient disconnect does not fail active optimistic send`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1006, reason = "network lost", willReconnect = true))
+        advanceUntilIdle()
+
+        assertNull(uiState.value.error)
+        assertEquals(true, uiState.value.isStreaming)
+        assertEquals(true, uiState.value.isAgentTyping)
+        assertEquals(emptyList<FakeTimelineExternalTransportWriter.LocalMarker>(), timelineRepository.failedLocals)
+        assertEquals(emptyList<String>(), timelineRepository.clearedActiveConversations)
     }
 
     @Test

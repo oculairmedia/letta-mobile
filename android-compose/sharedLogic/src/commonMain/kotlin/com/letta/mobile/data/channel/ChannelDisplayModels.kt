@@ -70,7 +70,7 @@ object ChannelDisplayMapper {
 
     private fun ChannelTransportState.describe(): String = when (this) {
         ChannelTransportState.Idle -> "Idle"
-        ChannelTransportState.Connecting -> "Connecting"
+        is ChannelTransportState.Connecting -> "Connecting"
         is ChannelTransportState.Connected -> buildString {
             append("Connected")
             canonicalLiveTransport?.takeIf { it.isNotBlank() }?.let { append(" via $it") }
@@ -80,7 +80,7 @@ object ChannelDisplayMapper {
 
     private fun ChannelTransportState.detailText(): String = when (this) {
         ChannelTransportState.Idle -> "Live channel transport is idle."
-        ChannelTransportState.Connecting -> "Live channel transport is connecting."
+        is ChannelTransportState.Connecting -> "Live channel transport is connecting."
         is ChannelTransportState.Connected -> buildString {
             append("Connected to server ")
             append(serverId)
@@ -97,7 +97,7 @@ object ChannelDisplayMapper {
 
     private fun ChannelTransportState.metadataLabels(status: ChannelDisplayStatus): List<String> = when (this) {
         ChannelTransportState.Idle,
-        ChannelTransportState.Connecting,
+        is ChannelTransportState.Connecting,
         -> listOf(status.label)
         is ChannelTransportState.Connected -> listOfNotNull(
             status.label,
@@ -116,7 +116,7 @@ object ChannelDisplayMapper {
 
     private fun ChannelTransportState.toDisplayStatus(): ChannelDisplayStatus = when (this) {
         ChannelTransportState.Idle -> ChannelDisplayStatus.Idle
-        ChannelTransportState.Connecting -> ChannelDisplayStatus.Connecting
+        is ChannelTransportState.Connecting -> ChannelDisplayStatus.Connecting
         is ChannelTransportState.Connected -> ChannelDisplayStatus.Connected
         is ChannelTransportState.Disconnected -> ChannelDisplayStatus.Disconnected
     }

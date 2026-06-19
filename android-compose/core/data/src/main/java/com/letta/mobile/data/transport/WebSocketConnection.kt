@@ -3,13 +3,17 @@ package com.letta.mobile.data.transport
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.min
+import kotlin.random.Random
 
 /**
  * Encapsulates low-level OkHttp WebSocket client requests, listener wiring,
@@ -32,6 +36,7 @@ internal class WebSocketConnection(
     private var reconnectJob: Job? = null
     @Volatile
     private var lastConnectionConfig: ConnectionConfig? = null
+    private val reconnectAttempt = AtomicInteger(0)
 
     @Volatile
     var clientInitiatedClose: Boolean = false
@@ -123,6 +128,7 @@ internal class WebSocketConnection(
         reason: String,
         isConnecting: () -> Boolean,
         connectFn: suspend (baseShimUrl: String, token: String, deviceId: String, clientVersion: String) -> Unit,
+        onAttemptScheduled: (attempt: Int, delayMs: Long) -> Unit = { _, _ -> },
     ) {
         val config = lastConnectionConfig
         if (config == null) {
@@ -131,10 +137,28 @@ internal class WebSocketConnection(
         }
         if (isConnecting()) return
         if (reconnectJob?.isActive == true) return
+        val attempt = reconnectAttempt.incrementAndGet()
+        val delayMs = backoffDelayMs(attempt)
+        onAttemptScheduled(attempt, delayMs)
         reconnectJob = scope.launch {
-            Log.i(TAG, "redialing WS: $reason")
+            Log.i(TAG, "redialing WS attempt=$attempt delayMs=$delayMs reason=$reason")
+            delay(delayMs)
             connectFn(config.baseShimUrl, config.token, config.deviceId, config.clientVersion)
         }
+    }
+
+    fun resetReconnectBackoff() {
+        reconnectAttempt.set(0)
+        reconnectJob?.cancel()
+        reconnectJob = null
+    }
+
+    fun backoffDelayMs(attempt: Int): Long {
+        val exponent = (attempt - 1).coerceAtLeast(0).coerceAtMost(MAX_BACKOFF_EXPONENT)
+        val base = min(MAX_RECONNECT_DELAY_MS, INITIAL_RECONNECT_DELAY_MS shl exponent)
+        val jitterBound = (base * JITTER_FRACTION).toLong().coerceAtLeast(1L)
+        val jitter = Random.nextLong(0L, jitterBound + 1L)
+        return min(MAX_RECONNECT_DELAY_MS, base + jitter)
     }
 
     private data class ConnectionConfig(
@@ -147,6 +171,10 @@ internal class WebSocketConnection(
     companion object {
         private const val TAG = "WebSocketConnection"
         private const val NORMAL_CLOSE = 1000
+        private const val INITIAL_RECONNECT_DELAY_MS = 1_000L
+        private const val MAX_RECONNECT_DELAY_MS = 30_000L
+        private const val MAX_BACKOFF_EXPONENT = 10
+        private const val JITTER_FRACTION = 0.20
 
         private fun String.toWsUrl(): String = when {
             startsWith("https://") -> "wss://" + removePrefix("https://")
