@@ -660,8 +660,8 @@ class WsChatSendCoordinatorTest {
 
         assertEquals(
             listOf(
-                FakeTimelineExternalTransportWriter.IngestedMessage("conv-created", reasoning),
-                FakeTimelineExternalTransportWriter.IngestedMessage("conv-created", assistant),
+                FakeTimelineExternalTransportWriter.IngestedMessage("agent-1", "conv-created", reasoning),
+                FakeTimelineExternalTransportWriter.IngestedMessage("agent-1", "conv-created", assistant),
             ),
             timelineRepository.ingestedMessages,
         )
@@ -689,22 +689,105 @@ class WsChatSendCoordinatorTest {
         )
         val replayed = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("old answer"))
 
-        coordinator.handleEvent(WsTimelineEvent.MessageDelta(replayed, isReplay = true))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(replayed, isReplay = true, agentId = "agent-1", conversationId = "conv-1"),
+        )
         advanceUntilIdle()
 
         assertEquals(
-            listOf(FakeTimelineExternalTransportWriter.IngestedMessage("conv-1", replayed)),
+            listOf(FakeTimelineExternalTransportWriter.IngestedMessage("agent-1", "conv-1", replayed)),
             timelineRepository.ingestedMessages,
         )
         assertEquals(false, uiState.value.isStreaming)
         assertEquals(false, uiState.value.isAgentTyping)
 
         val live = AssistantMessage(id = "assistant-2", contentRaw = JsonPrimitive("new answer"))
-        coordinator.handleEvent(WsTimelineEvent.MessageDelta(live, isReplay = false))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(live, isReplay = false, agentId = "agent-1", conversationId = "conv-1"),
+        )
         advanceUntilIdle()
 
         assertEquals(true, uiState.value.isStreaming)
         assertEquals(true, uiState.value.isAgentTyping)
+    }
+
+    @Test
+    fun `message delta routes to frame conversation instead of active conversation`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-bound",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(agentId = "agent-bound"),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-bound" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+        val foreignAssistant = AssistantMessage(id = "assistant-main", contentRaw = JsonPrimitive("main reply"))
+
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = foreignAssistant,
+                agentId = "agent-main",
+                conversationId = "conv-main",
+            )
+        )
+
+        assertEquals(
+            listOf(
+                FakeTimelineExternalTransportWriter.IngestedMessage("agent-main", "conv-main", foreignAssistant),
+            ),
+            timelineRepository.ingestedMessages,
+        )
+    }
+
+    @Test
+    fun `message delta keeps two default conversations separated by agent`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-a",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(agentId = "agent-a"),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent")),
+            clearComposerAfterSend = {},
+            activeConversationId = { "default" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+        val assistantA = AssistantMessage(id = "assistant-a", contentRaw = JsonPrimitive("agent a"))
+        val assistantB = AssistantMessage(id = "assistant-b", contentRaw = JsonPrimitive("agent b"))
+
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = assistantA,
+                agentId = "agent-a",
+                conversationId = "default",
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = assistantB,
+                agentId = "agent-b",
+                conversationId = "default",
+            )
+        )
+
+        assertEquals(
+            listOf(
+                FakeTimelineExternalTransportWriter.IngestedMessage("agent-a", "default", assistantA),
+                FakeTimelineExternalTransportWriter.IngestedMessage("agent-b", "default", assistantB),
+            ),
+            timelineRepository.ingestedMessages,
+        )
     }
 
     @Test

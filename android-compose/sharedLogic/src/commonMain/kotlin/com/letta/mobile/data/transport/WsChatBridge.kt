@@ -187,7 +187,12 @@ sealed interface WsTimelineEvent {
      */
     data class MessageDelta(
         val message: LettaMessage,
+        // letta-mobile-ktm2b: replayed frames are silent backfill (no streaming UI).
         val isReplay: Boolean = false,
+        // letta-mobile-sfex6: the frame's OWN scope, so ingest routes strictly by
+        // (agentId, conversationId) and never bleeds into the currently-viewed conv.
+        val agentId: String? = null,
+        val conversationId: String? = null,
     ) : WsTimelineEvent
 
     data class StopReason(
@@ -340,13 +345,20 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.ToolCallMessage -> if (isSelfTodoChipFrame()) {
         null
     } else {
-        WsFrameMapper.toLettaMessage(this)?.let { WsTimelineEvent.MessageDelta(it, isReplay = isReplay) }
+        WsFrameMapper.toLettaMessage(this)?.let {
+            WsTimelineEvent.MessageDelta(it, isReplay = isReplay, agentId = agentId, conversationId = conversationId)
+        }
     }
     is ServerFrame.UserMessage,
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,
     is ServerFrame.ToolReturnMessage -> WsFrameMapper.toLettaMessage(this)?.let {
-        WsTimelineEvent.MessageDelta(it, isReplay = isReplay)
+        WsTimelineEvent.MessageDelta(
+            message = it,
+            isReplay = isReplay,
+            agentId = messageAgentId(),
+            conversationId = messageConversationId(),
+        )
     }
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
@@ -381,6 +393,24 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
         status = status,
     )
     is ServerFrame.Unknown -> null
+}
+
+private fun ServerFrame.messageAgentId(): String? = when (this) {
+    is ServerFrame.UserMessage -> agentId
+    is ServerFrame.AssistantMessage -> agentId
+    is ServerFrame.ReasoningMessage -> agentId
+    is ServerFrame.ToolCallMessage -> agentId
+    is ServerFrame.ToolReturnMessage -> agentId
+    else -> null
+}
+
+private fun ServerFrame.messageConversationId(): String? = when (this) {
+    is ServerFrame.UserMessage -> conversationId
+    is ServerFrame.AssistantMessage -> conversationId
+    is ServerFrame.ReasoningMessage -> conversationId
+    is ServerFrame.ToolCallMessage -> conversationId
+    is ServerFrame.ToolReturnMessage -> conversationId
+    else -> null
 }
 
 /**

@@ -372,16 +372,29 @@ internal class WsChatSendCoordinator(
                 drainPreConversationMessages(event.conversationId)
             }
             is WsTimelineEvent.MessageDelta -> {
-                val conversationId = activeWsConversationId ?: activeConversationId()
-                if (conversationId == null) {
-                    preConversationMessageDeltas.addLast(event.message)
+                val eventAgentId = event.agentId ?: agentId
+                val eventConversationId = event.conversationId
+                if (eventConversationId == null) {
+                    val conversationId = activeWsConversationId ?: activeConversationId()
+                    if (conversationId == null) {
+                        preConversationMessageDeltas.addLast(event.message)
+                        return
+                    }
+                    recordRuntimeEvent(event, conversationIdOverride = conversationId)
+                    timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
                     return
                 }
-                recordRuntimeEvent(event, conversationIdOverride = conversationId)
-                timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
+                // letta-mobile-sfex6: route strictly by the frame's OWN scope
+                // (eventAgentId/eventConversationId), never the currently-bound
+                // conversation — prevents main-conversation frames bleeding into
+                // a subagent timeline being viewed.
+                recordRuntimeEvent(event, conversationIdOverride = eventConversationId)
+                timelineRepository.ingestExternalTransportMessage(eventAgentId, eventConversationId, event.message)
+                // letta-mobile-ktm2b: replayed frames are silent backfill — only
+                // a live (non-replay) delta flips the UI into streaming state.
                 if (!event.isReplay) {
                     uiState.value = uiState.value.copy(
-                        conversationState = ConversationState.Ready(conversationId),
+                        conversationState = ConversationState.Ready(eventConversationId),
                         isStreaming = true,
                         isAgentTyping = true,
                         error = null,
