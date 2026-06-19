@@ -249,6 +249,10 @@ class AgentRepositoryTest {
             agents.value = agents.value.filter { it.id in keepIds }
         }
 
+        override suspend fun deleteById(id: String) {
+            agents.value = agents.value.filterNot { it.id == id }
+        }
+
         override suspend fun deleteAll() {
             agents.value = emptyList()
         }
