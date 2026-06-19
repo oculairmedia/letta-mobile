@@ -248,13 +248,19 @@ class ChannelTransport internal constructor(
         val conversationKey = requireConversationKey(conversationId) ?: return false
         clearPendingA2uiActions(conversationKey, reason = "user cancel")
         val rid = conversationStateManager.currentRunId(conversationKey) ?: return false
-        return connection.sendFrame(
+        cursorCoordinator.markUserCancelled(conversationKey, rid)
+        val sent = connection.sendFrame(
             CancelFrame(
                 id = UUID.randomUUID().toString(),
                 ts = nowIso(),
                 runId = rid,
             )
         )
+        if (sent) {
+            conversationStateManager.clearRunConversation(rid)
+            conversationStateManager.clearConversationTurnState(conversationKey)
+        }
+        return sent
     }
 
     override fun bye(): Boolean {

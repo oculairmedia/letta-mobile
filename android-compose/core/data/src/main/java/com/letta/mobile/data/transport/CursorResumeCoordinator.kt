@@ -24,6 +24,7 @@ internal class CursorResumeCoordinator(
     private val resumedRunConversationIds = ConcurrentHashMap<String, String>()
     private val helloResumeAfterSeqByConversation = ConcurrentHashMap<String, Long>()
     private val helloResumeReplayCountsByConversation = ConcurrentHashMap<String, Long>()
+    private val userCancelledRunIds = ConcurrentHashMap.newKeySet<String>()
 
     fun ensureLoaded() {
         cursorStore.ensureLoaded()
@@ -46,6 +47,13 @@ internal class CursorResumeCoordinator(
     }
 
     fun clearCursor(conversationId: String, runId: String) {
+        cursorStore.clear(conversationId, runId)
+    }
+
+    fun markUserCancelled(conversationId: String, runId: String) {
+        if (conversationId.isEmpty() || runId.isEmpty()) return
+        userCancelledRunIds.add(runId)
+        resumedRunConversationIds.remove(runId)
         cursorStore.clear(conversationId, runId)
     }
 
@@ -197,6 +205,12 @@ internal class CursorResumeCoordinator(
         var dispatched = 0
         snapshot.forEach { (convId, runs) ->
             runs.forEach { (runId, lastSeq) ->
+                if (userCancelledRunIds.contains(runId)) {
+                    cursorStore.clear(convId, runId)
+                    resumedRunConversationIds.remove(runId)
+                    Log.i(TAG, "skipping resume for user-cancelled run convId=$convId runId=$runId")
+                    return@forEach
+                }
                 resumedRunConversationIds[runId] = convId
                 if (subscribeFn(runId, lastSeq)) {
                     dispatched++
