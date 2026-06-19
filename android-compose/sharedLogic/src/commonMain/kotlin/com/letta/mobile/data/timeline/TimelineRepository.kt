@@ -337,8 +337,16 @@ open class TimelineRepository(
     }
 
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) {
+        repairExpiredConversationCursorScoped(agentId = null, conversationId = conversationId, fallbackSeq = fallbackSeq)
+    }
+
+    override suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+    ) {
         conversationCursorStore.clearCursor(conversationId)
-        val loop = getOrCreateLoopWithoutHydrate(TimelineCacheKey(null, conversationId))
+        val loop = getOrCreateLoopWithoutHydrate(TimelineCacheKey(agentId, conversationId))
         runCatching {
             withContext(timelineIoDispatcher) {
                 loop.hydrate(
@@ -350,12 +358,14 @@ open class TimelineRepository(
         }.onSuccess {
             Telemetry.event(
                 "TimelineRepo", "cursorExpired.repaired",
+                "agentId" to agentId.orEmpty(),
                 "conversationId" to conversationId,
                 "fallbackSeq" to (fallbackSeq ?: -1L),
             )
         }.onFailure { t ->
             Telemetry.error(
                 "TimelineRepo", "cursorExpired.repairFailed", t,
+                "agentId" to agentId.orEmpty(),
                 "conversationId" to conversationId,
                 "fallbackSeq" to (fallbackSeq ?: -1L),
             )

@@ -54,13 +54,13 @@ internal class CursorResumeCoordinator(
         if (conversationId.isEmpty() || runId.isEmpty()) return
         userCancelledRunIds.add(runId)
         resumedRunConversationIds.remove(runId)
-        cursorStore.clear(conversationId, runId)
+        cursorStore.clearTerminal(conversationId, runId)
     }
 
     fun clearResumedRunFromAllActive(runId: String) {
         cursorStore.allActiveRuns().forEach { (convId, runs) ->
             if (runs.containsKey(runId)) {
-                cursorStore.clear(convId, runId)
+                cursorStore.clearTerminal(convId, runId)
             }
         }
         resumedRunConversationIds.remove(runId)
@@ -152,13 +152,13 @@ internal class CursorResumeCoordinator(
         val conversationId = frame.conversationId
         val runId = frame.runId
         if (!conversationId.isNullOrEmpty() && !runId.isNullOrEmpty()) {
-            cursorStore.clear(conversationId, runId)
+            cursorStore.clearTerminal(conversationId, runId)
             resumedRunConversationIds.remove(runId)
             cleared += "$conversationId/$runId"
             expiredConversationIds += conversationId
         } else if (!conversationId.isNullOrEmpty()) {
             cursorStore.activeRuns(conversationId).keys.forEach { activeRunId ->
-                cursorStore.clear(conversationId, activeRunId)
+                cursorStore.clearTerminal(conversationId, activeRunId)
                 resumedRunConversationIds.remove(activeRunId)
                 cleared += "$conversationId/$activeRunId"
             }
@@ -166,7 +166,7 @@ internal class CursorResumeCoordinator(
         } else if (!runId.isNullOrEmpty()) {
             cursorStore.allActiveRuns().forEach { (activeConversationId, runs) ->
                 if (runs.containsKey(runId)) {
-                    cursorStore.clear(activeConversationId, runId)
+                    cursorStore.clearTerminal(activeConversationId, runId)
                     resumedRunConversationIds.remove(runId)
                     cleared += "$activeConversationId/$runId"
                     expiredConversationIds += activeConversationId
@@ -206,7 +206,7 @@ internal class CursorResumeCoordinator(
         snapshot.forEach { (convId, runs) ->
             runs.forEach { (runId, lastSeq) ->
                 if (userCancelledRunIds.contains(runId)) {
-                    cursorStore.clear(convId, runId)
+                    cursorStore.clearTerminal(convId, runId)
                     resumedRunConversationIds.remove(runId)
                     Log.i(TAG, "skipping resume for user-cancelled run convId=$convId runId=$runId")
                     return@forEach

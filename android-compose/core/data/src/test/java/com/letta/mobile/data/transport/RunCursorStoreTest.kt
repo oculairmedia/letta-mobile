@@ -78,6 +78,15 @@ class RunCursorStoreTest : WordSpec({
             store.allActiveRuns().shouldBeEmpty()
         }
 
+        "keep terminal sticky when a later non-terminal frame is recorded" {
+            val store = RunCursorStore.inMemory()
+            store.record("conv-a", "run-1", 12L, isTerminal = true)
+            store.record("conv-a", "run-1", 13L)
+
+            store.activeRuns("conv-a").shouldBeEmpty()
+            store.allActiveRuns().shouldBeEmpty()
+        }
+
     }
 
     "clear" should {
@@ -100,6 +109,25 @@ class RunCursorStoreTest : WordSpec({
             val store = RunCursorStore.inMemory()
             store.clear("conv-a", "run-1")
             store.allActiveRuns().shouldBeEmpty()
+        }
+
+        "preserve terminal tombstone for normal active clear" {
+            val store = RunCursorStore.inMemory()
+            store.record("conv-a", "run-1", 12L, isTerminal = true)
+            store.clear("conv-a", "run-1")
+            store.record("conv-a", "run-1", 13L)
+
+            store.activeRuns("conv-a").shouldBeEmpty()
+            store.allActiveRuns().shouldBeEmpty()
+        }
+
+        "remove terminal tombstone only on explicit terminal clear" {
+            val store = RunCursorStore.inMemory()
+            store.record("conv-a", "run-1", 12L, isTerminal = true)
+            store.clearTerminal("conv-a", "run-1")
+            store.record("conv-a", "run-1", 13L)
+
+            store.activeRuns("conv-a") shouldContainExactly mapOf("run-1" to 13L)
         }
     }
 
