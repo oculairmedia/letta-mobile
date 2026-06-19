@@ -555,41 +555,11 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                 throw new Error('patch-switch-session-control: required token not found — letta.js shape changed: ' + required);
               }
             }
-            const token = `      } else if (subtype === "interrupt") {
-        if (currentAbortController !== null) {
-          currentAbortController.abort();
-          currentAbortController = null;
-        }
-        const interruptResponse = {
-          type: "control_response",
-          response: {
-            subtype: "success",
-            request_id: requestId ?? ""
-          },
-          session_id: sessionId,
-          uuid: randomUUID19()
-        };
-        writeWireMessage(interruptResponse);
-      } else if (subtype === "register_external_tools") {`;
+            const token = '      } else if (subtype === "register_external_tools") {';
             if (!src.includes(token)) {
-              throw new Error('patch-switch-session-control: interrupt control branch token not found — letta.js shape changed');
+              throw new Error('patch-switch-session-control: register_external_tools branch token not found — letta.js shape changed');
             }
-            const replacement = `      } else if (subtype === "interrupt") {
-        if (currentAbortController !== null) {
-          currentAbortController.abort();
-          currentAbortController = null;
-        }
-        const interruptResponse = {
-          type: "control_response",
-          response: {
-            subtype: "success",
-            request_id: requestId ?? ""
-          },
-          session_id: sessionId,
-          uuid: randomUUID19()
-        };
-        writeWireMessage(interruptResponse);
-      } else if (subtype === "switch_session") {
+            const replacement = `      } else if (subtype === "switch_session") {
         // letta-mobile-st78v-switch-session-control
         const switchAgentId = message.request?.agent_id ?? message.agent_id;
         const switchConversationId = message.request?.conversation_id ?? message.conversation_id;
