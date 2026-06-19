@@ -54,7 +54,19 @@ fun NavGraphBuilder.chatGraph(
             // a real transcript) and defaulting to INTERACTIVE mode so the
             // user sees the full tool/turn detail of the subagent's work.
             onViewSubagentConversation = { subagentAgentId, subagentConversationId ->
-                val normalizedConversationId = subagentConversationId.takeIf { it.isNotBlank() }
+                // letta-mobile-aw0dv: a subagent's registry conversation id is
+                // almost always the BARE literal "default", which is NOT
+                // addressable to the subagent's real transcript — the shim maps
+                // bare "default" to the external form "conv-default-<agentId>"
+                // (native-goal-mode.ts / mobile-channel-host.ts). #515 pinned
+                // the route but passed the bare form, so resolution landed on a
+                // fresh/wrong conversation. Transform "default" -> the external
+                // resolvable id here so the chip opens the actual transcript.
+                val normalizedConversationId = subagentConversationId
+                    .takeIf { it.isNotBlank() }
+                    ?.let { convId ->
+                        if (convId == "default") "conv-default-$subagentAgentId" else convId
+                    }
                 onSwitchConversation(
                     AgentChatRoute(
                         agentId = subagentAgentId,
