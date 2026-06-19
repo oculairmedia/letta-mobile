@@ -192,6 +192,10 @@ private class FakeAgentDao : AgentDao {
         agents = agents.filter { it.id in keepIds }
     }
 
+    override suspend fun deleteById(id: String) {
+        agents = agents.filterNot { it.id == id }
+    }
+
     override suspend fun deleteAll() {
         agents = emptyList()
     }
