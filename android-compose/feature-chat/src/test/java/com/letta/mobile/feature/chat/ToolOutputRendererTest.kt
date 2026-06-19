@@ -34,21 +34,21 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import com.letta.mobile.feature.chat.render.ToolOutputHighlightKind
-import com.letta.mobile.feature.chat.render.ToolOutputHighlightMode
-import com.letta.mobile.feature.chat.render.ToolOutputHighlightSpan
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightKind
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightMode
+import com.letta.mobile.ui.chat.render.ToolOutputHighlightSpan
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
-import com.letta.mobile.feature.chat.render.ToolOutputMaxRenderedChars
+import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedChars
 import com.letta.mobile.feature.chat.render.initialToolOutputDocument
-import com.letta.mobile.feature.chat.render.clearToolOutputRenderCachesForTest
-import com.letta.mobile.feature.chat.render.cachedToolOutputDocument
-import com.letta.mobile.feature.chat.render.ToolOutputDocumentMaxCacheableRawChars
-import com.letta.mobile.feature.chat.render.cachedToolOutputHighlightSpans
-import com.letta.mobile.feature.chat.render.ToolOutputMaxRenderedLines
-import com.letta.mobile.feature.chat.render.limitRenderedText
-import com.letta.mobile.feature.chat.render.limitDiffFilesForRendering
-import com.letta.mobile.feature.chat.render.highlightToolOutputText
-import com.letta.mobile.feature.chat.render.ToolOutputMaxHighlightSpans
+import com.letta.mobile.ui.chat.render.clearToolOutputRenderCachesForTest
+import com.letta.mobile.ui.chat.render.cachedToolOutputDocument
+import com.letta.mobile.ui.chat.render.ToolOutputDocumentMaxCacheableRawChars
+import com.letta.mobile.ui.chat.render.cachedToolOutputHighlightSpans
+import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
+import com.letta.mobile.ui.chat.render.limitRenderedText
+import com.letta.mobile.ui.chat.render.limitDiffFilesForRendering
+import com.letta.mobile.ui.chat.render.highlightToolOutputText
+import com.letta.mobile.ui.chat.render.ToolOutputMaxHighlightSpans
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
