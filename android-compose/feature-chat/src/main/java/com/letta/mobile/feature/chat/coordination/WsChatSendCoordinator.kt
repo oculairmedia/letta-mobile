@@ -343,6 +343,31 @@ internal class WsChatSendCoordinator(
     }
 
     internal suspend fun handleEvent(event: WsTimelineEvent) {
+        // letta-mobile-sfex6: strict agent scoping. wsChatBridge.events is a
+        // GLOBAL flow — every per-(agentId,conversationId) coordinator collects
+        // it, so a frame for one agent reaches every coordinator. When two
+        // agents share the bare conversation id "default" (main + a subagent),
+        // a foreign agent's TurnStarted would otherwise set THIS coordinator's
+        // activeWsConversationId and its deltas would ingest into our timeline —
+        // the cross-conversation leak. Drop any event that carries an explicit
+        // agentId not matching ours BEFORE it can mutate active-turn state.
+        // (MessageDelta/StopReason/etc. carry no agentId; they are scoped
+        // transitively because activeWsConversationId is only ever set by a
+        // TurnStarted that passed this gate.)
+        val eventAgentId: String? = when (event) {
+            is WsTimelineEvent.TurnStarted -> event.agentId
+            is WsTimelineEvent.AgentUpdated -> event.agentId
+            else -> null
+        }
+        if (eventAgentId != null && eventAgentId != agentId) {
+            Telemetry.event(
+                "AdminChatVM", "ws.event.foreignAgentDropped",
+                "eventType" to event::class.simpleName.orEmpty(),
+                "eventAgentId" to eventAgentId,
+                "boundAgentId" to agentId,
+            )
+            return
+        }
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
                 activeWsConversationId = event.conversationId
