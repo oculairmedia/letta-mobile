@@ -107,7 +107,7 @@ fun cachedToolOutputHighlightSpans(
         highlightToolOutputText(text = text, mode = mode, languageHint = languageHint)
     }
 
-internal fun clearToolOutputRenderCachesForTest() {
+fun clearToolOutputRenderCachesForTest() {
     toolOutputDocumentCache.clear()
     toolOutputHighlightCache.clear()
 }
