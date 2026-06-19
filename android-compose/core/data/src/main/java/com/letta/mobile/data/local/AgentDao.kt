@@ -23,6 +23,9 @@ interface AgentDao {
     @Query("DELETE FROM agents WHERE id NOT IN (:keepIds)")
     suspend fun deleteExcept(keepIds: List<String>)
 
+    @Query("DELETE FROM agents WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("DELETE FROM agents")
     suspend fun deleteAll()
 }

@@ -235,6 +235,10 @@ open class AgentRepository(
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatching {
         val fresh = agentApi.getAgent(agentId)
         updateAgentInCache(fresh)
+        // Persist the transport-driven refresh to the Room cache so a pushed
+        // agent_updated change survives an app restart (CodeRabbit #517).
+        runCatching { agentDao.upsert(AgentEntity.fromAgent(fresh)) }
+            .onFailure { e -> Log.w("AgentRepository", "agent_updated cache persist failed for ${agentId.value}", e) }
         fresh
     }
 
@@ -244,7 +248,9 @@ open class AgentRepository(
             val agentId = AgentId(frame.agentId)
             if (frame.reason == "deleted") {
                 _agents.update { current -> current.filterNot { it.id == agentId } }
-                runCatching { agentDao.deleteExcept(_agents.value.map { it.id.value }) }
+                // Targeted single-agent delete — not a broad deleteExcept that
+                // could race with a stale in-memory list (CodeRabbit #517).
+                runCatching { agentDao.deleteById(agentId.value) }
                     .onFailure { e -> Log.w("AgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", e) }
                 return@collect
             }
