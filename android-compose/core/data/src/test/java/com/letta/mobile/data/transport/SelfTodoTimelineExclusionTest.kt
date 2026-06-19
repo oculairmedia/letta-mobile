@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.repository.SelfTodoRepository
+import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.testutil.FakeChannelTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -69,8 +70,10 @@ class SelfTodoTimelineExclusionTest {
 
         // Re-emit the self-todo frame several times (mimicking TaskUpdate /
         // resubscribe bursts that previously caused the duplicate-key crash).
-        repeat(3) { transport.events.emit(selfTodoFrame()) }
-        transport.events.emit(realToolCallFrame())
+        // WsChatBridge consumes transport.frameEvents (replay-aware stream,
+        // letta-mobile-ktm2b/#516), so timeline assertions must emit there.
+        repeat(3) { transport.frameEvents.emit(TransportFrameEvent(selfTodoFrame())) }
+        transport.frameEvents.emit(TransportFrameEvent(realToolCallFrame()))
         advanceUntilIdle()
 
         val deltas = collected.filterIsInstance<WsTimelineEvent.MessageDelta>()
