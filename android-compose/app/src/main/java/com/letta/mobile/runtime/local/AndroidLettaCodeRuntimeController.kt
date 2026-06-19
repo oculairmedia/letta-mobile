@@ -203,10 +203,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             val active = activeSession
             if (active != null) {
                 if (active != requestedSession) {
-                    throw IllegalStateException(
-                        "Embedded LettaCode is already bound to agent ${active.agentId} " +
-                            "and conversation ${active.conversationId}. Restart the app before switching local sessions.",
+                    Log.i(
+                        TAG,
+                        "Switching embedded session from agent=${active.agentId} conversation=${active.conversationId} " +
+                            "to agent=${requestedSession.agentId} conversation=${requestedSession.conversationId} without restarting Node",
                     )
+                    activeSession = requestedSession
+                    localBackendStore.seedAgent(requestedSession.agentId, modelSelection.lettaCodeModelHandle)
+                    return@withLock true
                 }
                 return@withLock false
             }

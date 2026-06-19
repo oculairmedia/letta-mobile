@@ -12,6 +12,16 @@
             </intent-filter>
         </receiver>
 
+
+        <receiver
+            android:name=".runtime.local.VerifyEmbeddedSmokeReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.letta.mobile.VERIFY_EMBEDDED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".runtime.mobileactions.MobileIntentActionsSelfTestReceiver"
             android:enabled="true"
