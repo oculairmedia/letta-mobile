@@ -175,11 +175,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             if (activeSession == null) return
         }
         nodeBridge.writeLine(
-            buildJsonObject {
-                put("type", "control_request")
-                put("request_id", "interrupt-${System.currentTimeMillis()}")
-                put("request", buildJsonObject { put("subtype", "interrupt") })
-            }.toString(),
+            buildInterruptControlRequest("interrupt-${System.currentTimeMillis()}"),
         ).onFailure { error ->
             Log.w(TAG, "Failed to send interrupt to embedded LettaCode", error)
         }
@@ -209,10 +205,10 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             val active = activeSession
             if (active != null) {
                 if (active != requestedSession) {
-                    throw IllegalStateException(
-                        "Embedded LettaCode is already bound to agent ${active.agentId} " +
-                            "and conversation ${active.conversationId}. Restart the app before switching local sessions.",
-                    )
+                    interruptActiveSessionForSwitch()
+                    sendSwitchSessionControl(requestedSession)
+                    activeSession = requestedSession
+                    transcriptDirty = true
                 }
                 return@withLock false
             }
@@ -271,6 +267,31 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             activeSession = requestedSession
             true
         }
+    }
+
+    private suspend fun interruptActiveSessionForSwitch() {
+        nodeBridge.writeLine(buildInterruptControlRequest("switch-interrupt-${System.currentTimeMillis()}")).onFailure { error ->
+            Log.w(TAG, "Failed to interrupt embedded LettaCode before switching sessions", error)
+        }
+    }
+
+    private suspend fun sendSwitchSessionControl(session: EmbeddedLettaCodeSessionKey) {
+        nodeBridge.writeLine(
+            buildJsonObject {
+                put("type", "control_request")
+                put("request_id", "switch-session-${System.currentTimeMillis()}")
+                put(
+                    "request",
+                    buildJsonObject {
+                        put("subtype", "switch_session")
+                        put("agent_id", session.agentId)
+                        put("conversation_id", session.conversationId)
+                    },
+                )
+                put("agent_id", session.agentId)
+                put("conversation_id", session.conversationId)
+            }.toString(),
+        ).getOrThrow()
     }
 
     private fun PreparedLettaCodeProject.toLettaCodeNodeStartRequest(
@@ -562,6 +583,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         )
     }
 }
+
+
+private fun buildInterruptControlRequest(requestId: String): String =
+    buildJsonObject {
+        put("type", "control_request")
+        put("request_id", requestId)
+        put("request", buildJsonObject { put("subtype", "interrupt") })
+    }.toString()
 
 data class EmbeddedLettaCodeSessionKey(
     val agentId: String,

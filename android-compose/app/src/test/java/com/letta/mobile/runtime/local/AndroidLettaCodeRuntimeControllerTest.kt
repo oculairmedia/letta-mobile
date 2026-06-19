@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 class AndroidLettaCodeRuntimeControllerTest {
     @Test
@@ -187,6 +188,65 @@ class AndroidLettaCodeRuntimeControllerTest {
         assertEquals("openai-loopback-token", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_API_KEY"))
     }
 
+
+    @Test
+    fun `first session starts node once and same session does not restart`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-same-session-${System.nanoTime()}").apply { mkdirs() }
+        val nodeBridge = FakeNodeBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = mockk(relaxed = true),
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(command(), config(localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(command(), config(localModelHandle = "lmstudio/gemma")).first()
+
+        assertTrue(nodeBridge.started)
+        assertEquals(1, nodeBridge.startCalls)
+        assertEquals(2, nodeBridge.writtenLines.count { it.contains("\"type\":\"user\"") })
+        assertFalse(nodeBridge.writtenLines.any { it.contains("switch_session") })
+    }
+
+    @Test
+    fun `switching session sends live stdin switch without restarting node`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-switch-session-${System.nanoTime()}").apply { mkdirs() }
+        val nodeBridge = FakeNodeBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = mockk(relaxed = true),
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(command(), config(localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(
+            command(agentId = "agent-2", conversationId = "conv-2"),
+            config(localModelHandle = "lmstudio/gemma"),
+        ).first()
+
+        assertTrue(nodeBridge.started)
+        assertEquals(1, nodeBridge.startCalls)
+        assertEquals(0, nodeBridge.stopCalls)
+        assertTrue(nodeBridge.writtenLines.any { it.contains("\"subtype\":\"interrupt\"") })
+        val switchLine = nodeBridge.writtenLines.first { it.contains("\"subtype\":\"switch_session\"") }
+        assertTrue(switchLine.contains("\"agent_id\":\"agent-2\""))
+        assertTrue(switchLine.contains("\"conversation_id\":\"conv-2\""))
+    }
+
     @Test
     fun `model selection normalizes config defaults and handles`() {
         val selection = EmbeddedLettaCodeModelSelection.from(
@@ -238,11 +298,14 @@ class AndroidLettaCodeRuntimeControllerTest {
         localProviderModel = localProviderModel,
     )
 
-    private fun command(): TurnCommand = TurnCommand(
+    private fun command(
+        agentId: String = "agent-1",
+        conversationId: String = "conv-1",
+    ): TurnCommand = TurnCommand(
         backendId = BackendId("local-lettacode:test"),
         runtimeId = RuntimeId("local-lettacode:test"),
-        agentId = AgentId("agent-1"),
-        conversationId = ConversationId("conv-1"),
+        agentId = AgentId(agentId),
+        conversationId = ConversationId(conversationId),
         input = TurnInput.UserMessage(
             localMessageId = "local-1",
             text = "hello",
@@ -294,16 +357,27 @@ class AndroidLettaCodeRuntimeControllerTest {
     private class FakeNodeBridge : LettaCodeNodeBridge {
         override val outputLines = flowOf("""{"type":"result"}""")
         var started = false
+        var startCalls = 0
+        var stopCalls = 0
         var lastRequest: LettaCodeNodeStartRequest? = null
+        val writtenLines = mutableListOf<String>()
 
         override suspend fun start(request: LettaCodeNodeStartRequest): Result<Unit> {
+            startCalls += 1
             started = true
             lastRequest = request
             return Result.success(Unit)
         }
 
-        override suspend fun writeLine(line: String): Result<Unit> = Result.success(Unit)
+        override suspend fun writeLine(line: String): Result<Unit> {
+            writtenLines += line
+            return Result.success(Unit)
+        }
 
-        override suspend fun stop(): Result<Unit> = Result.success(Unit)
+        override suspend fun stop(): Result<Unit> {
+            stopCalls += 1
+            started = false
+            return Result.success(Unit)
+        }
     }
 }
