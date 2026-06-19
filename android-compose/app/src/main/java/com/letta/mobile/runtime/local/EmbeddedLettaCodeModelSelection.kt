@@ -32,6 +32,9 @@ data class EmbeddedLettaCodeModelSelection(
     val effectiveProviderBaseUrl: String?
         get() = customProviderBaseUrl ?: if (isRemoteProviderModel) DEFAULT_LM_STUDIO_BASE_URL else null
 
+    val effectiveProviderApiKey: String?
+        get() = customProviderApiKey ?: if (isRemoteProviderModel) DEFAULT_LM_STUDIO_API_KEY else null
+
     val openAiModelId: String
         get() = modelHandle.toOpenAiModelId()
 
@@ -54,6 +57,7 @@ data class EmbeddedLettaCodeModelSelection(
         const val DEFAULT_ACCELERATOR = "gpu"
         const val DEFAULT_MAX_TOKENS = 4096
         const val DEFAULT_LM_STUDIO_BASE_URL = "http://192.168.1.10:8082/v1"
+        const val DEFAULT_LM_STUDIO_API_KEY = "not-needed"
         fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection {
             val customBaseUrl = config.localProviderBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
             return EmbeddedLettaCodeModelSelection(

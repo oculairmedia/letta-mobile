@@ -256,7 +256,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                         session = requestedSession,
                         modelSelection = modelSelection,
                         onDeviceProviderBaseUrl = modelSelection.effectiveProviderBaseUrl ?: bridgeSession?.baseUrl,
-                        onDeviceProviderApiKey = modelSelection.customProviderApiKey ?: bridgeSession?.authToken,
+                        onDeviceProviderApiKey = modelSelection.effectiveProviderApiKey ?: bridgeSession?.authToken,
                         androidNetworkBridgeBaseUrl = networkBridgeSession.baseUrl,
                         androidNetworkBridgeToken = networkBridgeSession.authToken,
                     )
