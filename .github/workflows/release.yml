@@ -192,7 +192,9 @@ jobs:
           tag_name: ${{ needs.android-apk.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
+          # APK lands flat; EXE/MSI keep their exe/ and msi/ subdirs from the
+          # desktop artifact. Match both flat and nested so all three attach.
           files: |
             release-assets/*.apk
-            release-assets/*.exe
-            release-assets/*.msi
+            release-assets/exe/*.exe
+            release-assets/msi/*.msi
