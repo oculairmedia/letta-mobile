@@ -247,6 +247,12 @@ sealed interface WsTimelineEvent {
         val at: String,
     ) : WsTimelineEvent
 
+    data class AgentUpdated(
+        val agentId: String,
+        val reason: String,
+        val at: String,
+    ) : WsTimelineEvent
+
     data class UserActionOutcome(
         val frameId: String,
         val outcome: String,
@@ -302,6 +308,11 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
         reason = reason,
         at = at,
     )
+    is ServerFrame.AgentUpdated -> WsTimelineEvent.AgentUpdated(
+        agentId = agentId,
+        reason = reason,
+        at = at,
+    )
     is ServerFrame.UserActionOutcome -> WsTimelineEvent.UserActionOutcome(
         frameId = frameId,
         outcome = outcome,
@@ -351,6 +362,7 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.CronDeleteResponse,
     is ServerFrame.CronDeleteAllResponse,
     is ServerFrame.CronsUpdated,
+    is ServerFrame.AgentUpdated,
     // letta-mobile-73o2h: active-subagent frames route to the
     // SubagentRepository (active-bar), not chat content.
     is ServerFrame.SubagentListResponse,
