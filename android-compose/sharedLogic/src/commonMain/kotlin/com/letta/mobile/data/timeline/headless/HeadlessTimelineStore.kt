@@ -196,11 +196,27 @@ class HeadlessTimelineStore(
         otid
     }
 
+    override suspend fun appendExternalTransportLocal(
+        agentId: String?,
+        conversationId: String,
+        content: String,
+        otid: String,
+        attachments: List<MessageContentPart.Image>,
+    ): String = appendExternalTransportLocal(scopedConversationId(agentId, conversationId), content, otid, attachments)
+
     override suspend fun ingestExternalTransportMessage(
         conversationId: String,
         message: LettaMessage,
     ) {
         ingest(conversationId, message)
+    }
+
+    override suspend fun ingestExternalTransportMessage(
+        agentId: String?,
+        conversationId: String,
+        message: LettaMessage,
+    ) {
+        ingest(scopedConversationId(agentId, conversationId), message)
     }
 
     override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) {
@@ -209,10 +225,18 @@ class HeadlessTimelineStore(
         }
     }
 
+    override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) {
+        markExternalTransportLocalSent(scopedConversationId(agentId, conversationId), otid)
+    }
+
     override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) {
         mutex.withLock {
             timelines[conversationId] = timelineLocked(conversationId).markFailed(otid)
         }
+    }
+
+    override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) {
+        markExternalTransportLocalFailed(scopedConversationId(agentId, conversationId), otid)
     }
 
     override suspend fun reconcileExternalTransportSend(
@@ -224,12 +248,32 @@ class HeadlessTimelineStore(
         markExternalTransportLocalSent(conversationId, otid)
     }
 
+    override suspend fun reconcileExternalTransportSendScoped(
+        agentId: String?,
+        conversationId: String,
+        externalConversationId: String,
+        otid: String,
+    ) {
+        markExternalTransportLocalSent(agentId, conversationId, otid)
+    }
+
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) = Unit
+
+    override suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+    ) = Unit
 
     override suspend fun clearExternalTransportActive(conversationId: String) = Unit
 
+    override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) = Unit
+
     private fun timelineLocked(conversationId: String): Timeline =
         timelines.getOrPut(conversationId) { Timeline(conversationId = conversationId) }
+
+    private fun scopedConversationId(agentId: String?, conversationId: String): String =
+        agentId?.let { "$it:$conversationId" } ?: conversationId
 }
 
 data class TimelineAssertionReport(

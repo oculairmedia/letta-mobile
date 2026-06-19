@@ -12,7 +12,9 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val failedLocals: MutableList<LocalMarker> = mutableListOf()
     val reconciledSends: MutableList<ReconciledSend> = mutableListOf()
     val clearedActiveConversations: MutableList<String> = mutableListOf()
+    val scopedClearedActiveConversations: MutableList<ScopedConversation> = mutableListOf()
     val repairedCursors: MutableList<CursorRepair> = mutableListOf()
+    val scopedRepairedCursors: MutableList<ScopedCursorRepair> = mutableListOf()
 
     override suspend fun appendExternalTransportLocal(
         conversationId: String,
@@ -24,16 +26,39 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         return otid
     }
 
+    override suspend fun appendExternalTransportLocal(
+        agentId: String?,
+        conversationId: String,
+        content: String,
+        otid: String,
+        attachments: List<MessageContentPart.Image>,
+    ): String {
+        externalLocals += ExternalLocal(scopedConversationId(agentId, conversationId), content, otid, attachments)
+        return otid
+    }
+
     override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage) {
         ingestedMessages += IngestedMessage(conversationId, message)
+    }
+
+    override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage) {
+        ingestedMessages += IngestedMessage(scopedConversationId(agentId, conversationId), message)
     }
 
     override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) {
         sentLocals += LocalMarker(conversationId, otid)
     }
 
+    override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) {
+        sentLocals += LocalMarker(scopedConversationId(agentId, conversationId), otid)
+    }
+
     override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) {
         failedLocals += LocalMarker(conversationId, otid)
+    }
+
+    override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) {
+        failedLocals += LocalMarker(scopedConversationId(agentId, conversationId), otid)
     }
 
     override suspend fun reconcileExternalTransportSend(
@@ -45,12 +70,33 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         reconciledSends += ReconciledSend(conversationId, agentId, externalConversationId, otid)
     }
 
+    override suspend fun reconcileExternalTransportSendScoped(
+        agentId: String?,
+        conversationId: String,
+        externalConversationId: String,
+        otid: String,
+    ) {
+        reconciledSends += ReconciledSend(scopedConversationId(agentId, conversationId), agentId.orEmpty(), externalConversationId, otid)
+    }
+
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) {
         repairedCursors += CursorRepair(conversationId, fallbackSeq)
     }
 
+    override suspend fun repairExpiredConversationCursorScoped(
+        agentId: String?,
+        conversationId: String,
+        fallbackSeq: Long?,
+    ) {
+        scopedRepairedCursors += ScopedCursorRepair(agentId, conversationId, fallbackSeq)
+    }
+
     override suspend fun clearExternalTransportActive(conversationId: String) {
         clearedActiveConversations += conversationId
+    }
+
+    override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) {
+        scopedClearedActiveConversations += ScopedConversation(agentId, conversationId)
     }
 
     data class ExternalLocal(
@@ -81,4 +127,18 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         val conversationId: String,
         val fallbackSeq: Long?,
     )
+
+    data class ScopedCursorRepair(
+        val agentId: String?,
+        val conversationId: String,
+        val fallbackSeq: Long?,
+    )
+
+    data class ScopedConversation(
+        val agentId: String?,
+        val conversationId: String,
+    )
+
+    private fun scopedConversationId(agentId: String?, conversationId: String): String =
+        agentId?.let { "$it:$conversationId" } ?: conversationId
 }

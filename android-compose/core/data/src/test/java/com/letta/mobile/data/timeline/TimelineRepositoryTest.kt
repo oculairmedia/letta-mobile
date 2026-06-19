@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.UserMessage
 import io.ktor.utils.io.ByteReadChannel
 import io.mockk.mockk
 import java.util.concurrent.ConcurrentHashMap
@@ -14,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -37,6 +39,7 @@ class TimelineRepositoryTest {
         assertEquals(0, repository.cachedLoopCount())
         assertFalse("cleared loop should no longer have an active stream", api.isActive("conv-clear"))
     }
+
 
     @Test
     fun `cache evicts least recently used loop and keeps recently accessed loop active`() = runBlocking {
@@ -110,12 +113,60 @@ class TimelineRepositoryTest {
 
         repository.clearAll()
     }
+
+    @Test
+    fun `cursor repair hydrates the scoped loop when agent is present`() = runBlocking {
+        val api = CancellableStreamApi()
+        val cursorStore = RecordingConversationCursorStore()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore)
+
+        repository.getOrCreate("agent-a", "default")
+        repository.repairExpiredConversationCursorScoped("agent-a", "default", fallbackSeq = 42L)
+
+        assertTrue("scoped loop should be hydrated", api.listMessageCalls.contains("default"))
+        assertEquals(listOf("default"), cursorStore.cleared)
+        assertEquals(1, repository.cachedLoopCount())
+
+        repository.clearAll()
+    }
+
+    @Test
+    fun `cursor repair keeps reused conversation ids isolated by agent scope`() = runBlocking {
+        val api = CancellableStreamApi()
+        api.messagesByConversation["default"] = listOf(
+            UserMessage(id = "msg-a", contentRaw = JsonPrimitive("agent scoped"), seqId = 42),
+        )
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RecordingConversationCursorStore())
+
+        val agentALoop = repository.getOrCreate("agent-a", "default")
+        val agentBLoop = repository.getOrCreate("agent-b", "default")
+        repository.repairExpiredConversationCursorScoped("agent-a", "default", fallbackSeq = 42L)
+
+        assertTrue("agent-a scoped loop should receive repaired message", agentALoop.messages.value.any { it.id == "msg-a" })
+        assertFalse("agent-b scoped loop should not receive agent-a repair", agentBLoop.messages.value.any { it.id == "msg-a" })
+        assertEquals(2, repository.cachedLoopCount())
+
+        repository.clearAll()
+    }
+}
+
+private class RecordingConversationCursorStore : ConversationCursorStore {
+    val cleared = mutableListOf<String>()
+
+    override suspend fun recordFrame(conversationId: String, seq: Long) = Unit
+    override suspend fun getCursor(conversationId: String): Long? = null
+    override suspend fun getAllCursors(): Map<String, Long> = emptyMap()
+    override suspend fun clearCursor(conversationId: String) {
+        cleared += conversationId
+    }
 }
 
 private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
     private val activeStreams = ConcurrentHashMap<String, AtomicInteger>()
     private val closedStreams = ConcurrentHashMap<String, AtomicInteger>()
     val listMessageThreads = ConcurrentHashMap<String, String>()
+    val listMessageCalls = mutableListOf<String>()
+    val messagesByConversation = ConcurrentHashMap<String, List<LettaMessage>>()
 
     override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         activeStreams.counter(conversationId.value).incrementAndGet()
@@ -134,7 +185,8 @@ private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
         order: String?,
     ): List<LettaMessage> {
         listMessageThreads[conversationId.value] = Thread.currentThread().name
-        return emptyList()
+        listMessageCalls += conversationId.value
+        return messagesByConversation[conversationId.value].orEmpty()
     }
 
     fun isActive(conversationId: String): Boolean =

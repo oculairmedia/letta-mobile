@@ -467,7 +467,8 @@ internal class WsChatSendCoordinator(
                     val conversationId = event.conversationId ?: activeWsConversationId ?: activeConversationId()
                     if (conversationId != null) {
                         runCatching {
-                            timelineRepository.repairExpiredConversationCursor(
+                            timelineRepository.repairExpiredConversationCursorScoped(
+                                agentId = agentId,
                                 conversationId = conversationId,
                                 fallbackSeq = event.lastSeq,
                             )

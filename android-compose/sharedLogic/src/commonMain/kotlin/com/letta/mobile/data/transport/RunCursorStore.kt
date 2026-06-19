@@ -21,9 +21,13 @@ interface RunCursorStore {
     fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean = false)
 
     /**
-     * Drop the cursor for [runId] in [conversationId].
+     * Drop the active cursor for [runId] in [conversationId]. Terminal tombstones
+     * are preserved so late replay frames cannot reactivate completed runs.
      */
     fun clear(conversationId: String, runId: String)
+
+    /** Drop both active cursor state and terminal tombstone for explicit reset paths. */
+    fun clearTerminal(conversationId: String, runId: String)
 
     /** Snapshot of all non-terminal runs across every conversation. */
     fun allActiveRuns(): Map<String, Map<String, Long>>
@@ -46,7 +50,8 @@ internal class InMemoryRunCursorStore : RunCursorStore {
     override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
         if (isTerminal) {
-            clear(conversationId, runId)
+            active[conversationId]?.remove(runId)
+            if (active[conversationId]?.isEmpty() == true) active.remove(conversationId)
             terminal.getOrPut(conversationId) { mutableSetOf() }.add(runId)
             return
         }
@@ -60,11 +65,16 @@ internal class InMemoryRunCursorStore : RunCursorStore {
 
     override fun clear(conversationId: String, runId: String) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
-        terminal[conversationId]?.remove(runId)
-        if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
         val perConversation = active[conversationId] ?: return
         if (perConversation.remove(runId) == null) return
         if (perConversation.isEmpty()) active.remove(conversationId)
+    }
+
+    override fun clearTerminal(conversationId: String, runId: String) {
+        if (conversationId.isEmpty() || runId.isEmpty()) return
+        clear(conversationId, runId)
+        terminal[conversationId]?.remove(runId)
+        if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
     }
 
     override fun allActiveRuns(): Map<String, Map<String, Long>> =
