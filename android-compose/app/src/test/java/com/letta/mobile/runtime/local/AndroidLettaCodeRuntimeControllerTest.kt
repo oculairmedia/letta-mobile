@@ -108,6 +108,40 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
+    fun `lmstudio remote model bypasses litertlm gate and uses endpoint provider`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-remote-model-${System.nanoTime()}").apply { mkdirs() }
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = mockk<OnDeviceOpenAiBridge>(relaxed = true)
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        runCatching {
+            controller.submit(
+                command(),
+                config(localModelHandle = "lmstudio/google/gemma-3n-E2B-it"),
+            ).first()
+        }
+
+        assertEquals(true, nodeBridge.started)
+        assertEquals(
+            EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_BASE_URL,
+            nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"),
+        )
+        assertEquals("not-needed", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_API_KEY"))
+        coVerify(exactly = 0) { onDeviceBridge.start(any()) }
+    }
+
+    @Test
     fun `tool approval responses are ignored before starting bridge or node`() = runTest {
         val nodeBridge = FakeNodeBridge()
         val onDeviceBridge = mockk<OnDeviceOpenAiBridge>(relaxed = true)
@@ -189,11 +223,19 @@ class AndroidLettaCodeRuntimeControllerTest {
             EmbeddedLettaCodeRuntimeStatus(false, false, "", "")
         }
 
-    private fun config(localModelPath: String? = null): LettaConfig = LettaConfig(
+    private fun config(
+        localModelPath: String? = null,
+        localModelHandle: String? = null,
+        localProviderBaseUrl: String? = null,
+        localProviderModel: String? = null,
+    ): LettaConfig = LettaConfig(
         id = "local-lettacode",
         mode = LettaConfig.Mode.LOCAL,
         serverUrl = "local-lettacode://device",
         localModelPath = localModelPath,
+        localModelHandle = localModelHandle,
+        localProviderBaseUrl = localProviderBaseUrl,
+        localProviderModel = localProviderModel,
     )
 
     private fun command(): TurnCommand = TurnCommand(

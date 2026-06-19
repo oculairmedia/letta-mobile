@@ -20,6 +20,18 @@ data class EmbeddedLettaCodeModelSelection(
     val isCustomProvider: Boolean
         get() = customProviderBaseUrl != null
 
+    val isRemoteProviderModel: Boolean
+        get() = modelHandle.trim().startsWith("lmstudio/")
+
+    val routesToOpenAiCompatibleProvider: Boolean
+        get() = isCustomProvider || isRemoteProviderModel
+
+    val requiresOnDeviceModel: Boolean
+        get() = !routesToOpenAiCompatibleProvider
+
+    val effectiveProviderBaseUrl: String?
+        get() = customProviderBaseUrl ?: if (isRemoteProviderModel) DEFAULT_LM_STUDIO_BASE_URL else null
+
     val openAiModelId: String
         get() = modelHandle.toOpenAiModelId()
 
@@ -41,6 +53,7 @@ data class EmbeddedLettaCodeModelSelection(
         const val DEFAULT_MODEL_RUNTIME = "litert-lm"
         const val DEFAULT_ACCELERATOR = "gpu"
         const val DEFAULT_MAX_TOKENS = 4096
+        const val DEFAULT_LM_STUDIO_BASE_URL = "http://192.168.1.10:8082/v1"
         fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection {
             val customBaseUrl = config.localProviderBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
             return EmbeddedLettaCodeModelSelection(

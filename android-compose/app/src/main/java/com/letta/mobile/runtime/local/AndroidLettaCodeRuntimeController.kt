@@ -194,7 +194,13 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
      */
     private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean {
         return startMutex.withLock {
-            val modelSelection = EmbeddedLettaCodeModelSelection.from(config)
+            val configModelSelection = EmbeddedLettaCodeModelSelection.from(config)
+            val storedModelHandle = localBackendStore.storedModelHandle(command.agentId.value)
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+            val modelSelection = storedModelHandle
+                ?.let { configModelSelection.copy(modelHandle = it.toLettaCodeProviderModelHandle()) }
+                ?: configModelSelection
             val requestedSession = EmbeddedLettaCodeSessionKey(
                 agentId = command.agentId.value,
                 conversationId = command.conversationId.value,
@@ -217,10 +223,10 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                         "Enable embedded native and asset prerequisites before selecting local-lettacode://device.",
                 )
             }
-            // Custom OpenAI-compatible endpoint (letta-mobile-3icw7): the
-            // agent loop stays embedded but LLM calls go to the configured
-            // endpoint — no on-device model or LiteRT bridge needed.
-            if (!modelSelection.isCustomProvider) {
+            // OpenAI-compatible endpoints (explicit custom base URLs or remote
+            // provider handles like lmstudio/) keep the agent loop embedded but
+            // route LLM calls to the endpoint — no .litertlm bridge required.
+            if (modelSelection.requiresOnDeviceModel) {
                 val modelPath = modelSelection.modelPath?.let(::File)
                     ?: throw IllegalStateException(
                         "Embedded LettaCode requires an imported .litertlm model path before it can start.",
@@ -236,7 +242,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 "Embedded LettaCode foreground service could not start."
             }
             val project = assetExtractor.prepare()
-            val bridgeSession = if (modelSelection.isCustomProvider) {
+            val bridgeSession = if (modelSelection.routesToOpenAiCompatibleProvider) {
                 null
             } else {
                 onDeviceOpenAiBridge.start(modelSelection)
@@ -249,7 +255,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     project.toLettaCodeNodeStartRequest(
                         session = requestedSession,
                         modelSelection = modelSelection,
-                        onDeviceProviderBaseUrl = modelSelection.customProviderBaseUrl ?: bridgeSession?.baseUrl,
+                        onDeviceProviderBaseUrl = modelSelection.effectiveProviderBaseUrl ?: bridgeSession?.baseUrl,
                         onDeviceProviderApiKey = modelSelection.customProviderApiKey ?: bridgeSession?.authToken,
                         androidNetworkBridgeBaseUrl = networkBridgeSession.baseUrl,
                         androidNetworkBridgeToken = networkBridgeSession.authToken,
@@ -288,12 +294,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         // lmstudio/ provider prefix: letta.js aborts the whole process on an
         // unroutable bare id ("Invalid model" → node exit → SIGABRT), and
         // records written by older picker builds persisted bare ids.
-        val modelHandle = localBackendStore.storedModelHandle(session.agentId)
-            ?.let { stored ->
-                if (stored.startsWith("lmstudio/")) stored
-                else "lmstudio/${stored.removePrefix("local/")}"
-            }
-            ?: if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        val modelHandle = if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
         // One line per session start: which model letta.js was actually given.
         // A session pinned to the wrong model (e.g. the 2026-06-12 codexmini
         // detour) is otherwise impossible to diagnose after the fact because
@@ -301,7 +302,8 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         Log.i(
             TAG,
             "Starting embedded session agent=${session.agentId} model=$modelHandle " +
-                "customProvider=${modelSelection.isCustomProvider} providerBaseUrl=$onDeviceProviderBaseUrl",
+                "customProvider=${modelSelection.isCustomProvider} remoteProvider=${modelSelection.isRemoteProviderModel} " +
+                "providerBaseUrl=$onDeviceProviderBaseUrl",
         )
         localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
@@ -359,7 +361,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 // substrings against the model id), mirroring the shim's
                 // LETTA_VISION_MODELS so both surfaces share one list.
                 put("LETTA_CODE_VISION_MODEL_IDS", VISION_MODEL_PATTERNS.joinToString(","))
-                put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelSelection.modelHandle)
+                put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelHandle)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
                 put("LETTA_ANDROID_ON_DEVICE_MODEL_MAX_TOKENS", modelSelection.maxTokens.toString())
@@ -639,3 +641,6 @@ private fun encodeUserContentArray(
         )
     }
 }
+
+private fun String.toLettaCodeProviderModelHandle(): String =
+    if (startsWith("lmstudio/")) this else "lmstudio/${removePrefix("local/")}"
