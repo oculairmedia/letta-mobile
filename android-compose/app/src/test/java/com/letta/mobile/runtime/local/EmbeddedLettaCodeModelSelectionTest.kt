@@ -28,6 +28,30 @@ class EmbeddedLettaCodeModelSelectionTest {
         assertEquals(8192, selection.maxTokens)
         assertEquals("google/gemma-3n", selection.openAiModelId)
         assertEquals("lmstudio/google/gemma-3n", selection.lettaCodeModelHandle)
+        assertEquals(false, selection.isRemoteProviderModel)
+        assertEquals(true, selection.requiresOnDeviceModel)
+    }
+
+    @Test
+    fun `lmstudio handle selects remote provider without explicit base url`() {
+        val selection = EmbeddedLettaCodeModelSelection.from(
+            LettaConfig(
+                id = "local",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "local-lettacode://device",
+                localModelHandle = " lmstudio/google/gemma-3n-E2B-it ",
+                localProviderBaseUrl = null,
+            )
+        )
+
+        assertEquals("lmstudio/google/gemma-3n-E2B-it", selection.modelHandle)
+        assertEquals(false, selection.isCustomProvider)
+        assertEquals(true, selection.isRemoteProviderModel)
+        assertEquals(true, selection.routesToOpenAiCompatibleProvider)
+        assertEquals(false, selection.requiresOnDeviceModel)
+        assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_BASE_URL, selection.effectiveProviderBaseUrl)
+        assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_API_KEY, selection.effectiveProviderApiKey)
+        assertEquals(null, selection.modelPath)
     }
 
     @Test
@@ -84,8 +108,12 @@ class EmbeddedLettaCodeModelSelectionTest {
         )
 
         assertEquals(true, selection.isCustomProvider)
+        assertEquals(true, selection.routesToOpenAiCompatibleProvider)
+        assertEquals(false, selection.requiresOnDeviceModel)
         assertEquals("http://192.168.1.10:8082/v1", selection.customProviderBaseUrl)
+        assertEquals("http://192.168.1.10:8082/v1", selection.effectiveProviderBaseUrl)
         assertEquals("secret", selection.customProviderApiKey)
+        assertEquals("secret", selection.effectiveProviderApiKey)
         assertEquals("lmstudio/claude-proxy-model", selection.lettaCodeModelHandle)
         assertEquals(null, selection.modelPath)
     }

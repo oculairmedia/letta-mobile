@@ -557,6 +557,25 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun saveConfig_persistsLocalProviderFields_withLocalMode() = runTest {
+        fakeRepository.activeConfigState.value = null
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateLocalProviderBaseUrl("  http://192.168.1.10:8082/v1/  ")
+        viewModel.updateLocalProviderApiKey("  secret  ")
+        viewModel.updateLocalProviderModel("  google/gemma-3n-E2B-it  ")
+
+        viewModel.saveConfig(onSuccess = {})
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals(LettaConfig.Mode.LOCAL, savedConfig?.mode)
+        assertEquals("http://192.168.1.10:8082/v1", savedConfig?.localProviderBaseUrl)
+        assertEquals("secret", savedConfig?.localProviderApiKey)
+        assertEquals("google/gemma-3n-E2B-it", savedConfig?.localProviderModel)
+    }
+
+    @Test
     fun importLocalModel_updatesLocalModelPathAndHandle() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
