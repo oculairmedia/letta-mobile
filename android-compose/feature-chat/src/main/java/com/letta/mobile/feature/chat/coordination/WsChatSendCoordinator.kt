@@ -523,6 +523,7 @@ internal class WsChatSendCoordinator(
                 failActiveTurnForDisconnect(event)
             }
             is WsTimelineEvent.GoalsUpdated -> Unit
+            is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event)
         }
     }
