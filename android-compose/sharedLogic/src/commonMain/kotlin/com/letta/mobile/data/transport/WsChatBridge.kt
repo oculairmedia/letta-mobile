@@ -175,7 +175,11 @@ sealed interface WsTimelineEvent {
      * by date). The id prefixes (`cm-stream-`, `toolcall-`,
      * `toolreturn-`) are preserved verbatim so dedup fires correctly.
      */
-    data class MessageDelta(val message: LettaMessage) : WsTimelineEvent
+    data class MessageDelta(
+        val message: LettaMessage,
+        val agentId: String? = null,
+        val conversationId: String? = null,
+    ) : WsTimelineEvent
 
     data class StopReason(
         val turnId: String,
@@ -306,13 +310,19 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.ToolCallMessage -> if (isSelfTodoChipFrame()) {
         null
     } else {
-        WsFrameMapper.toLettaMessage(this)?.let { WsTimelineEvent.MessageDelta(it) }
+        WsFrameMapper.toLettaMessage(this)?.let {
+            WsTimelineEvent.MessageDelta(it, agentId = agentId, conversationId = conversationId)
+        }
     }
     is ServerFrame.UserMessage,
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,
     is ServerFrame.ToolReturnMessage -> WsFrameMapper.toLettaMessage(this)?.let {
-        WsTimelineEvent.MessageDelta(it)
+        WsTimelineEvent.MessageDelta(
+            message = it,
+            agentId = messageAgentId(),
+            conversationId = messageConversationId(),
+        )
     }
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
@@ -341,6 +351,24 @@ private fun ServerFrame.toTimelineEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.SubscribeFrameMessage,
     is ServerFrame.SubscribeDone,
     is ServerFrame.Unknown -> null
+}
+
+private fun ServerFrame.messageAgentId(): String? = when (this) {
+    is ServerFrame.UserMessage -> agentId
+    is ServerFrame.AssistantMessage -> agentId
+    is ServerFrame.ReasoningMessage -> agentId
+    is ServerFrame.ToolCallMessage -> agentId
+    is ServerFrame.ToolReturnMessage -> agentId
+    else -> null
+}
+
+private fun ServerFrame.messageConversationId(): String? = when (this) {
+    is ServerFrame.UserMessage -> conversationId
+    is ServerFrame.AssistantMessage -> conversationId
+    is ServerFrame.ReasoningMessage -> conversationId
+    is ServerFrame.ToolCallMessage -> conversationId
+    is ServerFrame.ToolReturnMessage -> conversationId
+    else -> null
 }
 
 /**

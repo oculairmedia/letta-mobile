@@ -51,6 +51,64 @@ class WsChatBridgeTest {
     }
 
     @Test
+    fun `message delta carries originating frame scope`() = runTest {
+        val transport = FakeChannelTransport()
+        val bridge = WsChatBridge(transport)
+        val event = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+
+        transport.events.emit(
+            ServerFrame.AssistantMessage(
+                id = "assistant-1",
+                agentId = "agent-a",
+                conversationId = "conv-a",
+                turnId = "turn-a",
+                runId = "run-a",
+                content = "hello",
+            )
+        )
+
+        val delta = event.await() as WsTimelineEvent.MessageDelta
+        assertEquals("agent-a", delta.agentId)
+        assertEquals("conv-a", delta.conversationId)
+    }
+
+    @Test
+    fun `message deltas preserve two default conversations by agent scope`() = runTest {
+        val transport = FakeChannelTransport()
+        val bridge = WsChatBridge(transport)
+        val first = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+
+        transport.events.emit(
+            ServerFrame.AssistantMessage(
+                id = "assistant-a",
+                agentId = "agent-a",
+                conversationId = "default",
+                turnId = "turn-a",
+                runId = "run-a",
+                content = "agent a",
+            )
+        )
+        val deltaA = first.await() as WsTimelineEvent.MessageDelta
+        val second = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+        transport.events.emit(
+            ServerFrame.AssistantMessage(
+                id = "assistant-b",
+                agentId = "agent-b",
+                conversationId = "default",
+                turnId = "turn-b",
+                runId = "run-b",
+                content = "agent b",
+            )
+        )
+        val deltaB = second.await() as WsTimelineEvent.MessageDelta
+
+        assertEquals("agent-a", deltaA.agentId)
+        assertEquals("default", deltaA.conversationId)
+        assertEquals("agent-b", deltaB.agentId)
+        assertEquals("default", deltaB.conversationId)
+    }
+
+    @Test
     fun `awaitConnected resumes with semantic connected state`() = runTest {
         val transport = FakeChannelTransport(initialState = ChannelTransportState.Connecting)
         val bridge = WsChatBridge(transport)

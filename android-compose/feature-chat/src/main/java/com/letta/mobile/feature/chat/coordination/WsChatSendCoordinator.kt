@@ -372,13 +372,20 @@ internal class WsChatSendCoordinator(
                 drainPreConversationMessages(event.conversationId)
             }
             is WsTimelineEvent.MessageDelta -> {
-                val conversationId = activeWsConversationId ?: activeConversationId()
-                if (conversationId == null) {
-                    preConversationMessageDeltas.addLast(event.message)
+                val eventAgentId = event.agentId ?: agentId
+                val eventConversationId = event.conversationId
+                if (eventConversationId == null) {
+                    val conversationId = activeWsConversationId ?: activeConversationId()
+                    if (conversationId == null) {
+                        preConversationMessageDeltas.addLast(event.message)
+                        return
+                    }
+                    recordRuntimeEvent(event, conversationIdOverride = conversationId)
+                    timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
                     return
                 }
-                recordRuntimeEvent(event, conversationIdOverride = conversationId)
-                timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
+                recordRuntimeEvent(event, conversationIdOverride = eventConversationId)
+                timelineRepository.ingestExternalTransportMessage(eventAgentId, eventConversationId, event.message)
             }
             is WsTimelineEvent.StopReason -> {
                 recordRuntimeEvent(event)
