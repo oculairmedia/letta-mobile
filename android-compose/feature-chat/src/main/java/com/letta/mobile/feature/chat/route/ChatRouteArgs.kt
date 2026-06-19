@@ -17,6 +17,12 @@ internal class ChatRouteArgs @Inject constructor(
 
     val initialMessage: String? = savedStateHandle.get<String>(INITIAL_MESSAGE_KEY)
 
+    // letta-mobile-aw0dv: chat display mode the route asked to open in
+    // ("simple" | "interactive" | "debug"); null = screen default. Captured
+    // once at construction so a later SavedStateHandle restore can't flip it.
+    val initialChatMode: String? = savedStateHandle.get<String>(INITIAL_CHAT_MODE_KEY)
+        ?.takeIf { it.isNotBlank() }
+
     val requestedConversationArg: String?
         get() = savedStateHandle.get<String>(CONVERSATION_ID_KEY)
 
@@ -89,6 +95,7 @@ internal class ChatRouteArgs @Inject constructor(
         const val AGENT_ID_KEY = "agentId"
         const val AGENT_NAME_KEY = "agentName"
         const val INITIAL_MESSAGE_KEY = "initialMessage"
+        const val INITIAL_CHAT_MODE_KEY = "initialChatMode"
         const val CONVERSATION_ID_KEY = "conversationId"
         const val FRESH_ROUTE_KEY = "freshRouteKey"
         const val SCROLL_TO_MESSAGE_ID_KEY = "scrollToMessageId"

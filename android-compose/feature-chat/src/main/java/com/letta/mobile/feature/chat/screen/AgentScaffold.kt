@@ -159,6 +159,10 @@ fun AgentScaffold(
     onNavigateToTools: (() -> Unit)? = null,
     onNavigateToMemory: ((String) -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    // letta-mobile-aw0dv: dedicated subagent-conversation nav. Distinct from
+    // onSwitchConversation so the subagent route can pin the conversation id
+    // and open in INTERACTIVE mode without changing the generic switch path.
+    onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
     onNavigateToSchedules: (() -> Unit)? = null,
@@ -172,6 +176,7 @@ fun AgentScaffold(
         onNavigateToTools = onNavigateToTools,
         onNavigateToMemory = onNavigateToMemory,
         onSwitchConversation = onSwitchConversation,
+        onViewSubagentConversation = onViewSubagentConversation,
         onNavigateToAdmin = onNavigateToAdmin,
         onNavigateToConversationList = onNavigateToConversationList,
         onNavigateToSchedules = onNavigateToSchedules,
@@ -190,6 +195,7 @@ internal fun AgentScaffoldContent(
     onNavigateToTools: (() -> Unit)? = null,
     onNavigateToMemory: ((String) -> Unit)? = null,
     onSwitchConversation: ((String, String?, String?) -> Unit)? = null,
+    onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
     onNavigateToSchedules: (() -> Unit)? = null,
@@ -215,7 +221,11 @@ internal fun AgentScaffoldContent(
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    var chatMode by rememberSaveable { mutableStateOf("simple") }
+    // letta-mobile-aw0dv: seed from the route's requested mode (e.g. subagent
+    // chip nav requests "interactive") so a subagent conversation opens with
+    // full tool/turn detail; otherwise default to "simple". rememberSaveable
+    // so a user mode change persists across recompositions.
+    var chatMode by rememberSaveable { mutableStateOf(viewModel.initialChatMode ?: "simple") }
     val drawerConversationRepo = conversationRepository
         ?: hiltViewModel<ConversationPickerViewModel>().conversationRepository
     val drawerConversations by drawerConversationRepo.getConversations(viewModel.agentId)
@@ -504,11 +514,12 @@ internal fun AgentScaffoldContent(
                         // agent at the shim-provided subagent conversation id,
                         // falling back to the subagent default. Never use the
                         // parent conversation for this route.
-                        onViewSubagentConversation = onSwitchConversation?.let { switch ->
-                            { subagentAgentId, subagentConversationId ->
-                                switch(subagentAgentId, subagentConversationId, null)
-                            }
-                        },
+                        onViewSubagentConversation = onViewSubagentConversation
+                            ?: onSwitchConversation?.let { switch ->
+                                { subagentAgentId, subagentConversationId ->
+                                    switch(subagentAgentId, subagentConversationId, null)
+                                }
+                            },
                         viewModel = viewModel,
                     )
                 }
