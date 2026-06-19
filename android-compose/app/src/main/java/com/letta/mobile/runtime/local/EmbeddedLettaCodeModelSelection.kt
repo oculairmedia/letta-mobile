@@ -56,7 +56,13 @@ data class EmbeddedLettaCodeModelSelection(
         const val DEFAULT_MODEL_RUNTIME = "litert-lm"
         const val DEFAULT_ACCELERATOR = "gpu"
         const val DEFAULT_MAX_TOKENS = 4096
-        const val DEFAULT_LM_STUDIO_BASE_URL = "http://192.168.1.10:8082/v1"
+        // Fallback endpoint used ONLY when an lmstudio/ remote model is
+        // selected but no localProviderBaseUrl was persisted. Points at the
+        // user's OpenAI/Anthropic-compatible proxy on the LAN. This is a
+        // last-resort default — the real endpoint should be set in config;
+        // a wrong/unreachable default just trades the .litertlm error for a
+        // connection failure, so the config base URL always takes precedence.
+        const val DEFAULT_LM_STUDIO_BASE_URL = "http://192.168.50.90:8082/v1"
         const val DEFAULT_LM_STUDIO_API_KEY = "not-needed"
         fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection {
             val customBaseUrl = config.localProviderBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
