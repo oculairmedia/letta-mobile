@@ -57,15 +57,18 @@ class WsChatBridgeTest {
         val transport = FakeChannelTransport()
         val bridge = WsChatBridge(transport)
         val event = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+        runCurrent()
 
-        transport.events.emit(
-            ServerFrame.AssistantMessage(
-                id = "assistant-1",
-                agentId = "agent-a",
-                conversationId = "conv-a",
-                turnId = "turn-a",
-                runId = "run-a",
-                content = "hello",
+        transport.frameEvents.emit(
+            TransportFrameEvent(
+                ServerFrame.AssistantMessage(
+                    id = "assistant-1",
+                    agentId = "agent-a",
+                    conversationId = "conv-a",
+                    turnId = "turn-a",
+                    runId = "run-a",
+                    content = "hello",
+                )
             )
         )
 
@@ -79,27 +82,33 @@ class WsChatBridgeTest {
         val transport = FakeChannelTransport()
         val bridge = WsChatBridge(transport)
         val first = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+        runCurrent()
 
-        transport.events.emit(
-            ServerFrame.AssistantMessage(
-                id = "assistant-a",
-                agentId = "agent-a",
-                conversationId = "default",
-                turnId = "turn-a",
-                runId = "run-a",
-                content = "agent a",
+        transport.frameEvents.emit(
+            TransportFrameEvent(
+                ServerFrame.AssistantMessage(
+                    id = "assistant-a",
+                    agentId = "agent-a",
+                    conversationId = "default",
+                    turnId = "turn-a",
+                    runId = "run-a",
+                    content = "agent a",
+                )
             )
         )
         val deltaA = first.await() as WsTimelineEvent.MessageDelta
         val second = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
-        transport.events.emit(
-            ServerFrame.AssistantMessage(
-                id = "assistant-b",
-                agentId = "agent-b",
-                conversationId = "default",
-                turnId = "turn-b",
-                runId = "run-b",
-                content = "agent b",
+        runCurrent()
+        transport.frameEvents.emit(
+            TransportFrameEvent(
+                ServerFrame.AssistantMessage(
+                    id = "assistant-b",
+                    agentId = "agent-b",
+                    conversationId = "default",
+                    turnId = "turn-b",
+                    runId = "run-b",
+                    content = "agent b",
+                )
             )
         )
         val deltaB = second.await() as WsTimelineEvent.MessageDelta
