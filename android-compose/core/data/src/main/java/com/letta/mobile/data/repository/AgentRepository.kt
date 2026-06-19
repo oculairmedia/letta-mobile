@@ -21,6 +21,9 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +49,7 @@ open class AgentRepository(
     private val repositoryScope: CoroutineScope = defaultAgentRepositoryScope(),
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
+    private val transport: IChannelTransport? = null,
 ) : IAgentRepository, BackendScopedCache {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
@@ -66,6 +70,10 @@ open class AgentRepository(
             } catch (e: Exception) {
                 Log.w("AgentRepository", "Failed to load cached agents", e)
             }
+        }
+        transport?.let { channelTransport ->
+            repositoryScope.launch { observeAgentUpdated(channelTransport) }
+            repositoryScope.launch { observeReconnects(channelTransport) }
         }
     }
 
@@ -222,6 +230,41 @@ open class AgentRepository(
         val fresh = agentApi.getAgent(id)
         emit(fresh)
         updateAgentInCache(fresh)
+    }
+
+    private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatching {
+        val fresh = agentApi.getAgent(agentId)
+        updateAgentInCache(fresh)
+        fresh
+    }
+
+    private suspend fun observeAgentUpdated(channelTransport: IChannelTransport) {
+        channelTransport.events.collect { frame ->
+            if (frame !is ServerFrame.AgentUpdated) return@collect
+            val agentId = AgentId(frame.agentId)
+            if (frame.reason == "deleted") {
+                _agents.update { current -> current.filterNot { it.id == agentId } }
+                runCatching { agentDao.deleteExcept(_agents.value.map { it.id.value }) }
+                    .onFailure { e -> Log.w("AgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", e) }
+                return@collect
+            }
+            refreshAgent(agentId)
+                .onFailure { e -> Log.w("AgentRepository", "agent_updated refresh failed for ${frame.agentId}: ${e.message}") }
+        }
+    }
+
+    private suspend fun observeReconnects(channelTransport: IChannelTransport) {
+        var wasConnected: Boolean? = null
+        channelTransport.state.collect { state ->
+            val nowConnected = state is ChannelTransportState.Connected
+            if (wasConnected == false && nowConnected) {
+                _agents.value.map { it.id }.forEach { agentId ->
+                    refreshAgent(agentId)
+                        .onFailure { e -> Log.w("AgentRepository", "reconnect agent refresh failed for ${agentId.value}: ${e.message}") }
+                }
+            }
+            wasConnected = nowConnected
+        }
     }
 
     override open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {

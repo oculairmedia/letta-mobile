@@ -175,18 +175,19 @@ class SessionGraphFactory internal constructor(
             conversationDao.deleteAllRefreshStates()
         }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val channelTransport = if (localRuntimeBackend == null) {
+            ChannelTransport(scope, runCursorStore, conversationCursorStore)
+        } else {
+            NoOpChannelTransport()
+        }
         val agentRepository = AgentRepository(
             agentApi = agentApi,
             agentDao = agentDao,
             repositoryScope = scope,
             localAgentSource = localAgentSource,
             settingsRepository = settingsRepository,
+            transport = channelTransport,
         )
-        val channelTransport = if (localRuntimeBackend == null) {
-            ChannelTransport(scope, runCursorStore, conversationCursorStore)
-        } else {
-            NoOpChannelTransport()
-        }
         return SessionGraph(
             id = graphId,
             backendDescriptor = localRuntimeBackend?.descriptor ?: remoteLettaDescriptor(activeConfig),
