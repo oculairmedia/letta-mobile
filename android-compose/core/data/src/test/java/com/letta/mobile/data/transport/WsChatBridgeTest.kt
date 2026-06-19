@@ -54,7 +54,9 @@ class WsChatBridgeTest {
     fun `message delta carries originating frame scope`() = runTest {
         val transport = FakeChannelTransport()
         val bridge = WsChatBridge(transport)
-        val event = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+        val event = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            bridge.events.first { it is WsTimelineEvent.MessageDelta }
+        }
 
         transport.events.emit(
             ServerFrame.AssistantMessage(
@@ -76,7 +78,9 @@ class WsChatBridgeTest {
     fun `message deltas preserve two default conversations by agent scope`() = runTest {
         val transport = FakeChannelTransport()
         val bridge = WsChatBridge(transport)
-        val first = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+        val first = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            bridge.events.first { it is WsTimelineEvent.MessageDelta }
+        }
 
         transport.events.emit(
             ServerFrame.AssistantMessage(
@@ -89,7 +93,9 @@ class WsChatBridgeTest {
             )
         )
         val deltaA = first.await() as WsTimelineEvent.MessageDelta
-        val second = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } }
+        val second = async(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+            bridge.events.first { it is WsTimelineEvent.MessageDelta }
+        }
         transport.events.emit(
             ServerFrame.AssistantMessage(
                 id = "assistant-b",
