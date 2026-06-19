@@ -45,10 +45,6 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         ingestedMessages += IngestedMessage(agentId = agentId, conversationId = conversationId, message = message)
     }
 
-    override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage) {
-        ingestedMessages += IngestedMessage(scopedConversationId(agentId, conversationId), message)
-    }
-
     override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) {
         sentLocals += LocalMarker(conversationId, otid)
     }
