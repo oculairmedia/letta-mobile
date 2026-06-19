@@ -152,6 +152,67 @@ class WsChatSendCoordinatorTest {
         assertEquals(ConversationState.Ready("conv-shim-created"), uiState.value.conversationState)
     }
 
+    // letta-mobile-sfex6: a TurnStarted for a DIFFERENT agent (e.g. the main
+    // agent, or a subagent that shares the bare "default" conversation id)
+    // must NOT hijack this coordinator's active conversation / timeline. The
+    // wsChatBridge.events flow is global, so every coordinator sees this frame;
+    // the agent-scope gate in handleEvent must drop it.
+    @Test
+    fun `foreign-agent TurnStarted does not hijack this coordinator's timeline`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        var activeConversation: String? = null
+        var observedConversation: String? = null
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { activeConversation },
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = { observedConversation = it },
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        // A different agent's turn starts on the shared event flow, using the
+        // bare "default" conversation id that would otherwise collide.
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-foreign",
+                agentId = "agent-2",
+                conversationId = "default",
+                runId = "run-foreign",
+            )
+        )
+        advanceUntilIdle()
+
+        // Nothing about this coordinator's state may change.
+        assertNull(activeConversation)
+        assertNull(observedConversation)
+        assertTrue(!uiState.value.isStreaming)
+        assertTrue(!uiState.value.isAgentTyping)
+
+        // And a foreign agent's TurnStarted must not have set an active ws
+        // conversation that a subsequent agentless MessageDelta could ingest
+        // into. Drive a delta and confirm it is buffered (no active conv),
+        // not ingested into a foreign "default" bucket.
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "cm-stream-foreign", contentRaw = JsonPrimitive("leaked text")),
+            )
+        )
+        advanceUntilIdle()
+        assertTrue(
+            "foreign delta must not be ingested into this coordinator's timeline",
+            timelineRepository.ingestedMessages.isEmpty(),
+        )
+    }
+
     @Test
     fun `send with image attachments passes them through to the bridge (lcp-dlj)`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
