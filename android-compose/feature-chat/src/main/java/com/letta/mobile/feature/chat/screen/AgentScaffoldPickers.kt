@@ -773,17 +773,12 @@ internal fun ModelPickerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    fun dismissThen(action: () -> Unit) {
+    fun selectThenDismiss(action: () -> Unit) {
         if (isDismissingForAction) return
         isDismissingForAction = true
-        scope.launch { sheetState.hide() }.invokeOnCompletion {
-            if (!sheetState.isVisible) {
-                action()
-                onDismiss()
-            } else {
-                isDismissingForAction = false
-            }
-        }
+        action()
+        onDismiss()
+        scope.launch { runCatching { sheetState.hide() } }
     }
 
     LaunchedEffect(Unit) {
@@ -889,7 +884,7 @@ internal fun ModelPickerSheet(
                                     .combinedClickable(
                                         enabled = !isDismissingForAction && !isActive,
                                         onClick = {
-                                            dismissThen { onModelSelected(handle) }
+                                            selectThenDismiss { onModelSelected(handle) }
                                         },
                                     ),
                                 colors = CardDefaults.cardColors(
