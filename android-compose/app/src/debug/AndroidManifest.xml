@@ -24,7 +24,8 @@
         <receiver
             android:name=".runtime.local.LiteRtSelfTestReceiver"
             android:enabled="true"
-            android:exported="true" />
+            android:exported="true"
+            android:process=":litert_selftest" />
 
         <service
             android:name=".runtime.sensors.DeviceSensorSelfTestService"
