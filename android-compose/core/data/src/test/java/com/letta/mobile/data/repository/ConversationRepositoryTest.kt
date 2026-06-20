@@ -166,13 +166,12 @@ class ConversationRepositoryTest {
     @Test
     fun `createConversation uses local source in local runtime mode`() = runTest {
         val localSource = FakeLocalRuntimeConversationSource()
-        val settingsRepository = FakeSettingsRepository()
-        settingsRepository.saveConfig(
-            LettaConfig(
+        val settingsRepository = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
                 id = "local",
                 mode = LettaConfig.Mode.LOCAL,
                 serverUrl = "local-lettacode://runtime",
-            )
+            ),
         )
         repository = ConversationRepository(
             fakeApi,
