@@ -26,6 +26,11 @@
             android:enabled="true"
             android:exported="true" />
 
+        <receiver
+            android:name=".runtime.local.LocalContextClearReceiver"
+            android:enabled="true"
+            android:exported="true" />
+
         <service
             android:name=".runtime.sensors.DeviceSensorSelfTestService"
             android:enabled="true"
