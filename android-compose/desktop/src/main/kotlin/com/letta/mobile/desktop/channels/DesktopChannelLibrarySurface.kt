@@ -8,18 +8,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
+import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopDefaultButton
 
 @Composable
 fun DesktopChannelLibrarySurface(
@@ -94,10 +93,11 @@ private fun ChannelsHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Button(onClick = onRefresh) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Refresh")
+        DesktopDefaultButton(onClick = onRefresh) {
+            DesktopButtonContent(
+                text = "Refresh",
+                icon = Icons.Outlined.Refresh,
+            )
         }
     }
 }

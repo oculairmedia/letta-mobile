@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,14 +42,11 @@ import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.DropdownMenu
@@ -90,6 +86,9 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopTextArea
 import java.util.Base64
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -285,17 +284,14 @@ internal fun ConversationPaneStateCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (screenStatus.isConnectionRetryable) {
-                Button(
+                DesktopDefaultButton(
                     onClick = onRetryConnection,
                     enabled = !state.isLoading,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                    DesktopButtonContent(
+                        text = "Retry",
+                        icon = Icons.Outlined.Refresh,
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Retry")
                 }
             }
         }
@@ -492,17 +488,14 @@ private fun ChatStatePanel(
                 modifier = Modifier.widthIn(max = 520.dp),
             )
             if (screenStatus.isConnectionRetryable) {
-                Button(
+                DesktopDefaultButton(
                     onClick = onRetryConnection,
                     enabled = !state.isLoading,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                    DesktopButtonContent(
+                        text = "Retry connection",
+                        icon = Icons.Outlined.Refresh,
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Retry connection")
                 }
             }
         }
@@ -1003,24 +996,16 @@ private fun ComposerBar(
                         )
                     }
                 }
-                OutlinedTextField(
+                DesktopTextArea(
                     value = text,
                     onValueChange = onTextChanged,
                     enabled = enabled,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 46.dp, max = 120.dp),
-                    placeholder = { Text("What are we building?") },
-                    minLines = 1,
                     maxLines = 5,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        disabledBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                    ),
+                    placeholder = "What are we building?",
+                    undecorated = true,
                 )
                 Surface(
                     modifier = Modifier
