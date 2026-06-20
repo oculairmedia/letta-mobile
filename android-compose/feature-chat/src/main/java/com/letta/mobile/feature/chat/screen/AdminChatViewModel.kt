@@ -18,8 +18,11 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.GoalStatus
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -68,6 +71,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.async
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -409,7 +413,8 @@ internal class AdminChatViewModel @Inject constructor(
     fun updateActiveAgentModel(handle: String) {
         viewModelScope.launch {
             try {
-                agentRepository.updateAgent(agentId, AgentUpdateParams(model = handle))
+                val config = settingsRepository.activeConfig.firstOrNull()
+                agentRepository.updateAgent(agentId, modelSwitchUpdateParams(handle, config, activeAgent.value))
                 refreshModels()
             } catch (e: Exception) {
                 // Surface the failure to the user and re-sync the displayed model state
@@ -420,6 +425,45 @@ internal class AdminChatViewModel @Inject constructor(
             }
         }
     }
+
+    private fun modelSwitchUpdateParams(handle: String, config: LettaConfig?, agent: Agent?): AgentUpdateParams {
+        val normalizedHandle = handle.trim()
+        val localModelHandle = config?.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
+        val localLeattaCodeHandle = localModelHandle?.let { "lmstudio/${it.removePrefix("lmstudio/")}" }
+        val localSelected = AgentRuntimeBinding.isLocalRuntime(config) &&
+            localModelHandle != null &&
+            normalizedHandle in setOf(localModelHandle, localLeattaCodeHandle)
+        val baseMetadata = agent?.metadata.orEmpty().filterKeys { it !in localRuntimeModelSwitchMetadataKeys }
+        if (!localSelected || config == null) {
+            return AgentUpdateParams(model = normalizedHandle, metadata = baseMetadata)
+        }
+        val runtime = config.localModelRuntime?.trim()?.takeIf { it.isNotBlank() } ?: "litert-lm"
+        val accelerator = config.localModelAccelerator?.trim()?.takeIf { it.isNotBlank() } ?: "gpu"
+        val maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: 4096
+        val localMetadata = mapOf(
+            LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
+            LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
+            LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
+            LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(localModelHandle),
+            LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(runtime.lowercase()),
+            LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(accelerator.lowercase()),
+        )
+        return AgentUpdateParams(
+            model = localModelHandle,
+            metadata = baseMetadata + localMetadata,
+            modelSettings = (agent?.modelSettings ?: ModelSettings()).copy(
+                providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
+                parallelToolCalls = false,
+                maxOutputTokens = maxTokens,
+            ),
+        )
+    }
+
+    private val localRuntimeModelSwitchMetadataKeys: Set<String> = LocalAgentRuntimeMetadata.bindingKeys + setOf(
+        LocalAgentRuntimeMetadata.LocalModelHandleKey,
+        LocalAgentRuntimeMetadata.LocalModelRuntimeKey,
+        LocalAgentRuntimeMetadata.LocalModelAcceleratorKey,
+    )
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {
