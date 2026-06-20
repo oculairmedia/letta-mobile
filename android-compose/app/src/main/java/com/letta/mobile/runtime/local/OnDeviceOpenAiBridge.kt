@@ -226,6 +226,14 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             result.fold(
                 onSuccess = { raw ->
                     logLiteRtInfo("bridge_inference_complete", "handle=${modelSelection.modelHandle} rawChars=${raw.length}")
+                    if (raw.isDegenerateLiteRtOutput()) {
+                        logLiteRtInfo("bridge_repetition_guard", "handle=${modelSelection.modelHandle} rawChars=${raw.length} preview=${raw.take(80).lineSafe()}")
+                        output.writeJsonResponse(
+                            503,
+                            errorBody("on_device_degenerate_output", "On-device model produced degenerate repeated output; try a shorter prompt or reset the conversation."),
+                        )
+                        return@fold
+                    }
                     when (val turn = OnDeviceToolCallProtocol.parseModelOutput(raw)) {
                         is OnDeviceToolCallProtocol.ModelTurn.Text ->
                             if (stream) {
@@ -559,3 +567,18 @@ private fun java.io.InputStream.readHttpLine(): String? {
 private fun EmbeddedLettaCodeModelSelection.isLiteRtLmRuntime(): Boolean =
     runtime.equals("litert-lm", ignoreCase = true) ||
         modelHandle.contains("litert", ignoreCase = true)
+
+
+private fun String.isDegenerateLiteRtOutput(): Boolean {
+    val compact = filterNot { it.isWhitespace() }
+    if (compact.length < 120) return false
+    val mostCommon = compact.groupingBy { it }.eachCount().maxOfOrNull { it.value } ?: 0
+    if (mostCommon.toDouble() / compact.length >= 0.85) return true
+    val lower = lowercase()
+    val tokens = lower.split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (tokens.size < 40) return false
+    val topTokenCount = tokens.groupingBy { it }.eachCount().maxOfOrNull { it.value } ?: 0
+    return topTokenCount.toDouble() / tokens.size >= 0.75
+}
+
+private fun String.lineSafe(): String = replace('\n', ' ').replace('\r', ' ')

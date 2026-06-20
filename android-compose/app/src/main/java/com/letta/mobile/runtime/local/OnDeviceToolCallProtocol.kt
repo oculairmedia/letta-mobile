@@ -40,7 +40,9 @@ object OnDeviceToolCallProtocol {
 
     /** Renders a compact bounded prompt: tool instructions + recent conversation transcript. */
     fun renderPrompt(request: JsonObject): String {
-        val parts = mutableListOf<String>()
+        val parts = mutableListOf(
+            "You are a concise assistant. Answer the user's latest message in natural language. Do not repeat a single character, syllable, or word. If unsure, say so briefly."
+        )
         val tools = request["tools"] as? JsonArray
         if (!tools.isNullOrEmpty()) {
             parts += renderToolInstructions(tools)
