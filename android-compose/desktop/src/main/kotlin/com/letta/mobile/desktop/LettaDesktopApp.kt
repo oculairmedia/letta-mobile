@@ -58,14 +58,9 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
-import com.letta.mobile.desktop.chat.ChatDetailPane
-import com.letta.mobile.desktop.chat.ConversationGroupHeader
-import com.letta.mobile.desktop.chat.ConversationPaneStateCard
-import com.letta.mobile.desktop.chat.ConversationRow
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurface
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-import com.letta.mobile.desktop.chat.DesktopConversationGroup
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
@@ -216,50 +211,19 @@ fun LettaDesktopApp() {
             color = MaterialTheme.colorScheme.surface,
         ) {
             if (selectedDestination == DesktopDestination.Conversations) {
-                // Conversations keeps the standard app menu, then adds the conversation list as a middle pane.
-                Row(Modifier.fillMaxSize()) {
-                    DesktopNavigation(
-                        selectedDestination = selectedDestination,
-                        onDestinationSelected = { selectedDestination = it },
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
-                    )
-                    Column(
-                        modifier = Modifier
-                            .width(320.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.surface),
-                    ) {
-                        ConversationsList(
-                            chatState = chatState,
-                            onConversationSelected = chatController::selectConversation,
-                            onConversationDeleted = chatController::deleteConversation,
-                            onRetryConnection = chatController::retryConnection,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant),
-                    )
-                    ChatDetailPane(
-                        state = chatState,
-                        onComposerTextChanged = chatController::updateComposerText,
-                        onSend = chatController::send,
-                        onAttachImage = { pickerLauncher.launch() },
-                        onRemoveImageAttachment = chatController::removeImageAttachment,
-                        onRetryConnection = chatController::retryConnection,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                DesktopChatSurface(
+                    state = chatState,
+                    onConversationSelected = chatController::selectConversation,
+                    onDeleteConversation = chatController::deleteConversation,
+                    onComposerTextChanged = chatController::updateComposerText,
+                    onSend = chatController::send,
+                    onAttachImage = { pickerLauncher.launch() },
+                    onRemoveImageAttachment = chatController::removeImageAttachment,
+                    onRetryConnection = chatController::retryConnection,
+                    onSettingsSelected = { selectedDestination = DesktopDestination.Settings },
+                    modifier = Modifier.fillMaxSize(),
+                )
             } else {
-                // Standard 3-column layout for other destinations
                 Row(Modifier.fillMaxSize()) {
                     DesktopNavigation(
                         selectedDestination = selectedDestination,
@@ -420,15 +384,15 @@ private fun DesktopNavigation(
             onClick = { onDestinationSelected(DesktopDestination.Overview) },
         )
 
-        SidebarSection("System")
+        Spacer(Modifier.weight(1f))
+
         DesktopNavRow(
             label = "Settings",
             icon = DesktopDestination.Settings.icon,
             selected = selectedDestination == DesktopDestination.Settings,
+            tooltip = "Settings",
             onClick = { onDestinationSelected(DesktopDestination.Settings) },
         )
-
-        Spacer(Modifier.weight(1f))
 
         Surface(
             color = Color.Transparent,
@@ -476,37 +440,40 @@ private fun DesktopNavRow(
     selected: Boolean,
     onClick: () -> Unit,
     subdued: Boolean = false,
+    tooltip: String = label,
 ) {
     val content = when {
         selected -> MaterialTheme.colorScheme.onSurface
         subdued -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    JewelSimpleListItem(
-        selected = selected,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        height = 34.dp,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    DesktopTooltip(text = tooltip) {
+        JewelSimpleListItem(
+            selected = selected,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            height = 34.dp,
         ) {
-            JewelIcon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(17.dp),
-                tint = content,
-            )
-            JewelText(
-                text = label,
-                color = content,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                JewelIcon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = content,
+                )
+                JewelText(
+                    text = label,
+                    color = content,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -966,50 +933,3 @@ private fun StatusPill(
     }
 }
 
-// Standalone conversations list (extracted from ConversationPane)
-@Composable
-private fun ConversationsList(
-    chatState: DesktopChatSurfaceState,
-    onConversationSelected: (String) -> Unit,
-    onConversationDeleted: (String) -> Unit,
-    onRetryConnection: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (chatState.conversations.isEmpty()) {
-                item {
-                    ConversationPaneStateCard(
-                        state = chatState,
-                        onRetryConnection = onRetryConnection,
-                    )
-                }
-            }
-            chatState.conversationGroups.forEach { group ->
-                item(key = "agent:${group.key}") {
-                    ConversationGroupHeader(group)
-                }
-                items(
-                    items = group.conversations,
-                    key = { it.id },
-                ) { conversation ->
-                    ConversationRow(
-                        conversation = conversation,
-                        selected = conversation.id == chatState.selectedConversationId,
-                        onClick = { onConversationSelected(conversation.id) },
-                        onDelete = { onConversationDeleted(conversation.id) },
-                    )
-                }
-            }
-        }
-    }
-}

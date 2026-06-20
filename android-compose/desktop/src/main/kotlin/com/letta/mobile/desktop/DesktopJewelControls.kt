@@ -1,5 +1,8 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardActions
@@ -17,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.MaterialTheme
 import org.jetbrains.jewel.foundation.theme.LocalContentColor as JewelLocalContentColor
@@ -29,6 +33,25 @@ import org.jetbrains.jewel.ui.component.RadioButtonChip as JewelRadioButtonChip
 import org.jetbrains.jewel.ui.component.TextArea as JewelTextArea
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import org.jetbrains.jewel.ui.component.Text as JewelText
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun DesktopTooltip(
+    text: String,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    TooltipArea(
+        tooltip = { DesktopControlText(text = text) },
+        modifier = modifier,
+        delayMillis = 450,
+        tooltipPlacement = TooltipPlacement.CursorPoint(
+            alignment = Alignment.BottomEnd,
+            offset = DpOffset(10.dp, 10.dp),
+        ),
+        content = content,
+    )
+}
 
 @Composable
 internal fun DesktopDefaultButton(
@@ -104,17 +127,27 @@ internal fun DesktopIconButton(
     enabled: Boolean = true,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
-    JewelIconButton(
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-    ) {
-        JewelIcon(
-            imageVector = imageVector,
-            contentDescription = contentDescription,
-            modifier = iconModifier,
-            tint = tint,
-        )
+    val button: @Composable () -> Unit = {
+        JewelIconButton(
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled,
+        ) {
+            JewelIcon(
+                imageVector = imageVector,
+                contentDescription = contentDescription,
+                modifier = iconModifier,
+                tint = tint,
+            )
+        }
+    }
+
+    if (contentDescription.isNullOrBlank()) {
+        button()
+    } else {
+        DesktopTooltip(text = contentDescription) {
+            button()
+        }
     }
 }
 
