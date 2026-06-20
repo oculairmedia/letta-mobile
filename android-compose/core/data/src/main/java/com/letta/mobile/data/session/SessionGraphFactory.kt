@@ -207,6 +207,8 @@ class SessionGraphFactory internal constructor(
                 agentRepository = agentRepository,
                 conversationDao = conversationDao,
                 repositoryScope = scope,
+                localConversationSource = localConversationSource,
+                settingsRepository = settingsRepository,
             ),
             cronRepository = CronRepository(
                 transport = channelTransport,

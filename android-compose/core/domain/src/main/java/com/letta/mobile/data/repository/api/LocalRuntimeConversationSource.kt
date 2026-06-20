@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.api
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 
 /**
@@ -10,6 +11,7 @@ import com.letta.mobile.data.model.Conversation
  * to this source instead of the remote API when the active config binds
  * to the local runtime, so screens need no per-ViewModel branching.
  */
-fun interface LocalRuntimeConversationSource {
+interface LocalRuntimeConversationSource {
     suspend fun listConversations(): List<Conversation>
+    suspend fun createConversation(agentId: AgentId, summary: String? = null): Conversation
 }

@@ -191,25 +191,66 @@ class LettaCodeLocalBackendStore @Inject constructor(
     override suspend fun listConversations(): List<Conversation> = withContext(Dispatchers.IO) {
         val conversationsDir = File(storageDirectory, "conversations")
         val directories = conversationsDir.listFiles { file -> file.isDirectory } ?: return@withContext emptyList()
-        directories.mapNotNull { directory ->
-            val record = runCatching {
-                json.parseToJsonElement(File(directory, "conversation.json").readText()).jsonObject
-            }.getOrNull() ?: return@mapNotNull null
-            val diskId = record.stringField("id") ?: return@mapNotNull null
-            val agentId = record.stringField("agent_id") ?: return@mapNotNull null
-            // Only the per-agent default conversation exists today; forks
-            // ("conversation:<id>" keys) have no chat-side binding yet.
-            if (diskId != "default") return@mapNotNull null
-            Conversation(
-                id = ConversationId(localConversationIdFor(agentId)),
-                agentId = AgentId(agentId),
-                summary = record.stringField("summary"),
-                createdAt = record.stringField("created_at"),
-                updatedAt = record.stringField("updated_at"),
-                lastMessageAt = record.stringField("last_message_at"),
-                archived = record["archived"]?.jsonPrimitive?.content?.toBooleanStrictOrNull(),
-            )
-        }.sortedByDescending { it.lastMessageAt ?: it.updatedAt ?: it.createdAt ?: "" }
+        directories.mapNotNull { directory -> readDefaultConversation(directory) }
+            .sortedByDescending { it.lastMessageAt ?: it.updatedAt ?: it.createdAt ?: "" }
+    }
+
+    override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation = withContext(Dispatchers.IO) {
+        val agentRecord = File(File(storageDirectory, "agents"), "${base64Url(agentId.value)}.json")
+        if (!agentRecord.isFile) {
+            throw IllegalStateException("Local agent ${agentId.value} is not persisted in the embedded LettaCode store")
+        }
+
+        val conversationDirectory = File(
+            File(storageDirectory, "conversations"),
+            base64Url("default:${agentId.value}"),
+        ).apply { mkdirs() }
+        val conversationFile = File(conversationDirectory, "conversation.json")
+        if (!conversationFile.isFile) {
+            val now = java.time.Instant.now().toString()
+            val record = buildJsonObject {
+                put("id", "default")
+                put("agent_id", agentId.value)
+                put("archived", false)
+                put("archived_at", null as String?)
+                put("created_at", now)
+                put("updated_at", now)
+                put("last_message_at", null as String?)
+                put("summary", summary)
+                putJsonArray("in_context_message_ids") {}
+            }
+            conversationFile.writeText(json.encodeToString(JsonObject.serializer(), record))
+        } else if (!summary.isNullOrBlank()) {
+            val existing = runCatching { json.parseToJsonElement(conversationFile.readText()).jsonObject }.getOrNull()
+                ?: throw IllegalStateException("Local conversation record for ${agentId.value} is unreadable")
+            val updated = buildJsonObject {
+                existing.forEach { (key, value) -> put(key, value) }
+                put("summary", summary)
+                put("updated_at", java.time.Instant.now().toString())
+            }
+            conversationFile.writeText(json.encodeToString(JsonObject.serializer(), updated))
+        }
+
+        readDefaultConversation(conversationDirectory)
+            ?: throw IllegalStateException("Local conversation record for ${agentId.value} could not be created")
+    }
+
+    private fun readDefaultConversation(directory: File): Conversation? {
+        val record = runCatching {
+            json.parseToJsonElement(File(directory, "conversation.json").readText()).jsonObject
+        }.getOrNull() ?: return null
+        val diskId = record.stringField("id") ?: return null
+        val agentId = record.stringField("agent_id") ?: return null
+        if (diskId != "default") return null
+        return Conversation(
+            id = ConversationId(localConversationIdFor(agentId)),
+            agentId = AgentId(agentId),
+            summary = record.stringField("summary"),
+            createdAt = record.stringField("created_at"),
+            updatedAt = record.stringField("updated_at"),
+            lastMessageAt = record.stringField("last_message_at"),
+            archived = record["archived"]?.jsonPrimitive?.content?.toBooleanStrictOrNull(),
+        )
     }
 
     /**

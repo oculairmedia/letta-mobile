@@ -6,12 +6,15 @@ import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ConversationUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.session.BackendScopedCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +35,8 @@ open class ConversationRepository(
     private val agentRepository: IAgentRepository,
     private val conversationDao: ConversationDao,
     private val repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
+    private val localConversationSource: LocalRuntimeConversationSource? = null,
+    private val settingsRepository: ISettingsRepository? = null,
 ) : IConversationRepository, BackendScopedCache {
     private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
@@ -106,8 +111,12 @@ open class ConversationRepository(
     }
 
     override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
-        val params = ConversationCreateParams(agentId = agentId, summary = summary)
-        val conversation = conversationApi.createConversation(params)
+        val conversation = if (localConversationSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)) {
+            localConversationSource.createConversation(agentId, summary)
+        } else {
+            val params = ConversationCreateParams(agentId = agentId, summary = summary)
+            conversationApi.createConversation(params)
+        }
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
     }
