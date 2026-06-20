@@ -38,38 +38,69 @@ object OnDeviceToolCallProtocol {
         ) : ModelTurn
     }
 
-    /** Renders the full prompt: tool instructions + conversation transcript. */
-    fun renderPrompt(request: JsonObject): String = buildString {
+    /** Renders a compact bounded prompt: tool instructions + recent conversation transcript. */
+    fun renderPrompt(request: JsonObject): String {
+        val parts = mutableListOf<String>()
         val tools = request["tools"] as? JsonArray
         if (!tools.isNullOrEmpty()) {
-            append(renderToolInstructions(tools))
-            append("\n\n")
+            parts += renderToolInstructions(tools)
         }
-        (request["messages"] as? JsonArray)?.forEach { message ->
-            val item = message as? JsonObject ?: return@forEach
-            val role = item.stringField("role") ?: "user"
-            when (role) {
-                "tool" -> {
-                    val id = item.stringField("tool_call_id").orEmpty()
-                    appendLine("tool result${if (id.isNotBlank()) " ($id)" else ""}: ${item.contentText()}")
-                }
-                "assistant" -> {
-                    val text = item.contentText()
-                    if (text.isNotBlank()) appendLine("assistant: $text")
-                    (item["tool_calls"] as? JsonArray)?.forEach { call ->
-                        val function = (call as? JsonObject)?.get("function") as? JsonObject ?: return@forEach
-                        val id = (call["id"] as? JsonPrimitive)?.content.orEmpty()
-                        appendLine(
-                            "assistant called tool${if (id.isNotBlank()) " ($id)" else ""}: " +
-                                "{\"name\": ${JsonPrimitive(function.stringField("name").orEmpty())}, " +
-                                "\"arguments\": ${function.stringField("arguments") ?: "{}"}}"
-                        )
-                    }
-                }
-                else -> appendLine("$role: ${item.contentText()}")
+        val messages = (request["messages"] as? JsonArray)
+            ?.mapNotNull(::renderMessage)
+            .orEmpty()
+        parts += fitRecentMessages(parts.sumOf { it.length + 2 }, messages)
+        return parts.joinToString("\n\n")
+            .trimEnd()
+            .fitPromptBudget()
+    }
+
+    private fun renderMessage(message: JsonElement): String? {
+        val item = message as? JsonObject ?: return null
+        val role = item.stringField("role") ?: "user"
+        return when (role) {
+            "tool" -> {
+                val id = item.stringField("tool_call_id").orEmpty()
+                "tool result${if (id.isNotBlank()) " ($id)" else ""}: ${item.contentText().ellipsize(MAX_MESSAGE_CHARS)}"
             }
+            "assistant" -> buildString {
+                val text = item.contentText()
+                if (text.isNotBlank()) appendLine("assistant: ${text.ellipsize(MAX_MESSAGE_CHARS)}")
+                (item["tool_calls"] as? JsonArray)?.forEach { call ->
+                    val function = (call as? JsonObject)?.get("function") as? JsonObject ?: return@forEach
+                    val id = (call["id"] as? JsonPrimitive)?.content.orEmpty()
+                    appendLine(
+                        "assistant called tool${if (id.isNotBlank()) " ($id)" else ""}: " +
+                            "{\"name\": ${JsonPrimitive(function.stringField("name").orEmpty())}, " +
+                            "\"arguments\": ${(function.stringField("arguments") ?: "{}").ellipsize(MAX_TOOL_ARGUMENT_CHARS)}}"
+                    )
+                }
+            }.trimEnd().takeIf { it.isNotBlank() }
+            else -> "$role: ${item.contentText().ellipsize(MAX_MESSAGE_CHARS)}"
         }
-    }.trimEnd()
+    }
+
+    private fun fitRecentMessages(prefixChars: Int, messages: List<String>): List<String> {
+        val selected = ArrayDeque<String>()
+        var total = prefixChars
+        for (message in messages.asReversed()) {
+            val extra = message.length + 2
+            if (selected.isNotEmpty() && total + extra > MAX_RENDERED_PROMPT_CHARS) break
+            selected.addFirst(message)
+            total += extra
+        }
+        if (selected.size < messages.size && selected.isNotEmpty()) {
+            val marker = "[Older conversation context omitted for on-device model context window.]"
+            while (selected.isNotEmpty() && total + marker.length + 2 > MAX_RENDERED_PROMPT_CHARS) {
+                total -= selected.removeFirst().length + 2
+            }
+            selected.addFirst(marker)
+        }
+        return selected.toList()
+    }
+
+    private fun String.fitPromptBudget(): String =
+        if (length <= MAX_RENDERED_PROMPT_CHARS) this
+        else "[Prompt truncated for on-device model context window.]\n" + takeLast(MAX_RENDERED_PROMPT_CHARS - 55)
 
     private fun renderToolInstructions(tools: JsonArray): String = buildString {
         appendLine("You can use tools. To use a tool, reply with ONLY one block in exactly this format and nothing else:")
@@ -85,9 +116,6 @@ object OnDeviceToolCallProtocol {
             val description = function.stringField("description").orEmpty()
                 .lineSequence().firstOrNull().orEmpty()
             appendLine("- $name: $description")
-            function["parameters"]?.let { parameters ->
-                appendLine("  parameters schema: $parameters")
-            }
         }
     }.trimEnd()
 
@@ -183,6 +211,13 @@ object OnDeviceToolCallProtocol {
     }
 
     private fun JsonPrimitive.contentOrEmpty(): String = content
+
+    private fun String.ellipsize(maxChars: Int): String =
+        if (length <= maxChars) this else take(maxChars) + "…"
+
+    private const val MAX_RENDERED_PROMPT_CHARS = 8_000
+    private const val MAX_MESSAGE_CHARS = 1_000
+    private const val MAX_TOOL_ARGUMENT_CHARS = 1_000
 
     // Tolerates ```tool_call and ```json fences; gemma-class models drift.
     private val FENCE_REGEX = Regex(
