@@ -173,7 +173,6 @@ class ConversationRepositoryTest {
                 id = "local",
                 mode = LettaConfig.Mode.LOCAL,
                 serverUrl = "local-lettacode://runtime",
-                runtimeBinding = AgentRuntimeBinding.LocalLettaCode,
             )
         )
         repository = ConversationRepository(

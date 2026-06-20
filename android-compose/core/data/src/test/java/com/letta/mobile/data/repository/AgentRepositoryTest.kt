@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Before
@@ -112,7 +113,7 @@ class AgentRepositoryTest {
     @Test
     fun `updateAgent on local-bound agent persists locally without remote call`() = runTest {
         val source = FakeLocalAgentSource().apply {
-            stored += TestData.agent(id = "local-agent-1", name = "Before")
+            stored += TestData.agent(id = "local-agent-1", name = "Before", model = "google/gemma-3n-E2B-it-litert-lm")
         }
         val localRepo = localRepository(source)
         localRepo.refreshAgents()
@@ -125,6 +126,67 @@ class AgentRepositoryTest {
         assertEquals("After", updated.name)
         assertEquals("After", source.stored.single().name)
         assertTrue(fakeApi.calls.none { it.startsWith("updateAgent") })
+    }
+
+    @Test
+    fun `local-agent id with cloud model is not local-bound`() {
+        val agent = TestData.agent(
+            id = "local-agent-1",
+            model = "openai/gpt-4o-mini",
+        )
+
+        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
+    }
+
+    @Test
+    fun `local-agent id with local model remains local-bound`() {
+        val agent = TestData.agent(
+            id = "local-agent-1",
+            model = "google/gemma-3n-E2B-it-litert-lm",
+        )
+
+        assertTrue(AgentRuntimeBinding.isLocalBound(agent))
+    }
+
+    @Test
+    fun `local runtime metadata with cloud model is not local-bound`() {
+        val agent = TestData.agent(
+            id = "local-agent-1",
+            model = "anthropic/claude-3-5-sonnet",
+        ).copy(
+            metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+        )
+
+        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
+    }
+
+    @Test
+    fun `switching local agent to cloud model updates remote instead of persisting locally`() = runTest {
+        val source = FakeLocalAgentSource().apply {
+            stored += TestData.agent(
+                id = "local-agent-1",
+                name = "Before",
+                model = "google/gemma-3n-E2B-it-litert-lm",
+            )
+        }
+        fakeApi.agents.add(
+            TestData.agent(
+                id = "local-agent-1",
+                name = "Before",
+                model = "google/gemma-3n-E2B-it-litert-lm",
+            ),
+        )
+        val localRepo = localRepository(source)
+        localRepo.refreshAgents()
+
+        val updated = localRepo.updateAgent(
+            AgentId("local-agent-1"),
+            com.letta.mobile.data.model.AgentUpdateParams(model = "openai/gpt-4o-mini"),
+        )
+
+        assertEquals("openai/gpt-4o-mini", updated.model)
+        assertTrue(fakeApi.calls.any { it == "updateAgent:local-agent-1" })
+        assertTrue(source.persisted.none { it.model == "openai/gpt-4o-mini" })
     }
 
     @Test

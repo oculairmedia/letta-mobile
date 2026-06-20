@@ -30,12 +30,44 @@ object AgentRuntimeBinding {
 
     fun isLocalBound(agent: Agent?): Boolean {
         if (agent == null) return false
+        if (isKnownLocalModelHandle(agent.model)) return true
+        if (isCloudModelHandle(agent.model)) return false
+        val explicitRuntime = agent.metadata
+            .filterKeys { it in LocalAgentRuntimeMetadata.bindingKeys }
+            .values
+            .mapNotNull { it.jsonPrimitive.contentOrNull?.trim() }
+            .firstOrNull { it.isNotBlank() }
+        if (explicitRuntime != null) return explicitRuntime.startsWith("local-")
         if (agent.id.value.startsWith("local-agent-")) return true
-        return agent.metadata.any { (key, value) ->
-            key in LocalAgentRuntimeMetadata.bindingKeys &&
-                value.jsonPrimitive.contentOrNull?.startsWith("local-") == true
-        }
+        return false
     }
+
+    private fun isKnownLocalModelHandle(model: String?): Boolean =
+        model?.trim()?.lowercase() in localModelHandles
+
+    private fun isCloudModelHandle(model: String?): Boolean {
+        val handle = model?.trim()?.lowercase().orEmpty()
+        if (handle.isBlank()) return false
+        if (isKnownLocalModelHandle(handle)) return false
+        return handle.substringBefore('/', missingDelimiterValue = handle) in cloudModelProviders
+    }
+
+    private val localModelHandles: Set<String> = setOf(
+        "google/gemma-3n-e2b-it-litert-lm",
+        "lmstudio/google/gemma-3n-e2b-it-litert-lm",
+    )
+
+    private val cloudModelProviders: Set<String> = setOf(
+        "anthropic",
+        "google-ai",
+        "groq",
+        "letta",
+        "openai",
+        "openrouter",
+        "perplexity",
+        "together",
+        "xai",
+    )
 
     private val localRuntimeSchemes: Set<String> = setOf(
         "local-lettacode",

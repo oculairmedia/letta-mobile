@@ -61,7 +61,11 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         if (shouldFail) throw ApiException(failCode, failMessage)
         val index = agents.indexOfFirst { it.id == agentId }
         if (index < 0) throw ApiException(404, "Not found")
-        val updated = agents[index].copy(name = params.name ?: agents[index].name)
+        val updated = agents[index].copy(
+            name = params.name ?: agents[index].name,
+            model = params.model ?: agents[index].model,
+            metadata = params.metadata ?: agents[index].metadata,
+        )
         agents[index] = updated
         return updated
     }
