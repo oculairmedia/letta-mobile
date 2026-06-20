@@ -9,6 +9,7 @@ import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
+import com.letta.mobile.feature.chat.send.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.CoroutineScope
@@ -151,7 +152,11 @@ internal class AdminChatComposerCoordinator(
         isClientModeEnabled = false,
         explicitConversationId = explicitConversationId,
         isShimBackend = isShimBackend(),
-        isLocalRuntime = sessionManager.current.localRuntimeBackend != null,
+        isLocalRuntime = LocalRuntimeRouting.shouldUseLocalRuntime(
+            sessionHasLocalRuntimeBackend = sessionManager.current.localRuntimeBackend != null,
+            agentId = agentId.value,
+            conversationId = explicitConversationId,
+        ),
     )
 
     private fun GoalStatus.toUi() = GoalStatusUi(
