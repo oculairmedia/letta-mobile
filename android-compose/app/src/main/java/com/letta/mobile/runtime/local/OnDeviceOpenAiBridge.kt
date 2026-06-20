@@ -116,6 +116,8 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
     ) {
         @Volatile private var closed = false
 
+        private val servedModelId: String = modelSelection.lettaCodeModelHandle
+
         fun acceptLoop() {
             while (!closed) {
                 val socket = runCatching { serverSocket.accept() }.getOrNull() ?: break
@@ -252,7 +254,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 buildJsonArray {
                     add(
                         buildJsonObject {
-                            put("id", modelSelection.openAiModelId)
+                            put("id", servedModelId)
                             put("object", "model")
                             put("owned_by", "letta-mobile")
                         }
@@ -265,7 +267,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             put("id", "chatcmpl-${UUID.randomUUID()}")
             put("object", "chat.completion")
             put("created", Instant.now().epochSecond)
-            put("model", modelSelection.openAiModelId)
+            put("model", servedModelId)
             put(
                 "choices",
                 buildJsonArray {
@@ -305,7 +307,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 put("id", "chatcmpl-${UUID.randomUUID()}")
                 put("object", "chat.completion")
                 put("created", Instant.now().epochSecond)
-                put("model", modelSelection.openAiModelId)
+                put("model", servedModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -343,7 +345,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 put("id", id)
                 put("object", "chat.completion.chunk")
                 put("created", created)
-                put("model", modelSelection.openAiModelId)
+                put("model", servedModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -374,7 +376,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 put("id", id)
                 put("object", "chat.completion.chunk")
                 put("created", created)
-                put("model", modelSelection.openAiModelId)
+                put("model", servedModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -413,7 +415,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 put("id", id)
                 put("object", "chat.completion.chunk")
                 put("created", created)
-                put("model", modelSelection.openAiModelId)
+                put("model", servedModelId)
                 put(
                     "choices",
                     buildJsonArray {
