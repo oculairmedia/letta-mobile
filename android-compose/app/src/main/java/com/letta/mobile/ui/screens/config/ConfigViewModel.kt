@@ -303,6 +303,14 @@ class ConfigViewModel @Inject constructor(
                 localModelHandle = item.entry.modelId,
                 localModelAccelerator = item.entry.primaryAccelerator,
                 localModelMaxTokens = item.entry.defaultConfig.maxTokens.toString(),
+                // letta-mobile-ajcrx: an ON-DEVICE LiteRT model must NOT carry a
+                // custom provider base URL — a non-blank localProviderBaseUrl makes
+                // isCustomProvider=true, which SKIPS the on-device loopback bridge
+                // and routes the turn to the remote proxy (-> "model: <id>"
+                // local_backend_error, the model isn't served remotely). Clear it
+                // so the selection routes to the on-device LiteRT engine.
+                localProviderBaseUrl = "",
+                localProviderApiKey = "",
             )
         )
         autoPersistLocalModelSelection()
