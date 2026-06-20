@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.CompactionSettings
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ModelSettings
+import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -32,6 +33,7 @@ internal class EditAgentUseCases(
     private val originalBlocks: Map<String, EditableBlock>,
     private val originalEmbedding: String,
     private val originalProviderType: String,
+    private val servedModelIds: () -> Collection<String>,
 ) {
     companion object {
         private const val DEFAULT_COMPACTION_CLIP_CHARS = 50_000
@@ -90,6 +92,19 @@ internal class EditAgentUseCases(
                 uiState.value = UiState.Error(
                     "Couldn't determine a supported provider type for the selected model. Please re-select the model and try again."
                 )
+                return
+            }
+            val modelValidation = ModelHandleValidator.validate(
+                handle = state.model,
+                backend = if (state.model.startsWith("lmstudio/", ignoreCase = true)) {
+                    ModelHandleValidator.Backend.REMOTE
+                } else {
+                    ModelHandleValidator.Backend.ON_DEVICE
+                },
+                servedModels = servedModelIds().takeIf { it.isNotEmpty() },
+            )
+            if (modelValidation is ModelHandleValidator.Result.Invalid) {
+                uiState.value = UiState.Error(modelValidation.reason)
                 return
             }
             agentRepository.updateAgent(

@@ -20,7 +20,7 @@ import kotlinx.serialization.json.jsonObject
  * back to the last good list so pickers degrade gracefully offline.
  */
 @Singleton
-class EndpointOpenAiModelCatalog @Inject constructor() {
+open class EndpointOpenAiModelCatalog @Inject constructor() {
     private val json = Json { ignoreUnknownKeys = true }
 
     // Last-good list per endpoint+key, so switching endpoints (or a fetch
@@ -28,7 +28,7 @@ class EndpointOpenAiModelCatalog @Inject constructor() {
     // cached models rather than a single global slot (CodeRabbit).
     private val cache = java.util.concurrent.ConcurrentHashMap<String, List<LlmModel>>()
 
-    suspend fun listModels(baseUrl: String, apiKey: String?): List<LlmModel> = withContext(Dispatchers.IO) {
+    open suspend fun listModels(baseUrl: String, apiKey: String?): List<LlmModel> = withContext(Dispatchers.IO) {
         val key = "$baseUrl|${apiKey.orEmpty()}"
         val fetched = runCatching { fetch(baseUrl, apiKey) }.getOrNull()
         if (fetched != null) {
@@ -37,6 +37,10 @@ class EndpointOpenAiModelCatalog @Inject constructor() {
         } else {
             cache[key].orEmpty()
         }
+    }
+
+    open suspend fun listServedModelIdsOrNull(baseUrl: String, apiKey: String?): List<String>? = withContext(Dispatchers.IO) {
+        runCatching { fetch(baseUrl, apiKey).map { model -> model.handle ?: model.name.ifBlank { model.id } } }.getOrNull()
     }
 
     private fun fetch(baseUrl: String, apiKey: String?): List<LlmModel> {
