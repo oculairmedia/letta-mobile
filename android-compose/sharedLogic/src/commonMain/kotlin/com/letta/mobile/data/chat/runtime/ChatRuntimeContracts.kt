@@ -67,9 +67,13 @@ fun Conversation.toChatConversationSummary(
     agentNamesById: Map<String, String> = emptyMap(),
 ): ChatConversationSummary {
     val agentIdValue = agentId.value
+    val apiAgentName = agentName
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
     val agentDisplayName = agentNamesById[agentIdValue]
         ?.trim()
         ?.takeIf { it.isNotBlank() }
+        ?: apiAgentName
         ?: agentIdValue
     val updatedLabel = lastMessageAt ?: updatedAt ?: createdAt ?: "Remote"
     return ChatConversationSummary(

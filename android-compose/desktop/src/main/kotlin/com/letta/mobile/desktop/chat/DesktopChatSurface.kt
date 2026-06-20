@@ -210,16 +210,21 @@ private fun ConversationPane(
                     )
                 }
             }
-            items(
-                items = state.conversations,
-                key = { it.id },
-            ) { conversation ->
-                ConversationRow(
-                    conversation = conversation,
-                    selected = conversation.id == state.selectedConversationId,
-                    onClick = { onConversationSelected(conversation.id) },
-                    onDelete = { onDeleteConversation(conversation.id) },
-                )
+            state.conversationGroups.forEach { group ->
+                item(key = "agent-${group.key}") {
+                    ConversationGroupHeader(group)
+                }
+                items(
+                    items = group.conversations,
+                    key = { it.id },
+                ) { conversation ->
+                    ConversationRow(
+                        conversation = conversation,
+                        selected = conversation.id == state.selectedConversationId,
+                        onClick = { onConversationSelected(conversation.id) },
+                        onDelete = { onDeleteConversation(conversation.id) },
+                    )
+                }
             }
         }
 
