@@ -297,8 +297,16 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     project.toLettaCodeNodeStartRequest(
                         session = requestedSession,
                         modelSelection = modelSelection,
-                        onDeviceProviderBaseUrl = modelSelection.effectiveProviderBaseUrl ?: bridgeSession?.baseUrl,
-                        onDeviceProviderApiKey = modelSelection.effectiveProviderApiKey ?: bridgeSession?.authToken,
+                        // letta-mobile-ajcrx: an on-device LiteRT model wears an
+                        // lmstudio/ prefix (to avoid letta.js's bare-id SIGABRT),
+                        // which makes effectiveProviderBaseUrl return the REMOTE
+                        // proxy default — but when an on-device bridgeSession
+                        // exists, the turn MUST route to the loopback bridge, not
+                        // the remote proxy. So the loopback bridge URL takes
+                        // priority; effectiveProviderBaseUrl is only the fallback
+                        // for a genuine custom/remote provider (no on-device bridge).
+                        onDeviceProviderBaseUrl = bridgeSession?.baseUrl ?: modelSelection.effectiveProviderBaseUrl,
+                        onDeviceProviderApiKey = bridgeSession?.authToken ?: modelSelection.effectiveProviderApiKey,
                         androidNetworkBridgeBaseUrl = networkBridgeSession.baseUrl,
                         androidNetworkBridgeToken = networkBridgeSession.authToken,
                     )
