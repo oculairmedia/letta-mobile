@@ -2,7 +2,9 @@ package com.letta.mobile.runtime.local
 
 import com.letta.mobile.data.model.LettaConfig
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EmbeddedLettaCodeModelSelectionTest {
@@ -28,12 +30,11 @@ class EmbeddedLettaCodeModelSelectionTest {
         assertEquals(8192, selection.maxTokens)
         assertEquals("google/gemma-3n", selection.openAiModelId)
         assertEquals("lmstudio/google/gemma-3n", selection.lettaCodeModelHandle)
-        assertEquals(false, selection.isRemoteProviderModel)
-        assertEquals(true, selection.requiresOnDeviceModel)
+        assertTrue(selection.requiresOnDeviceModel)
     }
 
     @Test
-    fun `lmstudio handle selects remote provider without explicit base url`() {
+    fun `lmstudio handle selects on-device bridge without explicit base url`() {
         val selection = EmbeddedLettaCodeModelSelection.from(
             LettaConfig(
                 id = "local",
@@ -45,12 +46,11 @@ class EmbeddedLettaCodeModelSelectionTest {
         )
 
         assertEquals("lmstudio/google/gemma-3n-E2B-it", selection.modelHandle)
-        assertEquals(false, selection.isCustomProvider)
-        assertEquals(true, selection.isRemoteProviderModel)
-        assertEquals(true, selection.routesToOpenAiCompatibleProvider)
-        assertEquals(false, selection.requiresOnDeviceModel)
-        assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_BASE_URL, selection.effectiveProviderBaseUrl)
-        assertEquals(EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_API_KEY, selection.effectiveProviderApiKey)
+        assertFalse(selection.isCustomProvider)
+        assertFalse(selection.routesToOpenAiCompatibleProvider)
+        assertTrue(selection.requiresOnDeviceModel)
+        assertNull(selection.effectiveProviderBaseUrl)
+        assertNull(selection.effectiveProviderApiKey)
         assertEquals(null, selection.modelPath)
     }
 
@@ -107,9 +107,9 @@ class EmbeddedLettaCodeModelSelectionTest {
             )
         )
 
-        assertEquals(true, selection.isCustomProvider)
-        assertEquals(true, selection.routesToOpenAiCompatibleProvider)
-        assertEquals(false, selection.requiresOnDeviceModel)
+        assertTrue(selection.isCustomProvider)
+        assertTrue(selection.routesToOpenAiCompatibleProvider)
+        assertFalse(selection.requiresOnDeviceModel)
         assertEquals("http://192.168.1.10:8082/v1", selection.customProviderBaseUrl)
         assertEquals("http://192.168.1.10:8082/v1", selection.effectiveProviderBaseUrl)
         assertEquals("secret", selection.customProviderApiKey)

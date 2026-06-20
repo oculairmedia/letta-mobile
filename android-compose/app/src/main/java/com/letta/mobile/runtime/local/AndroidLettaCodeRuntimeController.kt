@@ -369,14 +369,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         Log.i(
             TAG,
             "Starting embedded session agent=${session.agentId} model=$modelHandle " +
-                "customProvider=${modelSelection.isCustomProvider} remoteProvider=${modelSelection.isRemoteProviderModel} " +
-                "providerBaseUrl=$onDeviceProviderBaseUrl",
+                "customProvider=${modelSelection.isCustomProvider} providerBaseUrl=$onDeviceProviderBaseUrl",
         )
         localBackendStore.seedAgent(session.agentId, modelHandle)
         if (onDeviceProviderBaseUrl != null) {
             writeEmbeddedLettaCodeProviderAuth(
                 baseUrl = onDeviceProviderBaseUrl,
                 apiKey = onDeviceProviderApiKey ?: "not-needed",
+                modelId = modelSelection.openAiModelId,
             )
         }
         return LettaCodeNodeStartRequest(
@@ -541,7 +541,11 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         )
     }
 
-    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(baseUrl: String, apiKey: String) {
+    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(
+        baseUrl: String,
+        apiKey: String,
+        modelId: String,
+    ) {
         val authFile = File(storageDirectory, "providers/auth.json")
         val root = buildJsonObject {
             put("version", 1)
@@ -563,6 +567,25 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                                 },
                             )
                             put("base_url", baseUrl)
+                            put(
+                                "models",
+                                buildJsonArray {
+                                    add(
+                                        buildJsonObject {
+                                            put("id", modelId)
+                                            put("contextWindow", DEFAULT_LOCAL_CONTEXT_WINDOW)
+                                            put("maxTokens", EmbeddedLettaCodeModelSelection.DEFAULT_MAX_TOKENS)
+                                            put("input", buildJsonArray {
+                                                add(JsonPrimitive("text"))
+                                            })
+                                            put("cost", buildJsonObject {
+                                                put("input", 0)
+                                                put("output", 0)
+                                            })
+                                        },
+                                    )
+                                },
+                            )
                         },
                     )
                 },
@@ -618,6 +641,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         private const val TAG = "LettaCodeRuntime"
         private const val TURN_SILENCE_MS = 120_000L
         private const val TURN_ABSOLUTE_MAX_MS = 30 * 60 * 1000L
+        private const val DEFAULT_LOCAL_CONTEXT_WINDOW = 128_000
 
         /**
          * Vision-capable model id substrings (case-insensitive). KEEP IN SYNC
