@@ -241,7 +241,18 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
             val modelSelection = storedModelHandle
-                ?.let { configModelSelection.copy(modelHandle = it.toLettaCodeProviderModelHandle()) }
+                ?.let { stored ->
+                    val modelHandle = stored.toLettaCodeProviderModelHandle()
+                    if (modelHandle.isLiteRtLmModelHandle()) {
+                        configModelSelection.copy(
+                            modelHandle = modelHandle,
+                            customProviderBaseUrl = null,
+                            customProviderApiKey = null,
+                        )
+                    } else {
+                        configModelSelection.copy(modelHandle = modelHandle)
+                    }
+                }
                 ?: configModelSelection
             val requestedSession = EmbeddedLettaCodeSessionKey(
                 agentId = command.agentId.value,
@@ -754,3 +765,8 @@ private fun encodeUserContentArray(
 
 private fun String.toLettaCodeProviderModelHandle(): String =
     if (startsWith("lmstudio/")) this else "lmstudio/${removePrefix("local/")}"
+
+private fun String.isLiteRtLmModelHandle(): Boolean =
+    removePrefix("lmstudio/")
+        .removePrefix("local/")
+        .contains("litert", ignoreCase = true)
