@@ -27,6 +27,7 @@ class LocalLettaBackend(
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventEnvelope> = flow {
+        platformLogLocalHandoff("backend_runTurn_start backend=${descriptor.backendId.value} runtime=${descriptor.runtimeId.value} agent=${command.agentId.value} conversation=${command.conversationId.value}")
         require(command.backendId == descriptor.backendId) {
             "Command backend ${command.backendId} does not match ${descriptor.backendId}."
         }
@@ -39,9 +40,12 @@ class LocalLettaBackend(
         }
         emit(outbox.append(command.runStartedDraft()))
 
+        platformLogLocalHandoff("backend_engine_collect_start agent=${command.agentId.value} conversation=${command.conversationId.value}")
         engine.runTurn(command).collect { draft ->
+            platformLogLocalHandoff("backend_engine_draft payload=${draft.payload::class.simpleName} source=${draft.source}")
             emit(outbox.append(draft.scopedTo(command)))
         }
+        platformLogLocalHandoff("backend_runTurn_complete agent=${command.agentId.value} conversation=${command.conversationId.value}")
     }
 
     override fun events(afterOffset: RuntimeEventOffset): Flow<RuntimeEventEnvelope> =
@@ -110,4 +114,8 @@ class LocalLettaBackend(
         -> true
         BackendKind.RemoteLetta -> false
     }
+}
+
+private fun platformLogLocalHandoff(message: String) {
+    println("LOCAL_HANDOFF: $message")
 }

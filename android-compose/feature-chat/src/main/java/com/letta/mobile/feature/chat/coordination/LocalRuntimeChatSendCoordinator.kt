@@ -22,6 +22,7 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.util.Telemetry
 import java.util.UUID
+import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -54,6 +55,7 @@ internal class LocalRuntimeChatSendCoordinator(
         val job = scope.launch {
             val timer = Telemetry.startTimer("AdminChatVM", "send.local.enqueue")
             val backend = localBackend()
+            Log.i("LOCAL_HANDOFF", "send_start agent=$agentId backend=${backend?.descriptor} activeConversation=${activeConversationId()} textChars=${text.length} attachments=${attachments.size}")
             if (backend == null) {
                 failSend("Local runtime is not available")
                 timer.stop("accepted" to false, "reason" to "missing_backend")
@@ -89,8 +91,7 @@ internal class LocalRuntimeChatSendCoordinator(
 
             var terminalStatusSeen = false
             try {
-                backend.runTurn(
-                    TurnCommand(
+                val command = TurnCommand(
                         backendId = backend.descriptor.backendId,
                         runtimeId = backend.descriptor.runtimeId,
                         agentId = AgentId(agentId),
@@ -110,11 +111,14 @@ internal class LocalRuntimeChatSendCoordinator(
                             },
                         ),
                     )
-                ).collect { event ->
+                Log.i("LOCAL_HANDOFF", "runTurn_collect_start agent=$agentId conversation=$conversationId backend=${backend.descriptor.backendId} runtime=${backend.descriptor.runtimeId} otid=$otid")
+                backend.runTurn(command).collect { event ->
+                    Log.i("LOCAL_HANDOFF", "runTurn_event payload=${event.payload::class.simpleName} source=${event.source} runId=${event.runId?.value}")
                     if (handleRuntimeEvent(conversationId, otid, event)) {
                         terminalStatusSeen = true
                     }
                 }
+                Log.i("LOCAL_HANDOFF", "runTurn_collect_complete agent=$agentId conversation=$conversationId terminal=$terminalStatusSeen")
 
                 if (!terminalStatusSeen) {
                     timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
