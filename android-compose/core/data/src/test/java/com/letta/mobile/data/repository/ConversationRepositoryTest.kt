@@ -7,7 +7,6 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
@@ -173,7 +172,6 @@ class ConversationRepositoryTest {
                 id = "local",
                 mode = LettaConfig.Mode.LOCAL,
                 serverUrl = "local-lettacode://runtime",
-                runtimeBinding = AgentRuntimeBinding.LocalLettaCode,
             )
         )
         repository = ConversationRepository(
