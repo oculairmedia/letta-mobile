@@ -523,13 +523,8 @@ internal fun List<com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatal
 
 private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConfig): AgentCreateParams {
     val selection = EmbeddedLettaCodeModelSelection.from(config)
-    // A model picked in the dialog (endpoint or downloaded catalog id) wins
-    // over the config-level default; letta.js handles use the lmstudio/
-    // prefix convention for the local provider plumbing.
-    val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }?.let { picked ->
-        if (picked.startsWith("lmstudio/")) picked else "lmstudio/$picked"
-    }
-    val effectiveModel = pickedModel ?: selection.lettaCodeModelHandle
+    val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }
+    val effectiveModel = pickedModel ?: selection.modelHandle
     val localMetadata = mapOf(
         LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
         LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),

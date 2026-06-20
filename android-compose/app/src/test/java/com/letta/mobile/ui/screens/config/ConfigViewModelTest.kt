@@ -784,6 +784,27 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun selectEmbeddedModel_replacesStaleLocalModelHandleOnCreatePath() = runTest {
+        fakeRepository.activeConfigState.value = LettaConfig(
+            id = "stale-local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = ConfigViewModel.LOCAL_RUNTIME_URL,
+            localModelPath = "/data/user/0/com.letta.mobile/files/embedded-lettacode/models/old.litertlm",
+            localModelHandle = "lmstudio/opus-4-8",
+        )
+        viewModel.loadConfig()
+
+        viewModel.selectEmbeddedModel(downloadedGemmaTestItem())
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals("google/gemma-test-litert-lm", savedConfig?.localModelHandle)
+        assertEquals(
+            "/data/user/0/com.letta.mobile/files/embedded-lettacode/models/gemma-test.litertlm",
+            savedConfig?.localModelPath,
+        )
+    }
+
+    @Test
     fun selectEmbeddedModel_keepsRemoteActiveConfigAsSeparateEntry() = runTest {
         val remote = LettaConfig(
             id = "remote-1",
