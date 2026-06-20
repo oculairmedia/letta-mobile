@@ -74,6 +74,10 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
     private val secureRandom = SecureRandom()
 
     override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession {
+        logLiteRtInfo(
+            "bridge_start",
+            "handle=${modelSelection.modelHandle} routesToProvider=${modelSelection.routesToOpenAiCompatibleProvider} modelPath=${modelSelection.modelPath}",
+        )
         val serverSocket = ServerSocket(0, 50, InetAddress.getByName(LOOPBACK_HOST))
         val authToken = newSessionToken()
         val executor = Executors.newCachedThreadPool { runnable ->
@@ -88,6 +92,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             authToken = authToken,
         )
         executor.execute(session::acceptLoop)
+        logLiteRtInfo("bridge_started", "handle=${modelSelection.modelHandle} port=${serverSocket.localPort}")
         return OnDeviceOpenAiBridgeSession(
             baseUrl = "http://$LOOPBACK_HOST:${serverSocket.localPort}/v1",
             authToken = authToken,
@@ -207,9 +212,14 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             val prompt = OnDeviceToolCallProtocol.renderPrompt(request)
             val images = OnDeviceToolCallProtocol.extractImages(request)
             val stream = request["stream"]?.jsonPrimitive?.booleanOrNull == true
+            logLiteRtInfo(
+                "bridge_inference_start",
+                "handle=${modelSelection.modelHandle} promptChars=${prompt.length} images=${images.size} stream=$stream",
+            )
             val result = engine.generate(modelSelection, prompt, images)
             result.fold(
                 onSuccess = { raw ->
+                    logLiteRtInfo("bridge_inference_complete", "handle=${modelSelection.modelHandle} rawChars=${raw.length}")
                     when (val turn = OnDeviceToolCallProtocol.parseModelOutput(raw)) {
                         is OnDeviceToolCallProtocol.ModelTurn.Text ->
                             if (stream) {
@@ -226,9 +236,10 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                     }
                 },
                 onFailure = { error ->
+                    logLiteRtError("bridge_inference_error", "handle=${modelSelection.modelHandle}", error)
                     output.writeJsonResponse(
                         503,
-                        errorBody("on_device_runtime_unavailable", error.message ?: "On-device runtime unavailable."),
+                        errorBody("on_device_runtime_unavailable", error.fullLiteRtErrorText()),
                     )
                 },
             )

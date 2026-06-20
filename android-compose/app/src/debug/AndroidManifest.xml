@@ -21,6 +21,11 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".runtime.local.LiteRtSelfTestReceiver"
+            android:enabled="true"
+            android:exported="true" />
+
         <service
             android:name=".runtime.sensors.DeviceSensorSelfTestService"
             android:enabled="true"
