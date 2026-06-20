@@ -63,8 +63,11 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private var activeOnDeviceBridgeSession: OnDeviceOpenAiBridgeSession? = null
     private var activeAndroidNetworkBridgeSession: AndroidNetworkBridgeSession? = null
 
-    internal var turnSilenceMs: Long = TURN_SILENCE_MS
-    internal var turnAbsoluteMaxMs: Long = TURN_ABSOLUTE_MAX_MS
+    @androidx.annotation.VisibleForTesting
+    var turnSilenceMs: Long = TURN_SILENCE_MS
+
+    @androidx.annotation.VisibleForTesting
+    var turnAbsoluteMaxMs: Long = TURN_ABSOLUTE_MAX_MS
 
     override fun submit(command: TurnCommand, config: LettaConfig): Flow<String> = channelFlow {
         if (command.input is TurnInput.ToolApprovalResponse) {
