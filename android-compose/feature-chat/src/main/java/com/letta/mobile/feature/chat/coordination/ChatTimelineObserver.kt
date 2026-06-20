@@ -14,6 +14,7 @@ import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -467,6 +468,23 @@ internal class ChatTimelineObserver(
             }
             prefixA2ui + tailRecord.a2uiMessages
         }
+        // letta-mobile-flicker: avoid reallocating the full UI list on every
+        // streaming tick. Reuse the prior immutable snapshot and append only
+        // the new tail's UiMessage so Compose keeps prior keyed children stable
+        // and only the new card recomposes. Falls back to a fresh
+        // combineOlderPrefix walk if the prior snapshot is unavailable.
+        val combined = if (appendTail && previous.uiSnapshot != null) {
+            val appended = if (tailRecord.uiMessage == null) {
+                previous.uiSnapshot
+            } else {
+                previous.uiSnapshot.toMutableList().also { it.add(tailRecord.uiMessage) }
+            }
+            appended.toPersistentList()
+        } else if (appendTail) {
+            combineOlderPrefix(prefix, live).toPersistentList()
+        } else {
+            null
+        }
         // letta-mobile-yflpp: track pending/confirmed as counts on the snapshot
         // so a replaceTail can recompute the aggregate booleans in O(delta)
         // (subtract the old tail, add the new tail) instead of re-scanning the
@@ -494,8 +512,7 @@ internal class ChatTimelineObserver(
             previous.toolCardCount - previous.records.last().toolCardCount + tailRecord.toolCardCount
         }
         val tailIsAssistant = tailEvent is TimelineEvent.Confirmed && tailEvent.messageType == TimelineMessageType.ASSISTANT
-        val combined = combineOlderPrefix(prefix, live)
-        val ui = combined.toImmutableList()
+        val ui: ImmutableList<UiMessage> = combined ?: combineOlderPrefix(prefix, live).toImmutableList()
 
         projectionCache[tailKey] = tailRecord
         lastProjectionSnapshot = CachedTimelineProjectionSnapshot(
