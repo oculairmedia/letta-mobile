@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.letta.mobile.BuildConfig
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogParser
 import java.io.File
 import java.net.Socket
@@ -16,7 +15,7 @@ import java.net.Socket
  */
 class LiteRtSelfTestReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (!BuildConfig.DEBUG) return
+        selfTestLog("receiver_start", "PASS", "component=${javaClass.name}")
         val pendingResult = goAsync()
         Thread {
             try {
