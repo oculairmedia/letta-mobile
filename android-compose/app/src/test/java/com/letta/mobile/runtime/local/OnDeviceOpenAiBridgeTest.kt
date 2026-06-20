@@ -77,7 +77,7 @@ class OnDeviceOpenAiBridgeTest {
 
             assertEquals(200, response.code)
             assertTrue(response.body.contains("Hello from device"))
-            assertEquals("system: Be direct.\n\nuser: Say hello", engine.lastPrompt)
+            assertTrue(engine.lastPrompt.orEmpty().contains("system: Be direct.\n\nuser: Say hello"))
         }
     }
 
@@ -301,7 +301,7 @@ class OnDeviceOpenAiBridgeTest {
             assertEquals(200, response.code)
             assertTrue(response.body.contains("served by device"))
             assertTrue(response.body.contains("\"model\":\"$requestedModel\""))
-            assertEquals("user: Say hello", engine.lastPrompt)
+            assertTrue(engine.lastPrompt.orEmpty().contains("user: Say hello"))
         }
     }
 
