@@ -12,15 +12,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
 import org.jetbrains.jewel.foundation.theme.LocalContentColor as JewelLocalContentColor
 import org.jetbrains.jewel.ui.component.Chip as JewelChip
 import org.jetbrains.jewel.ui.component.DefaultButton as JewelDefaultButton
 import org.jetbrains.jewel.ui.component.Icon as JewelIcon
+import org.jetbrains.jewel.ui.component.IconButton as JewelIconButton
 import org.jetbrains.jewel.ui.component.OutlinedButton as JewelOutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonChip as JewelRadioButtonChip
 import org.jetbrains.jewel.ui.component.TextArea as JewelTextArea
@@ -89,6 +92,30 @@ internal fun DesktopSelectableChip(
         enabled = enabled,
         content = content,
     )
+}
+
+@Composable
+internal fun DesktopIconButton(
+    imageVector: ImageVector,
+    contentDescription: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconModifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    JewelIconButton(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+    ) {
+        JewelIcon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            modifier = iconModifier,
+            tint = tint,
+        )
+    }
 }
 
 @Composable

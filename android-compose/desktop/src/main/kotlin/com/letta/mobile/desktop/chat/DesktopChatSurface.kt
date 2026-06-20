@@ -45,12 +45,9 @@ import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,11 +84,14 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextArea
 import java.util.Base64
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
 
 @Composable
@@ -362,21 +362,27 @@ internal fun ConversationRow(
                     color = content.copy(alpha = 0.6f),
                 )
             }
-    }
-    DropdownMenu(
-        expanded = showMenu,
-        onDismissRequest = { showMenu = false }
-    ) {
-        DropdownMenuItem(
-            text = { Text("Delete Conversation") },
-            leadingIcon = { Icon(Icons.Outlined.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            onClick = {
-                showMenu = false
-                onDelete()
+        }
+        if (showMenu) {
+            JewelPopupMenu(
+                onDismissRequest = {
+                    showMenu = false
+                    true
+                },
+                horizontalAlignment = Alignment.End,
+            ) {
+                selectableItem(
+                    selected = false,
+                    onClick = {
+                        showMenu = false
+                        onDelete()
+                    },
+                ) {
+                    DesktopControlText("Delete conversation")
+                }
             }
-        )
+        }
     }
-}
 }
 
 @Composable
@@ -985,16 +991,14 @@ private fun ComposerBar(
                     color = Color.Transparent,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
-                    IconButton(
+                    DesktopIconButton(
+                        imageVector = Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = "Attach image",
                         onClick = onAttachImage,
                         enabled = enabled,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AddPhotoAlternate,
-                            contentDescription = "Attach image",
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                        iconModifier = Modifier.size(20.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 DesktopTextArea(
                     value = text,
@@ -1050,16 +1054,14 @@ private fun PendingAttachmentThumbnail(
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            IconButton(
+            DesktopIconButton(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Remove attachment",
                 onClick = onRemove,
                 modifier = Modifier.size(22.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = "Remove attachment",
-                    modifier = Modifier.size(14.dp),
-                )
-            }
+                iconModifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
         }
     }
 }
