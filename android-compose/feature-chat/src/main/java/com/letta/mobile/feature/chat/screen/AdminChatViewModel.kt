@@ -428,11 +428,18 @@ internal class AdminChatViewModel @Inject constructor(
 
     private fun modelSwitchUpdateParams(handle: String, config: LettaConfig?, agent: Agent?): AgentUpdateParams {
         val normalizedHandle = handle.trim()
-        val localModelHandle = config?.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
-        val localLeattaCodeHandle = localModelHandle?.let { "lmstudio/${it.removePrefix("lmstudio/")}" }
+        val configuredLocalModelHandle = config?.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
+        val normalizedLower = normalizedHandle.lowercase()
+        val knownGemmaLocalHandle = when (normalizedLower) {
+            "google/gemma-3n-e2b-it-litert-lm",
+            "lmstudio/google/gemma-3n-e2b-it-litert-lm" -> "google/gemma-3n-E2B-it-litert-lm"
+            else -> null
+        }
+        val effectiveLocalModelHandle = knownGemmaLocalHandle ?: configuredLocalModelHandle
+        val localLeattaCodeHandle = effectiveLocalModelHandle?.let { "lmstudio/${it.removePrefix("lmstudio/")}" }
         val localSelected = AgentRuntimeBinding.isLocalRuntime(config) &&
-            localModelHandle != null &&
-            normalizedHandle in setOf(localModelHandle, localLeattaCodeHandle)
+            effectiveLocalModelHandle != null &&
+            (knownGemmaLocalHandle != null || normalizedHandle in setOf(effectiveLocalModelHandle, localLeattaCodeHandle))
         val baseMetadata = agent?.metadata.orEmpty().filterKeys { it !in localRuntimeModelSwitchMetadataKeys }
         if (!localSelected || config == null) {
             return AgentUpdateParams(model = normalizedHandle, metadata = baseMetadata)
@@ -444,12 +451,12 @@ internal class AdminChatViewModel @Inject constructor(
             LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
             LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
             LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
-            LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(localModelHandle),
+            LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(effectiveLocalModelHandle),
             LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(runtime.lowercase()),
             LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(accelerator.lowercase()),
         )
         return AgentUpdateParams(
-            model = localModelHandle,
+            model = effectiveLocalModelHandle,
             metadata = baseMetadata + localMetadata,
             modelSettings = (agent?.modelSettings ?: ModelSettings()).copy(
                 providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
