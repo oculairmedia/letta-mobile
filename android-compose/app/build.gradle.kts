@@ -141,7 +141,7 @@ val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
 // Bump when asset-prep transforms change (transpile/polyfill), so the on-device
 // extractor re-extracts even though the npm version is unchanged.
-val embeddedLettaCodeAssetRevision = "29"
+val embeddedLettaCodeAssetRevision = "30"
 val embeddedLettaCodeLibnodeVersion = "v18.20.4"
 val embeddedLettaCodeLibnodeSha256 = "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af"
 val embeddedLettaCodeLibnodeArchiveName = "nodejs-mobile-$embeddedLettaCodeLibnodeVersion-android.zip"
@@ -741,7 +741,6 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
               const http = require('http');
               const dns = require('dns');
               const { Buffer } = require('buffer');
-              const { Readable } = require('stream');
               function postJson(path, payload) {
                 return new Promise((resolve, reject) => {
                   const body = JSON.stringify(payload || {});
@@ -775,6 +774,44 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                   req.end();
                 });
               }
+              function postFetch(payload) {
+                return new Promise((resolve, reject) => {
+                  const body = JSON.stringify(payload || {});
+                  const url = new URL('/fetch', bridgeBaseUrl);
+                  const req = http.request({
+                    hostname: url.hostname,
+                    port: url.port,
+                    path: url.pathname,
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Content-Length': Buffer.byteLength(body),
+                    },
+                  }, (res) => {
+                    const rawHeaders = res.headers || {};
+                    const status = Number(rawHeaders['x-android-bridge-upstream-status'] || res.statusCode || 0);
+                    const encodedStatusText = rawHeaders['x-android-bridge-upstream-status-text'];
+                    const statusText = encodedStatusText ? decodeURIComponent(String(encodedStatusText)) : (res.statusMessage || '');
+                    if (res.statusCode >= 400 && !rawHeaders['x-android-bridge-upstream-status']) {
+                      const chunks = [];
+                      res.on('data', (chunk) => chunks.push(chunk));
+                      res.on('end', () => {
+                        const text = Buffer.concat(chunks).toString('utf8');
+                        let parsed;
+                        try { parsed = text ? JSON.parse(text) : {}; } catch (_) { parsed = {}; }
+                        const message = parsed && parsed.error && parsed.error.message ? parsed.error.message : 'Android bridge HTTP ' + res.statusCode;
+                        reject(new Error(message));
+                      });
+                      return;
+                    }
+                    res.on('error', reject);
+                    resolve({ status, statusText, headers: rawHeaders, body: res });
+                  });
+                  req.on('error', reject);
+                  req.write(body);
+                  req.end();
+                });
+              }
               const nativeFetch = globalThis.fetch;
               const forceAndroidFetch = process.env.LETTA_ANDROID_NETWORK_BRIDGE_FORCE_FETCH === '1';
               if (forceAndroidFetch || typeof nativeFetch !== 'function') {
@@ -793,10 +830,11 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                     }
                   }
                   const requestBody = init.body == null ? undefined : String(init.body);
-                  const bridged = await postJson('/fetch', { url, method, headers, body: requestBody });
-                  const responseBody = Buffer.from(bridged.bodyBase64 || '', 'base64');
+                  const bridged = await postFetch({ url, method, headers, body: requestBody });
                   const rawHeaders = bridged.headers || {};
-                  const headerEntries = Object.entries(rawHeaders).map(([key, value]) => [String(key).toLowerCase(), String(value)]);
+                  const headerEntries = Object.entries(rawHeaders)
+                    .filter(([key]) => !String(key).toLowerCase().startsWith('x-android-bridge-upstream-'))
+                    .map(([key, value]) => [String(key).toLowerCase(), Array.isArray(value) ? value.join(', ') : String(value)]);
                   const responseHeaders = {
                     get(name) {
                       const key = String(name).toLowerCase();
@@ -810,16 +848,24 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
                     values() { return headerEntries.map(([, value]) => value)[Symbol.iterator](); },
                     [Symbol.iterator]() { return this.entries(); },
                   };
+                  const readBody = async () => {
+                    const chunks = [];
+                    for await (const chunk of bridged.body) chunks.push(Buffer.from(chunk));
+                    return Buffer.concat(chunks);
+                  };
                   return {
                     ok: bridged.status >= 200 && bridged.status < 300,
                     status: bridged.status,
                     statusText: bridged.statusText || '',
                     url,
                     headers: responseHeaders,
-                    body: Readable.from([responseBody]),
-                    arrayBuffer: async () => responseBody.buffer.slice(responseBody.byteOffset, responseBody.byteOffset + responseBody.byteLength),
-                    text: async () => responseBody.toString('utf8'),
-                    json: async () => JSON.parse(responseBody.toString('utf8')),
+                    body: bridged.body,
+                    arrayBuffer: async () => {
+                      const responseBody = await readBody();
+                      return responseBody.buffer.slice(responseBody.byteOffset, responseBody.byteOffset + responseBody.byteLength);
+                    },
+                    text: async () => (await readBody()).toString('utf8'),
+                    json: async () => JSON.parse((await readBody()).toString('utf8')),
                   };
                 };
                 globalThis.fetch.__androidBridgeOriginal = nativeFetch;
