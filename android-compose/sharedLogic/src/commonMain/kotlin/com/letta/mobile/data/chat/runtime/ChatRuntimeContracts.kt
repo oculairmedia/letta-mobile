@@ -85,8 +85,7 @@ fun Conversation.toChatConversationSummary(
 fun Iterable<Conversation>.toChatConversationSummaries(
     agentNamesById: Map<String, String> = emptyMap(),
 ): List<ChatConversationSummary> =
-    filterNot { it.isDefaultShimConversation() }
-        .map { it.toChatConversationSummary(agentNamesById) }
+    map { it.toChatConversationSummary(agentNamesById) }
 
 fun Conversation.isDefaultShimConversation(): Boolean =
     id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)

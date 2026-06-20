@@ -6,13 +6,18 @@ import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
+import com.letta.mobile.data.timeline.TimelineStreamFrame
+import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.desktop.DesktopBootstrapState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,12 +34,12 @@ class DesktopChatController(
     private val agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
     private val loopFactory: (
         gateway: DesktopChatGateway,
-        conversationId: String,
+        conversation: DesktopConversationSummary,
         scope: CoroutineScope,
-    ) -> DesktopTimelineLoop = { gateway, conversationId, loopScope ->
+    ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
         RealDesktopTimelineLoop(
             gateway = gateway,
-            conversationId = conversationId,
+            conversation = conversation,
             scope = loopScope,
         )
     },
@@ -253,7 +258,7 @@ class DesktopChatController(
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
         if (!isActiveSelection(generation)) return
         val nextGateway = gateway ?: return
-        if (_state.value.conversations.none { it.id == conversationId }) return
+        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
 
         timelineJob?.cancel()
         activeLoop?.close()
@@ -262,7 +267,7 @@ class DesktopChatController(
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
         }
 
-        val loop = loopFactory(nextGateway, conversationId, scope)
+        val loop = loopFactory(nextGateway, conversation, scope)
         activeLoop = loop
         timelineJob = scope.launch {
             loop.state.collect { timeline ->
@@ -328,12 +333,29 @@ interface DesktopTimelineLoop {
 
 private class RealDesktopTimelineLoop(
     gateway: DesktopChatGateway,
-    conversationId: String,
+    conversation: DesktopConversationSummary,
     scope: CoroutineScope,
 ) : DesktopTimelineLoop {
+    private val conversationId = conversation.id
+    private val agentId = conversation.agentId
+    private val transport = if (conversationId.isDefaultShimConversationId() && agentId != null) {
+        DefaultShimDesktopTimelineTransport(
+            gateway = gateway,
+            agentId = agentId,
+            externalConversationId = conversationId,
+        )
+    } else {
+        gateway
+    }
+    private val loopConversationId = if (conversationId.isDefaultShimConversationId() && agentId != null) {
+        "desktop-default-shim-$agentId-$conversationId"
+    } else {
+        conversationId
+    }
+
     private val delegate = TimelineSyncLoop(
-        messageApi = gateway,
-        conversationId = conversationId,
+        messageApi = transport,
+        conversationId = loopConversationId,
         scope = scope,
         logTag = "DesktopChat",
     )
@@ -353,3 +375,49 @@ private class RealDesktopTimelineLoop(
         delegate.close()
     }
 }
+
+private class DefaultShimDesktopTimelineTransport(
+    private val gateway: DesktopChatGateway,
+    private val agentId: String,
+    private val externalConversationId: String,
+) : TimelineTransport {
+    override suspend fun sendConversationMessage(
+        conversationId: String,
+        request: MessageCreateRequest,
+    ): Flow<LettaMessage> =
+        gateway.sendConversationMessage(externalConversationId, request)
+
+    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
+        gateway.streamConversation(externalConversationId)
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> =
+        gateway.listAgentMessages(
+            agentId = agentId,
+            limit = limit,
+            order = order,
+            conversationId = externalConversationId,
+        )
+
+    override suspend fun listAgentMessages(
+        agentId: String,
+        limit: Int?,
+        order: String?,
+        conversationId: String?,
+    ): List<LettaMessage> =
+        gateway.listAgentMessages(
+            agentId = agentId,
+            limit = limit,
+            order = order,
+            conversationId = conversationId,
+        )
+}
+
+private fun String.isDefaultShimConversationId(): Boolean =
+    startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
+
+private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
