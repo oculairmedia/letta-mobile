@@ -83,11 +83,12 @@ class ChatSessionReducerTest {
     }
 
     @Test
-    fun mapsConversationSummariesWithoutDefaultShimPlaceholders() {
+    fun mapsConversationSummariesIncludingDefaultShimPlaceholders() {
         val summaries = listOf(
             Conversation(
                 id = ConversationId("conv-default-agent-1"),
                 agentId = AgentId("agent-1"),
+                summary = "Default conversation",
             ),
             Conversation(
                 id = ConversationId("conversation-abcdef"),
@@ -96,9 +97,10 @@ class ChatSessionReducerTest {
             ),
         ).toChatConversationSummaries(agentNamesById = mapOf("agent-1" to "Ada"))
 
-        assertEquals(listOf("conversation-abcdef"), summaries.map { it.id })
-        assertEquals("Real conversation", summaries.single().title)
-        assertEquals("Ada", summaries.single().agentName)
+        assertEquals(listOf("conv-default-agent-1", "conversation-abcdef"), summaries.map { it.id })
+        assertEquals("Default conversation", summaries.first().title)
+        assertEquals("Real conversation", summaries.last().title)
+        assertEquals(listOf("Ada", "Ada"), summaries.map { it.agentName })
     }
 
     @Test
