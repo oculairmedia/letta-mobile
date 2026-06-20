@@ -109,6 +109,32 @@ class OnDeviceOpenAiBridgeTest {
         }
     }
 
+
+    @Test
+    fun `chat completions endpoint accepts any requested model for single served on-device model`() {
+        val engine = FakeEngine(response = "served by device")
+        val bridge = LocalOpenAiOnDeviceBridge(engine)
+        bridge.start(selection()).use { session ->
+            val response = post(
+                url = "${session.baseUrl}/chat/completions",
+                body = """
+                    {
+                      "model": "totally/different-model",
+                      "messages": [
+                        { "role": "user", "content": "Say hello" }
+                      ]
+                    }
+                """.trimIndent(),
+                bearerToken = session.authToken,
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(response.body.contains("served by device"))
+            assertTrue(response.body.contains("\"model\":\"lmstudio/gemma-3n\""))
+            assertEquals("user: Say hello", engine.lastPrompt)
+        }
+    }
+
     @Test
     fun `chat completions endpoint reports engine failure as unavailable`() {
         val bridge = LocalOpenAiOnDeviceBridge(
