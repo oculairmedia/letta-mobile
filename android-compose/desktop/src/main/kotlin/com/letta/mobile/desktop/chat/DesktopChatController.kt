@@ -400,7 +400,7 @@ private class DefaultShimDesktopTimelineTransport(
             agentId = agentId,
             limit = limit,
             order = order,
-            conversationId = externalConversationId,
+            conversationId = null,
         )
 
     override suspend fun listAgentMessages(

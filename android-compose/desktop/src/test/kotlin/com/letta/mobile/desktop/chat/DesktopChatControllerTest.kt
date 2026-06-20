@@ -83,8 +83,36 @@ class DesktopChatControllerTest {
         val state = controller.state.value
         assertEquals(listOf("conv-default-agent-1", "conv-2"), state.conversations.map { it.id })
         assertEquals("conv-default-agent-1", state.selectedConversationId)
-        assertTrue(state.selectedMessages.any { it.role == "user" && it.content == "Hello from agent history" })
-        assertEquals(listOf<Pair<String, String?>>("agent-0" to "conv-default-agent-1"), gateway.agentMessageRequests)
+        assertTrue(state.selectedMessages.any { it.role == "user" && it.content == "Hello from agent-0 history" })
+        assertEquals(listOf<Pair<String, String?>>("agent-0" to null), gateway.agentMessageRequests)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+
+        controller.close()
+    }
+
+    @Test
+    fun selectingAnotherDefaultShimConversationHydratesThroughItsAgentMessages() = runTest {
+        val gateway = FakeDesktopChatGateway(
+            conversationIds = listOf("conv-default-agent-1", "conv-default-agent-2"),
+        )
+        val controller = testController(gateway)
+
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-default-agent-2")
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals("conv-default-agent-2", state.selectedConversationId)
+        assertTrue(state.selectedMessages.any { it.role == "user" && it.content == "Hello from agent-1 history" })
+        assertEquals(
+            listOf<Pair<String, String?>>(
+                "agent-0" to null,
+                "agent-1" to null,
+            ),
+            gateway.agentMessageRequests,
+        )
+        assertTrue(gateway.conversationMessageRequests.isEmpty())
         assertEquals(DesktopChatConnectionState.Live, state.connectionState)
 
         controller.close()
@@ -525,8 +553,8 @@ open class FakeDesktopChatGateway(
         agentMessageRequests += agentId to conversationId
         return listOf(
             UserMessage(
-                id = "agent-user-1",
-                contentRaw = JsonPrimitive("Hello from agent history"),
+                id = "agent-user-$agentId",
+                contentRaw = JsonPrimitive("Hello from $agentId history"),
                 date = "2026-06-07T01:00:00Z",
             ),
         )
