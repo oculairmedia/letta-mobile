@@ -18,6 +18,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
 import java.net.URL
+import java.net.URLEncoder
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.Locale
@@ -57,6 +58,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
     private val mobileIntentActionTool: MobileIntentActionTool,
     private val hardwareControlProvider: DeviceHardwareControlProvider,
     private val deviceActionCommandRunner: DeviceActionCommandRunner,
+    private val allowLoopbackFetchForTests: Boolean = false,
 ) : AndroidNetworkBridge {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -76,6 +78,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
             mobileIntentActionTool = mobileIntentActionTool,
             hardwareControlTool = DeviceHardwareControlTool(hardwareControlProvider),
             deviceActionCommandRunner = deviceActionCommandRunner,
+            allowLoopbackFetchForTests = allowLoopbackFetchForTests,
         )
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
@@ -95,6 +98,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val mobileIntentActionTool: MobileIntentActionTool,
         private val hardwareControlTool: DeviceHardwareControlTool,
         private val deviceActionCommandRunner: DeviceActionCommandRunner,
+        private val allowLoopbackFetchForTests: Boolean,
     ) {
         @Volatile private var closed = false
 
@@ -334,24 +338,25 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 val text = value.jsonPrimitive.contentOrNull ?: return@mapNotNull null
                 key to text
             }
-            val response = runCatching { fetchViaHttpUrlConnection(url, method, headers, bodyText) }
+            runCatching { fetchViaHttpUrlConnection(output, url, method, headers, bodyText) }
                 .getOrElse { error ->
+                    if (error is BridgeResponseStartedException) return
                     output.writeJsonResponse(502, errorBody("fetch_failed", error.message ?: "Fetch failed."))
                     return
                 }
-            output.writeJsonResponse(200, response)
         }
 
         private fun fetchViaHttpUrlConnection(
+            output: OutputStream,
             url: String,
             method: String,
             headers: List<Pair<String, String>>,
             bodyText: String?,
-        ): JsonObject {
+        ) {
             val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = method
-                connectTimeout = FETCH_TIMEOUT_MS
-                readTimeout = FETCH_TIMEOUT_MS
+                connectTimeout = FETCH_CONNECT_TIMEOUT_MS
+                readTimeout = FETCH_READ_IDLE_TIMEOUT_MS
                 instanceFollowRedirects = true
                 headers.forEach { (key, value) ->
                     if (key.lowercase(Locale.US) !in BLOCKED_REQUEST_HEADERS) {
@@ -367,27 +372,26 @@ class LocalAndroidNetworkBridge @Inject constructor(
                     outputStream.use { it.write(bytes) }
                 }
             }
-            return connection.useResponse { input ->
-                val responseBytes = readLimitedBytes(input, MAX_RESPONSE_BYTES)
+            connection.useResponse { input ->
                 val responseHeaders = connection.headerFields.orEmpty()
                     .filterKeys { it != null }
-                    .mapValues { (_, values) -> values.orEmpty().joinToString(", ") }
-                buildJsonObject {
-                    put("status", connection.responseCode)
-                    put("statusText", connection.responseMessage.orEmpty())
-                    put(
-                        "headers",
-                        buildJsonObject {
-                            responseHeaders.forEach { (key, value) -> put(key, value) }
-                        },
-                    )
-                    put("bodyBase64", java.util.Base64.getEncoder().encodeToString(responseBytes))
+                    .mapValues { (_, values) -> values.orEmpty() }
+                output.writeUpstreamFetchHeaders(
+                    status = connection.responseCode,
+                    statusText = connection.responseMessage.orEmpty(),
+                    headers = responseHeaders,
+                )
+                try {
+                    output.streamLimited(input, MAX_RESPONSE_BYTES)
+                } catch (error: Throwable) {
+                    throw BridgeResponseStartedException(error)
                 }
             }
         }
 
         private fun isBlockedHost(host: String): Boolean {
             val normalized = host.lowercase(Locale.US).trimEnd('.')
+            if (allowLoopbackFetchForTests && (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "[::1]" || normalized == "::1")) return false
             if (normalized == "localhost") return true
             val addresses = runCatching { InetAddress.getAllByName(normalized).toList() }.getOrNull() ?: return false
             return addresses.any { address ->
@@ -407,14 +411,19 @@ class LocalAndroidNetworkBridge @Inject constructor(
             })
         }
 
-        private fun OutputStream.writeJsonResponse(status: Int, body: JsonObject) {
+        private fun OutputStream.writeJsonResponse(status: Int, body: JsonObject, extraHeaders: Map<String, String> = emptyMap()) {
             val bytes = json.encodeToString(JsonObject.serializer(), body).toByteArray(Charsets.UTF_8)
-            writeHeaders(status, "application/json; charset=utf-8", bytes.size)
+            writeHeaders(status, "application/json; charset=utf-8", bytes.size, extraHeaders)
             write(bytes)
             flush()
         }
 
-        private fun OutputStream.writeHeaders(status: Int, contentType: String, contentLength: Int? = null) {
+        private fun OutputStream.writeHeaders(
+            status: Int,
+            contentType: String,
+            contentLength: Int? = null,
+            extraHeaders: Map<String, String> = emptyMap(),
+        ) {
             val reason = when (status) {
                 200 -> "OK"
                 400 -> "Bad Request"
@@ -428,10 +437,73 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 append("HTTP/1.1 $status $reason\r\n")
                 append("Content-Type: $contentType\r\n")
                 contentLength?.let { append("Content-Length: $it\r\n") }
+                extraHeaders.forEach { (key, value) -> append("$key: $value\r\n") }
                 append("Connection: close\r\n")
                 append("\r\n")
             }
             write(headers.toByteArray(Charsets.UTF_8))
+        }
+
+        private fun OutputStream.writeUpstreamFetchHeaders(
+            status: Int,
+            statusText: String,
+            headers: Map<String, List<String>>,
+        ) {
+            val reason = statusText.ifBlank { httpReason(status) }
+            val headerText = buildString {
+                append("HTTP/1.1 $status $reason\r\n")
+                headers.forEach { (key, values) ->
+                    val normalized = key.trim()
+                    if (normalized.isBlank() || normalized.lowercase(Locale.US) in BLOCKED_RESPONSE_HEADERS) return@forEach
+                    values.filter { it.isNotBlank() }.forEach { value ->
+                        append(normalized).append(": ").append(value.replace("\r", "").replace("\n", "")).append("\r\n")
+                    }
+                }
+                append("X-Android-Bridge-Upstream-Status: $status\r\n")
+                append("X-Android-Bridge-Upstream-Status-Text: ${URLEncoder.encode(statusText, "UTF-8")}\r\n")
+                append("Connection: close\r\n")
+                append("\r\n")
+            }
+            write(headerText.toByteArray(Charsets.UTF_8))
+            flush()
+        }
+
+        private class BridgeResponseStartedException(cause: Throwable) : RuntimeException(cause)
+
+        private fun httpReason(status: Int): String = when (status) {
+            200 -> "OK"
+            201 -> "Created"
+            202 -> "Accepted"
+            204 -> "No Content"
+            400 -> "Bad Request"
+            401 -> "Unauthorized"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            500 -> "Internal Server Error"
+            502 -> "Bad Gateway"
+            503 -> "Service Unavailable"
+            504 -> "Gateway Timeout"
+            else -> "OK"
+        }
+
+        private fun OutputStream.streamLimited(input: InputStream, limit: Int) {
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            var total = 0
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                if (total + read > limit) {
+                    val allowed = limit - total
+                    if (allowed > 0) {
+                        write(buffer, 0, allowed)
+                        flush()
+                    }
+                    throw IllegalStateException("Response body exceeds ${limit} bytes.")
+                }
+                write(buffer, 0, read)
+                flush()
+                total += read
+            }
         }
     }
 
@@ -444,10 +516,12 @@ class LocalAndroidNetworkBridge @Inject constructor(
         // (letta-mobile-nojhc). 24MB comfortably covers the worst case.
         private const val MAX_REQUEST_BODY_BYTES = 24 * 1024 * 1024
         private const val MAX_RESPONSE_BYTES = 5 * 1024 * 1024
-        private const val FETCH_TIMEOUT_MS = 120_000
+        private const val FETCH_CONNECT_TIMEOUT_MS = 30_000
+        private const val FETCH_READ_IDLE_TIMEOUT_MS = 120_000
         private val ALLOWED_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
         private val METHODS_WITH_BODY = setOf("POST", "PUT", "PATCH", "DELETE")
         private val BLOCKED_REQUEST_HEADERS = setOf("host", "connection", "content-length", "transfer-encoding")
+        private val BLOCKED_RESPONSE_HEADERS = setOf("connection", "content-length", "transfer-encoding")
 
         private fun newBridgeToken(): String {
             val bytes = ByteArray(32)
@@ -485,10 +559,10 @@ private fun InputStream.readHttpLine(): String? {
     return line.toString()
 }
 
-private fun HttpURLConnection.useResponse(block: (InputStream) -> JsonObject): JsonObject {
+private fun HttpURLConnection.useResponse(block: (InputStream) -> Unit) {
     try {
         val input = if (responseCode >= 400) errorStream ?: inputStream else inputStream
-        return input.use(block)
+        input.use(block)
     } finally {
         disconnect()
     }
