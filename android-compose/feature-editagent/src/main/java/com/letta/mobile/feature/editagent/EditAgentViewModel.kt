@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -15,7 +16,6 @@ import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -126,6 +126,7 @@ internal class EditAgentViewModel @Inject constructor(
                     originalBlocks = originalBlocks,
                     originalEmbedding = originalEmbedding,
                     originalProviderType = originalProviderType,
+                    servedModelIds = { llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } } },
                 )
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
@@ -230,9 +231,23 @@ internal class EditAgentViewModel @Inject constructor(
                 )
             }
             val selectedContextWindow = selectedModel?.contextWindow?.takeIf { it > 0 }
+            val selectedHandle = selectedModel?.handle ?: value
+            val validation = ModelHandleValidator.validate(
+                handle = selectedHandle,
+                backend = if (selectedHandle.startsWith("lmstudio/", ignoreCase = true)) {
+                    ModelHandleValidator.Backend.REMOTE
+                } else {
+                    ModelHandleValidator.Backend.ON_DEVICE
+                },
+                servedModels = llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } },
+            )
+            if (validation is ModelHandleValidator.Result.Invalid) {
+                _uiState.value = UiState.Error(validation.reason)
+                return
+            }
             _uiState.value = UiState.Success(
                 currentState.copy(
-                    model = selectedModel?.handle ?: value,
+                    model = selectedHandle,
                     providerType = normalizedProviderType.orEmpty(),
                     contextWindow = selectedContextWindow
                         ?.let { maxContextWindow -> currentState.contextWindow.coerceIn(0, maxContextWindow) }

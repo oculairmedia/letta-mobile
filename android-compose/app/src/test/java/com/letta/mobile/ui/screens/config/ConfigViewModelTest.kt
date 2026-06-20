@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.EndpointOpenAiModelCatalog
 import com.letta.mobile.runtime.local.ImportedOnDeviceModel
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogEntry
@@ -44,6 +45,7 @@ class ConfigViewModelTest {
     private lateinit var fakeValidator: FakeCloudConnectionValidator
     private lateinit var fakeModelImporter: FakeOnDeviceModelImporter
     private lateinit var fakeEmbeddedModelRepository: FakeEmbeddedModelRepository
+    private lateinit var fakeEndpointCatalog: FakeEndpointOpenAiModelCatalog
     private lateinit var viewModel: ConfigViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -54,6 +56,7 @@ class ConfigViewModelTest {
         fakeValidator = FakeCloudConnectionValidator()
         fakeModelImporter = FakeOnDeviceModelImporter()
         fakeEmbeddedModelRepository = FakeEmbeddedModelRepository()
+        fakeEndpointCatalog = FakeEndpointOpenAiModelCatalog()
         // letta-mobile-cdlk: ConfigViewModel now reads ConfigRoute(createNew)
         // from SavedStateHandle. Empty handle is fine for the existing edit-
         // active-config test cases (createNew defaults to false when the
@@ -65,6 +68,7 @@ class ConfigViewModelTest {
             FakeEmbeddedLettaCodeRuntimeStatusProvider(),
             fakeModelImporter,
             fakeEmbeddedModelRepository,
+            fakeEndpointCatalog,
         )
     }
 
@@ -575,6 +579,68 @@ class ConfigViewModelTest {
         assertEquals("google/gemma-3n-E2B-it", savedConfig?.localProviderModel)
     }
 
+
+    @Test
+    fun saveConfig_withLiteRtModelUnderRemoteProvider_reportsErrorAndDoesNotSave() = runTest {
+        fakeRepository.activeConfigState.value = null
+        fakeEndpointCatalog.servedModels = listOf("deepseek-v4-flash")
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateLocalProviderBaseUrl("http://192.168.50.90:8082/v1")
+        viewModel.updateLocalProviderModel("lmstudio/google/gemma-3n-E2B-it-litert-lm")
+
+        var errorMessage: String? = null
+        viewModel.saveConfig(onSuccess = {}, onError = { errorMessage = it })
+
+        assertEquals(null, fakeRepository.activeConfig.value)
+        assertEquals(
+            "LiteRT models are on-device, not remote — pick a served model or import a .litertlm.",
+            errorMessage,
+        )
+    }
+
+    @Test
+    fun saveConfig_withUnservedRemoteProviderModel_reportsErrorAndDoesNotSave() = runTest {
+        fakeRepository.activeConfigState.value = null
+        fakeEndpointCatalog.servedModels = listOf("deepseek-v4-flash")
+        viewModel.loadConfig()
+
+        viewModel.updateMode(ServerMode.LOCAL)
+        viewModel.updateLocalProviderBaseUrl("http://192.168.50.90:8082/v1")
+        viewModel.updateLocalProviderModel("lmstudio/some-unserved")
+
+        var errorMessage: String? = null
+        viewModel.saveConfig(onSuccess = {}, onError = { errorMessage = it })
+
+        assertEquals(null, fakeRepository.activeConfig.value)
+        assertEquals("some-unserved is not served by http://192.168.50.90:8082/v1.", errorMessage)
+    }
+
+    @Test
+    fun saveConfig_withPreviouslyBrokenAgentEditedToServedRemoteModel_persistsValidHandle() = runTest {
+        val broken = LettaConfig(
+            id = "broken-local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = ConfigViewModel.LOCAL_RUNTIME_URL,
+            localProviderBaseUrl = "http://192.168.50.90:8082/v1",
+            localProviderModel = "lmstudio/google/gemma-3n-E2B-it-litert-lm",
+        )
+        fakeRepository.activeConfigState.value = broken
+        fakeEndpointCatalog.servedModels = listOf("deepseek-v4-flash", "gpt-4.1")
+        viewModel.loadConfig()
+
+        viewModel.updateLocalProviderModel("lmstudio/deepseek-v4-flash")
+
+        var onSuccessCalled = false
+        viewModel.saveConfig(onSuccess = { onSuccessCalled = true })
+
+        val savedConfig = fakeRepository.activeConfig.value
+        assertEquals("broken-local", savedConfig?.id)
+        assertEquals("lmstudio/deepseek-v4-flash", savedConfig?.localProviderModel)
+        assertTrue(onSuccessCalled)
+    }
+
     @Test
     fun importLocalModel_updatesLocalModelPathAndHandle() = runTest {
         fakeRepository.activeConfigState.value = null
@@ -789,6 +855,12 @@ class ConfigViewModelTest {
         )
 
         override suspend fun importModel(uri: Uri): ImportedOnDeviceModel = nextModel
+    }
+
+    private class FakeEndpointOpenAiModelCatalog : EndpointOpenAiModelCatalog() {
+        var servedModels: List<String>? = null
+
+        override suspend fun listServedModelIdsOrNull(baseUrl: String, apiKey: String?): List<String>? = servedModels
     }
 
     private class FakeEmbeddedModelRepository : EmbeddedModelRepository {

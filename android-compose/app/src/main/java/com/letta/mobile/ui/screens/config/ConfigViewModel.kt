@@ -11,8 +11,10 @@ import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
+import com.letta.mobile.runtime.local.EndpointOpenAiModelCatalog
 import com.letta.mobile.runtime.local.OnDeviceModelImporter
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
@@ -71,6 +73,7 @@ class ConfigViewModel @Inject constructor(
     private val embeddedRuntimeStatusProvider: EmbeddedLettaCodeRuntimeStatusProvider,
     private val onDeviceModelImporter: OnDeviceModelImporter,
     private val embeddedModelRepository: EmbeddedModelRepository,
+    private val endpointOpenAiModelCatalog: EndpointOpenAiModelCatalog,
 ) : ViewModel() {
 
     companion object {
@@ -407,6 +410,15 @@ class ConfigViewModel @Inject constructor(
                     onError?.invoke("Custom provider URL must start with http:// or https://.")
                     return@launch
                 }
+                val modelValidation = validateModelSelection(
+                    state = state,
+                    trimmedProviderBaseUrl = trimmedProviderBaseUrl,
+                )
+                if (modelValidation is ModelHandleValidator.Result.Invalid) {
+                    _uiState.value = UiState.Success(state.copy(isSaving = false))
+                    onError?.invoke(modelValidation.reason)
+                    return@launch
+                }
                 if (state.mode == ServerMode.CLOUD) {
                     if (apiToken.isBlank()) {
                         _uiState.value = UiState.Success(state.copy(isSaving = false))
@@ -480,6 +492,33 @@ class ConfigViewModel @Inject constructor(
                 onError?.invoke(e.message ?: "Failed to save config")
             }
         }
+    }
+
+    private suspend fun validateModelSelection(
+        state: ConfigUiState,
+        trimmedProviderBaseUrl: String,
+    ): ModelHandleValidator.Result {
+        if (state.mode != ServerMode.LOCAL) return ModelHandleValidator.Result.Valid
+
+        val providerModel = state.localProviderModel.trim()
+        if (trimmedProviderBaseUrl.isNotBlank() || providerModel.startsWith("lmstudio/", ignoreCase = true)) {
+            val servedModels = endpointOpenAiModelCatalog.listServedModelIdsOrNull(
+                baseUrl = trimmedProviderBaseUrl,
+                apiKey = state.localProviderApiKey.trim().ifBlank { null },
+            )
+            return ModelHandleValidator.validate(
+                handle = providerModel,
+                backend = ModelHandleValidator.Backend.REMOTE,
+                customBaseUrl = trimmedProviderBaseUrl,
+                servedModels = servedModels,
+            )
+        }
+
+        return ModelHandleValidator.validate(
+            handle = state.localModelHandle,
+            backend = ModelHandleValidator.Backend.ON_DEVICE,
+            onDeviceModelPath = state.localModelPath,
+        )
     }
 }
 
