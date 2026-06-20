@@ -13,7 +13,7 @@ class OnDeviceToolCallProtocolTest {
     private fun request(body: String) = json.parseToJsonElement(body).jsonObject
 
     @Test
-    fun `renderPrompt includes tool instructions and schemas`() {
+    fun `renderPrompt includes compact tool instructions without full schemas`() {
         val prompt = OnDeviceToolCallProtocol.renderPrompt(
             request(
                 """
@@ -36,7 +36,7 @@ class OnDeviceToolCallProtocolTest {
 
         assertTrue(prompt.contains("```tool_call"))
         assertTrue(prompt.contains("- memory: Edit memory."))
-        assertTrue(prompt.contains("\"path\""))
+        assertTrue("full parameter schemas should stay out of the LiteRT prompt budget", !prompt.contains("\"path\""))
         assertTrue(prompt.contains("system: You are helpful."))
         assertTrue(prompt.contains("user: hi"))
     }
@@ -64,6 +64,29 @@ class OnDeviceToolCallProtocolTest {
         assertTrue(prompt.contains("tool result (call_1): file-a\nfile-b"))
     }
 
+
+    @Test
+    fun `renderPrompt keeps recent messages within bounded prompt budget`() {
+        val oldMessages = (1..20).joinToString(",") { index ->
+            "{\"role\":\"user\",\"content\":\"old-$index ${"x".repeat(500)}\"}"
+        }
+        val prompt = OnDeviceToolCallProtocol.renderPrompt(
+            request(
+                """
+                {
+                  "messages": [
+                    $oldMessages,
+                    {"role": "user", "content": "latest question"}
+                  ]
+                }
+                """.trimIndent()
+            )
+        )
+
+        assertTrue(prompt.length <= 8_500)
+        assertTrue(prompt.contains("latest question"))
+        assertTrue(prompt.contains("Older conversation context omitted"))
+    }
 
     @Test
     fun `extractImages decodes OpenAI data URL image parts`() {
