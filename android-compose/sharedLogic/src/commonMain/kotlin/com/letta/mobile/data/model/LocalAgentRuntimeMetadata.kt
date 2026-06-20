@@ -62,6 +62,7 @@ object AgentRuntimeBinding {
         "google-ai",
         "groq",
         "letta",
+        "lmstudio",
         "openai",
         "openrouter",
         "perplexity",

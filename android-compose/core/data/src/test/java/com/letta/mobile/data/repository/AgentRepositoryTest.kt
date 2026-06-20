@@ -139,6 +139,16 @@ class AgentRepositoryTest {
     }
 
     @Test
+    fun `local-agent id with lmstudio cloud model is not local-bound`() {
+        val agent = TestData.agent(
+            id = "local-agent-1",
+            model = "lmstudio/deepseek-v4-flash",
+        )
+
+        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
+    }
+
+    @Test
     fun `local-agent id with local model remains local-bound`() {
         val agent = TestData.agent(
             id = "local-agent-1",
@@ -250,7 +260,7 @@ class AgentRepositoryTest {
         val agent = repository.createLocalAgent(
             AgentCreateParams(
                 name = "Local",
-                model = "lmstudio/local-model",
+                model = "google/gemma-3n-E2B-it-litert-lm",
                 metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
                 toolIds = listOf(com.letta.mobile.data.model.ToolId("tool-1")),
                 includeBaseTools = true,
@@ -259,7 +269,7 @@ class AgentRepositoryTest {
 
         assertTrue(agent.id.value.startsWith("local-agent-"))
         assertTrue(AgentRuntimeBinding.isLocalBound(agent))
-        assertEquals("lmstudio/local-model", agent.model)
+        assertEquals("google/gemma-3n-E2B-it-litert-lm", agent.model)
         assertTrue(agent.tools.isEmpty())
         assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
         assertEquals(listOf(agent.id.value), fakeDao.getAllOnce().map { it.id })
