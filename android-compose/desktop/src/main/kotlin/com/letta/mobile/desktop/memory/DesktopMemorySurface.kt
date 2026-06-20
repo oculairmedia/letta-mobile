@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,10 +23,8 @@ import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -72,6 +69,10 @@ import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.data.memory.MemoryTextLink
 import com.letta.mobile.data.memory.accentRole
 import com.letta.mobile.data.memory.validForText
+import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopControlText
+import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopRadioChip
 import sh.calvin.autolinktext.SimpleTextMatchResult
 import sh.calvin.autolinktext.TextMatcher
 import sh.calvin.autolinktext.TextRule
@@ -155,13 +156,14 @@ private fun MemoryHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Button(
+        DesktopDefaultButton(
             onClick = onRefresh,
             enabled = !state.isLoading,
         ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(if (state.isLoading) "Refreshing" else "Refresh")
+            DesktopButtonContent(
+                text = if (state.isLoading) "Refreshing" else "Refresh",
+                icon = Icons.Outlined.Refresh,
+            )
         }
     }
 }
@@ -207,11 +209,12 @@ private fun AgentSelector(
                     items = agents,
                     key = { it.id },
                 ) { agent ->
-                    FilterChip(
+                    DesktopRadioChip(
                         selected = agent.id == selectedAgentId,
                         onClick = { onAgentSelected(agent.id) },
-                        label = { Text(agent.name) },
-                    )
+                    ) {
+                        DesktopControlText(agent.name)
+                    }
                 }
             }
         }

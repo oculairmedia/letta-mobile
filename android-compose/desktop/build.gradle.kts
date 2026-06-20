@@ -7,6 +7,7 @@ val composeDesktopMaterial3Version = "1.9.0"
 val composeDesktopMaterialIconsVersion = "1.7.3"
 val coroutinesVersion = "1.11.0"
 val ktorVersion = "3.5.0"
+val jewelVersion = "0.37.0-262.4852.51"
 val kuiverVersion = "0.3.0"
 val autoLinkTextVersion = "2.0.2"
 val textyVersion = "1.0.0-alpha"
@@ -49,6 +50,7 @@ kotlin {
         jvmTarget.set(JvmTarget.JVM_17)
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=org.jetbrains.jewel.foundation.ExperimentalJewelApi",
             "-Xcontext-parameters",
         )
     }
@@ -60,6 +62,7 @@ dependencies {
     implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
     implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
     implementation(compose.desktop.currentOs)
+    implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
     implementation("io.github.justdeko:kuiver:$kuiverVersion")
