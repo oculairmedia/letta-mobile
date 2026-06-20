@@ -319,6 +319,33 @@ internal class ChatConversationCoordinator(
             loadTimer.stop("result" to "noConversation")
             return
         }
+        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+            val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
+            if (requestedConversationId == currentConversationId) {
+                val summary = ChatConversationSummary(
+                    id = requestedConversationId,
+                    title = cachedAgent?.name ?: uiState.value.agentName,
+                    agentName = cachedAgent?.name ?: uiState.value.agentName,
+                    updatedAtLabel = "",
+                    lastMessagePreview = "",
+                )
+                updateSessionState { current ->
+                    val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+                    ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
+                }
+                uiState.value = uiState.value.copy(
+                    agentName = cachedAgent?.name ?: uiState.value.agentName,
+                    isLoadingOlderMessages = false,
+                    hasMoreOlderMessages = false,
+                )
+                startTimelineObserver(requestedConversationId)
+            }
+            loadTimer.stop(
+                "conversationId" to requestedConversationId,
+                "mode" to "local",
+            )
+            return
+        }
         val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
         val cachedMessages = emptyList<AppMessage>()
         if (cachedAgent != null || cachedMessages.isNotEmpty()) {

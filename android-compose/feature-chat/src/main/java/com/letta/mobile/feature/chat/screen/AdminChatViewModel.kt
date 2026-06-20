@@ -664,6 +664,14 @@ internal class AdminChatViewModel @Inject constructor(
                     )
                 }
             }
+            if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+                Log.d(TAG, "Slash commands skipped for local runtime agent=${agentId.value}")
+                if (loadVersion == slashCommandsLoadVersion) {
+                    composerCoordinator.setSlashCommands(builtIns)
+                    _uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
+                }
+                return@launch
+            }
             // Always expose the FULL global catalog for discovery, marking
             // which are already installed on this agent. Installed ones appear
             // first and styled differently; selecting an uninstalled one
@@ -752,7 +760,10 @@ internal class AdminChatViewModel @Inject constructor(
         resolveConversationAndLoad()
     }
 
-    fun loadOlderMessages() = chatHistoryPager.loadOlderMessages(false)
+    fun loadOlderMessages() {
+        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        chatHistoryPager.loadOlderMessages(false)
+    }
 
     fun reportComposerError(message: String) = composerCoordinator.reportComposerError(message)
 
@@ -874,6 +885,10 @@ internal class AdminChatViewModel @Inject constructor(
     fun sendMessage(text: String) = composerCoordinator.sendMessage(text)
 
     fun refreshGoalStatus() {
+        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+            _uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isGoalStatusLoading = true) }
             slashCommandRepository.getGoalStatus(agentId.value)
