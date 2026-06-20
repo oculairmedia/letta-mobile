@@ -16,6 +16,7 @@ import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import io.mockk.coVerify
+import io.mockk.spyk
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -121,13 +122,15 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
-    fun `lmstudio remote model bypasses litertlm gate and uses endpoint provider`() = runTest {
+    fun `lmstudio-prefixed on-device model starts bridge and registers bare lookup id`() = runTest {
         mockkStatic(ContextCompat::class)
         every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
         every { ContextCompat.startForegroundService(any(), any()) } returns Unit
-        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-remote-model-${System.nanoTime()}").apply { mkdirs() }
+        val modelFile = File(System.getProperty("java.io.tmpdir"), "letta-model-${System.nanoTime()}.litertlm")
+            .apply { writeText("model") }
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-on-device-model-${System.nanoTime()}").apply { mkdirs() }
         val nodeBridge = FakeNodeBridge()
-        val onDeviceBridge = mockk<OnDeviceOpenAiBridge>(relaxed = true)
+        val onDeviceBridge = spyk(FakeOnDeviceBridge())
         val controller = AndroidLettaCodeRuntimeController(
             context = mockk<Context>(relaxed = true),
             assetExtractor = FakeAssetExtractor(baseDir),
@@ -141,17 +144,20 @@ class AndroidLettaCodeRuntimeControllerTest {
         runCatching {
             controller.submit(
                 command(),
-                config(localModelHandle = "lmstudio/google/gemma-3n-E2B-it"),
+                config(
+                    localModelPath = modelFile.absolutePath,
+                    localModelHandle = "lmstudio/google/gemma-3n-E2B-it-litert-lm",
+                ),
             ).first()
         }
 
-        assertEquals(true, nodeBridge.started)
-        assertEquals(
-            EmbeddedLettaCodeModelSelection.DEFAULT_LM_STUDIO_BASE_URL,
-            nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"),
-        )
-        assertEquals("not-needed", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_API_KEY"))
-        coVerify(exactly = 0) { onDeviceBridge.start(any()) }
+        val authJson = File(baseDir, "storage/providers/auth.json").readText()
+        assertTrue(nodeBridge.started)
+        assertEquals("http://127.0.0.1:2/v1", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"))
+        assertEquals("openai-loopback-token", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_API_KEY"))
+        assertTrue(authJson.contains("\"id\": \"google/gemma-3n-E2B-it-litert-lm\""))
+        assertFalse(authJson.contains("\"id\": \"lmstudio/google/gemma-3n-E2B-it-litert-lm\""))
+        coVerify(exactly = 1) { onDeviceBridge.start(any()) }
     }
 
     @Test
@@ -207,6 +213,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
         every { ContextCompat.startForegroundService(any(), any()) } returns Unit
         val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-same-session-${System.nanoTime()}").apply { mkdirs() }
+        val modelPath = tempModelPath()
         val nodeBridge = FakeNodeBridge()
         val controller = AndroidLettaCodeRuntimeController(
             context = mockk<Context>(relaxed = true),
@@ -218,8 +225,8 @@ class AndroidLettaCodeRuntimeControllerTest {
             androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
-        controller.submit(command(), config(localModelHandle = "lmstudio/gemma")).first()
-        controller.submit(command(), config(localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(command(), config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(command(), config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma")).first()
 
         assertTrue(nodeBridge.started)
         assertEquals(1, nodeBridge.startCalls)
@@ -244,10 +251,10 @@ class AndroidLettaCodeRuntimeControllerTest {
             androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
-        controller.submit(command(), config(localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/gemma")).first()
         controller.submit(
             command(agentId = "agent-2", conversationId = "conv-2"),
-            config(localModelHandle = "lmstudio/gemma"),
+            config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/gemma"),
         ).first()
 
         assertTrue(nodeBridge.started)
@@ -272,7 +279,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         )
         val controller = controller(nodeBridge, turnSilenceMs = 120_000L, turnAbsoluteMaxMs = 300_000L)
 
-        val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
+        val events = controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
 
         advanceTimeBy(160_000L)
         runCurrent()
@@ -288,7 +295,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         val nodeBridge = FakeNodeBridge(outputLines = MutableSharedFlow<String>())
         val controller = controller(nodeBridge, turnSilenceMs = 1_000L, turnAbsoluteMaxMs = 10_000L)
 
-        val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
+        val events = controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
         advanceTimeBy(1_000L)
         runCurrent()
 
@@ -308,7 +315,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         )
         val controller = controller(nodeBridge, turnSilenceMs = 1_000L, turnAbsoluteMaxMs = 3_000L)
 
-        val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
+        val events = controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
         advanceTimeBy(3_000L)
         runCurrent()
 
@@ -321,7 +328,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         val nodeBridge = FakeNodeBridge(outputLines = MutableSharedFlow<String>())
         val controller = controller(nodeBridge, turnSilenceMs = 120_000L, turnAbsoluteMaxMs = 300_000L)
 
-        val job = launch { controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).collect {} }
+        val job = launch { controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).collect {} }
         runCurrent()
         job.cancel(CancellationException("stop"))
         runCurrent()
@@ -364,6 +371,10 @@ class AndroidLettaCodeRuntimeControllerTest {
         } else {
             EmbeddedLettaCodeRuntimeStatus(false, false, "", "")
         }
+
+    private fun tempModelPath(): String = File.createTempFile("model", ".litertlm")
+        .apply { writeText("model"); deleteOnExit() }
+        .absolutePath
 
     private fun config(
         localModelPath: String? = null,
