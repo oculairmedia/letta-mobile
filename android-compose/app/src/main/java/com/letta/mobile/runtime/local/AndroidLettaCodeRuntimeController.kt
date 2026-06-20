@@ -54,8 +54,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val localBackendStore: LettaCodeLocalBackendStore,
     private val androidNetworkBridge: AndroidNetworkBridge,
     private val deviceSensorGroundingWriter: DeviceSensorGroundingWriter? = null,
-    private val turnSilenceMs: Long = TURN_SILENCE_MS,
-    private val turnAbsoluteMaxMs: Long = TURN_ABSOLUTE_MAX_MS,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -64,6 +62,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private var activeSession: EmbeddedLettaCodeSessionKey? = null
     private var activeOnDeviceBridgeSession: OnDeviceOpenAiBridgeSession? = null
     private var activeAndroidNetworkBridgeSession: AndroidNetworkBridgeSession? = null
+
+    internal var turnSilenceMs: Long = TURN_SILENCE_MS
+    internal var turnAbsoluteMaxMs: Long = TURN_ABSOLUTE_MAX_MS
 
     override fun submit(command: TurnCommand, config: LettaConfig): Flow<String> = channelFlow {
         if (command.input is TurnInput.ToolApprovalResponse) {

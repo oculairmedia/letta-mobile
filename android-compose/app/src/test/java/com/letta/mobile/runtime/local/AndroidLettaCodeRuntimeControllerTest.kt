@@ -203,7 +203,7 @@ class AndroidLettaCodeRuntimeControllerTest {
     @Test
     fun `streaming output keeps turn alive past old total timeout`() = runTest {
         val nodeBridge = FakeNodeBridge(
-            output = flow {
+            outputLines = flow {
                 repeat(5) { index ->
                     delay(40_000L)
                     emit("""{"type":"stream_event","event":{"type":"reasoning_message","message":"$index"}}""")
@@ -226,7 +226,7 @@ class AndroidLettaCodeRuntimeControllerTest {
 
     @Test
     fun `silent turn times out after idle window`() = runTest {
-        val nodeBridge = FakeNodeBridge(output = MutableSharedFlow())
+        val nodeBridge = FakeNodeBridge(outputLines = MutableSharedFlow<String>())
         val controller = controller(nodeBridge, turnSilenceMs = 1_000L, turnAbsoluteMaxMs = 10_000L)
 
         val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
@@ -240,7 +240,7 @@ class AndroidLettaCodeRuntimeControllerTest {
     @Test
     fun `absolute ceiling bounds output spamming turn`() = runTest {
         val nodeBridge = FakeNodeBridge(
-            output = flow {
+            outputLines = flow {
                 while (true) {
                     delay(500L)
                     emit("""{"type":"stream_event","event":{"type":"status","message":"working"}}""")
@@ -259,7 +259,7 @@ class AndroidLettaCodeRuntimeControllerTest {
 
     @Test
     fun `cancel interrupts turn promptly`() = runTest {
-        val nodeBridge = FakeNodeBridge(output = MutableSharedFlow())
+        val nodeBridge = FakeNodeBridge(outputLines = MutableSharedFlow<String>())
         val controller = controller(nodeBridge, turnSilenceMs = 120_000L, turnAbsoluteMaxMs = 300_000L)
 
         val job = launch { controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).collect {} }
@@ -344,9 +344,10 @@ class AndroidLettaCodeRuntimeControllerTest {
         onDeviceOpenAiBridge = mockk(relaxed = true),
         localBackendStore = mockk(relaxed = true),
         androidNetworkBridge = FakeAndroidNetworkBridge(),
-        turnSilenceMs = turnSilenceMs,
-        turnAbsoluteMaxMs = turnAbsoluteMaxMs,
-    )
+    ).apply {
+        this.turnSilenceMs = turnSilenceMs
+        this.turnAbsoluteMaxMs = turnAbsoluteMaxMs
+    }
 
 
     private fun toolApprovalCommand(): TurnCommand = command().copy(
