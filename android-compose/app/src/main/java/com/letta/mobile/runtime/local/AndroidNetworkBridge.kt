@@ -58,7 +58,6 @@ class LocalAndroidNetworkBridge @Inject constructor(
     private val mobileIntentActionTool: MobileIntentActionTool,
     private val hardwareControlProvider: DeviceHardwareControlProvider,
     private val deviceActionCommandRunner: DeviceActionCommandRunner,
-    private val allowLoopbackFetchForTests: Boolean = false,
 ) : AndroidNetworkBridge {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -78,7 +77,6 @@ class LocalAndroidNetworkBridge @Inject constructor(
             mobileIntentActionTool = mobileIntentActionTool,
             hardwareControlTool = DeviceHardwareControlTool(hardwareControlProvider),
             deviceActionCommandRunner = deviceActionCommandRunner,
-            allowLoopbackFetchForTests = allowLoopbackFetchForTests,
         )
         executor.execute(session::acceptLoop)
         return AndroidNetworkBridgeSession(
@@ -98,7 +96,6 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val mobileIntentActionTool: MobileIntentActionTool,
         private val hardwareControlTool: DeviceHardwareControlTool,
         private val deviceActionCommandRunner: DeviceActionCommandRunner,
-        private val allowLoopbackFetchForTests: Boolean,
     ) {
         @Volatile private var closed = false
 
@@ -391,7 +388,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
 
         private fun isBlockedHost(host: String): Boolean {
             val normalized = host.lowercase(Locale.US).trimEnd('.')
-            if (allowLoopbackFetchForTests && (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "[::1]" || normalized == "::1")) return false
+            if (java.lang.Boolean.getBoolean(ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY) && (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "[::1]" || normalized == "::1")) return false
             if (normalized == "localhost") return true
             val addresses = runCatching { InetAddress.getAllByName(normalized).toList() }.getOrNull() ?: return false
             return addresses.any { address ->
@@ -522,6 +519,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private val METHODS_WITH_BODY = setOf("POST", "PUT", "PATCH", "DELETE")
         private val BLOCKED_REQUEST_HEADERS = setOf("host", "connection", "content-length", "transfer-encoding")
         private val BLOCKED_RESPONSE_HEADERS = setOf("connection", "content-length", "transfer-encoding")
+        private const val ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY = "com.letta.mobile.androidNetworkBridge.allowLoopbackFetchForTests"
 
         private fun newBridgeToken(): String {
             val bytes = ByteArray(32)

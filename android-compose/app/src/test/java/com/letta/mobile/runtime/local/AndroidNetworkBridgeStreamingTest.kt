@@ -52,14 +52,14 @@ class AndroidNetworkBridgeStreamingTest {
         }
         upstream.start()
 
-        bridge().start().use { session ->
+        withLoopbackFetchAllowed { bridge().start().use { session ->
             Socket("127.0.0.1", java.net.URI(session.baseUrl).port).use { socket ->
                 socket.soTimeout = 2_000
                 postFetch(socket.getOutputStream(), session.authToken, "http://127.0.0.1:${upstream.address.port}/sse")
                 val input = socket.getInputStream()
                 val headers = readUntil(input, "\r\n\r\n")
                 assertTrue(headers.startsWith("HTTP/1.1 200"))
-                assertTrue(headers.contains("Content-Type: text/event-stream"))
+                assertTrue(headers.lowercase().contains("content-type: text/event-stream"))
                 assertTrue(firstChunkWritten.await(2, TimeUnit.SECONDS))
                 val first = readUntil(input, "\n\n")
                 assertEquals("data: first\n\n", first)
@@ -67,7 +67,7 @@ class AndroidNetworkBridgeStreamingTest {
                 val second = readUntil(input, "\n\n")
                 assertEquals("data: second\n\n", second)
             }
-        }
+        } }
         upstream.stop(0)
     }
 
@@ -83,16 +83,17 @@ class AndroidNetworkBridgeStreamingTest {
         }
         upstream.start()
 
-        bridge().start().use { session ->
+        withLoopbackFetchAllowed { bridge().start().use { session ->
             Socket("127.0.0.1", java.net.URI(session.baseUrl).port).use { socket ->
                 postFetch(socket.getOutputStream(), session.authToken, "http://127.0.0.1:${upstream.address.port}/json")
                 val response = socket.getInputStream().bufferedReader().readText()
                 assertTrue(response.startsWith("HTTP/1.1 201"))
-                assertTrue(response.contains("Content-Type: application/json"))
-                assertTrue(response.contains("X-test-header: present") || response.contains("X-Test-header: present") || response.contains("X-Test-Header: present"))
+                val lowerResponse = response.lowercase()
+                assertTrue(lowerResponse.contains("content-type: application/json"))
+                assertTrue(lowerResponse.contains("x-test-header: present"))
                 assertTrue(response.endsWith("{\"ok\":true}"))
             }
-        }
+        } }
         upstream.stop(0)
     }
 
@@ -159,8 +160,18 @@ class AndroidNetworkBridgeStreamingTest {
         mobileIntentActionTool = mobileIntentTool(),
         hardwareControlProvider = fakeHardwareProvider(),
         deviceActionCommandRunner = commandRunner(),
-        allowLoopbackFetchForTests = true,
     )
+
+    private fun withLoopbackFetchAllowed(block: () -> Unit) {
+        val property = "com.letta.mobile.androidNetworkBridge.allowLoopbackFetchForTests"
+        val previous = System.getProperty(property)
+        System.setProperty(property, "true")
+        try {
+            block()
+        } finally {
+            if (previous == null) System.clearProperty(property) else System.setProperty(property, previous)
+        }
+    }
 
     private fun sensorProvider(): DeviceSensorSnapshotProvider = object : DeviceSensorSnapshotProvider {
         override fun snapshot(nowMillis: Long): DeviceSensorSnapshot = DeviceSensorSnapshot(capturedAtMillis = nowMillis)
