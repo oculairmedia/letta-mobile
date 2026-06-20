@@ -111,28 +111,18 @@ class OnDeviceOpenAiBridgeTest {
 
 
     @Test
-    fun `chat completions endpoint accepts any requested model for single served on-device model`() {
-        val engine = FakeEngine(response = "served by device")
-        val bridge = LocalOpenAiOnDeviceBridge(engine)
-        bridge.start(selection()).use { session ->
-            val response = post(
-                url = "${session.baseUrl}/chat/completions",
-                body = """
-                    {
-                      "model": "totally/different-model",
-                      "messages": [
-                        { "role": "user", "content": "Say hello" }
-                      ]
-                    }
-                """.trimIndent(),
-                bearerToken = session.authToken,
-            )
+    fun `chat completions endpoint accepts bare model and echoes it`() {
+        assertAcceptedAndEchoed("google/gemma-3n-E2B-it-litert-lm")
+    }
 
-            assertEquals(200, response.code)
-            assertTrue(response.body.contains("served by device"))
-            assertTrue(response.body.contains("\"model\":\"lmstudio/gemma-3n\""))
-            assertEquals("user: Say hello", engine.lastPrompt)
-        }
+    @Test
+    fun `chat completions endpoint accepts prefixed model and echoes it`() {
+        assertAcceptedAndEchoed("lmstudio/google/gemma-3n-E2B-it-litert-lm")
+    }
+
+    @Test
+    fun `chat completions endpoint accepts mismatched model and echoes it`() {
+        assertAcceptedAndEchoed("totally/different-model")
     }
 
     @Test
@@ -261,6 +251,30 @@ class OnDeviceOpenAiBridgeTest {
 
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull()?.message.orEmpty().contains(missing.absolutePath))
+    }
+
+    private fun assertAcceptedAndEchoed(requestedModel: String) {
+        val engine = FakeEngine(response = "served by device")
+        val bridge = LocalOpenAiOnDeviceBridge(engine)
+        bridge.start(selection()).use { session ->
+            val response = post(
+                url = "${session.baseUrl}/chat/completions",
+                body = """
+                    {
+                      "model": "$requestedModel",
+                      "messages": [
+                        { "role": "user", "content": "Say hello" }
+                      ]
+                    }
+                """.trimIndent(),
+                bearerToken = session.authToken,
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(response.body.contains("served by device"))
+            assertTrue(response.body.contains("\"model\":\"$requestedModel\""))
+            assertEquals("user: Say hello", engine.lastPrompt)
+        }
     }
 
     private fun selection(modelPath: String? = "/data/model/gemma.litertlm"): EmbeddedLettaCodeModelSelection = EmbeddedLettaCodeModelSelection(

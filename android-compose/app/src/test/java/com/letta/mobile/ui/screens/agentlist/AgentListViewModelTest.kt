@@ -165,7 +165,7 @@ class AgentListViewModelTest {
 
         val captured = paramsSlot.captured
         assertEquals(AgentId("local-agent-test"), createdId)
-        assertEquals("lmstudio/google/gemma-test-litert-lm", captured.model)
+        assertEquals("google/gemma-test-litert-lm", captured.model)
         assertEquals(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime, captured.modelSettings?.providerType)
         assertEquals(false, captured.modelSettings?.parallelToolCalls)
         assertNull(captured.toolIds)
@@ -180,11 +180,8 @@ class AgentListViewModelTest {
             "${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:local-config",
             captured.metadata?.get(LocalAgentRuntimeMetadata.RuntimeIdKey)?.jsonPrimitive?.contentOrNull,
         )
-        // Metadata handle now mirrors the effective model (the prefixed
-        // handle the agent actually runs), not the bare config handle, so a
-        // future reader can't disagree with the record's model (CodeRabbit).
         assertEquals(
-            "lmstudio/google/gemma-test-litert-lm",
+            "google/gemma-test-litert-lm",
             captured.metadata?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
         )
         coVerify(exactly = 0) { agentRepository.createAgent(any()) }
@@ -205,11 +202,9 @@ class AgentListViewModelTest {
             AgentCreateRuntimeOption.LOCAL_LETTACODE,
         ) {}
 
-        assertEquals("lmstudio/MiniMax-M3", paramsSlot.captured.model)
-        // Metadata handle must track the picked model, not the config default,
-        // or the record's model and metadata disagree (CodeRabbit).
+        assertEquals("MiniMax-M3", paramsSlot.captured.model)
         assertEquals(
-            "lmstudio/MiniMax-M3",
+            "MiniMax-M3",
             paramsSlot.captured.metadata
                 ?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
         )

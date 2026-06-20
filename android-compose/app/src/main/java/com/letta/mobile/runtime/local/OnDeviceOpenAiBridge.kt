@@ -208,6 +208,12 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 output.writeJsonResponse(400, errorBody("invalid_request", "Request body is not valid JSON."))
                 return
             }
+            val requestedModelId = request["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            val responseModelId = requestedModelId ?: servedModelId
+            android.util.Log.i(
+                LITERT_BRIDGE_TAG,
+                "incoming model=${requestedModelId ?: "<missing>"} served=$servedModelId comparison=not_enforced response=$responseModelId",
+            )
             // Tool schemas ride inside the prompt and tool calls are parsed
             // back out of the text — LiteRT-LM has no native function calling
             // (letta-mobile-69i0z, see OnDeviceToolCallProtocol).
@@ -225,15 +231,15 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                     when (val turn = OnDeviceToolCallProtocol.parseModelOutput(raw)) {
                         is OnDeviceToolCallProtocol.ModelTurn.Text ->
                             if (stream) {
-                                output.writeStreamingCompletion(turn.text)
+                                output.writeStreamingCompletion(turn.text, responseModelId)
                             } else {
-                                output.writeJsonResponse(200, completionBody(turn.text))
+                                output.writeJsonResponse(200, completionBody(turn.text, responseModelId))
                             }
                         is OnDeviceToolCallProtocol.ModelTurn.ToolCall ->
                             if (stream) {
-                                output.writeStreamingToolCall(turn)
+                                output.writeStreamingToolCall(turn, responseModelId)
                             } else {
-                                output.writeJsonResponse(200, toolCallCompletionBody(turn))
+                                output.writeJsonResponse(200, toolCallCompletionBody(turn, responseModelId))
                             }
                     }
                 },
@@ -263,11 +269,11 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
             )
         }
 
-        private fun completionBody(text: String): JsonObject = buildJsonObject {
+        private fun completionBody(text: String, responseModelId: String): JsonObject = buildJsonObject {
             put("id", "chatcmpl-${UUID.randomUUID()}")
             put("object", "chat.completion")
             put("created", Instant.now().epochSecond)
-            put("model", servedModelId)
+            put("model", responseModelId)
             put(
                 "choices",
                 buildJsonArray {
@@ -302,12 +308,15 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 )
             }
 
-        private fun toolCallCompletionBody(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall): JsonObject =
+        private fun toolCallCompletionBody(
+            turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall,
+            responseModelId: String,
+        ): JsonObject =
             buildJsonObject {
                 put("id", "chatcmpl-${UUID.randomUUID()}")
                 put("object", "chat.completion")
                 put("created", Instant.now().epochSecond)
-                put("model", servedModelId)
+                put("model", responseModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -333,19 +342,22 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 )
             }
 
-        private fun OutputStream.writeStreamingToolCall(turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall) {
+        private fun OutputStream.writeStreamingToolCall(
+            turn: OnDeviceToolCallProtocol.ModelTurn.ToolCall,
+            responseModelId: String,
+        ) {
             val id = "chatcmpl-${UUID.randomUUID()}"
             val created = Instant.now().epochSecond
             writeHeaders(200, "text/event-stream; charset=utf-8")
             if (turn.leadingText.isNotBlank()) {
-                writeSseChunk(id, created, turn.leadingText, finishReason = null)
+                writeSseChunk(id, created, responseModelId, turn.leadingText, finishReason = null)
             }
             // pi-ai's parser accepts the whole arguments string in one delta.
             val toolCallChunk = buildJsonObject {
                 put("id", id)
                 put("object", "chat.completion.chunk")
                 put("created", created)
-                put("model", servedModelId)
+                put("model", responseModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -366,17 +378,22 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 )
             }
             write("data: ${json.encodeToString(JsonObject.serializer(), toolCallChunk)}\n\n".toByteArray(Charsets.UTF_8))
-            writeFinishChunk(id, created, finishReason = "tool_calls")
+            writeFinishChunk(id, created, responseModelId, finishReason = "tool_calls")
             write("data: [DONE]\n\n".toByteArray(Charsets.UTF_8))
             flush()
         }
 
-        private fun OutputStream.writeFinishChunk(id: String, created: Long, finishReason: String) {
+        private fun OutputStream.writeFinishChunk(
+            id: String,
+            created: Long,
+            responseModelId: String,
+            finishReason: String,
+        ) {
             val body = buildJsonObject {
                 put("id", id)
                 put("object", "chat.completion.chunk")
                 put("created", created)
-                put("model", servedModelId)
+                put("model", responseModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -395,12 +412,12 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
 
         private fun newToolCallId(): String = "call_${UUID.randomUUID()}"
 
-        private fun OutputStream.writeStreamingCompletion(text: String) {
+        private fun OutputStream.writeStreamingCompletion(text: String, responseModelId: String) {
             val id = "chatcmpl-${UUID.randomUUID()}"
             val created = Instant.now().epochSecond
             writeHeaders(200, "text/event-stream; charset=utf-8")
-            writeSseChunk(id, created, text, finishReason = null)
-            writeSseChunk(id, created, "", finishReason = "stop")
+            writeSseChunk(id, created, responseModelId, text, finishReason = null)
+            writeSseChunk(id, created, responseModelId, "", finishReason = "stop")
             write("data: [DONE]\n\n".toByteArray(Charsets.UTF_8))
             flush()
         }
@@ -408,6 +425,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
         private fun OutputStream.writeSseChunk(
             id: String,
             created: Long,
+            responseModelId: String,
             text: String,
             finishReason: String?,
         ) {
@@ -415,7 +433,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 put("id", id)
                 put("object", "chat.completion.chunk")
                 put("created", created)
-                put("model", servedModelId)
+                put("model", responseModelId)
                 put(
                     "choices",
                     buildJsonArray {
@@ -494,6 +512,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
 
     private companion object {
         private const val LOOPBACK_HOST = "127.0.0.1"
+        private const val LITERT_BRIDGE_TAG = "LITERT_BRIDGE"
 
         // Generous bound for chat-completion payloads (the full local system
         // prompt + transcript is ~50 KB today); rejects pathological
