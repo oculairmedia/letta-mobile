@@ -57,7 +57,7 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
-                api("org.jetbrains.compose.runtime:runtime:1.9.0")
+                api("org.jetbrains.compose.runtime:runtime:1.11.1")
                 api("io.ktor:ktor-http:3.5.0")
                 api("io.ktor:ktor-io:3.5.0")
                 // Multiplatform HTTP client core for shared repository logic
@@ -75,9 +75,9 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 // Compose-Multiplatform UI dependencies for shared chat UI (slice 1)
-                api("org.jetbrains.compose.foundation:foundation:1.9.0")
+                api("org.jetbrains.compose.foundation:foundation:1.11.1")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
-                api("org.jetbrains.compose.ui:ui:1.9.0")
+                api("org.jetbrains.compose.ui:ui:1.11.1")
             }
         }
 
