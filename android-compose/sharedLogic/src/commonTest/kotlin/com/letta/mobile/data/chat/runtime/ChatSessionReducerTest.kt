@@ -83,6 +83,18 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun mapsConversationSummaryWithApiProvidedAgentNameWhenCacheMisses() {
+        val summary = Conversation(
+            id = ConversationId("conversation-abcdef"),
+            agentId = AgentId("agent-1"),
+            agentName = "Grace",
+            summary = "Backend row",
+        ).toChatConversationSummary()
+
+        assertEquals("Grace", summary.agentName)
+    }
+
+    @Test
     fun mapsConversationSummariesIncludingDefaultShimPlaceholders() {
         val summaries = listOf(
             Conversation(

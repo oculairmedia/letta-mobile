@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 data class Conversation(
     val id: ConversationId,
     @SerialName("agent_id") val agentId: AgentId,
+    @SerialName("agent_name") val agentName: String? = null,
     val summary: String? = null,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
