@@ -527,11 +527,11 @@ internal class AdminChatViewModel @Inject constructor(
     )
 
     private fun localRuntimeRouting(): LocalRuntimeRouting {
-        if (sessionManager.current.localRuntimeBackend == null) return LocalRuntimeRouting.Remote
         val conversationId = chatConversationCoordinator.activeConversationId ?: explicitConversationId
         if (conversationId?.startsWith("local-conv-") == true) return LocalRuntimeRouting.LocalBound
-        return if (AgentRuntimeBinding.isLocalBound(activeAgent.value)) {
-            LocalRuntimeRouting.LocalBound
+        if (AgentRuntimeBinding.isLocalBound(activeAgent.value)) return LocalRuntimeRouting.LocalBound
+        return if (sessionManager.current.localRuntimeBackend == null) {
+            LocalRuntimeRouting.Remote
         } else {
             LocalRuntimeRouting.Blocked()
         }
