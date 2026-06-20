@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Card
@@ -88,6 +90,7 @@ import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextArea
+import com.letta.mobile.desktop.DesktopTooltip
 import java.util.Base64
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -104,6 +107,7 @@ fun DesktopChatSurface(
     onAttachImage: () -> Unit,
     onRemoveImageAttachment: (Int) -> Unit,
     onRetryConnection: () -> Unit,
+    onSettingsSelected: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val showConversationPane = state.conversations.isNotEmpty()
@@ -118,6 +122,7 @@ fun DesktopChatSurface(
                 onConversationSelected = onConversationSelected,
                 onDeleteConversation = onDeleteConversation,
                 onRetryConnection = onRetryConnection,
+                onSettingsSelected = onSettingsSelected,
             )
             Box(
                 modifier = Modifier
@@ -144,14 +149,15 @@ private fun ConversationPane(
     onConversationSelected: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
     onRetryConnection: () -> Unit,
+    onSettingsSelected: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
-            .width(328.dp)
+            .width(292.dp)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 18.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -191,8 +197,10 @@ private fun ConversationPane(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (state.conversations.isEmpty()) {
                 item {
@@ -202,21 +210,56 @@ private fun ConversationPane(
                     )
                 }
             }
-            state.conversationGroups.forEach { group ->
-                item(key = "agent:${group.key}") {
-                    ConversationGroupHeader(group)
-                }
-                items(
-                    items = group.conversations,
-                    key = { it.id },
-                ) { conversation ->
-                    ConversationRow(
-                        conversation = conversation,
-                        selected = conversation.id == state.selectedConversationId,
-                        onClick = { onConversationSelected(conversation.id) },
-                        onDelete = { onDeleteConversation(conversation.id) },
-                    )
-                }
+            items(
+                items = state.conversations,
+                key = { it.id },
+            ) { conversation ->
+                ConversationRow(
+                    conversation = conversation,
+                    selected = conversation.id == state.selectedConversationId,
+                    onClick = { onConversationSelected(conversation.id) },
+                    onDelete = { onDeleteConversation(conversation.id) },
+                )
+            }
+        }
+
+        if (onSettingsSelected != null) {
+            Spacer(Modifier.height(6.dp))
+            ConversationSidebarSettingsRow(onClick = onSettingsSelected)
+        }
+    }
+}
+
+@Composable
+private fun ConversationSidebarSettingsRow(
+    onClick: () -> Unit,
+) {
+    DesktopTooltip(text = "Settings") {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = MaterialTheme.shapes.small,
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }
@@ -227,15 +270,15 @@ internal fun ConversationGroupHeader(group: DesktopConversationGroup) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, start = 4.dp, end = 4.dp),
+            .padding(top = 8.dp, start = 4.dp, end = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = group.agentName.uppercase(),
+            text = group.agentName,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -318,67 +361,67 @@ internal fun ConversationRow(
         MaterialTheme.colorScheme.onSurface
     }
 
-    Box {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = { showMenu = true }
-                )
-                .onClick(
-                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                    onClick = { showMenu = true }
-                ),
-            shape = MaterialTheme.shapes.medium,
-            color = container,
-            contentColor = content,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
-            ),
-        ) {
-            Row(
+    DesktopTooltip(text = "${conversation.title} - ${conversation.updatedAtLabel}") {
+        Box {
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = { showMenu = true },
+                    )
+                    .onClick(
+                        matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                        onClick = { showMenu = true },
+                    ),
+                shape = MaterialTheme.shapes.small,
+                color = container,
+                contentColor = content,
             ) {
-                Text(
-                    text = conversation.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (conversation.unreadCount > 0) {
-                    CountPill(conversation.unreadCount)
-                }
-                Text(
-                    text = conversation.updatedAtLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = content.copy(alpha = 0.6f),
-                )
-            }
-        }
-        if (showMenu) {
-            JewelPopupMenu(
-                onDismissRequest = {
-                    showMenu = false
-                    true
-                },
-                horizontalAlignment = Alignment.End,
-            ) {
-                selectableItem(
-                    selected = false,
-                    onClick = {
-                        showMenu = false
-                        onDelete()
-                    },
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    DesktopControlText("Delete conversation")
+                    Text(
+                        text = conversation.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (conversation.unreadCount > 0) {
+                        CountPill(conversation.unreadCount)
+                    }
+                    Text(
+                        text = conversation.updatedAtLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = content.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (showMenu) {
+                JewelPopupMenu(
+                    onDismissRequest = {
+                        showMenu = false
+                        true
+                    },
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    selectableItem(
+                        selected = false,
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        },
+                    ) {
+                        DesktopControlText("Delete conversation")
+                    }
                 }
             }
         }
