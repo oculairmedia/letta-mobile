@@ -20,13 +20,26 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
+
+@OptIn(ExperimentalCoroutinesApi::class)
 class AndroidLettaCodeRuntimeControllerTest {
     @Test
     fun `disabled status fails before starting bridge or node`() = runTest {
@@ -188,6 +201,76 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
+    fun `streaming output keeps turn alive past old total timeout`() = runTest {
+        val nodeBridge = FakeNodeBridge(
+            output = flow {
+                repeat(5) { index ->
+                    delay(40_000L)
+                    emit("""{"type":"stream_event","event":{"type":"reasoning_message","message":"$index"}}""")
+                }
+                emit("""{"type":"result"}""")
+            }
+        )
+        val controller = controller(nodeBridge, turnSilenceMs = 120_000L, turnAbsoluteMaxMs = 300_000L)
+
+        val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
+
+        advanceTimeBy(160_000L)
+        runCurrent()
+
+        assertFalse(events.isCompleted)
+        advanceTimeBy(40_000L)
+        runCurrent()
+        assertEquals(6, events.await().size)
+    }
+
+    @Test
+    fun `silent turn times out after idle window`() = runTest {
+        val nodeBridge = FakeNodeBridge(output = MutableSharedFlow())
+        val controller = controller(nodeBridge, turnSilenceMs = 1_000L, turnAbsoluteMaxMs = 10_000L)
+
+        val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
+        advanceTimeBy(1_000L)
+        runCurrent()
+
+        val error = runCatching { events.await() }.exceptionOrNull()
+        assertEquals("Embedded LettaCode turn produced no output for 1s.", error?.message)
+    }
+
+    @Test
+    fun `absolute ceiling bounds output spamming turn`() = runTest {
+        val nodeBridge = FakeNodeBridge(
+            output = flow {
+                while (true) {
+                    delay(500L)
+                    emit("""{"type":"stream_event","event":{"type":"status","message":"working"}}""")
+                }
+            }
+        )
+        val controller = controller(nodeBridge, turnSilenceMs = 1_000L, turnAbsoluteMaxMs = 3_000L)
+
+        val events = controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).let { flow -> async { flow.toList() } }
+        advanceTimeBy(3_000L)
+        runCurrent()
+
+        val error = runCatching { events.await() }.exceptionOrNull()
+        assertEquals("Embedded LettaCode turn exceeded absolute maximum of 3s.", error?.message)
+    }
+
+    @Test
+    fun `cancel interrupts turn promptly`() = runTest {
+        val nodeBridge = FakeNodeBridge(output = MutableSharedFlow())
+        val controller = controller(nodeBridge, turnSilenceMs = 120_000L, turnAbsoluteMaxMs = 300_000L)
+
+        val job = launch { controller.submit(command(), config(localModelHandle = "lmstudio/minimax-m3")).collect {} }
+        runCurrent()
+        job.cancel(CancellationException("stop"))
+        runCurrent()
+
+        assertTrue(job.isCancelled)
+    }
+
+    @Test
     fun `model selection normalizes config defaults and handles`() {
         val selection = EmbeddedLettaCodeModelSelection.from(
             LettaConfig(
@@ -249,6 +332,23 @@ class AndroidLettaCodeRuntimeControllerTest {
         ),
     )
 
+    private fun controller(
+        nodeBridge: FakeNodeBridge,
+        turnSilenceMs: Long,
+        turnAbsoluteMaxMs: Long,
+    ): AndroidLettaCodeRuntimeController = AndroidLettaCodeRuntimeController(
+        context = mockk<Context>(relaxed = true),
+        assetExtractor = FakeAssetExtractor(File(System.getProperty("java.io.tmpdir"), "letta-timeout-${System.nanoTime()}").apply { mkdirs() }),
+        nodeBridge = nodeBridge,
+        runtimeStatusProvider = statusProvider(runnable = true),
+        onDeviceOpenAiBridge = mockk(relaxed = true),
+        localBackendStore = mockk(relaxed = true),
+        androidNetworkBridge = FakeAndroidNetworkBridge(),
+        turnSilenceMs = turnSilenceMs,
+        turnAbsoluteMaxMs = turnAbsoluteMaxMs,
+    )
+
+
     private fun toolApprovalCommand(): TurnCommand = command().copy(
         input = TurnInput.ToolApprovalResponse(
             decision = ToolApprovalDecision(
@@ -291,8 +391,9 @@ class AndroidLettaCodeRuntimeControllerTest {
         )
     }
 
-    private class FakeNodeBridge : LettaCodeNodeBridge {
-        override val outputLines = flowOf("""{"type":"result"}""")
+    private class FakeNodeBridge(
+        override val outputLines: Flow<String> = flowOf("""{"type":"result"}"""),
+    ) : LettaCodeNodeBridge {
         var started = false
         var lastRequest: LettaCodeNodeStartRequest? = null
 

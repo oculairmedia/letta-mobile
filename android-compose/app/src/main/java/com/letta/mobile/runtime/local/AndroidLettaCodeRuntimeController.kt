@@ -12,12 +12,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -50,6 +54,8 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
     private val localBackendStore: LettaCodeLocalBackendStore,
     private val androidNetworkBridge: AndroidNetworkBridge,
     private val deviceSensorGroundingWriter: DeviceSensorGroundingWriter? = null,
+    private val turnSilenceMs: Long = TURN_SILENCE_MS,
+    private val turnAbsoluteMaxMs: Long = TURN_ABSOLUTE_MAX_MS,
 ) : LettaCodeRuntimeController {
     private val submitMutex = Mutex()
     private val startMutex = Mutex()
@@ -90,24 +96,17 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             writeDeviceSensorGrounding()
             var endedCleanly = false
             try {
-                withTimeout(TURN_TIMEOUT_MS) {
-                    val reader = launch(start = CoroutineStart.UNDISPATCHED) {
-                        try {
-                            nodeBridge.outputLines.collect { line ->
-                                Log.d(TAG, "embedded node out: ${line.take(400)}")
-                                send(line)
-                                if (line.isTerminalFrame()) {
-                                    throw TerminalResultSeen()
-                                }
-                            }
-                        } catch (_: TerminalResultSeen) {
-                            Unit
-                        }
-                    }
-                    nodeBridge.writeLine(command.toWireLine()).getOrThrow()
-                    reader.join()
-                    endedCleanly = true
-                }
+                collectTurnOutputWithLivenessWatchdog(
+                    onOutput = { line ->
+                        Log.d(TAG, "embedded node out: ${line.take(400)}")
+                        send(line)
+                        line.isTerminalFrame()
+                    },
+                    startTurn = {
+                        nodeBridge.writeLine(command.toWireLine()).getOrThrow()
+                    },
+                )
+                endedCleanly = true
             } finally {
                 // Layer 2 — settle-on-interrupt (suspenders): ONLY when this turn
                 // ended abnormally (timeout, cancel, node death mid-tool) — a
@@ -119,6 +118,49 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                     healDanglingToolCalls(command.agentId.value, phase = "post-turn")
                 }
             }
+        }
+    }
+
+    private suspend fun collectTurnOutputWithLivenessWatchdog(
+        onOutput: suspend (String) -> Boolean,
+        startTurn: suspend () -> Unit,
+    ) = coroutineScope {
+        val outputLines = Channel<String>(capacity = Channel.BUFFERED)
+        val absoluteTimeout = Channel<Unit>(capacity = Channel.CONFLATED)
+        val reader = launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                nodeBridge.outputLines.collect { line ->
+                    outputLines.send(line)
+                }
+            } finally {
+                outputLines.close()
+            }
+        }
+        val absoluteWatchdog = launch(start = CoroutineStart.UNDISPATCHED) {
+            delay(turnAbsoluteMaxMs)
+            absoluteTimeout.trySend(Unit)
+        }
+        try {
+            startTurn()
+            while (true) {
+                val line = select<String?> {
+                    outputLines.onReceiveCatching { result -> result.getOrNull() }
+                    absoluteTimeout.onReceiveCatching {
+                        throw TurnTimeoutException(
+                            "Embedded LettaCode turn exceeded absolute maximum of ${turnAbsoluteMaxMs / 1000}s.",
+                        )
+                    }
+                    onTimeout(turnSilenceMs) {
+                        throw TurnTimeoutException(
+                            "Embedded LettaCode turn produced no output for ${turnSilenceMs / 1000}s.",
+                        )
+                    }
+                } ?: break
+                if (onOutput(line)) break
+            }
+        } finally {
+            reader.cancel()
+            absoluteWatchdog.cancel()
         }
     }
 
@@ -545,9 +587,12 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
 
     private class TerminalResultSeen : CancellationException()
 
+    private class TurnTimeoutException(message: String) : CancellationException(message)
+
     private companion object {
         private const val TAG = "LettaCodeRuntime"
-        private const val TURN_TIMEOUT_MS = 120_000L
+        private const val TURN_SILENCE_MS = 120_000L
+        private const val TURN_ABSOLUTE_MAX_MS = 30 * 60 * 1000L
 
         /**
          * Vision-capable model id substrings (case-insensitive). KEEP IN SYNC
