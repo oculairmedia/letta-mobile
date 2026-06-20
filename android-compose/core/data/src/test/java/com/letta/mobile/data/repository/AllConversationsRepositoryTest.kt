@@ -1,9 +1,9 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.model.ConversationCountEstimate
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationCountEstimate
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
@@ -56,10 +56,8 @@ class AllConversationsRepositoryTest {
         val localRepository = AllConversationsRepository(
             conversationApi = fakeApi,
             conversationDao = null,
-            localConversationSource = object : LocalRuntimeConversationSource {
-                override suspend fun listConversations(): List<Conversation> = listOf(localConversation)
-                override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
-                    fail("createConversation should not be used by refresh") as Conversation
+            localConversationSource = FakeLocalRuntimeConversationSource {
+                listOf(localConversation)
             },
             settingsRepository = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
@@ -83,13 +81,8 @@ class AllConversationsRepositoryTest {
         val repositoryWithLocal = AllConversationsRepository(
             conversationApi = fakeApi,
             conversationDao = null,
-            localConversationSource = object : LocalRuntimeConversationSource {
-                override suspend fun listConversations(): List<Conversation> {
-                    fail("local source must not be used for remote configs")
-                    return emptyList()
-                }
-                override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
-                    fail("local source must not be used for remote configs") as Conversation
+            localConversationSource = FakeLocalRuntimeConversationSource {
+                throw AssertionError("local source must not be used for remote configs")
             },
             settingsRepository = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
@@ -227,5 +220,14 @@ class AllConversationsRepositoryTest {
         assertTrue(repository.hasFreshConversations(maxAgeMs = 60_000))
         assertEquals(false, repository.refreshIfStale(maxAgeMs = 60_000))
         assertTrue(fakeApi.calls.none { it == "listConversations" })
+    }
+
+    private class FakeLocalRuntimeConversationSource(
+        private val conversationsProvider: suspend () -> List<Conversation>,
+    ) : LocalRuntimeConversationSource {
+        override suspend fun listConversations(): List<Conversation> = conversationsProvider()
+
+        override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
+            throw AssertionError("local create must not be used by all-conversations refresh")
     }
 }
