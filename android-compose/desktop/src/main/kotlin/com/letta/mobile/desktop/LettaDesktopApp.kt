@@ -85,6 +85,8 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
+import org.jetbrains.jewel.ui.component.Icon as JewelIcon
+import org.jetbrains.jewel.ui.component.SimpleListItem as JewelSimpleListItem
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
@@ -475,37 +477,32 @@ private fun DesktopNavRow(
     onClick: () -> Unit,
     subdued: Boolean = false,
 ) {
-    val container = when {
-        selected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f)
-        else -> Color.Transparent
-    }
     val content = when {
         selected -> MaterialTheme.colorScheme.onSurface
         subdued -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Surface(
+    JewelSimpleListItem(
+        selected = selected,
         modifier = Modifier
             .fillMaxWidth()
-            .height(34.dp)
             .clickable(onClick = onClick),
-        color = container,
-        contentColor = content,
-        shape = MaterialTheme.shapes.small,
+        height = 34.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
+            JewelIcon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(17.dp),
+                tint = content,
             )
-            Text(
+            JewelText(
                 text = label,
-                style = MaterialTheme.typography.labelLarge,
+                color = content,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
