@@ -73,6 +73,29 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun startIgnoresDefaultShimConversationsWhenSelectingInitialTimeline() = runTest {
+        val hydratedConversationIds = mutableListOf<String>()
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(conversationIds = listOf("conv-default-agent-1", "conv-2")),
+            loopFactory = { _, conversationId, _ ->
+                hydratedConversationIds += conversationId
+                FakeDesktopTimelineLoop(conversationId).also { it.completeHydrate() }
+            },
+        )
+
+        controller.start()
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(listOf("conv-2"), state.conversations.map { it.id })
+        assertEquals("conv-2", state.selectedConversationId)
+        assertEquals(listOf("conv-2"), hydratedConversationIds)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+
+        controller.close()
+    }
+
+    @Test
     fun sendUsesRemoteTimelineTransportAndUpdatesMessages() = runTest {
         val gateway = FakeDesktopChatGateway()
         val controller = testController(gateway)

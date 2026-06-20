@@ -83,6 +83,25 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun mapsConversationSummariesWithoutDefaultShimPlaceholders() {
+        val summaries = listOf(
+            Conversation(
+                id = ConversationId("conv-default-agent-1"),
+                agentId = AgentId("agent-1"),
+            ),
+            Conversation(
+                id = ConversationId("conversation-abcdef"),
+                agentId = AgentId("agent-1"),
+                summary = "Real conversation",
+            ),
+        ).toChatConversationSummaries(agentNamesById = mapOf("agent-1" to "Ada"))
+
+        assertEquals(listOf("conversation-abcdef"), summaries.map { it.id })
+        assertEquals("Real conversation", summaries.single().title)
+        assertEquals("Ada", summaries.single().agentName)
+    }
+
+    @Test
     fun selectingRemoteConversationClearsComposerAndStartsHydrateGeneration() {
         val state = ChatSessionState(
             conversations = listOf(conversation("a"), conversation("b", unreadCount = 3)),

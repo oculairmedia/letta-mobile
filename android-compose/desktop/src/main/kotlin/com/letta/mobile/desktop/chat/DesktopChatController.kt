@@ -5,7 +5,7 @@ import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
-import com.letta.mobile.data.chat.runtime.toChatConversationSummary
+import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
@@ -223,7 +223,7 @@ class DesktopChatController(
             gateway = nextGateway
             val conversations = nextGateway.listConversations()
             val agentNamesById = runCatching { agentNamesByIdProvider() }.getOrDefault(emptyMap())
-            val summaries = conversations.map { it.toChatConversationSummary(agentNamesById) }
+            val summaries = conversations.toChatConversationSummaries(agentNamesById)
             val selectedId = summaries.firstOrNull()?.id
 
             if (closed) return

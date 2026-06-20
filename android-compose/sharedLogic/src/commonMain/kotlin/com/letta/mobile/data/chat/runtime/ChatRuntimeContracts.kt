@@ -82,6 +82,15 @@ fun Conversation.toChatConversationSummary(
     )
 }
 
+fun Iterable<Conversation>.toChatConversationSummaries(
+    agentNamesById: Map<String, String> = emptyMap(),
+): List<ChatConversationSummary> =
+    filterNot { it.isDefaultShimConversation() }
+        .map { it.toChatConversationSummary(agentNamesById) }
+
+fun Conversation.isDefaultShimConversation(): Boolean =
+    id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
+
 private fun ChatConversationSummary.agentDisplayName(): String =
     agentName.trim().ifBlank { UNKNOWN_AGENT_LABEL }
 
@@ -89,6 +98,7 @@ private fun ChatConversationSummary.agentGroupKey(): String =
     agentDisplayName().lowercase()
 
 private const val UNKNOWN_AGENT_LABEL = "Unknown agent"
+private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
 
 @Immutable
 enum class ChatComposerError {
