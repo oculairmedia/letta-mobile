@@ -77,7 +77,7 @@ class OnDeviceOpenAiBridgeTest {
 
             assertEquals(200, response.code)
             assertTrue(response.body.contains("Hello from device"))
-            assertEquals("system: Be direct.\nuser: Say hello", engine.lastPrompt)
+            assertEquals("system: Be direct.\n\nuser: Say hello", engine.lastPrompt)
         }
     }
 
@@ -143,6 +143,34 @@ class OnDeviceOpenAiBridgeTest {
         }
     }
 
+    @Test
+    fun `LiteRT bridge strips tools before rendering prompt`() {
+        val engine = FakeEngine(response = "plain response")
+        val bridge = LocalOpenAiOnDeviceBridge(engine)
+        bridge.start(selection()).use { session ->
+            val response = post(
+                url = "${session.baseUrl}/chat/completions",
+                body = """
+                    {
+                      "messages": [{"role": "user", "content": "say hi"}],
+                      "tools": [{"type": "function", "function": {
+                        "name": "Read", "description": "Read a file.",
+                        "parameters": {"type": "object", "required": ["file_path"]}
+                      }}],
+                      "tool_choice": "auto"
+                    }
+                """.trimIndent(),
+                bearerToken = session.authToken,
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(response.body.contains("plain response"))
+            assertTrue(engine.lastPrompt.orEmpty().contains("user: say hi"))
+            assertTrue(!engine.lastPrompt.orEmpty().contains("Read a file"))
+            assertTrue(!engine.lastPrompt.orEmpty().contains("```tool_call"))
+        }
+    }
+
     // letta-mobile-69i0z: prompt-format tool calling through the bridge.
     @Test
     fun `tool call reply becomes openai tool_calls with finish_reason tool_calls`() {
@@ -169,9 +197,9 @@ class OnDeviceOpenAiBridgeTest {
             assertTrue(response.body.contains("\"tool_calls\""))
             assertTrue(response.body.contains("\"name\":\"memory\""))
             assertTrue(response.body.contains("\"finish_reason\":\"tool_calls\""))
-            // Tool schemas must reach the model through the prompt.
-            assertTrue(engine.lastPrompt.orEmpty().contains("- memory: Edit memory."))
-            assertTrue(engine.lastPrompt.orEmpty().contains("```tool_call"))
+            // LiteRT runs tool-free by policy; parser still converts fenced model output.
+            assertTrue(!engine.lastPrompt.orEmpty().contains("- memory: Edit memory."))
+            assertTrue(!engine.lastPrompt.orEmpty().contains("```tool_call"))
         }
     }
 
