@@ -332,25 +332,16 @@ open class AgentRepository(
 
     override open suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
         val cached = _agents.value.find { it.id == id }
+        val preview = cached?.withUpdates(params)
         val localSource = localAgentSource
-        if (localSource != null && cached != null && AgentRuntimeBinding.isLocalBound(cached)) {
+        if (localSource != null && preview != null && AgentRuntimeBinding.isLocalBound(preview)) {
             // Local agents have no remote API. Apply the fields letta.js
             // respects from its store record (name/system/model + settings);
             // a running embedded session picks them up on next start.
-            val updated = cached.copy(
-                name = params.name ?: cached.name,
-                description = params.description ?: cached.description,
-                model = params.model ?: cached.model,
-                modelSettings = params.modelSettings ?: cached.modelSettings,
-                llmConfig = params.llmConfig ?: cached.llmConfig,
-                system = params.system ?: cached.system,
-                tags = params.tags ?: cached.tags,
-                contextWindowLimit = params.contextWindowLimit ?: cached.contextWindowLimit,
-            )
-            localSource.persistAgent(updated)
-            agentDao.upsert(AgentEntity.fromAgent(updated))
-            updateAgentInCache(updated)
-            return updated
+            localSource.persistAgent(preview)
+            agentDao.upsert(AgentEntity.fromAgent(preview))
+            updateAgentInCache(preview)
+            return preview
         }
         val agent = agentApi.updateAgent(id, params)
         refreshAgents()
@@ -400,6 +391,18 @@ open class AgentRepository(
         agentApi.detachArchive(agentId, archiveId)
         refreshAgents()
     }
+
+    private fun Agent.withUpdates(params: AgentUpdateParams): Agent = copy(
+        name = params.name ?: name,
+        description = params.description ?: description,
+        model = params.model ?: model,
+        modelSettings = params.modelSettings ?: modelSettings,
+        llmConfig = params.llmConfig ?: llmConfig,
+        system = params.system ?: system,
+        tags = params.tags ?: tags,
+        metadata = params.metadata ?: metadata,
+        contextWindowLimit = params.contextWindowLimit ?: contextWindowLimit,
+    )
 
     private fun updateAgentInCache(agent: Agent) {
         _agents.update { current ->

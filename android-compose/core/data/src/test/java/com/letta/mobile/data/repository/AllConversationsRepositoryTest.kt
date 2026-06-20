@@ -2,6 +2,9 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
@@ -53,7 +56,11 @@ class AllConversationsRepositoryTest {
         val localRepository = AllConversationsRepository(
             conversationApi = fakeApi,
             conversationDao = null,
-            localConversationSource = { listOf(localConversation) },
+            localConversationSource = object : LocalRuntimeConversationSource {
+                override suspend fun listConversations(): List<Conversation> = listOf(localConversation)
+                override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
+                    fail("createConversation should not be used by refresh") as Conversation
+            },
             settingsRepository = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
                     id = "local-1",
@@ -76,7 +83,14 @@ class AllConversationsRepositoryTest {
         val repositoryWithLocal = AllConversationsRepository(
             conversationApi = fakeApi,
             conversationDao = null,
-            localConversationSource = { fail("local source must not be used for remote configs"); emptyList() },
+            localConversationSource = object : LocalRuntimeConversationSource {
+                override suspend fun listConversations(): List<Conversation> {
+                    fail("local source must not be used for remote configs")
+                    return emptyList()
+                }
+                override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation =
+                    fail("local source must not be used for remote configs") as Conversation
+            },
             settingsRepository = FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
                     id = "remote-1",
