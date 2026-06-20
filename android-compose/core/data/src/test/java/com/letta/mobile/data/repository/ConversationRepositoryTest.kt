@@ -6,9 +6,15 @@ import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.LettaDatabase
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.testutil.FakeSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
@@ -157,6 +163,35 @@ class ConversationRepositoryTest {
         assertTrue(repository.getConversations("a1").first().any { it.id == conv.id })
     }
 
+
+    @Test
+    fun `createConversation uses local source in local runtime mode`() = runTest {
+        val localSource = FakeLocalRuntimeConversationSource()
+        val settingsRepository = FakeSettingsRepository()
+        settingsRepository.saveConfig(
+            LettaConfig(
+                id = "local",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "local-lettacode://runtime",
+                runtimeBinding = AgentRuntimeBinding.LocalLettaCode,
+            )
+        )
+        repository = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            database.conversationDao(),
+            localConversationSource = localSource,
+            settingsRepository = settingsRepository,
+        )
+
+        val conversation = repository.createConversation("local-agent", "Local summary")
+
+        assertEquals("local-conv-local-agent", conversation.id.value)
+        assertEquals(listOf(AgentId("local-agent")), localSource.createdAgentIds)
+        assertTrue(fakeApi.calls.none { it.startsWith("createConversation") })
+        assertTrue(repository.getConversations("local-agent").first().any { it.id == conversation.id })
+    }
+
     @Test
     fun `deleteConversation removes optimistically`() = runTest {
         fakeApi.conversations.addAll(listOf(
@@ -262,4 +297,19 @@ class ConversationRepositoryTest {
         val result = repository.getConversations("unknown").first()
         assertTrue(result.isEmpty())
     }
+    private class FakeLocalRuntimeConversationSource : LocalRuntimeConversationSource {
+        val createdAgentIds = mutableListOf<AgentId>()
+
+        override suspend fun listConversations(): List<Conversation> = emptyList()
+
+        override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
+            createdAgentIds.add(agentId)
+            return TestData.conversation(
+                id = "local-conv-${agentId.value}",
+                agentId = agentId.value,
+                summary = summary,
+            )
+        }
+    }
+
 }

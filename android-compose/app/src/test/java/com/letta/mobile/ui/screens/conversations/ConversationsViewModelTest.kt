@@ -250,6 +250,32 @@ class ConversationsViewModelTest {
         assertEquals("Download or import a model in Settings before creating a local agent.", viewModel.uiState.value.localLettaCodeReadiness.setupMessage)
     }
 
+
+    @Test
+    fun `createConversation success calls onSuccess and adds to list`() = runTest {
+        var navigatedConversationId: ConversationId? = null
+
+        viewModel.createConversation(AgentId("a1")) { conversationId ->
+            navigatedConversationId = conversationId
+        }
+
+        assertEquals(ConversationId("new-conv"), navigatedConversationId)
+        assertTrue(viewModel.uiState.value.conversations.any { it.conversation.id == ConversationId("new-conv") })
+        assertEquals(null, viewModel.uiState.value.createConversationError)
+    }
+
+    @Test
+    fun `createConversation failure sets error state and does not call onSuccess`() = runTest {
+        fakeConvRepo.createFailure = IllegalStateException("Local create failed")
+        var didNavigate = false
+
+        viewModel.createConversation(AgentId("a1")) { didNavigate = true }
+
+        assertFalse(didNavigate)
+        assertEquals("Local create failed", viewModel.uiState.value.createConversationError)
+        assertTrue(viewModel.uiState.value.conversations.none { it.conversation.id == ConversationId("new-conv") })
+    }
+
     @Test
     fun `deleteConversation delegates to repository and removes from state`() = runTest {
         fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
@@ -372,8 +398,10 @@ class ConversationsViewModelTest {
     ) : ConversationRepository(FakeConversationApi(), agentRepository, mockk(relaxed = true)) {
         val deletedConversationIds = mutableListOf<String>()
         val archivedUpdates = mutableListOf<Pair<String, Boolean>>()
+        var createFailure: Throwable? = null
 
         override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
+            createFailure?.let { throw it }
             return TestData.conversation(id = "new-conv", agentId = agentId.value)
         }
 

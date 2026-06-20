@@ -55,6 +55,7 @@ data class ConversationsUiState(
     val inspectorError: String? = null,
     val recompilePreview: String? = null,
     val error: String? = null,
+    val createConversationError: String? = null,
     val localLettaCodeReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
 )
 
@@ -374,12 +375,21 @@ class ConversationsViewModel @Inject constructor(
                 onSuccess(conversation.id)
                 allConversationsRepository.handleOptimisticUpdate(conversation)
                 _uiState.value = _uiState.value.copy(
-                    conversations = applyPinnedState(_uiState.value.conversations + conversation.toDisplay()).toImmutableList()
+                    conversations = applyPinnedState(_uiState.value.conversations + conversation.toDisplay()).toImmutableList(),
+                    createConversationError = null,
                 )
             } catch (e: Exception) {
-                Log.w("ConversationsVM", "Create failed", e)
+                Log.e("ConversationsVM", "Create conversation failed for agent ${agentId.value}", e)
+                _uiState.value = _uiState.value.copy(
+                    createConversationError = e.message?.takeIf { it.isNotBlank() }
+                        ?: "Failed to create conversation for agent ${agentId.value}",
+                )
             }
         }
+    }
+
+    fun clearCreateConversationError() {
+        _uiState.value = _uiState.value.copy(createConversationError = null)
     }
 
     fun toggleConversationPinned(display: ConversationDisplay) {

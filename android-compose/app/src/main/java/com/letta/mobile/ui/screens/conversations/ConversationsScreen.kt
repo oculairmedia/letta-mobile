@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -35,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -127,6 +130,7 @@ fun ConversationsScreen(
     var showOverflowMenu by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     var isAppBarCollapsed by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -137,9 +141,16 @@ fun ConversationsScreen(
             }
     }
 
+    LaunchedEffect(uiState.createConversationError) {
+        val message = uiState.createConversationError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearCreateConversationError()
+    }
+
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
             LargeFlexibleTopAppBar(
@@ -959,42 +970,45 @@ private fun AgentPickerDialog(
     onDismiss: () -> Unit,
     onAgentSelected: (String) -> Unit
 ) {
-    MultiFieldInputDialog(
-        show = true,
-        title = stringResource(R.string.screen_conversations_dialog_select_agent_title),
-        confirmText = stringResource(R.string.action_cancel),
-        dismissText = stringResource(R.string.action_cancel),
-        onDismiss = onDismiss,
-        onConfirm = onDismiss,
-    ) {
-        if (agents.isEmpty()) {
-            Text(stringResource(R.string.screen_conversations_dialog_no_agents))
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.height(300.dp),
-            ) {
-                items(agents, key = { it.id.value }) { agent ->
-                    Card(
-                        onClick = { onAgentSelected(agent.id.value) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = agent.name,
-                                style = MaterialTheme.typography.listItemHeadline,
-                            )
-                            agent.model?.let { model ->
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.screen_conversations_dialog_select_agent_title)) },
+        text = {
+            if (agents.isEmpty()) {
+                Text(stringResource(R.string.screen_conversations_dialog_no_agents))
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.height(300.dp),
+                ) {
+                    items(agents, key = { it.id.value }) { agent ->
+                        Card(
+                            onClick = { onAgentSelected(agent.id.value) },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = model,
-                                    style = MaterialTheme.typography.listItemSupporting,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    text = agent.name,
+                                    style = MaterialTheme.typography.listItemHeadline,
                                 )
+                                agent.model?.let { model ->
+                                    Text(
+                                        text = model,
+                                        style = MaterialTheme.typography.listItemSupporting,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-        }
-    }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
 }
