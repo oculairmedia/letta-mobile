@@ -214,11 +214,9 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 LITERT_BRIDGE_TAG,
                 "incoming model=${requestedModelId ?: "<missing>"} served=$servedModelId comparison=not_enforced response=$responseModelId",
             )
-            // Tool schemas ride inside the prompt and tool calls are parsed
-            // back out of the text — LiteRT-LM has no native function calling
-            // (letta-mobile-69i0z, see OnDeviceToolCallProtocol).
-            val prompt = OnDeviceToolCallProtocol.renderPrompt(request)
-            val images = OnDeviceToolCallProtocol.extractImages(request)
+            val filteredRequest = applyOnDeviceToolPolicy(request)
+            val prompt = OnDeviceToolCallProtocol.renderPrompt(filteredRequest)
+            val images = OnDeviceToolCallProtocol.extractImages(filteredRequest)
             val stream = request["stream"]?.jsonPrimitive?.booleanOrNull == true
             logLiteRtInfo(
                 "bridge_inference_start",
@@ -251,6 +249,18 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                     )
                 },
             )
+        }
+
+
+        private fun applyOnDeviceToolPolicy(request: JsonObject): JsonObject {
+            if (!modelSelection.isLiteRtLmRuntime()) return request
+            val tools = request["tools"] as? JsonArray
+            if (tools.isNullOrEmpty()) return request
+            logLiteRtInfo(
+                "bridge_tool_policy",
+                "handle=${modelSelection.modelHandle} runtime=${modelSelection.runtime} action=drop_tools count=${tools.size}",
+            )
+            return JsonObject(request.filterKeys { key -> key != "tools" && key != "tool_choice" })
         }
 
         private fun modelsBody(): JsonObject = buildJsonObject {
@@ -545,3 +555,7 @@ private fun java.io.InputStream.readHttpLine(): String? {
     }
     return line.toString()
 }
+
+private fun EmbeddedLettaCodeModelSelection.isLiteRtLmRuntime(): Boolean =
+    runtime.equals("litert-lm", ignoreCase = true) ||
+        modelHandle.contains("litert", ignoreCase = true)
