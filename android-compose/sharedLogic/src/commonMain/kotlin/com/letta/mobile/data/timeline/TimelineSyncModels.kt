@@ -139,6 +139,25 @@ internal fun compareNullableInts(left: Int?, right: Int?): Int = when {
     else -> 0
 }
 
+/**
+ * True when [incoming] is a stream frame we have already folded into this
+ * event and can safely drop.
+ *
+ * letta-mobile-k9y5d: the seq id alone is NOT a reliable drop signal on
+ * replay. When a run's `frames.jsonl` is replayed (or frames arrive
+ * out-of-order on resume), the frame carrying the COMPLETE, correct
+ * assistant text can land with a seq id that is <= an existing event which
+ * currently holds only a shorter, garbled partial (e.g. a coincidental
+ * suffix chunk). Dropping purely on `incoming.seqId <= seqId` then strands
+ * the corrupted partial in the timeline forever — the exact replay garble
+ * we observed ("Kitchen sink is installed" -> "chen sink is installed").
+ *
+ * So a frame is only "already ingested" when its content adds nothing the
+ * existing text doesn't already contain: it is empty, identical, or a pure
+ * prefix/suffix subset of what we already hold. Any frame whose content
+ * would GROW or COMPLETE the message is processed by the merge (which
+ * already prefers the longer/complete text), even if its seq id is lower.
+ */
 fun TimelineEvent.Confirmed.hasAlreadyIngestedStreamFrame(
     incoming: TimelineEvent.Confirmed,
 ): Boolean =
@@ -146,7 +165,22 @@ fun TimelineEvent.Confirmed.hasAlreadyIngestedStreamFrame(
         incoming.messageType == TimelineMessageType.ASSISTANT &&
         seqId != null &&
         incoming.seqId != null &&
-        incoming.seqId <= seqId
+        incoming.seqId <= seqId &&
+        incoming.content.isContainedSnapshotOf(content)
+
+/**
+ * letta-mobile-k9y5d: true when [this] incoming frame text carries no
+ * information beyond [existing] — i.e. it is empty, equal, or a pure
+ * prefix/suffix of the already-held text. These are exactly the snapshot
+ * no-op cases (EMPTY_INCOMING/EQUAL/STALE/SUFFIX_DUPLICATE) where keeping the
+ * existing text is correct. Any other incoming (longer, or sharing only a
+ * coincidental overlap) must NOT be treated as a duplicate, because it may be
+ * the genuine full message.
+ */
+private fun String.isContainedSnapshotOf(existing: String): Boolean =
+    isEmpty() ||
+        this == existing ||
+        (existing.length >= length && (existing.startsWith(this) || existing.endsWith(this)))
 
 fun latestSeqId(left: Int?, right: Int?): Int? = when {
     left == null -> right

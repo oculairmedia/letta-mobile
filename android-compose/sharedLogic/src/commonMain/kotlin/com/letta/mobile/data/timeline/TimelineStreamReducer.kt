@@ -139,10 +139,18 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val oldText = existing.content
         val newText = confirmed.content
         val canUseSnapshotMerge = existing.seqId != null && confirmed.seqId != null
+        // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
+        // seq id is strictly greater than the text we already hold. A frame with
+        // a lower-or-equal seq id is a replayed / out-of-order re-delivery and
+        // must never append or drop a prefix of the complete text. When seq ids
+        // are absent we keep the historical append behaviour (treat as forward).
+        val incomingIsForwardDelta = existing.seqId == null || confirmed.seqId == null ||
+            confirmed.seqId > existing.seqId
         val textMerge = mergeStreamText(
             existing = oldText,
             incoming = newText,
             canUseSnapshotMerge = canUseSnapshotMerge,
+            incomingIsForwardDelta = incomingIsForwardDelta,
         )
         val mergedText = textMerge.text
         val oldCalls = existing.toolCalls
@@ -262,6 +270,9 @@ private fun StreamTextMergeResult.defensiveTelemetryName(): String? = when (bran
     StreamTextMergeBranch.CUMULATIVE -> "streamSubscriber.cumulativeSnapshotReplaced"
     StreamTextMergeBranch.STALE -> "streamSubscriber.staleFrameDropped"
     StreamTextMergeBranch.SUFFIX_DUPLICATE -> "streamSubscriber.endsWithDropped"
+    // letta-mobile-k9y5d: surface snapshot collisions resolved by keeping the
+    // longer text so the replay-garble path stays observable in telemetry.
+    StreamTextMergeBranch.SNAPSHOT_CONFLICT -> "streamSubscriber.snapshotConflictKeptLonger"
     StreamTextMergeBranch.EMPTY_INCOMING,
     StreamTextMergeBranch.EQUAL,
     StreamTextMergeBranch.APPEND -> null
