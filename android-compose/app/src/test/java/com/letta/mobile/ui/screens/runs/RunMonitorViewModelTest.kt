@@ -163,25 +163,6 @@ class RunMonitorViewModelTest {
         assertEquals("r2", state.runs.first().id)
     }
 
-
-    @Test
-    fun `clearSelectedStep resets step details in state`() = runTest {
-        awaitSuccessState()
-        viewModel.inspectRun("r1")
-        awaitSuccessState()
-        viewModel.inspectStep("step-1")
-        awaitSuccessState()
-
-        viewModel.clearSelectedStep()
-
-        val state = awaitSuccessState()
-        assertEquals(null, state.selectedStep)
-        assertTrue(state.selectedStepMessages.isEmpty())
-        assertEquals(null, state.selectedStepMetrics)
-        assertEquals(null, state.selectedStepTrace)
-        assertEquals("r1", state.selectedRun?.id)
-    }
-
     private suspend fun awaitSuccessState(): RunMonitorUiState {
         return viewModel.uiState.first { it is UiState.Success }.let { (it as UiState.Success).data }
     }

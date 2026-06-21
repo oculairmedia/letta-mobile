@@ -53,9 +53,9 @@ data class AgentEntity(
             return try {
                 json.decodeFromString(tagListSerializer, raw)
             } catch (_: SerializationException) {
-                raw.splitTrimAndFilter(",")
+                raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
             } catch (_: IllegalArgumentException) {
-                raw.splitTrimAndFilter(",")
+                raw.split(",").map { it.trim() }.filter { it.isNotBlank() }
             }
         }
 

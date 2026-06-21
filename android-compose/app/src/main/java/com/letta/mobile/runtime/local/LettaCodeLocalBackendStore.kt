@@ -150,7 +150,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
      * to accept --agent <id> turns. No-ops for records that already exist;
      * letta.js's normalizeAgentRecord fills every other field with defaults.
      */
-    suspend fun seedAgent(agentId: String, modelHandle: String) = withContext(Dispatchers.IO) {
+    fun seedAgent(agentId: String, modelHandle: String) {
         val agentFile = File(File(storageDirectory, "agents").apply { mkdirs() }, "${base64Url(agentId)}.json")
         if (!agentFile.isFile) {
             val record = buildJsonObject {
@@ -260,11 +260,11 @@ class LettaCodeLocalBackendStore @Inject constructor(
      * (updateAgentLLMConfig on resume), so anything other than the stored
      * value would clobber per-agent model selection.
      */
-    suspend fun storedModelHandle(agentId: String): String? = withContext(Dispatchers.IO) {
+    fun storedModelHandle(agentId: String): String? {
         val recordFile = File(File(storageDirectory, "agents"), "${base64Url(agentId)}.json")
-        if (!recordFile.isFile) return@withContext null
+        if (!recordFile.isFile) return null
         val record = runCatching { json.parseToJsonElement(recordFile.readText()).jsonObject }.getOrNull()
-        record?.stringField("model")?.takeIf { it.isNotBlank() }
+        return record?.stringField("model")?.takeIf { it.isNotBlank() }
     }
 
     /**

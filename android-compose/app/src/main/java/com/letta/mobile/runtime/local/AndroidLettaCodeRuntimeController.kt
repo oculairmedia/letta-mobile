@@ -359,7 +359,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         ).getOrThrow()
     }
 
-    private suspend fun PreparedLettaCodeProject.toLettaCodeNodeStartRequest(
+    private fun PreparedLettaCodeProject.toLettaCodeNodeStartRequest(
         session: EmbeddedLettaCodeSessionKey,
         modelSelection: EmbeddedLettaCodeModelSelection,
         onDeviceProviderBaseUrl: String? = null,

@@ -38,7 +38,12 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
             serverName = params.serverName,
             serverUrl = config["server_url"]?.toString()?.trim('"'),
             command = config["command"]?.toString()?.trim('"'),
-            args = parseArgsFast(config["args"]),
+            args = config["args"]?.toString()
+                ?.removePrefix("[")
+                ?.removeSuffix("]")
+                ?.split(",")
+                ?.map { it.trim().trim('"') }
+                ?.filter { it.isNotBlank() } ?: emptyList(),
             env = config["env"]?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content },
             authHeader = config["auth_header"]?.toString()?.trim('"'),
             authToken = config["auth_token"]?.toString()?.trim('"') ?: config["token"]?.toString()?.trim('"'),
@@ -61,7 +66,13 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
             serverName = params.serverName ?: current.serverName,
             serverUrl = config?.get("server_url")?.toString()?.trim('"') ?: current.serverUrl,
             command = config?.get("command")?.toString()?.trim('"') ?: current.command,
-            args = if (config?.containsKey("args") == true) parseArgsFast(config["args"]) else current.args,
+            args = config?.get("args")?.toString()
+                ?.removePrefix("[")
+                ?.removeSuffix("]")
+                ?.split(",")
+                ?.map { it.trim().trim('"') }
+                ?.filter { it.isNotBlank() }
+                ?: current.args,
             env = config?.get("env")?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content } ?: current.env,
             authHeader = config?.get("auth_header")?.toString()?.trim('"') ?: current.authHeader,
             authToken = config?.get("auth_token")?.toString()?.trim('"') ?: config?.get("token")?.toString()?.trim('"') ?: current.authToken,
@@ -102,51 +113,5 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
         if (shouldFail) throw ApiException(500, "Server error")
         return toolExecutionResults[serverId to toolId]
             ?: McpToolExecutionResult(status = "success", funcReturn = JsonPrimitive("ok"))
-    }
-
-    private fun parseArgsFast(configValue: Any?): List<String> {
-        if (configValue == null) return emptyList()
-        val str = configValue.toString()
-        if (str.isEmpty() || str == "[]") return emptyList()
-
-        val startIdx = if (str.startsWith("[")) 1 else 0
-        val endIdx = if (str.endsWith("]")) str.length - 1 else str.length
-
-        if (startIdx >= endIdx) return emptyList()
-
-        val result = mutableListOf<String>()
-        var start = startIdx
-
-        while (start < endIdx) {
-            var commaIndex = str.indexOf(',', start)
-            if (commaIndex == -1 || commaIndex > endIdx) {
-                commaIndex = endIdx
-            }
-
-            var s = start
-            var e = commaIndex - 1
-
-            while (s <= e && str[s].isWhitespace()) s++
-            while (e >= s && str[e].isWhitespace()) e--
-            if (s <= e && str[s] == '"') s++
-            if (e >= s && str[e] == '"') e--
-
-            if (s <= e) {
-                var isBlank = true
-                for (i in s..e) {
-                    if (!str[i].isWhitespace()) {
-                        isBlank = false
-                        break
-                    }
-                }
-                if (!isBlank) {
-                    result.add(str.substring(s, e + 1))
-                }
-            }
-
-            start = commaIndex + 1
-        }
-
-        return result
     }
 }

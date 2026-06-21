@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -16,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -52,7 +54,7 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var crashReporter: CrashReporter
 
-    private val launchTarget = mutableStateOf<AppLaunchTarget?>(null)
+    private var launchTarget by mutableStateOf<AppLaunchTarget?>(null)
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,7 +62,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ProfileCaptureKeyguardHelper.allowProfileCaptureLaunch(this)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = AppLaunchTarget.fromIntent(intent)
+        launchTarget = AppLaunchTarget.fromIntent(intent)
         enableEdgeToEdge()
         setContent {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
@@ -68,9 +70,9 @@ class MainActivity : ComponentActivity() {
             val snackbarHostState = remember { SnackbarHostState() }
             val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
             val view = androidx.compose.ui.platform.LocalView.current
-            val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
-            val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
-            val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            val appTheme by settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
+            val themePreset by settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
+            val dynamicColor by settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             val notificationPermissionLauncher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission(),
                 onResult = { granted ->
@@ -97,9 +99,9 @@ class MainActivity : ComponentActivity() {
             // Surface any uncaught crash from the previous session exactly once.
             // Snackbar with a "Copy id" action lets the user file a ticket tied
             // to the Sentry event. Dismissing clears the on-disk record.
-            val lastCrashState = crashReporter.lastCrash.collectAsStateWithLifecycle()
-            LaunchedEffect(lastCrashState.value) {
-                val crash = lastCrashState.value ?: return@LaunchedEffect
+            val lastCrash by crashReporter.lastCrash.collectAsStateWithLifecycle()
+            LaunchedEffect(lastCrash) {
+                val crash = lastCrash ?: return@LaunchedEffect
                 HapticEffects.reject(haptic, view)
                 val label = if (crash.sentryEventId != null) "Copy id" else "Details"
                 val summary = "App crashed last run (${crash.type.substringAfterLast('.')}). Tap to copy."
@@ -131,9 +133,9 @@ class MainActivity : ComponentActivity() {
             }
 
             LettaTheme(
-                appTheme = appThemeState.value,
-                themePreset = themePresetState.value,
-                dynamicColor = dynamicColorState.value,
+                appTheme = appTheme,
+                themePreset = themePreset,
+                dynamicColor = dynamicColor,
             ) {
                 CompositionLocalProvider(
                     LocalSnackbarDispatcher provides snackbarDispatcher,
@@ -146,8 +148,8 @@ class MainActivity : ComponentActivity() {
                         AdaptiveScaffold(navController = navController) {
                             AppNavGraph(
                                 navController = navController,
-                                 notificationTarget = launchTarget.value,
-                                 onNotificationTargetConsumed = { launchTarget.value = null },
+                                 notificationTarget = launchTarget,
+                                 onNotificationTargetConsumed = { launchTarget = null },
                             )
                         }
                     }
@@ -164,7 +166,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         importAutomationPayloadFromLaunchIntent()
-        launchTarget.value = AppLaunchTarget.fromIntent(intent)
+        launchTarget = AppLaunchTarget.fromIntent(intent)
     }
 
     private fun importAutomationPayloadFromLaunchIntent() {
