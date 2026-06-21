@@ -100,12 +100,12 @@ object SseParser {
         }
 
         if (dataBuilder == null) return null
-        val data = dataBuilder!!.toString().trim()
+        val data = dataBuilder?.toString()?.trim()
         if (data == "[DONE]") return null
 
         return SseFrame.RawEvent(
             event = eventName,
-            data = data,
+            data = data ?: "",
             id = id,
         )
     }

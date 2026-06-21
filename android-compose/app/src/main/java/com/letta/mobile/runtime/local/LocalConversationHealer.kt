@@ -154,13 +154,13 @@ class LocalConversationHealer(
 
         val rebuilt = ArrayList<String>(keptParsed.size + callIdToSynthetic.size)
         for ((line, row) in keptParsed) {
-            rebuilt += line
+            rebuilt.add(line)
             if (row?.stringField("role") != "assistant") continue
             (row["content"] as? JsonArray)?.forEach { part ->
                 val p = part as? JsonObject ?: return@forEach
                 if (p.stringField("type") != "toolCall") return@forEach
                 val callId = p.stringField("id") ?: return@forEach
-                callIdToSynthetic[callId]?.let { rebuilt += json.encodeToString(JsonObject.serializer(), it) }
+                callIdToSynthetic[callId]?.let { rebuilt.add(json.encodeToString(JsonObject.serializer(), it)) }
             }
         }
 
