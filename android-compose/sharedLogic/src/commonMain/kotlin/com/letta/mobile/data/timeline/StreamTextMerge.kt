@@ -11,6 +11,10 @@ enum class StreamTextMergeBranch {
     CUMULATIVE,
     STALE,
     SUFFIX_DUPLICATE,
+    // letta-mobile-k9y5d: two seq-id-carrying snapshots that share no clean
+    // prefix/suffix relationship. Appending them would duplicate/garble the
+    // text, so we keep the longer (more complete) snapshot instead.
+    SNAPSHOT_CONFLICT,
     APPEND,
 }
 
@@ -39,6 +43,13 @@ fun mergeStreamText(
         canUseSnapshotMerge && incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
+        // letta-mobile-k9y5d: both frames carry a seq id (so they are
+        // cumulative snapshots of the same logical message), but neither is a
+        // clean prefix/suffix of the other. This happens on replay /
+        // out-of-order resume, where a complete snapshot can collide with a
+        // stranded partial. Appending would duplicate the body and never drops
+        // a prefix; keeping the longer snapshot preserves the complete text.
+        canUseSnapshotMerge -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
         else -> StreamTextMergeBranch.APPEND
     }
     val text = when (branch) {
@@ -47,6 +58,7 @@ fun mergeStreamText(
         StreamTextMergeBranch.STALE,
         StreamTextMergeBranch.SUFFIX_DUPLICATE -> existing
         StreamTextMergeBranch.CUMULATIVE -> incoming
+        StreamTextMergeBranch.SNAPSHOT_CONFLICT -> if (incoming.length > existing.length) incoming else existing
         StreamTextMergeBranch.APPEND -> existing + incoming
     }
     return StreamTextMergeResult(
