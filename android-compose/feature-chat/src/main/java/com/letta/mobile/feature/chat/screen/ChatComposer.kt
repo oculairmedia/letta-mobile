@@ -322,8 +322,11 @@ private fun SlashCommandSuggestionRow(
                     androidx.compose.material3.DropdownMenuItem(
                         text = { androidx.compose.material3.Text(stringResource(R.string.chat_slash_uninstall_label, command.command)) },
                         onClick = {
-                            menuOpen = false
-                            onUninstall(command)
+                            try {
+                                onUninstall(command)
+                            } finally {
+                                menuOpen = false
+                            }
                         },
                     )
                 }

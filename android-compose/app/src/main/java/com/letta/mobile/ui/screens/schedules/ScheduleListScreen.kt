@@ -230,8 +230,11 @@ private fun AgentSelector(
                 DropdownMenuItem(
                     text = { Text(agent.name) },
                     onClick = {
-                        expanded = false
-                        onAgentSelected(agent.id.value)
+                        try {
+                            onAgentSelected(agent.id.value)
+                        } finally {
+                            expanded = false
+                        }
                     },
                 )
             }
