@@ -556,7 +556,7 @@ private fun EditToolDialog(
             onSave(
                 description.trim().ifBlank { null },
                 sourceCode,
-                tagsText.split(',').map { it.trim() }.filter { it.isNotBlank() }.ifEmpty { null },
+                tagsText.splitToSequence(',').map { it.trim() }.filter { it.isNotBlank() }.toList().ifEmpty { null },
             )
         },
         content = {
