@@ -1,6 +1,5 @@
 package com.letta.mobile.channel
 
-import android.content.Context
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -8,14 +7,13 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ChannelHeartbeatScheduler @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    private val workManager: WorkManager,
 ) {
     fun schedule() {
         val periodicConstraints = Constraints.Builder()
@@ -36,7 +34,6 @@ class ChannelHeartbeatScheduler @Inject constructor(
             .setConstraints(immediateConstraints)
             .build()
 
-        val workManager = WorkManager.getInstance(context)
         workManager.enqueueUniquePeriodicWork(
             PERIODIC_WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
