@@ -16,9 +16,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
-import java.lang.reflect.Field
-import java.lang.reflect.Modifier
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.util.ReflectionHelpers
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], manifest = Config.NONE)
 class ChatPushAlarmSchedulerTest {
 
     private lateinit var context: Context
@@ -45,7 +49,7 @@ class ChatPushAlarmSchedulerTest {
 
         Telemetry.clear()
 
-        setSdkInt(Build.VERSION_CODES.M)
+        ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", Build.VERSION_CODES.M)
     }
 
     @After
@@ -55,12 +59,7 @@ class ChatPushAlarmSchedulerTest {
     }
 
     private fun setSdkInt(version: Int) {
-        val field = Build.VERSION::class.java.getField("SDK_INT")
-        field.isAccessible = true
-        val modifiersField = Field::class.java.getDeclaredField("modifiers")
-        modifiersField.isAccessible = true
-        modifiersField.setInt(field, field.modifiers and Modifier.FINAL.inv())
-        field.set(null, version)
+        ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", version)
     }
 
     @Test
