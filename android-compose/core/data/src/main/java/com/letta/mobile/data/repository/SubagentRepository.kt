@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import android.util.Log
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.transport.ChannelTransport
@@ -43,14 +44,15 @@ internal fun defaultSubagentScope(): CoroutineScope =
  *  - The first subscriber triggers a `subagent_list` WS round-trip;
  *    subsequent subscribers share the same [kotlinx.coroutines.flow.StateFlow]
  *    so no duplicate fetches fire.
- *  - A `subagents_updated` push folds its fresh `subagents_active` snapshot
- *    straight into the cache by replacement — no re-fetch needed (the push
- *    already carries the canonical active set, mirroring how the bar reduces).
+ *  - A `subagents_updated` push folds its `subagents_active` snapshot into the
+ *    cache without dropping previously running entries that are merely omitted;
+ *    explicit terminal states remove entries.
  *  - On WS reconnect (`Disconnected → Connected`) the snapshot is refreshed
  *    so the UI doesn't keep showing a stale list after a dropped socket.
  *
- * Snapshot-by-replacement semantics are preserved end-to-end: every emission
- * is the full active set, never a delta — do not regress the rmzmo perf work.
+ * letta-mobile-sqdqe: push/refresh snapshots can be transiently incomplete,
+ * so replacement is conservative: running entries survive omission until the
+ * shim sends an explicit terminal state.
  */
 @Singleton
 open class SubagentRepository(
@@ -103,7 +105,7 @@ open class SubagentRepository(
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "subagent_list failed")
             }
-            val subagents = response.subagents
+            val subagents = mergeSnapshot(response.subagents)
             state.value = subagents
             subagents
         }
@@ -125,15 +127,35 @@ open class SubagentRepository(
         response.todos
     }
 
+
+    private fun mergeSnapshot(
+        incoming: List<SubagentEntry>,
+        terminal: SubagentEntry? = null,
+    ): List<SubagentEntry> {
+        val incomingByKey = incoming.associateBy { it.cacheKey() }
+        val terminalKey = terminal
+            ?.takeIf { it.status in TERMINAL_STATUSES }
+            ?.cacheKey()
+        val retained = state.value.filter { previous ->
+            val key = previous.cacheKey()
+            previous.status == SubagentStatus.RUNNING &&
+                key !in incomingByKey &&
+                key != terminalKey
+        }
+        return incoming + retained
+    }
+
+    private fun SubagentEntry.cacheKey(): String = toolCallId.takeIf { it.isNotBlank() }
+        ?: taskId?.takeIf { it.isNotBlank() }
+        ?: hashCode().toString()
+
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
             if (frame !is ServerFrame.SubagentsUpdated) return@collect
-            // The push carries a fresh canonical `subagents_active` set, so
-            // we fold it straight in by replacement rather than re-fetching.
             // Mark initialized so a later first-subscriber doesn't kick off a
-            // redundant subagent_list (the cache is already authoritative).
+            // redundant subagent_list (the cache is already warm).
             initialized.set(true)
-            state.value = frame.subagentsActive
+            state.value = mergeSnapshot(frame.subagentsActive, terminal = frame.subagent)
         }
     }
 
@@ -151,5 +173,10 @@ open class SubagentRepository(
 
     companion object {
         private const val TAG = "SubagentRepository"
+        private val TERMINAL_STATUSES = setOf(
+            SubagentStatus.COMPLETED,
+            SubagentStatus.FAILED,
+            SubagentStatus.CANCELLED,
+        )
     }
 }
