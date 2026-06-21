@@ -93,7 +93,7 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun `subagents_updated with empty active set clears the snapshot`() = runTest {
+    fun `subagents_updated with empty active set clears the snapshot after explicit terminal`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
         val repo = SubagentRepository(transport, backgroundScope)
         repo.activeSubagentsFlow().first { it.isNotEmpty() }
@@ -111,6 +111,42 @@ class SubagentRepositoryTest {
 
         val after = withTimeout(2_000) { repo.activeSubagentsFlow().first { it.isEmpty() } }
         assertEquals(emptyList<SubagentEntry>(), after)
+    }
+
+    @Test
+    fun `subagents_updated partial snapshot retains omitted running entries`() = runTest {
+        transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
+        val repo = SubagentRepository(transport, backgroundScope)
+        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "u-partial",
+                ts = "t",
+                reason = "registry-gap",
+                subagent = running("toolu_2"),
+                subagentsActive = listOf(running("toolu_2")),
+                at = "t",
+            )
+        )
+
+        val after = withTimeout(2_000) { repo.activeSubagentsFlow().first { it.size == 2 } }
+        assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `refresh partial snapshot retains existing running entries`() = runTest {
+        transport.enqueueSubagentList(
+            successList(listOf(running("toolu_1"))),
+            successList(listOf(running("toolu_2"))),
+        )
+        val repo = SubagentRepository(transport, backgroundScope)
+        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+
+        repo.refresh().getOrThrow()
+
+        val after = repo.activeSubagentsFlow().first { it.size == 2 }
+        assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
     }
 
     @Test
