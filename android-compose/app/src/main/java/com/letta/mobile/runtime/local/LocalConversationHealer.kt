@@ -97,7 +97,7 @@ class LocalConversationHealer(
                     val p = part as? JsonObject ?: return@forEach
                     if (p.stringField("type") == "toolCall") {
                         p.stringField("id")?.let { id ->
-                            declaredCallIds += id
+                            declaredCallIds.add(id)
                             callIdToName[id] = p.stringField("name") ?: "unknown"
                         }
                     }
@@ -115,8 +115,8 @@ class LocalConversationHealer(
             row ?: continue
             if (row.stringField("role") != "toolResult") continue
             val cid = row.stringField("toolCallId") ?: continue
-            resultCallIds += cid
-            if (cid !in declaredCallIds) orphanResultIds += cid
+            resultCallIds.add(cid)
+            if (cid !in declaredCallIds) orphanResultIds.add(cid)
         }
         val danglingCallIds = declaredCallIds.filter { it !in resultCallIds }
 
@@ -199,7 +199,7 @@ class LocalConversationHealer(
         for (row in rows) {
             if (row.stringField("role") != "toolResult") continue
             val callId = row.stringField("toolCallId") ?: continue
-            if (callId !in declaredCallIds) orphans += callId
+            if (callId !in declaredCallIds) orphans.add(callId)
         }
         return orphans
     }
@@ -228,8 +228,8 @@ class LocalConversationHealer(
                 if (part.stringField("type") != "toolCall") continue
                 val callId = part.stringField("id") ?: continue
                 if (callId in satisfied || callId in seen) continue
-                seen += callId
-                orphans += OrphanToolCall(callId = callId, name = part.stringField("name") ?: "unknown")
+                seen.add(callId)
+                orphans.add(OrphanToolCall(callId = callId, name = part.stringField("name") ?: "unknown"))
             }
         }
         return orphans
