@@ -97,7 +97,15 @@ class IncrementalChatRenderItemsCache {
                 messages = messages.subList(tailStartIndex, messages.size),
                 mode = mode,
             ).renderItems
-            val next = tailRenderItems + committedRenderItems
+            // letta-mobile-vxase: the tail and the committed history are each
+            // deduplicated WITHIN themselves by groupMessagesForRender, but
+            // concatenating them can reintroduce a duplicate LazyColumn key
+            // when the SAME runId straddles the tail/committed split — the tail
+            // emits a RunBlock keyed `run-<runId>` and the committed history
+            // already holds one. Two identical keys crash the LazyColumn
+            // ("Key was already used"). Re-run the global key de-dupe across
+            // the joined list so the boundary can never produce a collision.
+            val next = deduplicateRenderKeys(tailRenderItems + committedRenderItems)
             cachedMode = mode
             previousMessages = messages
             previousTailStartIndex = tailStartIndex
