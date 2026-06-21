@@ -1,8 +1,6 @@
 package com.letta.mobile.runtime.sensors
 
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -30,9 +28,10 @@ class DeviceSensorGroundingWriter(
             outputFile.parentFile?.mkdirs()
             val tmp = File(outputFile.parentFile, "${outputFile.name}.tmp")
             tmp.writeText(encoded)
-
-            Files.move(tmp.toPath(), outputFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-
+            if (!tmp.renameTo(outputFile)) {
+                outputFile.writeText(encoded)
+                tmp.delete()
+            }
             GroundingWriteReport(
                 file = outputFile,
                 bytes = encoded.toByteArray(Charsets.UTF_8).size,
