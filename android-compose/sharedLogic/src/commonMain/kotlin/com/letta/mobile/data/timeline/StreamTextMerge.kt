@@ -31,11 +31,21 @@ data class StreamTextMergeResult(
  * Snapshot-style merges are only safe when both frames carry seq ids. Without
  * that ordering signal, unrelated deltas must append even if they happen to
  * resemble a prefix/suffix.
+ *
+ * letta-mobile-k9y5d: [incomingIsForwardDelta] tells us whether the incoming
+ * frame is genuinely newer than the existing text (a higher seq id). A
+ * forward delta that shares no prefix/suffix is an incremental continuation
+ * and must APPEND (e.g. "Y" + "es ..." -> "Yes ..."). A NON-forward frame
+ * (lower-or-equal seq id) that shares no clean prefix/suffix is a replayed /
+ * re-delivered snapshot colliding with a stranded partial; appending it would
+ * duplicate/garble the body, so we keep the longer (complete) text instead.
+ * Defaults to true so existing callers keep the historical append behaviour.
  */
 fun mergeStreamText(
     existing: String,
     incoming: String,
     canUseSnapshotMerge: Boolean,
+    incomingIsForwardDelta: Boolean = true,
 ): StreamTextMergeResult {
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
@@ -43,13 +53,12 @@ fun mergeStreamText(
         canUseSnapshotMerge && incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
-        // letta-mobile-k9y5d: both frames carry a seq id (so they are
-        // cumulative snapshots of the same logical message), but neither is a
-        // clean prefix/suffix of the other. This happens on replay /
-        // out-of-order resume, where a complete snapshot can collide with a
-        // stranded partial. Appending would duplicate the body and never drops
-        // a prefix; keeping the longer snapshot preserves the complete text.
-        canUseSnapshotMerge -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
+        // letta-mobile-k9y5d: both frames carry a seq id but neither is a clean
+        // prefix/suffix of the other. If the incoming is NOT a forward delta it
+        // is a replayed/out-of-order snapshot, not a new continuation — appending
+        // would duplicate the body and could drop a prefix, so keep the longer
+        // (complete) snapshot. A forward delta still appends (incremental stream).
+        canUseSnapshotMerge && !incomingIsForwardDelta -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
         else -> StreamTextMergeBranch.APPEND
     }
     val text = when (branch) {

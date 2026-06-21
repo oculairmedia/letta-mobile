@@ -7,24 +7,30 @@ import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-k9y5d: regression guard for the replayed-assistant-text
- * corruption ("Kitchen sink"->"chen sink", "174MB"->"isMB",
- * "on-device"->"onice").
+ * corruption observed on device after an app restart + new message
+ * ("Kitchen sink is installed" -> "chen sink is installed",
+ *  "The APK is 174MB" -> "The APK isMB",
+ *  "local on-device agent" -> "local onice agent").
  *
- * Root cause: on replay / out-of-order resume, cumulative assistant snapshots
- * arrive carrying seq ids. The old seq guard dropped any frame with a lower
- * seq id, so when a stranded partial tail snapshot (high seq) landed before
- * the full snapshot (lower seq), the FULL text was discarded and the partial
- * was kept. And when two seq-carrying snapshots shared no clean prefix/suffix
- * the merge APPENDED them, duplicating/garbling the body.
+ * Root cause (PROJECTION/MERGE on replay, NOT the persisted record): on
+ * replay / out-of-order resume, the frame carrying the COMPLETE correct
+ * assistant text can arrive with a seq id that is <= an existing event which
+ * currently holds only a shorter, garbled partial. The old reducer dropped
+ * that frame purely on `incoming.seqId <= existing.seqId`
+ * (`hasAlreadyIngestedStreamFrame`), stranding the corrupted partial; and
+ * when the dropped frame slipped through, the snapshot merge APPENDED two
+ * competing snapshots, duplicating/garbling the body.
  *
- * Fix: the seq guard only drops a frame whose text is a pure contained
+ * Fix: the seq guard only drops a frame whose content is a pure contained
  * subset (empty/equal/prefix/suffix) of what we already hold; and the merge
- * gained a SNAPSHOT_CONFLICT branch that keeps the LONGER snapshot instead of
- * appending. A complete snapshot can therefore never be dropped or mangled by
- * a stranded partial, regardless of seq ordering.
+ * gained a SNAPSHOT_CONFLICT branch — for a NON-forward (replayed, lower seq)
+ * frame that shares no clean prefix/suffix it keeps the LONGER (complete)
+ * snapshot instead of appending. Genuine forward incremental deltas still
+ * append, so live streaming is unaffected.
  */
 class ReplayGarbleDiagnosticTest {
 
@@ -48,26 +54,25 @@ class ReplayGarbleDiagnosticTest {
 
     private fun cur(t: Timeline) = (t.events.single() as TimelineEvent.Confirmed).content
 
-    // The exact failure mode: a partial tail snapshot lands first on replay
-    // (higher seq), then the full snapshot replays with a lower seq. The full
-    // text must NOT be dropped or shrunk.
+    // (1) Reconstruct the exact corruption. A stranded partial tail snapshot
+    // sits in the timeline (high seq) when the full snapshot replays with a
+    // LOWER seq. Old behaviour kept "chen sink is installed"; the full text
+    // must win.
     @Test
-    fun `out-of-order replay keeps the full snapshot, never the partial`() {
+    fun `replay full snapshot wins over stranded partial with higher seq`() {
         var t = Timeline("conv")
-        // Partial tail arrives first (high seq) — stranded fragment.
         t = reduce(t, f("chen sink is installed", 6))
-        // Full snapshot replays with a LOWER seq id.
         t = reduce(t, f("Kitchen sink is installed", 5))
         assertEquals(
             "Kitchen sink is installed",
             cur(t),
-            "full snapshot must win even with a lower seq id than a stranded partial",
+            "the complete replayed text must replace the stranded partial",
         )
     }
 
-    // A later, equal-or-longer full snapshot must also be accepted.
+    // (1b) The "174" drop variant.
     @Test
-    fun `full snapshot is accepted even after a partial with higher seq`() {
+    fun `replay full snapshot wins for the 174MB corruption`() {
         var t = Timeline("conv")
         t = reduce(t, f("isMB with the embedded runtime", 9))
         t = reduce(t, f("The APK is 174MB with the embedded runtime", 7))
@@ -78,34 +83,78 @@ class ReplayGarbleDiagnosticTest {
         )
     }
 
-    // A genuine cumulative prefix snapshot (proper streaming) still grows.
+    // (2) Replay-specific: a COMPLETE message must NEVER be shortened or
+    // garbled by a later partial/duplicate/empty frame.
     @Test
-    fun `cumulative prefix snapshots still grow normally`() {
+    fun `complete message is never shortened by a later partial replay frame`() {
+        val full = "Kitchen sink is installed. The APK is 174MB (local on-device agent)."
+        var t = reduce(Timeline("conv"), f(full, 7))
+        // A replayed earlier partial (lower seq).
+        t = reduce(t, f("Kitchen sink is", 3))
+        assertEquals(full, cur(t), "stale prefix partial must not truncate the complete text")
+        // A replayed duplicate (same seq).
+        t = reduce(t, f(full, 7))
+        assertEquals(full, cur(t), "duplicate frame must not change the text")
+        // A replayed empty frame.
+        t = reduce(t, f("", 8))
+        assertEquals(full, cur(t), "empty frame must not blank the text")
+        // A coincidental-suffix partial (lower seq).
+        t = reduce(t, f("device agent).", 4))
+        assertEquals(full, cur(t), "suffix-only partial must not shrink the text")
+    }
+
+    // (3a) Genuine forward incremental deltas (live streaming) still append —
+    // proving the fix does not regress streaming. "Y" + "es ..." -> "Yes ..."
+    @Test
+    fun `forward incremental deltas still append`() {
+        var t = Timeline("conv")
+        t = reduce(t, f("Y", 1))
+        t = reduce(t, f("es — confirmed", 2))
+        assertEquals("Yes — confirmed", cur(t), "forward deltas must append into the growing message")
+    }
+
+    // (3b) A genuine cumulative prefix snapshot still grows to the longer text.
+    @Test
+    fun `cumulative prefix snapshot grows normally`() {
         var t = Timeline("conv")
         t = reduce(t, f("The APK", 1))
         t = reduce(t, f("The APK is 174MB", 2))
         assertEquals("The APK is 174MB", cur(t), "cumulative snapshot must grow to the longer text")
     }
 
-    // A stale earlier prefix snapshot must not shrink the complete text.
+    // (3c) Direct branch coverage of mergeStreamText: without a reliable
+    // ordering signal (no seq ids) a shorter incoming that coincidentally
+    // shares a prefix/suffix must NOT replace or truncate the existing text.
     @Test
-    fun `stale prefix snapshot does not shrink complete text`() {
-        var t = Timeline("conv")
-        t = reduce(t, f("The APK is 174MB", 3))
-        t = reduce(t, f("The APK is", 2))
-        assertEquals("The APK is 174MB", cur(t), "a stale prefix must never truncate the held text")
-    }
+    fun `merge without seq ids does not let coincidental overlap mangle text`() {
+        // No snapshot signal -> append, never truncate.
+        val appended = mergeStreamText(
+            existing = "Kitchen sink is installed",
+            incoming = "lled",
+            canUseSnapshotMerge = false,
+        )
+        assertEquals(StreamTextMergeBranch.APPEND, appended.branch)
+        assertEquals("Kitchen sink is installedlled", appended.text)
+        assertTrue(appended.text.startsWith("Kitchen sink is installed"), "prefix must be preserved")
 
-    // Two conflicting seq-carrying snapshots (no clean prefix/suffix) must
-    // keep the longer/complete one rather than appending and duplicating.
-    @Test
-    fun `conflicting snapshots keep the longer, never append`() {
-        var t = Timeline("conv")
-        t = reduce(t, f("local onice agent", 4))
-        t = reduce(t, f("local on-device agent", 5))
-        val text = cur(t)
-        assertEquals("local on-device agent", text, "longer/complete snapshot must win")
-        // And it must NOT be the appended concatenation.
-        assertEquals(false, text.contains("onice" + "local"), "must not append/duplicate snapshots")
+        // Non-forward snapshot collision -> keep the longer complete text.
+        val conflict = mergeStreamText(
+            existing = "chen sink is installed",
+            incoming = "Kitchen sink is installed",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = false,
+        )
+        assertEquals(StreamTextMergeBranch.SNAPSHOT_CONFLICT, conflict.branch)
+        assertEquals("Kitchen sink is installed", conflict.text)
+
+        // Forward snapshot delta with no overlap -> append (incremental stream).
+        val forward = mergeStreamText(
+            existing = "Y",
+            incoming = "es — confirmed",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = true,
+        )
+        assertEquals(StreamTextMergeBranch.APPEND, forward.branch)
+        assertEquals("Yes — confirmed", forward.text)
     }
 }
