@@ -133,7 +133,7 @@ object SseParser {
             return if (hasComment) {
                 ProcessedEvent(frame = SseFrame.Heartbeat)
             } else {
-                ProcessedEvent()
+                ProcessedEvent(frame = null)
             }
         }
 
@@ -158,6 +158,6 @@ object SseParser {
             } else {
                 ProcessedEvent(frame = SseFrame.Message(message))
             }
-        }.getOrDefault(ProcessedEvent())
+        }.getOrDefault(ProcessedEvent(frame = null))
     }
 }
