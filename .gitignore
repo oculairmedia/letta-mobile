@@ -45,5 +45,3 @@ android-compose/app/libs/embedded-bash/
 
 android-compose/app/libs/embedded-curl/
 android-compose/app/libs/embedded-node-cli/
-kotlinc/
-kotlin-compiler-1.9.22.zip
