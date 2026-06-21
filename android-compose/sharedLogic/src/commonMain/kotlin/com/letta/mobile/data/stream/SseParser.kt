@@ -105,7 +105,7 @@ object SseParser {
 
         return SseFrame.RawEvent(
             event = eventName,
-            data = data,
+            data = data ?: "",
             id = id,
         )
     }
