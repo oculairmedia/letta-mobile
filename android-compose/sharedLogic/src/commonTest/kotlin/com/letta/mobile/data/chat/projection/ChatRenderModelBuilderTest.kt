@@ -260,6 +260,50 @@ class ChatRenderModelBuilderTest {
     }
 
     @Test
+    fun `letta-mobile-vxase incremental tail never produces duplicate render keys across the split`() {
+        // The committed history ends with a RunBlock for run-shared, and the
+        // active tail (after the latest user turn) ALSO contains assistant
+        // messages for run-shared. Each slice de-dupes within itself, so a
+        // naive tailRenderItems + committedRenderItems concatenation yields
+        // TWO items keyed "run-run-shared" -> LazyColumn "Key already used"
+        // crash on the first render after restart. The builder must globally
+        // de-dupe the joined list.
+        // Same runId BEFORE the latest user turn (lands in committed history)
+        // AND after it (lands in the active tail). activeTailStartIndex splits
+        // just before the latest user, so a0(run-shared) sits in committed and
+        // a1(run-shared) in the tail — each slice emits a "run-run-shared"
+        // RunBlock, colliding when concatenated.
+        val cache = IncrementalChatRenderItemsCache()
+        val base = listOf(
+            assistant("a0", content = "earlier reply", runId = "run-shared", ts = "2026-04-19T12:00:00Z"),
+            user("u1"),
+            assistant("a1", content = "tail reply", runId = "run-shared", ts = "2026-04-19T12:01:00Z"),
+            user("u2"),
+            assistant("a2", content = "newest reply", runId = "run-shared", ts = "2026-04-19T12:02:00Z"),
+        )
+        cache.renderItems(base, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+
+        val appended = base + assistant(
+            "a3",
+            content = "newest reply continues",
+            runId = "run-shared",
+            ts = "2026-04-19T12:02:30Z",
+        )
+        val result = cache.renderItems(appended, ChatDisplayMode.Interactive, ChatMessageListChange.AppendTail)
+
+        val keys = result.map { it.key }
+        // The crash invariant: LazyColumn keys must be globally unique. Before
+        // the fix this list contained two "run-run-shared" entries and threw
+        // "Key was already used".
+        assertEquals(
+            keys.size,
+            keys.toSet().size,
+            "render keys must be globally unique across the tail/committed split; got duplicates: " +
+                keys.groupingBy { it }.eachCount().filterValues { it > 1 },
+        )
+    }
+
+    @Test
     fun `incremental render item cache falls back when update is not an active tail change`() {
         val cache = IncrementalChatRenderItemsCache()
         val base = streamingHistory(turnCount = 200)
