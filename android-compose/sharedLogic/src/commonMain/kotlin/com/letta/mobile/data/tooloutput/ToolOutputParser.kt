@@ -241,7 +241,7 @@ object ToolOutputParser {
 
         fun flush() {
             if (oldPath != null || newPath != null || currentLines.isNotEmpty()) {
-                files += DiffFile(oldPath = oldPath, newPath = newPath, lines = currentLines.toList())
+                files.add(DiffFile(oldPath = oldPath, newPath = newPath, lines = currentLines.toList()))
             }
             oldPath = null
             newPath = null
@@ -252,23 +252,23 @@ object ToolOutputParser {
             when {
                 line.startsWith("diff --git ") -> {
                     flush()
-                    currentLines += DiffLine(DiffLineType.Header, line)
+                    currentLines.add(DiffLine(DiffLineType.Header, line))
                     val parts = line.split(' ')
                     oldPath = parts.getOrNull(2)?.removePrefix("a/")
                     newPath = parts.getOrNull(3)?.removePrefix("b/")
                 }
                 line.startsWith("--- ") -> {
                     oldPath = line.removePrefix("--- ").trim().removePrefix("a/")
-                    currentLines += DiffLine(DiffLineType.Header, line)
+                    currentLines.add(DiffLine(DiffLineType.Header, line))
                 }
                 line.startsWith("+++ ") -> {
                     newPath = line.removePrefix("+++ ").trim().removePrefix("b/")
-                    currentLines += DiffLine(DiffLineType.Header, line)
+                    currentLines.add(DiffLine(DiffLineType.Header, line))
                 }
-                line.startsWith("@@ ") -> currentLines += DiffLine(DiffLineType.Hunk, line)
-                line.startsWith("+") -> currentLines += DiffLine(DiffLineType.Added, line)
-                line.startsWith("-") -> currentLines += DiffLine(DiffLineType.Removed, line)
-                else -> currentLines += DiffLine(DiffLineType.Context, line)
+                line.startsWith("@@ ") -> currentLines.add(DiffLine(DiffLineType.Hunk, line))
+                line.startsWith("+") -> currentLines.add(DiffLine(DiffLineType.Added, line))
+                line.startsWith("-") -> currentLines.add(DiffLine(DiffLineType.Removed, line))
+                else -> currentLines.add(DiffLine(DiffLineType.Context, line))
             }
         }
         flush()
@@ -348,9 +348,9 @@ object ToolOutputParser {
         text.lineSequence().forEach { line ->
             val trimmed = line.trimStart()
             if (trimmed.startsWith("$ ") || trimmed.startsWith("> ") || trimmed.startsWith("PS> ")) {
-                commandLines += line
+                commandLines.add(line)
             } else {
-                outputLines += line
+                outputLines.add(line)
             }
         }
         if (commandLines.isEmpty()) return null
