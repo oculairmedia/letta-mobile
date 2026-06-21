@@ -20,9 +20,9 @@ import kotlinx.coroutines.flow.stateIn
  * subagent registry ([ISubagentRepository], MOBILE_WS_PROTOCOL.md §13) into
  * the UI-facing [ActiveSubagent] model the bottom status bar renders.
  *
- * Snapshot-by-replacement is preserved: the repository emits the full active
- * set on every change (initial `subagent_list` + folded `subagents_updated`
- * pushes), and we map each whole snapshot to an [ImmutableList]. There are no
+ * Push snapshots can be incomplete during reconnect/registry gaps, so the
+ * source retains previously observed RUNNING entries across omissions and only
+ * removes them when a terminal status is explicitly observed. There are no
  * per-frame full rebuilds — the bar reduces by simple replacement, matching
  * the production reducer/render conventions and the rmzmo perf constraints.
  *
@@ -41,16 +41,12 @@ import kotlinx.coroutines.flow.stateIn
  *    when present; older shims are refreshed once on navigation and otherwise
  *    refuse navigation rather than guessing `default` or the parent.
  *
- * letta-mobile-29h9u — lingering terminals: the shim drops a subagent from
- * the next snapshot once it finishes (or flips it to a terminal status), so a
- * naive map would make the chip vanish instantly. To make the OUTCOME
- * reviewable, this source diffs each incoming snapshot against the previous
- * one and STAMPS any entry that just went terminal (status flipped, OR a
- * previously-running id disappeared) with [ActiveSubagent.terminalAt] = now.
- * Stamped terminals are merged back into the emitted snapshot; the host's
- * [withLingeringTerminals] rule then keeps them visible until their linger
- * window expires. The stamp is computed once and preserved across subsequent
- * snapshots so the dwell does not reset.
+ * letta-mobile-29h9u — lingering terminals: when the shim flips a subagent to
+ * a terminal status, this source stamps it with [ActiveSubagent.terminalAt] =
+ * now and merges it back into the emitted snapshot. The host's
+ * [withLingeringTerminals] rule then keeps it visible until its linger window
+ * expires. letta-mobile-sqdqe: omission alone is not terminal; an omitted
+ * RUNNING task remains visible until an explicit terminal status arrives.
  */
 class WsActiveSubagentSource(
     private val repository: ISubagentRepository,
@@ -97,8 +93,8 @@ class WsActiveSubagentSource(
      * `now` injected) so the linger semantics are unit-testable.
      */
     internal data class LingerAccumulator(
-        /** Last raw snapshot keyed by id, used to detect transitions. */
-        private val previous: Map<String, ActiveSubagent> = emptyMap(),
+        /** Last known running entries, retained across incomplete snapshots. */
+        private val running: Map<String, ActiveSubagent> = emptyMap(),
         /** Terminal entries currently lingering, keyed by id, stamped. */
         private val lingering: Map<String, ActiveSubagent> = emptyMap(),
         /** The list the source emits for this fold step. */
@@ -106,26 +102,20 @@ class WsActiveSubagentSource(
     ) {
         fun fold(snapshot: List<ActiveSubagent>, now: Long): LingerAccumulator {
             val byId = snapshot.associateBy { it.id }
+            val nextRunning = running.toMutableMap()
             val nextLingering = lingering.toMutableMap()
 
-            // 1) Entries that flipped to terminal IN the snapshot.
             for (entry in snapshot) {
-                if (entry.isTerminal && entry.id !in nextLingering) {
-                    nextLingering[entry.id] = entry.copy(terminalAt = now)
+                if (entry.isActive) {
+                    nextRunning[entry.id] = entry
+                    nextLingering.remove(entry.id)
+                } else if (entry.isTerminal) {
+                    nextRunning.remove(entry.id)
+                    nextLingering[entry.id] = nextLingering[entry.id]
+                        ?: entry.copy(terminalAt = now)
                 }
             }
-            // 2) Previously-running ids that DISAPPEARED — treat as completed
-            //    (the shim dropped them on finish) so the outcome still shows.
-            for ((id, prev) in previous) {
-                if (id !in byId && id !in nextLingering && prev.isActive) {
-                    nextLingering[id] = prev.copy(
-                        status = ActiveSubagent.Status.COMPLETED,
-                        terminalAt = now,
-                    )
-                }
-            }
-            // 3) Expire lingering terminals past their window; also clear one
-            //    if the same id has come back RUNNING (a re-dispatch).
+
             val expired = nextLingering.filterValues { lingered ->
                 val stampedAt = lingered.terminalAt
                 stampedAt == null ||
@@ -134,15 +124,13 @@ class WsActiveSubagentSource(
             }.keys
             expired.forEach { nextLingering.remove(it) }
 
-            // Emit: running entries from the snapshot + lingering terminals
-            // not already represented as running. Snapshot order first, then
-            // lingering terminals (stable, append-only).
-            val runningEmitted = snapshot.filter { it.isActive }
-            val terminalsEmitted = nextLingering.values.filter { it.id !in byId || byId[it.id]?.isActive != true }
-            val merged = (runningEmitted + terminalsEmitted).toImmutableList()
+            val snapshotActiveIds = snapshot.filter { it.isActive }.map { it.id }.toSet()
+            val retainedRunning = nextRunning.values.filter { it.id !in snapshotActiveIds }
+            val terminalsEmitted = nextLingering.values.filter { it.id !in nextRunning }
+            val merged = (snapshot.filter { it.isActive } + retainedRunning + terminalsEmitted).toImmutableList()
 
             return LingerAccumulator(
-                previous = byId,
+                running = nextRunning,
                 lingering = nextLingering,
                 emitted = merged,
             )

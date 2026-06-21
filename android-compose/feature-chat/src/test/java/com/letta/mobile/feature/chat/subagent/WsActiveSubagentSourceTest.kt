@@ -172,7 +172,7 @@ class WsActiveSubagentSourceTest {
     }
 
     @Test
-    fun `maps the full snapshot by replacement`() = runTest {
+    fun `retains running entry omitted from later non-terminal snapshot`() = runTest {
         val repo = FakeSubagentRepository(listOf(entry("toolu_1"), entry("toolu_2")))
         val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
 
@@ -180,19 +180,18 @@ class WsActiveSubagentSourceTest {
         assertEquals(listOf("toolu_1", "toolu_2"), mapped.map { it.id })
         assertEquals(listOf("general-purpose", "general-purpose"), mapped.map { it.subagentType })
 
-        // Replace the whole snapshot. The new RUNNING set replaces the old
-        // one; the vanished entries linger briefly as completed terminals
-        // (letta-mobile-29h9u). The running portion is the replacement only.
+        // A later refresh/push can be incomplete during reconnect or registry
+        // gaps. Omitted running entries must remain visible, not be converted
+        // to terminal linger entries, until an explicit terminal state arrives.
         repo.state.value = listOf(entry("toolu_3"))
         val after = source.activeSubagents.first { snapshot ->
             snapshot.any { it.id == "toolu_3" }
         }
-        assertEquals(listOf("toolu_3"), after.filter { it.isActive }.map { it.id })
-        // The previously-running entries are now lingering terminals, not gone.
         assertEquals(
-            setOf("toolu_1", "toolu_2"),
-            after.filter { it.isTerminal }.map { it.id }.toSet(),
+            setOf("toolu_1", "toolu_2", "toolu_3"),
+            after.filter { it.isActive }.map { it.id }.toSet(),
         )
+        assertTrue(after.none { it.isTerminal })
     }
 
     @Test
@@ -239,21 +238,39 @@ class WsActiveSubagentSourceTest {
     }
 
     @Test
-    fun `running entry that disappears is treated as completed and lingers`() = runTest {
-        // The shim often DROPS a finished subagent from the next snapshot
-        // rather than flipping its status; the source must still surface the
-        // outcome so the user isn't left with a chip that just vanished.
+    fun `explicit terminal state clears retained running entry into linger`() = runTest {
         val repo = FakeSubagentRepository(listOf(entry("toolu_1", SubagentStatus.RUNNING)))
         val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 5_000L })
 
         source.activeSubagents.first { it.singleOrNull()?.isActive == true }
 
-        // toolu_1 disappears entirely.
-        repo.state.value = emptyList()
+        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED))
         val lingering = source.activeSubagents.first { it.any { e -> e.isTerminal } }
         val done = lingering.single { it.id == "toolu_1" }
         assertEquals(ActiveSubagent.Status.COMPLETED, done.status)
         assertEquals(5_000L, done.terminalAt)
+    }
+
+    @Test
+    fun `omitted background task id remains visible until explicit terminal`() = runTest {
+        val repo = FakeSubagentRepository(listOf(entry("", taskId = "task_1")))
+        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 9_000L })
+
+        val initial = source.activeSubagents.first { it.singleOrNull()?.id == "task_1" }
+        assertEquals(ActiveSubagent.Kind.BACKGROUND_TASK, initial.single().kind)
+        assertTrue(initial.single().isActive)
+
+        repo.state.value = emptyList()
+        val retained = source.activeSubagents.first { snapshot ->
+            snapshot.singleOrNull()?.id == "task_1" && snapshot.single().isActive
+        }
+        assertEquals(listOf("task_1"), retained.map { it.id })
+
+        repo.state.value = listOf(entry("", status = SubagentStatus.COMPLETED, taskId = "task_1"))
+        val terminal = source.activeSubagents.first { snapshot ->
+            snapshot.singleOrNull()?.id == "task_1" && snapshot.single().isTerminal
+        }
+        assertEquals(ActiveSubagent.Status.COMPLETED, terminal.single().status)
     }
 
     // ── i2f23: todo_progress mapping ──────────────────────────────────────
