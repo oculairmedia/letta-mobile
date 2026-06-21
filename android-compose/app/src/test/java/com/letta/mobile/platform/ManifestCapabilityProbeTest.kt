@@ -16,6 +16,7 @@ import org.robolectric.annotation.Config
 import org.junit.jupiter.api.Tag
 
 @RunWith(RobolectricTestRunner::class)
+@Config(manifest = Config.NONE)
 @Tag("integration")
 class ManifestCapabilityProbeTest {
 
