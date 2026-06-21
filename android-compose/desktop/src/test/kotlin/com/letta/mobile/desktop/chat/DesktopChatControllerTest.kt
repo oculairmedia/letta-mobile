@@ -73,6 +73,52 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun startHydratesDefaultShimConversationThroughAgentMessages() = runTest {
+        val gateway = FakeDesktopChatGateway(conversationIds = listOf("conv-default-agent-1", "conv-2"))
+        val controller = testController(gateway)
+
+        controller.start()
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(listOf("conv-default-agent-1", "conv-2"), state.conversations.map { it.id })
+        assertEquals("conv-default-agent-1", state.selectedConversationId)
+        assertTrue(state.selectedMessages.any { it.role == "user" && it.content == "Hello from agent-0 history" })
+        assertEquals(listOf<Pair<String, String?>>("agent-0" to null), gateway.agentMessageRequests)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+
+        controller.close()
+    }
+
+    @Test
+    fun selectingAnotherDefaultShimConversationHydratesThroughItsAgentMessages() = runTest {
+        val gateway = FakeDesktopChatGateway(
+            conversationIds = listOf("conv-default-agent-1", "conv-default-agent-2"),
+        )
+        val controller = testController(gateway)
+
+        controller.start()
+        runCurrent()
+        controller.selectConversation("conv-default-agent-2")
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals("conv-default-agent-2", state.selectedConversationId)
+        assertTrue(state.selectedMessages.any { it.role == "user" && it.content == "Hello from agent-1 history" })
+        assertEquals(
+            listOf<Pair<String, String?>>(
+                "agent-0" to null,
+                "agent-1" to null,
+            ),
+            gateway.agentMessageRequests,
+        )
+        assertTrue(gateway.conversationMessageRequests.isEmpty())
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+
+        controller.close()
+    }
+
+    @Test
     fun sendUsesRemoteTimelineTransportAndUpdatesMessages() = runTest {
         val gateway = FakeDesktopChatGateway()
         val controller = testController(gateway)
@@ -335,8 +381,8 @@ class DesktopChatControllerTest {
         val loops = mutableListOf<FakeDesktopTimelineLoop>()
         val controller = testController(
             gateway = FakeDesktopChatGateway(conversationIds = listOf("conv-1", "conv-2")),
-            loopFactory = { _, conversationId, _ ->
-                FakeDesktopTimelineLoop(conversationId)
+            loopFactory = { _, conversation, _ ->
+                FakeDesktopTimelineLoop(conversation.id)
                     .also { loops += it }
                     .also { it.completeHydrate() }
             },
@@ -379,8 +425,8 @@ class DesktopChatControllerTest {
         val loops = mutableListOf<FakeDesktopTimelineLoop>()
         val controller = testController(
             gateway = FakeDesktopChatGateway(conversationIds = listOf("conv-1", "conv-2")),
-            loopFactory = { _, conversationId, _ ->
-                FakeDesktopTimelineLoop(conversationId).also { loops += it }
+            loopFactory = { _, conversation, _ ->
+                FakeDesktopTimelineLoop(conversation.id).also { loops += it }
             },
         )
 
@@ -405,7 +451,7 @@ class DesktopChatControllerTest {
         agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
         loopFactory: (
             gateway: DesktopChatGateway,
-            conversationId: String,
+            conversation: DesktopConversationSummary,
             scope: kotlinx.coroutines.CoroutineScope,
         ) -> DesktopTimelineLoop,
     ): DesktopChatController =
@@ -444,6 +490,8 @@ open class FakeDesktopChatGateway(
     private val conversationIds: List<String> = listOf("conv-1"),
 ) : DesktopChatGateway {
     val sentRequests = mutableListOf<MessageCreateRequest>()
+    val conversationMessageRequests = mutableListOf<String>()
+    val agentMessageRequests = mutableListOf<Pair<String, String?>>()
 
     override suspend fun listConversations(limit: Int): List<Conversation> =
         conversationIds.mapIndexed { index, conversationId ->
@@ -485,20 +533,32 @@ open class FakeDesktopChatGateway(
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = listOf(
-        UserMessage(
-            id = "user-1",
-            contentRaw = JsonPrimitive("Hello from history"),
-            date = "2026-06-07T01:00:00Z",
-        ),
-    )
+    ): List<LettaMessage> {
+        conversationMessageRequests += conversationId
+        return listOf(
+            UserMessage(
+                id = "user-1",
+                contentRaw = JsonPrimitive("Hello from history"),
+                date = "2026-06-07T01:00:00Z",
+            ),
+        )
+    }
 
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
         order: String?,
         conversationId: String?,
-    ): List<LettaMessage> = emptyList()
+    ): List<LettaMessage> {
+        agentMessageRequests += agentId to conversationId
+        return listOf(
+            UserMessage(
+                id = "agent-user-$agentId",
+                contentRaw = JsonPrimitive("Hello from $agentId history"),
+                date = "2026-06-07T01:00:00Z",
+            ),
+        )
+    }
 }
 
 private class CloseTrackingGateway(

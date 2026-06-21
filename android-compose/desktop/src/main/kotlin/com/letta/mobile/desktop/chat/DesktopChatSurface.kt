@@ -41,20 +41,15 @@ import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -90,9 +85,16 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopControlText
+import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopIconButton
+import com.letta.mobile.desktop.DesktopTextArea
+import com.letta.mobile.desktop.DesktopTooltip
 import java.util.Base64
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
 
 @Composable
@@ -105,6 +107,7 @@ fun DesktopChatSurface(
     onAttachImage: () -> Unit,
     onRemoveImageAttachment: (Int) -> Unit,
     onRetryConnection: () -> Unit,
+    onSettingsSelected: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val showConversationPane = state.conversations.isNotEmpty()
@@ -119,6 +122,7 @@ fun DesktopChatSurface(
                 onConversationSelected = onConversationSelected,
                 onDeleteConversation = onDeleteConversation,
                 onRetryConnection = onRetryConnection,
+                onSettingsSelected = onSettingsSelected,
             )
             Box(
                 modifier = Modifier
@@ -145,14 +149,15 @@ private fun ConversationPane(
     onConversationSelected: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
     onRetryConnection: () -> Unit,
+    onSettingsSelected: (() -> Unit)?,
 ) {
     Column(
         modifier = Modifier
-            .width(328.dp)
+            .width(292.dp)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 18.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(horizontal = 16.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
@@ -192,8 +197,10 @@ private fun ConversationPane(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (state.conversations.isEmpty()) {
                 item {
@@ -204,7 +211,7 @@ private fun ConversationPane(
                 }
             }
             state.conversationGroups.forEach { group ->
-                item(key = "agent:${group.key}") {
+                item(key = "agent-${group.key}") {
                     ConversationGroupHeader(group)
                 }
                 items(
@@ -220,6 +227,46 @@ private fun ConversationPane(
                 }
             }
         }
+
+        if (onSettingsSelected != null) {
+            Spacer(Modifier.height(6.dp))
+            ConversationSidebarSettingsRow(onClick = onSettingsSelected)
+        }
+    }
+}
+
+@Composable
+private fun ConversationSidebarSettingsRow(
+    onClick: () -> Unit,
+) {
+    DesktopTooltip(text = "Settings") {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = MaterialTheme.shapes.small,
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Settings",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -228,15 +275,15 @@ internal fun ConversationGroupHeader(group: DesktopConversationGroup) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 6.dp, start = 4.dp, end = 4.dp),
+            .padding(top = 8.dp, start = 4.dp, end = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = group.agentName.uppercase(),
+            text = group.agentName,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -285,17 +332,14 @@ internal fun ConversationPaneStateCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (screenStatus.isConnectionRetryable) {
-                Button(
+                DesktopDefaultButton(
                     onClick = onRetryConnection,
                     enabled = !state.isLoading,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                    DesktopButtonContent(
+                        text = "Retry",
+                        icon = Icons.Outlined.Refresh,
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Retry")
                 }
             }
         }
@@ -322,65 +366,71 @@ internal fun ConversationRow(
         MaterialTheme.colorScheme.onSurface
     }
 
-    Box {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = { showMenu = true }
-                )
-                .onClick(
-                    matcher = PointerMatcher.mouse(PointerButton.Secondary),
-                    onClick = { showMenu = true }
-                ),
-            shape = MaterialTheme.shapes.medium,
-            color = container,
-            contentColor = content,
-            border = BorderStroke(
-                width = 1.dp,
-                color = if (selected) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
-            ),
-        ) {
-            Row(
+    DesktopTooltip(text = "${conversation.title} - ${conversation.updatedAtLabel}") {
+        Box {
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = { showMenu = true },
+                    )
+                    .onClick(
+                        matcher = PointerMatcher.mouse(PointerButton.Secondary),
+                        onClick = { showMenu = true },
+                    ),
+                shape = MaterialTheme.shapes.small,
+                color = container,
+                contentColor = content,
             ) {
-                Text(
-                    text = conversation.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (conversation.unreadCount > 0) {
-                    CountPill(conversation.unreadCount)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = conversation.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (conversation.unreadCount > 0) {
+                        CountPill(conversation.unreadCount)
+                    }
+                    Text(
+                        text = conversation.updatedAtLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = content.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Text(
-                    text = conversation.updatedAtLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = content.copy(alpha = 0.6f),
-                )
             }
-    }
-    DropdownMenu(
-        expanded = showMenu,
-        onDismissRequest = { showMenu = false }
-    ) {
-        DropdownMenuItem(
-            text = { Text("Delete Conversation") },
-            leadingIcon = { Icon(Icons.Outlined.Close, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            onClick = {
-                showMenu = false
-                onDelete()
+            if (showMenu) {
+                JewelPopupMenu(
+                    onDismissRequest = {
+                        showMenu = false
+                        true
+                    },
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    selectableItem(
+                        selected = false,
+                        onClick = {
+                            showMenu = false
+                            onDelete()
+                        },
+                    ) {
+                        DesktopControlText("Delete conversation")
+                    }
+                }
             }
-        )
+        }
     }
-}
 }
 
 @Composable
@@ -492,17 +542,14 @@ private fun ChatStatePanel(
                 modifier = Modifier.widthIn(max = 520.dp),
             )
             if (screenStatus.isConnectionRetryable) {
-                Button(
+                DesktopDefaultButton(
                     onClick = onRetryConnection,
                     enabled = !state.isLoading,
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
+                    DesktopButtonContent(
+                        text = "Retry connection",
+                        icon = Icons.Outlined.Refresh,
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("Retry connection")
                 }
             }
         }
@@ -992,35 +1039,25 @@ private fun ComposerBar(
                     color = Color.Transparent,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ) {
-                    IconButton(
+                    DesktopIconButton(
+                        imageVector = Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = "Attach image",
                         onClick = onAttachImage,
                         enabled = enabled,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.AddPhotoAlternate,
-                            contentDescription = "Attach image",
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
+                        iconModifier = Modifier.size(20.dp),
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
-                OutlinedTextField(
+                DesktopTextArea(
                     value = text,
                     onValueChange = onTextChanged,
                     enabled = enabled,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 46.dp, max = 120.dp),
-                    placeholder = { Text("What are we building?") },
-                    minLines = 1,
                     maxLines = 5,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color.Transparent,
-                        unfocusedBorderColor = Color.Transparent,
-                        disabledBorderColor = Color.Transparent,
-                        focusedContainerColor = Color.Transparent,
-                        unfocusedContainerColor = Color.Transparent,
-                        disabledContainerColor = Color.Transparent,
-                    ),
+                    placeholder = "What are we building?",
+                    undecorated = true,
                 )
                 Surface(
                     modifier = Modifier
@@ -1065,16 +1102,14 @@ private fun PendingAttachmentThumbnail(
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            IconButton(
+            DesktopIconButton(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Remove attachment",
                 onClick = onRemove,
                 modifier = Modifier.size(22.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = "Remove attachment",
-                    modifier = Modifier.size(14.dp),
-                )
-            }
+                iconModifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onErrorContainer,
+            )
         }
     }
 }

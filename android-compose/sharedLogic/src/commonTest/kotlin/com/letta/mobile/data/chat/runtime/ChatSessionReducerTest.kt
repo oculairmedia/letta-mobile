@@ -83,6 +83,39 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun mapsConversationSummaryWithApiProvidedAgentNameWhenCacheMisses() {
+        val summary = Conversation(
+            id = ConversationId("conversation-abcdef"),
+            agentId = AgentId("agent-1"),
+            agentName = "Grace",
+            summary = "Backend row",
+        ).toChatConversationSummary()
+
+        assertEquals("Grace", summary.agentName)
+    }
+
+    @Test
+    fun mapsConversationSummariesIncludingDefaultShimPlaceholders() {
+        val summaries = listOf(
+            Conversation(
+                id = ConversationId("conv-default-agent-1"),
+                agentId = AgentId("agent-1"),
+                summary = "Default conversation",
+            ),
+            Conversation(
+                id = ConversationId("conversation-abcdef"),
+                agentId = AgentId("agent-1"),
+                summary = "Real conversation",
+            ),
+        ).toChatConversationSummaries(agentNamesById = mapOf("agent-1" to "Ada"))
+
+        assertEquals(listOf("conv-default-agent-1", "conversation-abcdef"), summaries.map { it.id })
+        assertEquals("Default conversation", summaries.first().title)
+        assertEquals("Real conversation", summaries.last().title)
+        assertEquals(listOf("Ada", "Ada"), summaries.map { it.agentName })
+    }
+
+    @Test
     fun selectingRemoteConversationClearsComposerAndStartsHydrateGeneration() {
         val state = ChatSessionState(
             conversations = listOf(conversation("a"), conversation("b", unreadCount = 3)),

@@ -6,21 +6,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,6 +30,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.ScheduleLibraryItem
 import com.letta.mobile.data.schedules.ScheduleTiming
+import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopControlText
+import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopRadioChip
 
 @Composable
 fun DesktopScheduleLibrarySurface(
@@ -112,13 +112,14 @@ private fun SchedulesHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Button(
+        DesktopDefaultButton(
             onClick = onRefresh,
             enabled = !state.isLoading,
         ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(if (state.isLoading) "Refreshing" else "Refresh")
+            DesktopButtonContent(
+                text = if (state.isLoading) "Refreshing" else "Refresh",
+                icon = Icons.Outlined.Refresh,
+            )
         }
     }
 }
@@ -133,17 +134,16 @@ private fun AgentFilters(
             items = state.agents,
             key = { agent -> agent.id.value },
         ) { agent ->
-            FilterChip(
+            DesktopRadioChip(
                 selected = agent.id.value == state.selectedAgentId,
                 onClick = { onAgentSelected(agent.id.value) },
-                label = {
-                    Text(
-                        text = agent.name,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-            )
+            ) {
+                DesktopControlText(
+                    text = agent.name,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

@@ -7,7 +7,6 @@ import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
@@ -167,13 +166,12 @@ class ConversationRepositoryTest {
     @Test
     fun `createConversation uses local source in local runtime mode`() = runTest {
         val localSource = FakeLocalRuntimeConversationSource()
-        val settingsRepository = FakeSettingsRepository()
-        settingsRepository.saveConfig(
-            LettaConfig(
+        val settingsRepository = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
                 id = "local",
                 mode = LettaConfig.Mode.LOCAL,
                 serverUrl = "local-lettacode://runtime",
-            )
+            ),
         )
         repository = ConversationRepository(
             fakeApi,

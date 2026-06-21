@@ -6,27 +6,21 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.DesktopControlText
+import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopOutlinedButton
+import com.letta.mobile.desktop.DesktopSelectableChip
+import com.letta.mobile.desktop.DesktopTextField
 
 @Composable
 fun DesktopToolLibrarySurface(
@@ -66,11 +66,10 @@ fun DesktopToolLibrarySurface(
             }
         }
         item {
-            OutlinedTextField(
+            DesktopTextField(
                 value = state.searchQuery,
                 onValueChange = onSearchQueryChanged,
-                label = { Text("Search tools") },
-                singleLine = true,
+                placeholder = "Search tools",
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -113,11 +112,11 @@ fun DesktopToolLibrarySurface(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center,
                     ) {
-                        TextButton(
+                        DesktopOutlinedButton(
                             onClick = onLoadMore,
                             enabled = !state.isLoadingMore,
                         ) {
-                            Text(if (state.isLoadingMore) "Loading more" else "Load more tools")
+                            DesktopButtonContent(if (state.isLoadingMore) "Loading more" else "Load more tools")
                         }
                     }
                 }
@@ -151,13 +150,14 @@ private fun ToolsHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Button(
+        DesktopDefaultButton(
             onClick = onRefresh,
             enabled = !state.isLoading,
         ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text(if (state.isLoading) "Refreshing" else "Refresh")
+            DesktopButtonContent(
+                text = if (state.isLoading) "Refreshing" else "Refresh",
+                icon = Icons.Outlined.Refresh,
+            )
         }
     }
 }
@@ -171,21 +171,23 @@ private fun TagFilters(
 ) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            FilterChip(
+            DesktopSelectableChip(
                 selected = selectedTags.isEmpty(),
                 onClick = onClearTags,
-                label = { Text("All") },
-            )
+            ) {
+                DesktopControlText("All")
+            }
         }
         items(
             items = tags,
             key = { tag -> tag },
         ) { tag ->
-            FilterChip(
+            DesktopSelectableChip(
                 selected = tag in selectedTags,
                 onClick = { onTagToggled(tag) },
-                label = { Text(tag, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            )
+            ) {
+                DesktopControlText(tag, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

@@ -28,18 +28,13 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,20 +51,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
-import com.letta.mobile.desktop.chat.ChatDetailPane
-import com.letta.mobile.desktop.chat.ConversationGroupHeader
-import com.letta.mobile.desktop.chat.ConversationPaneStateCard
-import com.letta.mobile.desktop.chat.ConversationRow
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurface
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-import com.letta.mobile.desktop.chat.DesktopConversationGroup
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
@@ -89,6 +80,10 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
+import org.jetbrains.jewel.ui.component.Icon as JewelIcon
+import org.jetbrains.jewel.ui.component.SimpleListItem as JewelSimpleListItem
+import org.jetbrains.jewel.ui.component.Text as JewelText
+import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 private const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
 
@@ -210,80 +205,25 @@ fun LettaDesktopApp() {
         onDispose { toolLibraryController.close() }
     }
 
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = Color(0xFFE8E3DA),
-            onPrimary = Color(0xFF171512),
-            primaryContainer = Color(0xFF2A2926),
-            onPrimaryContainer = Color(0xFFF4EFE7),
-            secondary = Color(0xFFA9B1AA),
-            onSecondary = Color(0xFF151816),
-            secondaryContainer = Color(0xFF242824),
-            onSecondaryContainer = Color(0xFFE6EAE4),
-            tertiary = Color(0xFFD2A55F),
-            onTertiary = Color(0xFF24180A),
-            tertiaryContainer = Color(0xFF352817),
-            onTertiaryContainer = Color(0xFFFFDFA5),
-            error = Color(0xFFFFB4AB),
-            errorContainer = Color(0xFF4F1718),
-            onErrorContainer = Color(0xFFFFDAD6),
-            surface = Color(0xFF11110F),
-            surfaceVariant = Color(0xFF20211E),
-            onSurface = Color(0xFFEDEBE6),
-            onSurfaceVariant = Color(0xFFAAA8A1),
-            outline = Color(0xFF76746D),
-            outlineVariant = Color(0xFF30322E),
-        ),
-    ) {
+    DesktopMaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.surface,
         ) {
             if (selectedDestination == DesktopDestination.Conversations) {
-                // Unified 2-pane layout: Left = Menu + Conversations, Right = Chat Detail
-                Row(Modifier.fillMaxSize()) {
-                    Column(
-                        modifier = Modifier
-                            .width(320.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.surface),
-                    ) {
-                        CompactDesktopNavigation(
-                            selectedDestination = selectedDestination,
-                            onDestinationSelected = { selectedDestination = it },
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        )
-                        ConversationsList(
-                            chatState = chatState,
-                            onConversationSelected = chatController::selectConversation,
-                            onConversationDeleted = chatController::deleteConversation,
-                            onRetryConnection = chatController::retryConnection,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant),
-                    )
-                    ChatDetailPane(
-                        state = chatState,
-                        onComposerTextChanged = chatController::updateComposerText,
-                        onSend = chatController::send,
-                        onAttachImage = { pickerLauncher.launch() },
-                        onRemoveImageAttachment = chatController::removeImageAttachment,
-                        onRetryConnection = chatController::retryConnection,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+                DesktopChatSurface(
+                    state = chatState,
+                    onConversationSelected = chatController::selectConversation,
+                    onDeleteConversation = chatController::deleteConversation,
+                    onComposerTextChanged = chatController::updateComposerText,
+                    onSend = chatController::send,
+                    onAttachImage = { pickerLauncher.launch() },
+                    onRemoveImageAttachment = chatController::removeImageAttachment,
+                    onRetryConnection = chatController::retryConnection,
+                    onSettingsSelected = { selectedDestination = DesktopDestination.Settings },
+                    modifier = Modifier.fillMaxSize(),
+                )
             } else {
-                // Standard 3-column layout for other destinations
                 Row(Modifier.fillMaxSize()) {
                     DesktopNavigation(
                         selectedDestination = selectedDestination,
@@ -352,7 +292,7 @@ private fun DesktopNavigation(
         modifier = Modifier
             .width(232.dp)
             .fillMaxHeight()
-            .background(Color(0xFF090A09))
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 14.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -444,15 +384,15 @@ private fun DesktopNavigation(
             onClick = { onDestinationSelected(DesktopDestination.Overview) },
         )
 
-        SidebarSection("System")
+        Spacer(Modifier.weight(1f))
+
         DesktopNavRow(
             label = "Settings",
             icon = DesktopDestination.Settings.icon,
             selected = selectedDestination == DesktopDestination.Settings,
+            tooltip = "Settings",
             onClick = { onDestinationSelected(DesktopDestination.Settings) },
         )
-
-        Spacer(Modifier.weight(1f))
 
         Surface(
             color = Color.Transparent,
@@ -500,42 +440,40 @@ private fun DesktopNavRow(
     selected: Boolean,
     onClick: () -> Unit,
     subdued: Boolean = false,
+    tooltip: String = label,
 ) {
-    val container = when {
-        selected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f)
-        else -> Color.Transparent
-    }
     val content = when {
         selected -> MaterialTheme.colorScheme.onSurface
         subdued -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(34.dp)
-            .clickable(onClick = onClick),
-        color = container,
-        contentColor = content,
-        shape = MaterialTheme.shapes.small,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    DesktopTooltip(text = tooltip) {
+        JewelSimpleListItem(
+            selected = selected,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            height = 34.dp,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(17.dp),
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                JewelIcon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = content,
+                )
+                JewelText(
+                    text = label,
+                    color = content,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
@@ -754,8 +692,8 @@ private fun BackendSettingsCard(
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
 ) {
-    var serverUrl by remember(config.id) { mutableStateOf(config.serverUrl) }
-    var tokenInput by remember(config.id) { mutableStateOf("") }
+    var serverUrl by remember(config.id, config.serverUrl) { mutableStateOf(TextFieldValue(config.serverUrl)) }
+    var tokenInput by remember(config.id) { mutableStateOf(TextFieldValue("")) }
     var mode by remember(config.id) { mutableStateOf(config.mode) }
 
     Card(
@@ -773,37 +711,33 @@ private fun BackendSettingsCard(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
-            OutlinedTextField(
+            DesktopSettingsFieldLabel("Server URL")
+            JewelTextField(
                 value = serverUrl,
                 onValueChange = { serverUrl = it },
-                label = { Text("Server URL") },
-                singleLine = true,
+                placeholder = { JewelText("https://app.letta.com") },
                 modifier = Modifier.fillMaxWidth(),
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Mode",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                DesktopSettingsFieldLabel("Mode")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LettaConfig.Mode.entries.forEach { option ->
-                        FilterChip(
+                        DesktopRadioChip(
                             selected = mode == option,
                             onClick = { mode = option },
-                            label = { Text(option.label) },
-                        )
+                        ) {
+                            DesktopControlText(option.label)
+                        }
                     }
                 }
             }
-            OutlinedTextField(
+            DesktopSettingsFieldLabel("Access token")
+            JewelTextField(
                 value = tokenInput,
                 onValueChange = { tokenInput = it },
-                label = { Text("Access token") },
                 placeholder = {
-                    Text(if (config.accessToken == null) "Optional" else "Saved token hidden")
+                    JewelText(if (config.accessToken == null) "Optional" else "Saved token hidden")
                 },
-                singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -811,36 +745,45 @@ private fun BackendSettingsCard(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Button(
+                DesktopDefaultButton(
                     onClick = {
-                        val normalizedUrl = serverUrl.trim()
+                        val normalizedUrl = serverUrl.text.trim()
                         onConfigSaved(
                             LettaConfig(
                                 id = desktopConfigIdFor(normalizedUrl),
                                 mode = mode,
                                 serverUrl = normalizedUrl,
-                                accessToken = tokenInput.trim().takeIf { it.isNotBlank() }
+                                accessToken = tokenInput.text.trim().takeIf { it.isNotBlank() }
                                     ?: config.accessToken,
                             ),
                         )
-                        tokenInput = ""
+                        tokenInput = TextFieldValue("")
                     },
                 ) {
-                    Text("Save")
+                    DesktopButtonContent("Save")
                 }
                 if (config.accessToken != null) {
-                    TextButton(
+                    DesktopOutlinedButton(
                         onClick = {
-                            tokenInput = ""
+                            tokenInput = TextFieldValue("")
                             onTokenCleared()
                         },
                     ) {
-                        Text("Clear token")
+                        DesktopButtonContent("Clear token")
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun DesktopSettingsFieldLabel(text: String) {
+    JewelText(
+        text = text,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.SemiBold,
+    )
 }
 
 private val LettaConfig.Mode.label: String
@@ -990,119 +933,3 @@ private fun StatusPill(
     }
 }
 
-// Compact navigation for unified Conversations left pane
-@Composable
-private fun CompactDesktopNavigation(
-    selectedDestination: DesktopDestination,
-    onDestinationSelected: (DesktopDestination) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = "Letta Desktop",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 4.dp),
-        )
-        DesktopDestination.entries.forEach { destination ->
-            val selected = destination == selectedDestination
-            val container = if (selected) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                Color.Transparent
-            }
-            val content = if (selected) {
-                MaterialTheme.colorScheme.onPrimaryContainer
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onDestinationSelected(destination) },
-                shape = MaterialTheme.shapes.small,
-                color = container,
-                contentColor = content,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(
-                        imageVector = destination.icon(),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        text = destination.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                    )
-                }
-            }
-        }
-    }
-}
-
-// Standalone conversations list (extracted from ConversationPane)
-@Composable
-private fun ConversationsList(
-    chatState: DesktopChatSurfaceState,
-    onConversationSelected: (String) -> Unit,
-    onConversationDeleted: (String) -> Unit,
-    onRetryConnection: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            if (chatState.conversations.isEmpty()) {
-                item {
-                    ConversationPaneStateCard(
-                        state = chatState,
-                        onRetryConnection = onRetryConnection,
-                    )
-                }
-            }
-            chatState.conversationGroups.forEach { group ->
-                item(key = "agent:${group.key}") {
-                    ConversationGroupHeader(group)
-                }
-                items(
-                    items = group.conversations,
-                    key = { it.id },
-                ) { conversation ->
-                    ConversationRow(
-                        conversation = conversation,
-                        selected = conversation.id == chatState.selectedConversationId,
-                        onClick = { onConversationSelected(conversation.id) },
-                        onDelete = { onConversationDeleted(conversation.id) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-private fun DesktopDestination.icon(): ImageVector = when (this) {
-    DesktopDestination.Overview -> Icons.Outlined.Dashboard
-    DesktopDestination.Agents -> Icons.Outlined.SmartToy
-    DesktopDestination.Memory -> Icons.Outlined.Memory
-    DesktopDestination.Conversations -> Icons.Outlined.Forum
-    DesktopDestination.Schedules -> Icons.Outlined.Schedule
-    DesktopDestination.Channels -> Icons.Outlined.Hub
-    DesktopDestination.Settings -> Icons.Outlined.Settings
-}
