@@ -98,13 +98,13 @@ class AdminAgentManager @Inject constructor(
 
     private suspend fun listAllAgentsForLookup(): List<Agent> {
         val merged = mutableListOf<Agent>()
+        val existingIds = mutableSetOf<AgentId>()
         var offset = AgentPagingSource.INITIAL_OFFSET
         while (true) {
             val page = agentApi.listAgents(limit = LOOKUP_PAGE_SIZE, offset = offset)
             if (page.isEmpty()) break
 
-            val existingIds = merged.asSequence().map { it.id }.toSet()
-            val newAgents = page.filter { it.id !in existingIds }
+            val newAgents = page.filter { existingIds.add(it.id) }
             if (newAgents.isEmpty()) {
                 Log.w(TAG, "Agent lookup offset pagination made no progress; falling back to count-sized fetch")
                 return listAllAgentsWithoutOffsetFallback()
