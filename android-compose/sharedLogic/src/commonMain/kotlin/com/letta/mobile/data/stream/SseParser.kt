@@ -74,34 +74,62 @@ object SseParser {
     }
 
     private fun processRawEvent(event: String): SseFrame.RawEvent? {
-        val lines = event.lineSequence().filter { it.isNotEmpty() }.toList()
-        val dataLines = lines.filter { it.startsWith("data:") }.map { line ->
-            line.removePrefix("data:").let { data -> if (data.startsWith(" ")) data.drop(1) else data }
+        var eventName: String? = null
+        var dataBuilder: StringBuilder? = null
+        var id: String? = null
+
+        event.lineSequence().forEach { line ->
+            if (line.isEmpty()) return@forEach
+
+            if (line.startsWith("data:")) {
+                val dataStr = line.substring(5).let { if (it.startsWith(" ")) it.substring(1) else it }
+                if (dataBuilder == null) {
+                    dataBuilder = StringBuilder(dataStr)
+                } else {
+                    dataBuilder?.append('\n')?.append(dataStr)
+                }
+            } else if (line.startsWith("event:")) {
+                if (eventName == null) {
+                    eventName = line.substring(6).trim().takeIf { it.isNotBlank() }
+                }
+            } else if (line.startsWith("id:")) {
+                if (id == null) {
+                    id = line.substring(3).trim().takeIf { it.isNotBlank() }
+                }
+            }
         }
-        if (dataLines.isEmpty()) return null
-        val data = dataLines.joinToString("\n").trim()
+
+        if (dataBuilder == null) return null
+        val data = dataBuilder?.toString()?.trim()
         if (data == "[DONE]") return null
+
         return SseFrame.RawEvent(
-            event = lines.firstOrNull { it.startsWith("event:") }?.removePrefix("event:")?.trim()?.takeIf { it.isNotBlank() },
+            event = eventName,
             data = data,
-            id = lines.firstOrNull { it.startsWith("id:") }?.removePrefix("id:")?.trim()?.takeIf { it.isNotBlank() },
+            id = id,
         )
     }
 
     private fun processEvent(event: String): ProcessedEvent {
-        val lines = event.lineSequence()
-            .filter { it.isNotEmpty() }
-            .toList()
-        val hasComment = lines.any { it.startsWith(":") }
-        val dataLines = lines
-            .filter { it.startsWith("data:") }
-            .map { line ->
-                line.removePrefix("data:").let { data ->
-                    if (data.startsWith(" ")) data.drop(1) else data
+        var hasComment = false
+        var dataBuilder: StringBuilder? = null
+
+        event.lineSequence().forEach { line ->
+            if (line.isEmpty()) return@forEach
+
+            if (line.startsWith(":")) {
+                hasComment = true
+            } else if (line.startsWith("data:")) {
+                val dataStr = line.substring(5).let { if (it.startsWith(" ")) it.substring(1) else it }
+                if (dataBuilder == null) {
+                    dataBuilder = StringBuilder(dataStr)
+                } else {
+                    dataBuilder?.append('\n')?.append(dataStr)
                 }
             }
+        }
 
-        if (dataLines.isEmpty()) {
+        if (dataBuilder == null) {
             return if (hasComment) {
                 ProcessedEvent(frame = SseFrame.Heartbeat)
             } else {
@@ -109,7 +137,7 @@ object SseParser {
             }
         }
 
-        val data = dataLines.joinToString("\n").trim()
+        val data = dataBuilder?.toString()?.trim() ?: ""
 
         if (data == "[DONE]") {
             return ProcessedEvent(frame = SseFrame.Done, isDone = true)
