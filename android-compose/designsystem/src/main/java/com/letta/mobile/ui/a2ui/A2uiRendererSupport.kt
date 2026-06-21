@@ -124,6 +124,7 @@ import java.time.LocalTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
+import java.util.concurrent.ConcurrentHashMap
 
 
 @Composable
@@ -856,8 +857,10 @@ internal fun JsonElement?.choiceSelection(): Set<String> = when (this) {
     else -> emptySet()
 }
 
+private val validationRegexCache = ConcurrentHashMap<String, Regex>()
+
 internal fun String.matchesValidation(pattern: String): Boolean =
-    runCatching { Regex(pattern).matches(this) }.getOrDefault(true)
+    runCatching { validationRegexCache.getOrPut(pattern) { Regex(pattern) }.matches(this) }.getOrDefault(true)
 
 internal fun String.toDateMillis(): Long? =
     runCatching {
