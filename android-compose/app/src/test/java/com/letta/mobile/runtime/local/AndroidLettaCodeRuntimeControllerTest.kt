@@ -324,6 +324,7 @@ class AndroidLettaCodeRuntimeControllerTest {
 
         assertEquals("lmstudio/deepseek", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))
         assertEquals(deepSeekPath, nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_PATH"))
+        coVerify(exactly = 0) { localBackendStore.storedModelHandle(any()) }
         coVerify { localBackendStore.seedAgent("agent-1", "lmstudio/deepseek") }
     }
 
