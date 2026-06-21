@@ -139,9 +139,10 @@ class DesktopLettaConfigStore(
 
     fun recentBackends(): List<String> =
         settingsStore.getString(KEY_RECENT_BACKENDS)
-            ?.split(RECENT_SEPARATOR)
+            ?.splitToSequence(RECENT_SEPARATOR)
             ?.map { it.trim() }
             ?.filter { it.isNotBlank() }
+            ?.toList()
             ?: emptyList()
 
     override suspend fun recentBackendUrls(): List<String> = recentBackends()
