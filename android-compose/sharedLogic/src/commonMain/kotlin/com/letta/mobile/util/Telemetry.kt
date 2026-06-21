@@ -115,8 +115,8 @@ object Telemetry {
         if (!enabled.get()) return
 
         val allAttrs = attrs.toMutableList()
-        allAttrs += ("errorClass" to (throwable::class.simpleName ?: "Throwable"))
-        allAttrs += ("errorMessage" to (throwable.message ?: "<none>"))
+        allAttrs.add("errorClass" to (throwable::class.simpleName ?: "Throwable"))
+        allAttrs.add("errorMessage" to (throwable.message ?: "<none>"))
         emit(
             Event(
                 timestampMs = nowEpochMillis(),
