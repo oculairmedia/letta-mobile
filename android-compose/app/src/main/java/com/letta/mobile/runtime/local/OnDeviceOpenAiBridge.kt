@@ -168,24 +168,15 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 )
                 return
             }
-            val rawContentLength = headers["content-length"]
-            val contentLength = rawContentLength?.toIntOrNull()
-            if (rawContentLength != null && (contentLength == null || contentLength < 0)) {
+            val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
+            if (contentLength < 0 || contentLength > MAX_BODY_BYTES) {
                 socket.outputStream.writeJsonResponse(
                     400,
-                    errorBody("invalid_request", "Invalid Content-Length header."),
+                    errorBody("invalid_request", "Content-Length out of range: $contentLength"),
                 )
                 return
             }
-            val resolvedContentLength = contentLength ?: 0
-            if (resolvedContentLength > MAX_BODY_BYTES) {
-                socket.outputStream.writeJsonResponse(
-                    400,
-                    errorBody("invalid_request", "Content-Length out of range: $resolvedContentLength"),
-                )
-                return
-            }
-            val body = readBody(input, resolvedContentLength)
+            val body = readBody(input, contentLength)
             if (body == null) {
                 socket.outputStream.writeJsonResponse(
                     400,
@@ -193,7 +184,7 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 )
                 return
             }
-            android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$resolvedContentLength")
+            android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$contentLength")
             when {
                 method == "GET" && path == "/v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
                 method == "POST" && path == "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
