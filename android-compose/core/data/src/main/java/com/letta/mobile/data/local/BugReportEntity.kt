@@ -22,8 +22,8 @@ data class BugReportEntity(
         title = title,
         description = description,
         severity = severity,
-        tags = tagsJson.split(",").map { it.trim() }.filter { it.isNotBlank() },
-        attachmentReferences = attachmentReferencesJson.split("||").map { it.trim() }.filter { it.isNotBlank() },
+        tags = tagsJson.splitTrimAndFilter(","),
+        attachmentReferences = attachmentReferencesJson.splitTrimAndFilter("||"),
         structuredPrompt = structuredPrompt,
         createdAt = createdAt,
     )
