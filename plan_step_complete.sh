@@ -1,1 +1,1 @@
-echo "All steps completed"
+echo "Everything looks good."

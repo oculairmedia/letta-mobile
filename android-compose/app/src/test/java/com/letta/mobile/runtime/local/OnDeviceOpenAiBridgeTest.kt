@@ -5,6 +5,7 @@ import io.mockk.mockk
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.Socket
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotEquals
@@ -143,6 +144,7 @@ class OnDeviceOpenAiBridgeTest {
         }
     }
 
+    // Main: LiteRT bridge strips tools before rendering prompt.
     @Test
     fun `LiteRT bridge strips tools before rendering prompt`() {
         val engine = FakeEngine(response = "plain response")
@@ -168,6 +170,57 @@ class OnDeviceOpenAiBridgeTest {
             assertTrue(engine.lastPrompt.orEmpty().contains("user: say hi"))
             assertTrue(!engine.lastPrompt.orEmpty().contains("Read a file"))
             assertTrue(!engine.lastPrompt.orEmpty().contains("```tool_call"))
+        }
+    }
+
+    // PR #536: reject malformed/negative Content-Length; accept explicit valid one.
+    @Test
+    fun `chat completions rejects malformed Content-Length header`() {
+        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
+        bridge.start(selection()).use { session ->
+            val response = postRawRequest(
+                url = "${session.baseUrl}/chat/completions",
+                body = """{"messages":[{"role":"user","content":"Hello"}]}""",
+                bearerToken = session.authToken,
+                contentLength = "abc",
+            )
+
+            assertEquals(400, response.code)
+            assertTrue(response.body.contains("Invalid Content-Length header."))
+        }
+    }
+
+    @Test
+    fun `chat completions rejects negative Content-Length header`() {
+        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine())
+        bridge.start(selection()).use { session ->
+            val response = postRawRequest(
+                url = "${session.baseUrl}/chat/completions",
+                body = """{"messages":[{"role":"user","content":"Hello"}]}""",
+                bearerToken = session.authToken,
+                contentLength = "-5",
+            )
+
+            assertEquals(400, response.code)
+            assertTrue(response.body.contains("Invalid Content-Length header."))
+        }
+    }
+
+    @Test
+    fun `chat completions accepts explicit Content-Length header`() {
+        val bridge = LocalOpenAiOnDeviceBridge(FakeEngine(response = "Hello from device"))
+        val body = """{"messages":[{"role":"user","content":"Hello from header"}]}"""
+        val contentLength = body.toByteArray(Charsets.UTF_8).size.toString()
+        bridge.start(selection()).use { session ->
+            val response = postRawRequest(
+                url = "${session.baseUrl}/chat/completions",
+                body = body,
+                bearerToken = session.authToken,
+                contentLength = contentLength,
+            )
+
+            assertEquals(200, response.code)
+            assertTrue(response.body.contains("Hello from device"))
         }
     }
 
@@ -320,7 +373,11 @@ class OnDeviceOpenAiBridgeTest {
         return connection.readResponse()
     }
 
-    private fun post(url: String, body: String, bearerToken: String? = null): Response {
+    private fun post(
+        url: String,
+        body: String,
+        bearerToken: String? = null,
+    ): Response {
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
         connection.doOutput = true
@@ -328,6 +385,57 @@ class OnDeviceOpenAiBridgeTest {
         bearerToken?.let { connection.setRequestProperty("Authorization", "Bearer $it") }
         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
         return connection.readResponse()
+    }
+
+    private fun postRawRequest(
+        url: String,
+        body: String,
+        bearerToken: String? = null,
+        contentLength: String,
+    ): Response {
+        val uri = java.net.URI(url)
+        val requestBody = body.toByteArray(Charsets.UTF_8)
+
+        return Socket(uri.host, uri.port).use { socket ->
+            val request = buildString {
+                append("POST ${uri.path} HTTP/1.1\r\n")
+                append("Host: ${uri.host}\r\n")
+                append("Content-Type: application/json\r\n")
+                if (bearerToken != null) {
+                    append("Authorization: Bearer $bearerToken\r\n")
+                }
+                append("Content-Length: $contentLength\r\n")
+                append("Connection: close\r\n\r\n")
+            }
+            val output = socket.getOutputStream()
+            output.write(request.toByteArray(Charsets.UTF_8))
+            output.write(requestBody)
+            output.flush()
+
+            val responseText = socket.getInputStream().bufferedReader().readText()
+            parseHttpResponse(responseText)
+        }
+    }
+
+    private fun parseHttpResponse(responseText: String): Response {
+        val headerSplitIndex = responseText.indexOf("\r\n\r\n")
+        val headersBlock = if (headerSplitIndex >= 0) responseText.substring(0, headerSplitIndex) else responseText
+        val bodyText = if (headerSplitIndex >= 0) responseText.substring(headerSplitIndex + 4) else ""
+        val statusLine = headersBlock.substringBefore("\r\n").trimEnd()
+        val status = statusLine.split(' ').getOrNull(1)?.toIntOrNull() ?: 0
+        val contentType = headersBlock
+            .lines()
+            .drop(1)
+            .firstOrNull { it.startsWith("content-type", ignoreCase = true) }
+            ?.substringAfter(':')
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+
+        return Response(
+            code = status,
+            body = bodyText,
+            contentType = contentType,
+        )
     }
 
     private fun HttpURLConnection.readResponse(): Response {

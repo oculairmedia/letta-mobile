@@ -197,16 +197,22 @@ fun ProjectHomeScreen(
                             text = { Text(stringResource(R.string.screen_create_project_overflow_manual)) },
                             leadingIcon = { Icon(LettaIcons.Edit, contentDescription = null) },
                             onClick = {
-                                showOverflow = false
-                                viewModel.startManualProjectCreation()
+                                try {
+                                    viewModel.startManualProjectCreation()
+                                } finally {
+                                    showOverflow = false
+                                }
                             },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.common_settings)) },
                             leadingIcon = { Icon(LettaIcons.Settings, contentDescription = null) },
                             onClick = {
-                                showOverflow = false
-                                onNavigateToSettings()
+                                try {
+                                    onNavigateToSettings()
+                                } finally {
+                                    showOverflow = false
+                                }
                             },
                         )
                     }

@@ -1026,8 +1026,11 @@ private fun DismissibleA2uiSurface(
             DropdownMenuItem(
                 text = { Text("Dismiss") },
                 onClick = {
-                    menuExpanded = false
-                    onDismissSurface(surfaceId)
+                    try {
+                        onDismissSurface(surfaceId)
+                    } finally {
+                        menuExpanded = false
+                    }
                 },
             )
         }
