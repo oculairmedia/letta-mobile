@@ -3,7 +3,7 @@ package com.letta.mobile.platform.storage
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 
-internal fun InputStream.readCapped(maxBytes: Int): Pair<ByteArray, Boolean> {
+fun InputStream.readCapped(maxBytes: Int): Pair<ByteArray, Boolean> {
     val output = ByteArrayOutputStream(maxBytes.coerceAtMost(DEFAULT_BUFFER_SIZE))
     val buffer = ByteArray(DEFAULT_BUFFER_SIZE.coerceAtMost(maxBytes + 1))
 
