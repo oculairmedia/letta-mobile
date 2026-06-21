@@ -147,19 +147,21 @@ class LettaCodeLocalBackendStore @Inject constructor(
 
     /**
      * Seeds the minimal agent + default-conversation records letta.js needs
-     * to accept --agent <id> turns. No-ops for records that already exist;
-     * letta.js's normalizeAgentRecord fills every other field with defaults.
+     * to accept --agent <id> turns. Existing agent records keep their
+     * non-model fields, but the selected embedded model is authoritative and
+     * must update the record before a restarted node resumes the agent.
      */
     suspend fun seedAgent(agentId: String, modelHandle: String) = withContext(Dispatchers.IO) {
         val agentFile = File(File(storageDirectory, "agents").apply { mkdirs() }, "${base64Url(agentId)}.json")
-        if (!agentFile.isFile) {
-            val record = buildJsonObject {
-                put("id", agentId)
-                put("name", "Letta Mobile")
-                put("model", modelHandle)
-            }
-            agentFile.writeText(json.encodeToString(JsonObject.serializer(), record))
+        val existing = agentFile.takeIf { it.isFile }
+            ?.let { runCatching { json.parseToJsonElement(it.readText()).jsonObject }.getOrNull() }
+        val record = buildJsonObject {
+            existing?.forEach { (key, value) -> put(key, value) }
+            put("id", agentId)
+            put("name", existing?.stringField("name") ?: "Letta Mobile")
+            put("model", modelHandle)
         }
+        agentFile.writeText(json.encodeToString(JsonObject.serializer(), record))
 
         val conversationDirectory =
             File(File(storageDirectory, "conversations"), base64Url("default:$agentId")).apply { mkdirs() }

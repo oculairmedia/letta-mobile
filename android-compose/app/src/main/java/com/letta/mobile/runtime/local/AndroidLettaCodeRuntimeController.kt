@@ -236,24 +236,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
      */
     private suspend fun ensureStarted(command: TurnCommand, config: LettaConfig): Boolean {
         return startMutex.withLock {
-            val configModelSelection = EmbeddedLettaCodeModelSelection.from(config)
-            val storedModelHandle = localBackendStore.storedModelHandle(command.agentId.value)
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-            val modelSelection = storedModelHandle
-                ?.let { stored ->
-                    val modelHandle = stored.toLettaCodeProviderModelHandle()
-                    if (modelHandle.isLiteRtLmModelHandle()) {
-                        configModelSelection.copy(
-                            modelHandle = modelHandle,
-                            customProviderBaseUrl = null,
-                            customProviderApiKey = null,
-                        )
-                    } else {
-                        configModelSelection.copy(modelHandle = modelHandle)
-                    }
-                }
-                ?: configModelSelection
+            val modelSelection = EmbeddedLettaCodeModelSelection.from(config)
             val requestedSession = EmbeddedLettaCodeSessionKey(
                 agentId = command.agentId.value,
                 conversationId = command.conversationId.value,
@@ -261,13 +244,17 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             )
             val active = activeSession
             if (active != null) {
-                if (active != requestedSession) {
-                    interruptActiveSessionForSwitch()
+                if (active == requestedSession) {
+                    return@withLock false
+                }
+                interruptActiveSessionForSwitch()
+                if (active.modelKey == requestedSession.modelKey) {
                     sendSwitchSessionControl(requestedSession)
                     activeSession = requestedSession
                     transcriptDirty = true
+                    return@withLock false
                 }
-                return@withLock false
+                stopActiveRuntimeForModelSwitch()
             }
 
             if (!runtimeStatusProvider.status.runnable) {
@@ -338,6 +325,17 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         nodeBridge.writeLine(buildInterruptControlRequest("switch-interrupt-${System.currentTimeMillis()}")).onFailure { error ->
             Log.w(TAG, "Failed to interrupt embedded LettaCode before switching sessions", error)
         }
+    }
+
+    private suspend fun stopActiveRuntimeForModelSwitch() {
+        runCatching { nodeBridge.stop().getOrThrow() }
+            .onFailure { error -> Log.w(TAG, "Failed to stop embedded LettaCode for model switch", error) }
+        activeOnDeviceBridgeSession?.close()
+        activeOnDeviceBridgeSession = null
+        activeAndroidNetworkBridgeSession?.close()
+        activeAndroidNetworkBridgeSession = null
+        activeSession = null
+        transcriptDirty = true
     }
 
     private suspend fun sendSwitchSessionControl(session: EmbeddedLettaCodeSessionKey) {

@@ -15,6 +15,7 @@ import com.letta.mobile.runtime.ToolApprovalScope
 import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.spyk
 import io.mockk.every
@@ -240,6 +241,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
         every { ContextCompat.startForegroundService(any(), any()) } returns Unit
         val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-switch-session-${System.nanoTime()}").apply { mkdirs() }
+        val modelPath = tempModelPath()
         val nodeBridge = FakeNodeBridge()
         val controller = AndroidLettaCodeRuntimeController(
             context = mockk<Context>(relaxed = true),
@@ -251,10 +253,10 @@ class AndroidLettaCodeRuntimeControllerTest {
             androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
-        controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(command(), config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma")).first()
         controller.submit(
             command(agentId = "agent-2", conversationId = "conv-2"),
-            config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/gemma"),
+            config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma"),
         ).first()
 
         assertTrue(nodeBridge.started)
@@ -264,6 +266,65 @@ class AndroidLettaCodeRuntimeControllerTest {
         val switchLine = nodeBridge.writtenLines.first { it.contains("\"subtype\":\"switch_session\"") }
         assertTrue(switchLine.contains("\"agent_id\":\"agent-2\""))
         assertTrue(switchLine.contains("\"conversation_id\":\"conv-2\""))
+    }
+
+    @Test
+    fun `switching embedded model restarts node with selected model instead of live session switch`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-switch-model-${System.nanoTime()}").apply { mkdirs() }
+        val gemmaPath = tempModelPath()
+        val deepSeekPath = tempModelPath()
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = FakeOnDeviceBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(command(), config(localModelPath = gemmaPath, localModelHandle = "lmstudio/gemma")).first()
+        controller.submit(command(), config(localModelPath = deepSeekPath, localModelHandle = "lmstudio/deepseek")).first()
+
+        assertEquals(2, nodeBridge.startCalls)
+        assertEquals(1, nodeBridge.stopCalls)
+        assertEquals(2, onDeviceBridge.startCalls)
+        assertEquals(1, onDeviceBridge.closeCalls)
+        assertFalse(nodeBridge.writtenLines.any { it.contains("switch_session") })
+        assertEquals("lmstudio/deepseek", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))
+        assertEquals(deepSeekPath, nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_PATH"))
+    }
+
+    @Test
+    fun `config selected embedded model wins over stale stored model handle`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-stale-stored-model-${System.nanoTime()}").apply { mkdirs() }
+        val deepSeekPath = tempModelPath()
+        val localBackendStore = mockk<LettaCodeLocalBackendStore>(relaxed = true)
+        coEvery { localBackendStore.storedModelHandle("agent-1") } returns "lmstudio/gemma"
+        val nodeBridge = FakeNodeBridge()
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = FakeOnDeviceBridge(),
+            localBackendStore = localBackendStore,
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(command(), config(localModelPath = deepSeekPath, localModelHandle = "lmstudio/deepseek")).first()
+
+        assertEquals("lmstudio/deepseek", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))
+        assertEquals(deepSeekPath, nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_PATH"))
+        coVerify { localBackendStore.seedAgent("agent-1", "lmstudio/deepseek") }
     }
 
     @Test
@@ -449,12 +510,17 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     private class FakeOnDeviceBridge : OnDeviceOpenAiBridge {
-        override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession =
-            OnDeviceOpenAiBridgeSession(
+        var startCalls = 0
+        var closeCalls = 0
+
+        override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession {
+            startCalls += 1
+            return OnDeviceOpenAiBridgeSession(
                 baseUrl = "http://127.0.0.1:2/v1",
                 authToken = "openai-loopback-token",
-                closeAction = {},
+                closeAction = { closeCalls += 1 },
             )
+        }
     }
 
     private class FakeAndroidNetworkBridge : AndroidNetworkBridge {
