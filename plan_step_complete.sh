@@ -1,1 +1,0 @@
-echo "Everything looks good."
