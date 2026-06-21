@@ -419,11 +419,14 @@ private fun stripTrailingPunctuation(url: String): String {
     return cleaned
 }
 
+private val codeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
+private val inlineCodeRegex = Regex("`[^`\n]+?`")
+private val markdownLinkRegex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
+
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {
     val ranges = mutableListOf<IntRange>()
-    val regex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
-    for (match in regex.findAll(text)) {
+    for (match in codeFenceRegex.findAll(text)) {
         ranges.add(match.range)
     }
     return ranges
@@ -432,8 +435,7 @@ private fun findCodeFenceRanges(text: String): List<IntRange> {
 /** Find ranges of inline code (`...`) to exclude from URL linkification. */
 private fun findInlineCodeRanges(text: String): List<IntRange> {
     val ranges = mutableListOf<IntRange>()
-    val regex = Regex("`[^`\n]+?`")
-    for (match in regex.findAll(text)) {
+    for (match in inlineCodeRegex.findAll(text)) {
         ranges.add(match.range)
     }
     return ranges
@@ -443,8 +445,7 @@ private fun findInlineCodeRanges(text: String): List<IntRange> {
 private fun findMarkdownLinkRanges(text: String): List<IntRange> {
     val ranges = mutableListOf<IntRange>()
     // Match markdown link syntax: [text](url)
-    val regex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
-    for (match in regex.findAll(text)) {
+    for (match in markdownLinkRegex.findAll(text)) {
         ranges.add(match.range)
     }
     return ranges
