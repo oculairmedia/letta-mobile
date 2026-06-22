@@ -2,18 +2,23 @@ package com.letta.mobile.desktop.schedules
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ElevatedCard
@@ -22,10 +27,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.schedules.ScheduleLibraryItem
@@ -33,7 +43,10 @@ import com.letta.mobile.data.schedules.ScheduleTiming
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopRadioChip
+import com.letta.mobile.desktop.DesktopTextArea
+import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 @Composable
 fun DesktopScheduleLibrarySurface(
@@ -43,21 +56,26 @@ fun DesktopScheduleLibrarySurface(
     modifier: Modifier = Modifier,
     crons: List<DesktopCronTask> = emptyList(),
     onDeleteCron: (String) -> Unit = {},
+    canCreate: Boolean = false,
+    onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit = { _, _, _, _, _ -> },
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 32.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            SchedulesHeader(
-                state = state,
-                cronCount = crons.size,
-                onRefresh = onRefresh,
-            )
-        }
+    var showCreate by remember { mutableStateOf(false) }
+    Box(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                SchedulesHeader(
+                    state = state,
+                    cronCount = crons.size,
+                    canCreate = canCreate,
+                    onRefresh = onRefresh,
+                    onNewSchedule = { showCreate = true },
+                )
+            }
         // Real schedules on this backend are exposed as cron tasks (/v1/crons).
         if (crons.isNotEmpty()) {
             if (state.agents.isNotEmpty()) {
@@ -97,6 +115,16 @@ fun DesktopScheduleLibrarySurface(
                 ScheduleRow(item)
             }
         }
+        }
+        if (showCreate) {
+            CronCreateDialog(
+                onDismiss = { showCreate = false },
+                onCreate = { name, prompt, cron, recurring, tz ->
+                    showCreate = false
+                    onCreateCron(name, prompt, cron, recurring, tz)
+                },
+            )
+        }
     }
 }
 
@@ -104,7 +132,9 @@ fun DesktopScheduleLibrarySurface(
 private fun SchedulesHeader(
     state: DesktopScheduleLibraryState,
     cronCount: Int,
+    canCreate: Boolean,
     onRefresh: () -> Unit,
+    onNewSchedule: () -> Unit,
 ) {
     val count = if (cronCount > 0) cronCount else state.schedules.size
     Row(
@@ -127,7 +157,12 @@ private fun SchedulesHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        DesktopDefaultButton(
+        if (canCreate) {
+            DesktopDefaultButton(onClick = onNewSchedule) {
+                DesktopButtonContent(text = "New schedule", icon = Icons.Outlined.Add)
+            }
+        }
+        DesktopOutlinedButton(
             onClick = onRefresh,
             enabled = !state.isLoading,
         ) {
@@ -135,6 +170,62 @@ private fun SchedulesHeader(
                 text = if (state.isLoading) "Refreshing" else "Refresh",
                 icon = Icons.Outlined.Refresh,
             )
+        }
+    }
+}
+
+/** Modal for creating a recurring cron schedule. */
+@Composable
+private fun CronCreateDialog(
+    onDismiss: () -> Unit,
+    onCreate: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
+) {
+    var name by remember { mutableStateOf(TextFieldValue("")) }
+    var cron by remember { mutableStateOf(TextFieldValue("0 9 * * *")) }
+    var timezone by remember { mutableStateOf(TextFieldValue("America/Toronto")) }
+    var prompt by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.width(480.dp).clickable(enabled = false) {},
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("New schedule", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text("Name", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                JewelTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
+                Text("Cron expression", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                JewelTextField(value = cron, onValueChange = { cron = it }, modifier = Modifier.fillMaxWidth())
+                Text("Timezone", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                JewelTextField(value = timezone, onValueChange = { timezone = it }, modifier = Modifier.fillMaxWidth())
+                Text("Prompt", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                DesktopTextArea(
+                    value = prompt,
+                    onValueChange = { prompt = it },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    placeholder = "What should the agent do on each run?",
+                )
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+                    DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
+                    DesktopDefaultButton(onClick = {
+                        when {
+                            name.text.isBlank() -> error = "Name is required"
+                            cron.text.isBlank() -> error = "Cron expression is required"
+                            prompt.isBlank() -> error = "Prompt is required"
+                            else -> onCreate(name.text.trim(), prompt.trim(), cron.text.trim(), true, timezone.text.trim().ifBlank { "UTC" })
+                        }
+                    }) { DesktopButtonContent("Create") }
+                }
+            }
         }
     }
 }

@@ -73,6 +73,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -486,6 +492,11 @@ internal fun ChatDetailPane(
                 onRetryConnection = onRetryConnection,
                 modifier = Modifier.weight(1f),
             )
+        } else if (state.renderItems.isEmpty()) {
+            NewConversationWelcome(
+                agentName = state.selectedConversation?.agentName,
+                modifier = Modifier.weight(1f),
+            )
         } else {
             MessageList(
                 conversationId = state.selectedConversationId,
@@ -506,6 +517,51 @@ internal fun ChatDetailPane(
             onAttachImage = onAttachImage,
             onRemoveImageAttachment = onRemoveImageAttachment,
         )
+    }
+}
+
+/**
+ * Empty-state shown for a fresh conversation (no messages yet): the agent's
+ * gradient sphere, a greeting, and a hint — matching the Penpot
+ * "Desktop · New conversation" board.
+ */
+@Composable
+private fun NewConversationWelcome(
+    agentName: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 40.dp, vertical = 28.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            AgentSphere(size = 72.dp)
+            Text(
+                text = agentName?.takeIf { it.isNotBlank() }?.let { "Chat with $it" } ?: "New conversation",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = "Ask a question, paste an error, or point me at a repo — I can read code, run tools, and help you ship.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.widthIn(max = 460.dp),
+            )
+            Text(
+                text = "@ to add files   ·   / for commands   ·   ⏎ to send",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            )
+        }
     }
 }
 
@@ -1416,7 +1472,24 @@ private fun ComposerBar(
                     enabled = enabled,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 28.dp, max = 120.dp),
+                        .heightIn(min = 28.dp, max = 120.dp)
+                        .onPreviewKeyEvent { event ->
+                            // Enter sends; Shift+Enter inserts a newline.
+                            if (event.type == KeyEventType.KeyDown &&
+                                (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
+                                !event.isShiftPressed
+                            ) {
+                                if (matchedCommands.isNotEmpty()) {
+                                    onTextChanged("")
+                                    matchedCommands.first().run()
+                                } else if (canSend) {
+                                    onSend()
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        },
                     maxLines = 5,
                     placeholder = "Message Meridian…",
                     undecorated = true,

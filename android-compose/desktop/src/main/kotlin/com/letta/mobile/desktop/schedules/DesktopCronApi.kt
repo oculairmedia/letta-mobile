@@ -8,13 +8,20 @@ import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Desktop cron/schedule API. This Letta server exposes scheduled work at
@@ -53,6 +60,33 @@ class DesktopCronApi(
 
     suspend fun deleteCron(id: String) {
         val response = httpClient.delete("$baseUrl/v1/crons/$id") { applyAuth() }
+        response.requireSuccess()
+    }
+
+    /** Create a recurring cron task for [agentId]. */
+    suspend fun createCron(
+        agentId: String,
+        name: String,
+        description: String,
+        prompt: String,
+        cron: String,
+        timezone: String,
+        recurring: Boolean = true,
+    ) {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("name", name)
+            put("description", description)
+            put("prompt", prompt)
+            put("cron", cron)
+            put("timezone", timezone)
+            put("recurring", recurring)
+        }
+        val response = httpClient.post("$baseUrl/v1/crons") {
+            applyAuth()
+            contentType(ContentType.Application.Json)
+            setBody(desktopChatJson.encodeToString(JsonObject.serializer(), body))
+        }
         response.requireSuccess()
     }
 

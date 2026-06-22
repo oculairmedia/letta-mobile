@@ -1,7 +1,13 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudQueue
@@ -60,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
@@ -290,6 +298,9 @@ fun LettaDesktopApp(
     val agentConversations = remember(chatState.conversations, selectedAgentId) {
         chatState.conversations.filter { it.agentId == selectedAgentId }
     }
+    // The active conversation/agent is "thinking" while a send/run is streaming.
+    val thinkingConversationId = chatState.selectedConversationId?.takeIf { chatState.isSending }
+    val thinkingAgentId = selectedAgentId?.takeIf { chatState.isSending }
 
     DesktopMaterialTheme {
         Surface(
@@ -302,6 +313,7 @@ fun LettaDesktopApp(
                 DesktopAgentRail(
                     agents = railAgents,
                     selectedAgentId = selectedAgentId,
+                    thinkingAgentId = thinkingAgentId,
                     onAgentSelected = { agentId ->
                         chatState.conversations
                             .firstOrNull { it.agentId == agentId }
@@ -319,6 +331,7 @@ fun LettaDesktopApp(
                     agentOrbIndex = selectedAgentOrbIndex,
                     conversations = agentConversations,
                     selectedConversationId = chatState.selectedConversationId,
+                    thinkingConversationId = thinkingConversationId,
                     selectedDestination = selectedDestination,
                     onDestinationSelected = { selectedDestination = it },
                     onConversationSelected = {
@@ -404,6 +417,27 @@ fun LettaDesktopApp(
                                     cronApi?.let {
                                         runCatching { it.deleteCron(id) }
                                         allCrons = runCatching { it.listCrons() }.getOrDefault(emptyList())
+                                    }
+                                }
+                            },
+                            canCreateCron = cronApi != null &&
+                                (scheduleLibraryState.selectedAgentId != null || selectedAgentId != null),
+                            onCreateCron = { name, prompt, cron, recurring, tz ->
+                                val targetAgent = scheduleLibraryState.selectedAgentId ?: selectedAgentId
+                                if (cronApi != null && targetAgent != null) {
+                                    chatScope.launch {
+                                        runCatching {
+                                            cronApi.createCron(
+                                                agentId = targetAgent,
+                                                name = name,
+                                                description = name,
+                                                prompt = prompt,
+                                                cron = cron,
+                                                timezone = tz,
+                                                recurring = recurring,
+                                            )
+                                        }
+                                        allCrons = runCatching { cronApi.listCrons() }.getOrDefault(emptyList())
                                     }
                                 }
                             },
@@ -710,6 +744,27 @@ private fun RailDivider() {
     )
 }
 
+/** Pulsing teal ring used as the agent "thinking" indicator. */
+@Composable
+private fun ThinkingRing(
+    diameter: Dp,
+    cornerRadius: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val transition = rememberInfiniteTransition(label = "thinking")
+    val alpha by transition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "thinkingAlpha",
+    )
+    Box(
+        modifier = modifier
+            .size(diameter)
+            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = alpha), RoundedCornerShape(cornerRadius)),
+    )
+}
+
 /**
  * Far-left workspace/agent rail (Penpot "App Mockups v2", 56.dp wide, #0A0A0A):
  * a "+" new-session button, a stack of gradient agent orbs (one per agent), and
@@ -719,6 +774,7 @@ private fun RailDivider() {
 private fun DesktopAgentRail(
     agents: List<Pair<String, String>>,
     selectedAgentId: String?,
+    thinkingAgentId: String?,
     onAgentSelected: (String) -> Unit,
     onNewSession: () -> Unit,
     onSearch: () -> Unit,
@@ -752,9 +808,10 @@ private fun DesktopAgentRail(
         Spacer(Modifier.height(8.dp))
         agents.forEachIndexed { index, (agentId, name) ->
             val selected = agentId == selectedAgentId
-            DesktopTooltip(text = name) {
+            val thinking = agentId == thinkingAgentId
+            DesktopTooltip(text = if (thinking) "$name · thinking…" else name) {
                 Box(
-                    modifier = Modifier.size(width = 46.dp, height = 36.dp),
+                    modifier = Modifier.size(width = 46.dp, height = 40.dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     if (selected) {
@@ -764,6 +821,9 @@ private fun DesktopAgentRail(
                                 .size(width = 3.dp, height = 28.dp)
                                 .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
                         )
+                    }
+                    if (thinking) {
+                        ThinkingRing(diameter = 44.dp, cornerRadius = 10.dp)
                     }
                     AgentOrb(
                         index = index,
@@ -823,6 +883,7 @@ private fun DesktopAgentSidebar(
     agentOrbIndex: Int,
     conversations: List<DesktopConversationSummary>,
     selectedConversationId: String?,
+    thinkingConversationId: String?,
     selectedDestination: DesktopDestination,
     onDestinationSelected: (DesktopDestination) -> Unit,
     onConversationSelected: (String) -> Unit,
@@ -940,6 +1001,7 @@ private fun DesktopAgentSidebar(
                     timeLabel = formatRelativeTimestamp(conversation.updatedAtLabel),
                     selected = selectedDestination == DesktopDestination.Conversations &&
                         conversation.id == selectedConversationId,
+                    thinking = conversation.id == thinkingConversationId,
                     onClick = { onConversationSelected(conversation.id) },
                 )
             }
@@ -972,9 +1034,27 @@ private fun SidebarConversationRow(
     title: String,
     timeLabel: String,
     selected: Boolean,
+    thinking: Boolean,
     onClick: () -> Unit,
 ) {
     val container = if (selected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent
+    // While thinking, the conversation icon pulses in the primary (teal) color.
+    val pulseAlpha = if (thinking) {
+        val transition = rememberInfiniteTransition(label = "convThinking")
+        transition.animateFloat(
+            initialValue = 0.4f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+            label = "convThinkingAlpha",
+        ).value
+    } else {
+        1f
+    }
+    val iconColor = when {
+        thinking -> MaterialTheme.colorScheme.primary.copy(alpha = pulseAlpha)
+        selected -> MaterialTheme.colorScheme.onSurface
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -989,9 +1069,9 @@ private fun SidebarConversationRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Outlined.ChatBubbleOutline,
-                contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
+                contentDescription = if (thinking) "thinking" else null,
+                tint = iconColor,
                 modifier = Modifier.size(15.dp),
             )
             Text(
@@ -1110,6 +1190,8 @@ private fun DestinationContent(
     blockApi: DesktopBlockApi?,
     crons: List<DesktopCronTask>,
     onDeleteCron: (String) -> Unit,
+    canCreateCron: Boolean,
+    onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (destination == DesktopDestination.Memory) {
@@ -1131,6 +1213,8 @@ private fun DestinationContent(
             modifier = modifier,
             crons = crons,
             onDeleteCron = onDeleteCron,
+            canCreate = canCreateCron,
+            onCreateCron = onCreateCron,
         )
         return
     }
