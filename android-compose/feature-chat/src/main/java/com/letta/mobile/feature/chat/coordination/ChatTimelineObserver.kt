@@ -195,7 +195,7 @@ internal class ChatTimelineObserver(
                     val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
                     val a2uiResponseArrived = a2uiStartMessageCount != null && ui
                         .drop(a2uiStartMessageCount)
-                        .any { it.role == "assistant" }
+                        .any { it.role == "assistant" && !it.isReasoning }
                     if (a2uiResponseArrived) {
                         clearA2uiThinkingOnResponse()
                     }
