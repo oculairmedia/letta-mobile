@@ -580,8 +580,20 @@ internal fun ToolCallCard(
             else -> display.detailLine
         }
     }
-    val compactTitle = remember(toolCall.name, compactDetail) {
-        compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
+    val compactTitle = remember(toolCall.name, compactDetail, display.label, argumentSummary) {
+        // letta-mobile-mtis: Prefer command-first summaries in Bash tool rows.
+        if (toolCall.name == "Bash" && argumentSummary?.value != null) {
+            val command = argumentSummary.value
+            if (compactDetail != null && compactDetail.startsWith("Result: ")) {
+                "$command - $compactDetail"
+            } else if (compactDetail != null && compactDetail.startsWith("Error: ")) {
+                "$command - $compactDetail"
+            } else {
+                command
+            }
+        } else {
+            compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
+        }
     }
     LaunchedEffect(toolCall.toolCallMotionKey(), showDetails, deferHeavyOutput, toolCall.result?.length) {
         if (Telemetry.isChatHotPathDebugEnabled()) {
@@ -1301,8 +1313,18 @@ internal fun CompactToolCallRow(
     val summary = remember(toolCall.name, toolCall.arguments, displayResult, toolCall.status, display.detailLine) {
         compactToolCallSummary(toolCall, display.detailLine, displayResult)
     }
-    val compactTitle = remember(toolCall.name, summary) {
-        "${toolCall.name} - $summary"
+    val compactTitle = remember(toolCall.name, summary, argumentSummary) {
+        // letta-mobile-mtis: Prefer command-first summaries in Bash compact tool rows.
+        if (toolCall.name == "Bash" && argumentSummary?.value != null) {
+            val command = argumentSummary.value
+            if (summary.startsWith("Result: ") || summary.startsWith("Error: ")) {
+                "$command - $summary"
+            } else {
+                command
+            }
+        } else {
+            "${toolCall.name} - $summary"
+        }
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
     LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
