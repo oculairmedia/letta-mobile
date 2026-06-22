@@ -6,6 +6,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -1003,6 +1006,7 @@ private fun DesktopAgentSidebar(
                         conversation.id == selectedConversationId,
                     thinking = conversation.id == thinkingConversationId,
                     onClick = { onConversationSelected(conversation.id) },
+                    onDelete = { onDeleteConversation(conversation.id) },
                 )
             }
             item {
@@ -1036,7 +1040,12 @@ private fun SidebarConversationRow(
     selected: Boolean,
     thinking: Boolean,
     onClick: () -> Unit,
+    onDelete: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    var menuOpen by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val container = if (selected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent
     // While thinking, the conversation icon pulses in the primary (teal) color.
     val pulseAlpha = if (thinking) {
@@ -1058,6 +1067,7 @@ private fun SidebarConversationRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .hoverable(interactionSource)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.small,
         color = container,
@@ -1082,12 +1092,99 @@ private fun SidebarConversationRow(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                text = timeLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-            )
+            // Hover (or an open menu) swaps the timestamp for an overflow menu.
+            if (hovered || menuOpen) {
+                Box {
+                    Icon(
+                        imageVector = Icons.Outlined.MoreVert,
+                        contentDescription = "Conversation menu",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { menuOpen = true },
+                    )
+                    if (menuOpen) {
+                        JewelPopupMenu(
+                            onDismissRequest = {
+                                menuOpen = false
+                                true
+                            },
+                            horizontalAlignment = Alignment.End,
+                        ) {
+                            selectableItem(
+                                selected = false,
+                                onClick = {
+                                    menuOpen = false
+                                    confirmDelete = true
+                                },
+                            ) {
+                                DesktopControlText("Delete chat")
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = timeLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+
+    if (confirmDelete) {
+        DesktopConfirmDialog(
+            title = "Delete chat?",
+            message = "\"$title\" will be permanently removed. This cannot be undone.",
+            confirmLabel = "Delete",
+            onConfirm = {
+                confirmDelete = false
+                onDelete()
+            },
+            onDismiss = { confirmDelete = false },
+        )
+    }
+}
+
+/** Small modal confirmation used for destructive actions in the desktop shell. */
+@Composable
+private fun DesktopConfirmDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.width(380.dp).clickable(enabled = false) {},
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                ) {
+                    DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
+                    DesktopDefaultButton(onClick = onConfirm) { DesktopButtonContent(confirmLabel) }
+                }
+            }
         }
     }
 }
