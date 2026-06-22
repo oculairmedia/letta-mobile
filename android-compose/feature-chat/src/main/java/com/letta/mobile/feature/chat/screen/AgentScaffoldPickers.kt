@@ -706,12 +706,19 @@ internal fun contrastDrawerItemColors() =
 @Composable
 internal fun ModelInfoCard(
     currentModel: String?,
+    acceleratorLabel: String? = null,
     onTap: () -> Unit,
 ) {
     val modelLabel = currentModel?.takeIf { it.isNotBlank() }
         ?: stringResource(R.string.screen_drawer_model_unknown)
     val displayModel = remember(modelLabel) {
         if (modelLabel.length > 48) modelLabel.take(45) + "\u2026" else modelLabel
+    }
+
+    val formattedLabel = remember(displayModel, acceleratorLabel) {
+        if (acceleratorLabel != null && currentModel?.startsWith("lmstudio/") == true) {
+            "$displayModel ($acceleratorLabel)"
+        } else displayModel
     }
 
     Card(
@@ -742,7 +749,7 @@ internal fun ModelInfoCard(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = displayModel,
+                text = formattedLabel,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -978,6 +985,7 @@ internal fun DrawerContent(
     agentId: String,
     activeBackendLabel: String?,
     currentModel: String?,
+    activeAccelerator: String? = null,
     contextWindow: ContextWindowUiState,
     chatMode: String,
     onChatModeSelected: (String) -> Unit,
@@ -1076,6 +1084,7 @@ internal fun DrawerContent(
         Spacer(modifier = Modifier.height(8.dp))
         ModelInfoCard(
             currentModel = currentModel,
+            acceleratorLabel = activeAccelerator,
             onTap = onModelTap,
         )
         Spacer(modifier = Modifier.height(16.dp))

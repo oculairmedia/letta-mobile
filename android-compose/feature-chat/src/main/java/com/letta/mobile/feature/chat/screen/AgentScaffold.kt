@@ -216,6 +216,7 @@ internal fun AgentScaffoldContent(
     val availableModels by viewModel.llmModels.collectAsStateWithLifecycle()
     val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
     val activeAgentModel = remember(activeAgent) { activeAgent?.model }
+    val activeAccelerator by viewModel.activeAccelerator.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
     val projectBindings = viewModel.projectBindings
     val pinnedAgentIds by viewModel.pinnedAgentIds.collectAsStateWithLifecycle()
@@ -304,6 +305,7 @@ internal fun AgentScaffoldContent(
                     agentId = agentIdValue,
                     activeBackendLabel = activeBackendLabel,
                     currentModel = activeAgentModel,
+                    activeAccelerator = activeAccelerator,
                     contextWindow = uiState.contextWindow,
                     chatMode = chatMode,
                     onChatModeSelected = { chatMode = it },

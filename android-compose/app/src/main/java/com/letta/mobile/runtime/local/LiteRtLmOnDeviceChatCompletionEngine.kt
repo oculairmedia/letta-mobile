@@ -102,6 +102,7 @@ class LiteRtLmOnDeviceChatCompletionEngine @Inject constructor(
                 return engineFor(modelSelection, modelFile, requiresVision = false)
             }
             if (requestedBackend is Backend.CPU) throw error
+            // TODO(letta-mobile-37uvo): The UI does not yet display this live fallback. Plumb it up.
             android.util.Log.w(
                 "LiteRtLmEngine",
                 "Accelerator '${modelSelection.accelerator}' failed to initialize; falling back to CPU",

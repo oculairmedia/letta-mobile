@@ -416,6 +416,10 @@ internal class AdminChatViewModel @Inject constructor(
         .map { it.toBackendLabel() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val activeAccelerator: StateFlow<String?> = settingsRepository.activeConfig
+        .map { if (AgentRuntimeBinding.isLocalRuntime(it)) it?.localModelAccelerator?.takeIf { it.isNotBlank() } ?: "gpu" else null }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val pinnedAgentIds: StateFlow<Set<String>> = settingsRepository.getPinnedAgentIds()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
