@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Hub
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Psychology
@@ -105,6 +106,7 @@ fun LettaDesktopApp(
     onActiveTitleChange: (String) -> Unit = {},
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
+    var showNewAgentDialog by remember { mutableStateOf(false) }
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }
@@ -273,6 +275,7 @@ fun LettaDesktopApp(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
+          Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -284,10 +287,7 @@ fun LettaDesktopApp(
                             ?.let { chatController.selectConversation(it.id) }
                         selectedDestination = DesktopDestination.Conversations
                     },
-                    onNewSession = {
-                        selectedDestination = DesktopDestination.Conversations
-                        chatController.createConversation()
-                    },
+                    onNewSession = { showNewAgentDialog = true },
                     onSearch = { selectedDestination = DesktopDestination.Conversations },
                     onSettings = { selectedDestination = DesktopDestination.Settings },
                 )
@@ -366,6 +366,126 @@ fun LettaDesktopApp(
                             },
                             modifier = Modifier.fillMaxSize(),
                         )
+                    }
+                }
+            }
+            if (showNewAgentDialog) {
+                NewAgentDialog(
+                    modelOptions = modelOptions,
+                    onDismiss = { showNewAgentDialog = false },
+                    onCreate = { name, modelValue ->
+                        showNewAgentDialog = false
+                        val template = selectedAgentId?.let {
+                            dataBindings.sessionGraphProvider.current.agentRepository.getCachedAgent(it)
+                        }
+                        val model = modelValue ?: template?.model
+                        chatController.createAgent(
+                            name = name,
+                            model = model,
+                            embedding = template?.embedding,
+                        )
+                        selectedDestination = DesktopDestination.Conversations
+                    },
+                )
+            }
+          }
+        }
+    }
+}
+
+/**
+ * Modal for creating a new agent: name + optional model, created with base
+ * tools and default memory blocks (model/embedding default to the active
+ * agent's config so the new agent is valid for this backend).
+ */
+@Composable
+private fun NewAgentDialog(
+    modelOptions: List<Pair<String, String>>,
+    onDismiss: () -> Unit,
+    onCreate: (name: String, model: String?) -> Unit,
+) {
+    var name by remember { mutableStateOf(TextFieldValue("New agent")) }
+    var modelValue by remember { mutableStateOf<String?>(null) }
+    var modelMenuOpen by remember { mutableStateOf(false) }
+    val modelLabel = modelOptions.firstOrNull { it.second == modelValue }?.first ?: "Same as current"
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.width(420.dp).clickable(enabled = false) {},
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    text = "New agent",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Name",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                JewelTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    text = "Model",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Box {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { modelMenuOpen = true },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(modelLabel, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                            Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    if (modelMenuOpen) {
+                        JewelPopupMenu(
+                            onDismissRequest = { modelMenuOpen = false; true },
+                            horizontalAlignment = Alignment.Start,
+                        ) {
+                            selectableItem(selected = modelValue == null, onClick = { modelMenuOpen = false; modelValue = null }) {
+                                DesktopControlText("Same as current")
+                            }
+                            modelOptions.forEach { (label, value) ->
+                                selectableItem(selected = modelValue == value, onClick = { modelMenuOpen = false; modelValue = value }) {
+                                    DesktopControlText(label)
+                                }
+                            }
+                        }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                ) {
+                    DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
+                    DesktopDefaultButton(onClick = { onCreate(name.text.trim(), modelValue) }) {
+                        DesktopButtonContent("Create agent")
                     }
                 }
             }

@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
@@ -168,6 +170,17 @@ class DesktopLettaHttpChatGateway(
                     summary = summary,
                 ),
             )
+        }
+        response.requireSuccess()
+        return response.body()
+    }
+
+    /** Create a new agent and return it. */
+    suspend fun createAgent(params: AgentCreateParams): Agent {
+        val response = httpClient.post("$baseUrl/v1/agents") {
+            applyDesktopAuth()
+            contentType(ContentType.Application.Json)
+            setBody(params)
         }
         response.requireSuccess()
         return response.body()

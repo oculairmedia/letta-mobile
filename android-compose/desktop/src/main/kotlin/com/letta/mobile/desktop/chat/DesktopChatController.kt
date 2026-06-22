@@ -6,6 +6,8 @@ import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -156,14 +158,52 @@ class DesktopChatController(
         scope.launch {
             try {
                 val created = httpGateway?.createConversation(agentId) ?: return@launch
-                retryConnection()
-                // After reload, select the freshly created conversation.
-                selectConversation(created.id.value)
+                reloadConversationsAndSelect(preferConversationId = created.id.value)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
                 _state.update {
                     it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create chat")
+                }
+            }
+        }
+    }
+
+    /**
+     * Create a new agent (cloning model/embedding from a template agent so the
+     * config is valid for this backend), open a conversation for it, and select
+     * it. [onCreated] reports the new agent id so the UI can refresh.
+     */
+    fun createAgent(
+        name: String,
+        model: String?,
+        embedding: String?,
+        onCreated: (String) -> Unit = {},
+    ) {
+        if (closed) return
+        scope.launch {
+            try {
+                val gw = httpGateway ?: return@launch
+                val agent = gw.createAgent(
+                    AgentCreateParams(
+                        name = name.ifBlank { "New agent" },
+                        model = model,
+                        embedding = embedding,
+                        includeBaseTools = true,
+                        memoryBlocks = listOf(
+                            BlockCreateParams(label = "human", value = "The user has not shared details yet."),
+                            BlockCreateParams(label = "persona", value = "I am $name, a helpful assistant."),
+                        ),
+                    ),
+                )
+                onCreated(agent.id.value)
+                val conversation = gw.createConversation(agent.id.value)
+                reloadConversationsAndSelect(preferConversationId = conversation.id.value)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                _state.update {
+                    it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create agent")
                 }
             }
         }
@@ -273,11 +313,6 @@ class DesktopChatController(
         try {
             val nextGateway = gatewayFactory()
             gateway = nextGateway
-            val conversations = nextGateway.listConversations()
-            val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
-            val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
-            val summaries = conversations.toChatConversationSummaries(agentNamesById)
-            val selectedId = summaries.firstOrNull()?.id
 
             // Load the model catalog for the composer model picker (best-effort).
             scope.launch {
@@ -285,14 +320,7 @@ class DesktopChatController(
                 if (!closed) _availableModels.value = models
             }
 
-            if (closed) return
-            val loadedRuntime = ChatSessionReducer.conversationsLoaded(
-                state = _state.value.runtimeState,
-                conversations = summaries,
-            )
-            _state.update { it.withRuntimeState(loadedRuntime) }
-
-            selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+            reloadConversationsAndSelect(preferConversationId = null)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -307,6 +335,29 @@ class DesktopChatController(
                 )
             }
         }
+    }
+
+    /**
+     * Re-list conversations from the backend, update state, and select either
+     * [preferConversationId] (e.g. a freshly created chat/agent) or the most
+     * recent. Runs in the caller's coroutine so callers can sequence reliably
+     * (no race against an async reload).
+     */
+    private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
+        val nextGateway = gateway ?: return
+        val conversations = nextGateway.listConversations()
+        val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
+        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
+        val summaries = conversations.toChatConversationSummaries(agentNamesById)
+        if (closed) return
+        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
+            state = _state.value.runtimeState,
+            conversations = summaries,
+        )
+        _state.update { it.withRuntimeState(loadedRuntime) }
+        val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
+            ?: summaries.firstOrNull()?.id
+        selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
     }
 
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
