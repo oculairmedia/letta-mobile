@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,7 +17,10 @@ import androidx.compose.ui.unit.dp
 fun EmptyState(
     icon: ImageVector,
     message: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    actionIcon: ImageVector? = null,
+    onAction: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier,
@@ -35,5 +40,18 @@ fun EmptyState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
+        if (actionLabel != null && onAction != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onAction,
+                contentPadding = if (actionIcon != null) ButtonDefaults.ButtonWithIconContentPadding else ButtonDefaults.ContentPadding,
+            ) {
+                if (actionIcon != null) {
+                    Icon(actionIcon, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(actionLabel)
+            }
+        }
     }
 }
