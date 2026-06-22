@@ -963,7 +963,7 @@ private fun ChatContent(
 }
 
 @Composable
-private fun A2uiSurfaceStack(
+internal fun A2uiSurfaceStack(
     surfaces: ImmutableMap<String, A2uiSurfaceState>,
     resolvedActionCounters: Map<String, Int>,
     onAction: (A2uiAction) -> Unit,
@@ -999,7 +999,7 @@ private fun A2uiSurfaceStack(
 }
 
 @Composable
-private fun DismissibleA2uiSurface(
+internal fun DismissibleA2uiSurface(
     surfaceId: String,
     onDismissSurface: (String) -> Unit,
     content: @Composable () -> Unit,
@@ -1010,7 +1010,7 @@ private fun DismissibleA2uiSurface(
             .fillMaxWidth()
             .semantics {
                 customActions = listOf(
-                    CustomAccessibilityAction("Dismiss A2UI surface") {
+                    CustomAccessibilityAction("Delete A2UI surface") {
                         onDismissSurface(surfaceId)
                         true
                     }
@@ -1024,7 +1024,15 @@ private fun DismissibleA2uiSurface(
             onDismissRequest = { menuExpanded = false },
         ) {
             DropdownMenuItem(
-                text = { Text("Dismiss") },
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = LettaIcons.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
                 onClick = {
                     try {
                         onDismissSurface(surfaceId)
