@@ -940,10 +940,15 @@ private fun ToolOutputBlock(text: String) {
 
 @Composable
 private fun outputLineColor(line: String): Color {
+    val success = MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
+        ?: MaterialTheme.colorScheme.primary
+    val trimmed = line.trimStart()
     val l = line.lowercase()
     return when {
-        l.contains("build successful") || l.contains("success") || l.contains("passed") ->
-            MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.primary
+        // Unified-diff lines: + added (green), - removed (red). Ignore +++/--- headers.
+        trimmed.startsWith("+") && !trimmed.startsWith("+++") -> success
+        trimmed.startsWith("-") && !trimmed.startsWith("---") -> MaterialTheme.colorScheme.error
+        l.contains("build successful") || l.contains("success") || l.contains("passed") -> success
         l.contains("error") || l.contains("failed") || l.contains("exception") || l.contains("fatal") ->
             MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.onSurfaceVariant
