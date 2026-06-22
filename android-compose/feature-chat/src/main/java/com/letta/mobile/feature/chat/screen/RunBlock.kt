@@ -425,7 +425,7 @@ private fun RunMessageStepRow(
         // dependency chain (and so a future visual upgrade can swap the dot
         // for an actual icon trivially).
         @Suppress("UNUSED_EXPRESSION") icon
-        renderRow(message, position, rowModifier)
+        renderRow(message, position, rowModifier.padding(start = 6.dp))
     }
 }
 
@@ -455,7 +455,7 @@ private fun RunToolCallGroupStepRow(
         CompactToolCallGroupCard(
             toolCalls = step.toolCalls,
             pendingApprovalToolCallIds = step.pendingApprovalToolCallIds,
-            modifier = rowModifier,
+            modifier = rowModifier.padding(start = 6.dp),
             approvalRequests = step.approvalRequests,
             activeApprovalRequestId = activeApprovalRequestId,
             onApprovalDecision = onApprovalDecision,
