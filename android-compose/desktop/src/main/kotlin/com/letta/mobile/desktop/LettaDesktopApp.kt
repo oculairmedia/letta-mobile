@@ -452,6 +452,7 @@ fun LettaDesktopApp(
                                     }
                                 }
                             },
+                            focusedAgentId = selectedAgentId,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -1370,6 +1371,7 @@ private fun DestinationContent(
     onDeleteCron: (String) -> Unit,
     canCreateCron: Boolean,
     onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
+    focusedAgentId: String?,
     modifier: Modifier = Modifier,
 ) {
     if (destination == DesktopDestination.Memory) {
@@ -1390,6 +1392,7 @@ private fun DestinationContent(
             onAgentSelected = onScheduleAgentSelected,
             modifier = modifier,
             crons = crons,
+            focusedAgentId = focusedAgentId,
             onDeleteCron = onDeleteCron,
             canCreate = canCreateCron,
             onCreateCron = onCreateCron,

@@ -55,11 +55,23 @@ fun DesktopScheduleLibrarySurface(
     onAgentSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
     crons: List<DesktopCronTask> = emptyList(),
+    focusedAgentId: String? = null,
     onDeleteCron: (String) -> Unit = {},
     canCreate: Boolean = false,
     onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit = { _, _, _, _, _ -> },
 ) {
     var showCreate by remember { mutableStateOf(false) }
+    // Schedules are scoped to the agent in focus by default; the "All" chip
+    // (filterAgentId == null) widens the view to every agent's schedules.
+    var filterAgentId by remember(focusedAgentId) { mutableStateOf(focusedAgentId) }
+    val filteredCrons = remember(crons, filterAgentId) {
+        if (filterAgentId == null) crons else crons.filter { it.agentId == filterAgentId }
+    }
+    val cronAgentIds = remember(crons, focusedAgentId) {
+        (crons.mapNotNull { it.agentId?.takeIf(String::isNotBlank) } + listOfNotNull(focusedAgentId))
+            .distinct()
+    }
+    val agentNames = remember(state.agents) { state.agents.associate { it.id.value to it.name } }
     Box(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
         LazyColumn(
             modifier = Modifier
@@ -70,7 +82,7 @@ fun DesktopScheduleLibrarySurface(
             item {
                 SchedulesHeader(
                     state = state,
-                    cronCount = crons.size,
+                    cronCount = if (crons.isNotEmpty()) filteredCrons.size else 0,
                     canCreate = canCreate,
                     onRefresh = onRefresh,
                     onNewSchedule = { showCreate = true },
@@ -78,11 +90,20 @@ fun DesktopScheduleLibrarySurface(
             }
         // Real schedules on this backend are exposed as cron tasks (/v1/crons).
         if (crons.isNotEmpty()) {
-            if (state.agents.isNotEmpty()) {
-                item { AgentFilters(state = state, onAgentSelected = onAgentSelected) }
+            item {
+                CronAgentFilters(
+                    agentIds = cronAgentIds,
+                    agentNames = agentNames,
+                    selectedAgentId = filterAgentId,
+                    onSelect = { filterAgentId = it },
+                )
             }
-            items(items = crons, key = { it.id }) { cron ->
-                CronRow(cron = cron, onDelete = { onDeleteCron(cron.id) })
+            if (filteredCrons.isEmpty()) {
+                item { SchedulesInfoCard("No schedules for this agent yet. Use “New schedule” to add one.") }
+            } else {
+                items(items = filteredCrons, key = { it.id }) { cron ->
+                    CronRow(cron = cron, onDelete = { onDeleteCron(cron.id) })
+                }
             }
             return@LazyColumn
         }
@@ -306,6 +327,42 @@ private fun humanizeCron(cron: String?): String {
         minN != null && hr == "*" -> "Hourly at :${min.padStart(2, '0')}"
         minN != null && hrN != null -> "Daily at ${hr.padStart(2, '0')}:${min.padStart(2, '0')}"
         else -> cron
+    }
+}
+
+/**
+ * Filter chips for the cron list: an "All" chip plus one per agent that owns a
+ * schedule (and the focused agent). Selecting an agent scopes the list to it;
+ * "All" shows every agent's schedules.
+ */
+@Composable
+private fun CronAgentFilters(
+    agentIds: List<String>,
+    agentNames: Map<String, String>,
+    selectedAgentId: String?,
+    onSelect: (String?) -> Unit,
+) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item {
+            DesktopRadioChip(
+                selected = selectedAgentId == null,
+                onClick = { onSelect(null) },
+            ) {
+                DesktopControlText(text = "All")
+            }
+        }
+        items(items = agentIds, key = { it }) { id ->
+            DesktopRadioChip(
+                selected = id == selectedAgentId,
+                onClick = { onSelect(id) },
+            ) {
+                DesktopControlText(
+                    text = agentNames[id] ?: "Agent ${id.takeLast(4)}",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
