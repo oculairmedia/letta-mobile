@@ -35,6 +35,7 @@ class DesktopChatController(
         DesktopLettaHttpChatGateway(bootstrapState.config)
     },
     private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
+    private val agentModelByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
     private val loopFactory: (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
@@ -59,6 +60,10 @@ class DesktopChatController(
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
 
     private var gateway: DesktopChatGateway? = null
+
+    // Per-conversation model overrides set this session (the picker). The
+    // effective composer model otherwise comes from the conversation's agent.
+    private var conversationModelById: Map<String, String> = emptyMap()
 
     private val httpGateway: DesktopLettaHttpChatGateway?
         get() = gateway as? DesktopLettaHttpChatGateway
@@ -240,6 +245,7 @@ class DesktopChatController(
     fun setConversationModel(model: String) {
         if (closed) return
         val conversationId = _state.value.selectedConversationId ?: return
+        conversationModelById = conversationModelById + (conversationId to model)
         _state.update { it.copy(composerModelLabel = model) }
         scope.launch {
             runCatching { httpGateway?.setConversationModel(conversationId, model) }
@@ -248,6 +254,27 @@ class DesktopChatController(
                         it.copy(errorMessage = t.message ?: "Could not change model")
                     }
                 }
+        }
+    }
+
+    /**
+     * Resolve and show the composer's model label for [conversationId]: a
+     * session override if the user picked one, otherwise the conversation's
+     * agent's configured model (the server-side default), else "Auto".
+     */
+    private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
+        scope.launch {
+            val override = conversationModelById[conversationId]
+            val label = when {
+                !override.isNullOrBlank() -> override
+                !agentId.isNullOrBlank() ->
+                    runCatching { agentModelByIdProvider(setOf(agentId)) }
+                        .getOrNull()?.get(agentId)?.takeIf { it.isNotBlank() } ?: "Auto"
+                else -> "Auto"
+            }
+            if (!closed && _state.value.selectedConversationId == conversationId) {
+                _state.update { it.copy(composerModelLabel = label) }
+            }
         }
     }
 
@@ -391,6 +418,9 @@ class DesktopChatController(
         if (!isActiveSelection(generation)) return
         val nextGateway = gateway ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
+
+        // Reflect the conversation's effective model in the composer chip.
+        applyComposerModelLabel(conversationId, conversation.agentId)
 
         timelineJob?.cancel()
         activeLoop?.close()

@@ -169,6 +169,19 @@ fun LettaDesktopApp(
                 }
                 resolved
             },
+            agentModelByIdProvider = { agentIds ->
+                val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
+                val resolved = mutableMapOf<String, String>()
+                agentRepository.agents.value.forEach { agent ->
+                    agent.model?.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+                }
+                agentIds.filter { it !in resolved }.forEach { id ->
+                    val model = agentRepository.getCachedAgent(id)?.model
+                        ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.model
+                    model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
+                }
+                resolved
+            },
         )
     }
     val chatState by chatController.state.collectAsState()
