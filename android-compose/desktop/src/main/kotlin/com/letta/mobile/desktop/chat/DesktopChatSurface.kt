@@ -109,6 +109,7 @@ import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.theme.customColors
 import java.util.Base64
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -481,42 +482,65 @@ internal fun ChatDetailPane(
     commands: List<ComposerCommand> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    // Drive the ambient glow off the chat state: a teal breath while sending,
+    // a brief "completed" settle afterward, the error tint on failure.
+    var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
+    var hadActiveRun by remember { mutableStateOf(false) }
+    LaunchedEffect(state.isSending, state.errorMessage) {
+        when {
+            state.errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
+            state.isSending -> {
+                hadActiveRun = true
+                ambientStatus = DesktopAmbientStatus.Running
+            }
+            hadActiveRun -> {
+                ambientStatus = DesktopAmbientStatus.Completed
+                delay(1400)
+                hadActiveRun = false
+                ambientStatus = DesktopAmbientStatus.Idle
+            }
+            else -> ambientStatus = DesktopAmbientStatus.Idle
+        }
+    }
+    DesktopAmbientChatBackground(
+        status = ambientStatus,
         modifier = modifier
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        if (state.shouldShowStatePanel) {
-            ChatStatePanel(
-                state = state,
-                onRetryConnection = onRetryConnection,
-                modifier = Modifier.weight(1f),
-            )
-        } else if (state.renderItems.isEmpty()) {
-            NewConversationWelcome(
-                agentName = state.selectedConversation?.agentName,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            MessageList(
-                conversationId = state.selectedConversationId,
-                renderItems = state.renderItems,
-                modifier = Modifier.weight(1f),
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (state.shouldShowStatePanel) {
+                ChatStatePanel(
+                    state = state,
+                    onRetryConnection = onRetryConnection,
+                    modifier = Modifier.weight(1f),
+                )
+            } else if (state.renderItems.isEmpty()) {
+                NewConversationWelcome(
+                    agentName = state.selectedConversation?.agentName,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                MessageList(
+                    conversationId = state.selectedConversationId,
+                    renderItems = state.renderItems,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            ComposerBar(
+                text = state.composerText,
+                pendingImageAttachments = state.pendingImageAttachments,
+                enabled = state.canSend,
+                modelLabel = state.composerModelLabel,
+                modelOptions = modelOptions,
+                onModelSelected = onModelSelected,
+                commands = commands,
+                onTextChanged = onComposerTextChanged,
+                onSend = onSend,
+                onAttachImage = onAttachImage,
+                onRemoveImageAttachment = onRemoveImageAttachment,
             )
         }
-        ComposerBar(
-            text = state.composerText,
-            pendingImageAttachments = state.pendingImageAttachments,
-            enabled = state.canSend,
-            modelLabel = state.composerModelLabel,
-            modelOptions = modelOptions,
-            onModelSelected = onModelSelected,
-            commands = commands,
-            onTextChanged = onComposerTextChanged,
-            onSend = onSend,
-            onAttachImage = onAttachImage,
-            onRemoveImageAttachment = onRemoveImageAttachment,
-        )
     }
 }
 
