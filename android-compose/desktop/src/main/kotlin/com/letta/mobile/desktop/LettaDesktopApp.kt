@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Autorenew
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudQueue
@@ -1187,32 +1189,80 @@ private fun DesktopConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val dialogState = rememberDialogState(size = DpSize(420.dp, 200.dp))
+    val dialogState = rememberDialogState(size = DpSize(420.dp, 210.dp))
     DialogWindow(
         onCloseRequest = onDismiss,
         state = dialogState,
         title = title,
+        undecorated = true,
         resizable = false,
     ) {
+        val windowScope = this
         DesktopMaterialTheme {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(22.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Custom dark title bar — the native OS chrome is hidden.
+                    with(windowScope) {
+                        WindowDraggableArea(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(38.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f).padding(start = 16.dp),
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 46.dp, height = 38.dp)
+                                        .clickable(onClick = onDismiss),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Close,
+                                        contentDescription = "Close",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(15.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant),
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(22.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
-                        DesktopDefaultButton(onClick = onConfirm) { DesktopButtonContent(confirmLabel) }
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                        ) {
+                            DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
+                            DesktopDefaultButton(onClick = onConfirm) { DesktopButtonContent(confirmLabel) }
+                        }
                     }
                 }
             }
