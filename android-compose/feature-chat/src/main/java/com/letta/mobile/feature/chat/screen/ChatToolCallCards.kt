@@ -561,6 +561,7 @@ internal fun ToolCallCard(
     // tracked in `letta-mobile-o9ce`. See ToolReturnStatus for the full
     // empirical justification.
     val isError = ToolReturnStatus.isError(toolCall.status)
+    val isComplete = toolCall.result != null || toolCall.status == "success"
     val codeStyle = MaterialTheme.chatTypography.codeBlock
     val approvalState = approvalStateOverride ?: toolCall.approvalDecision?.toToolApprovalState()
     val compactDetail = remember(
@@ -665,7 +666,7 @@ internal fun ToolCallCard(
                         modifier = Modifier.size(LettaIconSizing.Inline),
                         tint = MaterialTheme.colorScheme.error,
                     )
-                } else if (toolCall.result != null) {
+                } else if (isComplete) {
                     Icon(
                         imageVector = LettaIcons.CheckCircle,
                         contentDescription = "Success",
@@ -1327,6 +1328,7 @@ internal fun CompactToolCallRow(
         }
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
+    val isComplete = toolCall.result != null || toolCall.status == "success"
     LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
         if (Telemetry.isChatHotPathDebugEnabled()) {
             Telemetry.event(
@@ -1379,7 +1381,7 @@ internal fun CompactToolCallRow(
             // information and dropping the chip reclaims width for the result
             // preview. RequestingInput and Rejected still render (they carry
             // information the checkmark can't).
-            if (shouldShowCompactApprovalChip(approvalState, hasResult = toolCall.result != null)) {
+            if (shouldShowCompactApprovalChip(approvalState, hasResult = isComplete)) {
                 AnimatedToolApprovalChip(state = approvalState)
             }
             executionTimeText?.let { time ->
@@ -1392,7 +1394,7 @@ internal fun CompactToolCallRow(
                     modifier = Modifier.size(LettaIconSizing.Inline),
                     tint = MaterialTheme.colorScheme.error,
                 )
-                toolCall.result != null -> Icon(
+                isComplete -> Icon(
                     imageVector = LettaIcons.CheckCircle,
                     contentDescription = if (approvalState == ToolApprovalState.Approved) {
                         "Approved, success"
