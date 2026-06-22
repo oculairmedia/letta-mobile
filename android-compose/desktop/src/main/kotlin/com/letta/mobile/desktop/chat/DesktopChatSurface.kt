@@ -4,6 +4,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.PointerMatcher
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -515,7 +521,7 @@ internal fun ChatDetailPane(
                     onRetryConnection = onRetryConnection,
                     modifier = Modifier.weight(1f),
                 )
-            } else if (state.renderItems.isEmpty()) {
+            } else if (state.renderItems.isEmpty() && !state.isSending) {
                 NewConversationWelcome(
                     agentName = state.selectedConversation?.agentName,
                     modifier = Modifier.weight(1f),
@@ -524,6 +530,7 @@ internal fun ChatDetailPane(
                 MessageList(
                     conversationId = state.selectedConversationId,
                     renderItems = state.renderItems,
+                    isSending = state.isSending,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -658,6 +665,7 @@ private fun ChatScreenStatus.heroBody(): String = when (this) {
 private fun MessageList(
     conversationId: String?,
     renderItems: List<ChatRenderItem>,
+    isSending: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -689,6 +697,14 @@ private fun MessageList(
         }
     }
 
+    // When a send starts, snap to the bottom so the thinking row is visible.
+    LaunchedEffect(isSending) {
+        if (isSending) {
+            followLatest = true
+            listState.animateScrollToItem(renderItems.size + 1)
+        }
+    }
+
     Box(modifier = modifier.fillMaxWidth()) {
         LazyColumn(
             state = listState,
@@ -715,6 +731,13 @@ private fun MessageList(
                     when (item) {
                         is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
                         is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                    }
+                }
+            }
+            if (isSending) {
+                item(key = "__thinking__") {
+                    Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                        ThinkingMessageRow()
                     }
                 }
             }
@@ -1112,6 +1135,47 @@ private fun UserPrompt(message: UiMessage) {
                 modifier = Modifier.size(14.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             )
+        }
+    }
+}
+
+/**
+ * Inline "thinking" indicator shown in the thread while a send is in flight:
+ * the agent's teal sphere avatar + three breathing dots, so the user gets
+ * immediate feedback before the response starts streaming.
+ */
+@Composable
+private fun ThinkingMessageRow() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AgentSphere(size = 28.dp)
+        val transition = rememberInfiniteTransition(label = "thinkingDots")
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(3) { index ->
+                val alpha by transition.animateFloat(
+                    initialValue = 0.2f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = 600, delayMillis = index * 160, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                    label = "thinkingDot$index",
+                )
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                            shape = CircleShape,
+                        ),
+                )
+            }
         }
     }
 }
