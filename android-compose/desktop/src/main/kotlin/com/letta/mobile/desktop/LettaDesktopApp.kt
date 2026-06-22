@@ -61,7 +61,11 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.api.IAgentRepository
+import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
@@ -110,6 +114,7 @@ fun LettaDesktopApp(
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     var showNewAgentDialog by remember { mutableStateOf(false) }
+    var editAgentId by remember { mutableStateOf<String?>(null) }
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }
@@ -324,6 +329,7 @@ fun LettaDesktopApp(
                         selectedDestination = DesktopDestination.Conversations
                         chatController.createConversation()
                     },
+                    onEditAgent = { editAgentId = selectedAgentId },
                 )
                 RailDivider()
                 // Main content pane.
@@ -393,6 +399,20 @@ fun LettaDesktopApp(
                         )
                     }
                 }
+            }
+            val editingAgentId = editAgentId
+            if (editingAgentId != null) {
+                EditAgentDialog(
+                    agentId = editingAgentId,
+                    modelOptions = modelOptions,
+                    agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                    scope = chatScope,
+                    onDismiss = { editAgentId = null },
+                    onSaved = {
+                        editAgentId = null
+                        chatController.retryConnection()
+                    },
+                )
             }
             if (showNewAgentDialog) {
                 NewAgentDialog(
@@ -512,6 +532,139 @@ private fun NewAgentDialog(
                     DesktopDefaultButton(onClick = { onCreate(name.text.trim(), modelValue) }) {
                         DesktopButtonContent("Create agent")
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Modal for editing an existing agent: name, model, and system prompt, applied
+ * via the real agent repository (PATCH /v1/agents/{id}).
+ */
+@Composable
+private fun EditAgentDialog(
+    agentId: String,
+    modelOptions: List<Pair<String, String>>,
+    agentRepository: IAgentRepository,
+    scope: CoroutineScope,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit,
+) {
+    var name by remember(agentId) { mutableStateOf(TextFieldValue("")) }
+    var modelValue by remember(agentId) { mutableStateOf<String?>(null) }
+    var system by remember(agentId) { mutableStateOf("") }
+    var modelMenuOpen by remember { mutableStateOf(false) }
+    var loading by remember(agentId) { mutableStateOf(true) }
+    var busy by remember(agentId) { mutableStateOf(false) }
+    var error by remember(agentId) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(agentId) {
+        val agent = agentRepository.getCachedAgent(agentId)
+            ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
+        if (agent != null) {
+            name = TextFieldValue(agent.name)
+            modelValue = agent.model
+            system = agent.system.orEmpty()
+        } else {
+            error = "Could not load agent"
+        }
+        loading = false
+    }
+    val modelLabel = modelOptions.firstOrNull { it.second == modelValue }?.first
+        ?: modelValue ?: "Default"
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.width(480.dp).clickable(enabled = false) {},
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column(
+                modifier = Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text(
+                    text = "Edit agent",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (loading) {
+                    Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    Text("Name", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    JewelTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
+
+                    Text("Model", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable { modelMenuOpen = true },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(modelLabel, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                                Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (modelMenuOpen) {
+                            JewelPopupMenu(onDismissRequest = { modelMenuOpen = false; true }, horizontalAlignment = Alignment.Start) {
+                                modelOptions.forEach { (label, value) ->
+                                    selectableItem(selected = modelValue == value, onClick = { modelMenuOpen = false; modelValue = value }) {
+                                        DesktopControlText(label)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Text("System prompt", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    DesktopTextArea(
+                        value = system,
+                        onValueChange = { system = it },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth().height(200.dp),
+                        placeholder = "System prompt…",
+                    )
+                }
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                ) {
+                    DesktopOutlinedButton(onClick = onDismiss, enabled = !busy) { DesktopButtonContent("Cancel") }
+                    DesktopDefaultButton(
+                        onClick = {
+                            busy = true; error = null
+                            scope.launch {
+                                runCatching {
+                                    agentRepository.updateAgent(
+                                        AgentId(agentId),
+                                        AgentUpdateParams(
+                                            name = name.text.trim().takeIf { it.isNotBlank() },
+                                            model = modelValue,
+                                            system = system.takeIf { it.isNotBlank() },
+                                        ),
+                                    )
+                                }
+                                    .onSuccess { onSaved() }
+                                    .onFailure { error = it.message ?: "Save failed"; busy = false }
+                            }
+                        },
+                        enabled = !busy && !loading,
+                    ) { DesktopButtonContent(if (busy) "Saving…" else "Save") }
                 }
             }
         }
@@ -663,6 +816,7 @@ private fun DesktopAgentSidebar(
     onConversationSelected: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
     onNewChat: () -> Unit,
+    onEditAgent: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -708,6 +862,9 @@ private fun DesktopAgentSidebar(
                     ) {
                         selectableItem(selected = false, onClick = { menuOpen = false; onNewChat() }) {
                             DesktopControlText("New chat")
+                        }
+                        selectableItem(selected = false, onClick = { menuOpen = false; onEditAgent() }) {
+                            DesktopControlText("Edit agent")
                         }
                         selectableItem(
                             selected = false,
