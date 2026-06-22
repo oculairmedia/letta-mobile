@@ -11,7 +11,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import com.letta.mobile.ui.test.ComposeTestContent
+import com.letta.mobile.ui.test.setLettaTestContent
 import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
@@ -36,8 +36,7 @@ class ConversationCardTest {
             isPinned = true
         )
 
-        composeTestRule.setContent {
-            ComposeTestContent {
+        composeTestRule.setLettaTestContent {
                 ConversationCard(
                     display = display,
                     onClick = {},
@@ -47,7 +46,6 @@ class ConversationCardTest {
                     onTogglePinned = {},
                     onFork = {}
                 )
-            }
         }
 
         // Check if the title exists
@@ -71,8 +69,7 @@ class ConversationCardTest {
             isPinned = false
         )
 
-        composeTestRule.setContent {
-            ComposeTestContent {
+        composeTestRule.setLettaTestContent {
                 ConversationCard(
                     display = display,
                     onClick = {},
@@ -82,7 +79,6 @@ class ConversationCardTest {
                     onTogglePinned = {},
                     onFork = {}
                 )
-            }
         }
 
         // The prefix should just be "Test Agent" with no "Pinned • "
