@@ -55,19 +55,24 @@ data class EmbeddedLettaCodeModelSelection(
         const val DEFAULT_MAX_TOKENS = 4096
         const val DEFAULT_LM_STUDIO_API_KEY = "not-needed"
         fun from(config: LettaConfig): EmbeddedLettaCodeModelSelection {
-            val customBaseUrl = config.localProviderBaseUrl?.trim()?.trimEnd('/')?.takeIf { it.isNotBlank() }
+            val localModelPath = config.localModelPath?.trim()?.takeIf { it.isNotBlank() }
+            val localModelHandle = config.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
+            val providerModel = config.localProviderModel?.trim()?.takeIf { it.isNotBlank() }
+            val customBaseUrl = config.localProviderBaseUrl?.trim()?.trimEnd('/')?.takeIf {
+                it.isNotBlank() && localModelPath == null
+            }
             return EmbeddedLettaCodeModelSelection(
                 modelHandle = if (customBaseUrl != null) {
-                    config.localProviderModel.normalizedOr(DEFAULT_MODEL_HANDLE)
+                    providerModel.normalizedOr(DEFAULT_MODEL_HANDLE)
                 } else {
-                    config.localModelHandle.normalizedOr(DEFAULT_MODEL_HANDLE)
+                    localModelHandle.normalizedOr(DEFAULT_MODEL_HANDLE)
                 },
-                modelPath = config.localModelPath?.trim()?.takeIf { it.isNotBlank() },
+                modelPath = localModelPath,
                 runtime = config.localModelRuntime.normalizedOr(DEFAULT_MODEL_RUNTIME).lowercase(Locale.US),
                 accelerator = config.localModelAccelerator.normalizedOr(DEFAULT_ACCELERATOR).lowercase(Locale.US),
                 maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: DEFAULT_MAX_TOKENS,
                 customProviderBaseUrl = customBaseUrl,
-                customProviderApiKey = config.localProviderApiKey?.trim()?.takeIf { it.isNotBlank() },
+                customProviderApiKey = config.localProviderApiKey?.trim()?.takeIf { customBaseUrl != null && it.isNotBlank() },
             )
         }
     }

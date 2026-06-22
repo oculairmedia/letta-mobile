@@ -240,20 +240,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             val storedModelHandle = localBackendStore.storedModelHandle(command.agentId.value)
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-            val modelSelection = storedModelHandle
-                ?.let { stored ->
-                    val modelHandle = stored.toLettaCodeProviderModelHandle()
-                    if (modelHandle.isLiteRtLmModelHandle()) {
-                        configModelSelection.copy(
-                            modelHandle = modelHandle,
-                            customProviderBaseUrl = null,
-                            customProviderApiKey = null,
-                        )
-                    } else {
-                        configModelSelection.copy(modelHandle = modelHandle)
-                    }
-                }
-                ?: configModelSelection
+            val modelSelection = if (
+                configModelSelection.modelHandle == EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE &&
+                storedModelHandle != null
+            ) {
+                configModelSelection.copy(modelHandle = storedModelHandle.toLettaCodeProviderModelHandle())
+            } else {
+                configModelSelection
+            }
             val requestedSession = EmbeddedLettaCodeSessionKey(
                 agentId = command.agentId.value,
                 conversationId = command.conversationId.value,
@@ -261,13 +255,17 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             )
             val active = activeSession
             if (active != null) {
-                if (active != requestedSession) {
-                    interruptActiveSessionForSwitch()
+                if (active == requestedSession) {
+                    return@withLock false
+                }
+                interruptActiveSessionForSwitch()
+                if (active.modelKey == requestedSession.modelKey) {
                     sendSwitchSessionControl(requestedSession)
                     activeSession = requestedSession
                     transcriptDirty = true
+                    return@withLock false
                 }
-                return@withLock false
+                stopActiveRuntimeForModelSwitch()
             }
 
             if (!runtimeStatusProvider.status.runnable) {
@@ -279,6 +277,14 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             // OpenAI-compatible endpoints (explicit custom base URLs or remote
             // provider handles like lmstudio/) keep the agent loop embedded but
             // route LLM calls to the endpoint — no .litertlm bridge required.
+            if (
+                modelSelection.routesToOpenAiCompatibleProvider &&
+                modelSelection.modelHandle == EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE
+            ) {
+                throw IllegalStateException(
+                    "Embedded LettaCode custom provider requires a selected provider model before it can start.",
+                )
+            }
             if (modelSelection.requiresOnDeviceModel) {
                 val modelPath = modelSelection.modelPath?.let(::File)
                     ?: throw IllegalStateException(
@@ -340,6 +346,17 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
+    private suspend fun stopActiveRuntimeForModelSwitch() {
+        runCatching { nodeBridge.stop().getOrThrow() }
+            .onFailure { error -> Log.w(TAG, "Failed to stop embedded LettaCode for model switch", error) }
+        activeOnDeviceBridgeSession?.close()
+        activeOnDeviceBridgeSession = null
+        activeAndroidNetworkBridgeSession?.close()
+        activeAndroidNetworkBridgeSession = null
+        activeSession = null
+        transcriptDirty = true
+    }
+
     private suspend fun sendSwitchSessionControl(session: EmbeddedLettaCodeSessionKey) {
         nodeBridge.writeLine(
             buildJsonObject {
@@ -374,12 +391,9 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         val tempDirectory = File(storageDirectory.parentFile, "tmp").apply { mkdirs() }
         val backgroundDirectory = File(storageDirectory.parentFile, "background").apply { mkdirs() }
         // Per-agent model: letta.js overwrites the agent's model with the
-        // --model argv on resume, so the stored record's handle must win;
-        // the config-level selection is only the seed default for brand-new
-        // agents (letta-mobile-3icw7). Stored handles are normalized to the
-        // lmstudio/ provider prefix: letta.js aborts the whole process on an
-        // unroutable bare id ("Invalid model" → node exit → SIGABRT), and
-        // records written by older picker builds persisted bare ids.
+        // --model argv on resume. The current config selection is therefore
+        // authoritative for embedded model switches and reseeds the stored
+        // agent model before letta.js resumes it.
         val modelHandle = if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
         // One line per session start: which model letta.js was actually given.
         // A session pinned to the wrong model (e.g. the 2026-06-12 codexmini

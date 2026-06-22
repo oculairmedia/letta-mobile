@@ -334,10 +334,11 @@ open class AgentRepository(
         val cached = _agents.value.find { it.id == id }
         val preview = cached?.withUpdates(params)
         val localSource = localAgentSource
-        if (localSource != null && preview != null && AgentRuntimeBinding.isLocalBound(preview)) {
-            // Local agents have no remote API. Apply the fields letta.js
-            // respects from its store record (name/system/model + settings);
-            // a running embedded session picks them up on next start.
+        if (localSource != null && preview != null && id.value.startsWith("local-agent-")) {
+            // Local agents have no remote API even when their selected model is
+            // cloud/API-backed. Persist the update locally; the routing layer
+            // decides whether the next turn uses embedded runtime or remote
+            // transport from the updated model/metadata binding.
             localSource.persistAgent(preview)
             agentDao.upsert(AgentEntity.fromAgent(preview))
             updateAgentInCache(preview)

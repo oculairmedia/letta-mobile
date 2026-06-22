@@ -113,6 +113,24 @@ import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 
 
 
+internal fun resolveLocalRuntimeRouting(
+    agent: Agent?,
+    localRuntimeBackendAvailable: Boolean,
+): LocalRuntimeRouting {
+    if (agent != null) {
+        return if (AgentRuntimeBinding.isLocalBound(agent)) {
+            LocalRuntimeRouting.LocalBound
+        } else {
+            LocalRuntimeRouting.Remote
+        }
+    }
+    return if (localRuntimeBackendAvailable) {
+        LocalRuntimeRouting.Blocked()
+    } else {
+        LocalRuntimeRouting.Remote
+    }
+}
+
 @HiltViewModel
 internal class AdminChatViewModel @Inject constructor(
     private val routeArgs: ChatRouteArgs,
@@ -577,17 +595,10 @@ internal class AdminChatViewModel @Inject constructor(
         localRuntimeRouting = ::localRuntimeRouting,
     )
 
-    private fun localRuntimeRouting(): LocalRuntimeRouting {
-        val conversationId = chatConversationCoordinator.activeConversationId ?: explicitConversationId
-        if (conversationId?.startsWith("local-conv-") == true) return LocalRuntimeRouting.LocalBound
-        if (agentId.value.startsWith("local-agent-")) return LocalRuntimeRouting.LocalBound
-        if (AgentRuntimeBinding.isLocalBound(activeAgent.value)) return LocalRuntimeRouting.LocalBound
-        return if (sessionManager.current.localRuntimeBackend == null) {
-            LocalRuntimeRouting.Remote
-        } else {
-            LocalRuntimeRouting.Blocked()
-        }
-    }
+    private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(
+        agent = activeAgent.value,
+        localRuntimeBackendAvailable = sessionManager.current.localRuntimeBackend != null,
+    )
 
     private val chatHistoryPager: ChatHistoryPager by lazy {
         ChatHistoryPager(
