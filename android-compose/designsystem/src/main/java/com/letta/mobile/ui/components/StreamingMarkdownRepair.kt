@@ -15,6 +15,7 @@ internal fun repairIncompleteMarkdownForStreaming(text: String): String {
 
     repairOpenCodeFence(text)?.let { return it }
     repairOpenDisplayMath(text)?.let { return it }
+    repairOpenA2uiJsonTag(text)?.let { return it }
     repairOpenInlineCodeSpan(text)?.let { return it }
     repairOpenInlineMath(text)?.let { return it }
 
@@ -37,6 +38,16 @@ private fun repairOpenDisplayMath(text: String): String? {
     } else {
         text + "$$"
     }
+}
+
+private fun repairOpenA2uiJsonTag(text: String): String? {
+    val openTagIndex = text.lastIndexOf("<a2ui-json", ignoreCase = true)
+    if (openTagIndex < 0) return null
+
+    val closeTagIndex = text.indexOf("</a2ui-json>", startIndex = openTagIndex, ignoreCase = true)
+    if (closeTagIndex >= 0) return null
+
+    return text + "</a2ui-json>"
 }
 
 private fun hasOpenCodeFence(text: String): Boolean {

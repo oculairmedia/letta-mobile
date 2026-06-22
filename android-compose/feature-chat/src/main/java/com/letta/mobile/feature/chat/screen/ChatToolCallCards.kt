@@ -561,6 +561,7 @@ internal fun ToolCallCard(
     // tracked in `letta-mobile-o9ce`. See ToolReturnStatus for the full
     // empirical justification.
     val isError = ToolReturnStatus.isError(toolCall.status)
+    val isComplete = toolCall.result != null || toolCall.status == "success"
     val codeStyle = MaterialTheme.chatTypography.codeBlock
     val approvalState = approvalStateOverride ?: toolCall.approvalDecision?.toToolApprovalState()
     val compactDetail = remember(
@@ -580,8 +581,20 @@ internal fun ToolCallCard(
             else -> display.detailLine
         }
     }
-    val compactTitle = remember(toolCall.name, compactDetail) {
-        compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
+    val compactTitle = remember(toolCall.name, compactDetail, display.label, argumentSummary) {
+        // letta-mobile-mtis: Prefer command-first summaries in Bash tool rows.
+        if (toolCall.name == "Bash" && argumentSummary?.value != null) {
+            val command = argumentSummary.value
+            if (compactDetail != null && compactDetail.startsWith("Result: ")) {
+                "$command - $compactDetail"
+            } else if (compactDetail != null && compactDetail.startsWith("Error: ")) {
+                "$command - $compactDetail"
+            } else {
+                command
+            }
+        } else {
+            compactDetail?.let { "${toolCall.name} - $it" } ?: toolCall.name
+        }
     }
     LaunchedEffect(toolCall.toolCallMotionKey(), showDetails, deferHeavyOutput, toolCall.result?.length) {
         if (Telemetry.isChatHotPathDebugEnabled()) {
@@ -653,7 +666,7 @@ internal fun ToolCallCard(
                         modifier = Modifier.size(LettaIconSizing.Inline),
                         tint = MaterialTheme.colorScheme.error,
                     )
-                } else if (toolCall.result != null) {
+                } else if (isComplete) {
                     Icon(
                         imageVector = LettaIcons.CheckCircle,
                         contentDescription = "Success",
@@ -1301,10 +1314,21 @@ internal fun CompactToolCallRow(
     val summary = remember(toolCall.name, toolCall.arguments, displayResult, toolCall.status, display.detailLine) {
         compactToolCallSummary(toolCall, display.detailLine, displayResult)
     }
-    val compactTitle = remember(toolCall.name, summary) {
-        "${toolCall.name} - $summary"
+    val compactTitle = remember(toolCall.name, summary, argumentSummary) {
+        // letta-mobile-mtis: Prefer command-first summaries in Bash compact tool rows.
+        if (toolCall.name == "Bash" && argumentSummary?.value != null) {
+            val command = argumentSummary.value
+            if (summary.startsWith("Result: ") || summary.startsWith("Error: ")) {
+                "$command - $summary"
+            } else {
+                command
+            }
+        } else {
+            "${toolCall.name} - $summary"
+        }
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
+    val isComplete = toolCall.result != null || toolCall.status == "success"
     LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
         if (Telemetry.isChatHotPathDebugEnabled()) {
             Telemetry.event(
@@ -1357,7 +1381,7 @@ internal fun CompactToolCallRow(
             // information and dropping the chip reclaims width for the result
             // preview. RequestingInput and Rejected still render (they carry
             // information the checkmark can't).
-            if (shouldShowCompactApprovalChip(approvalState, hasResult = toolCall.result != null)) {
+            if (shouldShowCompactApprovalChip(approvalState, hasResult = isComplete)) {
                 AnimatedToolApprovalChip(state = approvalState)
             }
             executionTimeText?.let { time ->
@@ -1370,7 +1394,7 @@ internal fun CompactToolCallRow(
                     modifier = Modifier.size(LettaIconSizing.Inline),
                     tint = MaterialTheme.colorScheme.error,
                 )
-                toolCall.result != null -> Icon(
+                isComplete -> Icon(
                     imageVector = LettaIcons.CheckCircle,
                     contentDescription = if (approvalState == ToolApprovalState.Approved) {
                         "Approved, success"
@@ -1488,7 +1512,8 @@ internal fun compactToolCallSummary(
 internal fun String.displayToolResult(): String = ToolOutputParser.sanitizeResultFieldText(this)
 
 internal fun String.deferredToolResultPreview(): String {
-    val preview = take(240).substringBefore('\n').trim()
+    val firstNonEmptyLine = lineSequence().firstOrNull { it.isNotBlank() } ?: ""
+    val preview = firstNonEmptyLine.take(240).trim()
     return if (length > preview.length) "$preview…" else preview
 }
 

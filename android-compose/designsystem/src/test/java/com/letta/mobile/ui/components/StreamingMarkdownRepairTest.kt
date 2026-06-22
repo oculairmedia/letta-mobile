@@ -8,6 +8,14 @@ import org.junit.jupiter.api.Tag
 class StreamingMarkdownRepairTest {
 
     @Test
+    fun `repairs open a2ui-json tag`() {
+        assertEquals(
+            "Some text <a2ui-json>{\"foo\"</a2ui-json>",
+            repairIncompleteMarkdownForStreaming("Some text <a2ui-json>{\"foo\""),
+        )
+    }
+
+    @Test
     fun `repairs incomplete bold marker`() {
         assertEquals(
             "This is **bold**",
