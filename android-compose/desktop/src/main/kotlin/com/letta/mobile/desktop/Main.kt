@@ -1,6 +1,10 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -25,9 +29,10 @@ private fun runDesktopApplication(
 ) {
     try {
         application {
+            var windowTitle by remember { mutableStateOf("Letta Desktop") }
             DesktopJewelWindow(
                 onCloseRequest = ::exitApplication,
-                title = "Letta Desktop",
+                title = windowTitle,
                 state = rememberWindowState(width = 1280.dp, height = 820.dp),
             ) {
                 LaunchedEffect(Unit) {
@@ -35,7 +40,7 @@ private fun runDesktopApplication(
                     window.minimumSize = Dimension(960, 640)
                 }
 
-                LettaDesktopApp()
+                LettaDesktopApp(onActiveTitleChange = { windowTitle = it })
             }
         }
     } finally {

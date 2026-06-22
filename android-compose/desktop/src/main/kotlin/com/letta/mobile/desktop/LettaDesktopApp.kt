@@ -18,12 +18,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -58,8 +64,12 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.desktop.chat.AgentSphere
+import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.DesktopChatController
-import com.letta.mobile.desktop.chat.DesktopChatSurface
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
@@ -88,7 +98,9 @@ import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 private const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
 
 @Composable
-fun LettaDesktopApp() {
+fun LettaDesktopApp(
+    onActiveTitleChange: (String) -> Unit = {},
+) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
@@ -205,78 +217,104 @@ fun LettaDesktopApp() {
         onDispose { toolLibraryController.close() }
     }
 
+    val activeTitle = when (selectedDestination) {
+        DesktopDestination.Conversations ->
+            chatState.selectedConversation?.title ?: "Letta Desktop"
+        else -> selectedDestination.label
+    }
+    LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
+
     DesktopMaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
+            color = MaterialTheme.colorScheme.background,
         ) {
-            if (selectedDestination == DesktopDestination.Conversations) {
-                DesktopChatSurface(
-                    state = chatState,
-                    onConversationSelected = chatController::selectConversation,
-                    onDeleteConversation = chatController::deleteConversation,
-                    onComposerTextChanged = chatController::updateComposerText,
-                    onSend = chatController::send,
-                    onAttachImage = { pickerLauncher.launch() },
-                    onRemoveImageAttachment = chatController::removeImageAttachment,
-                    onRetryConnection = chatController::retryConnection,
-                    onSettingsSelected = { selectedDestination = DesktopDestination.Settings },
-                    modifier = Modifier.fillMaxSize(),
+            Row(Modifier.fillMaxSize()) {
+                // Far-left workspace/agent rail.
+                DesktopAgentRail(
+                    agentNames = chatState.conversationGroups.map { it.agentName },
+                    selectedAgentName = chatState.selectedConversation?.agentName,
+                    onAgentSelected = { agentName ->
+                        chatState.conversations
+                            .firstOrNull { it.agentName == agentName }
+                            ?.let { chatController.selectConversation(it.id) }
+                        selectedDestination = DesktopDestination.Conversations
+                    },
+                    onNewSession = { selectedDestination = DesktopDestination.Conversations },
+                    onSearch = { selectedDestination = DesktopDestination.Conversations },
+                    onSettings = { selectedDestination = DesktopDestination.Settings },
                 )
-            } else {
-                Row(Modifier.fillMaxSize()) {
-                    DesktopNavigation(
-                        selectedDestination = selectedDestination,
-                        onDestinationSelected = { selectedDestination = it },
-                    )
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
-                    )
-                    DestinationContent(
-                        destination = selectedDestination,
-                        state = bootstrapState,
-                        chatState = chatState,
-                        memoryState = memoryState,
-                        scheduleLibraryState = scheduleLibraryState,
-                        channelLibraryState = channelLibraryState,
-                        toolLibraryState = toolLibraryState,
-                        onChatConversationSelected = chatController::selectConversation,
-                        onChatConversationDeleted = chatController::deleteConversation,
-                        onChatComposerTextChanged = chatController::updateComposerText,
-                        onChatSend = chatController::send,
-                        onChatAttachImage = {
-                            pickerLauncher.launch()
-                        },
-                        onChatRemoveImageAttachment = chatController::removeImageAttachment,
-                        onChatRetryConnection = chatController::retryConnection,
-                        onMemoryRefresh = memoryController::reload,
-                        onMemoryAgentSelected = memoryController::selectAgent,
-                        onSchedulesRefresh = scheduleLibraryController::reload,
-                        onScheduleAgentSelected = scheduleLibraryController::selectAgent,
-                        onChannelsRefresh = channelLibraryController::refresh,
-                        onToolsRefresh = toolLibraryController::reload,
-                        onToolsSearchQueryChanged = toolLibraryController::updateSearchQuery,
-                        onToolsTagToggled = toolLibraryController::toggleTag,
-                        onToolsClearTags = toolLibraryController::clearTags,
-                        onToolsLoadMore = toolLibraryController::loadMore,
-                        onConfigSaved = { nextConfig ->
-                            configStore.save(nextConfig)
-                            activeConfig = configStore.load()
-                            dataBindings.sessionGraphProvider.rebuild()
-                            bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
-                        },
-                        onTokenCleared = {
-                            val nextConfig = activeConfig.copy(accessToken = null)
-                            configStore.save(nextConfig)
-                            activeConfig = configStore.load()
-                            dataBindings.sessionGraphProvider.rebuild()
-                            bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
+                RailDivider()
+                // Agent sidebar: agent header + nav + conversations.
+                DesktopAgentSidebar(
+                    agentName = chatState.selectedConversation?.agentName
+                        ?: chatState.conversationGroups.firstOrNull()?.agentName
+                        ?: "Letta",
+                    selectedDestination = selectedDestination,
+                    onDestinationSelected = { selectedDestination = it },
+                    chatState = chatState,
+                    onConversationSelected = {
+                        chatController.selectConversation(it)
+                        selectedDestination = DesktopDestination.Conversations
+                    },
+                    onDeleteConversation = chatController::deleteConversation,
+                    onNewChat = { selectedDestination = DesktopDestination.Conversations },
+                )
+                RailDivider()
+                // Main content pane.
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    if (selectedDestination == DesktopDestination.Conversations) {
+                        ChatDetailPane(
+                            state = chatState,
+                            onComposerTextChanged = chatController::updateComposerText,
+                            onSend = chatController::send,
+                            onAttachImage = { pickerLauncher.launch() },
+                            onRemoveImageAttachment = chatController::removeImageAttachment,
+                            onRetryConnection = chatController::retryConnection,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        DestinationContent(
+                            destination = selectedDestination,
+                            state = bootstrapState,
+                            chatState = chatState,
+                            memoryState = memoryState,
+                            scheduleLibraryState = scheduleLibraryState,
+                            channelLibraryState = channelLibraryState,
+                            toolLibraryState = toolLibraryState,
+                            onChatConversationSelected = chatController::selectConversation,
+                            onChatConversationDeleted = chatController::deleteConversation,
+                            onChatComposerTextChanged = chatController::updateComposerText,
+                            onChatSend = chatController::send,
+                            onChatAttachImage = { pickerLauncher.launch() },
+                            onChatRemoveImageAttachment = chatController::removeImageAttachment,
+                            onChatRetryConnection = chatController::retryConnection,
+                            onMemoryRefresh = memoryController::reload,
+                            onMemoryAgentSelected = memoryController::selectAgent,
+                            onSchedulesRefresh = scheduleLibraryController::reload,
+                            onScheduleAgentSelected = scheduleLibraryController::selectAgent,
+                            onChannelsRefresh = channelLibraryController::refresh,
+                            onToolsRefresh = toolLibraryController::reload,
+                            onToolsSearchQueryChanged = toolLibraryController::updateSearchQuery,
+                            onToolsTagToggled = toolLibraryController::toggleTag,
+                            onToolsClearTags = toolLibraryController::clearTags,
+                            onToolsLoadMore = toolLibraryController::loadMore,
+                            onConfigSaved = { nextConfig ->
+                                configStore.save(nextConfig)
+                                activeConfig = configStore.load()
+                                dataBindings.sessionGraphProvider.rebuild()
+                                bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+                            },
+                            onTokenCleared = {
+                                val nextConfig = activeConfig.copy(accessToken = null)
+                                configStore.save(nextConfig)
+                                activeConfig = configStore.load()
+                                dataBindings.sessionGraphProvider.rebuild()
+                                bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
             }
         }
@@ -284,140 +322,277 @@ fun LettaDesktopApp() {
 }
 
 @Composable
-private fun DesktopNavigation(
-    selectedDestination: DesktopDestination,
-    onDestinationSelected: (DesktopDestination) -> Unit,
+private fun RailDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+/**
+ * Far-left workspace/agent rail (Penpot "App Mockups v2", 56.dp wide, #0A0A0A):
+ * a "+" new-session button, a stack of gradient agent orbs (one per agent), and
+ * search/settings/identity actions pinned to the bottom.
+ */
+@Composable
+private fun DesktopAgentRail(
+    agentNames: List<String>,
+    selectedAgentName: String?,
+    onAgentSelected: (String) -> Unit,
+    onNewSession: () -> Unit,
+    onSearch: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
-            .width(232.dp)
+            .width(56.dp)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 14.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(vertical = 15.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(bottom = 8.dp),
-        ) {
+        DesktopTooltip(text = "New session") {
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        shape = MaterialTheme.shapes.small,
-                    ),
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                    .clickable(onClick = onNewSession),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.SmartToy,
-                    contentDescription = null,
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = "New session",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(17.dp),
-                )
-            }
-            Column {
-                Text(
-                    text = "Letta Desktop",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = "Workspace",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }
+        Spacer(Modifier.height(8.dp))
+        agentNames.forEachIndexed { index, name ->
+            val selected = name == selectedAgentName
+            DesktopTooltip(text = name) {
+                Box(
+                    modifier = Modifier.size(width = 46.dp, height = 36.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .size(width = 3.dp, height = 28.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                        )
+                    }
+                    AgentOrb(
+                        index = index,
+                        size = 36.dp,
+                        modifier = Modifier.clickable { onAgentSelected(name) },
+                    ) {
+                        Text(
+                            text = name.firstOrNull()?.uppercase() ?: "?",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                        )
+                    }
+                }
+            }
+        }
 
-        DesktopNavRow(
-            label = "New session",
-            icon = Icons.Outlined.Add,
-            selected = false,
-            onClick = { onDestinationSelected(DesktopDestination.Conversations) },
-        )
-        DesktopNavRow(
-            label = "Search sessions...",
-            icon = Icons.Outlined.Search,
-            selected = false,
-            subdued = true,
-            onClick = { onDestinationSelected(DesktopDestination.Conversations) },
-        )
+        Spacer(Modifier.weight(1f))
 
-        SidebarSection("Workspace")
-        DesktopNavRow(
-            label = "Messaging",
-            icon = DesktopDestination.Conversations.icon,
-            selected = selectedDestination == DesktopDestination.Conversations,
-            onClick = { onDestinationSelected(DesktopDestination.Conversations) },
-        )
+        RailActionIcon(Icons.Outlined.Search, "Search", onSearch)
+        RailActionIcon(Icons.Outlined.Settings, "Settings", onSettings)
+        RailActionIcon(Icons.Outlined.AccountCircle, "Account", onSettings)
+    }
+}
+
+@Composable
+private fun RailActionIcon(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    DesktopTooltip(text = description) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Agent sidebar (231.dp, #0D0D0D): the active agent header, per-agent
+ * navigation (Memory/Schedules/Channels/Skills/New chat), then the pinned
+ * conversation list and a Documents section.
+ */
+@Composable
+private fun DesktopAgentSidebar(
+    agentName: String,
+    selectedDestination: DesktopDestination,
+    onDestinationSelected: (DesktopDestination) -> Unit,
+    chatState: DesktopChatSurfaceState,
+    onConversationSelected: (String) -> Unit,
+    onDeleteConversation: (String) -> Unit,
+    onNewChat: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .width(231.dp)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
+            .padding(horizontal = 14.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        // Agent header.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.padding(start = 2.dp, bottom = 16.dp),
+        ) {
+            AgentOrb(index = 0, size = 30.dp, cornerRadius = 6.dp)
+            Text(
+                text = agentName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Outlined.MoreVert,
+                contentDescription = "Agent menu",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+
         DesktopNavRow(
             label = "Memory",
-            icon = DesktopDestination.Memory.icon,
+            icon = Icons.Outlined.Psychology,
             selected = selectedDestination == DesktopDestination.Memory,
             onClick = { onDestinationSelected(DesktopDestination.Memory) },
         )
         DesktopNavRow(
             label = "Schedules",
-            icon = DesktopDestination.Schedules.icon,
+            icon = Icons.Outlined.Schedule,
             selected = selectedDestination == DesktopDestination.Schedules,
             onClick = { onDestinationSelected(DesktopDestination.Schedules) },
         )
         DesktopNavRow(
             label = "Channels",
-            icon = DesktopDestination.Channels.icon,
+            icon = Icons.Outlined.Hub,
             selected = selectedDestination == DesktopDestination.Channels,
             onClick = { onDestinationSelected(DesktopDestination.Channels) },
         )
         DesktopNavRow(
-            label = "Skills & Tools",
-            icon = DesktopDestination.Agents.icon,
+            label = "Skills",
+            icon = Icons.Outlined.Build,
             selected = selectedDestination == DesktopDestination.Agents,
             onClick = { onDestinationSelected(DesktopDestination.Agents) },
         )
         DesktopNavRow(
-            label = "Artifacts",
-            icon = DesktopDestination.Overview.icon,
-            selected = selectedDestination == DesktopDestination.Overview,
-            onClick = { onDestinationSelected(DesktopDestination.Overview) },
+            label = "New chat",
+            icon = Icons.Outlined.Edit,
+            selected = false,
+            onClick = onNewChat,
         )
 
-        Spacer(Modifier.weight(1f))
+        // Pinned conversations.
+        SidebarSection("Pinned")
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            items(items = chatState.conversations, key = { it.id }) { conversation ->
+                SidebarConversationRow(
+                    title = conversation.title,
+                    timeLabel = conversation.updatedAtLabel,
+                    selected = selectedDestination == DesktopDestination.Conversations &&
+                        conversation.id == chatState.selectedConversationId,
+                    onClick = { onConversationSelected(conversation.id) },
+                )
+            }
+            item {
+                SidebarSection("Documents")
+            }
+            if (chatState.conversations.isEmpty()) {
+                item {
+                    Text(
+                        text = "No chats",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 4.dp, top = 2.dp),
+                    )
+                }
+            }
+        }
 
         DesktopNavRow(
             label = "Settings",
-            icon = DesktopDestination.Settings.icon,
+            icon = Icons.Outlined.Settings,
             selected = selectedDestination == DesktopDestination.Settings,
-            tooltip = "Settings",
             onClick = { onDestinationSelected(DesktopDestination.Settings) },
         )
+    }
+}
 
-        Surface(
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth(),
+@Composable
+private fun SidebarConversationRow(
+    title: String,
+    timeLabel: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val container = if (selected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.small,
+        color = container,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .background(MaterialTheme.colorScheme.tertiary, MaterialTheme.shapes.small),
-                )
-                Text(
-                    text = "Gateway ready",
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Icon(
+                imageVector = Icons.Outlined.ChatBubbleOutline,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = timeLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -519,20 +694,6 @@ private fun DestinationContent(
     onTokenCleared: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (destination == DesktopDestination.Conversations) {
-        DesktopChatSurface(
-            state = chatState,
-            onConversationSelected = onChatConversationSelected,
-            onDeleteConversation = onChatConversationDeleted,
-            onComposerTextChanged = onChatComposerTextChanged,
-            onSend = onChatSend,
-            onAttachImage = onChatAttachImage,
-            onRemoveImageAttachment = onChatRemoveImageAttachment,
-            onRetryConnection = onChatRetryConnection,
-            modifier = modifier,
-        )
-        return
-    }
     if (destination == DesktopDestination.Memory) {
         DesktopMemorySurface(
             state = memoryState,

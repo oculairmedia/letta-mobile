@@ -28,11 +28,15 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -91,6 +95,7 @@ import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTooltip
+import com.letta.mobile.ui.theme.customColors
 import java.util.Base64
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -458,21 +463,11 @@ internal fun ChatDetailPane(
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val showHeader = !state.shouldShowStatePanel || state.selectedConversation != null
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        if (showHeader) {
-            ChatHeader(state)
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant),
-            )
-        }
         if (state.shouldShowStatePanel) {
             ChatStatePanel(
                 state = state,
@@ -486,12 +481,6 @@ internal fun ChatDetailPane(
                 modifier = Modifier.weight(1f),
             )
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-        )
         ComposerBar(
             text = state.composerText,
             pendingImageAttachments = state.pendingImageAttachments,
@@ -570,53 +559,6 @@ private fun ChatScreenStatus.heroBody(): String = when (this) {
 }
 
 @Composable
-private fun ChatHeader(state: DesktopChatSurfaceState) {
-    val conversation = state.selectedConversation
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Surface(
-            modifier = Modifier.size(44.dp),
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Outlined.SmartToy,
-                    contentDescription = null,
-                )
-            }
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
-        ) {
-            Text(
-                text = conversation?.title ?: "No conversation selected",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = conversation?.agentName ?: "Select a conversation",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        StatusChip("Graph ${state.sessionGraphId}")
-    }
-}
-
-@Composable
 private fun MessageList(
     conversationId: String?,
     renderItems: List<ChatRenderItem>,
@@ -656,16 +598,28 @@ private fun MessageList(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp, vertical = 22.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(horizontal = 28.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
+            item(key = "__today__") {
+                Text(
+                    text = "Today",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
             items(
                 items = renderItems,
                 key = { it.key },
             ) { item ->
-                when (item) {
-                    is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
-                    is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                    when (item) {
+                        is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
+                        is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                    }
                 }
             }
         }
@@ -723,11 +677,12 @@ private fun DesktopRunBlock(item: ChatRenderItem.RunBlock) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                StatusDot(MaterialTheme.colorScheme.tertiary)
+                StatusDot(MaterialTheme.colorScheme.primary)
                 Text(
-                    text = "Run ${item.runId}",
+                    text = "Run · ${item.messages.size} step${if (item.messages.size == 1) "" else "s"}",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -767,26 +722,83 @@ private fun RunStepRow(message: UiMessage) {
     }
 }
 
+private val ChatColumnMaxWidth = 760.dp
+
 @Composable
 private fun DesktopMessageBubble(message: UiMessage) {
     val isUser = message.role == "user"
+    if (isUser) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Surface(
+                modifier = Modifier.widthIn(max = 520.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (message.content.isNotBlank()) {
+                        SelectionContainer {
+                            Text(
+                                text = message.content,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+                    DesktopImageAttachmentsGrid(
+                        attachments = message.attachments,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        return
+    }
 
+    // Assistant / agent message: gradient orb avatar + plain text, no bubble.
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Top,
     ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 720.dp),
-            shape = MaterialTheme.shapes.medium,
-            color = messageBubbleColor(message),
-            contentColor = messageBubbleContentColor(message),
-            border = BorderStroke(1.dp, messageBubbleBorderColor(message)),
+        AgentSphere(size = 28.dp, modifier = Modifier.padding(top = 2.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DesktopMessageContent(
-                message = message,
-                compact = false,
-                modifier = Modifier.padding(14.dp),
+            if (message.isReasoning) {
+                Text(
+                    text = "Reasoning",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (message.content.isNotBlank()) {
+                SelectionContainer {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (message.isError) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                }
+            }
+            DesktopImageAttachmentsGrid(
+                attachments = message.attachments,
+                modifier = Modifier.fillMaxWidth(),
             )
+            message.toolCalls.orEmpty().forEach { toolCall -> ToolCallCard(toolCall) }
+            message.generatedUi?.let { GeneratedUiCard(it) }
+            message.approvalRequest?.let { ApprovalRequestCard(it) }
+            message.approvalResponse?.let { ApprovalResponseCard(it) }
         }
     }
 }
@@ -855,19 +867,18 @@ private fun DesktopMessageContent(
 @Composable
 private fun ToolCallCard(toolCall: UiToolCall) {
     ArtifactCard(
-        icon = Icons.Outlined.Build,
+        icon = null,
         title = toolCall.name,
         status = toolCall.status ?: "tool call",
     ) {
-        Text(
-            text = toolCall.arguments,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
+            CodeBlock(args)
+        }
         toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
             Text(
                 text = result,
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         toolCall.executionTimeMs?.let { duration ->
@@ -947,43 +958,90 @@ private fun ApprovalResponseCard(approvalResponse: UiApprovalResponse) {
 
 @Composable
 private fun ArtifactCard(
-    icon: ImageVector,
+    icon: ImageVector?,
     title: String,
     status: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.tertiary,
-                )
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                StatusChip(status)
+                ToolStatusBadge(status)
+                Spacer(Modifier.weight(1f))
             }
             content()
+        }
+    }
+}
+
+/** Status badge for tool/artifact cards — green text for success-like states. */
+@Composable
+private fun ToolStatusBadge(status: String) {
+    val isSuccess = status.equals("success", ignoreCase = true) ||
+        status.equals("completed", ignoreCase = true)
+    val contentColor = if (isSuccess) {
+        MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
+            ?: MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = contentColor,
+    ) {
+        Text(
+            text = status,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Monospace code block matching the mockup's #262626 inset. */
+@Composable
+private fun CodeBlock(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+    ) {
+        SelectionContainer {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            )
         }
     }
 }
@@ -1002,113 +1060,182 @@ private fun ComposerBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 28.dp, vertical = 18.dp),
+            .padding(start = 28.dp, top = 4.dp, end = 28.dp, bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (pendingImageAttachments.isNotEmpty()) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                pendingImageAttachments.forEachIndexed { index, image ->
-                    PendingAttachmentThumbnail(
-                        image = image,
-                        onRemove = { onRemoveImageAttachment(index) },
-                    )
-                }
-            }
-        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 820.dp),
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
+                .widthIn(max = 760.dp),
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceContainer,
             contentColor = MaterialTheme.colorScheme.onSurface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            Column(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Surface(
-                    modifier = Modifier.size(38.dp),
-                    shape = MaterialTheme.shapes.small,
-                    color = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ) {
-                    DesktopIconButton(
-                        imageVector = Icons.Outlined.AddPhotoAlternate,
-                        contentDescription = "Attach image",
-                        onClick = onAttachImage,
-                        enabled = enabled,
-                        iconModifier = Modifier.size(20.dp),
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                if (pendingImageAttachments.isNotEmpty()) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        pendingImageAttachments.forEachIndexed { index, image ->
+                            ComposerAttachmentChip(
+                                image = image,
+                                onRemove = { onRemoveImageAttachment(index) },
+                            )
+                        }
+                    }
                 }
                 DesktopTextArea(
                     value = text,
                     onValueChange = onTextChanged,
                     enabled = enabled,
                     modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 46.dp, max = 120.dp),
+                        .fillMaxWidth()
+                        .heightIn(min = 28.dp, max = 120.dp),
                     maxLines = 5,
-                    placeholder = "What are we building?",
+                    placeholder = "Message Meridian…",
                     undecorated = true,
                 )
-                Surface(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clickable(
-                            enabled = canSend,
-                            onClick = onSend,
-                        ),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canSend) 1f else 0.16f),
-                    contentColor = MaterialTheme.colorScheme.surface.copy(alpha = if (canSend) 1f else 0.54f),
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.Send,
-                            contentDescription = "Send message",
-                            modifier = Modifier.size(18.dp),
-                        )
+                    DesktopIconButton(
+                        imageVector = Icons.Outlined.Add,
+                        contentDescription = "Attach",
+                        onClick = onAttachImage,
+                        enabled = enabled,
+                        iconModifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(28.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ComposerChip(label = "MiniMax M3")
+                    ComposerChip(
+                        label = "Unrestricted",
+                        leadingIcon = Icons.Outlined.Security,
+                        contentColor = MaterialTheme.customColors.runningColor
+                            .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary,
+                    )
+                    ComposerChip(label = "Medium")
+                    Spacer(Modifier.weight(1f))
+                    Surface(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clickable(enabled = canSend, onClick = onSend),
+                        shape = CircleShape,
+                        color = if (canSend) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        contentColor = if (canSend) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        },
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Outlined.ArrowUpward,
+                                contentDescription = "Send message",
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
             }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 760.dp)
+                .padding(start = 4.dp),
+        ) {
+            Text(
+                text = "@ to add files   ·   / for commands   ·   ⏎ to send",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+            )
+        }
+    }
+}
+
+/** A pill selector in the composer control row (model / safety / effort). */
+@Composable
+private fun ComposerChip(
+    label: String,
+    leadingIcon: ImageVector? = null,
+    contentColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = contentColor,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                    tint = contentColor,
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+            Icon(
+                imageVector = Icons.Outlined.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
 
 @Composable
-private fun PendingAttachmentThumbnail(
+private fun ComposerAttachmentChip(
     image: MessageContentPart.Image,
     onRemove: () -> Unit,
 ) {
-    Box(modifier = Modifier.size(68.dp)) {
-        DesktopAttachmentImage(
-            attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
-            modifier = Modifier.size(64.dp),
-        )
-        Surface(
-            modifier = Modifier
-                .size(22.dp)
-                .align(Alignment.TopEnd),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            DesktopIconButton(
+            DesktopAttachmentImage(
+                attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = "image",
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1,
+            )
+            Icon(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = "Remove attachment",
-                onClick = onRemove,
-                modifier = Modifier.size(22.dp),
-                iconModifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier
+                    .size(14.dp)
+                    .clickable(onClick = onRemove),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -1250,30 +1377,6 @@ private fun UiMessage.senderLabel(): String = when {
     approvalRequest != null -> "Approval"
     generatedUi != null -> "Generated UI"
     else -> "Assistant"
-}
-
-@Composable
-private fun messageBubbleColor(message: UiMessage): Color = when {
-    message.isError -> MaterialTheme.colorScheme.errorContainer
-    message.role == "user" -> MaterialTheme.colorScheme.primaryContainer
-    message.isReasoning -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
-    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
-}
-
-@Composable
-private fun messageBubbleContentColor(message: UiMessage): Color = when {
-    message.isError -> MaterialTheme.colorScheme.onErrorContainer
-    message.role == "user" -> MaterialTheme.colorScheme.onPrimaryContainer
-    message.isReasoning -> MaterialTheme.colorScheme.onTertiaryContainer
-    else -> MaterialTheme.colorScheme.onSurface
-}
-
-@Composable
-private fun messageBubbleBorderColor(message: UiMessage): Color = when {
-    message.isError -> MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
-    message.role == "user" -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-    message.isReasoning -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.26f)
-    else -> MaterialTheme.colorScheme.outlineVariant
 }
 
 @Composable
