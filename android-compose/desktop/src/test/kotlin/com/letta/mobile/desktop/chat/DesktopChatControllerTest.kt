@@ -142,6 +142,67 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun sendMarksConversationThinkingUntilAgentReplyLands() = runTest {
+        val gateway = FakeDesktopChatGateway()
+        val controller = testController(gateway)
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("hey")
+        controller.send()
+        // Thinking is set the instant the prompt is sent (before the reply lands).
+        assertEquals("conv-1", controller.thinkingConversationId.value)
+
+        runCurrent()
+        // Once the agent's reply lands, the thinking indicator clears.
+        assertNull(controller.thinkingConversationId.value)
+        assertTrue(controller.state.value.selectedMessages.any { it.role == "assistant" })
+
+        controller.close()
+    }
+
+    @Test
+    fun thinkingPersistsWhileAwaitingAgentReply() = runTest {
+        val loop = FakeDesktopTimelineLoop("conv-1").also { it.completeHydrate() }
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            loopFactory = { _, _, _ -> loop },
+        )
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("hey")
+        controller.send()
+        runCurrent()
+
+        // No assistant reply has streamed back yet, so the conversation stays
+        // in the thinking state (no premature clear from isSending).
+        assertEquals("conv-1", controller.thinkingConversationId.value)
+
+        controller.close()
+    }
+
+    @Test
+    fun sendFailureClearsThinking() = runTest {
+        val loop = FakeDesktopTimelineLoop("conv-1", sendFailure = IllegalStateException("boom"))
+            .also { it.completeHydrate() }
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            loopFactory = { _, _, _ -> loop },
+        )
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("hey")
+        controller.send()
+        runCurrent()
+
+        assertNull(controller.thinkingConversationId.value)
+
+        controller.close()
+    }
+
+    @Test
     fun sendIncludesPendingImageAttachmentInContentPartsAndClearsComposer() = runTest {
         val gateway = FakeDesktopChatGateway()
         val controller = testController(gateway)

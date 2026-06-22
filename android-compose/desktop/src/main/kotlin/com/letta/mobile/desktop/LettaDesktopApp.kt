@@ -321,9 +321,15 @@ fun LettaDesktopApp(
     val agentConversations = remember(chatState.conversations, selectedAgentId) {
         chatState.conversations.filter { it.agentId == selectedAgentId }
     }
-    // The active conversation/agent is "thinking" while a send/run is streaming.
-    val thinkingConversationId = chatState.selectedConversationId?.takeIf { chatState.isSending }
-    val thinkingAgentId = selectedAgentId?.takeIf { chatState.isSending }
+    // A conversation is "thinking" from the moment a prompt is sent until the
+    // agent's reply starts landing (tracked by the controller — `isSending`
+    // alone clears too early, while the reply streams over a separate channel).
+    val thinkingConversationId by chatController.thinkingConversationId.collectAsState()
+    val thinkingAgentId = thinkingConversationId?.let { tid ->
+        chatState.conversations.firstOrNull { it.id == tid }?.agentId
+    }
+    val isThinkingSelected = thinkingConversationId != null &&
+        thinkingConversationId == chatState.selectedConversationId
 
     DesktopMaterialTheme {
         Surface(
@@ -385,6 +391,7 @@ fun LettaDesktopApp(
                         )
                         ChatDetailPane(
                             state = chatState,
+                            isThinking = isThinkingSelected,
                             modelOptions = modelOptions,
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,

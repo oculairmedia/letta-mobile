@@ -478,6 +478,7 @@ private fun CountPill(count: Int) {
 @Composable
 internal fun ChatDetailPane(
     state: DesktopChatSurfaceState,
+    isThinking: Boolean = false,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
@@ -488,14 +489,14 @@ internal fun ChatDetailPane(
     commands: List<ComposerCommand> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
-    // Drive the ambient glow off the chat state: a teal breath while sending,
-    // a brief "completed" settle afterward, the error tint on failure.
+    // Drive the ambient glow off the thinking state: a teal breath while the
+    // agent works, a brief "completed" settle afterward, error tint on failure.
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
-    LaunchedEffect(state.isSending, state.errorMessage) {
+    LaunchedEffect(isThinking, state.errorMessage) {
         when {
             state.errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
-            state.isSending -> {
+            isThinking -> {
                 hadActiveRun = true
                 ambientStatus = DesktopAmbientStatus.Running
             }
@@ -521,7 +522,7 @@ internal fun ChatDetailPane(
                     onRetryConnection = onRetryConnection,
                     modifier = Modifier.weight(1f),
                 )
-            } else if (state.renderItems.isEmpty() && !state.isSending) {
+            } else if (state.renderItems.isEmpty() && !isThinking) {
                 NewConversationWelcome(
                     agentName = state.selectedConversation?.agentName,
                     modifier = Modifier.weight(1f),
@@ -530,7 +531,7 @@ internal fun ChatDetailPane(
                 MessageList(
                     conversationId = state.selectedConversationId,
                     renderItems = state.renderItems,
-                    isSending = state.isSending,
+                    isSending = isThinking,
                     modifier = Modifier.weight(1f),
                 )
             }

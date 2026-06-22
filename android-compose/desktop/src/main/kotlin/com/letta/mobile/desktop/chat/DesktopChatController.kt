@@ -59,6 +59,15 @@ class DesktopChatController(
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
 
+    /**
+     * Conversation awaiting the agent's reply. Set the moment a prompt is sent
+     * and cleared once the agent's response starts landing (or on failure/
+     * timeout). Drives the "thinking" indicator — `isSending` alone is too brief
+     * because the reply streams in over a separate background subscription.
+     */
+    private val _thinkingConversationId = MutableStateFlow<String?>(null)
+    val thinkingConversationId: StateFlow<String?> = _thinkingConversationId.asStateFlow()
+
     private var gateway: DesktopChatGateway? = null
 
     // Per-conversation model overrides set this session (the picker). The
@@ -322,9 +331,11 @@ class DesktopChatController(
             return
         }
 
+        val sendingConversationId = _state.value.selectedConversationId
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
+        beginThinking(sendingConversationId)
         sendJob?.cancel()
         sendJob = scope.launch {
             try {
@@ -337,6 +348,9 @@ class DesktopChatController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (closed) return@launch
+                if (_thinkingConversationId.value == sendingConversationId) {
+                    _thinkingConversationId.value = null
+                }
                 _state.update {
                     it.withRuntimeState(
                         ChatSessionReducer.sendFailed(
@@ -347,6 +361,21 @@ class DesktopChatController(
                         ),
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Mark [conversationId] as awaiting the agent's reply, with a safety timeout
+     * so the indicator can't get stuck if the reply never lands.
+     */
+    private fun beginThinking(conversationId: String?) {
+        if (conversationId == null) return
+        _thinkingConversationId.value = conversationId
+        scope.launch {
+            kotlinx.coroutines.delay(THINKING_TIMEOUT_MS)
+            if (_thinkingConversationId.value == conversationId) {
+                _thinkingConversationId.value = null
             }
         }
     }
@@ -467,6 +496,13 @@ class DesktopChatController(
         val messages = timeline.events
             .sortedBy { it.position }
             .mapNotNull(::timelineEventToUiMessage)
+        // Stop "thinking" once the agent's reply begins to land (the latest
+        // message is no longer the user's own prompt).
+        if (_thinkingConversationId.value == conversationId &&
+            messages.lastOrNull()?.role?.equals("user", ignoreCase = true) == false
+        ) {
+            _thinkingConversationId.value = null
+        }
         _state.update { current ->
             current.withRuntimeState(
                 ChatSessionReducer.timelineMessagesUpdated(
@@ -583,3 +619,6 @@ private fun String.isDefaultShimConversationId(): Boolean =
     startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
 
 private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
+
+/** Safety cap so the thinking indicator can't get stuck if no reply arrives. */
+private const val THINKING_TIMEOUT_MS = 180_000L
