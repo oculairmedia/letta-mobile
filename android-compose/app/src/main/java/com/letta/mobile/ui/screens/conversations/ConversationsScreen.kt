@@ -521,7 +521,7 @@ private fun FirstRunStep(text: String) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationCard(
+fun ConversationCard(
     display: ConversationDisplay,
     onClick: () -> Unit,
     onOpenAdmin: () -> Unit,
@@ -562,34 +562,26 @@ private fun ConversationCard(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            if (display.isPinned) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Pinned",
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            val timeText = conversationActivityText(conversation)
+            val metadataText = buildString {
+                if (display.isPinned) {
+                    append("Pinned • ")
+                }
+                append(display.agentName)
+                if (timeText != null) {
+                    append(" • ")
+                    append(timeText)
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
-
             Text(
-                text = display.agentName,
+                text = metadataText,
                 style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-
-            val timeText = conversationActivityText(conversation)
-            if (timeText != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
 
     }
