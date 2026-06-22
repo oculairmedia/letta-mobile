@@ -1488,7 +1488,8 @@ internal fun compactToolCallSummary(
 internal fun String.displayToolResult(): String = ToolOutputParser.sanitizeResultFieldText(this)
 
 internal fun String.deferredToolResultPreview(): String {
-    val preview = take(240).substringBefore('\n').trim()
+    val firstNonEmptyLine = lineSequence().firstOrNull { it.isNotBlank() } ?: ""
+    val preview = firstNonEmptyLine.take(240).trim()
     return if (length > preview.length) "$preview…" else preview
 }
 
