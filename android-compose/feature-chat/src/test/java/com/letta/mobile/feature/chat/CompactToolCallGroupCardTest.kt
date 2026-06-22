@@ -1,6 +1,10 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -331,5 +335,60 @@ class CompactToolCallGroupCardTest {
         assertFalse(
             toolCardBodyRenderEligibility(expanded = false, parentVisible = false).shouldRenderBody,
         )
+    }
+
+    @Test
+    fun compactToolCallRow_retainsExpansionStateAcrossRecomposition() {
+        var toolCalls by mutableStateOf(
+            listOf(
+                UiToolCall(
+                    name = "Bash",
+                    arguments = """{"command":"pwd"}""",
+                    result = null,
+                    toolCallId = "stable-call-a",
+                )
+            )
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompactToolCallGroupCard(
+                        toolCalls = toolCalls,
+                        pendingApprovalToolCallIds = emptySet(),
+                    )
+                }
+            }
+        }
+
+        // Initially collapsed, "Args:" label from expanded details shouldn't be there
+        composeRule.onAllNodesWithText("Args: ").assertCountEquals(0)
+
+        // Click to expand
+        composeRule.onNodeWithText("Bash", substring = true).performClick()
+
+        // Verify expanded state
+        composeRule.onNodeWithText("Args: ").assertIsDisplayed()
+
+        // Trigger recomposition by updating the tool call list (simulating a streaming update)
+        toolCalls = listOf(
+            UiToolCall(
+                name = "Bash",
+                arguments = """{"command":"pwd"}""",
+                result = "streaming output...",
+                toolCallId = "stable-call-a",
+            )
+        )
+
+        // Wait for idle to allow recomposition
+        composeRule.waitForIdle()
+
+        // Verify expanded state is retained
+        composeRule.onNodeWithText("Args: ").assertIsDisplayed()
+        composeRule.onNodeWithText("streaming output...").assertIsDisplayed()
     }
 }

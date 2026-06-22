@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -163,7 +164,7 @@ internal fun MessageToolCalls(
             ) {
                 toolCalls.forEachIndexed { index, toolCall ->
                     val motionKey = toolCall.toolCallMotionKey()
-                    key(index, motionKey) {
+                    key(index, toolCall.toolCallId ?: motionKey) {
                         val entranceKey = remember(messageId, motionKey) {
                             "tool|${messageId.orEmpty()}|$motionKey"
                         }
@@ -350,7 +351,7 @@ private fun SubagentDispatchCard(
     val opener = LocalSubagentTodoSheetOpener.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    var expanded by remember(dispatch.toolCallId, dispatch.prompt) { mutableStateOf(false) }
+    var expanded by rememberSaveable(dispatch.toolCallId, dispatch.prompt) { mutableStateOf(false) }
     val openTodosModifier = dispatch.toolCallId?.takeIf { it.isNotBlank() }?.let { callId ->
         Modifier.clickable {
             HapticEffects.segmentTick(haptic, view)
@@ -1247,7 +1248,7 @@ internal fun CompactToolCallGroupCard(
             }
             toolCalls.forEachIndexed { index, toolCall ->
                 val motionKey = toolCall.toolCallMotionKey()
-                key(index, motionKey) {
+                key(index, toolCall.toolCallId ?: motionKey) {
                     val entranceKey = remember(rowAnimationKeyPrefix, motionKey) {
                         "compact-tool-row|$rowAnimationKeyPrefix|$motionKey"
                     }
@@ -1284,7 +1285,7 @@ internal fun CompactToolCallRow(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val reducedMotion = rememberReducedMotionEnabled()
-    var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
+    var expanded by rememberSaveable(toolCall.toolCallId ?: toolCall.toolCallMotionKey()) { mutableStateOf(false) }
     val parentVisible = LocalToolCardBodyParentVisible.current
     val canRenderFullOutput = expanded && parentVisible
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
