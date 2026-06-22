@@ -74,6 +74,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -335,6 +336,16 @@ fun LettaDesktopApp(
                 // Main content pane.
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     if (selectedDestination == DesktopDestination.Conversations) {
+                        val composerCommands = listOf(
+                            ComposerCommand("new", "Start a new chat") { chatController.createConversation() },
+                            ComposerCommand("agent", "Create a new agent") { showNewAgentDialog = true },
+                            ComposerCommand("edit", "Edit this agent") { editAgentId = selectedAgentId },
+                            ComposerCommand("memory", "Open memory") { selectedDestination = DesktopDestination.Memory },
+                            ComposerCommand("schedules", "Open schedules") { selectedDestination = DesktopDestination.Schedules },
+                            ComposerCommand("skills", "Open skills & tools") { selectedDestination = DesktopDestination.Agents },
+                            ComposerCommand("channels", "Open channels") { selectedDestination = DesktopDestination.Channels },
+                            ComposerCommand("settings", "Open settings") { selectedDestination = DesktopDestination.Settings },
+                        )
                         ChatDetailPane(
                             state = chatState,
                             modelOptions = modelOptions,
@@ -344,6 +355,7 @@ fun LettaDesktopApp(
                             onRemoveImageAttachment = chatController::removeImageAttachment,
                             onRetryConnection = chatController::retryConnection,
                             onModelSelected = chatController::setConversationModel,
+                            commands = composerCommands,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

@@ -472,6 +472,7 @@ internal fun ChatDetailPane(
     onRetryConnection: () -> Unit,
     modelOptions: List<Pair<String, String>> = emptyList(),
     onModelSelected: (String) -> Unit = {},
+    commands: List<ComposerCommand> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -499,6 +500,7 @@ internal fun ChatDetailPane(
             modelLabel = state.composerModelLabel,
             modelOptions = modelOptions,
             onModelSelected = onModelSelected,
+            commands = commands,
             onTextChanged = onComposerTextChanged,
             onSend = onSend,
             onAttachImage = onAttachImage,
@@ -957,6 +959,13 @@ private fun outputLineColor(line: String): Color {
 
 private val ChatColumnMaxWidth = 760.dp
 
+/** A composer slash-command (shown when the message starts with "/"). */
+data class ComposerCommand(
+    val label: String,
+    val description: String,
+    val run: () -> Unit,
+)
+
 @Composable
 private fun DesktopMessageBubble(message: UiMessage) {
     if (message.role == "user") {
@@ -1318,12 +1327,19 @@ private fun ComposerBar(
     modelLabel: String,
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
+    commands: List<ComposerCommand>,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
     onRemoveImageAttachment: (Int) -> Unit,
 ) {
     val canSend = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty())
+    val slashQuery = text.trimStart().takeIf { it.startsWith("/") }?.drop(1)
+    val matchedCommands = if (slashQuery != null && commands.isNotEmpty()) {
+        commands.filter { it.label.contains(slashQuery, ignoreCase = true) }
+    } else {
+        emptyList()
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1331,6 +1347,44 @@ private fun ComposerBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        if (matchedCommands.isNotEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            ) {
+                Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                    matchedCommands.take(8).forEach { command ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onTextChanged("")
+                                    command.run()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "/${command.label}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = command.description,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
