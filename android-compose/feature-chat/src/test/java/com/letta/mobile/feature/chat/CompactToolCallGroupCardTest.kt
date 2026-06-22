@@ -73,7 +73,7 @@ class CompactToolCallGroupCardTest {
         composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
         composeRule.onAllNodesWithText("Arguments").assertCountEquals(0)
 
-        composeRule.onNodeWithText("Bash - Result: line one", substring = true).performClick()
+        composeRule.onNodeWithText("pwd - Result: line one", substring = true).performClick()
 
         composeRule.onNodeWithText("Execution time: 1.3s").assertIsDisplayed()
         composeRule.onNodeWithText("Args: ").assertIsDisplayed()
@@ -119,9 +119,9 @@ class CompactToolCallGroupCardTest {
             }
         }
 
-        composeRule.onNodeWithText("Bash - Result: line one", substring = true).performClick()
+        composeRule.onNodeWithText("pwd - Result: line one", substring = true).performClick()
 
-        composeRule.onNodeWithText("Bash - Result: line one", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("pwd - Result: line one", substring = true).assertIsDisplayed()
         composeRule.onAllNodesWithText("Tool: Bash").assertCountEquals(0)
         composeRule.onAllNodesWithText("Arguments").assertCountEquals(0)
         composeRule.onAllNodesWithText("Output").assertCountEquals(0)
@@ -160,10 +160,10 @@ class CompactToolCallGroupCardTest {
             }
         }
 
-        composeRule.onNodeWithText("Bash - Result: first line…", substring = true).assertIsDisplayed()
+        composeRule.onNodeWithText("pwd - Result: first line…", substring = true).assertIsDisplayed()
         composeRule.onAllNodesWithText("second line with details", substring = true).assertCountEquals(0)
 
-        composeRule.onNodeWithText("Bash - Result: first line…", substring = true).performClick()
+        composeRule.onNodeWithText("pwd - Result: first line…", substring = true).performClick()
 
         composeRule.onNodeWithText("Args: ").assertIsDisplayed()
         composeRule.onNodeWithText("pwd").assertIsDisplayed()

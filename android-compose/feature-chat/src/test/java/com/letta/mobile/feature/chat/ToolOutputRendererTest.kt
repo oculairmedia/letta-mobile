@@ -49,6 +49,7 @@ import com.letta.mobile.ui.chat.render.limitRenderedText
 import com.letta.mobile.ui.chat.render.limitDiffFilesForRendering
 import com.letta.mobile.ui.chat.render.highlightToolOutputText
 import com.letta.mobile.ui.chat.render.ToolOutputMaxHighlightSpans
+import com.letta.mobile.feature.chat.screen.deferredToolResultPreview
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -56,6 +57,15 @@ import com.letta.mobile.ui.chat.render.ToolOutputMaxHighlightSpans
 class ToolOutputRendererTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun deferredToolResultPreviewSkipsLeadingBlankLinesAndTruncates() {
+        assertEquals("line 1…", "\n\n   \nline 1\nline 2".deferredToolResultPreview())
+        assertEquals("short", "short".deferredToolResultPreview())
+        assertEquals("short…", "short\n".deferredToolResultPreview())
+        val longLine = "a".repeat(250)
+        assertEquals("${"a".repeat(240)}…", "\n  \n$longLine\nmore".deferredToolResultPreview())
+    }
 
     @Test
     fun expandedJsonOutputShowsStructuredHeaderAndPrettyBody() {

@@ -1199,6 +1199,7 @@ private fun StepTraceAccordion(
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
     val pretty = remember(json) { json.toPrettyJsonString() }
     val truncated = remember(pretty) { truncateJsonForDisplay(pretty) }
+    val scrollState = rememberScrollState()
 
     Accordions(
         title = title,
@@ -1249,7 +1250,7 @@ private fun StepTraceAccordion(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                        .horizontalScroll(scrollState),
                 )
             }
         }
