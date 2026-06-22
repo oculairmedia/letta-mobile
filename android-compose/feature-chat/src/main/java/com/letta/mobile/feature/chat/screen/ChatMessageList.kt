@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
@@ -327,6 +329,7 @@ internal fun ChatMessageList(
     val chatShapes = MaterialTheme.chatShapes
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
+    val focusManager = LocalFocusManager.current
     // perf/frame-budget-audit: `renderItems` gets a fresh identity on every
     // streamed token, so a `remember(renderItems) { associateBy { it.key } }`
     // here rebuilt an O(conversation) map PER TOKEN purely to serve the
@@ -348,6 +351,14 @@ internal fun ChatMessageList(
     val pinchFrameBudgetSampler = remember { ChatPinchFrameBudgetSampler() }
     DisposableEffect(Unit) {
         onDispose { pinchFrameBudgetSampler.cancel() }
+    }
+
+    LaunchedEffect(listState.interactionSource) {
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) {
+                focusManager.clearFocus()
+            }
+        }
     }
     // letta-mobile-6261e: drive real text re-layout during pinch instead of a
     // graphicsLayer bitmap scale. During a gesture the controller's
