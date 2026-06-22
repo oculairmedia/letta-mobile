@@ -1,5 +1,9 @@
 package com.letta.mobile.ui.chat.render
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
 data class ToolDisplayInfo(
     val emoji: String,
     val label: String,
@@ -74,7 +78,20 @@ class ToolDisplayRegistry {
     }
 
     private fun extractJsonStringField(json: String, field: String): String? {
-        // Lightweight extraction without a JSON parser
+        try {
+            val element = Json.parseToJsonElement(json)
+            if (element is kotlinx.serialization.json.JsonObject) {
+                val value = element[field]
+                if (value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
+                    val content = value.content
+                    return content.ifBlank { null }
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback to legacy string manipulation for invalid/partial JSON
+        }
+
+        // Lightweight extraction without a JSON parser (Fallback)
         val key = "\"$field\""
         val keyIdx = json.indexOf(key)
         if (keyIdx < 0) return null
