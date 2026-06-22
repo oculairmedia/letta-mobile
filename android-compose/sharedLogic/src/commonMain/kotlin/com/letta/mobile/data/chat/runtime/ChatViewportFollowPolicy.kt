@@ -7,7 +7,7 @@ package com.letta.mobile.data.chat.runtime
 data class ChatViewportSnapshot(
     val totalItems: Int,
     val lastVisibleIndex: Int?,
-    val isScrollInProgress: Boolean = false,
+    val isUserScrolling: Boolean = false,
 )
 
 object ChatViewportFollowPolicy {
@@ -30,7 +30,7 @@ object ChatViewportFollowPolicy {
         snapshot.totalItems > 0 && !isNearLatest(snapshot, thresholdItems)
 
     fun shouldUpdateFollowModeAfterScroll(snapshot: ChatViewportSnapshot): Boolean =
-        !snapshot.isScrollInProgress
+        !snapshot.isUserScrolling
 
     fun nextFollowModeAfterScroll(
         currentFollowMode: Boolean,

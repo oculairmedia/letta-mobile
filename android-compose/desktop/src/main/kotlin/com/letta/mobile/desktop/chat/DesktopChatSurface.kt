@@ -96,6 +96,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
 @Composable
 fun DesktopChatSurface(
@@ -623,6 +624,7 @@ private fun MessageList(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    val isUserScrolling by listState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
     var followLatest by remember(conversationId) { mutableStateOf(true) }
     val latestItemKey = renderItems.lastOrNull()?.key
@@ -635,7 +637,7 @@ private fun MessageList(
     }
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.toChatViewportSnapshot() }
+        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling) }
             .distinctUntilChanged()
             .collect { snapshot ->
                 followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
@@ -670,7 +672,7 @@ private fun MessageList(
             }
         }
 
-        if (ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot())) {
+        if (ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling))) {
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -698,11 +700,11 @@ private fun MessageList(
     }
 }
 
-private fun LazyListState.toChatViewportSnapshot(): ChatViewportSnapshot =
+private fun LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): ChatViewportSnapshot =
     ChatViewportSnapshot(
         totalItems = layoutInfo.totalItemsCount,
         lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index,
-        isScrollInProgress = isScrollInProgress,
+        isUserScrolling = isUserScrolling,
     )
 
 @Composable
