@@ -288,6 +288,20 @@ class ChatMessageListScrollTest {
     }
 
     @Test
+    fun `clear streaming floors removes existing streaming bounds`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val streamingItem = geometrySignature(content = "Streaming response...")
+
+        state.recordMeasuredHeight(streamingItem, heightPx = 300, isStreaming = true)
+
+        assertEquals(300, state.heightFloorFor(streamingItem, isStreaming = true))
+
+        state.clearStreamingFloors()
+
+        assertEquals(0, state.heightFloorFor(streamingItem, isStreaming = true))
+    }
+
+    @Test
     fun `streaming geometry measurement does not seed settled exact height for same content`() {
         val state = ChatMessageGeometryState(maxEntries = 8)
         val tableMessage = geometrySignature(
