@@ -41,6 +41,8 @@ fun DesktopScheduleLibrarySurface(
     onRefresh: () -> Unit,
     onAgentSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    crons: List<DesktopCronTask> = emptyList(),
+    onDeleteCron: (String) -> Unit = {},
 ) {
     LazyColumn(
         modifier = modifier
@@ -52,8 +54,19 @@ fun DesktopScheduleLibrarySurface(
         item {
             SchedulesHeader(
                 state = state,
+                cronCount = crons.size,
                 onRefresh = onRefresh,
             )
+        }
+        // Real schedules on this backend are exposed as cron tasks (/v1/crons).
+        if (crons.isNotEmpty()) {
+            if (state.agents.isNotEmpty()) {
+                item { AgentFilters(state = state, onAgentSelected = onAgentSelected) }
+            }
+            items(items = crons, key = { it.id }) { cron ->
+                CronRow(cron = cron, onDelete = { onDeleteCron(cron.id) })
+            }
+            return@LazyColumn
         }
         state.errorMessage?.let { message ->
             item {
@@ -90,8 +103,10 @@ fun DesktopScheduleLibrarySurface(
 @Composable
 private fun SchedulesHeader(
     state: DesktopScheduleLibraryState,
+    cronCount: Int,
     onRefresh: () -> Unit,
 ) {
+    val count = if (cronCount > 0) cronCount else state.schedules.size
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -107,7 +122,7 @@ private fun SchedulesHeader(
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "${state.schedules.size} scheduled message${if (state.schedules.size == 1) "" else "s"}",
+                text = "$count scheduled task${if (count == 1) "" else "s"}",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -121,6 +136,85 @@ private fun SchedulesHeader(
                 icon = Icons.Outlined.Refresh,
             )
         }
+    }
+}
+
+@Composable
+private fun CronRow(
+    cron: DesktopCronTask,
+    onDelete: () -> Unit,
+) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 3.dp)
+                    .size(10.dp)
+                    .background(MaterialTheme.colorScheme.tertiary, MaterialTheme.shapes.small),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = cron.name?.ifBlank { null } ?: cron.id,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                cron.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    MetadataPill(humanizeCron(cron.cron), MaterialTheme.colorScheme.tertiary)
+                    if (cron.recurring) MetadataPill("recurring", MaterialTheme.colorScheme.secondary)
+                    cron.timezone?.takeIf { it.isNotBlank() }?.let {
+                        MetadataPill(it, MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+            DesktopDefaultButton(onClick = onDelete) {
+                DesktopButtonContent(text = "Delete")
+            }
+        }
+    }
+}
+
+/** Best-effort human label for a 5-field cron expression. */
+private fun humanizeCron(cron: String?): String {
+    if (cron.isNullOrBlank()) return "no schedule"
+    val parts = cron.trim().split(Regex("\\s+"))
+    if (parts.size < 5) return cron
+    val min = parts[0]; val hr = parts[1]
+    Regex("""\*/(\d+)""").matchEntire(min)?.let { return "Every ${it.groupValues[1]} min" }
+    Regex("""\*/(\d+)""").matchEntire(hr)?.let { return "Every ${it.groupValues[1]}h" }
+    val minN = min.toIntOrNull(); val hrN = hr.toIntOrNull()
+    return when {
+        minN != null && hr == "*" -> "Hourly at :${min.padStart(2, '0')}"
+        minN != null && hrN != null -> "Daily at ${hr.padStart(2, '0')}:${min.padStart(2, '0')}"
+        else -> cron
     }
 }
 

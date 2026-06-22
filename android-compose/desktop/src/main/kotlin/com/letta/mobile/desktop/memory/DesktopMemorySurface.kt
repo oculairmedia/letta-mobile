@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.memory
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Refresh
@@ -31,7 +33,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -59,6 +65,7 @@ import com.dk.kuiver.ui.LabelPlacement
 import com.dk.kuiver.ui.StyledEdgeContent
 import com.letta.mobile.data.memory.MemoryAccentRole
 import com.letta.mobile.data.memory.MemoryGraphNode
+import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
 import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.MemoryParitySection
@@ -72,7 +79,12 @@ import com.letta.mobile.data.memory.validForText
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopRadioChip
+import com.letta.mobile.desktop.DesktopTextArea
+import kotlinx.coroutines.launch
+import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+import androidx.compose.ui.text.input.TextFieldValue
 import sh.calvin.autolinktext.SimpleTextMatchResult
 import sh.calvin.autolinktext.TextMatcher
 import sh.calvin.autolinktext.TextRule
@@ -84,46 +96,85 @@ fun DesktopMemorySurface(
     onRefresh: () -> Unit,
     onAgentSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    blockApi: DesktopBlockApi? = null,
+    onBlockChanged: () -> Unit = {},
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 32.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            MemoryHeader(
-                state = state,
-                onRefresh = onRefresh,
-            )
-        }
-        val errorMessage = state.errorMessage
-        if (errorMessage != null) {
+    var editorTarget by remember { mutableStateOf<BlockEditorTarget?>(null) }
+    val agentId = state.memory.selectedAgentId
+
+    Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(horizontal = 32.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             item {
-                MemoryErrorBanner(errorMessage)
+                MemoryHeader(
+                    state = state,
+                    onRefresh = onRefresh,
+                )
             }
-        }
-        if (state.agents.isNotEmpty()) {
+            val errorMessage = state.errorMessage
+            if (errorMessage != null) {
+                item {
+                    MemoryErrorBanner(errorMessage)
+                }
+            }
+            if (state.agents.isNotEmpty()) {
+                item {
+                    AgentSelector(
+                        agents = state.agents,
+                        selectedAgentId = state.memory.selectedAgentId,
+                        onAgentSelected = onAgentSelected,
+                    )
+                }
+            }
             item {
-                AgentSelector(
-                    agents = state.agents,
-                    selectedAgentId = state.memory.selectedAgentId,
-                    onAgentSelected = onAgentSelected,
+                MemorySummaryCard(state.memory.summary)
+            }
+            item {
+                MemoryGraphPanel(
+                    graph = state.memory.graph,
+                    onBlockNodeClick = { node ->
+                        if (agentId != null) {
+                            editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
+                        }
+                    },
+                )
+            }
+            items(
+                items = state.memory.sections,
+                key = { section -> section.kind.name },
+            ) { section ->
+                MemorySectionCard(
+                    section = section,
+                    canEdit = agentId != null && blockApi != null,
+                    onBlockClick = { block -> editorTarget = BlockEditorTarget.Existing(block.title, block.id) },
+                    onNewBlock = { editorTarget = BlockEditorTarget.New },
                 )
             }
         }
-        item {
-            MemorySummaryCard(state.memory.summary)
-        }
-        item {
-            MemoryGraphPanel(state.memory.graph)
-        }
-        items(
-            items = state.memory.sections,
-            key = { section -> section.kind.name },
-        ) { section ->
-            MemorySectionCard(section)
+
+        val target = editorTarget
+        if (target != null && agentId != null && blockApi != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+            BlockEditorPanel(
+                target = target,
+                agentId = agentId,
+                blockApi = blockApi,
+                onDismiss = { editorTarget = null },
+                onChanged = {
+                    editorTarget = null
+                    onBlockChanged()
+                },
+            )
         }
     }
 }
@@ -268,7 +319,10 @@ private fun SummaryMetric(
 }
 
 @Composable
-private fun MemoryGraphPanel(graph: MemoryParityGraph) {
+private fun MemoryGraphPanel(
+    graph: MemoryParityGraph,
+    onBlockNodeClick: (MemoryGraphNode) -> Unit = {},
+) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -329,7 +383,16 @@ private fun MemoryGraphPanel(graph: MemoryParityGraph) {
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.36f)),
                 nodeContent = { node ->
-                    MemoryGraphNodeChip(nodesById[node.id])
+                    val resolved = nodesById[node.id]
+                    val clickable = resolved?.kind == MemoryGraphNodeKind.Memory
+                    MemoryGraphNodeChip(
+                        node = resolved,
+                        onClick = if (clickable && resolved != null) {
+                            { onBlockNodeClick(resolved) }
+                        } else {
+                            null
+                        },
+                    )
                 },
                 edgeContent = { edge, from, to ->
                     val commonEdge = edgesById["${edge.fromId}->${edge.toId}"]
@@ -397,7 +460,10 @@ private fun GraphLegend(
 }
 
 @Composable
-private fun MemoryGraphNodeChip(node: MemoryGraphNode?) {
+private fun MemoryGraphNodeChip(
+    node: MemoryGraphNode?,
+    onClick: (() -> Unit)? = null,
+) {
     val resolvedNode = node ?: return
     val accentColor = resolvedNode.kind.accentRole(resolvedNode.status).color()
     Surface(
@@ -406,6 +472,7 @@ private fun MemoryGraphNodeChip(node: MemoryGraphNode?) {
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.46f)),
         shadowElevation = 2.dp,
+        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
     ) {
         Row(
             modifier = Modifier
@@ -448,7 +515,13 @@ private fun MemoryGraphNodeChip(node: MemoryGraphNode?) {
 }
 
 @Composable
-private fun MemorySectionCard(section: MemoryParitySection) {
+private fun MemorySectionCard(
+    section: MemoryParitySection,
+    canEdit: Boolean = false,
+    onBlockClick: (MemoryParityItem.MemoryBlock) -> Unit = {},
+    onNewBlock: () -> Unit = {},
+) {
+    val isMemory = section.kind == MemoryParitySectionKind.Memory
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
         shape = MaterialTheme.shapes.medium,
@@ -460,7 +533,7 @@ private fun MemorySectionCard(section: MemoryParitySection) {
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(
                     modifier = Modifier
@@ -477,7 +550,10 @@ private fun MemorySectionCard(section: MemoryParitySection) {
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
                     Text(
                         text = section.title,
                         style = MaterialTheme.typography.titleLarge,
@@ -489,6 +565,11 @@ private fun MemorySectionCard(section: MemoryParitySection) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                if (isMemory && canEdit) {
+                    DesktopDefaultButton(onClick = onNewBlock) {
+                        DesktopButtonContent(text = "New block")
+                    }
+                }
             }
 
             if (section.items.isEmpty()) {
@@ -499,7 +580,15 @@ private fun MemorySectionCard(section: MemoryParitySection) {
                 )
             } else {
                 section.items.forEach { item ->
-                    MemoryItemRow(item)
+                    val clickable = isMemory && canEdit && item is MemoryParityItem.MemoryBlock
+                    MemoryItemRow(
+                        item = item,
+                        onClick = if (clickable) {
+                            { onBlockClick(item as MemoryParityItem.MemoryBlock) }
+                        } else {
+                            null
+                        },
+                    )
                 }
             }
         }
@@ -507,11 +596,16 @@ private fun MemorySectionCard(section: MemoryParitySection) {
 }
 
 @Composable
-private fun MemoryItemRow(item: MemoryParityItem) {
+private fun MemoryItemRow(
+    item: MemoryParityItem,
+    onClick: (() -> Unit)? = null,
+) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.Top,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
     ) {
         Box(
             modifier = Modifier
@@ -605,6 +699,162 @@ private fun MetadataPill(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
         )
+    }
+}
+
+private sealed interface BlockEditorTarget {
+    data object New : BlockEditorTarget
+    data class Existing(val label: String, val blockId: String?) : BlockEditorTarget
+}
+
+/** Right-side panel for viewing/editing a core-memory block (CRUD). */
+@Composable
+private fun BlockEditorPanel(
+    target: BlockEditorTarget,
+    agentId: String,
+    blockApi: DesktopBlockApi,
+    onDismiss: () -> Unit,
+    onChanged: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val isNew = target is BlockEditorTarget.New
+    var label by remember(target) {
+        mutableStateOf((target as? BlockEditorTarget.Existing)?.label.orEmpty())
+    }
+    var value by remember(target) { mutableStateOf("") }
+    var blockId by remember(target) {
+        mutableStateOf((target as? BlockEditorTarget.Existing)?.blockId)
+    }
+    var loading by remember(target) { mutableStateOf(target is BlockEditorTarget.Existing) }
+    var busy by remember(target) { mutableStateOf(false) }
+    var error by remember(target) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(target) {
+        if (target is BlockEditorTarget.Existing) {
+            val id = target.blockId
+            if (id.isNullOrBlank()) {
+                error = "This block has no id and can't be edited."
+                loading = false
+            } else {
+                runCatching { blockApi.getBlockById(id) }
+                    .onSuccess {
+                        value = it.value
+                        blockId = it.id.value
+                        loading = false
+                    }
+                    .onFailure {
+                        error = it.message ?: "Could not load block"
+                        loading = false
+                    }
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .width(380.dp)
+            .fillMaxHeight()
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = if (isNew) "New memory block" else label,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "Close",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp).clickable(onClick = onDismiss),
+            )
+        }
+
+        if (isNew) {
+            Text("Label", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            var labelField by remember { mutableStateOf(TextFieldValue("")) }
+            JewelTextField(
+                value = labelField,
+                onValueChange = { labelField = it; label = it.text },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        Text("Value", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (loading) {
+            Text(
+                text = "Loading…",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            DesktopTextArea(
+                value = value,
+                onValueChange = { value = it },
+                enabled = !busy,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                placeholder = "Block contents…",
+            )
+        }
+
+        error?.let {
+            Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val currentBlockId = blockId
+            if (!isNew && currentBlockId != null) {
+                DesktopOutlinedButton(
+                    onClick = {
+                        busy = true; error = null
+                        scope.launch {
+                            runCatching { blockApi.deleteBlockById(currentBlockId) }
+                                .onSuccess { onChanged() }
+                                .onFailure { error = it.message ?: "Delete failed"; busy = false }
+                        }
+                    },
+                    enabled = !busy,
+                ) { DesktopButtonContent(text = "Delete") }
+            }
+            Box(modifier = Modifier.weight(1f))
+            DesktopOutlinedButton(onClick = onDismiss, enabled = !busy) {
+                DesktopButtonContent(text = "Cancel")
+            }
+            DesktopDefaultButton(
+                onClick = {
+                    if (label.isBlank()) {
+                        error = "Label is required"
+                    } else {
+                        busy = true; error = null
+                        val id = blockId
+                        scope.launch {
+                            runCatching {
+                                if (isNew) {
+                                    blockApi.createAndAttachBlock(agentId, label.trim(), value)
+                                } else if (id != null) {
+                                    blockApi.updateBlockById(id, value)
+                                } else {
+                                    error("Missing block id")
+                                }
+                            }
+                                .onSuccess { onChanged() }
+                                .onFailure { error = it.message ?: "Save failed"; busy = false }
+                        }
+                    }
+                },
+                enabled = !busy && !loading,
+            ) { DesktopButtonContent(text = if (busy) "Saving…" else "Save") }
+        }
     }
 }
 

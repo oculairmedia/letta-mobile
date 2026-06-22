@@ -79,8 +79,11 @@ import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.memory.DesktopMemoryController
+import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.desktop.memory.DesktopMemorySurface
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
+import com.letta.mobile.desktop.schedules.DesktopCronApi
+import com.letta.mobile.desktop.schedules.DesktopCronTask
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
@@ -155,6 +158,13 @@ fun LettaDesktopApp(
             label to value
         }
     }
+    val blockApi = remember(activeConfig) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopBlockApi(it) }
+    }
+    val cronApi = remember(activeConfig) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopCronApi(it) }
+    }
+    var allCrons by remember(cronApi) { mutableStateOf<List<DesktopCronTask>>(emptyList()) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -230,6 +240,11 @@ fun LettaDesktopApp(
     LaunchedEffect(selectedDestination, chatState.selectedConversation?.agentId, scheduleLibraryController) {
         if (selectedDestination == DesktopDestination.Schedules) {
             chatState.selectedConversation?.agentId?.let(scheduleLibraryController::selectAgent)
+        }
+    }
+    LaunchedEffect(selectedDestination, cronApi) {
+        if (selectedDestination == DesktopDestination.Schedules && cronApi != null) {
+            allCrons = runCatching { cronApi.listCrons() }.getOrDefault(emptyList())
         }
     }
     DisposableEffect(memoryController) {
@@ -363,6 +378,16 @@ fun LettaDesktopApp(
                                 activeConfig = configStore.load()
                                 dataBindings.sessionGraphProvider.rebuild()
                                 bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+                            },
+                            blockApi = blockApi,
+                            crons = allCrons,
+                            onDeleteCron = { id ->
+                                chatScope.launch {
+                                    cronApi?.let {
+                                        runCatching { it.deleteCron(id) }
+                                        allCrons = runCatching { it.listCrons() }.getOrDefault(emptyList())
+                                    }
+                                }
                             },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -913,6 +938,9 @@ private fun DestinationContent(
     onToolsLoadMore: () -> Unit,
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
+    blockApi: DesktopBlockApi?,
+    crons: List<DesktopCronTask>,
+    onDeleteCron: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (destination == DesktopDestination.Memory) {
@@ -921,6 +949,8 @@ private fun DestinationContent(
             onRefresh = onMemoryRefresh,
             onAgentSelected = onMemoryAgentSelected,
             modifier = modifier,
+            blockApi = blockApi,
+            onBlockChanged = onMemoryRefresh,
         )
         return
     }
@@ -930,6 +960,8 @@ private fun DestinationContent(
             onRefresh = onSchedulesRefresh,
             onAgentSelected = onScheduleAgentSelected,
             modifier = modifier,
+            crons = crons,
+            onDeleteCron = onDeleteCron,
         )
         return
     }
