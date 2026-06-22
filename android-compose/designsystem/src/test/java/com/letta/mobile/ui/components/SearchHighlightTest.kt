@@ -53,4 +53,22 @@ class SearchHighlightTest {
         assertTrue(snippet.endsWith("..."))
         assertTrue(snippet.length < source.length)
     }
+
+    @Test
+    fun `preserves original casing while highlighting`() {
+        val result = highlightSearchMatches(
+            text = "Search For THIS text",
+            query = "for this",
+            highlightColor = Color.Cyan,
+            matchTextColor = Color.Blue,
+        )
+
+        assertEquals("Search For THIS text", result.text)
+        assertEquals(1, result.spanStyles.size)
+        assertEquals(7, result.spanStyles[0].start)
+        assertEquals(15, result.spanStyles[0].end) // "For THIS" length is 8
+        assertEquals(Color.Cyan, result.spanStyles[0].item.background)
+        assertEquals(Color.Blue, result.spanStyles[0].item.color)
+    }
+
 }
