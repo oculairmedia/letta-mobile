@@ -50,6 +50,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,7 +72,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
@@ -167,6 +171,7 @@ fun LettaDesktopApp(
     }
     val chatState by chatController.state.collectAsState()
     val availableModels by chatController.availableModels.collectAsState()
+    val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val modelOptions = remember(availableModels) {
         availableModels.map { model ->
             val label = model.displayNameOverride?.takeIf { it.isNotBlank() }
@@ -335,6 +340,7 @@ fun LettaDesktopApp(
                     conversations = agentConversations,
                     selectedConversationId = chatState.selectedConversationId,
                     thinkingConversationId = thinkingConversationId,
+                    deletingConversationIds = deletingConversationIds,
                     selectedDestination = selectedDestination,
                     onDestinationSelected = { selectedDestination = it },
                     onConversationSelected = {
@@ -887,6 +893,7 @@ private fun DesktopAgentSidebar(
     conversations: List<DesktopConversationSummary>,
     selectedConversationId: String?,
     thinkingConversationId: String?,
+    deletingConversationIds: Set<String> = emptySet(),
     selectedDestination: DesktopDestination,
     onDestinationSelected: (DesktopDestination) -> Unit,
     onConversationSelected: (String) -> Unit,
@@ -1005,6 +1012,7 @@ private fun DesktopAgentSidebar(
                     selected = selectedDestination == DesktopDestination.Conversations &&
                         conversation.id == selectedConversationId,
                     thinking = conversation.id == thinkingConversationId,
+                    deleting = conversation.id in deletingConversationIds,
                     onClick = { onConversationSelected(conversation.id) },
                     onDelete = { onDeleteConversation(conversation.id) },
                 )
@@ -1039,6 +1047,7 @@ private fun SidebarConversationRow(
     timeLabel: String,
     selected: Boolean,
     thinking: Boolean,
+    deleting: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -1068,7 +1077,7 @@ private fun SidebarConversationRow(
         modifier = Modifier
             .fillMaxWidth()
             .hoverable(interactionSource)
-            .clickable(onClick = onClick),
+            .clickable(enabled = !deleting, onClick = onClick),
         shape = MaterialTheme.shapes.small,
         color = container,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -1078,23 +1087,42 @@ private fun SidebarConversationRow(
             horizontalArrangement = Arrangement.spacedBy(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
-                contentDescription = if (thinking) "thinking" else null,
-                tint = iconColor,
-                modifier = Modifier.size(15.dp),
-            )
+            if (deleting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                Icon(
+                    imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
+                    contentDescription = if (thinking) "thinking" else null,
+                    tint = iconColor,
+                    modifier = Modifier.size(15.dp),
+                )
+            }
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (deleting) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            // Hover (or an open menu) swaps the timestamp for an overflow menu.
-            if (hovered || menuOpen) {
-                Box {
+            when {
+                deleting -> Text(
+                    text = "Deleting…",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                // Hover (or an open menu) swaps the timestamp for an overflow menu.
+                hovered || menuOpen -> Box {
                     Icon(
                         imageVector = Icons.Outlined.MoreVert,
                         contentDescription = "Conversation menu",
@@ -1123,8 +1151,7 @@ private fun SidebarConversationRow(
                         }
                     }
                 }
-            } else {
-                Text(
+                else -> Text(
                     text = timeLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1137,7 +1164,7 @@ private fun SidebarConversationRow(
     if (confirmDelete) {
         DesktopConfirmDialog(
             title = "Delete chat?",
-            message = "\"$title\" will be permanently removed. This cannot be undone.",
+            message = "\"$title\" will be permanently removed. This can't be undone.",
             confirmLabel = "Delete",
             onConfirm = {
                 confirmDelete = false
@@ -1148,7 +1175,10 @@ private fun SidebarConversationRow(
     }
 }
 
-/** Small modal confirmation used for destructive actions in the desktop shell. */
+/**
+ * Destructive-action confirmation as a real, separate desktop window (it "pops
+ * out" of the app rather than dimming the page like a mobile sheet).
+ */
 @Composable
 private fun DesktopConfirmDialog(
     title: String,
@@ -1157,32 +1187,33 @@ private fun DesktopConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center,
+    val dialogState = rememberDialogState(size = DpSize(420.dp, 200.dp))
+    DialogWindow(
+        onCloseRequest = onDismiss,
+        state = dialogState,
+        title = title,
+        resizable = false,
     ) {
-        Surface(
-            modifier = Modifier.width(380.dp).clickable(enabled = false) {},
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Column(modifier = Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+        DesktopMaterialTheme {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(22.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
-                    DesktopDefaultButton(onClick = onConfirm) { DesktopButtonContent(confirmLabel) }
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                    ) {
+                        DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
+                        DesktopDefaultButton(onClick = onConfirm) { DesktopButtonContent(confirmLabel) }
+                    }
                 }
             }
         }

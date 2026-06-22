@@ -54,6 +54,10 @@ class DesktopChatController(
     private val _availableModels = MutableStateFlow<List<LlmModel>>(emptyList())
     val availableModels: StateFlow<List<LlmModel>> = _availableModels.asStateFlow()
 
+    /** Conversations whose delete is in flight — the sidebar shows a spinner. */
+    private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
+    val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
+
     private var gateway: DesktopChatGateway? = null
 
     private val httpGateway: DesktopLettaHttpChatGateway?
@@ -132,16 +136,39 @@ class DesktopChatController(
 
     fun deleteConversation(conversationId: String) {
         if (closed) return
+        if (conversationId in _deletingConversationIds.value) return
         scope.launch {
+            val nextGateway = gateway ?: return@launch
+            // Show a spinner on the row while the server delete is in flight,
+            // then remove it in place — no full reconnect, so nothing flashes.
+            _deletingConversationIds.update { it + conversationId }
             try {
-                val nextGateway = gateway ?: return@launch
                 nextGateway.deleteConversation(conversationId)
-                retryConnection()
+                if (closed) return@launch
+                val wasSelected = _state.value.selectedConversationId == conversationId
+                _state.update {
+                    it.withRuntimeState(
+                        ChatSessionReducer.conversationDeleted(it.runtimeState, conversationId),
+                    )
+                }
+                if (wasSelected) {
+                    // The active chat was removed; hydrate whatever became selected.
+                    timelineJob?.cancel()
+                    activeLoop?.close()
+                    activeLoop = null
+                    val runtime = _state.value.runtimeState
+                    val nextSelected = runtime.selectedConversationId
+                    if (nextSelected != null) {
+                        selectRemoteConversation(nextSelected, runtime.selectionGeneration)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 val message = t.message ?: t::class.simpleName ?: "Delete failed"
-                _state.update { current ->
-                    current.copy(errorMessage = message)
-                }
+                _state.update { current -> current.copy(errorMessage = message) }
+            } finally {
+                _deletingConversationIds.update { it - conversationId }
             }
         }
     }

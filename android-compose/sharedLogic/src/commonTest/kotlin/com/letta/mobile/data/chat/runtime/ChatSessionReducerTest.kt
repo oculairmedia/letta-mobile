@@ -257,6 +257,80 @@ class ChatSessionReducerTest {
         assertTrue(ChatSessionReducer.canSend(noConversations))
     }
 
+    @Test
+    fun deletingBackgroundConversationKeepsActiveSelectionAndMessages() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a"), conversation("b")),
+            selectedConversationId = "a",
+            messagesByConversationId = mapOf(
+                "a" to listOf(message("a1", "hi")),
+                "b" to listOf(message("b1", "yo")),
+            ),
+            isRemoteBacked = true,
+            connectionState = ChatConnectionState.Live,
+            selectionGeneration = 7,
+        )
+
+        val next = ChatSessionReducer.conversationDeleted(state, "b")
+
+        assertEquals(listOf("a"), next.conversations.map { it.id })
+        assertEquals("a", next.selectedConversationId)
+        // Active conversation's messages are untouched (no reload, no flash).
+        assertEquals(listOf("a1"), next.messagesByConversationId["a"]?.map { it.id })
+        assertFalse(next.messagesByConversationId.containsKey("b"))
+        assertEquals(7, next.selectionGeneration)
+        assertFalse(next.isLoading)
+    }
+
+    @Test
+    fun deletingActiveConversationFallsBackToNextAndBumpsGeneration() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a"), conversation("b")),
+            selectedConversationId = "a",
+            messagesByConversationId = mapOf("a" to listOf(message("a1", "hi"))),
+            isRemoteBacked = true,
+            connectionState = ChatConnectionState.Live,
+            selectionGeneration = 7,
+        )
+
+        val next = ChatSessionReducer.conversationDeleted(state, "a")
+
+        assertEquals(listOf("b"), next.conversations.map { it.id })
+        assertEquals("b", next.selectedConversationId)
+        assertEquals(8, next.selectionGeneration)
+        assertTrue(next.isLoading)
+        assertEquals(ChatConnectionState.Loading, next.connectionState)
+    }
+
+    @Test
+    fun deletingLastConversationLeavesEmptyState() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a")),
+            selectedConversationId = "a",
+            messagesByConversationId = mapOf("a" to listOf(message("a1", "hi"))),
+            isRemoteBacked = true,
+            connectionState = ChatConnectionState.Live,
+            selectionGeneration = 7,
+        )
+
+        val next = ChatSessionReducer.conversationDeleted(state, "a")
+
+        assertTrue(next.conversations.isEmpty())
+        assertEquals(null, next.selectedConversationId)
+        assertEquals(ChatConnectionState.NoConversations, next.connectionState)
+        assertEquals(7, next.selectionGeneration)
+    }
+
+    @Test
+    fun deletingUnknownConversationIsNoOp() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a")),
+            selectedConversationId = "a",
+        )
+
+        assertSame(state, ChatSessionReducer.conversationDeleted(state, "missing"))
+    }
+
     private fun conversation(
         id: String,
         unreadCount: Int = 0,

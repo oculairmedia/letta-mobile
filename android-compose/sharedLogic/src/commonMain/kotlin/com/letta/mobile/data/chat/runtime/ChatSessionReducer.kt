@@ -82,6 +82,59 @@ object ChatSessionReducer {
         )
     }
 
+    /**
+     * Remove a single conversation in place without rebuilding the whole session.
+     * Deleting a background conversation leaves the active selection and its
+     * hydrated messages untouched (no reload, no flash). Deleting the active
+     * conversation falls back to the next one and bumps the selection generation
+     * so the caller can hydrate it.
+     */
+    fun conversationDeleted(
+        state: ChatSessionState,
+        conversationId: String,
+        emptyStatusMessage: String = "No conversations",
+    ): ChatSessionState {
+        if (state.conversations.none { it.id == conversationId }) return state
+        val remaining = state.conversations.filterNot { it.id == conversationId }
+        val messages = state.messagesByConversationId - conversationId
+        if (state.selectedConversationId != conversationId) {
+            return state.copy(
+                conversations = remaining,
+                messagesByConversationId = messages,
+                connectionState = if (remaining.isEmpty()) {
+                    ChatConnectionState.NoConversations
+                } else {
+                    state.connectionState
+                },
+                statusMessage = if (remaining.isEmpty()) emptyStatusMessage else state.statusMessage,
+            )
+        }
+        val nextSelected = remaining.firstOrNull()
+        return state.copy(
+            conversations = remaining,
+            messagesByConversationId = messages,
+            selectedConversationId = nextSelected?.id,
+            composer = ChatComposerState(),
+            isLoading = nextSelected != null && state.isRemoteBacked,
+            connectionState = when {
+                nextSelected == null -> ChatConnectionState.NoConversations
+                state.isRemoteBacked -> ChatConnectionState.Loading
+                else -> state.connectionState
+            },
+            statusMessage = when {
+                nextSelected == null -> emptyStatusMessage
+                state.isRemoteBacked -> "Loading messages"
+                else -> state.statusMessage
+            },
+            errorMessage = null,
+            selectionGeneration = if (nextSelected != null) {
+                state.selectionGeneration + 1
+            } else {
+                state.selectionGeneration
+            },
+        )
+    }
+
     fun retryConnection(
         current: ChatSessionState,
         initial: ChatSessionState,
