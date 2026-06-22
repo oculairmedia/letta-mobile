@@ -298,6 +298,10 @@ data class Timeline(
         val stabilized = confirmed.copy(
             position = local.position,
             otid = local.otid,
+            // The Letta server doesn't echo inbound image content back in the
+            // confirmed message, so carry the locally-sent attachments forward;
+            // otherwise the image the user just sent vanishes on confirmation.
+            attachments = if (confirmed.attachments.isEmpty()) local.attachments else confirmed.attachments,
         )
         val newEvents = events.replacingAt(idx, stabilized)
         return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
