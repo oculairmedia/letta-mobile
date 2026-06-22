@@ -79,6 +79,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
 internal fun chatRenderItemSeesLiveScale(
     isPinching: Boolean,
@@ -322,6 +323,7 @@ internal fun ChatMessageList(
     bottomPadding: Dp = 0.dp,
 ) {
     val listState = rememberLazyListState()
+    val isUserScrolling by listState.interactionSource.collectIsDraggedAsState()
     val scope = rememberCoroutineScope()
     val chatDimens = MaterialTheme.chatDimens
     val chatShapes = MaterialTheme.chatShapes
@@ -456,13 +458,13 @@ internal fun ChatMessageList(
 
     val isNearBottom by remember {
         derivedStateOf {
-            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot())
+            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot(isUserScrolling))
         }
     }
 
     val showScrollFab by remember {
         derivedStateOf {
-            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot())
+            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling))
         }
     }
 
@@ -548,7 +550,7 @@ internal fun ChatMessageList(
     }
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.toChatViewportSnapshot() }
+        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling) }
             .distinctUntilChanged()
             .collect { snapshot ->
                 followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
@@ -1393,14 +1395,14 @@ private fun DebugMessageCard(
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(): ChatViewportSnapshot {
+private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): ChatViewportSnapshot {
     val totalItems = layoutInfo.totalItemsCount
     val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()?.index
     val lastVisibleIndexMapped = if (firstVisible != null) totalItems - 1 - firstVisible else null
     return ChatViewportSnapshot(
         totalItems = totalItems,
         lastVisibleIndex = lastVisibleIndexMapped,
-        isScrollInProgress = isScrollInProgress,
+        isUserScrolling = isUserScrolling,
     )
 }
 
