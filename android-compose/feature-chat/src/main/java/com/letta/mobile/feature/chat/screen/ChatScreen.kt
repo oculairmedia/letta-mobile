@@ -1019,6 +1019,16 @@ private fun DismissibleA2uiSurface(
             .longPressPassthrough { menuExpanded = true },
     ) {
         content()
+        androidx.compose.material3.IconButton(
+            onClick = { onDismissSurface(surfaceId) },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = com.letta.mobile.ui.icons.LettaIcons.Close,
+                contentDescription = "Close A2UI surface",
+                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         DropdownMenu(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
