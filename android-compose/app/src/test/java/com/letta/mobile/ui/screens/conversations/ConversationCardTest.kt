@@ -15,7 +15,7 @@ import com.letta.mobile.ui.test.setLettaTestContent
 import java.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
-@Config(instrumentedPackages = ["androidx.loader.content"])
+@Config(sdk = [34], manifest = Config.NONE)
 class ConversationCardTest {
     @get:Rule
     val composeTestRule = createComposeRule()
