@@ -1,8 +1,12 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationCreateParams
+import com.letta.mobile.data.model.ConversationUpdateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.stream.SseFrame
@@ -23,6 +27,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.patch
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -151,6 +156,43 @@ class DesktopLettaHttpChatGateway(
         response.requireSuccess()
     }
 
+    /** Create a new conversation for [agentId]; returns the created conversation. */
+    suspend fun createConversation(agentId: String, summary: String? = null): Conversation {
+        val response = httpClient.post("$baseUrl/v1/conversations") {
+            applyDesktopAuth()
+            contentType(ContentType.Application.Json)
+            parameter("agent_id", agentId)
+            setBody(
+                ConversationCreateParams(
+                    agentId = AgentId(agentId),
+                    summary = summary,
+                ),
+            )
+        }
+        response.requireSuccess()
+        return response.body()
+    }
+
+    /** List the LLM models available on this backend (for the model picker). */
+    suspend fun listLlmModels(): List<LlmModel> {
+        val response = httpClient.get("$baseUrl/v1/models") {
+            applyDesktopAuth()
+        }
+        response.requireSuccess()
+        return response.body()
+    }
+
+    /** Set the model override for an existing conversation. */
+    suspend fun setConversationModel(conversationId: String, model: String): Conversation {
+        val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
+            applyDesktopAuth()
+            contentType(ContentType.Application.Json)
+            setBody(ConversationUpdateParams(model = model))
+        }
+        response.requireSuccess()
+        return response.body()
+    }
+
     override fun close() {
         httpClient.close()
     }
@@ -178,6 +220,10 @@ internal val desktopChatJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
     encodeDefaults = false
+    // The Letta API returns explicit nulls for several non-nullable fields that
+    // have defaults (e.g. agent.metadata). Coerce null -> default so agent /
+    // conversation deserialization doesn't fail and agent names hydrate.
+    coerceInputValues = true
 }
 
 private suspend fun HttpResponse.requireSuccess() {

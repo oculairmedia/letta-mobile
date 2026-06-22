@@ -99,6 +99,9 @@ import com.letta.mobile.ui.theme.customColors
 import java.util.Base64
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
 
@@ -461,6 +464,8 @@ internal fun ChatDetailPane(
     onAttachImage: () -> Unit,
     onRemoveImageAttachment: (Int) -> Unit,
     onRetryConnection: () -> Unit,
+    modelOptions: List<Pair<String, String>> = emptyList(),
+    onModelSelected: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -485,6 +490,9 @@ internal fun ChatDetailPane(
             text = state.composerText,
             pendingImageAttachments = state.pendingImageAttachments,
             enabled = state.canSend,
+            modelLabel = state.composerModelLabel,
+            modelOptions = modelOptions,
+            onModelSelected = onModelSelected,
             onTextChanged = onComposerTextChanged,
             onSend = onSend,
             onAttachImage = onAttachImage,
@@ -864,6 +872,30 @@ private fun DesktopMessageContent(
     }
 }
 
+/**
+ * Pull the human-meaningful payload out of a tool-call arguments JSON object
+ * (e.g. the shell command / code / query) so the card shows that instead of a
+ * raw `{"command":"…"}` dump. Falls back to pretty-printed JSON, then the raw
+ * string.
+ */
+private fun primaryToolArgument(raw: String): String {
+    val obj = runCatching { desktopChatJson.parseToJsonElement(raw) as? JsonObject }.getOrNull()
+        ?: return raw
+    val preferredKeys = listOf("command", "code", "query", "input", "text", "content", "cmd", "script", "expression")
+    for (key in preferredKeys) {
+        val value = obj[key]
+        if (value is JsonPrimitive && value.isString && value.content.isNotBlank()) {
+            return value.content
+        }
+    }
+    return runCatching { prettyDesktopJson.encodeToString(JsonObject.serializer(), obj) }.getOrDefault(raw)
+}
+
+private val prettyDesktopJson = Json {
+    prettyPrint = true
+    prettyPrintIndent = "  "
+}
+
 @Composable
 private fun ToolCallCard(toolCall: UiToolCall) {
     ArtifactCard(
@@ -872,11 +904,11 @@ private fun ToolCallCard(toolCall: UiToolCall) {
         status = toolCall.status ?: "tool call",
     ) {
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
-            CodeBlock(args)
+            CodeBlock(primaryToolArgument(args))
         }
         toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
             Text(
-                text = result,
+                text = result.trim(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1051,6 +1083,9 @@ private fun ComposerBar(
     text: String,
     pendingImageAttachments: List<MessageContentPart.Image>,
     enabled: Boolean,
+    modelLabel: String,
+    modelOptions: List<Pair<String, String>>,
+    onModelSelected: (String) -> Unit,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
@@ -1114,14 +1149,31 @@ private fun ComposerBar(
                         modifier = Modifier.size(28.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    ComposerChip(label = "MiniMax M3")
-                    ComposerChip(
-                        label = "Unrestricted",
+                    val modelDisplay = modelOptions.firstOrNull { it.second == modelLabel }?.first
+                        ?: modelLabel.ifBlank { "Model" }
+                    ComposerDropdownChip(
+                        label = modelDisplay,
+                        options = modelOptions.map { it.first },
+                        emptyHint = "No models available",
+                        onSelect = { selected ->
+                            modelOptions.firstOrNull { it.first == selected }?.let { onModelSelected(it.second) }
+                        },
+                    )
+                    var safety by remember { mutableStateOf("Unrestricted") }
+                    ComposerDropdownChip(
+                        label = safety,
+                        options = listOf("Unrestricted", "Standard", "Strict"),
+                        onSelect = { safety = it },
                         leadingIcon = Icons.Outlined.Security,
                         contentColor = MaterialTheme.customColors.runningColor
                             .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary,
                     )
-                    ComposerChip(label = "Medium")
+                    var effort by remember { mutableStateOf("Medium") }
+                    ComposerDropdownChip(
+                        label = effort,
+                        options = listOf("Low", "Medium", "High"),
+                        onSelect = { effort = it },
+                    )
                     Spacer(Modifier.weight(1f))
                     Surface(
                         modifier = Modifier
@@ -1165,42 +1217,78 @@ private fun ComposerBar(
     }
 }
 
-/** A pill selector in the composer control row (model / safety / effort). */
+/**
+ * A functional pill selector in the composer control row (model / safety /
+ * effort): click opens a popup of [options]; selecting one fires [onSelect].
+ */
 @Composable
-private fun ComposerChip(
+private fun ComposerDropdownChip(
     label: String,
+    options: List<String>,
+    onSelect: (String) -> Unit,
     leadingIcon: ImageVector? = null,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
+    emptyHint: String? = null,
 ) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = contentColor,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = contentColor,
+            modifier = Modifier.clickable { open = !open },
         ) {
-            if (leadingIcon != null) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (leadingIcon != null) {
+                    Icon(
+                        imageVector = leadingIcon,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp),
+                        tint = contentColor,
+                    )
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
                 Icon(
-                    imageVector = leadingIcon,
+                    imageVector = Icons.Outlined.KeyboardArrowDown,
                     contentDescription = null,
-                    modifier = Modifier.size(13.dp),
-                    tint = contentColor,
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-            )
-            Icon(
-                imageVector = Icons.Outlined.KeyboardArrowDown,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        }
+        if (open) {
+            JewelPopupMenu(
+                onDismissRequest = {
+                    open = false
+                    true
+                },
+                horizontalAlignment = Alignment.Start,
+            ) {
+                if (options.isEmpty() && emptyHint != null) {
+                    selectableItem(selected = false, onClick = { open = false }) {
+                        DesktopControlText(emptyHint)
+                    }
+                }
+                options.forEach { option ->
+                    selectableItem(
+                        selected = option == label,
+                        onClick = {
+                            open = false
+                            onSelect(option)
+                        },
+                    ) {
+                        DesktopControlText(option)
+                    }
+                }
+            }
         }
     }
 }

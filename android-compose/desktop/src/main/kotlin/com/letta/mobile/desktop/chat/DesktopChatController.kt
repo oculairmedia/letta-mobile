@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
@@ -31,7 +32,7 @@ class DesktopChatController(
     private val gatewayFactory: () -> DesktopChatGateway = {
         DesktopLettaHttpChatGateway(bootstrapState.config)
     },
-    private val agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+    private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
     private val loopFactory: (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
@@ -48,7 +49,13 @@ class DesktopChatController(
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<DesktopChatSurfaceState> = _state.asStateFlow()
 
+    private val _availableModels = MutableStateFlow<List<LlmModel>>(emptyList())
+    val availableModels: StateFlow<List<LlmModel>> = _availableModels.asStateFlow()
+
     private var gateway: DesktopChatGateway? = null
+
+    private val httpGateway: DesktopLettaHttpChatGateway?
+        get() = gateway as? DesktopLettaHttpChatGateway
     private var activeLoop: DesktopTimelineLoop? = null
     private var timelineJob: Job? = null
     private var loadJob: Job? = null
@@ -134,6 +141,46 @@ class DesktopChatController(
                     current.copy(errorMessage = message)
                 }
             }
+        }
+    }
+
+    /** Create a new conversation for the active agent and select it. */
+    fun createConversation() {
+        if (closed) return
+        val agentId = _state.value.selectedConversation?.agentId
+            ?: _state.value.conversations.firstOrNull()?.agentId
+        if (agentId.isNullOrBlank()) {
+            _state.update { it.copy(errorMessage = "Select an agent before starting a new chat.") }
+            return
+        }
+        scope.launch {
+            try {
+                val created = httpGateway?.createConversation(agentId) ?: return@launch
+                retryConnection()
+                // After reload, select the freshly created conversation.
+                selectConversation(created.id.value)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                _state.update {
+                    it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create chat")
+                }
+            }
+        }
+    }
+
+    /** Apply a model override to the active conversation. */
+    fun setConversationModel(model: String) {
+        if (closed) return
+        val conversationId = _state.value.selectedConversationId ?: return
+        _state.update { it.copy(composerModelLabel = model) }
+        scope.launch {
+            runCatching { httpGateway?.setConversationModel(conversationId, model) }
+                .onFailure { t ->
+                    _state.update {
+                        it.copy(errorMessage = t.message ?: "Could not change model")
+                    }
+                }
         }
     }
 
@@ -227,9 +274,16 @@ class DesktopChatController(
             val nextGateway = gatewayFactory()
             gateway = nextGateway
             val conversations = nextGateway.listConversations()
-            val agentNamesById = runCatching { agentNamesByIdProvider() }.getOrDefault(emptyMap())
+            val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
+            val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
             val summaries = conversations.toChatConversationSummaries(agentNamesById)
             val selectedId = summaries.firstOrNull()?.id
+
+            // Load the model catalog for the composer model picker (best-effort).
+            scope.launch {
+                val models = runCatching { httpGateway?.listLlmModels() }.getOrNull().orEmpty()
+                if (!closed) _availableModels.value = models
+            }
 
             if (closed) return
             val loadedRuntime = ChatSessionReducer.conversationsLoaded(

@@ -448,7 +448,7 @@ class DesktopChatControllerTest {
 
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
-        agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+        agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
         loopFactory: (
             gateway: DesktopChatGateway,
             conversation: DesktopConversationSummary,
@@ -465,7 +465,7 @@ class DesktopChatControllerTest {
 
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
-        agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+        agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
     ): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
@@ -476,7 +476,7 @@ class DesktopChatControllerTest {
 
     private fun TestScope.testController(
         gatewayFactory: () -> DesktopChatGateway,
-        agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+        agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
     ): DesktopChatController =
         DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),

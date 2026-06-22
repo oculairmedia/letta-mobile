@@ -89,7 +89,9 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.jewel.ui.component.Icon as JewelIcon
 import org.jetbrains.jewel.ui.component.SimpleListItem as JewelSimpleListItem
 import org.jetbrains.jewel.ui.component.Text as JewelText
@@ -119,14 +121,37 @@ fun LettaDesktopApp(
         DesktopChatController(
             bootstrapState = bootstrapState,
             scope = chatScope,
-            agentNamesByIdProvider = {
+            agentNamesByIdProvider = { agentIds ->
                 val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
-                agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
-                agentRepository.agents.value.associate { agent -> agent.id.value to agent.name }
+                runCatching {
+                    agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
+                }
+                val resolved = mutableMapOf<String, String>()
+                // Seed from the cached list (fast path).
+                agentRepository.agents.value.forEach { agent ->
+                    agent.name.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+                }
+                // For any conversation agent still unresolved, fetch it directly
+                // (robust against list pagination / partial caches).
+                agentIds.filter { it !in resolved }.forEach { id ->
+                    val name = agentRepository.getCachedAgent(id)?.name
+                        ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.name
+                    name?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
+                }
+                resolved
             },
         )
     }
     val chatState by chatController.state.collectAsState()
+    val availableModels by chatController.availableModels.collectAsState()
+    val modelOptions = remember(availableModels) {
+        availableModels.map { model ->
+            val label = model.displayNameOverride?.takeIf { it.isNotBlank() }
+                ?: model.name
+            val value = model.handle?.takeIf { it.isNotBlank() } ?: model.name
+            label to value
+        }
+    }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -258,7 +283,10 @@ fun LettaDesktopApp(
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onDeleteConversation = chatController::deleteConversation,
-                    onNewChat = { selectedDestination = DesktopDestination.Conversations },
+                    onNewChat = {
+                        selectedDestination = DesktopDestination.Conversations
+                        chatController.createConversation()
+                    },
                 )
                 RailDivider()
                 // Main content pane.
@@ -266,11 +294,13 @@ fun LettaDesktopApp(
                     if (selectedDestination == DesktopDestination.Conversations) {
                         ChatDetailPane(
                             state = chatState,
+                            modelOptions = modelOptions,
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,
                             onAttachImage = { pickerLauncher.launch() },
                             onRemoveImageAttachment = chatController::removeImageAttachment,
                             onRetryConnection = chatController::retryConnection,
+                            onModelSelected = chatController::setConversationModel,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -318,6 +348,23 @@ fun LettaDesktopApp(
                 }
             }
         }
+    }
+}
+
+/**
+ * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
+ * (now / 5m / 2h / 4d / 3w / 2mo). Non-ISO values are returned unchanged.
+ */
+private fun formatRelativeTimestamp(raw: String): String {
+    val instant = runCatching { java.time.Instant.parse(raw) }.getOrNull() ?: return raw
+    val seconds = java.time.Duration.between(instant, java.time.Instant.now()).seconds
+    return when {
+        seconds < 60 -> "now"
+        seconds < 3_600 -> "${seconds / 60}m"
+        seconds < 86_400 -> "${seconds / 3_600}h"
+        seconds < 604_800 -> "${seconds / 86_400}d"
+        seconds < 2_592_000 -> "${seconds / 604_800}w"
+        else -> "${seconds / 2_592_000}mo"
     }
 }
 
@@ -472,12 +519,42 @@ private fun DesktopAgentSidebar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Icon(
-                imageVector = Icons.Outlined.MoreVert,
-                contentDescription = "Agent menu",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp),
-            )
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                Icon(
+                    imageVector = Icons.Outlined.MoreVert,
+                    contentDescription = "Agent menu",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .clickable { menuOpen = true },
+                )
+                if (menuOpen) {
+                    JewelPopupMenu(
+                        onDismissRequest = {
+                            menuOpen = false
+                            true
+                        },
+                        horizontalAlignment = Alignment.End,
+                    ) {
+                        selectableItem(selected = false, onClick = { menuOpen = false; onNewChat() }) {
+                            DesktopControlText("New chat")
+                        }
+                        selectableItem(
+                            selected = false,
+                            onClick = { menuOpen = false; onDestinationSelected(DesktopDestination.Memory) },
+                        ) {
+                            DesktopControlText("Memory")
+                        }
+                        selectableItem(
+                            selected = false,
+                            onClick = { menuOpen = false; onDestinationSelected(DesktopDestination.Settings) },
+                        ) {
+                            DesktopControlText("Settings")
+                        }
+                    }
+                }
+            }
         }
 
         DesktopNavRow(
@@ -522,7 +599,7 @@ private fun DesktopAgentSidebar(
             items(items = chatState.conversations, key = { it.id }) { conversation ->
                 SidebarConversationRow(
                     title = conversation.title,
-                    timeLabel = conversation.updatedAtLabel,
+                    timeLabel = formatRelativeTimestamp(conversation.updatedAtLabel),
                     selected = selectedDestination == DesktopDestination.Conversations &&
                         conversation.id == chatState.selectedConversationId,
                     onClick = { onConversationSelected(conversation.id) },
