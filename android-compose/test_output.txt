@@ -1,0 +1,230 @@
+Calculating task graph as no cached configuration is available for tasks: testDebugUnitTest --tests com.letta.mobile.ui.screens.conversations.ConversationCardTest
+
+> Configure project :app
+[versioning] versionName=0.0.0-dev versionCode=1
+
+> Task :sharedLogic:convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :sharedLogic:convertXmlValueResourcesForJvmAndAndroid NO-SOURCE
+> Task :sharedLogic:checkJvmMainComposeLibrariesCompatibility
+> Task :sharedLogic:kmpPartiallyResolvedDependenciesChecker
+> Task :sharedLogic:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :sharedLogic:generateComposeResClass SKIPPED
+> Task :sharedLogic:generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :sharedLogic:convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :sharedLogic:copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :sharedLogic:copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :core:ids:kmpPartiallyResolvedDependenciesChecker
+> Task :sharedLogic:copyNonXmlValueResourcesForJvmAndAndroid NO-SOURCE
+> Task :core:ids:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :sharedLogic:prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :sharedLogic:prepareComposeResourcesTaskForJvmAndAndroid NO-SOURCE
+> Task :sharedLogic:generateResourceAccessorsForCommonMain SKIPPED
+> Task :sharedLogic:prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :sharedLogic:generateResourceAccessorsForJvmAndAndroid SKIPPED
+> Task :core:runtime:kmpPartiallyResolvedDependenciesChecker
+> Task :core:runtime:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :sharedLogic:generateResourceAccessorsForJvmMain SKIPPED
+> Task :sharedLogic:generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :core:runtime:jvmProcessResources NO-SOURCE
+> Task :core:ids:jvmProcessResources NO-SOURCE
+> Task :core:ids:processJvmMainResources SKIPPED
+> Task :core:runtime:processJvmMainResources SKIPPED
+> Task :core:domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:domain:processResources NO-SOURCE
+> Task :cli:preBuild UP-TO-DATE
+> Task :cli:preDebugBuild UP-TO-DATE
+> Task :sharedLogic:convertXmlValueResourcesForAndroidMain NO-SOURCE
+> Task :sharedLogic:assembleJvmMainResources
+> Task :cli:processDebugNavigationResources
+> Task :sharedLogic:copyNonXmlValueResourcesForAndroidMain NO-SOURCE
+> Task :cli:generateDebugResources
+> Task :sharedLogic:prepareComposeResourcesTaskForAndroidMain NO-SOURCE
+> Task :sharedLogic:generateResourceAccessorsForAndroidMain SKIPPED
+> Task :sharedLogic:generateActualResourceCollectorsForAndroidMain SKIPPED
+> Task :sharedLogic:jvmProcessResources
+> Task :sharedLogic:processJvmMainResources SKIPPED
+> Task :core:ids:androidPreBuild UP-TO-DATE
+> Task :core:ids:preAndroidMainBuild UP-TO-DATE
+> Task :core:runtime:androidPreBuild UP-TO-DATE
+> Task :core:runtime:preAndroidMainBuild UP-TO-DATE
+> Task :sharedLogic:androidPreBuild UP-TO-DATE
+> Task :sharedLogic:preAndroidMainBuild UP-TO-DATE
+> Task :core:data:preBuild UP-TO-DATE
+> Task :core:data:preDebugBuild UP-TO-DATE
+> Task :cli:packageDebugResources
+> Task :core:data:generateDebugResources FROM-CACHE
+> Task :core:data:packageDebugResources
+> Task :core:data:processDebugNavigationResources FROM-CACHE
+> Task :core:data:parseDebugLocalResources
+> Task :core:data:generateDebugRFile
+> Task :core:data:generateDebugBuildConfig
+> Task :core:data:prepareKspDebugKotlinOutputDirs
+> Task :cli:parseDebugLocalResources
+> Task :cli:generateDebugRFile
+> Task :cli:javaPreCompileDebug
+> Task :cli:preDebugUnitTestBuild UP-TO-DATE
+> Task :cli:writeDebugAarMetadata
+> Task :sharedLogic:writeAndroidMainAarMetadata
+> Task :core:data:writeDebugAarMetadata
+> Task :core:ids:writeAndroidMainAarMetadata
+> Task :core:runtime:writeAndroidMainAarMetadata
+> Task :core:data:javaPreCompileDebug
+> Task :cli:mapDebugSourceSetPaths
+> Task :cli:checkDebugUnitTestAarMetadata
+> Task :cli:mapDebugUnitTestSourceSetPaths
+> Task :cli:generateDebugUnitTestResources FROM-CACHE
+> Task :sharedLogic:generateAndroidMainEmptyResourceFiles
+> Task :core:ids:generateAndroidMainEmptyResourceFiles
+> Task :core:runtime:generateAndroidMainEmptyResourceFiles
+> Task :cli:compileDebugLibraryResources
+> Task :cli:extractDeepLinksDebug
+> Task :cli:processDebugManifest
+> Task :sharedLogic:processAndroidMainManifest
+> Task :core:data:extractDeepLinksDebug FROM-CACHE
+> Task :core:data:processDebugManifest
+> Task :core:ids:processAndroidMainManifest
+> Task :core:runtime:processAndroidMainManifest
+> Task :cli:processDebugUnitTestManifest
+> Task :core:data:mapDebugSourceSetPaths
+> Task :core:data:compileDebugLibraryResources FROM-CACHE
+> Task :cli:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :cli:generateDebugUnitTestAssets UP-TO-DATE
+> Task :cli:generateDebugAssets UP-TO-DATE
+> Task :cli:mergeDebugAssets
+> Task :core:data:generateDebugAssets UP-TO-DATE
+> Task :core:data:mergeDebugAssets
+> Task :cli:mergeDebugUnitTestAssets
+> Task :designsystem:preBuild UP-TO-DATE
+> Task :designsystem:preDebugBuild UP-TO-DATE
+> Task :designsystem:generateDebugResources
+> Task :designsystem:packageDebugResources
+> Task :designsystem:processDebugNavigationResources
+> Task :designsystem:parseDebugLocalResources
+> Task :designsystem:generateDebugRFile
+> Task :designsystem:javaPreCompileDebug FROM-CACHE
+> Task :designsystem:preDebugUnitTestBuild UP-TO-DATE
+> Task :designsystem:generateDebugUnitTestStubRFile
+> Task :designsystem:koverFindJar
+> Task :cli:mergeDebugUnitTestResources
+> Task :designsystem:preparePaparazziDebugResources
+> Task :designsystem:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :feature-chat:preBuild UP-TO-DATE
+> Task :feature-chat:preDebugBuild UP-TO-DATE
+> Task :feature-chat:generateDebugResources
+> Task :feature-chat:packageDebugResources
+> Task :feature-chat:processDebugNavigationResources
+> Task :feature-chat:parseDebugLocalResources
+> Task :feature-chat:generateDebugRFile
+> Task :feature-chat:prepareKspDebugKotlinOutputDirs
+> Task :feature-chat:javaPreCompileDebug
+> Task :designsystem:generateDebugAssets UP-TO-DATE
+> Task :designsystem:mergeDebugAssets
+> Task :feature-chat:generateDebugUnitTestAssets UP-TO-DATE
+> Task :feature-chat:generateDebugAssets UP-TO-DATE
+> Task :feature-chat:mergeDebugAssets
+> Task :feature-chat:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:testutil:generateDebugAssets UP-TO-DATE
+> Task :core:testutil:preBuild UP-TO-DATE
+> Task :core:testutil:preDebugBuild UP-TO-DATE
+> Task :core:testutil:mergeDebugAssets
+> Task :feature-chat:mergeDebugUnitTestAssets
+> Task :designsystem:mapDebugSourceSetPaths
+> Task :designsystem:compileDebugLibraryResources
+> Task :designsystem:writeDebugAarMetadata
+> Task :feature-chat:writeDebugAarMetadata
+> Task :core:testutil:writeDebugAarMetadata
+> Task :feature-chat:checkDebugUnitTestAarMetadata
+> Task :feature-chat:mapDebugSourceSetPaths
+> Task :feature-chat:compileDebugLibraryResources
+> Task :feature-chat:mapDebugUnitTestSourceSetPaths
+> Task :feature-chat:generateDebugUnitTestResources FROM-CACHE
+> Task :core:testutil:generateDebugResources FROM-CACHE
+> Task :core:testutil:packageDebugResources
+> Task :cli:processDebugUnitTestResources
+> Task :cli:packageDebugUnitTestForUnitTest
+> Task :cli:generateDebugUnitTestConfig
+> Task :designsystem:extractDeepLinksDebug FROM-CACHE
+> Task :designsystem:processDebugManifest
+> Task :feature-chat:extractDeepLinksDebug FROM-CACHE
+> Task :feature-chat:processDebugManifest
+> Task :core:testutil:extractDeepLinksDebug FROM-CACHE
+> Task :core:testutil:processDebugManifest
+> Task :core:ids:compileKotlinJvm
+> Task :core:ids:compileAndroidMain
+> Task :feature-chat:processDebugUnitTestManifest
+> Task :core:testutil:mapDebugSourceSetPaths
+> Task :core:testutil:processDebugNavigationResources FROM-CACHE
+> Task :core:testutil:compileDebugLibraryResources FROM-CACHE
+> Task :core:testutil:parseDebugLocalResources FROM-CACHE
+> Task :core:testutil:generateDebugRFile
+> Task :feature-chat:koverFindJar
+> Task :feature-chat:prepareKspDebugUnitTestKotlinOutputDirs
+> Task :core:testutil:javaPreCompileDebug FROM-CACHE
+> Task :feature-chat:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :feature-editagent:preBuild UP-TO-DATE
+> Task :feature-editagent:preDebugBuild UP-TO-DATE
+> Task :feature-editagent:generateDebugResources
+> Task :feature-editagent:packageDebugResources
+> Task :feature-editagent:processDebugNavigationResources
+> Task :feature-editagent:parseDebugLocalResources
+> Task :feature-editagent:generateDebugRFile
+> Task :feature-editagent:prepareKspDebugKotlinOutputDirs
+> Task :feature-editagent:javaPreCompileDebug FROM-CACHE
+> Task :feature-editagent:generateDebugUnitTestAssets UP-TO-DATE
+> Task :feature-editagent:generateDebugAssets UP-TO-DATE
+> Task :feature-editagent:mergeDebugAssets
+> Task :feature-editagent:preDebugUnitTestBuild UP-TO-DATE
+> Task :feature-editagent:mergeDebugUnitTestAssets
+> Task :feature-editagent:writeDebugAarMetadata
+> Task :feature-editagent:checkDebugUnitTestAarMetadata
+> Task :feature-editagent:mapDebugSourceSetPaths
+> Task :feature-editagent:compileDebugLibraryResources
+> Task :feature-editagent:mapDebugUnitTestSourceSetPaths
+> Task :feature-editagent:generateDebugUnitTestResources FROM-CACHE
+> Task :feature-chat:mergeDebugUnitTestResources
+> Task :feature-editagent:mergeDebugUnitTestResources
+> Task :feature-editagent:extractDeepLinksDebug FROM-CACHE
+> Task :feature-editagent:processDebugManifest
+> Task :feature-editagent:processDebugUnitTestManifest
+> Task :feature-chat:processDebugUnitTestResources
+> Task :feature-chat:packageDebugUnitTestForUnitTest
+> Task :feature-chat:generateDebugUnitTestConfig
+> Task :feature-editagent:koverFindJar
+> Task :feature-editagent:prepareKspDebugUnitTestKotlinOutputDirs
+> Task :feature-editagent:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :core:data:generateDebugUnitTestAssets UP-TO-DATE
+> Task :core:data:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:data:mergeDebugUnitTestAssets
+> Task :core:data:checkDebugUnitTestAarMetadata
+> Task :core:data:mapDebugUnitTestSourceSetPaths
+> Task :core:data:generateDebugUnitTestResources FROM-CACHE
+> Task :feature-editagent:processDebugUnitTestResources
+> Task :feature-editagent:packageDebugUnitTestForUnitTest
+> Task :feature-editagent:generateDebugUnitTestConfig
+> Task :core:data:processDebugUnitTestManifest
+> Task :core:data:koverFindJar
+> Task :core:data:prepareKspDebugUnitTestKotlinOutputDirs
+> Task :core:data:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :core:testutil:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:testutil:generateDebugUnitTestStubRFile
+> Task :core:testutil:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :core:data:mergeDebugUnitTestResources
+> Task :core:ids:compileJvmMainJava NO-SOURCE
+> Task :core:ids:jvmMainClasses
+> Task :core:ids:jvmJar
+> Task :core:ids:bundleAndroidMainClassesToCompileJar
+> Task :core:ids:bundleAndroidMainClassesToRuntimeJar
+> Task :core:ids:processAndroidMainJavaRes
+> Task :core:data:processDebugUnitTestResources
+> Task :core:data:packageDebugUnitTestForUnitTest
+> Task :core:data:generateDebugUnitTestConfig
+> Task :core:runtime:compileKotlinJvm
+> Task :core:runtime:compileJvmMainJava NO-SOURCE
+> Task :core:runtime:jvmMainClasses
+> Task :core:runtime:compileAndroidMain
+> Task :core:runtime:processAndroidMainJavaRes
+> Task :core:runtime:bundleAndroidMainClassesToRuntimeJar
+> Task :core:runtime:bundleAndroidMainClassesToCompileJar
+> Task :core:runtime:jvmJar
+> Task :sharedLogic:compileAndroidMain
+> Task :sharedLogic:compileKotlinJvm
