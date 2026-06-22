@@ -38,6 +38,7 @@ object AgentRuntimeBinding {
             .mapNotNull { it.jsonPrimitive.contentOrNull?.trim() }
             .firstOrNull { it.isNotBlank() }
         if (explicitRuntime != null) return explicitRuntime.startsWith("local-")
+        if (agent.model?.trim()?.isNotBlank() == true) return false
         if (agent.id.value.startsWith("local-agent-")) return true
         return false
     }

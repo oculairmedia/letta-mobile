@@ -561,6 +561,27 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun updateLocalModelHandle_clearsStaleCustomProviderRoutingFields() = runTest {
+        fakeRepository.activeConfigState.value = LettaConfig(
+            id = "local-provider",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = ConfigViewModel.LOCAL_RUNTIME_URL,
+            localProviderBaseUrl = "http://192.168.50.90:8082/v1",
+            localProviderApiKey = "secret",
+            localProviderModel = "lmstudio/deepseek-v4-flash",
+        )
+        viewModel.loadConfig()
+
+        viewModel.updateLocalModelHandle("google/gemma-3n-E2B-it-litert-lm")
+
+        val state = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("google/gemma-3n-E2B-it-litert-lm", state.localModelHandle)
+        assertEquals("", state.localProviderBaseUrl)
+        assertEquals("", state.localProviderApiKey)
+        assertEquals("", state.localProviderModel)
+    }
+
+    @Test
     fun saveConfig_persistsLocalProviderFields_withLocalMode() = runTest {
         fakeRepository.activeConfigState.value = null
         viewModel.loadConfig()
@@ -762,6 +783,9 @@ class ConfigViewModelTest {
         assertEquals("google/gemma-test-litert-lm", successState.localModelHandle)
         assertEquals("gpu", successState.localModelAccelerator)
         assertEquals("8192", successState.localModelMaxTokens)
+        assertEquals("", successState.localProviderBaseUrl)
+        assertEquals("", successState.localProviderApiKey)
+        assertEquals("", successState.localProviderModel)
     }
 
     // letta-mobile-qmrs8: selecting a catalog model must persist without an

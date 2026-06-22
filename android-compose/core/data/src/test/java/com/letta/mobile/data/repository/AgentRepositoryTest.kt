@@ -129,6 +129,16 @@ class AgentRepositoryTest {
     }
 
     @Test
+    fun `local-agent id with bare api model is not local-bound`() {
+        val agent = TestData.agent(
+            id = "local-agent-1",
+            model = "gpt-5.5",
+        )
+
+        assertFalse(AgentRuntimeBinding.isLocalBound(agent))
+    }
+
+    @Test
     fun `local-agent id with cloud model is not local-bound`() {
         val agent = TestData.agent(
             id = "local-agent-1",
@@ -171,7 +181,7 @@ class AgentRepositoryTest {
     }
 
     @Test
-    fun `switching local agent to cloud model updates remote instead of persisting locally`() = runTest {
+    fun `switching local agent to cloud model persists locally without remote update`() = runTest {
         val source = FakeLocalAgentSource().apply {
             stored += TestData.agent(
                 id = "local-agent-1",
@@ -195,8 +205,9 @@ class AgentRepositoryTest {
         )
 
         assertEquals("openai/gpt-4o-mini", updated.model)
-        assertTrue(fakeApi.calls.any { it == "updateAgent:local-agent-1" })
-        assertTrue(source.persisted.none { it.model == "openai/gpt-4o-mini" })
+        assertTrue(fakeApi.calls.none { it == "updateAgent:local-agent-1" })
+        assertTrue(source.persisted.any { it.model == "openai/gpt-4o-mini" })
+        assertFalse(AgentRuntimeBinding.isLocalBound(updated))
     }
 
     @Test
