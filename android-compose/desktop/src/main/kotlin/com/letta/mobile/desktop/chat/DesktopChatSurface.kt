@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.PointerMatcher
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.onClick
@@ -36,7 +37,12 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -667,66 +673,280 @@ private fun LazyListState.toChatViewportSnapshot(): ChatViewportSnapshot =
         isScrollInProgress = isScrollInProgress,
     )
 
+/**
+ * A run (reasoning + tool steps + narration) rendered to match the Penpot
+ * "Conversation (detailed)" board: an optional "Thought" row, a compact
+ * "Run · N steps" card (one row per tool call), then the agent's narration.
+ */
 @Composable
 private fun DesktopRunBlock(item: ChatRenderItem.RunBlock) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 780.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    val messages = item.messages.map { it.first }
+    val reasoning = messages.filter { it.isReasoning && it.content.isNotBlank() }
+    val toolCalls = messages.flatMap { it.toolCalls.orEmpty() }
+    val narration = messages.filter {
+        !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank()
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        reasoning.forEach { ReasoningRow(it.content) }
+        if (toolCalls.isNotEmpty()) {
+            RunStepsCard(toolCalls)
+        }
+        narration.forEach { AgentText(it.content, it.isError) }
+        messages.forEach { message ->
+            message.generatedUi?.let { GeneratedUiCard(it) }
+            message.approvalRequest?.let { ApprovalRequestCard(it) }
+            message.approvalResponse?.let { ApprovalResponseCard(it) }
+            DesktopImageAttachmentsGrid(
+                attachments = message.attachments,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Lifecycle state of a tool step, driving the leading status circle. */
+private enum class StepState { Done, Running, Error }
+
+private fun UiToolCall.stepState(): StepState = when (status?.lowercase()) {
+    "completed", "success", "ok" -> StepState.Done
+    "failed", "error" -> StepState.Error
+    else -> StepState.Done
+}
+
+/** "Ran ./gradlew …" / "Read Foo.kt" — a friendly verb + short target. */
+private fun UiToolCall.stepLabel(): String {
+    val n = name.lowercase()
+    val verb = when {
+        listOf("bash", "shell", "command", "exec", "run", "terminal").any { n.contains(it) } -> "Ran"
+        listOf("read", "cat", "view", "open").any { n.contains(it) } -> "Read"
+        listOf("write", "create").any { n.contains(it) } -> "Wrote"
+        listOf("edit", "replace", "apply", "patch").any { n.contains(it) } -> "Edited"
+        listOf("search", "grep", "glob", "find", "list").any { n.contains(it) } -> "Searched"
+        listOf("fetch", "http", "web", "curl", "request").any { n.contains(it) } -> "Fetched"
+        else -> null
+    }
+    val target = primaryToolArgument(arguments).lineSequence().firstOrNull()?.trim().orEmpty()
+        .let { if (it.length > 52) it.take(52) + "…" else it }
+    return if (verb != null && target.isNotBlank()) "$verb  $target" else if (verb != null) verb else name
+}
+
+/** Right-aligned step summary (result first line / duration). */
+private fun UiToolCall.stepSummary(): String {
+    val resultLine = result?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotBlank() }
+    return when {
+        !resultLine.isNullOrBlank() && resultLine.length <= 28 -> resultLine
+        executionTimeMs != null -> "${executionTimeMs} ms"
+        else -> ""
+    }
+}
+
+@Composable
+private fun ReasoningRow(text: String) {
+    var open by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier.clickable { open = !open },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                StatusDot(MaterialTheme.colorScheme.primary)
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .height(16.dp)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            Text(
+                text = "Thought",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                imageVector = if (open) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (open) {
+            SelectionContainer {
                 Text(
-                    text = "Run · ${item.messages.size} step${if (item.messages.size == 1) "" else "s"}",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    text = text.trim(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp),
                 )
             }
-            item.messages.forEach { (message, _) ->
-                RunStepRow(message)
+        }
+    }
+}
+
+/** Compact, collapsible "Run · N steps" card with one row per tool call. */
+@Composable
+private fun RunStepsCard(toolCalls: List<UiToolCall>) {
+    var expanded by remember { mutableStateOf(true) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Terminal,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "Run · ${toolCalls.size} step${if (toolCalls.size == 1) "" else "s"}",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                )
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+                    toolCalls.forEach { ToolStepRow(it) }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun RunStepRow(message: UiMessage) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Surface(
-            modifier = Modifier.size(28.dp),
-            shape = CircleShape,
-            color = message.runStepDotIcon().containerColor(),
-            contentColor = message.runStepDotIcon().contentColor(),
+private fun ToolStepRow(toolCall: UiToolCall) {
+    var open by remember { mutableStateOf(false) }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { open = !open }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = message.runStepDotIcon().icon(),
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp),
+            StepStatusCircle(toolCall.stepState())
+            Text(
+                text = toolCall.stepLabel(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            val summary = toolCall.stepSummary()
+            if (summary.isNotBlank()) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }
-        DesktopMessageContent(
-            message = message,
-            compact = true,
-            modifier = Modifier.weight(1f),
+        if (open) {
+            Column(
+                modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                toolCall.arguments.takeIf { it.isNotBlank() }?.let { CodeBlock(primaryToolArgument(it)) }
+                toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it) }
+                DesktopImageAttachmentsGrid(
+                    attachments = toolCall.generatedImageAttachments,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepStatusCircle(state: StepState) {
+    val teal = MaterialTheme.colorScheme.primary
+    when (state) {
+        StepState.Done -> Box(
+            modifier = Modifier.size(16.dp).background(teal, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Check,
+                contentDescription = "done",
+                modifier = Modifier.size(11.dp),
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+        StepState.Running -> Box(
+            modifier = Modifier
+                .size(16.dp)
+                .border(1.5.dp, teal, CircleShape),
         )
+        StepState.Error -> Box(
+            modifier = Modifier.size(16.dp).background(MaterialTheme.colorScheme.error, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Close,
+                contentDescription = "failed",
+                modifier = Modifier.size(11.dp),
+                tint = MaterialTheme.colorScheme.onError,
+            )
+        }
+    }
+}
+
+/** Inset output block (monospace) with light per-line colorization. */
+@Composable
+private fun ToolOutputBlock(text: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        SelectionContainer {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                text.trim().lineSequence().take(40).forEach { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                        color = outputLineColor(line),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun outputLineColor(line: String): Color {
+    val l = line.lowercase()
+    return when {
+        l.contains("build successful") || l.contains("success") || l.contains("passed") ->
+            MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.primary
+        l.contains("error") || l.contains("failed") || l.contains("exception") || l.contains("fatal") ->
+            MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 }
 
@@ -734,140 +954,169 @@ private val ChatColumnMaxWidth = 760.dp
 
 @Composable
 private fun DesktopMessageBubble(message: UiMessage) {
-    val isUser = message.role == "user"
-    if (isUser) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            Surface(
-                modifier = Modifier.widthIn(max = 520.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (message.content.isNotBlank()) {
-                        SelectionContainer {
-                            Text(
-                                text = message.content,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
-                    DesktopImageAttachmentsGrid(
-                        attachments = message.attachments,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        }
+    if (message.role == "user") {
+        UserPrompt(message)
         return
     }
-
-    // Assistant / agent message: gradient orb avatar + plain text, no bubble.
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        AgentSphere(size = 28.dp, modifier = Modifier.padding(top = 2.dp))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (message.isReasoning) {
-                Text(
-                    text = "Reasoning",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (message.content.isNotBlank()) {
-                SelectionContainer {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (message.isError) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                }
-            }
-            DesktopImageAttachmentsGrid(
-                attachments = message.attachments,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            message.toolCalls.orEmpty().forEach { toolCall -> ToolCallCard(toolCall) }
-            message.generatedUi?.let { GeneratedUiCard(it) }
-            message.approvalRequest?.let { ApprovalRequestCard(it) }
-            message.approvalResponse?.let { ApprovalResponseCard(it) }
+    // Assistant message (standalone): reasoning / text / tool cards, full-width.
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (message.isReasoning && message.content.isNotBlank()) {
+            ReasoningRow(message.content)
+        } else if (message.content.isNotBlank()) {
+            AgentText(message.content, message.isError)
         }
-    }
-}
-
-@Composable
-private fun DesktopMessageContent(
-    message: UiMessage,
-    compact: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = if (message.role == "user") Icons.Outlined.Person else Icons.Outlined.SmartToy,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = message.senderLabel(),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            if (message.isPending) {
-                StatusChip("Queued")
-            }
-            if (message.latencyMs != null) {
-                StatusChip("${message.latencyMs} ms")
-            }
-        }
-
-        if (message.content.isNotBlank()) {
-            SelectionContainer {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-
         DesktopImageAttachmentsGrid(
             attachments = message.attachments,
             modifier = Modifier.fillMaxWidth(),
         )
+        message.toolCalls.orEmpty().forEach { toolCall -> ToolCard(toolCall) }
+        message.generatedUi?.let { GeneratedUiCard(it) }
+        message.approvalRequest?.let { ApprovalRequestCard(it) }
+        message.approvalResponse?.let { ApprovalResponseCard(it) }
+    }
+}
 
-        message.toolCalls.orEmpty().forEach { toolCall ->
-            ToolCallCard(toolCall)
+/** User prompt — teal bubble, right-aligned, with faint copy/edit affordances. */
+@Composable
+private fun UserPrompt(message: UiMessage) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Surface(
+            modifier = Modifier.widthIn(max = 520.dp),
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (message.content.isNotBlank()) {
+                    SelectionContainer {
+                        Text(text = message.content, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                DesktopImageAttachmentsGrid(
+                    attachments = message.attachments,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
-        message.generatedUi?.let { generatedUi ->
-            GeneratedUiCard(generatedUi)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(
+                imageVector = Icons.Outlined.ContentCopy,
+                contentDescription = "Copy",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+            Icon(
+                imageVector = Icons.Outlined.Edit,
+                contentDescription = "Edit",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
         }
-        message.approvalRequest?.let { approvalRequest ->
-            ApprovalRequestCard(approvalRequest)
-        }
-        message.approvalResponse?.let { approvalResponse ->
-            ApprovalResponseCard(approvalResponse)
+    }
+}
+
+/** Plain agent narration text, full width (no bubble), per the detailed board. */
+@Composable
+private fun AgentText(text: String, isError: Boolean) {
+    SelectionContainer {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * Full, collapsible single-tool card matching the Penpot "Tool call (expanded)"
+ * board: terminal glyph + name + green outlined success badge + copy/chevron,
+ * the command, an inset output block, and an exit-code footer.
+ */
+@Composable
+private fun ToolCard(toolCall: UiToolCall) {
+    var expanded by remember { mutableStateOf(true) }
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Terminal,
+                    contentDescription = null,
+                    modifier = Modifier.size(15.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = toolCall.name,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                ToolStatusBadge(toolCall.status ?: "tool call")
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.Outlined.ContentCopy,
+                    contentDescription = "Copy",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                    contentDescription = if (expanded) "Collapse" else "Expand",
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (expanded) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+                )
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
+                        SelectionContainer {
+                            Text(
+                                text = "$ ${primaryToolArgument(args)}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
+                    }
+                    toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it) }
+                    DesktopImageAttachmentsGrid(
+                        attachments = toolCall.generatedImageAttachments,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    toolCall.executionTimeMs?.let { ms ->
+                        Text(
+                            text = "${toolCall.status?.replaceFirstChar { it.uppercase() } ?: "Done"} · ${ms} ms",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -894,33 +1143,6 @@ private fun primaryToolArgument(raw: String): String {
 private val prettyDesktopJson = Json {
     prettyPrint = true
     prettyPrintIndent = "  "
-}
-
-@Composable
-private fun ToolCallCard(toolCall: UiToolCall) {
-    ArtifactCard(
-        icon = null,
-        title = toolCall.name,
-        status = toolCall.status ?: "tool call",
-    ) {
-        toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
-            CodeBlock(primaryToolArgument(args))
-        }
-        toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
-            Text(
-                text = result.trim(),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        toolCall.executionTimeMs?.let { duration ->
-            StatusChip("$duration ms")
-        }
-        DesktopImageAttachmentsGrid(
-            attachments = toolCall.generatedImageAttachments,
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
 }
 
 @Composable
@@ -1032,27 +1254,32 @@ private fun ArtifactCard(
     }
 }
 
-/** Status badge for tool/artifact cards — green text for success-like states. */
+/**
+ * Outlined status badge for tool cards (Penpot: green-bordered "success",
+ * red-bordered "error", muted otherwise).
+ */
 @Composable
 private fun ToolStatusBadge(status: String) {
     val isSuccess = status.equals("success", ignoreCase = true) ||
-        status.equals("completed", ignoreCase = true)
-    val contentColor = if (isSuccess) {
-        MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
+        status.equals("completed", ignoreCase = true) || status.equals("ok", ignoreCase = true)
+    val isError = status.equals("error", ignoreCase = true) || status.equals("failed", ignoreCase = true)
+    val color = when {
+        isSuccess -> MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
             ?: MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+        isError -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = contentColor,
+        shape = RoundedCornerShape(5.dp),
+        color = Color.Transparent,
+        contentColor = color,
+        border = BorderStroke(1.dp, color.copy(alpha = 0.55f)),
     ) {
         Text(
             text = status,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

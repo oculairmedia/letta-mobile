@@ -71,6 +71,7 @@ import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
@@ -249,6 +250,24 @@ fun LettaDesktopApp(
     }
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
+    // Distinct agents (by id, since many agents share a display name) that have
+    // conversations — these are the rail orbs. Conversations in the sidebar are
+    // filtered to the currently-selected agent only.
+    val railAgents = remember(chatState.conversations) {
+        chatState.conversations
+            .filter { !it.agentId.isNullOrBlank() }
+            .distinctBy { it.agentId }
+            .map { it.agentId!! to it.agentName }
+    }
+    val selectedAgentId = chatState.selectedConversation?.agentId
+        ?: railAgents.firstOrNull()?.first
+    val selectedAgentOrbIndex = railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
+    val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
+        ?: chatState.selectedConversation?.agentName ?: "Letta"
+    val agentConversations = remember(chatState.conversations, selectedAgentId) {
+        chatState.conversations.filter { it.agentId == selectedAgentId }
+    }
+
     DesktopMaterialTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -257,27 +276,30 @@ fun LettaDesktopApp(
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
-                    agentNames = chatState.conversationGroups.map { it.agentName },
-                    selectedAgentName = chatState.selectedConversation?.agentName,
-                    onAgentSelected = { agentName ->
+                    agents = railAgents,
+                    selectedAgentId = selectedAgentId,
+                    onAgentSelected = { agentId ->
                         chatState.conversations
-                            .firstOrNull { it.agentName == agentName }
+                            .firstOrNull { it.agentId == agentId }
                             ?.let { chatController.selectConversation(it.id) }
                         selectedDestination = DesktopDestination.Conversations
                     },
-                    onNewSession = { selectedDestination = DesktopDestination.Conversations },
+                    onNewSession = {
+                        selectedDestination = DesktopDestination.Conversations
+                        chatController.createConversation()
+                    },
                     onSearch = { selectedDestination = DesktopDestination.Conversations },
                     onSettings = { selectedDestination = DesktopDestination.Settings },
                 )
                 RailDivider()
                 // Agent sidebar: agent header + nav + conversations.
                 DesktopAgentSidebar(
-                    agentName = chatState.selectedConversation?.agentName
-                        ?: chatState.conversationGroups.firstOrNull()?.agentName
-                        ?: "Letta",
+                    agentName = selectedAgentName,
+                    agentOrbIndex = selectedAgentOrbIndex,
+                    conversations = agentConversations,
+                    selectedConversationId = chatState.selectedConversationId,
                     selectedDestination = selectedDestination,
                     onDestinationSelected = { selectedDestination = it },
-                    chatState = chatState,
                     onConversationSelected = {
                         chatController.selectConversation(it)
                         selectedDestination = DesktopDestination.Conversations
@@ -385,8 +407,8 @@ private fun RailDivider() {
  */
 @Composable
 private fun DesktopAgentRail(
-    agentNames: List<String>,
-    selectedAgentName: String?,
+    agents: List<Pair<String, String>>,
+    selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
     onNewSession: () -> Unit,
     onSearch: () -> Unit,
@@ -418,8 +440,8 @@ private fun DesktopAgentRail(
             }
         }
         Spacer(Modifier.height(8.dp))
-        agentNames.forEachIndexed { index, name ->
-            val selected = name == selectedAgentName
+        agents.forEachIndexed { index, (agentId, name) ->
+            val selected = agentId == selectedAgentId
             DesktopTooltip(text = name) {
                 Box(
                     modifier = Modifier.size(width = 46.dp, height = 36.dp),
@@ -436,7 +458,7 @@ private fun DesktopAgentRail(
                     AgentOrb(
                         index = index,
                         size = 36.dp,
-                        modifier = Modifier.clickable { onAgentSelected(name) },
+                        modifier = Modifier.clickable { onAgentSelected(agentId) },
                     ) {
                         Text(
                             text = name.firstOrNull()?.uppercase() ?: "?",
@@ -488,9 +510,11 @@ private fun RailActionIcon(
 @Composable
 private fun DesktopAgentSidebar(
     agentName: String,
+    agentOrbIndex: Int,
+    conversations: List<DesktopConversationSummary>,
+    selectedConversationId: String?,
     selectedDestination: DesktopDestination,
     onDestinationSelected: (DesktopDestination) -> Unit,
-    chatState: DesktopChatSurfaceState,
     onConversationSelected: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
     onNewChat: () -> Unit,
@@ -509,7 +533,7 @@ private fun DesktopAgentSidebar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(start = 2.dp, bottom = 16.dp),
         ) {
-            AgentOrb(index = 0, size = 30.dp, cornerRadius = 6.dp)
+            AgentOrb(index = agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
             Text(
                 text = agentName,
                 style = MaterialTheme.typography.titleMedium,
@@ -596,19 +620,19 @@ private fun DesktopAgentSidebar(
                 .weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            items(items = chatState.conversations, key = { it.id }) { conversation ->
+            items(items = conversations, key = { it.id }) { conversation ->
                 SidebarConversationRow(
                     title = conversation.title,
                     timeLabel = formatRelativeTimestamp(conversation.updatedAtLabel),
                     selected = selectedDestination == DesktopDestination.Conversations &&
-                        conversation.id == chatState.selectedConversationId,
+                        conversation.id == selectedConversationId,
                     onClick = { onConversationSelected(conversation.id) },
                 )
             }
             item {
                 SidebarSection("Documents")
             }
-            if (chatState.conversations.isEmpty()) {
+            if (conversations.isEmpty()) {
                 item {
                     Text(
                         text = "No chats",
