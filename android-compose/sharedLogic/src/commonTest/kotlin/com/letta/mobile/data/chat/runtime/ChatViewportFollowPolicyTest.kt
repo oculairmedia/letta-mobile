@@ -30,7 +30,7 @@ class ChatViewportFollowPolicyTest {
         val snapshot = ChatViewportSnapshot(
             totalItems = 40,
             lastVisibleIndex = 20,
-            isScrollInProgress = false,
+            isUserScrolling = false,
         )
 
         assertFalse(ChatViewportFollowPolicy.isNearLatest(snapshot))
@@ -39,11 +39,11 @@ class ChatViewportFollowPolicyTest {
     }
 
     @Test
-    fun inProgressScrollDoesNotChangeFollowModeUntilItSettles() {
+    fun inProgressUserScrollDoesNotChangeFollowModeUntilItSettles() {
         val snapshot = ChatViewportSnapshot(
             totalItems = 40,
             lastVisibleIndex = 20,
-            isScrollInProgress = true,
+            isUserScrolling = true,
         )
 
         assertTrue(ChatViewportFollowPolicy.nextFollowModeAfterScroll(currentFollowMode = true, snapshot = snapshot))

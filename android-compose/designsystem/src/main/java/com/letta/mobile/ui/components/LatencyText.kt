@@ -5,6 +5,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import com.letta.mobile.ui.theme.LocalChatFontScale
+import com.letta.mobile.ui.theme.scaledBy
 
 @Composable
 fun LatencyText(
@@ -16,7 +18,7 @@ fun LatencyText(
     Text(
         text = latencyMs.humanReadableDuration(),
         modifier = modifier.alpha(0.5f),
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelSmall.scaledBy(LocalChatFontScale.current),
     )
 }
 

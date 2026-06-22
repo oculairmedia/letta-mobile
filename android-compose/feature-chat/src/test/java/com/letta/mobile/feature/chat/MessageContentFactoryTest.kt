@@ -7,6 +7,7 @@ import com.letta.mobile.feature.chat.screen.clearToolCallEntranceAnimationHistor
 import com.letta.mobile.feature.chat.screen.shouldRunToolCallEntranceAnimation
 import com.letta.mobile.feature.chat.screen.shouldUseCompactToolCallGroup
 import com.letta.mobile.feature.chat.screen.buildMessageCopyText
+import com.letta.mobile.feature.chat.render.isStreamingBoundary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -73,5 +74,24 @@ class MessageContentFactoryTest {
             "Tool: Bash\nArguments:\n{\"command\":\"run\"}\nResult:\n$rawResult",
             buildMessageCopyText(message),
         )
+    }
+
+    @Test
+    fun `isStreamingBoundary correctly identifies boundary characters`() {
+        // Whitespace
+        assertTrue(' '.isStreamingBoundary())
+        assertTrue('\n'.isStreamingBoundary())
+        assertTrue('\t'.isStreamingBoundary())
+
+        // Hoisted characters
+        val boundaries = setOf('.', ',', ';', ':', '!', '?', ')', ']', '}', '—', '-', '/', '\\')
+        for (char in boundaries) {
+            assertTrue(char.isStreamingBoundary())
+        }
+
+        // Non-boundaries
+        assertFalse('a'.isStreamingBoundary())
+        assertFalse('1'.isStreamingBoundary())
+        assertFalse('_'.isStreamingBoundary())
     }
 }
