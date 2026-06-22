@@ -529,27 +529,14 @@ private fun AgentListEmptyState(
     onCreateAgent: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    EmptyState(
+        icon = LettaIcons.Agent,
+        message = message,
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        EmptyState(
-            icon = LettaIcons.Agent,
-            message = message,
-        )
-        if (showCreateAction) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = onCreateAgent,
-                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-            ) {
-                Icon(LettaIcons.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.screen_agents_empty_create_action))
-            }
-        }
-    }
+        actionLabel = if (showCreateAction) stringResource(R.string.screen_agents_empty_create_action) else null,
+        actionIcon = if (showCreateAction) LettaIcons.Add else null,
+        onAction = if (showCreateAction) onCreateAgent else null,
+    )
 }
 
 data class AgentListDisplayAgents(
