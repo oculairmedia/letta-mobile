@@ -545,7 +545,7 @@ internal class AdminChatViewModel @Inject constructor(
         activeReplyStreams = kotlinx.coroutines.flow.MutableStateFlow(emptySet()),
         uiState = _uiState,
         isClientModeStreamInFlight = { false },
-        a2uiThinkingStartMessageCount = { null },
+        a2uiThinkingStartMessageCount = { adminChatA2uiCoordinator.getA2uiThinkingStartMessageCount() },
         clearA2uiThinkingOnResponse = { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() },
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
         clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },

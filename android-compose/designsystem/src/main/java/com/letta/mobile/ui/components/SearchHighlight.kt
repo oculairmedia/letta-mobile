@@ -19,8 +19,8 @@ data class SearchHighlightColors(
 
 @Composable
 fun rememberSearchHighlightColors(
-    background: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-    content: Color = MaterialTheme.colorScheme.primary,
+    background: Color = MaterialTheme.colorScheme.primaryContainer,
+    content: Color = MaterialTheme.colorScheme.onPrimaryContainer,
 ): SearchHighlightColors = remember(background, content) {
     SearchHighlightColors(background = background, content = content)
 }

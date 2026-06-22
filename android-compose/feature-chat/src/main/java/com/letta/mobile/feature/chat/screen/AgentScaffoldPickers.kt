@@ -717,6 +717,7 @@ internal fun ModelInfoCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag(AgentScaffoldTestTags.DRAWER_MODEL_CARD)
             .combinedClickable(onClick = onTap),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -881,6 +882,7 @@ internal fun ModelPickerSheet(
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .testTag("model_row_${handle}")
                                     .combinedClickable(
                                         enabled = !isDismissingForAction && !isActive,
                                         onClick = {

@@ -42,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -129,17 +128,9 @@ fun ConversationsScreen(
     var showAgentPickerDialog by remember { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
-    var isAppBarCollapsed by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-
-    LaunchedEffect(scrollBehavior) {
-        snapshotFlow { scrollBehavior.state.collapsedFraction }
-            .collect { fraction ->
-                isAppBarCollapsed = fraction >= 0.9f
-            }
-    }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     LaunchedEffect(uiState.createConversationError) {
         val message = uiState.createConversationError ?: return@LaunchedEffect
@@ -153,7 +144,7 @@ fun ConversationsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
-            LargeFlexibleTopAppBar(
+            TopAppBar(
                 title = {
                     ExpandableTitleSearch(
                         query = uiState.searchQuery,
@@ -164,7 +155,6 @@ fun ConversationsScreen(
                         placeholder = stringResource(R.string.screen_conversations_search_hint),
                         autoFocus = false,
                         showCollapseButton = false,
-                        isAppBarCollapsed = isAppBarCollapsed,
                         titleContent = {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(stringResource(R.string.common_conversations))
@@ -179,7 +169,7 @@ fun ConversationsScreen(
                     )
                 },
                 scrollBehavior = scrollBehavior,
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.topAppBarColors(),
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(LettaIcons.Settings, stringResource(R.string.common_settings))
@@ -531,7 +521,7 @@ private fun FirstRunStep(text: String) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationCard(
+fun ConversationCard(
     display: ConversationDisplay,
     onClick: () -> Unit,
     onOpenAdmin: () -> Unit,
@@ -572,34 +562,26 @@ private fun ConversationCard(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            if (display.isPinned) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Pinned",
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            val timeText = conversationActivityText(conversation)
+            val metadataText = buildString {
+                if (display.isPinned) {
+                    append("Pinned • ")
+                }
+                append(display.agentName)
+                if (timeText != null) {
+                    append(" • ")
+                    append(timeText)
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
-
             Text(
-                text = display.agentName,
+                text = metadataText,
                 style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-
-            val timeText = conversationActivityText(conversation)
-            if (timeText != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.listItemMetadata,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
 
     }

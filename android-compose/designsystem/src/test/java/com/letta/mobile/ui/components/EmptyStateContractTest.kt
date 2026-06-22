@@ -27,6 +27,16 @@ class EmptyStateContractTest {
     fun `empty state uses surface variant tone`() {
         assertTrue(source.contains("MaterialTheme.colorScheme.onSurfaceVariant"))
     }
+
+    @Test
+    fun `empty state natively supports actionable recovery`() {
+        assertTrue(source.contains("actionLabel: String? = null"))
+        assertTrue(source.contains("actionIcon: ImageVector? = null"))
+        assertTrue(source.contains("onAction: (() -> Unit)? = null"))
+        assertTrue(source.contains("if (actionLabel != null && onAction != null)"))
+        assertTrue(source.contains("Button("))
+        assertTrue(source.contains("onClick = onAction"))
+    }
 }
 
 private fun readSource(relativePath: String): String {
