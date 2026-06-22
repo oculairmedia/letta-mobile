@@ -80,8 +80,8 @@ class ChatProjectionParityFixturesTest {
         assertEquals(2, model.renderItems.size)
 
         val item1 = model.renderItems[0] // assistant run block
-        assertTrue(item1 is ChatRenderItem.Single, "Should be single because reasoning was deduped")
-        assertEquals("a1", item1.message.id)
+        assertTrue(item1 is ChatRenderItem.Single, "Should be single because assistant message was deduped")
+        assertEquals("r1", item1.message.id)
     }
 
     @Test
