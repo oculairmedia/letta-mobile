@@ -46,6 +46,8 @@ internal class AdminChatA2uiCoordinator(
     private val pendingA2uiActions = mutableMapOf<String, PendingA2uiAction>()
     private var a2uiConversationId: String? = null
     private var a2uiHistorySignature: Int? = null
+    private var a2uiHistoryAppliedCount: Int = 0
+    private var a2uiHistoryAppliedPrefix: List<A2uiMessage>? = null
     private var a2uiLiveEventSeen = false
     private var a2uiThinkingTimeoutJob: Job? = null
     private var a2uiThinkingStartMessageCount: Int? = null
@@ -110,6 +112,8 @@ internal class AdminChatA2uiCoordinator(
         if (a2uiConversationId == conversationId) return
         a2uiConversationId = conversationId
         a2uiHistorySignature = null
+        a2uiHistoryAppliedCount = 0
+        a2uiHistoryAppliedPrefix = null
         a2uiLiveEventSeen = false
         a2uiSurfaceManager.clear()
         uiState.update { it.copy(a2uiSurfaces = persistentMapOf()) }
@@ -123,8 +127,23 @@ internal class AdminChatA2uiCoordinator(
         if (!a2uiLiveEventSeen) {
             val signature = messages.hashCode()
             if (signature != a2uiHistorySignature) {
-                a2uiSurfaceManager.replaceWith(messages)
+                val appliedPrefix = a2uiHistoryAppliedPrefix
+                val isAppend = messages.size >= a2uiHistoryAppliedCount &&
+                    appliedPrefix != null &&
+                    messages.subList(0, a2uiHistoryAppliedCount) == appliedPrefix
+
+                if (isAppend) {
+                    val trailing = messages.subList(a2uiHistoryAppliedCount, messages.size)
+                    if (trailing.isNotEmpty()) {
+                        a2uiSurfaceManager.applyMessages(trailing)
+                    }
+                } else {
+                    a2uiSurfaceManager.replaceWith(messages)
+                }
+
                 a2uiHistorySignature = signature
+                a2uiHistoryAppliedCount = messages.size
+                a2uiHistoryAppliedPrefix = messages.toList()
             }
         }
         return a2uiSurfaceManager.surfaces.value
@@ -188,6 +207,8 @@ internal class AdminChatA2uiCoordinator(
             }
         }
     }
+
+    fun getA2uiThinkingStartMessageCount(): Int? = a2uiThinkingStartMessageCount
 
     fun clearA2uiThinkingOnResponse() {
         a2uiThinkingStartMessageCount = null
