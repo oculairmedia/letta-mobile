@@ -120,7 +120,7 @@ import kotlin.math.max
  * call-site stops feeding tools through, so flipping to true re-enables
  * the row without any other change.
  */
-private const val TOOL_AFFORDANCE_ROW_ENABLED = false
+private const val TOOL_AFFORDANCE_ROW_ENABLED = true
 
 @Composable
 internal fun ChatScreen(
