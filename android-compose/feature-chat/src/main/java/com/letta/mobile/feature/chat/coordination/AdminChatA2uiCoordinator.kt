@@ -189,6 +189,8 @@ internal class AdminChatA2uiCoordinator(
         }
     }
 
+    fun getA2uiThinkingStartMessageCount(): Int? = a2uiThinkingStartMessageCount
+
     fun clearA2uiThinkingOnResponse() {
         a2uiThinkingStartMessageCount = null
         a2uiThinkingTimeoutJob?.cancel()
