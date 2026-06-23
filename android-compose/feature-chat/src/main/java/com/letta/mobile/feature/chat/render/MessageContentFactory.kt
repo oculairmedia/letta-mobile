@@ -229,10 +229,10 @@ private fun String.looksLikeMarkdownTableSeparator(start: Int, endExclusive: Int
  * letta-mobile-6p4o.
  *
  * Fix:
- *  - **A**: while streaming, render only the prefix up to the last
- *    whitespace/punctuation — i.e. hold the trailing partial-word
- *    until the next chunk completes it. When `isStreaming = false`,
- *    render the full text.
+ *  - **A**: while streaming, render every received character. Earlier
+ *    revisions hid trailing partial words, but that made acronyms and
+ *    short tokens appear to drop letters on-device (for example `A2UI`
+ *    rendering as `AUI` while streaming).
  *  - **Markdown repair**: when the tail is inside an incomplete markdown
  *    construct, pass the raw tail through so the design-system renderer can
  *    close it synthetically for display instead of hiding it.
@@ -240,9 +240,8 @@ private fun String.looksLikeMarkdownTableSeparator(start: Int, endExclusive: Int
  *    partial text reads as "in progress" rather than "broken".
  *
  * Long-tail safety:
- *  - If the unrendered trailing fragment grows past
- *    `MAX_HELD_TAIL_CHARS`, emit it anyway. Avoids stalling on long
- *    base64-/URL-/non-whitespace chunks.
+ *  - Plain prose is no longer word-boundary clamped; rendering all received
+ *    characters is safer than hiding suffixes on narrow mobile frames.
  *  - Inside an unclosed fenced code block we skip the cursor (it'd be
  *    rendered as literal text inside the code) and skip the clamp
  *    (whitespace inside code blocks is meaningful and we don't want to
@@ -253,8 +252,7 @@ private const val STREAMING_CURSOR = "\u258E" // ▎ LEFT VERTICAL BAR
 internal const val MAX_HELD_TAIL_CHARS = 24
 
 internal fun streamingDisplayText(raw: String): String {
-    // letta-mobile-flk2 (revision 11+): word-boundary clamp plus markdown-tail
-    // handoff.
+    // letta-mobile-flk2 (revision 11+): markdown-tail handoff.
     //
     // Background: mikepenz's renderer parses the full text on every
     // re-emission. While streaming, the latest tail almost always
@@ -271,7 +269,8 @@ internal fun streamingDisplayText(raw: String): String {
     // Current mitigation: let obvious markdown tails through unchanged. The
     // design-system streaming renderer repairs that tail into syntactically
     // valid markdown for display only, which preserves live formatting without
-    // leaking raw delimiters. Plain prose still uses the word-boundary clamp.
+    // leaking raw delimiters. Plain prose also renders as-received; the cursor
+    // communicates that the tail is still in progress.
     //
     // Inside an open ``` fence we skip the clamp entirely (whitespace
     // is meaningful in code, and the parser already renders the
@@ -294,10 +293,10 @@ internal fun streamingDisplayText(raw: String): String {
     //     when new chunks arrive.
     //  3. Incomplete tail markup (open **, *, _, __, `, ~~, [) passes
     //     through unclamped — the renderer repairs it.
-    //  4. Fenced code/math block transitions are clean — word-boundary
-    //     clamp is skipped inside open fences.
-    //  5. Plain prose uses word-boundary clamping to avoid mid-word
-    //     garble from arbitrary chunk boundaries.
+    //  4. Fenced code/math block transitions are clean — open fence content
+    //     passes through unchanged.
+    //  5. Plain prose renders as-received; the streaming cursor communicates
+    //     partialness without hiding already-arrived characters.
     //
     // See StreamingDisplayTextTest for exhaustive contract verification.
     if (raw.isEmpty()) return ""
@@ -307,12 +306,7 @@ internal fun streamingDisplayText(raw: String): String {
     if (hasOpenDisplayMathFence(raw)) {
         return raw
     }
-    val stableMarkdownPrefix = clampToStableMarkdown(raw)
-    return if (stableMarkdownPrefix.length < raw.length) {
-        raw
-    } else {
-        clampToWordBoundary(raw)
-    }
+    return raw
 }
 
 @VisibleForTesting

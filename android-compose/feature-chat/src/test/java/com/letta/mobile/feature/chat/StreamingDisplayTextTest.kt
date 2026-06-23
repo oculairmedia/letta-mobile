@@ -26,10 +26,10 @@ import org.junit.jupiter.api.Tag
  * 3. **Incomplete tail passes through.** Open `**`, `*`, `_`, `__`, `` ` ``,
  *    `~~`, `[text]`(no url yet), `$$`, ` ``` ` cause full raw tail to pass
  *    through unclamped.  Renderer repairs markup synthetically.
- * 4. **Fence transitions clean.** Inside open ` ``` ` or `$$` fence, no
- *    word-boundary clamp.  When closed, clamp re-engages.
- * 5. **Plain prose uses word-boundary clamp.** Trailing partial words held
- *    until next chunk avoids mid-word garble.
+ * 4. **Fence transitions clean.** Inside open ` ``` ` or `$$` fence, raw
+ *    content passes through; once closed, prose still renders as-received.
+ * 5. **Plain prose renders as-received.** The cursor communicates partialness
+ *    without hiding already-arrived characters.
  *
  * References: llm-typewriter (prefix-stability), letta-mobile-flk2,
  * letta-mobile-6p4o, letta-mobile-c8of.6.
@@ -45,8 +45,8 @@ class StreamingDisplayTextTest {
     }
 
     @Test
-    fun `plain prose clips trailing partial word to last boundary`() {
-        assertEquals("Hello ", streamingDisplayText("Hello wor"))
+    fun `plain prose renders trailing partial word`() {
+        assertEquals("Hello wor", streamingDisplayText("Hello wor"))
     }
 
     @Test
@@ -107,15 +107,12 @@ class StreamingDisplayTextTest {
         assertEquals("See [docs](https://ex", streamingDisplayText("See [docs](https://ex"))
     }
 
-    // Closed markup ending with * or ` (not in STREAMING_BOUNDARY_CHARS)
-    // gets word-boundary-clamped — the closing marker is held until a space
-    // or punctuation arrives in the next chunk. In practice, the smoother
-    // catches up and reveals the full text before the user notices.
+    // Closed markup and plain prose render every received character. The
+    // cursor indicates that the stream may still be mid-token.
 
     @Test
-    fun `closed bold word-boundary clamped until trailing boundary arrives`() {
-        // "**bold text**" — last * is not a boundary, so clamped at space
-        assertEquals("**bold ", streamingDisplayText("**bold text**"))
+    fun `closed bold renders fully even without trailing boundary`() {
+        assertEquals("**bold text**", streamingDisplayText("**bold text**"))
     }
 
     @Test
@@ -124,13 +121,13 @@ class StreamingDisplayTextTest {
     }
 
     @Test
-    fun `closed italic word-boundary clamped until trailing boundary arrives`() {
-        assertEquals("*italic ", streamingDisplayText("*italic text*"))
+    fun `closed italic renders fully even without trailing boundary`() {
+        assertEquals("*italic text*", streamingDisplayText("*italic text*"))
     }
 
     @Test
-    fun `closed inline code word-boundary clamped`() {
-        assertEquals("Run `ls` ", streamingDisplayText("Run `ls` now"))
+    fun `closed inline code renders full text`() {
+        assertEquals("Run `ls` now", streamingDisplayText("Run `ls` now"))
     }
 
     @Test
@@ -173,9 +170,9 @@ class StreamingDisplayTextTest {
     }
 
     @Test
-    fun `closed code fence re-engages word-boundary clamp`() {
-        val result = streamingDisplayText("```kt\nval x = 1\n```\n\nNow tex")
-        assertTrue(result.startsWith("```kt\nval x = 1\n```\n\nNow "))
+    fun `closed code fence preserves trailing prose`() {
+        val input = "```kt\nval x = 1\n```\n\nNow tex"
+        assertEquals(input, streamingDisplayText(input))
     }
 
     @Test
@@ -185,7 +182,7 @@ class StreamingDisplayTextTest {
         assertEquals("Intro\n\n```kt\nval x = 1\nval y", step2)
         val step3 = streamingDisplayText("Intro\n\n```kt\nval x = 1\n```\n\nNext paragrap")
         assertTrue(step3.contains("```kt\nval x = 1\n```"))
-        assertTrue(step3.contains("Next "))
+        assertTrue(step3.contains("Next paragrap"))
     }
 
     // ── Display math fence transitions ──
@@ -197,9 +194,9 @@ class StreamingDisplayTextTest {
     }
 
     @Test
-    fun `closed display math re-engages word-boundary clamp`() {
-        val result = streamingDisplayText("Here:\n\n\$\$x^2+y^2=z^2\$\$\n\nConclusion rea")
-        assertTrue(result.contains("\$\$x^2+y^2=z^2\$\$"))
+    fun `closed display math preserves trailing prose`() {
+        val input = "Here:\n\n\$\$x^2+y^2=z^2\$\$\n\nConclusion rea"
+        assertEquals(input, streamingDisplayText(input))
     }
 
     @Test
@@ -504,15 +501,17 @@ class StreamingDisplayTextTest {
     fun `contract-4 fence transitions clean`() {
         assertEquals("```kt\nval x", streamingDisplayText("```kt\nval x"))
         val closed = streamingDisplayText("```kt\nval x = 1\n```\n\nProse her")
-        assertTrue(closed.contains("```kt\nval x = 1\n```"))
+        assertEquals("```kt\nval x = 1\n```\n\nProse her", closed)
         assertEquals("\$\$x^2", streamingDisplayText("\$\$x^2"))
         val closedMath = streamingDisplayText("\$\$x=1\$\$\n\nFinal wor")
-        assertTrue(closedMath.contains("\$\$x=1\$\$"))
+        assertEquals("\$\$x=1\$\$\n\nFinal wor", closedMath)
     }
 
-    /** CONTRACT 5: Plain prose uses word-boundary clamping. */
+    /** CONTRACT 5: Plain prose renders every received character. */
     @Test
-    fun `contract-5 plain prose clips to word boundary`() {
-        assertEquals("Hello ", streamingDisplayText("Hello wor"))
+    fun `contract-5 plain prose preserves partial words and acronyms`() {
+        assertEquals("Hello wor", streamingDisplayText("Hello wor"))
+        assertEquals("#639 A2UI", streamingDisplayText("#639 A2UI"))
+        assertEquals("Jules queue", streamingDisplayText("Jules queue"))
     }
 }
