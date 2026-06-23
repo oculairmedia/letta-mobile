@@ -188,6 +188,9 @@ fun AppNavGraph(
             onNavigateToAdmin = {
                 navController.navigate(AdminRoute)
             },
+            onNavigateToSchedules = {
+                navController.navigate(SchedulesRoute)
+            },
             onNavigateToConversationList = {
                 navController.navigate(ConversationsRoute)
             },
