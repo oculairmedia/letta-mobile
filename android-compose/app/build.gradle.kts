@@ -1297,11 +1297,20 @@ if (embeddedLettaCodeAssetsEnabled.get()) {
         // prep. Wire them so :app:assemble*Release works with
         // -PembedLettaCodeAssets=true (and so the CI release path is clean).
         if (
-            (name.startsWith("lintVital") || name.startsWith("generate") && name.contains("LintVital")) &&
+            (name.startsWith("lintVital") || (name.startsWith("generate") && name.contains("LintVital"))) &&
             name.contains("Release")
         ) {
             dependsOn(prepareEmbeddedLettaCodeAssets)
         }
+    }
+
+    // Catch late-instantiated tasks using matching, as whenTaskAdded seems to
+    // break eager task evaluation in AGP 8.x
+    tasks.matching {
+        (it.name.startsWith("lintVital") || (it.name.startsWith("generate") && it.name.contains("LintVital"))) &&
+        it.name.contains("Release")
+    }.configureEach {
+        dependsOn(prepareEmbeddedLettaCodeAssets)
     }
 }
 
