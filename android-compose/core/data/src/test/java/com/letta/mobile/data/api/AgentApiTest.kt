@@ -20,7 +20,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -71,6 +71,54 @@ class AgentApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
         val agent = api.getAgent("a1")
         assertTrue(capturedUrl!!.contains("/v1/agents/a1"))
         assertEquals("MyAgent", agent.name)
+    }
+
+    @Test
+    fun `getContextWindow requests mobile-safe overview`() = runTest {
+        var capturedUrl: String? = null
+        val client = trackClient(HttpClient(MockEngine { request ->
+            capturedUrl = request.url.toString()
+            respond(
+                """{"context_window_size_max":4096,"context_window_size_current":256,"num_messages":3}""",
+                HttpStatusCode.OK,
+                jsonHeaders,
+            )
+        }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val overview = api.getContextWindow("a1", "conversation-1")
+
+        assertTrue(capturedUrl!!.contains("/v1/agents/a1/context"))
+        assertTrue(capturedUrl!!.contains("conversation_id=conversation-1"))
+        assertTrue(capturedUrl!!.contains("mobile_safe=true"))
+        assertTrue(capturedUrl!!.contains("include_raw=false"))
+        assertEquals(4096, overview.contextWindowSizeMax)
+        assertEquals(256, overview.contextWindowSizeCurrent)
+        assertEquals(3, overview.numMessages)
+    }
+
+    @Test
+    fun `getContextWindow rejects oversized response before buffering body`() = runTest {
+        val client = trackClient(HttpClient(MockEngine {
+            respond(
+                "{}",
+                HttpStatusCode.OK,
+                headersOf(
+                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                    HttpHeaders.ContentLength to listOf((1024 * 1024).toString()),
+                ),
+            )
+        }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val exception = assertThrows(AgentApi.ResponseTooLargeException::class.java) {
+            kotlinx.coroutines.runBlocking { api.getContextWindow("a1") }
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge.value, exception.code)
     }
 
     @Test

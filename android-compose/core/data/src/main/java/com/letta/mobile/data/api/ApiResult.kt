@@ -10,7 +10,7 @@ sealed interface ApiResult<out T> {
     data class NetworkError(val exception: Throwable) : ApiResult<Nothing>
 }
 
-class ApiException(val code: Int, message: String) : Exception(message)
+open class ApiException(val code: Int, message: String) : Exception(message)
 
 /**
  * Thrown by [MessageApi.streamConversation] when the conversation has no active run
