@@ -528,4 +528,32 @@ class ChatMessageListScrollTest {
             layoutDirection = layoutDirection,
             activeFontScale = activeFontScale,
         )
+
+    @Test
+    fun `streaming geometry floor is invalidated across chatFontScaleBucket changes`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val baseScale = single("assistant", content = "Streaming response...")
+            .chatGeometrySignature(activeFontScale = 1.0f)
+        val smallerScale = single("assistant", content = "Streaming response...")
+            .chatGeometrySignature(activeFontScale = 0.8f)
+
+        state.recordMeasuredHeight(baseScale, heightPx = 300, isStreaming = true)
+
+        assertEquals(300, state.heightFloorFor(baseScale, isStreaming = true))
+        assertEquals(0, state.heightFloorFor(smallerScale, isStreaming = true))
+    }
+
+    @Test
+    fun `exact height is invalidated across chatFontScaleBucket changes`() {
+        val state = ChatMessageGeometryState(maxEntries = 8)
+        val baseScale = single("assistant", content = "Settled response.")
+            .chatGeometrySignature(activeFontScale = 1.0f)
+        val largerScale = single("assistant", content = "Settled response.")
+            .chatGeometrySignature(activeFontScale = 1.5f)
+
+        state.recordMeasuredHeight(baseScale, heightPx = 150, isStreaming = false)
+
+        assertEquals(150, state.heightFloorFor(baseScale, isStreaming = false))
+        assertEquals(0, state.heightFloorFor(largerScale, isStreaming = false))
+    }
 }
