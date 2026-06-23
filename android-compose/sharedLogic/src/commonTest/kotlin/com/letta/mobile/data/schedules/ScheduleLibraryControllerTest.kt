@@ -134,6 +134,109 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
+    fun nativeRouteUnavailableFallsBackToCronListNotUnavailableState() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val crons = listOf(
+            CronTask(id = "c1", agentId = "a1", name = "Daily digest", cron = "0 9 * * *", recurring = true),
+            CronTask(id = "c2", agentId = "a1", name = "Hourly", cron = "0 * * * *", recurring = true),
+        )
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { crons },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(listOf("c1", "c2"), state.crons.map { it.id })
+        assertEquals("No schedules for this agent.", state.emptyMessage)
+    }
+
+    @Test
+    fun nativeRouteUnavailableWithEmptyCronListShowsEmptyNotUnavailable() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { emptyList() },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(emptyList(), state.crons)
+        assertEquals("No schedules for this agent.", state.emptyMessage)
+    }
+
+    @Test
+    fun bothNativeAndCronRoutesUnavailableShowsUnavailableState() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { throw RouteUnavailableException() },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(false, state.cronMode)
+        assertEquals(false, state.scheduleAdminAvailable)
+        assertEquals(SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE, state.scheduleAdminMessage)
+        assertEquals(emptyList(), state.crons)
+    }
+
+    @Test
+    fun nativeRouteUnavailableWithoutCronSourceStillShowsUnavailable() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val controller = controller(scheduleRepository = scheduleRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(false, state.cronMode)
+        assertEquals(false, state.scheduleAdminAvailable)
+        assertEquals(SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE, state.scheduleAdminMessage)
+    }
+
+    @Test
+    fun selectAgentOnUnavailableRouteFallsBackToCronList() = runTest {
+        val scheduleRepository = FakeScheduleRepository()
+        val crons = listOf(CronTask(id = "c1", agentId = "a2", name = "A2 cron", cron = "0 9 * * *", recurring = true))
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { crons },
+        )
+        controller.start()
+        advanceUntilIdle()
+
+        // Now make the native route unavailable and switch agents.
+        scheduleRepository.error = RouteUnavailableException()
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals("a2", state.selectedAgentId)
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(listOf("c1"), state.crons.map { it.id })
+    }
+
+    @Test
     fun malformedAndEmptySchedulesConvertGracefullyWithoutCrashing() {
         val emptyMessageSchedule = ScheduledMessage(
             id = "empty",
@@ -161,11 +264,13 @@ class ScheduleLibraryControllerTest {
     private fun TestScope.controller(
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
+        cronSource: CronScheduleSource? = null,
     ) = ScheduleLibraryController(
         agentRepository = agentRepository,
         scheduleRepository = scheduleRepository,
         scope = this,
         scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
+        cronSource = cronSource,
     )
 
     private class RouteUnavailableException : RuntimeException("route unavailable")

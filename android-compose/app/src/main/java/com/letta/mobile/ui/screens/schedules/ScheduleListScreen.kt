@@ -45,8 +45,10 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleLibraryItem
 import com.letta.mobile.data.schedules.ScheduleTiming
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -89,7 +91,13 @@ fun ScheduleListScreen(
             )
         },
         floatingActionButton = {
-            if (successState?.data?.scheduleAdminAvailable != false) {
+            // Native schedule admin: show the create FAB. In cron-backed mode
+            // (fallback for self-hosted backends) the list is read-only for
+            // now — cron create/delete is not yet wired on mobile — so
+            // the FAB stays hidden to avoid a create that the native route
+            // can't satisfy.
+            val data = successState?.data
+            if (data != null && data.scheduleAdminAvailable && !data.cronMode) {
                 FloatingActionButton(onClick = { showCreateDialog = true }) {
                     Icon(LettaIcons.Add, stringResource(R.string.screen_schedules_add_title))
                 }
@@ -113,7 +121,7 @@ fun ScheduleListScreen(
     }
 
     val state = successState?.data
-    if (showCreateDialog && state != null && state.scheduleAdminAvailable) {
+    if (showCreateDialog && state != null && state.scheduleAdminAvailable && !state.cronMode) {
         CreateScheduleDialog(
             agents = state.agents,
             selectedAgentId = state.selectedAgentId,
@@ -157,7 +165,29 @@ private fun ScheduleListContent(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        if (!state.scheduleAdminAvailable) {
+        if (state.cronMode) {
+            // Cron-backed fallback (self-hosted / admin-shim backends that
+            // don't serve the native schedule route). An empty cron list is
+            // a real "0 schedules", NOT the unavailable wall. Parity with the
+            // desktop schedules surface.
+            val crons = state.cronsForSelectedAgent
+            if (crons.isEmpty()) {
+                EmptyState(
+                    icon = LettaIcons.AccessTime,
+                    message = stringResource(R.string.screen_schedules_empty),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(crons, key = { it.id }) { cron ->
+                        CronScheduleCard(cron = cron)
+                    }
+                }
+            }
+        } else if (!state.scheduleAdminAvailable) {
             EmptyState(
                 icon = LettaIcons.AccessTime,
                 message = state.scheduleAdminMessage ?: stringResource(R.string.screen_schedules_unavailable),
@@ -276,6 +306,48 @@ private fun ScheduleCard(
                     Icon(LettaIcons.Delete, stringResource(R.string.action_delete))
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CronScheduleCard(
+    cron: CronTask,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = LettaCardDefaults.listCardColors(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = cron.name?.takeIf { it.isNotBlank() }
+                    ?: cron.prompt?.takeIf { it.isNotBlank() }
+                    ?: cron.id,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            cron.description?.takeIf { it.isNotBlank() }?.let { desc ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = desc,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = stringResource(
+                    R.string.screen_schedules_recurring_label,
+                    cron.cron?.takeIf { it.isNotBlank() } ?: "—",
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
