@@ -142,6 +142,7 @@ internal fun ChatDetailPane(
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
+    composerPlaceholder: String = "Message…",
     modifier: Modifier = Modifier,
 ) {
     // Drive the ambient glow off the thinking state: a teal breath while the
@@ -198,6 +199,7 @@ internal fun ChatDetailPane(
                 modelOptions = modelOptions,
                 onModelSelected = onModelSelected,
                 commands = commands,
+                placeholder = composerPlaceholder,
                 onTextChanged = onComposerTextChanged,
                 onSend = onSend,
                 onAttachImage = onAttachImage,
@@ -1212,6 +1214,7 @@ private fun ComposerBar(
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
+    placeholder: String,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
@@ -1325,7 +1328,7 @@ private fun ComposerBar(
                             }
                         },
                     maxLines = 5,
-                    placeholder = "Message Meridian…",
+                    placeholder = placeholder,
                     undecorated = true,
                 )
                 Row(

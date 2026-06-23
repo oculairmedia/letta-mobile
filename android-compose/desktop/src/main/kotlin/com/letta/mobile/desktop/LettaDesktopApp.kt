@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Memory
@@ -69,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -82,6 +84,9 @@ import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.lens.WorkPlayLens
+import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.SubagentRepository
@@ -261,6 +266,8 @@ fun LettaDesktopApp(
         }
     }
     var showBackgroundTasks by remember { mutableStateOf(false) }
+    // Work | Play presentation lens over the same agents/memory/conversations.
+    var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -451,6 +458,8 @@ fun LettaDesktopApp(
                     thinkingConversationId = thinkingConversationId,
                     deletingConversationIds = deletingConversationIds,
                     selectedDestination = selectedDestination,
+                    mode = workPlayMode,
+                    onModeChange = { workPlayMode = it },
                     onDestinationSelected = { selectedDestination = it },
                     onConversationSelected = {
                         chatController.selectConversation(it)
@@ -494,6 +503,7 @@ fun LettaDesktopApp(
                         ChatDetailPane(
                             state = chatState,
                             isThinking = isThinkingSelected,
+                            composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                             modelOptions = modelOptions,
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,
@@ -1069,6 +1079,8 @@ private fun DesktopAgentSidebar(
     thinkingConversationId: String?,
     deletingConversationIds: Set<String> = emptySet(),
     selectedDestination: DesktopDestination,
+    mode: WorkPlayMode,
+    onModeChange: (WorkPlayMode) -> Unit,
     onDestinationSelected: (DesktopDestination) -> Unit,
     onConversationSelected: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
@@ -1083,6 +1095,12 @@ private fun DesktopAgentSidebar(
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        // Work | Play lens switcher (Penpot "App Mockups v2": top of sidebar).
+        WorkPlaySwitcher(
+            mode = mode,
+            onModeChange = onModeChange,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        )
         // Agent header.
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1140,39 +1158,24 @@ private fun DesktopAgentSidebar(
             }
         }
 
+        WorkPlayLens.navDestinations(mode).forEach { lensDestination ->
+            val target = lensNavTarget(mode, lensDestination)
+            DesktopNavRow(
+                label = WorkPlayLens.destinationLabel(mode, lensDestination),
+                icon = target.second,
+                selected = selectedDestination == target.first,
+                onClick = { onDestinationSelected(target.first) },
+            )
+        }
         DesktopNavRow(
-            label = "Memory",
-            icon = Icons.Outlined.Psychology,
-            selected = selectedDestination == DesktopDestination.Memory,
-            onClick = { onDestinationSelected(DesktopDestination.Memory) },
-        )
-        DesktopNavRow(
-            label = "Schedules",
-            icon = Icons.Outlined.Schedule,
-            selected = selectedDestination == DesktopDestination.Schedules,
-            onClick = { onDestinationSelected(DesktopDestination.Schedules) },
-        )
-        DesktopNavRow(
-            label = "Channels",
-            icon = Icons.Outlined.Hub,
-            selected = selectedDestination == DesktopDestination.Channels,
-            onClick = { onDestinationSelected(DesktopDestination.Channels) },
-        )
-        DesktopNavRow(
-            label = "Skills",
-            icon = Icons.Outlined.Build,
-            selected = selectedDestination == DesktopDestination.Agents,
-            onClick = { onDestinationSelected(DesktopDestination.Agents) },
-        )
-        DesktopNavRow(
-            label = "New chat",
+            label = WorkPlayLens.newConversationLabel(mode),
             icon = Icons.Outlined.Edit,
             selected = false,
             onClick = onNewChat,
         )
 
-        // Pinned conversations.
-        SidebarSection("Pinned")
+        // Pinned conversations / scenes.
+        SidebarSection(WorkPlayLens.conversationsHeader(mode))
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1451,6 +1454,62 @@ private fun SidebarSection(label: String) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(top = 10.dp, start = 4.dp, bottom = 2.dp),
     )
+}
+
+/** Maps a lens nav item to its concrete desktop destination + icon for the mode. */
+private fun lensNavTarget(
+    mode: WorkPlayMode,
+    destination: LensDestination,
+): Pair<DesktopDestination, ImageVector> = when (destination) {
+    LensDestination.Memory -> DesktopDestination.Memory to Icons.Outlined.Psychology
+    LensDestination.Schedules -> DesktopDestination.Schedules to Icons.Outlined.Schedule
+    LensDestination.Channels -> DesktopDestination.Channels to Icons.Outlined.Hub
+    LensDestination.Skills -> DesktopDestination.Agents to
+        if (mode == WorkPlayMode.Play) Icons.Outlined.Group else Icons.Outlined.Build
+    LensDestination.Conversations -> DesktopDestination.Conversations to Icons.Outlined.ChatBubbleOutline
+}
+
+/** Segmented Work | Play toggle (Penpot "App Mockups v2", top of the sidebar). */
+@Composable
+private fun WorkPlaySwitcher(
+    mode: WorkPlayMode,
+    onModeChange: (WorkPlayMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(modifier = Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            WorkPlayMode.entries.forEach { option ->
+                val selected = option == mode
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.surfaceContainerLowest else Color.Transparent,
+                        )
+                        .clickable { onModeChange(option) }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = WorkPlayLens.modeLabel(option),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable
