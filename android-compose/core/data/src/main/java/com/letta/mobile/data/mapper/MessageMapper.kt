@@ -667,6 +667,9 @@ fun AppMessage.toUiMessage(): UiMessage {
                     result = content.ifBlank { null },
                     toolCallId = toolCallId,
                     subagentDispatch = subagentDispatch,
+                    generatedImageAttachments = attachments.map {
+                        UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
+                    },
                 )
             )
         }
