@@ -204,4 +204,20 @@ class StreamingMarkdownRepairTest {
             repairIncompleteMarkdownForStreaming("foo_bar"),
         )
     }
+
+    @Test
+    fun `repairs open a2ui tag even with numbers and acronyms inside`() {
+        assertEquals(
+            "Some text <a2ui-json>{\"queue\":\"Jules queue\",\"A2UI\":true</a2ui-json>",
+            repairIncompleteMarkdownForStreaming("Some text <a2ui-json>{\"queue\":\"Jules queue\",\"A2UI\":true"),
+        )
+    }
+
+    @Test
+    fun `does not lose characters like numbers and acronyms in incomplete inline code`() {
+        assertEquals(
+            "Here is `A2UI 123 Jules queue`",
+            repairIncompleteMarkdownForStreaming("Here is `A2UI 123 Jules queue"),
+        )
+    }
 }
