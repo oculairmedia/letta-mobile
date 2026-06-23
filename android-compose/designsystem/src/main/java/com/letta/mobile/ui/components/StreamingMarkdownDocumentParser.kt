@@ -45,7 +45,7 @@ internal object StreamingMarkdownDocumentParser {
                 else -> parseParagraph(normalized, line)
             }
 
-            blocks += parsed
+            blocks.add(parsed)
             cursor = parsed.startOffset + parsed.source.length
         }
 

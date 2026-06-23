@@ -563,6 +563,7 @@ internal fun ChatScreen(
                         visible = state.isAgentTyping,
                         delayMessage = state.a2uiThinkingDelayMessage,
                         reducedMotion = reducedMotion,
+                        reserveSpace = state.isStreaming || state.isAgentTyping || !state.a2uiThinkingDelayMessage.isNullOrBlank(),
                     )
 
                     val launchPicker = rememberImageAttachmentPicker(
