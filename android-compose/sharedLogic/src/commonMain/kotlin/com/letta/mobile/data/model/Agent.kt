@@ -43,6 +43,27 @@ data class CompactionSettings(
     @SerialName("sliding_window_percentage") val slidingWindowPercentage: Double? = null,
 )
 
+/**
+ * Lightweight projection of an agent used by picker UIs (e.g. the Schedules
+ * dropdown). Mirrors the admin-shim's opt-in `GET /v1/agents?slim=true`
+ * response, which returns only `{id, name, description}` and skips the
+ * per-agent [Agent]/`AgentState` synthesis (system prompt, message_ids,
+ * llm_config, tool_rules, blocks, …) that bloats the default
+ * `/v1/agents` response to ~621KB for 50 agents.
+ *
+ * This is intentionally NOT the full [Agent] model: the slim response omits
+ * required fields ([Agent.name] is required but all the rest default, and
+ * strict screens still need the full object). Keep this model lenient and
+ * minimal — adapt at the boundary rather than widening it to satisfy a
+ * consumer that wants the heavy type.
+ */
+@Serializable
+data class AgentSummary(
+    val id: AgentId,
+    val name: String = "",
+    val description: String? = null,
+)
+
 @Serializable
 data class Agent(
     val id: AgentId,

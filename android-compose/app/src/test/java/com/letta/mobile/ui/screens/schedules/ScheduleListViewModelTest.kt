@@ -202,6 +202,8 @@ class ScheduleListViewModelTest {
 
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
         override suspend fun refreshAgents() {}
+        override suspend fun listAgentSummaries(): List<com.letta.mobile.data.model.AgentSummary> =
+            _agents.value.map { com.letta.mobile.data.model.AgentSummary(id = it.id, name = it.name, description = it.description) }
         override fun getAgent(id: String): Flow<Agent> = flow { emit(_agents.value.first { it.id.value == id }) }
         override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): Agent = _agents.value.first()
         override suspend fun updateAgent(id: String, params: com.letta.mobile.data.model.AgentUpdateParams): Agent = _agents.value.first { it.id.value == id }

@@ -5,6 +5,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
@@ -22,6 +23,12 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         calls.add("listAgents")
         if (shouldFail) throw ApiException(failCode, failMessage)
         return agents.toList()
+    }
+
+    override suspend fun listAgentsSlim(limit: Int?, offset: Int?, tags: List<String>?): List<AgentSummary> {
+        calls.add("listAgentsSlim")
+        if (shouldFail) throw ApiException(failCode, failMessage)
+        return agents.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
     }
 
     override suspend fun getAgent(agentId: AgentId): Agent {
