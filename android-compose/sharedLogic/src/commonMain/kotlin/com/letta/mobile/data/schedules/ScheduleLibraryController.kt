@@ -107,6 +107,17 @@ class ScheduleLibraryController(
      * preserves the legacy behaviour for callers that don't wire it.
      */
     private val cronSource: CronScheduleSource? = null,
+    /**
+     * Optional agent to pre-select when the surface is opened from a context
+     * that already knows the "current" agent (e.g. the chat drawer's
+     * Schedules entry point). When non-null and present in the loaded agents
+     * list, it is preferred as the initial selection; otherwise selection
+     * falls back to the existing [resolveSelection] behaviour (first agent).
+     * Defaults to null so every other entry point (admin/conversations
+     * menus) keeps the original "no pre-selected agent" behaviour. Mirrors
+     * the Memory surface, which carries the agent id through MemoryRoute.
+     */
+    private val initialAgentId: String? = null,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
@@ -116,6 +127,13 @@ class ScheduleLibraryController(
 
     fun start() {
         if (stateFlow.value.agents.isEmpty() && stateFlow.value.schedules.isEmpty()) {
+            // Seed the requested agent BEFORE loading so loadData()'s
+            // resolveSelection prefers it (when it exists in the agents list)
+            // and otherwise falls back gracefully. A null initialAgentId
+            // leaves selectedAgentId null, preserving the legacy default.
+            if (initialAgentId != null && stateFlow.value.selectedAgentId == null) {
+                stateFlow.update { it.copy(selectedAgentId = initialAgentId) }
+            }
             loadData()
         }
     }
