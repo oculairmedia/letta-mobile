@@ -122,6 +122,53 @@ class AgentApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
     }
 
     @Test
+    fun `getContextWindow rejects incremental response larger than max bytes`() = runTest {
+        val client = trackClient(HttpClient(MockEngine {
+            // Emulate chunked transfer by omitting Content-Length and writing a large body
+            // We'll write slightly more than MAX_CONTEXT_WINDOW_RESPONSE_BYTES
+            val largeBody = "a".repeat(512 * 1024 + 10)
+            respond(
+                largeBody,
+                HttpStatusCode.OK,
+                headersOf(
+                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())
+                ),
+            )
+        }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val exception = assertThrows(AgentApi.ResponseTooLargeException::class.java) {
+            kotlinx.coroutines.runBlocking { api.getContextWindow("a1") }
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge.value, exception.code)
+    }
+
+    @Test
+    fun `getContextWindow succeeds for small response`() = runTest {
+        val client = trackClient(HttpClient(MockEngine {
+            respond(
+                """{"context_window_size_max":8192,"context_window_size_current":1024,"num_messages":5}""",
+                HttpStatusCode.OK,
+                headersOf(
+                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                    // Explicitly set content length
+                    HttpHeaders.ContentLength to listOf("88"),
+                ),
+            )
+        }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val overview = api.getContextWindow("a1")
+        assertEquals(8192, overview.contextWindowSizeMax)
+        assertEquals(1024, overview.contextWindowSizeCurrent)
+        assertEquals(5, overview.numMessages)
+    }
+
+    @Test
     fun `createAgent sends POST with body`() = runTest {
         var capturedMethod: HttpMethod? = null
         val client = trackClient(HttpClient(MockEngine { request ->
