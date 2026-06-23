@@ -175,6 +175,22 @@ class ChatConversationCoordinatorTest {
     }
 
     @Test
+    fun `resetting conversation puts state in NoConversation to prevent history inheritance`() = runTest {
+        val harness = ChatConversationCoordinatorTestHarness(
+            scope = this,
+            agentId = "agent-1",
+            isFreshRoute = true
+        )
+
+        // Simulate resolving an existing conversation first
+        harness.coordinator.loadMessages(useClientModeForCurrentRoute = false)
+        assertEquals(ConversationState.Ready("conv-existing"), harness.uiState.value.conversationState)
+
+        harness.coordinator.resetClientModeConversationState()
+        assertEquals(ConversationState.NoConversation, harness.uiState.value.conversationState)
+    }
+
+    @Test
     fun `explicit timeline route hydrates requested conversation and starts observer`() = runTest {
         val harness = Harness(scope = this, explicitConversationId = "conv-explicit")
 
