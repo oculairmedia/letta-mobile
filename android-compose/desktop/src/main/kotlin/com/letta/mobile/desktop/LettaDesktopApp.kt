@@ -613,6 +613,9 @@ fun LettaDesktopApp(
                     DesktopBackgroundTasksPanel(
                         subagents = activeSubagents,
                         onClose = { showBackgroundTasks = false },
+                        onFetchTodos = subagentRepository?.let { repo ->
+                            { toolCallId -> repo.todos(toolCallId).getOrDefault(emptyList()) }
+                        },
                     )
                 }
             }
