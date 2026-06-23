@@ -2,8 +2,8 @@ package com.letta.mobile.desktop.skills
 
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
-import com.letta.mobile.desktop.chat.desktopChatJson
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -15,15 +15,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Desktop skills API. Skills are a first-class registry on this Letta server:
@@ -31,8 +24,8 @@ import kotlinx.serialization.json.put
  * lists what a given agent has installed, and POST/DELETE on
  * `/v1/agents/{id}/skills` install/uninstall a skill for that agent.
  *
- * The `:desktop` module has no kotlinx-serialization compiler plugin, so
- * responses are parsed via the JSON element API (matching [DesktopCronApi]).
+ * Responses are deserialized with the content-negotiation [body] helper (the
+ * `:desktop` module applies the kotlinx-serialization plugin).
  */
 class DesktopSkillApi(
     private val config: LettaConfig,
@@ -44,23 +37,22 @@ class DesktopSkillApi(
     suspend fun listSkills(): List<DesktopSkill> {
         val response = httpClient.get("$baseUrl/v1/skills") { applyAuth() }
         response.requireSuccess()
-        return parseSkills(response.bodyAsText())
+        return response.body<SkillsResponse>().skills
     }
 
     /** Skills installed on [agentId]. */
     suspend fun listAgentSkills(agentId: String): List<DesktopSkill> {
         val response = httpClient.get("$baseUrl/v1/agents/$agentId/skills") { applyAuth() }
         response.requireSuccess()
-        return parseSkills(response.bodyAsText())
+        return response.body<SkillsResponse>().skills
     }
 
     /** Install [skillName] onto [agentId]. */
     suspend fun installSkill(agentId: String, skillName: String) {
-        val body = buildJsonObject { put("name", skillName) }
         val response = httpClient.post("$baseUrl/v1/agents/$agentId/skills") {
             applyAuth()
             contentType(ContentType.Application.Json)
-            setBody(desktopChatJson.encodeToString(JsonObject.serializer(), body))
+            setBody(InstallSkillRequest(skillName))
         }
         response.requireSuccess()
     }
@@ -70,27 +62,6 @@ class DesktopSkillApi(
         val encoded = skillName.encodeURLPathPart()
         val response = httpClient.delete("$baseUrl/v1/agents/$agentId/skills/$encoded") { applyAuth() }
         response.requireSuccess()
-    }
-
-    private fun parseSkills(body: String): List<DesktopSkill> {
-        val root = desktopChatJson.parseToJsonElement(body)
-        val array: JsonArray = when {
-            root is JsonArray -> root
-            root is JsonObject -> root["skills"]?.jsonArray ?: root["data"]?.jsonArray ?: return emptyList()
-            else -> return emptyList()
-        }
-        return array.mapNotNull { element ->
-            val obj = element.jsonObject
-            val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-            DesktopSkill(
-                name = name,
-                version = obj["version"]?.jsonPrimitive?.contentOrNull,
-                description = obj["description"]?.jsonPrimitive?.contentOrNull,
-                author = obj["author"]?.jsonPrimitive?.contentOrNull,
-                installedCount = obj["installed_count"]?.jsonPrimitive?.intOrNull,
-                tags = obj["tags"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
-            )
-        }
     }
 
     override fun close() {
@@ -108,11 +79,22 @@ class DesktopSkillApi(
     }
 }
 
+@Serializable
 data class DesktopSkill(
     val name: String,
     val version: String? = null,
     val description: String? = null,
     val author: String? = null,
-    val installedCount: Int? = null,
+    @SerialName("installed_count") val installedCount: Int? = null,
     val tags: List<String> = emptyList(),
+)
+
+@Serializable
+private data class SkillsResponse(
+    val skills: List<DesktopSkill> = emptyList(),
+)
+
+@Serializable
+private data class InstallSkillRequest(
+    val name: String,
 )

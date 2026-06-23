@@ -2,28 +2,21 @@ package com.letta.mobile.desktop.commands
 
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
-import com.letta.mobile.desktop.chat.desktopChatJson
 import io.ktor.client.HttpClient
+import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Desktop slash-command API. The server exposes per-agent slash commands at
  * `GET /v1/agents/{id}/slash-commands` (builtins like `/goal` plus any installed
  * skill's commands). Selecting one fills the composer with its command text so
  * the user can add args and send — the server interprets the slash prefix.
- *
- * Parsed via the JSON element API since `:desktop` has no serialization plugin.
  */
 class DesktopSlashCommandApi(
     private val config: LettaConfig,
@@ -34,24 +27,7 @@ class DesktopSlashCommandApi(
     suspend fun listAgentSlashCommands(agentId: String): List<DesktopSlashCommand> {
         val response = httpClient.get("$baseUrl/v1/agents/$agentId/slash-commands") { applyAuth() }
         response.requireSuccess()
-        val root = desktopChatJson.parseToJsonElement(response.bodyAsText())
-        val array: JsonArray = when {
-            root is JsonArray -> root
-            root is JsonObject -> root["commands"]?.jsonArray ?: return emptyList()
-            else -> return emptyList()
-        }
-        return array.mapNotNull { element ->
-            val obj = element.jsonObject
-            val command = obj["command"]?.jsonPrimitive?.contentOrNull?.trim()?.removePrefix("/")
-                ?: return@mapNotNull null
-            DesktopSlashCommand(
-                command = command,
-                name = obj["name"]?.jsonPrimitive?.contentOrNull ?: command,
-                description = obj["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                skillName = obj["skill_name"]?.jsonPrimitive?.contentOrNull,
-                installed = obj["installed"]?.jsonPrimitive?.booleanOrNull ?: false,
-            )
-        }
+        return response.body<SlashCommandsResponse>().commands
     }
 
     override fun close() {
@@ -69,10 +45,20 @@ class DesktopSlashCommandApi(
     }
 }
 
+@Serializable
 data class DesktopSlashCommand(
-    val command: String,
-    val name: String,
+    @SerialName("command") val rawCommand: String,
+    val name: String = "",
     val description: String = "",
-    val skillName: String? = null,
+    @SerialName("skill_name") val skillName: String? = null,
+    val source: String = "",
     val installed: Boolean = false,
+) {
+    /** The command without its leading slash, for matching and composer insertion. */
+    val command: String get() = rawCommand.trim().removePrefix("/")
+}
+
+@Serializable
+private data class SlashCommandsResponse(
+    val commands: List<DesktopSlashCommand> = emptyList(),
 )
