@@ -1,6 +1,10 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -67,6 +71,38 @@ class ThinkingTextTokenTest {
     }
 
     @Test
+    fun `keeps token mounted while reserved streaming slot is active`() {
+        var visible by mutableStateOf(true)
+        var reserveSpace by mutableStateOf(true)
+
+        composeRule.setContent {
+            ThemedToken(
+                visible = visible,
+                delayMessage = null,
+                reducedMotion = true,
+                reserveSpace = reserveSpace,
+            )
+        }
+
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertExists()
+
+        composeRule.runOnIdle { visible = false }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertExists()
+
+        composeRule.runOnIdle { visible = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertExists()
+
+        composeRule.runOnIdle {
+            visible = false
+            reserveSpace = false
+        }
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(0)
+    }
+
+    @Test
     fun `reducedMotion still renders the text`() {
         composeRule.setContent {
             ThemedToken(visible = true, delayMessage = null, reducedMotion = true)
@@ -80,6 +116,7 @@ private fun ThemedToken(
     visible: Boolean,
     delayMessage: String?,
     reducedMotion: Boolean = false,
+    reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(),
 ) {
     LettaTheme(
         appTheme = AppTheme.LIGHT,
@@ -91,6 +128,7 @@ private fun ThemedToken(
                 visible = visible,
                 delayMessage = delayMessage,
                 reducedMotion = reducedMotion,
+                reserveSpace = reserveSpace,
             )
         }
     }
