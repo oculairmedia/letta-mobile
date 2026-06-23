@@ -657,6 +657,64 @@ class TimelineStreamReducerTest {
         output.emittedEvents shouldBe emptyList()
     }
 
+
+    @Test
+    fun `stream text is preserved across tool-call and status transitions`() {
+        // 1. Initial text stream
+        var output = reduce(
+            frame = AssistantMessage(
+                id = "msg-1",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("Lead"),
+                seqId = 1
+            )
+        )
+
+        var event = output.next.events.last() as TimelineEvent.Confirmed
+        event.content shouldBe "Lead"
+
+        // 2. Tool call arrives on the same message ID
+        output = reduce(
+            prev = output.next,
+            frame = com.letta.mobile.data.model.ToolCallMessage(
+                id = "msg-1",
+                toolCalls = listOf(com.letta.mobile.data.model.ToolCall(id = "call-1", name = "my_tool", type = "function")),
+                seqId = 2
+            )
+        )
+
+        event = output.next.events.last() as TimelineEvent.Confirmed
+        event.content shouldBe "Lead"
+        event.toolCalls.size shouldBe 1
+
+        // 3. Tool return arrives
+        output = reduce(
+            prev = output.next,
+            frame = com.letta.mobile.data.model.ToolReturnMessage(
+                id = "return-1",
+                toolCallId = "call-1",
+                status = "success",
+                toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("ok")
+            )
+        )
+
+        event = output.next.events.first { it is TimelineEvent.Confirmed && it.serverId == "msg-1" } as TimelineEvent.Confirmed
+        event.content shouldBe "Lead"
+        event.toolReturnContentByCallId["call-1"] shouldBe "ok"
+
+        // 4. More text arrives for the same message
+        output = reduce(
+            prev = output.next,
+            frame = AssistantMessage(
+                id = "msg-1",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("ing chars"),
+                seqId = 3
+            )
+        )
+
+        event = output.next.events.first { it is TimelineEvent.Confirmed && it.serverId == "msg-1" } as TimelineEvent.Confirmed
+        event.content shouldBe "Leading chars"
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,

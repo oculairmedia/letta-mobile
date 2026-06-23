@@ -123,7 +123,11 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
-    val existing = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
+    var existing = timeline.findByServerId(confirmed.serverId, null)
+    // Do not merge reasoning frames with other frame types sharing the same server id
+    if (existing != null && existing.messageType == TimelineMessageType.REASONING && confirmed.messageType != TimelineMessageType.REASONING) {
+        existing = null
+    }
     if (existing != null) {
         if (existing.hasAlreadyIngestedStreamFrame(confirmed)) {
             hotPathTelemetry(
@@ -137,7 +141,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             return output()
         }
         val oldText = existing.content
-        val newText = confirmed.content
+        val newText = if (confirmed.messageType == TimelineMessageType.TOOL_CALL || confirmed.messageType == TimelineMessageType.TOOL_RETURN || confirmed.messageType == TimelineMessageType.ERROR || confirmed.messageType != existing.messageType) oldText else confirmed.content
         val canUseSnapshotMerge = existing.seqId != null && confirmed.seqId != null
         // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
         // seq id is strictly greater than the text we already hold. A frame with
@@ -177,7 +181,8 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             ),
             pendingToolReturnsByCallId,
         )
-        timeline = timeline.replaceByServerId(merged)
+        val mergedWithType = merged.copy(messageType = existing.messageType)
+        timeline = timeline.replaceByServerId(mergedWithType)
         timeline = timeline.copy(liveCursor = confirmed.serverId)
         pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
         hotPathTelemetry(
