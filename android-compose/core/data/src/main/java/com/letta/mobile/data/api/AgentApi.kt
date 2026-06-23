@@ -3,9 +3,12 @@ package com.letta.mobile.data.api
 import com.letta.mobile.data.model.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.client.request.forms.*
+import io.ktor.utils.io.*
+import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,6 +16,13 @@ import javax.inject.Singleton
 open class AgentApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+        coerceInputValues = true
+    }
+
     open suspend fun listAgents(
         limit: Int? = null,
         offset: Int? = null,
@@ -46,13 +56,17 @@ open class AgentApi @Inject constructor(
     open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/agents/${agentId.value}/context") {
+        return client.prepareGet("$baseUrl/v1/agents/${agentId.value}/context") {
             parameter("conversation_id", conversationId?.value)
+            parameter("mobile_safe", true)
+            parameter("include_raw", false)
+        }.execute { response ->
+            val responseText = response.bodyAsTextAtMost(MAX_CONTEXT_WINDOW_RESPONSE_BYTES)
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, responseText)
+            }
+            json.decodeFromString(ContextWindowOverview.serializer(), responseText)
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
     }
 
     open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
@@ -169,4 +183,39 @@ open class AgentApi @Inject constructor(
     }
 
     open suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
+
+    private suspend fun HttpResponse.bodyAsTextAtMost(maxBytes: Int): String {
+        val declaredLength = headers[HttpHeaders.ContentLength]?.toLongOrNull()
+        if (declaredLength != null && declaredLength > maxBytes) {
+            throw ResponseTooLargeException(maxBytes, declaredLength)
+        }
+
+        val output = ByteArrayOutputStream(minOf(maxBytes, declaredLength?.toInt() ?: READ_BUFFER_BYTES))
+        val buffer = ByteArray(READ_BUFFER_BYTES)
+        val channel = bodyAsChannel()
+        var totalBytes = 0
+
+        while (true) {
+            val bytesRead = channel.readAvailable(buffer, 0, minOf(buffer.size, maxBytes + 1 - totalBytes))
+            if (bytesRead == -1) break
+            if (bytesRead == 0) continue
+            totalBytes += bytesRead
+            if (totalBytes > maxBytes) {
+                throw ResponseTooLargeException(maxBytes, declaredLength)
+            }
+            output.write(buffer, 0, bytesRead)
+        }
+
+        return output.toString(Charsets.UTF_8.name())
+    }
+
+    class ResponseTooLargeException(maxBytes: Int, declaredBytes: Long?) : ApiException(
+        HttpStatusCode.PayloadTooLarge.value,
+        "Context window response is too large for mobile (${declaredBytes ?: "more than $maxBytes"} bytes; cap is $maxBytes bytes)."
+    )
+
+    private companion object {
+        const val MAX_CONTEXT_WINDOW_RESPONSE_BYTES = 512 * 1024
+        const val READ_BUFFER_BYTES = 8 * 1024
+    }
 }
