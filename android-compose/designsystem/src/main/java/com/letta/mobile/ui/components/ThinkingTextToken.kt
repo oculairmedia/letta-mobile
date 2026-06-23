@@ -1,6 +1,8 @@
 package com.letta.mobile.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -60,8 +62,10 @@ fun ThinkingTextToken(
 ) {
     AnimatedVisibility(
         visible = reserveSpace,
-        enter = fadeIn(animationSpec = tween(durationMillis = 180)),
-        exit = fadeOut(animationSpec = tween(durationMillis = 180)),
+        enter = fadeIn(animationSpec = tween(durationMillis = 180)) +
+            expandVertically(animationSpec = tween(durationMillis = 180)),
+        exit = fadeOut(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 160)) +
+            shrinkVertically(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 220)),
         modifier = modifier,
     ) {
         val contentVisible = visible || !delayMessage.isNullOrBlank()
