@@ -673,11 +673,18 @@ private fun StepStatusCircle(state: StepState) {
 
 /** Inset output block (monospace) with light per-line colorization. */
 @Composable
-private fun ToolOutputBlock(text: String) {
+private fun ToolOutputBlock(text: String, isError: Boolean = false) {
+    // The "Tool error + retry" board renders failed output on a dark-red inset
+    // instead of the neutral surface, so the failure reads at a glance.
+    val blockColor = if (isError) {
+        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = blockColor,
     ) {
         SelectionContainer {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -685,7 +692,7 @@ private fun ToolOutputBlock(text: String) {
                     Text(
                         text = line,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = outputLineColor(line),
+                        color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(line),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -807,9 +814,9 @@ private fun ThinkingMessageRow() {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AgentSphere(size = 28.dp)
+        AgentActivityOrb(size = 40.dp, activity = AgentActivity.Working)
         val transition = rememberInfiniteTransition(label = "thinkingDots")
         Row(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -858,11 +865,17 @@ private fun AgentText(text: String, isError: Boolean) {
 @Composable
 private fun ToolCard(toolCall: UiToolCall) {
     var expanded by remember { mutableStateOf(true) }
+    val isError = toolCall.status?.let {
+        it.equals("error", ignoreCase = true) || it.equals("failed", ignoreCase = true)
+    } == true
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            1.dp,
+            if (isError) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Column {
             Row(
@@ -919,7 +932,7 @@ private fun ToolCard(toolCall: UiToolCall) {
                             )
                         }
                     }
-                    toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it) }
+                    toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it, isError = isError) }
                     DesktopImageAttachmentsGrid(
                         attachments = toolCall.generatedImageAttachments,
                         modifier = Modifier.fillMaxWidth(),
