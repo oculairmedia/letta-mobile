@@ -3,6 +3,7 @@ package com.letta.mobile.data.schedules
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
@@ -39,6 +40,22 @@ class ScheduleLibraryControllerTest {
 
         assertEquals("a1", controller.state.value.selectedAgentId)
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun loadDataPopulatesDropdownFromSlimAgentSummariesNotFullRefresh() = runTest {
+        val agentRepository = FakeAgentRepository()
+        val controller = controller(agentRepository = agentRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        // Dropdown populated from the slim summaries path...
+        assertEquals(listOf("a1", "a2"), controller.state.value.agents.map { it.id.value })
+        assertEquals(listOf("Agent One", "Agent Two"), controller.state.value.agents.map { it.name })
+        assertTrue(agentRepository.calls.contains("listAgentSummaries"))
+        // ...and NOT the full ~621KB refreshAgents() payload.
+        assertTrue(agentRepository.calls.none { it == "refreshAgents" })
     }
 
     @Test
@@ -317,12 +334,20 @@ class ScheduleLibraryControllerTest {
                 Agent(id = AgentId("a2"), name = "Agent Two"),
             ),
         )
+        val calls = mutableListOf<String>()
         override val agents: StateFlow<List<Agent>> = agentsFlow.asStateFlow()
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
 
         override suspend fun countAgents(): Int = agents.value.size
-        override suspend fun refreshAgents() = Unit
+        override suspend fun refreshAgents() {
+            calls += "refreshAgents"
+        }
+
+        override suspend fun listAgentSummaries(): List<AgentSummary> {
+            calls += "listAgentSummaries"
+            return agents.value.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
+        }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = agents.value.firstOrNull { it.id == id }
         override fun getAgent(id: AgentId): Flow<Agent> = flowOf(checkNotNull(getCachedAgent(id)))

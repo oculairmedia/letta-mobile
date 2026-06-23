@@ -41,6 +41,41 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
+    /**
+     * Slim agents projection for picker UIs (e.g. the Schedules dropdown).
+     *
+     * Calls the admin-shim's opt-in `GET /v1/agents?slim=true`, which returns
+     * a lightweight `[{id, name, description}]` array and skips the per-agent
+     * `AgentState` synthesis that makes the default [listAgents] response
+     * ~621KB for 50 agents. Deserializes into [AgentSummary] — a dedicated,
+     * lenient model — NOT the heavy [Agent] (whose required fields the slim
+     * payload omits).
+     *
+     * The default full-agent [listAgents] path is unchanged and still used by
+     * screens that need full [Agent] objects (edit-agent, chat config, …).
+     */
+    open suspend fun listAgentsSlim(
+        limit: Int? = null,
+        offset: Int? = null,
+        tags: List<String>? = null
+    ): List<AgentSummary> {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.get("$baseUrl/v1/agents") {
+            parameter("slim", true)
+            parameter("limit", limit)
+            parameter("offset", offset)
+            tags?.forEach { parameter("tags", it) }
+        }
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        return json.decodeFromString(
+            kotlinx.serialization.builtins.ListSerializer(AgentSummary.serializer()),
+            response.bodyAsText(),
+        )
+    }
+
     open suspend fun getAgent(agentId: AgentId): Agent {
         val (client, baseUrl) = apiClient.session()
 

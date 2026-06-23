@@ -91,13 +91,36 @@ class LocalLettaCodeService : Service() {
         private const val CHANNEL_ID = "letta-code-runtime"
         private const val NOTIFICATION_ID = 9142
 
+        /**
+         * Whether the foreground-service notification will actually be visible in the
+         * notification drawer.
+         *
+         * On Android 13+ (TIRAMISU) posting notifications requires the runtime
+         * POST_NOTIFICATIONS permission. When it is denied the foreground service is
+         * still allowed to run — the notification simply moves to the Task Manager
+         * (active apps) surface instead of the drawer. This decision is intentionally
+         * pure so it can be unit-tested without the Android framework: it controls
+         * notification VISIBILITY/UX only and must never gate the runtime launch.
+         */
+        fun notificationsWillBeVisible(
+            sdkInt: Int,
+            postNotificationsGranted: Boolean,
+        ): Boolean = sdkInt < Build.VERSION_CODES.TIRAMISU || postNotificationsGranted
+
         fun start(context: Context): Boolean {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) {
-                Log.w(TAG, "POST_NOTIFICATIONS not granted; deferring LocalLettaCodeService start")
-                return false
+            // Record notification visibility for the UX layer, but never block the
+            // launch on it: Android allows foreground services to start without
+            // POST_NOTIFICATIONS (the notification appears in Task Manager instead).
+            val notificationsGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!notificationsWillBeVisible(Build.VERSION.SDK_INT, notificationsGranted)) {
+                Log.i(
+                    TAG,
+                    "POST_NOTIFICATIONS not granted; starting LocalLettaCodeService anyway " +
+                        "(its foreground notification will surface in Task Manager, not the drawer)",
+                )
             }
             return try {
                 ContextCompat.startForegroundService(context, Intent(context, LocalLettaCodeService::class.java))
