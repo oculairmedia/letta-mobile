@@ -261,16 +261,51 @@ class ScheduleLibraryControllerTest {
         assertEquals("", (item2.timing as ScheduleTiming.OneTime).displayTime)
     }
 
+    @Test
+    fun `initialAgentId pre-selects that agent instead of the first`() = runTest {
+        val controller = controller(initialAgentId = "a2")
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a2", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun `null initialAgentId falls back to existing first-agent behaviour`() = runTest {
+        val controller = controller(initialAgentId = null)
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun `initialAgentId not in agent list falls back gracefully to first agent`() = runTest {
+        val controller = controller(initialAgentId = "does-not-exist")
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
     private fun TestScope.controller(
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
         cronSource: CronScheduleSource? = null,
+        initialAgentId: String? = null,
     ) = ScheduleLibraryController(
         agentRepository = agentRepository,
         scheduleRepository = scheduleRepository,
         scope = this,
         scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
         cronSource = cronSource,
+        initialAgentId = initialAgentId,
     )
 
     private class RouteUnavailableException : RuntimeException("route unavailable")

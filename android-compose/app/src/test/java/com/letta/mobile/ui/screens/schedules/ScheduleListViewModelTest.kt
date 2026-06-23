@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.screens.schedules
 
+import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
@@ -52,7 +53,7 @@ class ScheduleListViewModelTest {
         // exercise the case where BOTH the native schedule route and the
         // /v1/crons fallback are missing.
         fakeScheduleApi = FakeScheduleApi()
-        viewModel = ScheduleListViewModel(fakeAgentRepo, fakeScheduleRepo, fakeScheduleApi)
+        viewModel = ScheduleListViewModel(SavedStateHandle(), fakeAgentRepo, fakeScheduleRepo, fakeScheduleApi)
     }
 
     @After
@@ -67,6 +68,24 @@ class ScheduleListViewModelTest {
         val state = awaitSuccessState()
         assertEquals("a1", state.selectedAgentId)
         assertEquals(1, state.schedules.size)
+    }
+
+    @Test
+    fun `route agentId pre-selects that agent instead of the first`() = runTest {
+        // Opened FROM A CHAT with agent a2: SchedulesRoute(agentId = "a2") is
+        // delivered via SavedStateHandle and must pre-select a2, not the
+        // default first agent (a1).
+        val vm = ScheduleListViewModel(
+            SavedStateHandle(mapOf("agentId" to "a2")),
+            fakeAgentRepo,
+            fakeScheduleRepo,
+            fakeScheduleApi,
+        )
+
+        val state = vm.uiState.first { it is com.letta.mobile.ui.common.UiState.Success }
+            .let { (it as com.letta.mobile.ui.common.UiState.Success).data }
+        assertEquals("a2", state.selectedAgentId)
+        assertEquals("s2", state.schedules.first().id)
     }
 
     @Test

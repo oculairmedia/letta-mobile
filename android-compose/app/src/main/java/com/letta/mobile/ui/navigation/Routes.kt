@@ -25,7 +25,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object ProvidersRoute
 @Serializable data object BlocksRoute
 @Serializable data object IdentitiesRoute
-@Serializable data object SchedulesRoute
+@Serializable data class SchedulesRoute(val agentId: String? = null)
 @Serializable data object RunsRoute
 @Serializable data object JobsRoute
 @Serializable data object MessageBatchesRoute
