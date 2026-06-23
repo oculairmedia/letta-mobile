@@ -176,7 +176,17 @@ internal class LocalRuntimeChatSendCoordinator(
         event: RuntimeEventEnvelope,
     ): Boolean {
         when (val payload = event.payload) {
-            is RuntimeEventPayload.LocalUserAppend -> Unit
+            is RuntimeEventPayload.LocalUserAppend -> {
+                timelineRepository.ingestExternalTransportMessage(
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    message = com.letta.mobile.data.model.UserMessage(
+                        id = payload.localMessageId,
+                        contentRaw = JsonPrimitive(payload.text),
+                        runId = event.runId?.value,
+                    )
+                )
+            }
             is RuntimeEventPayload.RemoteStreamFrame -> {
                 payload.toLettaMessage(event)?.let { message ->
                     timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message)
