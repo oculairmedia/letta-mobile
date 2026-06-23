@@ -40,6 +40,14 @@ data class CustomColors(
     val harmonizedSuccess: Color = Color.Unspecified,
     val harmonizedSuccessContainer: Color = Color.Unspecified,
 
+    // Agent status (fixed brand values — see deriveCustomColors)
+    val runningColor: Color = Color.Unspecified,
+    val onRunningColor: Color = Color.Unspecified,
+    val onSuccessColor: Color = Color.Unspecified,
+    val agentAColor: Color = Color.Unspecified,
+    val agentBColor: Color = Color.Unspecified,
+    val agentCColor: Color = Color.Unspecified,
+
     // Connection status
     val onlineColor: Color = Color.Unspecified,
     val offlineColor: Color = Color.Unspecified,
