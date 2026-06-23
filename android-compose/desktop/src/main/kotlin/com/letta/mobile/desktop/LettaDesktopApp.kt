@@ -84,7 +84,10 @@ import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.composer.MentionKind
+import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.SubagentEntry
@@ -390,6 +393,29 @@ fun LettaDesktopApp(
     val agentConversations = remember(chatState.conversations, selectedAgentId) {
         chatState.conversations.filter { it.agentId == selectedAgentId }
     }
+    // @mention candidates: other agents + the focused agent's memory blocks.
+    // (Files need a client-side index — tracked as a follow-up.)
+    val mentionables = remember(railAgents, memoryState) {
+        buildList {
+            railAgents.forEach { (id, name) ->
+                add(Mentionable(id = id, label = name, sublabel = "agent", kind = MentionKind.Agent, insertText = name))
+            }
+            memoryState.memory.sections
+                .flatMap { it.items }
+                .filterIsInstance<MemoryParityItem.MemoryBlock>()
+                .forEach { block ->
+                    add(
+                        Mentionable(
+                            id = block.id,
+                            label = block.title,
+                            sublabel = "core block",
+                            kind = MentionKind.Memory,
+                            insertText = block.title,
+                        ),
+                    )
+                }
+        }
+    }
     // A conversation is "thinking" from the moment a prompt is sent until the
     // agent's reply starts landing (tracked by the controller — `isSending`
     // alone clears too early, while the reply streams over a separate channel).
@@ -525,6 +551,7 @@ fun LettaDesktopApp(
                             onRetryConnection = chatController::retryConnection,
                             onModelSelected = chatController::setConversationModel,
                             commands = composerCommands,
+                            mentionables = mentionables,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

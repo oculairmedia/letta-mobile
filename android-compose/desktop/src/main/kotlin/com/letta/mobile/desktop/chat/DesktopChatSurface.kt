@@ -59,6 +59,8 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Card
@@ -109,6 +111,11 @@ import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.composer.AutocompleteTrigger
+import com.letta.mobile.data.composer.ComposerAutocomplete
+import com.letta.mobile.data.composer.MentionCatalog
+import com.letta.mobile.data.composer.MentionKind
+import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.onboarding.AgentOnboarding
 import com.letta.mobile.data.onboarding.OnboardingTask
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
@@ -130,6 +137,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -146,6 +155,7 @@ internal fun ChatDetailPane(
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
+    mentionables: List<Mentionable> = emptyList(),
     composerPlaceholder: String = "Message…",
     onOpenModelPicker: (() -> Unit)? = null,
     onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
@@ -207,6 +217,7 @@ internal fun ChatDetailPane(
                 modelOptions = modelOptions,
                 onModelSelected = onModelSelected,
                 commands = commands,
+                mentionables = mentionables,
                 placeholder = composerPlaceholder,
                 onOpenModelPicker = onOpenModelPicker,
                 onTextChanged = onComposerTextChanged,
@@ -1309,6 +1320,7 @@ private fun ComposerBar(
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
+    mentionables: List<Mentionable>,
     placeholder: String,
     onOpenModelPicker: (() -> Unit)? = null,
     onTextChanged: (String) -> Unit,
@@ -1317,9 +1329,18 @@ private fun ComposerBar(
     onRemoveImageAttachment: (Int) -> Unit,
 ) {
     val canSend = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty())
-    val slashQuery = text.trimStart().takeIf { it.startsWith("/") }?.drop(1)
-    val matchedCommands = if (slashQuery != null && commands.isNotEmpty()) {
-        commands.filter { it.label.contains(slashQuery, ignoreCase = true) }
+    // Trigger detection (/, @) is shared in commonMain so desktop and mobile
+    // resolve autocomplete identically (ComposerAutocomplete).
+    val activeToken = ComposerAutocomplete.activeToken(text)
+    val commandToken = activeToken?.takeIf { it.trigger == AutocompleteTrigger.Command }
+    val mentionToken = activeToken?.takeIf { it.trigger == AutocompleteTrigger.Mention }
+    val matchedCommands = if (commandToken != null && commands.isNotEmpty()) {
+        commands.filter { it.label.contains(commandToken.query, ignoreCase = true) }
+    } else {
+        emptyList()
+    }
+    val mentionGroups = if (mentionToken != null && mentionables.isNotEmpty()) {
+        MentionCatalog.grouped(mentionables, mentionToken.query)
     } else {
         emptyList()
     }
@@ -1367,6 +1388,16 @@ private fun ComposerBar(
                     }
                 }
             }
+        }
+        if (mentionGroups.isNotEmpty() && mentionToken != null) {
+            MentionPopup(
+                groups = mentionGroups,
+                onSelect = { mention ->
+                    onTextChanged(
+                        ComposerAutocomplete.replaceToken(text, mentionToken, "@${mention.insertText} "),
+                    )
+                },
+            )
         }
         Surface(
             modifier = Modifier
@@ -1518,6 +1549,75 @@ private fun ComposerBar(
  * A functional pill selector in the composer control row (model / safety /
  * effort): click opens a popup of [options]; selecting one fires [onSelect].
  */
+/**
+ * The `@mention` popup (Penpot "Composer (@ mentions)"): FILES / AGENTS / MEMORY
+ * sections of mentionables, filtered by the shared MentionCatalog. Selecting one
+ * inserts an `@label` token into the composer.
+ */
+@Composable
+private fun MentionPopup(
+    groups: List<Pair<MentionKind, List<Mentionable>>>,
+    onSelect: (Mentionable) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).heightIn(max = 320.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
+            groups.forEach { (kind, items) ->
+                Text(
+                    text = MentionCatalog.sectionTitle(kind).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 2.dp),
+                )
+                items.take(6).forEach { mention ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(mention) }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = when (kind) {
+                                MentionKind.File -> Icons.Outlined.Description
+                                MentionKind.Agent -> Icons.Outlined.SmartToy
+                                MentionKind.Memory -> Icons.Outlined.Memory
+                            },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = mention.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        mention.sublabel?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /** A composer chip that opens a separate picker (vs. an inline dropdown). */
 @Composable
 private fun ComposerActionChip(
