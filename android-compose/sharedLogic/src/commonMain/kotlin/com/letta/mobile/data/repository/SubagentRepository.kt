@@ -1,14 +1,13 @@
 package com.letta.mobile.data.repository
 
-import android.util.Log
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
-import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,61 +16,56 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
- * Long-lived coroutine scope SubagentRepository uses for its push observer
- * and reconnect watcher. Defaults to [Dispatchers.IO] + a fresh
- * [SupervisorJob] — same pattern [CronRepository] uses. Exposed as a
- * factory so tests can substitute a [kotlinx.coroutines.test.TestScope].
+ * Long-lived coroutine scope SubagentRepository uses for its push observer and
+ * reconnect watcher. Defaults to [Dispatchers.Default] + a fresh
+ * [SupervisorJob]. Exposed as a factory so tests can substitute a
+ * `kotlinx.coroutines.test.TestScope`.
+ *
+ * (Common code can't reference `Dispatchers.IO`; the scope only collects flows
+ * and launches transport round-trips, so [Dispatchers.Default] is appropriate —
+ * the actual socket I/O happens inside the platform [IChannelTransport].)
  */
 internal fun defaultSubagentScope(): CoroutineScope =
-    CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
  * letta-mobile-73o2h.3: single source of truth for the active-subagent
- * registry, driven by the shim's mobile WS subagent protocol (the wire
- * layer landed in letta-mobile-73o2h.1 / [ChannelTransport.sendSubagentList]).
+ * registry, driven by the shim's mobile WS subagent protocol
+ * (`IChannelTransport.sendSubagentList`).
  *
- * The registry is per-socket (NOT per-agent), so unlike [CronRepository]
- * there is exactly one shared [MutableStateFlow] snapshot rather than a map
- * keyed by agent id.
+ * Platform-neutral: it depends only on the common [IChannelTransport] surface,
+ * so the same registry logic backs both the mobile WS transport and (once it
+ * exists) a desktop WS transport (letta-mobile-0yf7o).
+ *
+ * The registry is per-socket (NOT per-agent), so unlike CronRepository there is
+ * exactly one shared [MutableStateFlow] snapshot rather than a map keyed by
+ * agent id.
  *
  * Lifecycle:
- *  - The first subscriber triggers a `subagent_list` WS round-trip;
- *    subsequent subscribers share the same [kotlinx.coroutines.flow.StateFlow]
- *    so no duplicate fetches fire.
+ *  - The first subscriber triggers a `subagent_list` WS round-trip; subsequent
+ *    subscribers share the same [kotlinx.coroutines.flow.StateFlow] so no
+ *    duplicate fetches fire.
  *  - A `subagents_updated` push folds its `subagents_active` snapshot into the
  *    cache without dropping previously running entries that are merely omitted;
  *    explicit terminal states remove entries.
- *  - On WS reconnect (`Disconnected → Connected`) the snapshot is refreshed
- *    so the UI doesn't keep showing a stale list after a dropped socket.
+ *  - On WS reconnect (`Disconnected → Connected`) the snapshot is refreshed so
+ *    the UI doesn't keep showing a stale list after a dropped socket.
  *
- * letta-mobile-sqdqe: push/refresh snapshots can be transiently incomplete,
- * so replacement is conservative: running entries survive omission until the
- * shim sends an explicit terminal state.
+ * letta-mobile-sqdqe: push/refresh snapshots can be transiently incomplete, so
+ * replacement is conservative: running entries survive omission until the shim
+ * sends an explicit terminal state.
  */
-@Singleton
 open class SubagentRepository(
     private val transport: IChannelTransport,
-    private val scope: CoroutineScope,
+    private val scope: CoroutineScope = defaultSubagentScope(),
 ) : ISubagentRepository {
-    /**
-     * Hilt-friendly constructor — uses a fresh [defaultSubagentScope] tied
-     * to the singleton's lifetime. Tests inject their own scope via the
-     * primary constructor.
-     */
-    @Inject
-    constructor(transport: IChannelTransport) : this(transport, defaultSubagentScope())
-
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
-    private val inFlightRefresh = AtomicReference<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
+    private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
     // Whether the initial subagent_list has been dispatched. Repeated
     // subscribe/unsubscribe must not duplicate the initial fetch.
-    private val initialized = AtomicBoolean(false)
+    private val initialized = atomic(false)
 
     init {
         scope.launch { observePushEvents() }
@@ -79,8 +73,8 @@ open class SubagentRepository(
     }
 
     /**
-     * Hot stream of the active-subagent snapshot. The flow is shared across
-     * all subscribers; only the first subscription triggers the initial
+     * Hot stream of the active-subagent snapshot. The flow is shared across all
+     * subscribers; only the first subscription triggers the initial
      * `subagent_list` round-trip.
      */
     override fun activeSubagentsFlow(): Flow<List<SubagentEntry>> {
@@ -96,7 +90,7 @@ open class SubagentRepository(
      * deferred so the shim never sees duplicate `subagent_list` frames.
      */
     override suspend fun refresh(): Result<List<SubagentEntry>> {
-        inFlightRefresh.get()?.takeIf { !it.isCompleted }?.let { return it.await() }
+        inFlightRefresh.value?.takeIf { !it.isCompleted }?.let { return it.await() }
         val deferred = CompletableDeferred<Result<List<SubagentEntry>>>()
         val previous = inFlightRefresh.getAndSet(deferred)
         previous?.takeIf { !it.isCompleted }?.cancel()
@@ -115,9 +109,9 @@ open class SubagentRepository(
     }
 
     /**
-     * Fetch one subagent's latest TodoWrite snapshot (§13.3). Resolves on
-     * the matching `subagent_todos_response`; degrades to an empty list when
-     * the shim reports the todos could not be resolved.
+     * Fetch one subagent's latest TodoWrite snapshot (§13.3). Resolves on the
+     * matching `subagent_todos_response`; degrades to an empty list when the
+     * shim reports the todos could not be resolved.
      */
     override suspend fun todos(toolCallId: String): Result<List<SubagentTodo>> = runCatching {
         val response = transport.sendSubagentTodos(toolCallId)
@@ -126,7 +120,6 @@ open class SubagentRepository(
         }
         response.todos
     }
-
 
     private fun mergeSnapshot(
         incoming: List<SubagentEntry>,
@@ -154,7 +147,7 @@ open class SubagentRepository(
             if (frame !is ServerFrame.SubagentsUpdated) return@collect
             // Mark initialized so a later first-subscriber doesn't kick off a
             // redundant subagent_list (the cache is already warm).
-            initialized.set(true)
+            initialized.value = true
             state.value = mergeSnapshot(frame.subagentsActive, terminal = frame.subagent)
         }
     }
@@ -163,16 +156,16 @@ open class SubagentRepository(
         var wasConnected: Boolean? = null
         transport.state.collect { connectionState ->
             val nowConnected = connectionState is ChannelTransportState.Connected
-            if (wasConnected == false && nowConnected && initialized.get()) {
+            if (wasConnected == false && nowConnected && initialized.value) {
+                // Best-effort refresh; a failure here is non-fatal (the next
+                // push or manual refresh recovers the snapshot).
                 runCatching { refresh() }
-                    .onFailure { e -> Log.w(TAG, "reconnect refresh failed: ${e.message}") }
             }
             wasConnected = nowConnected
         }
     }
 
     companion object {
-        private const val TAG = "SubagentRepository"
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,
