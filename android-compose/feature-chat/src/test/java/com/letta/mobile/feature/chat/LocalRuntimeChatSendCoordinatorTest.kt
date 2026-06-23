@@ -3,6 +3,7 @@ import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -51,6 +52,15 @@ class LocalRuntimeChatSendCoordinatorTest {
                             backendId = BackendId("foreign"),
                             runtimeId = RuntimeId("foreign"),
                             source = RuntimeEventSource.LocalRuntime,
+                            payload = RuntimeEventPayload.LocalUserAppend(
+                                localMessageId = "local-user-append-1",
+                                text = "hello local append text",
+                            ),
+                        ),
+                        RuntimeEventDraft(
+                            backendId = BackendId("foreign"),
+                            runtimeId = RuntimeId("foreign"),
+                            source = RuntimeEventSource.LocalRuntime,
                             payload = RuntimeEventPayload.RemoteStreamFrame(
                                 frameId = "assistant-1",
                                 messageId = "assistant-1",
@@ -85,7 +95,12 @@ class LocalRuntimeChatSendCoordinatorTest {
         assertEquals(activeConversation, observedConversation)
         assertTrue(cleared)
         assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(resolvedConversation, local.otid), timelineRepository.sentLocals.single())
-        val assistant = timelineRepository.ingestedMessages.single().message as AssistantMessage
+
+        val userAppendMessage = timelineRepository.ingestedMessages[0].message as UserMessage
+        assertEquals("local-user-append-1", userAppendMessage.id)
+        assertEquals("hello local append text", userAppendMessage.content)
+
+        val assistant = timelineRepository.ingestedMessages[1].message as AssistantMessage
         assertEquals("assistant-1", assistant.id)
         assertEquals("Hello from local runtime", assistant.content)
         assertEquals(false, uiState.value.isStreaming)
