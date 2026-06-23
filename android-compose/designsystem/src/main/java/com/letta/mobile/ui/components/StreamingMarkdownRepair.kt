@@ -115,7 +115,15 @@ private fun findUnclosedInlineCodeMarker(text: String): String? {
         if (backtickRun > 0) {
             val marker = "`".repeat(backtickRun)
             val close = findNextUnescapedBacktickRun(text, marker, i + backtickRun)
-            if (close < 0) return marker
+            if (close < 0) {
+                // If it's 1 or 2 backticks at the very end of the string, and at the start of a line,
+                // it's likely a partial block fence being streamed, NOT an inline code span.
+                // Leave it alone so it renders as plain text without dropping the backticks.
+                if (backtickRun < 3 && i + backtickRun == text.length && isAtLineStart(text, i)) {
+                    return null
+                }
+                return marker
+            }
             i = close + backtickRun
             continue
         }
@@ -123,6 +131,23 @@ private fun findUnclosedInlineCodeMarker(text: String): String? {
         i++
     }
     return null
+}
+
+private fun isAtLineStart(text: String, index: Int): Boolean {
+    var spaces = 0
+    var idx = index - 1
+    while (idx >= 0) {
+        if (text[idx] == ' ') {
+            spaces++
+            if (spaces > 3) return false
+        } else if (text[idx] == '\n') {
+            return true
+        } else {
+            return false
+        }
+        idx--
+    }
+    return true
 }
 
 private fun findNextUnescapedBacktickRun(text: String, marker: String, startIndex: Int): Int {
