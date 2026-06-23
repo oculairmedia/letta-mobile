@@ -1745,6 +1745,43 @@ class A2uiRendererTest {
     }
 
     @Test
+    fun buttonOmitsDataModelWhenContextEmptyAndUnsafeTrue() {
+        val manager = A2uiSurfaceManager()
+        manager.applyMessages(
+            decodeA2uiMessages(
+                A2uiProtocolJson.Default,
+                A2uiProtocolJson.Default.parseToJsonElement(
+                    "[" +
+                    "  {\"version\":\"v0.9\",\"createSurface\":{\"surfaceId\":\"$SurfaceId\",\"catalogId\":\"basic\"}}," +
+                    "  {\"version\":\"v0.9\",\"updateComponents\":{\"surfaceId\":\"$SurfaceId\",\"root\":\"form\",\"components\":[" +
+                    "    {\"id\":\"form\",\"component\":\"Column\",\"children\":[\"field\",\"submit\"],\"spacing\":\"sm\"}," +
+                    "    {\"id\":\"field\",\"component\":\"TextField\",\"label\":{\"literalString\":\"Reply\"},\"value\":{\"path\":\"/reply\"}}," +
+                    "    {\"id\":\"submit\",\"component\":\"Button\",\"label\":{\"literalString\":\"Send\"},\"action\":{\"name\":\"demo.send\",\"unsafe\":true}}" +
+                    "  ]}}," +
+                    "  {\"version\":\"v0.9\",\"updateDataModel\":{\"surfaceId\":\"$SurfaceId\",\"path\":\"/reply\",\"value\":\"world\"}}" +
+                    "]"
+                ),
+            )
+        )
+        val actions = mutableListOf<A2uiAction>()
+
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            A2uiRenderer(
+                surfaceId = SurfaceId,
+                surfaceManager = manager,
+                onAction = actions::add,
+            )
+        }
+
+        composeRule.onNodeWithText("Send").performClick()
+
+        composeRule.runOnIdle {
+            val action = actions.single()
+            assertEquals(null, action.context["data_model"])
+        }
+    }
+
+    @Test
     fun buttonTapShowsLocalSubmittingStateAndCoalescesRepeatedTaps() {
         val manager = bookingFormSurfaceManager()
         val actions = mutableListOf<A2uiAction>()
