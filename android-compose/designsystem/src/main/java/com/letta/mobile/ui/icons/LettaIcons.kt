@@ -50,6 +50,7 @@ import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.TextSearch
 import com.composables.icons.lucide.Trash2
+import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.Unlink
 import com.composables.icons.lucide.Users
 import com.composables.icons.lucide.Workflow
@@ -96,6 +97,7 @@ object LettaIcons {
     val Check: ImageVector get() = Lucide.Check
     val CheckCircle: ImageVector get() = Lucide.CircleCheck
     val Error: ImageVector get() = Lucide.CircleAlert
+    val Warning: ImageVector get() = Lucide.TriangleAlert
     val Info: ImageVector get() = Lucide.CircleAlert
     val Help: ImageVector get() = Lucide.CircleHelp
     val Circle: ImageVector get() = Lucide.Circle

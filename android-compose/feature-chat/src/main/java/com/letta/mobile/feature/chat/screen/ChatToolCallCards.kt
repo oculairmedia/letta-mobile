@@ -561,7 +561,8 @@ internal fun ToolCallCard(
     // tracked in `letta-mobile-o9ce`. See ToolReturnStatus for the full
     // empirical justification.
     val isError = ToolReturnStatus.isError(toolCall.status)
-    val isComplete = toolCall.result != null || toolCall.status == "success"
+    val isWarning = toolCall.status == "warning"
+    val isComplete = toolCall.result != null || toolCall.status == "success" || toolCall.status == "warning"
     val codeStyle = MaterialTheme.chatTypography.codeBlock
     val approvalState = approvalStateOverride ?: toolCall.approvalDecision?.toToolApprovalState()
     val compactDetail = remember(
@@ -666,6 +667,13 @@ internal fun ToolCallCard(
                         modifier = Modifier.size(LettaIconSizing.Inline),
                         tint = MaterialTheme.colorScheme.error,
                     )
+                } else if (isWarning) {
+                    Icon(
+                        imageVector = LettaIcons.Warning,
+                        contentDescription = "Warning",
+                        modifier = Modifier.size(LettaIconSizing.Inline),
+                        tint = MaterialTheme.colorScheme.tertiary,
+                    )
                 } else if (isComplete) {
                     Icon(
                         imageVector = LettaIcons.CheckCircle,
@@ -766,6 +774,7 @@ private fun GeneratedImageToolCard(
     val reducedMotion = rememberReducedMotionEnabled()
     val hasImage = toolCall.generatedImageAttachments.isNotEmpty()
     val isError = ToolReturnStatus.isError(toolCall.status)
+    val isWarning = toolCall.status == "warning"
     val prompt = remember(toolCall.arguments) { summarizeGenerateImagePrompt(toolCall.arguments) }
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -970,6 +979,7 @@ private fun ToolCallExpandedBodyContentInner(
     argumentSummary: ToolArgumentSummary?,
     resultPreview: String?,
     isError: Boolean,
+    isWarning: Boolean = false,
     fontScale: Float,
     codeStyle: androidx.compose.ui.text.TextStyle,
     display: ToolDisplayInfo,
@@ -980,12 +990,13 @@ private fun ToolCallExpandedBodyContentInner(
     val view = LocalView.current
     Column {
         ToolCallExpandedSummary(
-            toolCall = toolCall,
-            argumentSummary = argumentSummary,
-            resultPreview = resultPreview,
-            isError = isError,
-            fontScale = fontScale,
-        )
+                            toolCall = toolCall,
+                            argumentSummary = argumentSummary,
+                            resultPreview = resultPreview,
+                            isError = isError,
+                            isWarning = isWarning,
+                            fontScale = fontScale,
+                        )
         Column(modifier = Modifier.padding(top = 4.dp)) {
             // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
             // (the header already names the tool). Timing/detail kept below.
@@ -1081,6 +1092,7 @@ internal fun ToolCallExpandedBody(
     executionTimeText: String?,
     displayResult: String?,
     isError: Boolean,
+    isWarning: Boolean = false,
     fontScale: Float,
 ) {
     val parentVisible = LocalToolCardBodyParentVisible.current
@@ -1191,6 +1203,7 @@ internal fun ToolCallExpandedSummary(
     argumentSummary: ToolArgumentSummary?,
     resultPreview: String?,
     isError: Boolean,
+    isWarning: Boolean = false,
     fontScale: Float,
 ) {
     argumentSummary?.let { summary ->
@@ -1199,6 +1212,8 @@ internal fun ToolCallExpandedSummary(
             label = summary.label,
             value = summary.value,
             fontScale = fontScale,
+            isError = isError,
+            isWarning = isWarning,
             maxLines = 2,
         )
     }
@@ -1328,7 +1343,8 @@ internal fun CompactToolCallRow(
         }
     }
     val isError = ToolReturnStatus.isError(toolCall.status)
-    val isComplete = toolCall.result != null || toolCall.status == "success"
+    val isWarning = toolCall.status == "warning"
+    val isComplete = toolCall.result != null || toolCall.status == "success" || toolCall.status == "warning"
     LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
         if (Telemetry.isChatHotPathDebugEnabled()) {
             Telemetry.event(
@@ -1371,7 +1387,7 @@ internal fun CompactToolCallRow(
                 style = MaterialTheme.typography.chatBubbleSender
                     .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily)
                     .scaledBy(fontScale),
-                color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -1393,6 +1409,12 @@ internal fun CompactToolCallRow(
                     contentDescription = "Error",
                     modifier = Modifier.size(LettaIconSizing.Inline),
                     tint = MaterialTheme.colorScheme.error,
+                )
+                isWarning -> Icon(
+                    imageVector = LettaIcons.Warning,
+                    contentDescription = "Warning",
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.colorScheme.tertiary,
                 )
                 isComplete -> Icon(
                     imageVector = LettaIcons.CheckCircle,
@@ -1480,6 +1502,7 @@ internal fun CompactToolCallRow(
                             argumentSummary = argumentSummary,
                             resultPreview = resultPreview,
                             isError = isError,
+                            isWarning = isWarning,
                             fontScale = fontScale,
                         )
                         ToolCallExpandedBody(
@@ -1488,6 +1511,7 @@ internal fun CompactToolCallRow(
                             executionTimeText = executionTimeText,
                             displayResult = displayResult,
                             isError = isError,
+                            isWarning = isWarning,
                             fontScale = fontScale,
                         )
                     }
@@ -1627,6 +1651,7 @@ internal fun ToolSummaryLine(
     value: String,
     fontScale: Float,
     isError: Boolean = false,
+    isWarning: Boolean = false,
     maxLines: Int = 1,
 ) {
     Row(modifier = Modifier.fillMaxWidth()) {
@@ -1635,6 +1660,8 @@ internal fun ToolSummaryLine(
             style = MaterialTheme.typography.sectionTitle.scaledBy(fontScale),
             color = if (isError) {
                 MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+            } else if (isWarning) {
+                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f)
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
             },
@@ -1642,7 +1669,7 @@ internal fun ToolSummaryLine(
         Text(
             text = value,
             style = MaterialTheme.typography.listItemSupporting.scaledBy(fontScale),
-            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
