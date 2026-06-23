@@ -42,6 +42,21 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
+    fun `loadData sets empty schedules successfully without error`() = runTest {
+        val scheduleRepository = FakeScheduleRepository()
+        scheduleRepository.clearSchedules()
+        val controller = controller(scheduleRepository = scheduleRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertEquals(emptyList(), controller.state.value.schedules)
+        assertEquals(true, controller.state.value.scheduleAdminAvailable)
+        assertEquals("No schedules for this agent.", controller.state.value.emptyMessage)
+    }
+
+    @Test
     fun selectAgentLoadsThatAgentsSchedules() = runTest {
         val controller = controller()
         controller.start()
@@ -104,6 +119,20 @@ class ScheduleLibraryControllerTest {
         assertEquals(emptyList(), controller.state.value.schedules)
     }
 
+    @Test
+    fun nonRouteParseAndTransportErrorsAreNotMislabeledAsAdminUnavailable() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RuntimeException("parse error")
+        }
+        val controller = controller(scheduleRepository = scheduleRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals(true, controller.state.value.scheduleAdminAvailable)
+        assertEquals("parse error", controller.state.value.errorMessage)
+    }
+
     private fun TestScope.controller(
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
@@ -159,6 +188,10 @@ class ScheduleLibraryControllerTest {
         var error: Throwable? = null
         val createdSchedules = mutableListOf<ScheduleCreateParams>()
         val deletedScheduleIds = mutableListOf<String>()
+
+        fun clearSchedules() {
+            schedulesByAgent.clear()
+        }
 
         override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> =
             flowOf(schedulesByAgent[agentId].orEmpty())

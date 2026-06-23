@@ -38,6 +38,16 @@ class ScheduleRepositoryTest {
     }
 
     @Test
+    fun `refreshSchedules handles empty scheduled messages successfully`() = runTest {
+        fakeApi.schedules["a1"] = mutableListOf()
+
+        repository.refreshSchedules("a1")
+
+        assertTrue(repository.getSchedules("a1").first().isEmpty())
+        assertTrue(fakeApi.calls.contains("listSchedules:a1"))
+    }
+
+    @Test
     fun `createSchedule refreshes repository cache`() = runTest {
         repository.createSchedule(
             agentId = "a1",
