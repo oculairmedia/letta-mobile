@@ -40,10 +40,14 @@ object TestData {
         id: String = "conv-1",
         agentId: String = "agent-1",
         summary: String? = "Test conversation",
+        createdAt: String? = null,
+        lastMessageAt: String? = null,
     ) = Conversation(
         id = ConversationId(id),
         agentId = AgentId(agentId),
         summary = summary,
+        createdAt = createdAt,
+        lastMessageAt = lastMessageAt,
     )
 
     fun appMessage(

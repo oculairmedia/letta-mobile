@@ -54,6 +54,38 @@ class ScheduleApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport()
     }
 
     @Test
+    fun `listSchedules parses array payload from shim`() = runTest {
+        val api = createApi { _ ->
+            respond(
+                """[{"id":"s1","agent_id":"a1","message":{"messages":[{"content":"hello","role":"user"}]},"schedule":{"type":"one-time","scheduled_at":1700000000.0}}]""",
+                HttpStatusCode.OK,
+                jsonHeaders
+            )
+        }
+
+        val response = api.listSchedules("a1")
+        assertEquals(false, response.hasNextPage)
+        assertEquals(1, response.scheduledMessages.size)
+        assertEquals("s1", response.scheduledMessages[0].id)
+    }
+
+    @Test
+    fun `listSchedules parses object payload`() = runTest {
+        val api = createApi { _ ->
+            respond(
+                """{"has_next_page":true,"scheduled_messages":[{"id":"s2","agent_id":"a1","message":{"messages":[{"content":"hi","role":"user"}]},"schedule":{"type":"recurring","cron_expression":"* * * * *"}}]}""",
+                HttpStatusCode.OK,
+                jsonHeaders
+            )
+        }
+
+        val response = api.listSchedules("a1")
+        assertEquals(true, response.hasNextPage)
+        assertEquals(1, response.scheduledMessages.size)
+        assertEquals("s2", response.scheduledMessages[0].id)
+    }
+
+    @Test
     fun `createSchedule sends POST`() = runTest {
         var method: HttpMethod? = null
         val api = createApi { req ->
