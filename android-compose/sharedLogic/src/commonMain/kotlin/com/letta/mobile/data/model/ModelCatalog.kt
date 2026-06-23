@@ -1,5 +1,7 @@
 package com.letta.mobile.data.model
 
+import com.letta.mobile.data.search.TextMatch
+
 /** Provenance badge shown next to a model in the picker. */
 enum class ModelBadge { Byok, Local }
 
@@ -43,13 +45,8 @@ object ModelCatalog {
     }
 
     /** Case-insensitive match of [query] against a model's name/value/provider. */
-    fun matches(option: ModelOption, provider: String, query: String): Boolean {
-        if (query.isBlank()) return true
-        val q = query.trim()
-        return option.displayName.contains(q, ignoreCase = true) ||
-            option.value.contains(q, ignoreCase = true) ||
-            provider.contains(q, ignoreCase = true)
-    }
+    fun matches(option: ModelOption, provider: String, query: String): Boolean =
+        TextMatch.matches(query, option.displayName, option.value, provider)
 
     /** Filter grouped models by [query], dropping now-empty groups. */
     fun filter(groups: List<ModelGroup>, query: String): List<ModelGroup> {

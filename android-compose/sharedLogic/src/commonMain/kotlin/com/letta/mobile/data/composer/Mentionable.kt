@@ -1,5 +1,7 @@
 package com.letta.mobile.data.composer
 
+import com.letta.mobile.data.search.TextMatch
+
 /** What an `@mention` references (drives the section + icon in the picker). */
 enum class MentionKind { File, Agent, Memory }
 
@@ -31,13 +33,8 @@ object MentionCatalog {
     }
 
     /** Case-insensitive match against label, sublabel, and insert text. */
-    fun matches(item: Mentionable, query: String): Boolean {
-        if (query.isBlank()) return true
-        val q = query.trim()
-        return item.label.contains(q, ignoreCase = true) ||
-            item.insertText.contains(q, ignoreCase = true) ||
-            (item.sublabel?.contains(q, ignoreCase = true) == true)
-    }
+    fun matches(item: Mentionable, query: String): Boolean =
+        TextMatch.matches(query, item.label, item.insertText, item.sublabel)
 
     /** Filter then group [items] by kind, in [sectionOrder], dropping empty sections. */
     fun grouped(items: List<Mentionable>, query: String): List<Pair<MentionKind, List<Mentionable>>> {

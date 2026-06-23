@@ -104,8 +104,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.data.search.PaletteItem
+import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
+import com.letta.mobile.desktop.chat.DesktopCommandPalette
 import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import com.letta.mobile.desktop.chat.ComposerCommand
@@ -274,6 +277,7 @@ fun LettaDesktopApp(
     // Work | Play presentation lens over the same agents/memory/conversations.
     var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
     var showModelPicker by remember { mutableStateOf(false) }
+    var showCommandPalette by remember { mutableStateOf(false) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -416,6 +420,37 @@ fun LettaDesktopApp(
                 }
         }
     }
+    // Cmd/Ctrl-K command palette over conversations, agents, and destinations.
+    val paletteItems = remember(chatState.conversations, railAgents, workPlayMode) {
+        buildList {
+            chatState.conversations.forEach { conversation ->
+                val orbIndex = railAgents.indexOfFirst { it.first == conversation.agentId }.coerceAtLeast(0)
+                add(
+                    PaletteItem(
+                        id = conversation.id,
+                        label = conversation.title,
+                        sublabel = conversation.agentName,
+                        kind = PaletteItemKind.Conversation,
+                        orbIndex = orbIndex,
+                    ),
+                )
+            }
+            railAgents.forEachIndexed { index, (id, name) ->
+                add(PaletteItem(id = id, label = name, sublabel = "agent", kind = PaletteItemKind.Agent, orbIndex = index))
+            }
+            WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
+                val target = lensNavTarget(workPlayMode, lensDestination)
+                add(
+                    PaletteItem(
+                        id = target.first.name,
+                        label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination),
+                        sublabel = null,
+                        kind = PaletteItemKind.Destination,
+                    ),
+                )
+            }
+        }
+    }
     // A conversation is "thinking" from the moment a prompt is sent until the
     // agent's reply starts landing (tracked by the controller — `isSending`
     // alone clears too early, while the reply streams over a separate channel).
@@ -474,7 +509,7 @@ fun LettaDesktopApp(
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onNewSession = { showNewAgentDialog = true },
-                    onSearch = { selectedDestination = DesktopDestination.Conversations },
+                    onSearch = { showCommandPalette = true },
                     onSettings = { selectedDestination = DesktopDestination.Settings },
                 )
                 RailDivider()
@@ -685,6 +720,28 @@ fun LettaDesktopApp(
                     selectedValue = chatState.composerModelLabel,
                     onSelect = chatController::setConversationModel,
                     onDismiss = { showModelPicker = false },
+                )
+            }
+            if (showCommandPalette) {
+                DesktopCommandPalette(
+                    items = paletteItems,
+                    onSelect = { item ->
+                        when (item.kind) {
+                            PaletteItemKind.Conversation -> {
+                                chatController.selectConversation(item.id)
+                                selectedDestination = DesktopDestination.Conversations
+                            }
+                            PaletteItemKind.Agent -> {
+                                chatState.conversations.firstOrNull { it.agentId == item.id }
+                                    ?.let { chatController.selectConversation(it.id) }
+                                selectedDestination = DesktopDestination.Conversations
+                            }
+                            PaletteItemKind.Destination ->
+                                DesktopDestination.entries.firstOrNull { it.name == item.id }
+                                    ?.let { selectedDestination = it }
+                        }
+                    },
+                    onDismiss = { showCommandPalette = false },
                 )
             }
             val editingAgentId = editAgentId
