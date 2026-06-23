@@ -240,7 +240,14 @@ class ConfigViewModel @Inject constructor(
 
     fun updateLocalModelHandle(handle: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelHandle = handle))
+        _uiState.value = UiState.Success(
+            currentState.copy(
+                localModelHandle = handle,
+                localProviderBaseUrl = "",
+                localProviderApiKey = "",
+                localProviderModel = "",
+            )
+        )
     }
 
     fun updateLocalModelAccelerator(accelerator: String) {
@@ -311,6 +318,7 @@ class ConfigViewModel @Inject constructor(
                 // so the selection routes to the on-device LiteRT engine.
                 localProviderBaseUrl = "",
                 localProviderApiKey = "",
+                localProviderModel = "",
             )
         )
         autoPersistLocalModelSelection()

@@ -7,12 +7,12 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
@@ -53,50 +53,61 @@ fun ThinkingTextToken(
     visible: Boolean,
     delayMessage: String? = null,
     reducedMotion: Boolean = false,
+    reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(),
     modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
-        visible = visible || !delayMessage.isNullOrBlank(),
-        enter = fadeIn(animationSpec = tween(durationMillis = 180)) +
-            expandVertically(animationSpec = tween(durationMillis = 180)),
-        exit = fadeOut(animationSpec = tween(durationMillis = 180)) +
-            shrinkVertically(animationSpec = tween(durationMillis = 180)),
+        visible = reserveSpace,
+        enter = fadeIn(animationSpec = tween(durationMillis = 180)),
+        exit = fadeOut(animationSpec = tween(durationMillis = 180)),
         modifier = modifier,
     ) {
-        val scheme = MaterialTheme.colorScheme
-        val text = delayMessage?.takeIf { it.isNotBlank() } ?: "Thinking…"
-
-        val phase = if (reducedMotion) {
-            0f
-        } else {
-            val transition = rememberInfiniteTransition(label = "thinking-text-token")
-            val animated by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 1200, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-                label = "thinking-text-token-phase",
-            )
-            animated
-        }
-
-        val brush = remember(phase, scheme) { thinkingTextTokenBrush(scheme, phase) }
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-                .testTag(THINKING_TEXT_TOKEN_TEST_TAG),
+                .heightIn(min = ThinkingTextTokenReservedHeight)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium.copy(brush = brush),
-            )
+            AnimatedVisibility(
+                visible = visible || !delayMessage.isNullOrBlank(),
+                enter = fadeIn(animationSpec = tween(durationMillis = 180)),
+                exit = fadeOut(animationSpec = tween(durationMillis = 180)),
+            ) {
+                val scheme = MaterialTheme.colorScheme
+                val text = delayMessage?.takeIf { it.isNotBlank() } ?: "Thinking…"
+
+                val phase = if (reducedMotion) {
+                    0f
+                } else {
+                    val transition = rememberInfiniteTransition(label = "thinking-text-token")
+                    val animated by transition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(durationMillis = 1200, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart,
+                        ),
+                        label = "thinking-text-token-phase",
+                    )
+                    animated
+                }
+
+                val brush = remember(phase, scheme) { thinkingTextTokenBrush(scheme, phase) }
+
+                Text(
+                    text = text,
+                    modifier = Modifier
+                        .defaultMinSize(minHeight = ThinkingTextTokenTextMinHeight)
+                        .testTag(THINKING_TEXT_TOKEN_TEST_TAG),
+                    style = MaterialTheme.typography.bodyMedium.copy(brush = brush),
+                )
+            }
         }
     }
 }
+
+private val ThinkingTextTokenReservedHeight = 32.dp
+private val ThinkingTextTokenTextMinHeight = 24.dp
 
 private const val SWEEP_BAND_PX = 800f
 private const val SWEEP_TRAVEL_PX = 2_400f

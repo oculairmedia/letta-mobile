@@ -248,3 +248,17 @@ internal fun PreviewTelemetryGridContent() {
 @PreviewLightDark
 @Composable
 private fun TelemetryGridPreview() = PreviewTelemetryGridContent()
+
+@PreviewLightDark
+@Composable
+internal fun PreviewDateSeparatorContent() {
+    LettaTheme(dynamicColor = false) {
+        Surface {
+            Column(modifier = Modifier.padding(16.dp)) {
+                DateSeparator(date = java.time.LocalDate.now())
+                DateSeparator(date = java.time.LocalDate.now().minusDays(1))
+                DateSeparator(date = java.time.LocalDate.of(2023, 1, 1))
+            }
+        }
+    }
+}

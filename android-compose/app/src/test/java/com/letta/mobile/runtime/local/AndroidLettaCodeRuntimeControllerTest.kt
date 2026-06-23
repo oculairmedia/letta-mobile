@@ -161,6 +161,138 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
+    fun `embedded model path ignores stale custom provider fields`() = runTest {
+        val modelPath = tempModelPath()
+        val selection = EmbeddedLettaCodeModelSelection.from(
+            config(
+                localModelPath = modelPath,
+                localModelHandle = "google/gemma-3n-E2B-it-litert-lm",
+                localProviderBaseUrl = "http://192.168.50.90:8082/v1",
+                localProviderModel = null,
+            )
+        )
+
+        assertFalse(selection.routesToOpenAiCompatibleProvider)
+        assertEquals("google/gemma-3n-E2B-it-litert-lm", selection.modelHandle)
+        assertEquals(modelPath, selection.modelPath)
+        assertEquals(null, selection.customProviderBaseUrl)
+    }
+
+    @Test
+    fun `custom provider without selected model fails before starting node`() = runTest {
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = mockk<OnDeviceOpenAiBridge>(relaxed = true)
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = mockk(relaxed = true),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        val error = runCatching {
+            controller.submit(command(), config(localProviderBaseUrl = "http://192.168.50.90:8082/v1")).first()
+        }.exceptionOrNull()
+
+        assertEquals(
+            "Embedded LettaCode custom provider requires a selected provider model before it can start.",
+            error?.message,
+        )
+        assertFalse(nodeBridge.started)
+        coVerify(exactly = 0) { onDeviceBridge.start(any()) }
+    }
+
+    @Test
+    fun `custom provider model routes to provider url without starting on-device bridge`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-provider-model-${System.nanoTime()}").apply { mkdirs() }
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = spyk(FakeOnDeviceBridge())
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(
+            command(),
+            config(
+                localProviderBaseUrl = "http://192.168.50.90:8082/v1",
+                localProviderModel = "lmstudio/deepseek-v4-flash",
+            ),
+        ).first()
+
+        assertTrue(nodeBridge.started)
+        assertEquals("http://192.168.50.90:8082/v1", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"))
+        assertEquals("lmstudio/deepseek-v4-flash", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))
+        coVerify(exactly = 0) { onDeviceBridge.start(any()) }
+    }
+
+    @Test
+    fun `switching between provider and embedded models restarts with correct route each way`() = runTest {
+        mockkStatic(ContextCompat::class)
+        every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
+        every { ContextCompat.startForegroundService(any(), any()) } returns Unit
+        val baseDir = File(System.getProperty("java.io.tmpdir"), "letta-route-switch-${System.nanoTime()}").apply { mkdirs() }
+        val gemmaPath = tempModelPath()
+        val nodeBridge = FakeNodeBridge()
+        val onDeviceBridge = spyk(FakeOnDeviceBridge())
+        val controller = AndroidLettaCodeRuntimeController(
+            context = mockk<Context>(relaxed = true),
+            assetExtractor = FakeAssetExtractor(baseDir),
+            nodeBridge = nodeBridge,
+            runtimeStatusProvider = statusProvider(runnable = true),
+            onDeviceOpenAiBridge = onDeviceBridge,
+            localBackendStore = mockk(relaxed = true),
+            androidNetworkBridge = FakeAndroidNetworkBridge(),
+        )
+
+        controller.submit(
+            command(),
+            config(
+                localProviderBaseUrl = "http://192.168.50.90:8082/v1",
+                localProviderModel = "lmstudio/deepseek-v4-flash",
+            ),
+        ).first()
+        assertEquals("http://192.168.50.90:8082/v1", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"))
+        coVerify(exactly = 0) { onDeviceBridge.start(any()) }
+
+        controller.submit(
+            command(),
+            config(
+                localModelPath = gemmaPath,
+                localModelHandle = "google/gemma-3n-E2B-it-litert-lm",
+            ),
+        ).first()
+        assertEquals(2, nodeBridge.startCalls)
+        assertEquals(1, nodeBridge.stopCalls)
+        assertEquals("http://127.0.0.1:2/v1", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"))
+        assertEquals("lmstudio/google/gemma-3n-E2B-it-litert-lm", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))
+        assertEquals(gemmaPath, nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_PATH"))
+        coVerify(exactly = 1) { onDeviceBridge.start(any()) }
+
+        controller.submit(
+            command(),
+            config(
+                localProviderBaseUrl = "http://192.168.50.90:8082/v1",
+                localProviderModel = "lmstudio/deepseek-v4-flash",
+            ),
+        ).first()
+        assertEquals(3, nodeBridge.startCalls)
+        assertEquals(2, nodeBridge.stopCalls)
+        assertEquals("http://192.168.50.90:8082/v1", nodeBridge.lastRequest?.environment?.get("LMSTUDIO_BASE_URL"))
+        assertEquals("lmstudio/deepseek-v4-flash", nodeBridge.lastRequest?.environment?.get("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE"))
+    }
+
+    @Test
     fun `tool approval responses are ignored before starting bridge or node`() = runTest {
         val nodeBridge = FakeNodeBridge()
         val onDeviceBridge = mockk<OnDeviceOpenAiBridge>(relaxed = true)
@@ -251,10 +383,11 @@ class AndroidLettaCodeRuntimeControllerTest {
             androidNetworkBridge = FakeAndroidNetworkBridge(),
         )
 
-        controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/gemma")).first()
+        val modelPath = tempModelPath()
+        controller.submit(command(), config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma")).first()
         controller.submit(
             command(agentId = "agent-2", conversationId = "conv-2"),
-            config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/gemma"),
+            config(localModelPath = modelPath, localModelHandle = "lmstudio/gemma"),
         ).first()
 
         assertTrue(nodeBridge.started)

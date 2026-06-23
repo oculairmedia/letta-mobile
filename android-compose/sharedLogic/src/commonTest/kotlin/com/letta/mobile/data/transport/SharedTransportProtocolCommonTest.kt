@@ -41,6 +41,26 @@ class SharedTransportProtocolCommonTest {
     }
 
     @Test
+    fun desktopCompatibleWelcomeParsesWithoutAndroidApis() {
+        val payload = """
+            {"v":1,"type":"welcome","id":"f1","ts":"t",
+             "server_id":"desktop-server","session_id":"sess-desktop",
+             "device_id":"mac-1",
+             "a2ui_negotiated":true,
+             "a2ui":{"version":"0.9","catalog_id":"basic"}}
+        """.trimIndent()
+        val parsed = json.decodeFromString(ServerFrameSerializer, payload)
+
+        val welcome = assertIs<ServerFrame.Welcome>(parsed)
+        assertEquals("desktop-server", welcome.serverId)
+        assertEquals("sess-desktop", welcome.sessionId)
+        assertEquals("mac-1", welcome.deviceId)
+        assertEquals(true, welcome.a2uiNegotiated)
+        assertEquals("0.9", welcome.a2ui?.version)
+        assertEquals("basic", welcome.a2ui?.catalogId)
+    }
+
+    @Test
     fun unknownServerFrameRemainsRawAndForwardCompatible() {
         val payload = """{"v":1,"type":"future_frame","id":"frame-2","ts":"2026-05-25T12:00:01Z","extra":42}"""
 

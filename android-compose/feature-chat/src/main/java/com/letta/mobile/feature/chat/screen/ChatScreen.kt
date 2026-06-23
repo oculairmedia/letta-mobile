@@ -120,7 +120,7 @@ import kotlin.math.max
  * call-site stops feeding tools through, so flipping to true re-enables
  * the row without any other change.
  */
-private const val TOOL_AFFORDANCE_ROW_ENABLED = false
+private const val TOOL_AFFORDANCE_ROW_ENABLED = true
 
 @Composable
 internal fun ChatScreen(
@@ -563,6 +563,7 @@ internal fun ChatScreen(
                         visible = state.isAgentTyping,
                         delayMessage = state.a2uiThinkingDelayMessage,
                         reducedMotion = reducedMotion,
+                        reserveSpace = state.isStreaming || state.isAgentTyping || !state.a2uiThinkingDelayMessage.isNullOrBlank(),
                     )
 
                     val launchPicker = rememberImageAttachmentPicker(
@@ -963,7 +964,7 @@ private fun ChatContent(
 }
 
 @Composable
-private fun A2uiSurfaceStack(
+internal fun A2uiSurfaceStack(
     surfaces: ImmutableMap<String, A2uiSurfaceState>,
     resolvedActionCounters: Map<String, Int>,
     onAction: (A2uiAction) -> Unit,
@@ -999,7 +1000,7 @@ private fun A2uiSurfaceStack(
 }
 
 @Composable
-private fun DismissibleA2uiSurface(
+internal fun DismissibleA2uiSurface(
     surfaceId: String,
     onDismissSurface: (String) -> Unit,
     content: @Composable () -> Unit,
@@ -1010,7 +1011,7 @@ private fun DismissibleA2uiSurface(
             .fillMaxWidth()
             .semantics {
                 customActions = listOf(
-                    CustomAccessibilityAction("Dismiss A2UI surface") {
+                    CustomAccessibilityAction("Delete A2UI surface") {
                         onDismissSurface(surfaceId)
                         true
                     }
@@ -1019,12 +1020,30 @@ private fun DismissibleA2uiSurface(
             .longPressPassthrough { menuExpanded = true },
     ) {
         content()
+        androidx.compose.material3.IconButton(
+            onClick = { onDismissSurface(surfaceId) },
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = com.letta.mobile.ui.icons.LettaIcons.Close,
+                contentDescription = "Close A2UI surface",
+                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         DropdownMenu(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
         ) {
             DropdownMenuItem(
-                text = { Text("Dismiss") },
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = LettaIcons.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
                 onClick = {
                     try {
                         onDismissSurface(surfaceId)
