@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Terminal
@@ -108,6 +109,9 @@ import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.onboarding.AgentOnboarding
+import com.letta.mobile.data.onboarding.OnboardingTask
+import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
@@ -144,6 +148,7 @@ internal fun ChatDetailPane(
     commands: List<ComposerCommand>,
     composerPlaceholder: String = "Message…",
     onOpenModelPicker: (() -> Unit)? = null,
+    onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // Drive the ambient glow off the thinking state: a teal breath while the
@@ -182,6 +187,8 @@ internal fun ChatDetailPane(
             } else if (state.renderItems.isEmpty() && !isThinking) {
                 NewConversationWelcome(
                     agentName = state.selectedConversation?.agentName,
+                    onStarterPrompt = onComposerTextChanged,
+                    onOnboardingTask = onOnboardingTask,
                     modifier = Modifier.weight(1f),
                 )
             } else {
@@ -212,13 +219,16 @@ internal fun ChatDetailPane(
 }
 
 /**
- * Empty-state shown for a fresh conversation (no messages yet): the agent's
- * gradient sphere, a greeting, and a hint — matching the Penpot
- * "Desktop · New conversation" board.
+ * First-run / empty-state for a fresh conversation (Penpot "Desktop · New agent
+ * first-run"): the agent's gradient sphere, a greeting, a setup checklist
+ * (persona / channel / skills), and "or just start chatting" starter prompts.
+ * Copy + tasks come from the shared [AgentOnboarding].
  */
 @Composable
 private fun NewConversationWelcome(
     agentName: String?,
+    onStarterPrompt: (String) -> Unit,
+    onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -230,29 +240,109 @@ private fun NewConversationWelcome(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.widthIn(max = 620.dp),
         ) {
             AgentSphere(size = 72.dp)
             Text(
-                text = agentName?.takeIf { it.isNotBlank() }?.let { "Chat with $it" } ?: "New conversation",
+                text = AgentOnboarding.greeting(agentName),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = "Ask a question, paste an error, or point me at a repo — I can read code, run tools, and help you ship.",
+                text = AgentOnboarding.SUBTITLE,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 460.dp),
+                modifier = Modifier.widthIn(max = 480.dp),
+            )
+            if (onOnboardingTask != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Column {
+                        AgentOnboarding.tasks(agentName).forEachIndexed { index, task ->
+                            if (index > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                )
+                            }
+                            OnboardingTaskRow(task = task, onClick = { onOnboardingTask(task.kind) })
+                        }
+                    }
+                }
+            }
+            Text(
+                text = AgentOnboarding.STARTER_HEADER,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AgentOnboarding.starterPrompts.forEach { prompt ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.clickable { onStarterPrompt(prompt) },
+                    ) {
+                        Text(
+                            text = prompt,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingTaskRow(task: OnboardingTask, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = when (task.kind) {
+                OnboardingTaskKind.SetPersona -> Icons.Outlined.Edit
+                OnboardingTaskKind.ConnectChannel -> Icons.Outlined.Hub
+                OnboardingTaskKind.AddSkills -> Icons.Outlined.Build
+            },
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "@ to add files   ·   / for commands   ·   ⏎ to send",
+                text = task.subtitle,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            text = "Set up",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 

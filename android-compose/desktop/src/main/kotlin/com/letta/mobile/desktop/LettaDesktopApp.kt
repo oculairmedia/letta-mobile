@@ -88,6 +88,7 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -507,6 +508,15 @@ fun LettaDesktopApp(
                             isThinking = isThinkingSelected,
                             composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                             onOpenModelPicker = { showModelPicker = true },
+                            onOnboardingTask = { kind ->
+                                when (kind) {
+                                    OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
+                                    OnboardingTaskKind.ConnectChannel ->
+                                        selectedDestination = DesktopDestination.Channels
+                                    OnboardingTaskKind.AddSkills ->
+                                        selectedDestination = DesktopDestination.Agents
+                                }
+                            },
                             modelOptions = modelOptions,
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,
