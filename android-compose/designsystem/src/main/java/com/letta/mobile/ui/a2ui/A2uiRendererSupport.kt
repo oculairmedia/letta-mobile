@@ -395,8 +395,9 @@ internal fun A2uiComponent.action(surface: A2uiSurfaceState, renderScope: A2uiRe
     //       has data â†’ attach anyway so the agent gets the inputs even
     //       before the shim prompt change ships.
     val dataModelRoot = surface.dataModel.root
+    val isUnsafe = action.booleanValue("unsafe") == true
     val attachDataModel = dataModelRoot is JsonObject && dataModelRoot.isNotEmpty() &&
-        (surface.sendDataModel || resolvedContext.isEmpty())
+        (surface.sendDataModel || (resolvedContext.isEmpty() && !isUnsafe))
     val context = if (attachDataModel) {
         JsonObject(resolvedContext + ("data_model" to dataModelRoot))
     } else {
