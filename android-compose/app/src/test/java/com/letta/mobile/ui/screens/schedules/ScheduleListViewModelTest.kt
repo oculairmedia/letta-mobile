@@ -64,6 +64,17 @@ class ScheduleListViewModelTest {
     }
 
     @Test
+    fun `loadData empty schedules state handles success and displays 0 items`() = runTest {
+        fakeScheduleRepo.clearSchedules()
+        viewModel.loadData()
+
+        val state = awaitSuccessState()
+        assertEquals("a1", state.selectedAgentId)
+        assertEquals(0, state.schedules.size)
+        assertEquals(true, state.scheduleAdminAvailable)
+    }
+
+    @Test
     fun `selectAgent loads that agents schedules`() = runTest {
         awaitSuccessState()
         viewModel.selectAgent("a2")
@@ -122,6 +133,17 @@ class ScheduleListViewModelTest {
         assertEquals(false, state.scheduleAdminAvailable)
     }
 
+    @Test
+    fun `loadData shows error state for non-route parse and transport errors`() = runTest {
+        fakeScheduleRepo.error = RuntimeException("Transport error")
+
+        viewModel.loadData()
+
+        val state = viewModel.uiState.first { it is com.letta.mobile.ui.common.UiState.Error }
+            .let { (it as com.letta.mobile.ui.common.UiState.Error).message }
+        assertEquals("Failed to load schedules", state)
+    }
+
     private suspend fun awaitSuccessState(): ScheduleListUiState {
         return viewModel.uiState.first { it is com.letta.mobile.ui.common.UiState.Success }
             .let { (it as com.letta.mobile.ui.common.UiState.Success).data }
@@ -158,6 +180,10 @@ class ScheduleListViewModelTest {
 
         override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
             error?.let { throw it }
+        }
+
+        fun clearSchedules() {
+            schedulesByAgent.clear()
         }
 
         override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
