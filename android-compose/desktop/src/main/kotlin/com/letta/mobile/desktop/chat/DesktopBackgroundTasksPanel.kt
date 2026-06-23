@@ -361,7 +361,9 @@ private fun SubagentEntry.subtitle(): String {
         add("Subagent")
         subagentType.takeIf { it.isNotBlank() }?.let { add(it) }
         if (status != SubagentStatus.RUNNING) add(status.replaceFirstChar { it.uppercase() })
-        elapsedLabel()?.let { add(it) }
+        // Elapsed-since-start is only meaningful while running; SubagentEntry has
+        // no end timestamp, so for terminal entries it would grow unbounded.
+        if (status == SubagentStatus.RUNNING) elapsedLabel()?.let { add(it) }
         todoProgress?.takeIf { it.total > 0 }?.let { add("${it.completed}/${it.total}") }
     }
     return parts.joinToString(" · ")
