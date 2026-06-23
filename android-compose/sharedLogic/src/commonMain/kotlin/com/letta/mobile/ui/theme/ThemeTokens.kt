@@ -30,6 +30,30 @@ object LettaColorTokens {
     const val tealAccent = 0xFF1DE9B6
     const val cyanAccent = 0xFF00E5FF
     const val amberAccent = 0xFFFFD740
+
+    // Surface levels (dark) used by the desktop scheme + template chrome.
+    const val darkSurfaceContainerLowest = 0xFF0D0D0D
+    const val darkSurfaceContainerLow = 0xFF121212
+    const val darkSurfaceContainerDefault = 0xFF1E1E1E
+    const val darkSurfaceContainerHigh = 0xFF2A2A2A
+    const val darkSurfaceContainerHighest = 0xFF353535
+    const val darkOutlineVariant = 0xFF303030
+
+    // Agent status tokens (fixed brand values — not derived from the scheme).
+    const val darkRunning = 0xFFE0A458
+    const val lightRunning = 0xFFB26A00
+    const val darkOnRunning = 0xFF2B1B00
+    const val lightOnRunning = 0xFFFFFFFF
+    const val darkSuccess = 0xFF46C08F
+    const val lightSuccess = 0xFF2E9E73
+    const val darkOnSuccess = 0xFF06302B
+    const val lightOnSuccess = 0xFFFFFFFF
+    const val darkAgentA = 0xFF8B7CF0
+    const val lightAgentA = 0xFF6B4EE6
+    const val darkAgentB = 0xFF4C9AFF
+    const val lightAgentB = 0xFF1A73E8
+    const val darkAgentC = 0xFFE36FB3
+    const val lightAgentC = 0xFFC03D8E
 }
 
 data class LettaThemePaletteTokens(

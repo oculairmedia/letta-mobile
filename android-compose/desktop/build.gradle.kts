@@ -15,6 +15,7 @@ val textyVersion = "1.0.0-alpha"
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.compose")
 }
 

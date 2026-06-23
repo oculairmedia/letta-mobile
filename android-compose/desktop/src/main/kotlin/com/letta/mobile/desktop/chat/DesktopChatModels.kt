@@ -43,6 +43,7 @@ data class DesktopChatSurfaceState(
     val backendLabel: String,
     val sessionGraphId: Long,
     val selectionGeneration: Long = 0L,
+    val composerModelLabel: String = "Auto",
 ) {
     val composer: ChatComposerState
         get() = ChatComposerState(
