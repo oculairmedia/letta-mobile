@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
@@ -20,8 +21,24 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
     val calls = mutableListOf<String>()
     val listLimits = mutableListOf<Int?>()
     val listOffsets = mutableListOf<Int?>()
+    val slimLimits = mutableListOf<Int?>()
+    val slimOffsets = mutableListOf<Int?>()
     var ignoreListOffset = false
     var exportPayloadByAgentId = mutableMapOf<String, String>()
+
+    override suspend fun listAgentsSlim(limit: Int?, offset: Int?, tags: List<String>?): List<AgentSummary> {
+        calls.add("listAgentsSlim")
+        slimLimits.add(limit)
+        slimOffsets.add(offset)
+        if (listDelayMillis > 0L) delay(listDelayMillis)
+        if (shouldFail) throw ApiException(failCode, failMessage)
+        val filtered = tags?.takeIf { it.isNotEmpty() }?.let { requiredTags ->
+            agents.filter { agent -> requiredTags.all { it in agent.tags } }
+        } ?: agents
+        val effectiveOffset = if (ignoreListOffset) 0 else offset ?: 0
+        val paged = limit?.let { filtered.drop(effectiveOffset).take(it) } ?: filtered.toList()
+        return paged.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
+    }
 
     override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<Agent> {
         calls.add("listAgents")

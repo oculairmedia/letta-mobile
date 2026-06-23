@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
-import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
@@ -225,7 +225,7 @@ private fun ScheduleListContent(
 
 @Composable
 private fun AgentSelector(
-    agents: List<Agent>,
+    agents: List<AgentSummary>,
     selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -361,7 +361,7 @@ private fun ScheduleTiming.label(): String =
 
 @Composable
 private fun CreateScheduleDialog(
-    agents: List<Agent>,
+    agents: List<AgentSummary>,
     selectedAgentId: String?,
     onDismiss: () -> Unit,
     onCreate: (String, ScheduleCreateParams) -> Unit,

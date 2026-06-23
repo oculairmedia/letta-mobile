@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
@@ -89,6 +90,38 @@ open class AgentRepository(
     }
 
     override open suspend fun countAgents(): Int = agentApi.countAgents()
+
+    /**
+     * Slim agent list for picker UIs (Schedules dropdown). Hits the
+     * admin-shim's opt-in `GET /v1/agents?slim=true` so the picker pulls a
+     * small `{id, name, description}` projection instead of the ~621KB full
+     * agents payload. Deliberately SEPARATE from [refreshAgents]/[agents],
+     * which full-object consumers (edit-agent, chat config, …) still need.
+     *
+     * Local-runtime mode has no remote API, so it derives summaries from the
+     * on-device agents (via the shared cache / interface default).
+     */
+    override suspend fun listAgentSummaries(): List<AgentSummary> {
+        if (isLocalRuntimeActive()) {
+            return super.listAgentSummaries()
+        }
+        // Page through the slim projection so pickers see every agent, not
+        // just the first page. Each item is tiny ({id, name, description}),
+        // so this stays far below the full-agents wire cost even across pages.
+        val merged = mutableListOf<AgentSummary>()
+        var offset = AgentPagingSource.INITIAL_OFFSET
+        while (true) {
+            val page = agentApi.listAgentsSlim(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
+            if (page.isEmpty()) break
+            val existingIds = merged.asSequence().map { it.id }.toSet()
+            val newAgents = page.filter { it.id !in existingIds }
+            if (newAgents.isEmpty()) break
+            merged += newAgents
+            if (page.size < CACHE_REFRESH_PAGE_SIZE) break
+            offset += page.size
+        }
+        return merged
+    }
 
     override open suspend fun refreshAgents() = refreshMutex.withLock {
         _isRefreshing.value = true
