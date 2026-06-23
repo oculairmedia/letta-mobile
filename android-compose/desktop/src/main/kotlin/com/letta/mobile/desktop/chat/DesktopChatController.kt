@@ -6,7 +6,10 @@ import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
@@ -31,7 +34,8 @@ class DesktopChatController(
     private val gatewayFactory: () -> DesktopChatGateway = {
         DesktopLettaHttpChatGateway(bootstrapState.config)
     },
-    private val agentNamesByIdProvider: suspend () -> Map<String, String> = { emptyMap() },
+    private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
+    private val agentModelByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
     private val loopFactory: (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
@@ -48,7 +52,34 @@ class DesktopChatController(
     private val _state = MutableStateFlow(initialState)
     val state: StateFlow<DesktopChatSurfaceState> = _state.asStateFlow()
 
+    private val _availableModels = MutableStateFlow<List<LlmModel>>(emptyList())
+    val availableModels: StateFlow<List<LlmModel>> = _availableModels.asStateFlow()
+
+    /** Conversations whose delete is in flight — the sidebar shows a spinner. */
+    private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
+    val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
+
+    /**
+     * Conversation awaiting the agent's reply. Set the moment a prompt is sent
+     * and cleared once the agent's response starts landing (or on failure/
+     * timeout). Drives the "thinking" indicator — `isSending` alone is too brief
+     * because the reply streams in over a separate background subscription.
+     */
+    private val _thinkingConversationId = MutableStateFlow<String?>(null)
+    val thinkingConversationId: StateFlow<String?> = _thinkingConversationId.asStateFlow()
+
+    // Bumped on every send so a stale safety-timeout can't clear the indicator
+    // for a newer send in the same conversation.
+    private var thinkingGeneration = 0
+
     private var gateway: DesktopChatGateway? = null
+
+    // Per-conversation model overrides set this session (the picker). The
+    // effective composer model otherwise comes from the conversation's agent.
+    private var conversationModelById: Map<String, String> = emptyMap()
+
+    private val httpGateway: DesktopLettaHttpChatGateway?
+        get() = gateway as? DesktopLettaHttpChatGateway
     private var activeLoop: DesktopTimelineLoop? = null
     private var timelineJob: Job? = null
     private var loadJob: Job? = null
@@ -123,16 +154,146 @@ class DesktopChatController(
 
     fun deleteConversation(conversationId: String) {
         if (closed) return
+        if (conversationId in _deletingConversationIds.value) return
         scope.launch {
+            val nextGateway = gateway ?: return@launch
+            // Show a spinner on the row while the server delete is in flight,
+            // then remove it in place — no full reconnect, so nothing flashes.
+            _deletingConversationIds.update { it + conversationId }
             try {
-                val nextGateway = gateway ?: return@launch
                 nextGateway.deleteConversation(conversationId)
-                retryConnection()
+                if (closed) return@launch
+                val wasSelected = _state.value.selectedConversationId == conversationId
+                _state.update {
+                    it.withRuntimeState(
+                        ChatSessionReducer.conversationDeleted(it.runtimeState, conversationId),
+                    )
+                }
+                if (wasSelected) {
+                    // The active chat was removed; cancel any in-flight send so a
+                    // late success/failure can't mutate the next conversation,
+                    // then hydrate whatever became selected.
+                    sendJob?.cancel()
+                    if (_thinkingConversationId.value == conversationId) {
+                        _thinkingConversationId.value = null
+                    }
+                    timelineJob?.cancel()
+                    activeLoop?.close()
+                    activeLoop = null
+                    val runtime = _state.value.runtimeState
+                    val nextSelected = runtime.selectedConversationId
+                    if (nextSelected != null) {
+                        selectRemoteConversation(nextSelected, runtime.selectionGeneration)
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (t: Throwable) {
                 val message = t.message ?: t::class.simpleName ?: "Delete failed"
-                _state.update { current ->
-                    current.copy(errorMessage = message)
+                _state.update { current -> current.copy(errorMessage = message) }
+            } finally {
+                _deletingConversationIds.update { it - conversationId }
+            }
+        }
+    }
+
+    /** Create a new conversation for the active agent and select it. */
+    fun createConversation() {
+        if (closed) return
+        val agentId = _state.value.selectedConversation?.agentId
+            ?: _state.value.conversations.firstOrNull()?.agentId
+        if (agentId.isNullOrBlank()) {
+            _state.update { it.copy(errorMessage = "Select an agent before starting a new chat.") }
+            return
+        }
+        scope.launch {
+            try {
+                val created = httpGateway?.createConversation(agentId) ?: return@launch
+                reloadConversationsAndSelect(preferConversationId = created.id.value)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                _state.update {
+                    it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create chat")
                 }
+            }
+        }
+    }
+
+    /**
+     * Create a new agent (cloning model/embedding from a template agent so the
+     * config is valid for this backend), open a conversation for it, and select
+     * it. [onCreated] reports the new agent id so the UI can refresh.
+     */
+    fun createAgent(
+        name: String,
+        model: String?,
+        embedding: String?,
+        onCreated: (String) -> Unit = {},
+    ) {
+        if (closed) return
+        val agentName = name.ifBlank { "New agent" }
+        scope.launch {
+            try {
+                val gw = httpGateway ?: return@launch
+                val agent = gw.createAgent(
+                    AgentCreateParams(
+                        name = agentName,
+                        model = model,
+                        embedding = embedding,
+                        includeBaseTools = true,
+                        memoryBlocks = listOf(
+                            BlockCreateParams(label = "human", value = "The user has not shared details yet."),
+                            BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
+                        ),
+                    ),
+                )
+                onCreated(agent.id.value)
+                val conversation = gw.createConversation(agent.id.value)
+                reloadConversationsAndSelect(preferConversationId = conversation.id.value)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                _state.update {
+                    it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create agent")
+                }
+            }
+        }
+    }
+
+    /** Apply a model override to the active conversation. */
+    fun setConversationModel(model: String) {
+        if (closed) return
+        val conversationId = _state.value.selectedConversationId ?: return
+        conversationModelById = conversationModelById + (conversationId to model)
+        _state.update { it.copy(composerModelLabel = model) }
+        scope.launch {
+            runCatching { httpGateway?.setConversationModel(conversationId, model) }
+                .onFailure { t ->
+                    _state.update {
+                        it.copy(errorMessage = t.message ?: "Could not change model")
+                    }
+                }
+        }
+    }
+
+    /**
+     * Resolve and show the composer's model label for [conversationId]: a
+     * session override if the user picked one, otherwise the conversation's
+     * agent's configured model (the server-side default), else "Auto".
+     */
+    private fun applyComposerModelLabel(conversationId: String, agentId: String?) {
+        scope.launch {
+            val override = conversationModelById[conversationId]
+            val label = when {
+                !override.isNullOrBlank() -> override
+                !agentId.isNullOrBlank() ->
+                    runCatching { agentModelByIdProvider(setOf(agentId)) }
+                        .getOrNull()?.get(agentId)?.takeIf { it.isNotBlank() } ?: "Auto"
+                else -> "Auto"
+            }
+            if (!closed && _state.value.selectedConversationId == conversationId) {
+                _state.update { it.copy(composerModelLabel = label) }
             }
         }
     }
@@ -181,9 +342,11 @@ class DesktopChatController(
             return
         }
 
+        val sendingConversationId = _state.value.selectedConversationId
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
+        beginThinking(sendingConversationId)
         sendJob?.cancel()
         sendJob = scope.launch {
             try {
@@ -196,6 +359,9 @@ class DesktopChatController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (closed) return@launch
+                if (_thinkingConversationId.value == sendingConversationId) {
+                    _thinkingConversationId.value = null
+                }
                 _state.update {
                     it.withRuntimeState(
                         ChatSessionReducer.sendFailed(
@@ -206,6 +372,23 @@ class DesktopChatController(
                         ),
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Mark [conversationId] as awaiting the agent's reply, with a safety timeout
+     * so the indicator can't get stuck if the reply never lands.
+     */
+    private fun beginThinking(conversationId: String?) {
+        if (conversationId == null) return
+        val generation = ++thinkingGeneration
+        _thinkingConversationId.value = conversationId
+        scope.launch {
+            kotlinx.coroutines.delay(THINKING_TIMEOUT_MS)
+            // Only the timer for the latest send may clear the indicator.
+            if (generation == thinkingGeneration && _thinkingConversationId.value == conversationId) {
+                _thinkingConversationId.value = null
             }
         }
     }
@@ -226,19 +409,14 @@ class DesktopChatController(
         try {
             val nextGateway = gatewayFactory()
             gateway = nextGateway
-            val conversations = nextGateway.listConversations()
-            val agentNamesById = runCatching { agentNamesByIdProvider() }.getOrDefault(emptyMap())
-            val summaries = conversations.toChatConversationSummaries(agentNamesById)
-            val selectedId = summaries.firstOrNull()?.id
 
-            if (closed) return
-            val loadedRuntime = ChatSessionReducer.conversationsLoaded(
-                state = _state.value.runtimeState,
-                conversations = summaries,
-            )
-            _state.update { it.withRuntimeState(loadedRuntime) }
+            // Load the model catalog for the composer model picker (best-effort).
+            scope.launch {
+                val models = runCatching { httpGateway?.listLlmModels() }.getOrNull().orEmpty()
+                if (!closed) _availableModels.value = models
+            }
 
-            selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+            reloadConversationsAndSelect(preferConversationId = null)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -255,10 +433,36 @@ class DesktopChatController(
         }
     }
 
+    /**
+     * Re-list conversations from the backend, update state, and select either
+     * [preferConversationId] (e.g. a freshly created chat/agent) or the most
+     * recent. Runs in the caller's coroutine so callers can sequence reliably
+     * (no race against an async reload).
+     */
+    private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
+        val nextGateway = gateway ?: return
+        val conversations = nextGateway.listConversations()
+        val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
+        val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
+        val summaries = conversations.toChatConversationSummaries(agentNamesById)
+        if (closed) return
+        val loadedRuntime = ChatSessionReducer.conversationsLoaded(
+            state = _state.value.runtimeState,
+            conversations = summaries,
+        )
+        _state.update { it.withRuntimeState(loadedRuntime) }
+        val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
+            ?: summaries.firstOrNull()?.id
+        selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+    }
+
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
         if (!isActiveSelection(generation)) return
         val nextGateway = gateway ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
+
+        // Reflect the conversation's effective model in the composer chip.
+        applyComposerModelLabel(conversationId, conversation.agentId)
 
         timelineJob?.cancel()
         activeLoop?.close()
@@ -305,6 +509,13 @@ class DesktopChatController(
         val messages = timeline.events
             .sortedBy { it.position }
             .mapNotNull(::timelineEventToUiMessage)
+        // Stop "thinking" once the agent's reply begins to land (the latest
+        // message is no longer the user's own prompt).
+        if (_thinkingConversationId.value == conversationId &&
+            messages.lastOrNull()?.role?.equals("user", ignoreCase = true) == false
+        ) {
+            _thinkingConversationId.value = null
+        }
         _state.update { current ->
             current.withRuntimeState(
                 ChatSessionReducer.timelineMessagesUpdated(
@@ -421,3 +632,6 @@ private fun String.isDefaultShimConversationId(): Boolean =
     startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
 
 private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
+
+/** Safety cap so the thinking indicator can't get stuck if no reply arrives. */
+private const val THINKING_TIMEOUT_MS = 180_000L

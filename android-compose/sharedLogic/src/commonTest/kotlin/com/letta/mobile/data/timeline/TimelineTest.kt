@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlin.test.AfterTest
@@ -87,6 +88,63 @@ class TimelineTest {
         assertEquals(1.0, first.position, 0.0)
         assertEquals("user-1", first.otid)
         assertEquals(2.0, updated.events[1].position, 0.0)
+    }
+
+    @Test
+    fun `replaceLocal carries local image attachments into the text-only confirmed event`() {
+        val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/jpeg")
+        val localWithImage = TimelineEvent.Local(
+            position = 1.0,
+            otid = "user-1",
+            content = "look at this",
+            role = Role.USER,
+            sentAt = timelineNow(),
+            deliveryState = DeliveryState.SENDING,
+            attachments = persistentListOf(image),
+        )
+        val t = Timeline("c1").append(localWithImage)
+
+        // The server confirms with text-only content (no echoed image).
+        val confirmedUser = confirmed("user-1", 99.0, TimelineMessageType.USER, content = "look at this")
+        val updated = t.replaceLocal("user-1", confirmedUser)
+
+        val first = updated.events[0]
+        assertTrue(first is TimelineEvent.Confirmed)
+        assertEquals(1, first.attachments.size)
+        assertEquals("AAAA", first.attachments[0].base64)
+        assertEquals("image/jpeg", first.attachments[0].mediaType)
+    }
+
+    @Test
+    fun `replaceLocal keeps server attachments when the confirmed event already has them`() {
+        val localImage = MessageContentPart.Image(base64 = "LOCAL", mediaType = "image/jpeg")
+        val serverImage = MessageContentPart.Image(base64 = "SERVER", mediaType = "image/png")
+        val localWithImage = TimelineEvent.Local(
+            position = 1.0,
+            otid = "user-1",
+            content = "x",
+            role = Role.USER,
+            sentAt = timelineNow(),
+            deliveryState = DeliveryState.SENDING,
+            attachments = persistentListOf(localImage),
+        )
+        val t = Timeline("c1").append(localWithImage)
+        val confirmedUser = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "user-1",
+            content = "x",
+            serverId = "server-user-1",
+            messageType = TimelineMessageType.USER,
+            date = timelineNow(),
+            runId = null,
+            stepId = null,
+            attachments = persistentListOf(serverImage),
+        )
+
+        val updated = t.replaceLocal("user-1", confirmedUser)
+
+        assertEquals(1, updated.events[0].attachments.size)
+        assertEquals("SERVER", updated.events[0].attachments[0].base64)
     }
 
     @Test
