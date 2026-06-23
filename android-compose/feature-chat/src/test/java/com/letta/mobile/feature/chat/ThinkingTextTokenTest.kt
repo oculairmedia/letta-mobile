@@ -4,7 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -84,15 +83,15 @@ class ThinkingTextTokenTest {
             )
         }
 
-        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertExists()
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(1)
 
         composeRule.runOnIdle { visible = false }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertExists()
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(1)
 
         composeRule.runOnIdle { visible = true }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertExists()
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(1)
 
         composeRule.runOnIdle {
             visible = false
