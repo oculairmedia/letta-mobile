@@ -1027,6 +1027,31 @@ The implementation looks solid. One actionable issue: handle the null case.</res
     }
 
     "AppMessage.toUiMessage" should {
+        "hydrate standalone TOOL_RETURN image attachments when unmerged" {
+            val appMsg = TestData.appMessage(
+                id = "m1",
+                messageType = MessageType.TOOL_RETURN,
+                content = "Some raw return content",
+                toolName = "read_file",
+                toolCallId = "tc-unmerged",
+            ).copy(
+                attachments = listOf(
+                    com.letta.mobile.data.model.MessageContentPart.Image(
+                        base64 = "STANDALONE_HYDRATED+/==",
+                        mediaType = "image/png"
+                    )
+                )
+            )
+
+            val uiMsg = appMsg.toUiMessage()
+
+            uiMsg.role shouldBe "tool"
+            uiMsg.toolCalls.shouldNotBeNull()
+            uiMsg.toolCalls!!.single().name shouldBe "read_file"
+            uiMsg.toolCalls!!.single().generatedImageAttachments shouldHaveSize 1
+            uiMsg.toolCalls!!.single().generatedImageAttachments.first().base64 shouldBe "STANDALONE_HYDRATED+/=="
+        }
+
         "carry generated ui payloads into chat messages" {
             val uiMsg = TestData.appMessage(
                 messageType = MessageType.ASSISTANT,
