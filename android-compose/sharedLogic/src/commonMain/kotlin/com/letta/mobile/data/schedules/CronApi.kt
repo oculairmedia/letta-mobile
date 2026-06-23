@@ -1,7 +1,6 @@
-package com.letta.mobile.desktop.schedules
+package com.letta.mobile.data.schedules
 
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -18,18 +17,17 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Desktop cron/schedule API. This Letta server exposes scheduled work at
- * `/v1/crons` (the REST `/v1/agents/{id}/schedule` path 404s here), so the
- * desktop Schedules surface reads cron tasks directly. Deserialized with the
- * content-negotiation [body] helper.
+ * Platform-neutral cron/schedule API. This Letta server exposes scheduled work
+ * at `/v1/crons` (the REST `/v1/agents/{id}/schedule` path 404s here). Lives in
+ * commonMain; the platform supplies the Ktor [HttpClient].
  */
-class DesktopCronApi(
+class CronApi(
     private val config: LettaConfig,
-    private val httpClient: HttpClient = createDesktopLettaHttpClient(),
+    private val httpClient: HttpClient,
 ) : AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
-    suspend fun listCrons(): List<DesktopCronTask> {
+    suspend fun listCrons(): List<CronTask> {
         val response = httpClient.get("$baseUrl/v1/crons") { applyAuth() }
         response.requireSuccess()
         return response.body<CronsResponse>().tasks
@@ -84,7 +82,7 @@ class DesktopCronApi(
 }
 
 @Serializable
-data class DesktopCronTask(
+data class CronTask(
     val id: String,
     @SerialName("agent_id") val agentId: String? = null,
     @SerialName("conversation_id") val conversationId: String? = null,
@@ -98,7 +96,7 @@ data class DesktopCronTask(
 
 @Serializable
 private data class CronsResponse(
-    val tasks: List<DesktopCronTask> = emptyList(),
+    val tasks: List<CronTask> = emptyList(),
 )
 
 @Serializable

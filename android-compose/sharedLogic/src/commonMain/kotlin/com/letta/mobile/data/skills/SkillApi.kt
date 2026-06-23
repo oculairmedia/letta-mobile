@@ -1,7 +1,6 @@
-package com.letta.mobile.desktop.skills
+package com.letta.mobile.data.skills
 
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -19,29 +18,29 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Desktop skills API. Skills are a first-class registry on this Letta server:
- * `GET /v1/skills` lists everything available, `GET /v1/agents/{id}/skills`
- * lists what a given agent has installed, and POST/DELETE on
- * `/v1/agents/{id}/skills` install/uninstall a skill for that agent.
+ * Platform-neutral skills API. Skills are a first-class registry on the Letta
+ * server: `GET /v1/skills` lists the registry, `GET /v1/agents/{id}/skills`
+ * lists what an agent has installed, and POST/DELETE on `/v1/agents/{id}/skills`
+ * install/uninstall a skill for that agent.
  *
- * Responses are deserialized with the content-negotiation [body] helper (the
- * `:desktop` module applies the kotlinx-serialization plugin).
+ * Lives in commonMain so every host shares one implementation; the platform
+ * supplies the Ktor [HttpClient] (with content negotiation installed).
  */
-class DesktopSkillApi(
+class SkillApi(
     private val config: LettaConfig,
-    private val httpClient: HttpClient = createDesktopLettaHttpClient(),
+    private val httpClient: HttpClient,
 ) : AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     /** Every skill in the server registry. */
-    suspend fun listSkills(): List<DesktopSkill> {
+    suspend fun listSkills(): List<Skill> {
         val response = httpClient.get("$baseUrl/v1/skills") { applyAuth() }
         response.requireSuccess()
         return response.body<SkillsResponse>().skills
     }
 
     /** Skills installed on [agentId]. */
-    suspend fun listAgentSkills(agentId: String): List<DesktopSkill> {
+    suspend fun listAgentSkills(agentId: String): List<Skill> {
         val response = httpClient.get("$baseUrl/v1/agents/$agentId/skills") { applyAuth() }
         response.requireSuccess()
         return response.body<SkillsResponse>().skills
@@ -80,7 +79,7 @@ class DesktopSkillApi(
 }
 
 @Serializable
-data class DesktopSkill(
+data class Skill(
     val name: String,
     val version: String? = null,
     val description: String? = null,
@@ -91,7 +90,7 @@ data class DesktopSkill(
 
 @Serializable
 private data class SkillsResponse(
-    val skills: List<DesktopSkill> = emptyList(),
+    val skills: List<Skill> = emptyList(),
 )
 
 @Serializable

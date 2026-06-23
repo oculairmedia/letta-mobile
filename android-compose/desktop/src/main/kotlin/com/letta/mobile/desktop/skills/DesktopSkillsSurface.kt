@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
@@ -51,7 +52,7 @@ private enum class SkillsTab { Skills, Tools }
 
 @Composable
 fun DesktopSkillsSurface(
-    skills: List<DesktopSkill>,
+    skills: List<Skill>,
     installedSkillNames: Set<String>,
     skillsLoading: Boolean,
     skillsError: String?,
@@ -116,7 +117,7 @@ private fun TabRow(tab: SkillsTab, onSelect: (SkillsTab) -> Unit) {
 
 @Composable
 private fun SkillsTabContent(
-    skills: List<DesktopSkill>,
+    skills: List<Skill>,
     installedSkillNames: Set<String>,
     skillsLoading: Boolean,
     skillsError: String?,
@@ -128,12 +129,12 @@ private fun SkillsTabContent(
     modifier: Modifier = Modifier,
 ) {
     var showInstalledOnly by remember { mutableStateOf(true) }
-    var selectedSkill by remember { mutableStateOf<DesktopSkill?>(null) }
+    var selectedSkill by remember { mutableStateOf<Skill?>(null) }
     val installed = remember(skills, installedSkillNames) { skills.filter { it.name in installedSkillNames } }
     // The agent's installed list may include skills not present in the registry feed.
     val installedExtras = remember(installedSkillNames, skills) {
         val known = skills.map { it.name }.toSet()
-        installedSkillNames.filter { it !in known }.map { DesktopSkill(name = it) }
+        installedSkillNames.filter { it !in known }.map { Skill(name = it) }
     }
     val visible = if (showInstalledOnly) installed + installedExtras else skills
 
@@ -232,7 +233,7 @@ private fun SkillsHeader(
 
 @Composable
 private fun SkillRow(
-    skill: DesktopSkill,
+    skill: Skill,
     installed: Boolean,
     canManage: Boolean,
     selected: Boolean,
@@ -307,7 +308,7 @@ private fun SkillActionButton(
 
 @Composable
 private fun SkillDetailPanel(
-    skill: DesktopSkill,
+    skill: Skill,
     installed: Boolean,
     canManage: Boolean,
     onInstall: () -> Unit,

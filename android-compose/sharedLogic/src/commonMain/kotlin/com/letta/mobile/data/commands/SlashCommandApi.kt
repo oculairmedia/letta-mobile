@@ -1,7 +1,6 @@
-package com.letta.mobile.desktop.commands
+package com.letta.mobile.data.commands
 
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -13,18 +12,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Desktop slash-command API. The server exposes per-agent slash commands at
- * `GET /v1/agents/{id}/slash-commands` (builtins like `/goal` plus any installed
- * skill's commands). Selecting one fills the composer with its command text so
- * the user can add args and send — the server interprets the slash prefix.
+ * Platform-neutral slash-command API. The server exposes per-agent slash
+ * commands at `GET /v1/agents/{id}/slash-commands` (builtins like `/goal` plus
+ * any installed skill's commands). Selecting one fills the composer with its
+ * command text so the user can add args and send.
+ *
+ * Lives in commonMain; the platform supplies the Ktor [HttpClient].
  */
-class DesktopSlashCommandApi(
+class SlashCommandApi(
     private val config: LettaConfig,
-    private val httpClient: HttpClient = createDesktopLettaHttpClient(),
+    private val httpClient: HttpClient,
 ) : AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
-    suspend fun listAgentSlashCommands(agentId: String): List<DesktopSlashCommand> {
+    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
         val response = httpClient.get("$baseUrl/v1/agents/$agentId/slash-commands") { applyAuth() }
         response.requireSuccess()
         return response.body<SlashCommandsResponse>().commands
@@ -46,7 +47,7 @@ class DesktopSlashCommandApi(
 }
 
 @Serializable
-data class DesktopSlashCommand(
+data class AgentSlashCommand(
     @SerialName("command") val rawCommand: String,
     val name: String = "",
     val description: String = "",
@@ -60,5 +61,5 @@ data class DesktopSlashCommand(
 
 @Serializable
 private data class SlashCommandsResponse(
-    val commands: List<DesktopSlashCommand> = emptyList(),
+    val commands: List<AgentSlashCommand> = emptyList(),
 )

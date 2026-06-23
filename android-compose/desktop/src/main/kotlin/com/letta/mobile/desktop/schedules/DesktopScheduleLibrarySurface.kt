@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleLibraryItem
 import com.letta.mobile.data.schedules.ScheduleTiming
 import com.letta.mobile.desktop.DesktopButtonContent
@@ -54,7 +55,7 @@ fun DesktopScheduleLibrarySurface(
     onRefresh: () -> Unit,
     onAgentSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
-    crons: List<DesktopCronTask> = emptyList(),
+    crons: List<CronTask> = emptyList(),
     focusedAgentId: String? = null,
     onDeleteCron: (String) -> Unit = {},
     canCreate: Boolean = false,
@@ -253,7 +254,7 @@ private fun CronCreateDialog(
 
 @Composable
 private fun CronRow(
-    cron: DesktopCronTask,
+    cron: CronTask,
     onDelete: () -> Unit,
 ) {
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {

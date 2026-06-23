@@ -104,17 +104,18 @@ import com.letta.mobile.desktop.memory.DesktopMemoryController
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.desktop.memory.DesktopMemorySurface
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
-import com.letta.mobile.desktop.schedules.DesktopCronApi
-import com.letta.mobile.desktop.schedules.DesktopCronTask
+import com.letta.mobile.data.schedules.CronApi
+import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
-import com.letta.mobile.desktop.commands.DesktopSlashCommand
-import com.letta.mobile.desktop.commands.DesktopSlashCommandApi
-import com.letta.mobile.desktop.skills.DesktopSkill
-import com.letta.mobile.desktop.skills.DesktopSkillApi
+import com.letta.mobile.data.commands.AgentSlashCommand
+import com.letta.mobile.data.commands.SlashCommandApi
+import com.letta.mobile.data.skills.Skill
+import com.letta.mobile.data.skills.SkillApi
+import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -204,20 +205,20 @@ fun LettaDesktopApp(
         activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopBlockApi(it) }
     }
     val cronApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopCronApi(it) }
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { CronApi(it, createDesktopLettaHttpClient()) }
     }
-    var allCrons by remember(cronApi) { mutableStateOf<List<DesktopCronTask>>(emptyList()) }
+    var allCrons by remember(cronApi) { mutableStateOf<List<CronTask>>(emptyList()) }
     val skillApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopSkillApi(it) }
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { SkillApi(it, createDesktopLettaHttpClient()) }
     }
-    var allSkills by remember(skillApi) { mutableStateOf<List<DesktopSkill>>(emptyList()) }
+    var allSkills by remember(skillApi) { mutableStateOf<List<Skill>>(emptyList()) }
     var installedSkillNames by remember(skillApi) { mutableStateOf<Set<String>>(emptySet()) }
     var skillsLoading by remember(skillApi) { mutableStateOf(false) }
     var skillsError by remember(skillApi) { mutableStateOf<String?>(null) }
     val slashCommandApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopSlashCommandApi(it) }
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
     }
-    var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<DesktopSlashCommand>>(emptyList()) }
+    var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -1473,12 +1474,12 @@ private fun DestinationContent(
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
     blockApi: DesktopBlockApi?,
-    crons: List<DesktopCronTask>,
+    crons: List<CronTask>,
     onDeleteCron: (String) -> Unit,
     canCreateCron: Boolean,
     onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
     focusedAgentId: String?,
-    skills: List<DesktopSkill>,
+    skills: List<Skill>,
     installedSkillNames: Set<String>,
     skillsLoading: Boolean,
     skillsError: String?,
