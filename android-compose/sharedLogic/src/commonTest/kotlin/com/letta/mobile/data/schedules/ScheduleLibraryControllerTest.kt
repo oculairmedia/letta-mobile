@@ -133,6 +133,31 @@ class ScheduleLibraryControllerTest {
         assertEquals("parse error", controller.state.value.errorMessage)
     }
 
+    @Test
+    fun malformedAndEmptySchedulesConvertGracefullyWithoutCrashing() {
+        val emptyMessageSchedule = ScheduledMessage(
+            id = "empty",
+            agentId = "a1",
+            message = SchedulePayload(messages = emptyList()),
+            schedule = ScheduleDefinition(type = "recurring", cronExpression = null),
+            nextScheduledTime = null
+        )
+
+        val item1 = emptyMessageSchedule.toScheduleLibraryItem()
+        assertEquals("", item1.messagePreview)
+        assertTrue(item1.timing is ScheduleTiming.Recurring)
+        assertEquals("", (item1.timing as ScheduleTiming.Recurring).cronExpression)
+
+        val malformedOneTime = emptyMessageSchedule.copy(
+            schedule = ScheduleDefinition(type = "one-time", scheduledAt = null)
+        )
+
+        val item2 = malformedOneTime.toScheduleLibraryItem()
+        assertEquals("", item2.messagePreview)
+        assertTrue(item2.timing is ScheduleTiming.OneTime)
+        assertEquals("", (item2.timing as ScheduleTiming.OneTime).displayTime)
+    }
+
     private fun TestScope.controller(
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),

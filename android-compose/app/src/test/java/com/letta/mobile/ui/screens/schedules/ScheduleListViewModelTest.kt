@@ -144,6 +144,27 @@ class ScheduleListViewModelTest {
         assertEquals("Failed to load schedules", state)
     }
 
+    @Test
+    fun `loadData schedules with empty messages and missing schedule info convert gracefully`() = runTest {
+        val emptyMessageSchedule = ScheduledMessage(
+            id = "empty",
+            agentId = "a1",
+            message = SchedulePayload(messages = emptyList()),
+            schedule = ScheduleDefinition(type = "recurring", cronExpression = null),
+            nextScheduledTime = null
+        )
+        fakeScheduleRepo.setSchedules("a1", listOf(emptyMessageSchedule))
+
+        viewModel.loadData()
+
+        val state = awaitSuccessState()
+        assertEquals(1, state.displayItems.size)
+        val item = state.displayItems.first()
+        assertEquals("", item.messagePreview)
+        assert(item.timing is com.letta.mobile.data.schedules.ScheduleTiming.Recurring)
+        assertEquals("", (item.timing as com.letta.mobile.data.schedules.ScheduleTiming.Recurring).cronExpression)
+    }
+
     private suspend fun awaitSuccessState(): ScheduleListUiState {
         return viewModel.uiState.first { it is com.letta.mobile.ui.common.UiState.Success }
             .let { (it as com.letta.mobile.ui.common.UiState.Success).data }
@@ -184,6 +205,10 @@ class ScheduleListViewModelTest {
 
         fun clearSchedules() {
             schedulesByAgent.clear()
+        }
+
+        fun setSchedules(agentId: String, schedules: List<ScheduledMessage>) {
+            schedulesByAgent[agentId] = schedules.toMutableList()
         }
 
         override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
