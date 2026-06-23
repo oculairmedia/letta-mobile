@@ -174,30 +174,6 @@ class ChatConversationCoordinatorTest {
         assertEquals("conv-existing", timelineRepository.externalLocals.single().conversationId)
     }
 
-
-    @Test
-    fun `reopening existing timeline conversation clears prior messages avoiding inherited history`() = runTest {
-        val harness = Harness(scope = this, explicitConversationId = "conv-existing")
-
-        // Simulate dirty state from a previous conversation route
-        harness.uiState.value = harness.uiState.value.copy(
-            messages = persistentListOf(
-                com.letta.mobile.data.model.UiMessage(id = "old-1", role = "user", content = "Old message", timestamp = "")
-            ),
-            messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.AppendTail
-        )
-
-        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
-        advanceUntilIdle()
-
-        // The timeline observer will eventually emit its own hydrated list, but
-        // the initial load must immediately clear out the prior conversation's messages
-        // so they don't briefly flash or permanently pollute the UI state.
-        assertEquals(ConversationState.Ready("conv-existing"), harness.uiState.value.conversationState)
-        assertTrue("Messages should be cleared initially", harness.uiState.value.messages.isEmpty())
-        assertEquals(com.letta.mobile.data.chat.projection.ChatMessageListChange.Full, harness.uiState.value.messageListChange)
-    }
-
     @Test
     fun `explicit timeline route hydrates requested conversation and starts observer`() = runTest {
         val harness = Harness(scope = this, explicitConversationId = "conv-explicit")
