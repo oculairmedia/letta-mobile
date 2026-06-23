@@ -1,7 +1,14 @@
 package com.letta.mobile.data.model
 
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.decodeFromJsonElement
 
 @Serializable
 data class ScheduleMessage(
@@ -46,8 +53,51 @@ data class ScheduleCreateParams(
     @SerialName("max_steps") val maxSteps: Double? = null,
 )
 
-@Serializable
+@Serializable(with = ScheduleListResponseSerializer::class)
 data class ScheduleListResponse(
+    val hasNextPage: Boolean = false,
+    val scheduledMessages: List<ScheduledMessage> = emptyList(),
+)
+
+@Serializable
+private data class ScheduleListResponseSurrogate(
     @SerialName("has_next_page") val hasNextPage: Boolean = false,
     @SerialName("scheduled_messages") val scheduledMessages: List<ScheduledMessage> = emptyList(),
 )
+
+/**
+ * Shim/local-runtime Letta servers return the schedule list as a bare JSON array
+ * (`[ {...}, {...} ]`), while native servers return the wrapped object shape
+ * (`{ "has_next_page": ..., "scheduled_messages": [...] }`). This serializer accepts
+ * both shapes so the mobile Schedules page hydrates (or shows an empty state) instead
+ * of throwing a SerializationException and landing in a broken/error state.
+ *
+ * NOTE: previously added in PR #648 and inadvertently reverted by PR #650; restored here.
+ */
+object ScheduleListResponseSerializer : KSerializer<ScheduleListResponse> {
+    override val descriptor: SerialDescriptor = ScheduleListResponseSurrogate.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): ScheduleListResponse {
+        val input = decoder as? JsonDecoder ?: error("Only JSON is supported")
+        val element = input.decodeJsonElement()
+
+        return if (element is JsonArray) {
+            val messages = input.json.decodeFromJsonElement<List<ScheduledMessage>>(element)
+            ScheduleListResponse(hasNextPage = false, scheduledMessages = messages)
+        } else {
+            val surrogate = input.json.decodeFromJsonElement<ScheduleListResponseSurrogate>(element)
+            ScheduleListResponse(
+                hasNextPage = surrogate.hasNextPage,
+                scheduledMessages = surrogate.scheduledMessages,
+            )
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: ScheduleListResponse) {
+        val surrogate = ScheduleListResponseSurrogate(
+            hasNextPage = value.hasNextPage,
+            scheduledMessages = value.scheduledMessages,
+        )
+        encoder.encodeSerializableValue(ScheduleListResponseSurrogate.serializer(), surrogate)
+    }
+}
