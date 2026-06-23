@@ -143,6 +143,7 @@ internal fun ChatDetailPane(
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
     composerPlaceholder: String = "Message…",
+    onOpenModelPicker: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // Drive the ambient glow off the thinking state: a teal breath while the
@@ -200,6 +201,7 @@ internal fun ChatDetailPane(
                 onModelSelected = onModelSelected,
                 commands = commands,
                 placeholder = composerPlaceholder,
+                onOpenModelPicker = onOpenModelPicker,
                 onTextChanged = onComposerTextChanged,
                 onSend = onSend,
                 onAttachImage = onAttachImage,
@@ -1215,6 +1217,7 @@ private fun ComposerBar(
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
     placeholder: String,
+    onOpenModelPicker: (() -> Unit)? = null,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
@@ -1347,14 +1350,19 @@ private fun ComposerBar(
                     )
                     val modelDisplay = modelOptions.firstOrNull { it.second == modelLabel }?.first
                         ?: modelLabel.ifBlank { "Model" }
-                    ComposerDropdownChip(
-                        label = modelDisplay,
-                        options = modelOptions.map { it.first },
-                        emptyHint = "No models available",
-                        onSelect = { selected ->
-                            modelOptions.firstOrNull { it.first == selected }?.let { onModelSelected(it.second) }
-                        },
-                    )
+                    if (onOpenModelPicker != null) {
+                        // Rich, searchable, provider-grouped picker sheet.
+                        ComposerActionChip(label = modelDisplay, onClick = onOpenModelPicker)
+                    } else {
+                        ComposerDropdownChip(
+                            label = modelDisplay,
+                            options = modelOptions.map { it.first },
+                            emptyHint = "No models available",
+                            onSelect = { selected ->
+                                modelOptions.firstOrNull { it.first == selected }?.let { onModelSelected(it.second) }
+                            },
+                        )
+                    }
                     var safety by remember { mutableStateOf("Unrestricted") }
                     ComposerDropdownChip(
                         label = safety,
@@ -1417,6 +1425,43 @@ private fun ComposerBar(
  * A functional pill selector in the composer control row (model / safety /
  * effort): click opens a popup of [options]; selecting one fires [onSelect].
  */
+/** A composer chip that opens a separate picker (vs. an inline dropdown). */
+@Composable
+private fun ComposerActionChip(
+    label: String,
+    onClick: () -> Unit,
+    leadingIcon: ImageVector? = null,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(text = label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Icon(
+                imageVector = Icons.Outlined.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ComposerDropdownChip(
     label: String,

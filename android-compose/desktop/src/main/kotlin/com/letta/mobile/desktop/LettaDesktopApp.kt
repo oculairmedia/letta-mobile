@@ -102,6 +102,7 @@ import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
+import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
@@ -268,6 +269,7 @@ fun LettaDesktopApp(
     var showBackgroundTasks by remember { mutableStateOf(false) }
     // Work | Play presentation lens over the same agents/memory/conversations.
     var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
+    var showModelPicker by remember { mutableStateOf(false) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -504,6 +506,7 @@ fun LettaDesktopApp(
                             state = chatState,
                             isThinking = isThinkingSelected,
                             composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
+                            onOpenModelPicker = { showModelPicker = true },
                             modelOptions = modelOptions,
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,
@@ -637,6 +640,14 @@ fun LettaDesktopApp(
                     runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
                     onClick = { showBackgroundTasks = true },
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp),
+                )
+            }
+            if (showModelPicker) {
+                DesktopModelPickerSheet(
+                    models = availableModels,
+                    selectedValue = chatState.composerModelLabel,
+                    onSelect = chatController::setConversationModel,
+                    onDismiss = { showModelPicker = false },
                 )
             }
             val editingAgentId = editAgentId
