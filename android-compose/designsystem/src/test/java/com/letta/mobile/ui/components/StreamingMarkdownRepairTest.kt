@@ -76,6 +76,54 @@ class StreamingMarkdownRepairTest {
     }
 
     @Test
+    fun `leaves partial code fence marker with one backtick unchanged to prevent dropping content`() {
+        assertEquals(
+            "\n`",
+            repairIncompleteMarkdownForStreaming("\n`"),
+        )
+    }
+
+    @Test
+    fun `leaves partial code fence marker with two backticks unchanged to prevent dropping content`() {
+        assertEquals(
+            "\n``",
+            repairIncompleteMarkdownForStreaming("\n``"),
+        )
+    }
+
+    @Test
+    fun `repairs partial code fence marker if followed by text because it is an inline code span`() {
+        assertEquals(
+            "\n`k`",
+            repairIncompleteMarkdownForStreaming("\n`k"),
+        )
+    }
+
+    @Test
+    fun `leaves partial code fence marker with leading spaces unchanged`() {
+        assertEquals(
+            "\n  ``",
+            repairIncompleteMarkdownForStreaming("\n  ``"),
+        )
+    }
+
+    @Test
+    fun `repairs backticks with too many leading spaces as inline code span`() {
+        assertEquals(
+            "\n    ````",
+            repairIncompleteMarkdownForStreaming("\n    ``"),
+        )
+    }
+
+    @Test
+    fun `repairs inline code span correctly if not at start of line`() {
+        assertEquals(
+            "hello `world`",
+            repairIncompleteMarkdownForStreaming("hello `world"),
+        )
+    }
+
+    @Test
     fun `repairs open fenced code block with a closing fence on a new line`() {
         assertEquals(
             "```kotlin\nval x = 1\n```",
