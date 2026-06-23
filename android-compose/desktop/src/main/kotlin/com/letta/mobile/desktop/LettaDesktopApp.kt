@@ -306,6 +306,24 @@ fun LettaDesktopApp(
         )
     }
     val toolLibraryState by toolLibraryController.state.collectAsState()
+    // Cmd/Ctrl-K opens the command palette (Penpot shows the ⌘K hint). A global
+    // AWT key dispatcher fires regardless of which Compose field has focus.
+    DisposableEffect(Unit) {
+        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val dispatcher = java.awt.KeyEventDispatcher { event ->
+            if (event.id == java.awt.event.KeyEvent.KEY_PRESSED &&
+                event.keyCode == java.awt.event.KeyEvent.VK_K &&
+                (event.isControlDown || event.isMetaDown)
+            ) {
+                showCommandPalette = true
+                true
+            } else {
+                false
+            }
+        }
+        focusManager.addKeyEventDispatcher(dispatcher)
+        onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
+    }
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,

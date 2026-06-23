@@ -68,6 +68,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
@@ -96,7 +97,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
@@ -113,6 +121,7 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.composer.AutocompleteTrigger
 import com.letta.mobile.data.composer.ComposerAutocomplete
+import com.letta.mobile.data.composer.ComposerEffort
 import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
@@ -1496,11 +1505,13 @@ private fun ComposerBar(
                         contentColor = MaterialTheme.customColors.runningColor
                             .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary,
                     )
-                    var effort by remember { mutableStateOf("Medium") }
-                    ComposerDropdownChip(
-                        label = effort,
-                        options = listOf("Low", "Medium", "High"),
-                        onSelect = { effort = it },
+                    var effort by remember { mutableStateOf(ComposerEffort.Medium) }
+                    var thinking by remember { mutableStateOf(true) }
+                    ComposerEffortChip(
+                        effort = effort,
+                        thinking = thinking,
+                        onEffortChange = { effort = it },
+                        onThinkingChange = { thinking = it },
                     )
                     Spacer(Modifier.weight(1f))
                     Surface(
@@ -1616,6 +1627,112 @@ private fun MentionPopup(
             }
         }
     }
+}
+
+/**
+ * Composer effort chip + popover (Penpot "Effort popover"): an OPTIONS section
+ * with a Thinking toggle and an EFFORT section (Minimal … Max) with the selected
+ * level checked. Effort levels come from the shared [ComposerEffort].
+ */
+@Composable
+private fun ComposerEffortChip(
+    effort: ComposerEffort,
+    thinking: Boolean,
+    onEffortChange: (ComposerEffort) -> Unit,
+    onThinkingChange: (Boolean) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        ComposerActionChip(label = effort.label, onClick = { open = !open })
+        if (open) {
+            val positionProvider = object : PopupPositionProvider {
+                override fun calculatePosition(
+                    anchorBounds: IntRect,
+                    windowSize: IntSize,
+                    layoutDirection: LayoutDirection,
+                    popupContentSize: IntSize,
+                ): IntOffset = IntOffset(
+                    x = anchorBounds.left,
+                    y = anchorBounds.top - popupContentSize.height - 6,
+                )
+            }
+            Popup(
+                popupPositionProvider = positionProvider,
+                onDismissRequest = { open = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                Surface(
+                    modifier = Modifier.width(230.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        EffortSectionHeader("Options")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Thinking",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(checked = thinking, onCheckedChange = onThinkingChange)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        )
+                        EffortSectionHeader("Effort")
+                        ComposerEffort.entries.forEach { level ->
+                            val selected = level == effort
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onEffortChange(level); open = false }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = level.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (selected) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Check,
+                                        contentDescription = "Selected",
+                                        tint = Color(0xFF00BFA5),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EffortSectionHeader(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 4.dp),
+    )
 }
 
 /** A composer chip that opens a separate picker (vs. an inline dropdown). */
