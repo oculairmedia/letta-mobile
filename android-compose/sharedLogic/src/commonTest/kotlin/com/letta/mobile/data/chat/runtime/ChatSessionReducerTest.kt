@@ -289,6 +289,7 @@ class ChatSessionReducerTest {
             selectedConversationId = "a",
             messagesByConversationId = mapOf("a" to listOf(message("a1", "hi"))),
             isRemoteBacked = true,
+            isSending = true,
             connectionState = ChatConnectionState.Live,
             selectionGeneration = 7,
         )
@@ -300,6 +301,8 @@ class ChatSessionReducerTest {
         assertEquals(8, next.selectionGeneration)
         assertTrue(next.isLoading)
         assertEquals(ChatConnectionState.Loading, next.connectionState)
+        // Deleting the active chat mid-send must not leave the next one stuck sending.
+        assertFalse(next.isSending)
     }
 
     @Test

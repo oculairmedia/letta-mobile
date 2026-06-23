@@ -513,8 +513,10 @@ fun LettaDesktopApp(
                             },
                             canCreateCron = cronApi != null &&
                                 (scheduleLibraryState.selectedAgentId != null || selectedAgentId != null),
-                            onCreateCron = { name, prompt, cron, recurring, tz ->
-                                val targetAgent = scheduleLibraryState.selectedAgentId ?: selectedAgentId
+                            onCreateCron = { filteredAgentId, name, prompt, cron, recurring, tz ->
+                                val targetAgent = filteredAgentId
+                                    ?: scheduleLibraryState.selectedAgentId
+                                    ?: selectedAgentId
                                 if (cronApi != null && targetAgent != null) {
                                     chatScope.launch {
                                         runCatching {
@@ -1477,7 +1479,7 @@ private fun DestinationContent(
     crons: List<CronTask>,
     onDeleteCron: (String) -> Unit,
     canCreateCron: Boolean,
-    onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
+    onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
     focusedAgentId: String?,
     skills: List<Skill>,
     installedSkillNames: Set<String>,

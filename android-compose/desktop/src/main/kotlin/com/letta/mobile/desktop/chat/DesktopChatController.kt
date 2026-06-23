@@ -68,6 +68,10 @@ class DesktopChatController(
     private val _thinkingConversationId = MutableStateFlow<String?>(null)
     val thinkingConversationId: StateFlow<String?> = _thinkingConversationId.asStateFlow()
 
+    // Bumped on every send so a stale safety-timeout can't clear the indicator
+    // for a newer send in the same conversation.
+    private var thinkingGeneration = 0
+
     private var gateway: DesktopChatGateway? = null
 
     // Per-conversation model overrides set this session (the picker). The
@@ -166,7 +170,13 @@ class DesktopChatController(
                     )
                 }
                 if (wasSelected) {
-                    // The active chat was removed; hydrate whatever became selected.
+                    // The active chat was removed; cancel any in-flight send so a
+                    // late success/failure can't mutate the next conversation,
+                    // then hydrate whatever became selected.
+                    sendJob?.cancel()
+                    if (_thinkingConversationId.value == conversationId) {
+                        _thinkingConversationId.value = null
+                    }
                     timelineJob?.cancel()
                     activeLoop?.close()
                     activeLoop = null
@@ -222,18 +232,19 @@ class DesktopChatController(
         onCreated: (String) -> Unit = {},
     ) {
         if (closed) return
+        val agentName = name.ifBlank { "New agent" }
         scope.launch {
             try {
                 val gw = httpGateway ?: return@launch
                 val agent = gw.createAgent(
                     AgentCreateParams(
-                        name = name.ifBlank { "New agent" },
+                        name = agentName,
                         model = model,
                         embedding = embedding,
                         includeBaseTools = true,
                         memoryBlocks = listOf(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
-                            BlockCreateParams(label = "persona", value = "I am $name, a helpful assistant."),
+                            BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
                         ),
                     ),
                 )
@@ -371,10 +382,12 @@ class DesktopChatController(
      */
     private fun beginThinking(conversationId: String?) {
         if (conversationId == null) return
+        val generation = ++thinkingGeneration
         _thinkingConversationId.value = conversationId
         scope.launch {
             kotlinx.coroutines.delay(THINKING_TIMEOUT_MS)
-            if (_thinkingConversationId.value == conversationId) {
+            // Only the timer for the latest send may clear the indicator.
+            if (generation == thinkingGeneration && _thinkingConversationId.value == conversationId) {
                 _thinkingConversationId.value = null
             }
         }

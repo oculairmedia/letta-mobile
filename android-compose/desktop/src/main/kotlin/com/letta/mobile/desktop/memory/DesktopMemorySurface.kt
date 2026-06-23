@@ -728,12 +728,16 @@ private fun BlockEditorPanel(
     var loading by remember(target) { mutableStateOf(target is BlockEditorTarget.Existing) }
     var busy by remember(target) { mutableStateOf(false) }
     var error by remember(target) { mutableStateOf<String?>(null) }
+    // When an existing block fails to load, the editor is read-only — saving the
+    // empty value would clobber the real block content on the server.
+    var loadFailed by remember(target) { mutableStateOf(false) }
 
     LaunchedEffect(target) {
         if (target is BlockEditorTarget.Existing) {
             val id = target.blockId
             if (id.isNullOrBlank()) {
                 error = "This block has no id and can't be edited."
+                loadFailed = true
                 loading = false
             } else {
                 runCatching { blockApi.getBlockById(id) }
@@ -744,6 +748,7 @@ private fun BlockEditorPanel(
                     }
                     .onFailure {
                         error = it.message ?: "Could not load block"
+                        loadFailed = true
                         loading = false
                     }
             }
@@ -797,7 +802,7 @@ private fun BlockEditorPanel(
             DesktopTextArea(
                 value = value,
                 onValueChange = { value = it },
-                enabled = !busy,
+                enabled = !busy && !loadFailed,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 placeholder = "Block contents…",
             )
@@ -852,7 +857,7 @@ private fun BlockEditorPanel(
                         }
                     }
                 },
-                enabled = !busy && !loading,
+                enabled = !busy && !loading && !loadFailed,
             ) { DesktopButtonContent(text = if (busy) "Saving…" else "Save") }
         }
     }

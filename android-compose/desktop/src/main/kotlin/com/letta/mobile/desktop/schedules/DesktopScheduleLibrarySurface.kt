@@ -59,7 +59,7 @@ fun DesktopScheduleLibrarySurface(
     focusedAgentId: String? = null,
     onDeleteCron: (String) -> Unit = {},
     canCreate: Boolean = false,
-    onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit = { _, _, _, _, _ -> },
+    onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit = { _, _, _, _, _, _ -> },
 ) {
     var showCreate by remember { mutableStateOf(false) }
     // Schedules are scoped to the agent in focus by default; the "All" chip
@@ -73,6 +73,10 @@ fun DesktopScheduleLibrarySurface(
             .distinct()
     }
     val agentNames = remember(state.agents) { state.agents.associate { it.id.value to it.name } }
+    // This backend is cron-backed whenever creation is wired (cronApi present)
+    // or any cron exists — an empty cron list is a real "0 schedules", not a
+    // signal to fall back to the legacy /schedule admin UI.
+    val cronMode = canCreate || crons.isNotEmpty()
     Box(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
         LazyColumn(
             modifier = Modifier
@@ -83,14 +87,15 @@ fun DesktopScheduleLibrarySurface(
             item {
                 SchedulesHeader(
                     state = state,
-                    cronCount = if (crons.isNotEmpty()) filteredCrons.size else 0,
+                    cronCount = filteredCrons.size,
+                    cronMode = cronMode,
                     canCreate = canCreate,
                     onRefresh = onRefresh,
                     onNewSchedule = { showCreate = true },
                 )
             }
         // Real schedules on this backend are exposed as cron tasks (/v1/crons).
-        if (crons.isNotEmpty()) {
+        if (cronMode) {
             item {
                 CronAgentFilters(
                     agentIds = cronAgentIds,
@@ -143,7 +148,8 @@ fun DesktopScheduleLibrarySurface(
                 onDismiss = { showCreate = false },
                 onCreate = { name, prompt, cron, recurring, tz ->
                     showCreate = false
-                    onCreateCron(name, prompt, cron, recurring, tz)
+                    // Create for the currently-filtered agent ("All" → focused).
+                    onCreateCron(filterAgentId ?: focusedAgentId, name, prompt, cron, recurring, tz)
                 },
             )
         }
@@ -154,11 +160,12 @@ fun DesktopScheduleLibrarySurface(
 private fun SchedulesHeader(
     state: DesktopScheduleLibraryState,
     cronCount: Int,
+    cronMode: Boolean,
     canCreate: Boolean,
     onRefresh: () -> Unit,
     onNewSchedule: () -> Unit,
 ) {
-    val count = if (cronCount > 0) cronCount else state.schedules.size
+    val count = if (cronMode) cronCount else if (cronCount > 0) cronCount else state.schedules.size
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,

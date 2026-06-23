@@ -64,10 +64,14 @@ class DesktopBlockApi(
         }
         createResponse.requireSuccess()
         val block: Block = createResponse.body()
-        runCatching {
-            httpClient.patch("$baseUrl/v1/agents/$agentId/core-memory/blocks/attach/${block.id.value}") {
-                applyAuth()
-            }
+        val attachResponse = httpClient.patch(
+            "$baseUrl/v1/agents/$agentId/core-memory/blocks/attach/${block.id.value}",
+        ) { applyAuth() }
+        if (attachResponse.status.value !in 200..299) {
+            // The block was created but couldn't be attached — roll it back so it
+            // isn't left orphaned, then surface the attach failure to the caller.
+            runCatching { deleteBlockById(block.id.value) }
+            attachResponse.requireSuccess()
         }
         return block
     }

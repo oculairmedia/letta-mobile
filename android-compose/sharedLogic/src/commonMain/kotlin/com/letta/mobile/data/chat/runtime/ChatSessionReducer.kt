@@ -115,6 +115,7 @@ object ChatSessionReducer {
             messagesByConversationId = messages,
             selectedConversationId = nextSelected?.id,
             composer = ChatComposerState(),
+            isSending = false,
             isLoading = nextSelected != null && state.isRemoteBacked,
             connectionState = when {
                 nextSelected == null -> ChatConnectionState.NoConversations
