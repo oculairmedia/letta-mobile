@@ -66,6 +66,37 @@ class A2uiProtocolCommonTest {
         assertEquals("test_surface", unknown.raw["someOtherMessage"]?.jsonObject?.get("surfaceId")?.jsonPrimitive?.content)
     }
 
+    @Test
+    fun decodeA2uiMessagesLenient_handlesTrailingCommasInArraysAndObjects() {
+        val raw = "{\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\",},}"
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_handlesFencedJson() {
+        val raw = "```json\n{\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\"}}\n```"
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_handlesLeadingProse() {
+        val raw = "Here is the JSON you requested: {\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\"}}"
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_handlesUnrecoverableMalformedPayload() {
+        val raw = "{\"createSurface\": { surfaceId: test_surface "
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(null, parsed)
+    }
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
