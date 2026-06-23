@@ -37,4 +37,19 @@ class A2uiHistoryExtractorTest {
         assertEquals(raw, extraction.content)
         assertEquals(emptyList<A2uiMessage>(), extraction.messages)
     }
+
+    @Test
+    fun `extract repairs truncated a2ui json`() {
+        val extraction = A2uiHistoryExtractor.extract(
+            """
+            <a2ui-json>
+            {"createSurface":{"surfaceId":"s1","catalogId":"basic"
+            </a2ui-json>
+            """.trimIndent()
+        )
+
+        assertEquals("", extraction.content)
+        assertEquals(1, extraction.messages.size)
+        assertTrue(extraction.messages[0] is A2uiMessage.CreateSurface)
+    }
 }
