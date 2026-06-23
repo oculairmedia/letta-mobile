@@ -60,6 +60,10 @@ internal fun defaultSubagentScope(): CoroutineScope =
 open class SubagentRepository(
     private val transport: IChannelTransport,
     private val scope: CoroutineScope = defaultSubagentScope(),
+    // Mobile shows only active subagents (all=false). The desktop Background
+    // tasks panel also has a "Finished" section, so it requests all=true to
+    // include recently-terminal entries in the initial snapshot.
+    private val includeAll: Boolean = false,
 ) : ISubagentRepository {
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
     private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
@@ -95,7 +99,7 @@ open class SubagentRepository(
         val previous = inFlightRefresh.getAndSet(deferred)
         previous?.takeIf { !it.isCompleted }?.cancel()
         val result = runCatching {
-            val response = transport.sendSubagentList(all = false)
+            val response = transport.sendSubagentList(all = includeAll)
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "subagent_list failed")
             }

@@ -57,6 +57,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -81,6 +82,9 @@ import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
@@ -91,6 +95,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
+import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
+import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -219,6 +226,41 @@ fun LettaDesktopApp(
         activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
     }
     var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
+    // Active-subagent registry (Background tasks). Desktop streams chat over SSE,
+    // but the subagent registry only exists on the shim's mobile WS protocol, so
+    // we open a lean WS side-channel and feed the shared SubagentRepository.
+    val subagentTransport = remember(activeConfig) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() }
+            ?.let { DesktopWsChannelTransport(chatScope) }
+    }
+    val subagentRepository = remember(subagentTransport) {
+        subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    }
+    DisposableEffect(subagentTransport) {
+        val transport = subagentTransport
+        if (transport != null) {
+            chatScope.launch {
+                runCatching {
+                    transport.connect(
+                        baseShimUrl = activeConfig.serverUrl,
+                        token = activeConfig.accessToken.orEmpty(),
+                        deviceId = "letta-desktop",
+                        clientVersion = "letta-desktop",
+                    )
+                }
+            }
+        }
+        onDispose { transport?.close() }
+    }
+    val activeSubagents by produceState(emptyList<SubagentEntry>(), subagentRepository) {
+        val repo = subagentRepository
+        if (repo == null) {
+            value = emptyList()
+        } else {
+            repo.activeSubagentsFlow().collect { value = it }
+        }
+    }
+    var showBackgroundTasks by remember { mutableStateOf(false) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -566,6 +608,23 @@ fun LettaDesktopApp(
                         )
                     }
                 }
+                if (showBackgroundTasks && subagentRepository != null) {
+                    RailDivider()
+                    DesktopBackgroundTasksPanel(
+                        subagents = activeSubagents,
+                        onClose = { showBackgroundTasks = false },
+                    )
+                }
+            }
+            if (selectedDestination == DesktopDestination.Conversations &&
+                !showBackgroundTasks &&
+                subagentRepository != null
+            ) {
+                DesktopBackgroundTasksToggle(
+                    runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
+                    onClick = { showBackgroundTasks = true },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp),
+                )
             }
             val editingAgentId = editAgentId
             if (editingAgentId != null) {
