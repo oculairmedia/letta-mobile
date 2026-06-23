@@ -237,6 +237,72 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
+    fun cronBackedVerdictLatchesSoSecondLoadSkipsDoomedNativeRoute() = runTest {
+        // Native route 404s; cron source answers. After the first load the
+        // controller should remember the backend is cron-backed and NOT
+        // re-attempt the doomed native round-trip on subsequent loads.
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val crons = listOf(CronTask(id = "c1", agentId = "a1", name = "Daily", cron = "0 9 * * *", recurring = true))
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { crons },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        // First load probed the native route exactly once and fell back to cron.
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(true, controller.state.value.cronMode)
+
+        // A subsequent selectAgent must NOT re-probe the native route.
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(0, scheduleRepository.getSchedulesCallCount)
+        assertEquals(true, controller.state.value.cronMode)
+        assertEquals("a2", controller.state.value.selectedAgentId)
+
+        // A subsequent full loadData must NOT re-probe the native route either.
+        controller.loadData()
+        advanceUntilIdle()
+
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(0, scheduleRepository.getSchedulesCallCount)
+        assertEquals(true, controller.state.value.cronMode)
+    }
+
+    @Test
+    fun nativeRouteServingBackendUsesNativeOnEveryLoadAndNeverLatches() = runTest {
+        // Backend serves the native route: the verdict must never latch, so
+        // native is used on every load/select with zero behaviour change.
+        val scheduleRepository = FakeScheduleRepository()
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { error("cron should never be consulted") },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(false, controller.state.value.cronMode)
+        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+        assertEquals(2, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+
+        controller.loadData()
+        advanceUntilIdle()
+        assertEquals(3, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(false, controller.state.value.cronMode)
+    }
+
+    @Test
     fun malformedAndEmptySchedulesConvertGracefullyWithoutCrashing() {
         val emptyMessageSchedule = ScheduledMessage(
             id = "empty",
@@ -319,14 +385,25 @@ class ScheduleLibraryControllerTest {
         val createdSchedules = mutableListOf<ScheduleCreateParams>()
         val deletedScheduleIds = mutableListOf<String>()
 
+        /** Number of times the native refresh round-trip was attempted. */
+        var refreshScheduleCallCount = 0
+            private set
+
+        /** Number of times the native getSchedules round-trip was attempted. */
+        var getSchedulesCallCount = 0
+            private set
+
         fun clearSchedules() {
             schedulesByAgent.clear()
         }
 
-        override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> =
-            flowOf(schedulesByAgent[agentId].orEmpty())
+        override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> {
+            getSchedulesCallCount++
+            return flowOf(schedulesByAgent[agentId].orEmpty())
+        }
 
         override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
+            refreshScheduleCallCount++
             error?.let { throw it }
         }
 
