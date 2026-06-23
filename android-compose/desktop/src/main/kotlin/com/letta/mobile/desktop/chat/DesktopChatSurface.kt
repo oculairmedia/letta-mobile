@@ -1067,6 +1067,12 @@ private val ChatColumnMaxWidth = 760.dp
 data class ComposerCommand(
     val label: String,
     val description: String,
+    /**
+     * When true, selecting the command fills the composer (e.g. a server slash
+     * command the user then edits/sends) rather than running an app action. The
+     * palette won't intercept Enter for these, so the message can still be sent.
+     */
+    val fillsComposer: Boolean = false,
     val run: () -> Unit,
 )
 
@@ -1563,18 +1569,24 @@ private fun ComposerBar(
                         .fillMaxWidth()
                         .heightIn(min = 28.dp, max = 120.dp)
                         .onPreviewKeyEvent { event ->
-                            // Enter sends; Shift+Enter inserts a newline.
+                            // Enter sends; Shift+Enter inserts a newline. Only an
+                            // app-action command intercepts Enter — server slash
+                            // commands (fillsComposer) let the message send.
                             if (event.type == KeyEventType.KeyDown &&
                                 (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
                                 !event.isShiftPressed
                             ) {
-                                if (matchedCommands.isNotEmpty()) {
+                                val actionCommand = matchedCommands.firstOrNull { !it.fillsComposer }
+                                if (actionCommand != null) {
                                     onTextChanged("")
-                                    matchedCommands.first().run()
+                                    actionCommand.run()
+                                    true
                                 } else if (canSend) {
                                     onSend()
+                                    true
+                                } else {
+                                    false
                                 }
-                                true
                             } else {
                                 false
                             }

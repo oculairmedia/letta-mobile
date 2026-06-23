@@ -111,6 +111,8 @@ import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
+import com.letta.mobile.desktop.commands.DesktopSlashCommand
+import com.letta.mobile.desktop.commands.DesktopSlashCommandApi
 import com.letta.mobile.desktop.skills.DesktopSkill
 import com.letta.mobile.desktop.skills.DesktopSkillApi
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
@@ -212,6 +214,10 @@ fun LettaDesktopApp(
     var installedSkillNames by remember(skillApi) { mutableStateOf<Set<String>>(emptySet()) }
     var skillsLoading by remember(skillApi) { mutableStateOf(false) }
     var skillsError by remember(skillApi) { mutableStateOf<String?>(null) }
+    val slashCommandApi = remember(activeConfig) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopSlashCommandApi(it) }
+    }
+    var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<DesktopSlashCommand>>(emptyList()) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -359,6 +365,16 @@ fun LettaDesktopApp(
             reloadSkills()
         }
     }
+    // Load the focused agent's server slash commands for the composer palette.
+    LaunchedEffect(slashCommandApi, selectedAgentId) {
+        val api = slashCommandApi
+        val agent = selectedAgentId
+        agentSlashCommands = if (api != null && agent != null) {
+            runCatching { api.listAgentSlashCommands(agent) }.getOrDefault(emptyList())
+        } else {
+            emptyList()
+        }
+    }
 
     DesktopMaterialTheme {
         Surface(
@@ -408,16 +424,30 @@ fun LettaDesktopApp(
                 // Main content pane.
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     if (selectedDestination == DesktopDestination.Conversations) {
-                        val composerCommands = listOf(
-                            ComposerCommand("new", "Start a new chat") { chatController.createConversation() },
-                            ComposerCommand("agent", "Create a new agent") { showNewAgentDialog = true },
-                            ComposerCommand("edit", "Edit this agent") { editAgentId = selectedAgentId },
-                            ComposerCommand("memory", "Open memory") { selectedDestination = DesktopDestination.Memory },
-                            ComposerCommand("schedules", "Open schedules") { selectedDestination = DesktopDestination.Schedules },
-                            ComposerCommand("skills", "Open skills & tools") { selectedDestination = DesktopDestination.Agents },
-                            ComposerCommand("channels", "Open channels") { selectedDestination = DesktopDestination.Channels },
-                            ComposerCommand("settings", "Open settings") { selectedDestination = DesktopDestination.Settings },
-                        )
+                        val composerCommands = buildList {
+                            add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
+                            add(ComposerCommand("agent", "Create a new agent") { showNewAgentDialog = true })
+                            add(ComposerCommand("edit", "Edit this agent") { editAgentId = selectedAgentId })
+                            add(ComposerCommand("memory", "Open memory") { selectedDestination = DesktopDestination.Memory })
+                            add(ComposerCommand("schedules", "Open schedules") { selectedDestination = DesktopDestination.Schedules })
+                            add(ComposerCommand("skills", "Open skills & tools") { selectedDestination = DesktopDestination.Agents })
+                            add(ComposerCommand("channels", "Open channels") { selectedDestination = DesktopDestination.Channels })
+                            add(ComposerCommand("settings", "Open settings") { selectedDestination = DesktopDestination.Settings })
+                            // Server-backed slash commands (goal mode + installed skills).
+                            // Selecting one fills the composer so the user can add
+                            // args and send; the server interprets the slash prefix.
+                            agentSlashCommands.forEach { cmd ->
+                                add(
+                                    ComposerCommand(
+                                        label = cmd.command,
+                                        description = cmd.description.ifBlank {
+                                            cmd.skillName?.let { "Skill: $it" } ?: "Slash command"
+                                        },
+                                        fillsComposer = true,
+                                    ) { chatController.updateComposerText("/${cmd.command} ") },
+                                )
+                            }
+                        }
                         ChatDetailPane(
                             state = chatState,
                             isThinking = isThinkingSelected,
