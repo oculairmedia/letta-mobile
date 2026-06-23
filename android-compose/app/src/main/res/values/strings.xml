@@ -310,6 +310,7 @@
     <string name="screen_config_embedded_runtime_title">Embedded LettaCode runtime</string>
     <string name="screen_config_embedded_runtime_disabled_placeholder">Model import and configuration are available, but local turn execution is disabled in this build.</string>
     <string name="screen_config_embedded_runtime_enabled_placeholder">Local turns run fully on this device through the embedded runtime.</string>
+    <string name="screen_config_embedded_runtime_notifications_note">Notifications are recommended so you can see when the local runtime is active, but they aren\'t required — the runtime still starts if you deny notification access.</string>
     <string name="screen_config_embedded_runtime_execution_disabled">Execution disabled</string>
     <string name="screen_config_embedded_runtime_execution_enabled">Execution enabled</string>
     <string name="screen_config_embedded_runtime_version">Runtime: %1$s</string>

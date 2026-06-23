@@ -1,7 +1,7 @@
 package com.letta.mobile.data.schedules
 
 import androidx.compose.runtime.Immutable
-import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -17,7 +17,13 @@ import kotlinx.coroutines.launch
 
 @Immutable
 data class ScheduleLibraryState(
-    val agents: List<Agent> = emptyList(),
+    /**
+     * Slim agent projection for the picker dropdown — only id+name+description
+     * are needed to render the list and select by id. Sourced via
+     * [IAgentRepository.listAgentSummaries] (the admin-shim's
+     * `GET /v1/agents?slim=true`), NOT the full ~621KB agents payload.
+     */
+    val agents: List<AgentSummary> = emptyList(),
     val selectedAgentId: String? = null,
     val schedules: List<ScheduledMessage> = emptyList(),
     val scheduleAdminAvailable: Boolean = true,
@@ -39,7 +45,7 @@ data class ScheduleLibraryState(
      */
     val cronMode: Boolean = false,
 ) {
-    val selectedAgent: Agent?
+    val selectedAgent: AgentSummary?
         get() = agents.firstOrNull { it.id.value == selectedAgentId }
 
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
@@ -134,9 +140,15 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
+            // Picker only needs id+name+description; pull the slim agents
+            // projection (admin-shim `?slim=true`) instead of the full
+            // ~621KB refreshAgents() payload. Keeps other screens' shared
+            // full-agent cache untouched. Captured outside the try so the
+            // schedule-unavailable fallback can reuse the agents it loaded.
+            var loadedAgents: List<AgentSummary> = stateFlow.value.agents
             try {
-                agentRepository.refreshAgents()
-                val agents = agentRepository.agents.value
+                val agents = agentRepository.listAgentSummaries()
+                loadedAgents = agents
                 val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
                 // If a prior load already proved the native schedule route is
                 // unavailable on this backend, skip the doomed native round-trip
@@ -159,7 +171,7 @@ class ScheduleLibraryController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    val agents = agentRepository.agents.value
+                    val agents = loadedAgents
                     val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
                     latchNativeUnavailableIfCronBacked()
                     publishCronFallbackOrUnavailable(agents, selectedAgentId)
@@ -334,7 +346,7 @@ class ScheduleLibraryController(
      * unavailable state. Parity with the desktop schedules surface.
      */
     private suspend fun publishCronFallbackOrUnavailable(
-        agents: List<Agent>,
+        agents: List<AgentSummary>,
         selectedAgentId: String?,
         base: ScheduleLibraryState? = null,
     ) {
@@ -361,7 +373,7 @@ class ScheduleLibraryController(
     }
 
     private fun publishUnavailableState(
-        fallbackAgents: List<Agent>,
+        fallbackAgents: List<AgentSummary>,
         requestedAgentId: String?,
     ) {
         val selectedAgentId = fallbackAgents.resolveSelection(requestedAgentId)
@@ -376,7 +388,7 @@ class ScheduleLibraryController(
         )
     }
 
-    private fun List<Agent>.resolveSelection(requestedAgentId: String?): String? =
+    private fun List<AgentSummary>.resolveSelection(requestedAgentId: String?): String? =
         if (requestedAgentId != null && any { it.id.value == requestedAgentId }) {
             requestedAgentId
         } else {
