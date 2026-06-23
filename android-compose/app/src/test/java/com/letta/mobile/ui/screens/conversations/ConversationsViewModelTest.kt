@@ -81,6 +81,27 @@ class ConversationsViewModelTest {
     }
 
     @Test
+    fun `loadConversations sorts items by lastMessageAt descending`() = runTest {
+        fakeAllRepo.setConversations(
+            listOf(
+                TestData.conversation(id = "conv-1", agentId = "a1", lastMessageAt = "2023-01-01T10:00:00Z"),
+                TestData.conversation(id = "conv-2", agentId = "a1", lastMessageAt = "2023-01-03T10:00:00Z"),
+                TestData.conversation(id = "conv-3", agentId = "a1", lastMessageAt = "2023-01-02T10:00:00Z"),
+                TestData.conversation(id = "conv-4", agentId = "a1", lastMessageAt = null, createdAt = "2023-01-04T10:00:00Z")
+            )
+        )
+
+        viewModel.loadConversations()
+
+        val conversations = viewModel.uiState.value.conversations
+        assertEquals(4, conversations.size)
+        assertEquals("conv-4", conversations[0].conversation.id.value) // Uses createdAt which is the newest
+        assertEquals("conv-2", conversations[1].conversation.id.value)
+        assertEquals("conv-3", conversations[2].conversation.id.value)
+        assertEquals("conv-1", conversations[3].conversation.id.value)
+    }
+
+    @Test
     fun `loadConversations skips refresh when caches are fresh`() = runTest {
         fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
         fakeAllRepo.fresh = true
