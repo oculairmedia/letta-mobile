@@ -115,6 +115,38 @@ class ChannelTransportKeepaliveCloseTest {
     }
 
     @Test
+    fun `transient disconnect re-subscribes to active runs upon reconnection`() = runBlocking {
+        val shim = KeepaliveCloseShimServer()
+        val cursorStore = RunCursorStore.inMemory().also { it.record("conv-1", "run-1", 7L) }
+        val transport = ChannelTransport(cursorStore)
+
+        try {
+            transport.connect(
+                baseShimUrl = shim.baseUrl(),
+                token = "token",
+                deviceId = "device",
+                clientVersion = "test",
+            )
+
+            shim.frames.receiveType("hello")
+            val firstSubscribe = shim.frames.receiveType("subscribe")
+            assertEquals("run-1", firstSubscribe.stringValue("run_id"))
+            assertEquals(7L, firstSubscribe.longValue("cursor"))
+
+            // Simulate transient disconnect
+            shim.closeFirstSocket(1001, "going away")
+
+            shim.frames.receiveType("hello")
+            val secondSubscribe = shim.frames.receiveType("subscribe")
+            assertEquals("run-1", secondSubscribe.stringValue("run_id"))
+            assertEquals(7L, secondSubscribe.longValue("cursor"))
+        } finally {
+            transport.disconnect()
+            shim.close()
+        }
+    }
+
+    @Test
     fun `redials when shim closes for protocol keepalive timeout`() = runBlocking {
         val shim = KeepaliveCloseShimServer()
         val transport = ChannelTransport(RunCursorStore.inMemory())
