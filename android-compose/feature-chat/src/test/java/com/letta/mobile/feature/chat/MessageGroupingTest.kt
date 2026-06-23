@@ -599,6 +599,20 @@ class MessageGroupingTest {
     // must still be globally unique so we degrade gracefully instead of
     // hard-crashing with `Key "run-<id>" was already used`.
 
+
+    @Test
+    fun `tool-call message with standalone content splits into distinct keys`() {
+        val steps = compactRunToolCallSteps(
+            listOf(
+                assistantToolCall("tc1", command = "pwd", content = "Here is the result")
+            )
+        )
+        val keys = steps.map { it.key }
+        assertEquals("Keys must be distinct", keys.size, keys.toSet().size)
+        assertTrue(keys.contains("tc1-content"))
+        assertTrue(keys.contains("tc1"))
+    }
+
     @Test
     fun `deduplicateRenderKeys keeps unique keys untouched`() {
         val a = ChatRenderItem.Single(assistant("a1", runId = "r1"), GroupPosition.None)

@@ -249,8 +249,9 @@ internal sealed interface RunTimelineStep {
 
     data class Message(
         val message: UiMessage,
+        val keySuffix: String = "",
     ) : RunTimelineStep {
-        override val key: String = message.id
+        override val key: String = message.id + keySuffix
     }
 
     data class ToolCallGroup(
@@ -298,7 +299,7 @@ internal fun compactRunToolCallSteps(messages: List<UiMessage>): List<RunTimelin
             }
             message.hasStandaloneContentAndToolCalls() -> {
                 flushToolMessages()
-                steps.add(RunTimelineStep.Message(message.withoutToolCallsForStandaloneContent()))
+                steps.add(RunTimelineStep.Message(message.withoutToolCallsForStandaloneContent(), keySuffix = "-content"))
                 pendingToolMessages += message.withoutStandaloneContentForToolGroup()
             }
             else -> {
