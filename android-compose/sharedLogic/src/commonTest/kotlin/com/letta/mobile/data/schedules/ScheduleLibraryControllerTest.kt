@@ -15,6 +15,7 @@ import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.TestScope
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -39,6 +41,102 @@ class ScheduleLibraryControllerTest {
 
         assertEquals("a1", controller.state.value.selectedAgentId)
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun warmCacheRendersSchedulesWithoutAwaitingAgentRefresh() = runTest {
+        // Warm cache: agents already populated app-wide. Gate refreshAgents so
+        // it can never complete during this test; the page must still render
+        // schedules from the cached agents WITHOUT being blocked on the heavy
+        // (621KB) agents refresh.
+        val agentRepository = FakeAgentRepository().apply {
+            refreshGate = CompletableDeferred()
+        }
+        val controller = controller(agentRepository = agentRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        // First render happened even though refreshAgents is still suspended.
+        val state = controller.state.value
+        assertFalse(state.isLoading, "page should not be stuck loading on the slow agents refresh")
+        assertEquals("a1", state.selectedAgentId)
+        assertEquals(listOf("s1"), state.schedules.map { it.id })
+        // The background refresh was kicked off (non-blocking) but did not gate render.
+        assertEquals(1, agentRepository.refreshCallCount)
+        assertFalse(agentRepository.refreshGate!!.isCompleted)
+
+        // Let the still-suspended background refresh complete so runTest's
+        // coroutine accounting is clean. This does not change the assertions
+        // above: render already happened before the gate was released.
+        agentRepository.refreshGate!!.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun warmCacheBackgroundRefreshUpdatesDropdownWhenItReturns() = runTest {
+        // Start with a single cached agent; the background refresh discovers a
+        // second one. The dropdown should update once the refresh returns,
+        // without disturbing the already-rendered schedules.
+        val agentRepository = FakeAgentRepository(
+            initialAgents = listOf(Agent(id = AgentId("a1"), name = "Agent One")),
+        ).apply {
+            refreshResult = listOf(
+                Agent(id = AgentId("a1"), name = "Agent One"),
+                Agent(id = AgentId("a2"), name = "Agent Two"),
+            )
+        }
+        val controller = controller(agentRepository = agentRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(1, agentRepository.refreshCallCount)
+        assertEquals(listOf("a1", "a2"), state.agents.map { it.id.value })
+        // Selection and schedules from the first render are preserved.
+        assertEquals("a1", state.selectedAgentId)
+        assertEquals(listOf("s1"), state.schedules.map { it.id })
+    }
+
+    @Test
+    fun coldCacheFallsBackToAwaitingRefreshSoDropdownPopulates() = runTest {
+        // Cold start: cache empty. The controller must await refreshAgents so
+        // the dropdown isn't stuck empty forever.
+        val agentRepository = FakeAgentRepository(initialAgents = emptyList()).apply {
+            refreshResult = listOf(
+                Agent(id = AgentId("a1"), name = "Agent One"),
+                Agent(id = AgentId("a2"), name = "Agent Two"),
+            )
+        }
+        val controller = controller(agentRepository = agentRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(1, agentRepository.refreshCallCount)
+        assertEquals(listOf("a1", "a2"), state.agents.map { it.id.value })
+        assertEquals("a1", state.selectedAgentId)
+        assertEquals(listOf("s1"), state.schedules.map { it.id })
+        assertFalse(state.isLoading)
+    }
+
+    @Test
+    fun preselectedAgentIsPreservedWhenStillPresentInWarmCache() = runTest {
+        val controller = controller()
+        controller.start()
+        advanceUntilIdle()
+
+        // Select a2, then reload from the warm cache; a2 stays selected.
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+        assertEquals("a2", controller.state.value.selectedAgentId)
+
+        controller.loadData()
+        advanceUntilIdle()
+        assertEquals("a2", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
     }
 
     @Test
@@ -275,19 +373,38 @@ class ScheduleLibraryControllerTest {
 
     private class RouteUnavailableException : RuntimeException("route unavailable")
 
-    private class FakeAgentRepository : IAgentRepository {
-        private val agentsFlow = MutableStateFlow(
-            listOf(
-                Agent(id = AgentId("a1"), name = "Agent One"),
-                Agent(id = AgentId("a2"), name = "Agent Two"),
-            ),
-        )
+    private class FakeAgentRepository(
+        initialAgents: List<Agent> = listOf(
+            Agent(id = AgentId("a1"), name = "Agent One"),
+            Agent(id = AgentId("a2"), name = "Agent Two"),
+        ),
+    ) : IAgentRepository {
+        private val agentsFlow = MutableStateFlow(initialAgents)
         override val agents: StateFlow<List<Agent>> = agentsFlow.asStateFlow()
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
 
+        /** Number of times [refreshAgents] has been invoked. */
+        var refreshCallCount: Int = 0
+            private set
+
+        /**
+         * When non-null, [refreshAgents] suspends on this deferred until the
+         * test completes it. Lets a test assert the schedules render WITHOUT a
+         * blocking refresh: keep this incomplete and verify the first Ready
+         * emission still happens.
+         */
+        var refreshGate: CompletableDeferred<Unit>? = null
+
+        /** Agents the cache transitions to once [refreshAgents] completes. */
+        var refreshResult: List<Agent>? = null
+
         override suspend fun countAgents(): Int = agents.value.size
-        override suspend fun refreshAgents() = Unit
+        override suspend fun refreshAgents() {
+            refreshCallCount++
+            refreshGate?.await()
+            refreshResult?.let { agentsFlow.value = it }
+        }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = agents.value.firstOrNull { it.id == id }
         override fun getAgent(id: AgentId): Flow<Agent> = flowOf(checkNotNull(getCachedAgent(id)))

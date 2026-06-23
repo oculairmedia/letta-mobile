@@ -107,6 +107,7 @@ class ScheduleLibraryController(
 
     private var loadJob: Job? = null
     private var mutationJob: Job? = null
+    private var agentRefreshJob: Job? = null
 
     fun start() {
         if (stateFlow.value.agents.isEmpty() && stateFlow.value.schedules.isEmpty()) {
@@ -114,39 +115,117 @@ class ScheduleLibraryController(
         }
     }
 
+    /**
+     * Loads the schedules surface.
+     *
+     * The agent dropdown is sourced from [IAgentRepository.agents], which is
+     * populated app-wide (the dropdown is used on many screens), but a full
+     * [IAgentRepository.refreshAgents] is a heavy call — the backend returns
+     * the full agent objects (~621KB for 50 agents: system prompts,
+     * message_ids, llm_config, tool_rules, …) at ~125-200ms, whereas the
+     * actual schedules/cron data this page renders is ~4ms / ~4KB. Gating the
+     * first render on that refresh made the whole page block on the slow fetch.
+     *
+     * So we decouple rendering from the heavy refresh:
+     *  - If the agent cache is already warm (the common case — the user
+     *    navigated here from a chat), resolve the selection from the CURRENT
+     *    cached [IAgentRepository.agents] value, load the (fast) schedules and
+     *    publish a usable Ready state immediately, WITHOUT first awaiting
+     *    [IAgentRepository.refreshAgents]. The refresh still runs, but
+     *    concurrently in the background; when it returns we re-publish only the
+     *    `agents` list so the dropdown is eventually fresh.
+     *  - If the cache is cold/empty (no agents yet), we fall back to the legacy
+     *    behaviour and await the refresh so the user isn't stuck with an empty
+     *    dropdown forever.
+     */
     fun loadData() {
         loadJob?.cancel()
+        agentRefreshJob?.cancel()
         loadJob = scope.launch {
             stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
+
+            val cachedAgents = agentRepository.agents.value
+            if (cachedAgents.isNotEmpty()) {
+                // Warm cache: render immediately from cache, refresh in background.
+                loadFromAgents(cachedAgents)
+                scheduleBackgroundAgentRefresh()
+            } else {
+                // Cold cache: fall back to awaiting the refresh so the dropdown
+                // eventually populates instead of dead-ending on an empty list.
+                try {
+                    agentRepository.refreshAgents()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    // Swallow refresh errors here; loadFromAgents below renders
+                    // whatever the cache holds (possibly still empty) and any
+                    // schedule-route error is surfaced by loadFromAgents itself.
+                }
+                loadFromAgents(agentRepository.agents.value)
+            }
+        }
+    }
+
+    /**
+     * Resolves the selection from [agents], loads the (fast) schedules for the
+     * selected agent and publishes a Ready state — or the cron fallback /
+     * unavailable / error state, preserving all existing behaviour.
+     */
+    private suspend fun loadFromAgents(agents: List<Agent>) {
+        val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+        try {
+            val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
+            stateFlow.value = ScheduleLibraryState(
+                agents = agents,
+                selectedAgentId = selectedAgentId,
+                schedules = schedules,
+                scheduleAdminAvailable = true,
+                scheduleAdminMessage = null,
+                isLoading = false,
+                errorMessage = null,
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            if (scheduleAdminUnavailableMatcher(t)) {
+                publishCronFallbackOrUnavailable(agents, selectedAgentId)
+            } else {
+                stateFlow.update {
+                    it.copy(
+                        agents = agents,
+                        selectedAgentId = selectedAgentId,
+                        isLoading = false,
+                        errorMessage = errorMessageMapper(t, "Failed to load schedules"),
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Refreshes the agent cache in the background (non-blocking) after the
+     * first render. When it returns, re-publish ONLY the `agents` list (and the
+     * resolved selection) so the dropdown is fresh without disturbing the
+     * already-rendered schedules / cron state.
+     */
+    private fun scheduleBackgroundAgentRefresh() {
+        agentRefreshJob?.cancel()
+        agentRefreshJob = scope.launch {
             try {
                 agentRepository.refreshAgents()
-                val agents = agentRepository.agents.value
-                val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
-                val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
-                stateFlow.value = ScheduleLibraryState(
-                    agents = agents,
-                    selectedAgentId = selectedAgentId,
-                    schedules = schedules,
-                    scheduleAdminAvailable = true,
-                    scheduleAdminMessage = null,
-                    isLoading = false,
-                    errorMessage = null,
-                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (t: Throwable) {
-                if (scheduleAdminUnavailableMatcher(t)) {
-                    val agents = agentRepository.agents.value
-                    val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
-                    publishCronFallbackOrUnavailable(agents, selectedAgentId)
-                } else {
-                    stateFlow.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = errorMessageMapper(t, "Failed to load schedules"),
-                        )
-                    }
-                }
+            } catch (_: Throwable) {
+                // Background refresh is best-effort; keep the already-rendered
+                // (cached) dropdown if it fails.
+                return@launch
+            }
+            val refreshedAgents = agentRepository.agents.value
+            stateFlow.update { current ->
+                current.copy(
+                    agents = refreshedAgents,
+                    selectedAgentId = refreshedAgents.resolveSelection(current.selectedAgentId),
+                )
             }
         }
     }
@@ -269,6 +348,7 @@ class ScheduleLibraryController(
     override fun close() {
         loadJob?.cancel()
         mutationJob?.cancel()
+        agentRefreshJob?.cancel()
     }
 
     private suspend fun loadSchedulesForAgent(agentId: String): List<ScheduledMessage> {
