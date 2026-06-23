@@ -77,5 +77,20 @@ class A2uiMarkdownFallbackTest {
 
         assertTrue(fallback.contains("````a2ui-json"))
         assertTrue(fallback.trimEnd().endsWith("````"))
+}
+
+    @Test
+    fun `preserves acronyms and numbers in a2ui json`() {
+        val text = """<a2ui-json>{"A2UI":true, "count": 123}</a2ui-json>"""
+        val fallback = exposeA2uiJsonTagsAsCodeFences(text)
+        assertTrue(fallback.contains("A2UI"))
+        assertTrue(fallback.contains("123"))
+    }
+
+    @Test
+    fun `preserves queue names like Jules queue`() {
+        val text = """<a2ui-json>{"queue":"Jules queue"}</a2ui-json>"""
+        val fallback = exposeA2uiJsonTagsAsCodeFences(text)
+        assertTrue(fallback.contains("Jules queue"))
     }
 }
