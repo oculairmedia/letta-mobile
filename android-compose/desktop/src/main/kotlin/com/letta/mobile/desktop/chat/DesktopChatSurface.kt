@@ -122,6 +122,8 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.composer.AutocompleteTrigger
 import com.letta.mobile.data.composer.ComposerAutocomplete
 import com.letta.mobile.data.composer.ComposerEffort
+import com.letta.mobile.data.diff.DiffLineKind
+import com.letta.mobile.data.diff.UnifiedDiff
 import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
@@ -810,6 +812,12 @@ private fun StepStatusCircle(state: StepState) {
 /** Inset output block (monospace) with light per-line colorization. */
 @Composable
 private fun ToolOutputBlock(text: String, isError: Boolean = false) {
+    // Unified diffs (file-edit tool output) render as a reviewable diff block
+    // (Penpot "Diff review") rather than plain monospace lines.
+    if (!isError && UnifiedDiff.looksLikeDiff(text)) {
+        DiffBlock(text)
+        return
+    }
     // The "Tool error + retry" board renders failed output on a dark-red inset
     // instead of the neutral surface, so the failure reads at a glance.
     val blockColor = if (isError) {
@@ -836,6 +844,77 @@ private fun ToolOutputBlock(text: String, isError: Boolean = false) {
             }
         }
     }
+}
+
+/**
+ * Renders a unified diff (Penpot "Diff review"): a line-numbered gutter (old |
+ * new) with red removed rows, green added rows, and muted hunk headers. Parsing
+ * is shared via [UnifiedDiff]; git metadata (diff/index/--- /+++) is dropped.
+ */
+@Composable
+private fun DiffBlock(text: String) {
+    val lines = remember(text) {
+        UnifiedDiff.parse(text).filterNot { it.kind == DiffLineKind.FileHeader }
+    }
+    val added = Color(0xFF2EA043)
+    val removed = Color(0xFFE5484D)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        SelectionContainer {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                lines.take(200).forEach { line ->
+                    val (rowColor, marker, textColor) = when (line.kind) {
+                        DiffLineKind.Added -> Triple(added.copy(alpha = 0.12f), "+", added)
+                        DiffLineKind.Removed -> Triple(removed.copy(alpha = 0.12f), "-", removed)
+                        DiffLineKind.Hunk -> Triple(
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
+                            "",
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        else -> Triple(Color.Transparent, "", MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(rowColor)
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DiffGutter(line.oldLine)
+                        DiffGutter(line.newLine)
+                        Text(
+                            text = marker,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = textColor,
+                            modifier = Modifier.width(12.dp),
+                        )
+                        Text(
+                            text = line.text,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = textColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiffGutter(lineNumber: Int?) {
+    Text(
+        text = lineNumber?.toString().orEmpty(),
+        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        maxLines = 1,
+        modifier = Modifier.width(34.dp).padding(end = 6.dp),
+    )
 }
 
 @Composable
