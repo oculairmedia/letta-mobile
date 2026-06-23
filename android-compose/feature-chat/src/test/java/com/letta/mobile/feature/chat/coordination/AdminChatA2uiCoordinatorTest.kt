@@ -1,11 +1,16 @@
 package com.letta.mobile.feature.chat.coordination
 
+import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.a2ui.A2uiActionDispatchResult
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.feature.chat.state.ChatBannerController
+import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -57,5 +62,76 @@ class AdminChatA2uiCoordinatorTest {
         // Fourth projection (divergent prefix): replaceWith
         coordinator.syncA2uiHistorySnapshot("conv1", list3)
         verify(exactly = 1) { surfaceManager.replaceWith(list3) }
+    }
+
+    @Test
+    fun `submitA2uiAction routes tool approval via REST if request id is present`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = TestScope(testDispatcher)
+        val uiState = MutableStateFlow(com.letta.mobile.ui.chat.render.ChatUiState())
+        val chatApprovalController = mockk<ChatApprovalController>(relaxed = true)
+        val wsChatBridge = mockk<WsChatBridge>(relaxed = true)
+        val coordinator = AdminChatA2uiCoordinator(
+            scope = scope,
+            uiState = uiState,
+            chatBannerController = mockk(),
+            chatApprovalController = chatApprovalController,
+            wsChatBridge = wsChatBridge,
+            activeConversationId = { "conv1" },
+            a2uiSurfaceManager = mockk(),
+            composerCoordinator = mockk()
+        )
+
+        val action = A2uiAction(
+            name = "tool_approval_response",
+            surfaceId = "surface-1",
+            context = buildJsonObject {
+                put("approvalRequestId", "req-1")
+                put("callId", "call-1")
+                put("decision", "approve")
+            },
+            raw = buildJsonObject {}
+        )
+
+        coordinator.submitA2uiAction(action)
+
+        verify(exactly = 1) { chatApprovalController.submitApproval("req-1", listOf("call-1"), true, null, "conv1") }
+        verify(exactly = 0) { wsChatBridge.sendA2uiAction(any()) }
+    }
+
+    @Test
+    fun `submitA2uiAction routes tool approval via WS if request id is missing`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        val scope = TestScope(testDispatcher)
+        val uiState = MutableStateFlow(com.letta.mobile.ui.chat.render.ChatUiState())
+        val chatApprovalController = mockk<ChatApprovalController>(relaxed = true)
+        val wsChatBridge = mockk<WsChatBridge>(relaxed = true)
+        val coordinator = AdminChatA2uiCoordinator(
+            scope = scope,
+            uiState = uiState,
+            chatBannerController = mockk(),
+            chatApprovalController = chatApprovalController,
+            wsChatBridge = wsChatBridge,
+            activeConversationId = { "conv1" },
+            a2uiSurfaceManager = mockk(),
+            composerCoordinator = mockk()
+        )
+
+        val action = A2uiAction(
+            name = "tool_approval_response",
+            surfaceId = "surface-1",
+            context = buildJsonObject {
+                put("callId", "call-1")
+                put("decision", "approve")
+            },
+            raw = buildJsonObject {}
+        )
+
+        every { wsChatBridge.sendA2uiAction(any()) } returns A2uiActionDispatchResult.Queued
+
+        coordinator.submitA2uiAction(action)
+
+        verify(exactly = 0) { chatApprovalController.submitApproval(any(), any(), any(), any(), any()) }
+        verify(exactly = 1) { wsChatBridge.sendA2uiAction(action.copy(conversationId = "conv1")) }
     }
 }
