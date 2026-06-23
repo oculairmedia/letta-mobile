@@ -13,6 +13,7 @@ import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ScheduleRepository
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeScheduleApi
+import com.letta.mobile.data.schedules.CronTask
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,6 +40,7 @@ class ScheduleListViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var fakeAgentRepo: FakeAgentRepo
     private lateinit var fakeScheduleRepo: FakeScheduleRepo
+    private lateinit var fakeScheduleApi: FakeScheduleApi
     private lateinit var viewModel: ScheduleListViewModel
 
     @Before
@@ -46,7 +48,11 @@ class ScheduleListViewModelTest {
         Dispatchers.setMain(testDispatcher)
         fakeAgentRepo = FakeAgentRepo()
         fakeScheduleRepo = FakeScheduleRepo()
-        viewModel = ScheduleListViewModel(fakeAgentRepo, fakeScheduleRepo)
+        // Cron route unavailable by default: the "unavailable" tests below
+        // exercise the case where BOTH the native schedule route and the
+        // /v1/crons fallback are missing.
+        fakeScheduleApi = FakeScheduleApi()
+        viewModel = ScheduleListViewModel(fakeAgentRepo, fakeScheduleRepo, fakeScheduleApi)
     }
 
     @After
@@ -131,6 +137,22 @@ class ScheduleListViewModelTest {
         val state = awaitSuccessState()
         assertEquals("a2", state.selectedAgentId)
         assertEquals(false, state.scheduleAdminAvailable)
+    }
+
+    @Test
+    fun `loadData falls back to cron list when native route missing and cron route available`() = runTest {
+        fakeScheduleRepo.error = ApiException(404, "Not found")
+        fakeScheduleApi.cronRouteAvailable = true
+        fakeScheduleApi.crons = mutableListOf(
+            CronTask(id = "c1", agentId = "a1", name = "Daily", cron = "0 9 * * *", recurring = true),
+        )
+
+        viewModel.loadData()
+
+        val state = awaitSuccessState()
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(listOf("c1"), state.crons.map { it.id })
     }
 
     @Test
