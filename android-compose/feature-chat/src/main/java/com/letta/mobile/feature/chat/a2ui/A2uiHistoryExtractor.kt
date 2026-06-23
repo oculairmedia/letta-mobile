@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.a2ui
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiProtocolJson
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
+import com.letta.mobile.data.a2ui.decodeA2uiMessagesLenient
 
 internal data class A2uiHistoryExtraction(
     val content: String,
@@ -23,12 +24,7 @@ internal object A2uiHistoryExtractor {
         val messages = mutableListOf<A2uiMessage>()
         val stripped = blockRegex.replace(content) { match ->
             val body = match.groups[1]?.value?.trim().orEmpty()
-            val decoded = runCatching {
-                decodeA2uiMessages(
-                    A2uiProtocolJson.Default,
-                    A2uiProtocolJson.Default.parseToJsonElement(body),
-                )
-            }.getOrNull()
+            val decoded = decodeA2uiMessagesLenient(A2uiProtocolJson.Default, body)
             if (decoded == null) {
                 match.value
             } else {

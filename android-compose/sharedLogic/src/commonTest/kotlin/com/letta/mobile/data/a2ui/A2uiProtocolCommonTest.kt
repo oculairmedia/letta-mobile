@@ -16,6 +16,56 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class A2uiProtocolCommonTest {
+
+    @Test
+    fun decodeA2uiMessagesLenient_handlesValidJson() {
+        val raw = "{\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\"}}"
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_handlesTrailingJunk() {
+        val raw = "{\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\"}}  \n and some text"
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_handlesLeadingAndTrailingJunk() {
+        val raw = "Some leading junk {\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\"}} and trailing junk"
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_repairsTruncatedJson() {
+        val raw = "{\"createSurface\": {\"surfaceId\": \"test_surface\", \"catalogId\": \"basic\""
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.CreateSurface>(parsed?.first())
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_returnsNullForInvalidJson() {
+        val raw = "This is not JSON at all."
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(null, parsed)
+    }
+
+    @Test
+    fun decodeA2uiMessagesLenient_repairsTruncatedJsonWithTrailingComma() {
+        val raw = "{\"someOtherMessage\": {\"surfaceId\": \"test_surface\", "
+        val parsed = decodeA2uiMessagesLenient(json, raw)
+        assertEquals(1, parsed?.size)
+        assertIs<A2uiMessage.Unknown>(parsed?.first())
+        val unknown = parsed?.first() as A2uiMessage.Unknown
+        assertEquals("test_surface", unknown.raw["someOtherMessage"]?.jsonObject?.get("surfaceId")?.jsonPrimitive?.content)
+    }
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true

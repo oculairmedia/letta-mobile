@@ -272,6 +272,81 @@ object A2uiProtocolJson {
     }
 }
 
+fun decodeA2uiMessagesLenient(json: Json, raw: String): List<A2uiMessage>? {
+    val trimmed = raw.trim()
+    val firstBrace = trimmed.indexOf('{')
+    val firstBracket = trimmed.indexOf('[')
+
+    if (firstBrace < 0 && firstBracket < 0) {
+        return null
+    }
+
+    val startIdx = if (firstBrace >= 0 && firstBracket >= 0) {
+        minOf(firstBrace, firstBracket)
+    } else {
+        maxOf(firstBrace, firstBracket)
+    }
+
+    var substr = trimmed.substring(startIdx)
+
+    val lastBrace = substr.lastIndexOf('}')
+    val lastBracket = substr.lastIndexOf(']')
+    val endIdx = maxOf(lastBrace, lastBracket)
+
+    if (endIdx >= 0) {
+        val bounded = substr.substring(0, endIdx + 1)
+        try {
+            val element = json.parseToJsonElement(bounded)
+            return decodeA2uiMessages(json, element)
+        } catch (_: Exception) {}
+    }
+
+    if (endIdx >= 0) {
+        substr = substr.substring(0, endIdx + 1)
+    }
+
+    substr = substr.replace(Regex("[,\\s]+\$"), "")
+
+    var unescapedQuotes = 0
+    var i = 0
+    while (i < substr.length) {
+        if (substr[i] == '"') {
+            var escapes = 0
+            var j = i - 1
+            while (j >= 0 && substr[j] == '\\') {
+                escapes++
+                j--
+            }
+            if (escapes % 2 == 0) unescapedQuotes++
+        }
+        i++
+    }
+    if (unescapedQuotes % 2 != 0) {
+        substr += "\""
+    }
+
+    var openBraces = substr.count { it == '{' }
+    var closeBraces = substr.count { it == '}' }
+    var openBrackets = substr.count { it == '[' }
+    var closeBrackets = substr.count { it == ']' }
+
+    while (openBrackets > closeBrackets) {
+        substr += "]"
+        closeBrackets++
+    }
+    while (openBraces > closeBraces) {
+        substr += "}"
+        closeBraces++
+    }
+
+    return try {
+        val element = json.parseToJsonElement(substr)
+        decodeA2uiMessages(json, element)
+    } catch (_: Exception) {
+        null
+    }
+}
+
 fun decodeA2uiMessages(json: Json, element: JsonElement): List<A2uiMessage> = when (element) {
     is JsonArray -> element.map { json.decodeFromJsonElement(A2uiMessageSerializer, it) }
     is JsonObject -> {
