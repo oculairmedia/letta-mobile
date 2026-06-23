@@ -69,6 +69,32 @@ class ChatTextGeometryCacheTest {
     }
 
     @Test
+    fun `cache separates geometry for different font scales`() {
+        val cache = ChatTextGeometryCache(maxEntries = 4)
+        val text = "settled message that needs to reflow"
+
+        val keyScale1 = geometryKey(text, widthPx = 240).copy(fontScale = 1.0f)
+        val keyScale2 = geometryKey(text, widthPx = 240).copy(fontScale = 1.2f)
+
+        var producerCalls = 0
+
+        val geom1 = cache.getOrPut(keyScale1) {
+            producerCalls++
+            geometry(lineCount = 1)
+        }
+
+        val geom2 = cache.getOrPut(keyScale2) {
+            producerCalls++
+            geometry(lineCount = 2)
+        }
+
+        assertEquals(2, producerCalls)
+        assertNotEquals(geom1, geom2)
+        assertEquals(1, geom1.lineCount)
+        assertEquals(2, geom2.lineCount)
+    }
+
+    @Test
     fun `prepared content key covers representative chat text corpus`() {
         val samples = listOf(
             "Plain English assistant prose with punctuation and wrapping.",
