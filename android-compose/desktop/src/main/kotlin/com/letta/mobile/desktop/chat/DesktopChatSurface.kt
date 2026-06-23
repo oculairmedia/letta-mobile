@@ -70,6 +70,8 @@ import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -123,7 +125,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 
 @Composable
 internal fun ChatDetailPane(
@@ -379,10 +384,24 @@ private fun MessageList(
                 items = renderItems,
                 key = { it.key },
             ) { item ->
-                Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                val interaction = remember { MutableInteractionSource() }
+                val hovered by interaction.collectIsHoveredAsState()
+                Box(
+                    modifier = Modifier
+                        .widthIn(max = ChatColumnMaxWidth)
+                        .fillMaxWidth()
+                        .hoverable(interaction),
+                ) {
                     when (item) {
                         is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
                         is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                    }
+                    val copyText = item.copyableText()
+                    if (hovered && copyText.isNotBlank()) {
+                        MessageHoverToolbar(
+                            text = copyText,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp),
+                        )
                     }
                 }
             }
@@ -843,6 +862,56 @@ private fun ThinkingMessageRow() {
             }
         }
     }
+}
+
+/**
+ * Floating per-message toolbar (Penpot "Reasoning + hover toolbar" board) shown
+ * at the top-right of a message on hover. Only the Copy action is wired — it
+ * copies the message text to the clipboard; regenerate/branch/edit need backend
+ * support and are intentionally omitted rather than shown as dead controls.
+ */
+@Composable
+private fun MessageHoverToolbar(text: String, modifier: Modifier = Modifier) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1200)
+            copied = false
+        }
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 2.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .clickable {
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                }
+                .padding(8.dp),
+        ) {
+            Icon(
+                imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                contentDescription = if (copied) "Copied" else "Copy message",
+                tint = if (copied) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp),
+            )
+        }
+    }
+}
+
+/** The message text a hover toolbar's Copy action puts on the clipboard. */
+private fun ChatRenderItem.copyableText(): String = when (this) {
+    is ChatRenderItem.Single -> message.content
+    is ChatRenderItem.RunBlock -> messages
+        .map { it.first }
+        .filter { !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
+        .joinToString("\n\n") { it.content }
 }
 
 /** Plain agent narration text, full width (no bubble), per the detailed board. */
