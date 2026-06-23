@@ -490,8 +490,11 @@ private fun MessageList(
                         is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
                         is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
                     }
+                    // Only plain message bubbles get the hover copy toolbar — a
+                    // RunBlock has its own header chevron at the top-right, which
+                    // the floating toolbar would otherwise cover.
                     val copyText = item.copyableText()
-                    if (hovered && copyText.isNotBlank()) {
+                    if (hovered && copyText.isNotBlank() && item is ChatRenderItem.Single) {
                         MessageHoverToolbar(
                             text = copyText,
                             modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp),
