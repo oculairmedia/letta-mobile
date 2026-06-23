@@ -111,6 +111,9 @@ import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
+import com.letta.mobile.desktop.skills.DesktopSkill
+import com.letta.mobile.desktop.skills.DesktopSkillApi
+import com.letta.mobile.desktop.skills.DesktopSkillsSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
@@ -202,6 +205,13 @@ fun LettaDesktopApp(
         activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopCronApi(it) }
     }
     var allCrons by remember(cronApi) { mutableStateOf<List<DesktopCronTask>>(emptyList()) }
+    val skillApi = remember(activeConfig) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopSkillApi(it) }
+    }
+    var allSkills by remember(skillApi) { mutableStateOf<List<DesktopSkill>>(emptyList()) }
+    var installedSkillNames by remember(skillApi) { mutableStateOf<Set<String>>(emptySet()) }
+    var skillsLoading by remember(skillApi) { mutableStateOf(false) }
+    var skillsError by remember(skillApi) { mutableStateOf<String?>(null) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -330,6 +340,25 @@ fun LettaDesktopApp(
     }
     val isThinkingSelected = thinkingConversationId != null &&
         thinkingConversationId == chatState.selectedConversationId
+
+    // Load the skills registry + the focused agent's installed skills when the
+    // Skills page is open (or the focused agent changes).
+    suspend fun reloadSkills() {
+        val api = skillApi ?: return
+        skillsLoading = true
+        skillsError = null
+        runCatching {
+            allSkills = api.listSkills()
+            installedSkillNames = selectedAgentId?.let { api.listAgentSkills(it).map { s -> s.name }.toSet() }
+                ?: emptySet()
+        }.onFailure { skillsError = it.message ?: "Could not load skills." }
+        skillsLoading = false
+    }
+    LaunchedEffect(selectedDestination, skillApi, selectedAgentId) {
+        if (selectedDestination == DesktopDestination.Agents && skillApi != null) {
+            reloadSkills()
+        }
+    }
 
     DesktopMaterialTheme {
         Surface(
@@ -473,6 +502,33 @@ fun LettaDesktopApp(
                                 }
                             },
                             focusedAgentId = selectedAgentId,
+                            skills = allSkills,
+                            installedSkillNames = installedSkillNames,
+                            skillsLoading = skillsLoading,
+                            skillsError = skillsError,
+                            canManageSkills = skillApi != null && selectedAgentId != null,
+                            focusedAgentName = selectedAgentName,
+                            onRefreshSkills = { chatScope.launch { reloadSkills() } },
+                            onInstallSkill = { name ->
+                                val agent = selectedAgentId
+                                if (skillApi != null && agent != null) {
+                                    chatScope.launch {
+                                        runCatching { skillApi.installSkill(agent, name) }
+                                            .onFailure { skillsError = it.message ?: "Could not install skill." }
+                                        reloadSkills()
+                                    }
+                                }
+                            },
+                            onUninstallSkill = { name ->
+                                val agent = selectedAgentId
+                                if (skillApi != null && agent != null) {
+                                    chatScope.launch {
+                                        runCatching { skillApi.uninstallSkill(agent, name) }
+                                            .onFailure { skillsError = it.message ?: "Could not remove skill." }
+                                        reloadSkills()
+                                    }
+                                }
+                            },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -1392,6 +1448,15 @@ private fun DestinationContent(
     canCreateCron: Boolean,
     onCreateCron: (name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
     focusedAgentId: String?,
+    skills: List<DesktopSkill>,
+    installedSkillNames: Set<String>,
+    skillsLoading: Boolean,
+    skillsError: String?,
+    canManageSkills: Boolean,
+    focusedAgentName: String?,
+    onRefreshSkills: () -> Unit,
+    onInstallSkill: (String) -> Unit,
+    onUninstallSkill: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (destination == DesktopDestination.Memory) {
@@ -1428,13 +1493,22 @@ private fun DestinationContent(
         return
     }
     if (destination == DesktopDestination.Agents) {
-        DesktopToolLibrarySurface(
-            state = toolLibraryState,
-            onRefresh = onToolsRefresh,
-            onSearchQueryChanged = onToolsSearchQueryChanged,
-            onTagToggled = onToolsTagToggled,
-            onClearTags = onToolsClearTags,
-            onLoadMore = onToolsLoadMore,
+        DesktopSkillsSurface(
+            skills = skills,
+            installedSkillNames = installedSkillNames,
+            skillsLoading = skillsLoading,
+            skillsError = skillsError,
+            canManageSkills = canManageSkills,
+            focusedAgentName = focusedAgentName,
+            onRefreshSkills = onRefreshSkills,
+            onInstallSkill = onInstallSkill,
+            onUninstallSkill = onUninstallSkill,
+            toolState = toolLibraryState,
+            onToolsRefresh = onToolsRefresh,
+            onToolsSearchQueryChanged = onToolsSearchQueryChanged,
+            onToolsTagToggled = onToolsTagToggled,
+            onToolsClearTags = onToolsClearTags,
+            onToolsLoadMore = onToolsLoadMore,
             modifier = modifier,
         )
         return
