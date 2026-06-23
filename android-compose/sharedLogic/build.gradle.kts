@@ -57,7 +57,7 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
-                api("org.jetbrains.compose.runtime:runtime:1.11.1")
+                api("org.jetbrains.compose.runtime:runtime:1.10.0")
                 api("io.ktor:ktor-http:3.5.0")
                 api("io.ktor:ktor-io:3.5.0")
                 // Multiplatform HTTP client core for shared repository logic
@@ -74,10 +74,15 @@ kotlin {
         val jvmAndAndroid by creating {
             dependsOn(commonMain.get())
             dependencies {
-                // Compose-Multiplatform UI dependencies for shared chat UI (slice 1)
-                api("org.jetbrains.compose.foundation:foundation:1.11.1")
+                // Compose-Multiplatform UI dependencies for shared chat UI (slice 1).
+                // foundation/ui are kept on the 1.10.x train (matching the
+                // org.jetbrains.compose plugin) so Jewel's expected Compose
+                // foundation API is present on the desktop classpath
+                // (letta-mobile-5icsp). material3 stays on 1.9.0 — the latest
+                // STABLE Compose material3 (1.10.x material3 is alpha-only).
+                api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
-                api("org.jetbrains.compose.ui:ui:1.11.1")
+                api("org.jetbrains.compose.ui:ui:1.10.0")
             }
         }
 
