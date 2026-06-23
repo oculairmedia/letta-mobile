@@ -125,6 +125,22 @@ class ScheduleLibraryController(
     private var loadJob: Job? = null
     private var mutationJob: Job? = null
 
+    /**
+     * Per-controller-instance verdict: once the native
+     * `/v1/agents/{id}/schedule` route has answered with an
+     * "admin unavailable" error (404/405/501, matched by
+     * [scheduleAdminUnavailableMatcher]) AND a [cronSource] is wired, we
+     * latch this to true and stop re-attempting the doomed native round-trip
+     * on subsequent loads/selects. Every later load goes straight to the
+     * cron source. This is intentionally NOT persisted: a fresh controller
+     * starts Unknown (false) and probes the native route once, so switching
+     * to a backend that serves the native route re-probes from scratch.
+     *
+     * Backends that DO serve the native route never latch this — the native
+     * path is used on every load, so their behaviour is completely unchanged.
+     */
+    private var nativeScheduleRouteUnavailable = false
+
     fun start() {
         if (stateFlow.value.agents.isEmpty() && stateFlow.value.schedules.isEmpty()) {
             // Seed the requested agent BEFORE loading so loadData()'s
@@ -152,6 +168,13 @@ class ScheduleLibraryController(
                 val agents = agentRepository.listAgentSummaries()
                 loadedAgents = agents
                 val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                // If a prior load already proved the native schedule route is
+                // unavailable on this backend, skip the doomed native round-trip
+                // and go straight to the cron-backed source.
+                if (nativeScheduleRouteUnavailable) {
+                    publishCronFallbackOrUnavailable(agents, selectedAgentId)
+                    return@launch
+                }
                 val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
                 stateFlow.value = ScheduleLibraryState(
                     agents = agents,
@@ -168,6 +191,7 @@ class ScheduleLibraryController(
                 if (scheduleAdminUnavailableMatcher(t)) {
                     val agents = loadedAgents
                     val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                    latchNativeUnavailableIfCronBacked()
                     publishCronFallbackOrUnavailable(agents, selectedAgentId)
                 } else {
                     stateFlow.update {
@@ -185,6 +209,17 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             val current = stateFlow.value
+            // If a prior load already proved the native schedule route is
+            // unavailable on this backend, skip the doomed native round-trip
+            // and go straight to the cron-backed source.
+            if (nativeScheduleRouteUnavailable) {
+                publishCronFallbackOrUnavailable(
+                    agents = current.agents,
+                    selectedAgentId = agentId,
+                    base = current.copy(selectedAgentId = agentId),
+                )
+                return@launch
+            }
             try {
                 val schedules = loadSchedulesForAgent(agentId)
                 stateFlow.value = current.copy(
@@ -199,6 +234,7 @@ class ScheduleLibraryController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
+                    latchNativeUnavailableIfCronBacked()
                     publishCronFallbackOrUnavailable(
                         agents = current.agents,
                         selectedAgentId = agentId,
@@ -304,6 +340,19 @@ class ScheduleLibraryController(
     private suspend fun loadSchedulesForAgent(agentId: String): List<ScheduledMessage> {
         scheduleRepository.refreshSchedules(agentId)
         return scheduleRepository.getSchedules(agentId).first()
+    }
+
+    /**
+     * Latch the "native schedule route is unavailable" verdict so subsequent
+     * loads skip the doomed native round-trip. Only latched when a [cronSource]
+     * is wired (i.e. the backend is genuinely cron-backed); without a cron
+     * source the controller keeps probing native and lands on the same
+     * unavailable state either way, so latching there would change nothing.
+     */
+    private fun latchNativeUnavailableIfCronBacked() {
+        if (cronSource != null) {
+            nativeScheduleRouteUnavailable = true
+        }
     }
 
     /**
