@@ -22,7 +22,7 @@ class ToolCallStatusTest {
     @Test
     fun testSuccessShowsNoStatusChrome() {
         composeRule.setContent {
-            LettaTheme {
+            LettaTheme(appTheme = com.letta.mobile.data.model.AppTheme.LIGHT, themePreset = com.letta.mobile.data.model.ThemePreset.DEFAULT, dynamicColor = false) {
                 LettaChatTheme {
                     ToolCallCard(
                         toolCall = UiToolCall(
@@ -45,7 +45,7 @@ class ToolCallStatusTest {
     @Test
     fun testErrorShowsRedRuleIndicator() {
         composeRule.setContent {
-            LettaTheme {
+            LettaTheme(appTheme = com.letta.mobile.data.model.AppTheme.LIGHT, themePreset = com.letta.mobile.data.model.ThemePreset.DEFAULT, dynamicColor = false) {
                 LettaChatTheme {
                     ToolCallCard(
                         toolCall = UiToolCall(
@@ -66,7 +66,7 @@ class ToolCallStatusTest {
     @Test
     fun testWarningShowsAmberIndicator() {
         composeRule.setContent {
-            LettaTheme {
+            LettaTheme(appTheme = com.letta.mobile.data.model.AppTheme.LIGHT, themePreset = com.letta.mobile.data.model.ThemePreset.DEFAULT, dynamicColor = false) {
                 LettaChatTheme {
                     ToolCallCard(
                         toolCall = UiToolCall(
@@ -87,7 +87,7 @@ class ToolCallStatusTest {
     @Test
     fun testRunningShowsTransientIndicator() {
         composeRule.setContent {
-            LettaTheme {
+            LettaTheme(appTheme = com.letta.mobile.data.model.AppTheme.LIGHT, themePreset = com.letta.mobile.data.model.ThemePreset.DEFAULT, dynamicColor = false) {
                 LettaChatTheme {
                     ToolCallCard(
                         toolCall = UiToolCall(
