@@ -517,6 +517,7 @@ internal class ChatConversationCoordinator(
         stopTimelineObserver()
         updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
         uiState.value = uiState.value.copy(
+            conversationState = ConversationState.NoConversation,
             messages = persistentListOf(),
             messageListChange = ChatMessageListChange.Full,
             isLoadingOlderMessages = false,
