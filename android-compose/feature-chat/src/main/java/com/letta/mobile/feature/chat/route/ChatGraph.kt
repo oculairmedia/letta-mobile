@@ -19,7 +19,7 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToTools: () -> Unit,
     onNavigateToMemory: (String) -> Unit,
     onNavigateToAdmin: () -> Unit,
-    onNavigateToSchedules: () -> Unit,
+    onNavigateToSchedules: (String) -> Unit,
     onNavigateToConversationList: () -> Unit,
     onSwitchConversation: (AgentChatRoute) -> Unit,
 ) {
