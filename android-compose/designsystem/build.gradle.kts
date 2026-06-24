@@ -71,7 +71,6 @@ kotlin {
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
             "-opt-in=kotlin.contracts.ExperimentalContracts",
-            "-Xcontext-parameters",
         )
     }
 }
