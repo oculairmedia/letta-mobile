@@ -436,6 +436,10 @@ the Phase C seam for replacing the shim as a required remote dependency: the
 mobile CLI does not implement a parallel server, it starts `letta app-server`
 with the same listen and WebSocket auth flags exposed by Letta Code.
 
+For the installable host distribution, build `:appserver-cli:distZip` and run
+`bin/meridian-app-server` from the unzipped artifact. The Gradle-backed `:cli`
+command below remains useful when debugging the broader mobile CLI harness.
+
 ```powershell
 .\gradlew.bat :cli:run -PcliArgs="app-server-serve --listen ws://127.0.0.1:4500"
 .\gradlew.bat :cli:run -PcliArgs="app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>"
