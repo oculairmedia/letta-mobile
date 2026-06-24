@@ -441,7 +441,7 @@ For the installable host distribution, build `:appserver-cli:distZip` and run
 command below remains useful when debugging the broader mobile CLI harness.
 
 ```powershell
-.\gradlew.bat :cli:run -PcliArgs="app-server-serve --listen ws://127.0.0.1:4500"
+.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.27.15 --letta-arg=--backend --letta-arg local --listen ws://127.0.0.1:4500"
 .\gradlew.bat :cli:run -PcliArgs="app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>"
 .\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.27.15 --dry-run"
 ```
@@ -449,6 +449,14 @@ command below remains useful when debugging the broader mobile CLI harness.
 Use `--dry-run` to print the generated process command without launching a
 server. Use repeated `--letta-arg` values when the host Letta command is a tool
 wrapper such as `pnpm dlx @letta-ai/letta-code@0.27.15`.
+
+Loopback development uses no WebSocket auth. Any non-loopback listen host must
+be launched with `--ws-auth`; clients then pass the same token as
+`Authorization: Bearer <token>`.
+
+Use one direct control owner per App Server process. If several product clients
+need the same process, put a fanout controller in front of it instead of letting
+every client write to `/ws?channel=control`.
 
 ### `app-server-smoke`
 
@@ -460,6 +468,15 @@ $env:APP_SERVER_TEST_URL="ws://127.0.0.1:4500"
 $env:APP_SERVER_TEST_AGENT_ID="agt_x"
 $env:APP_SERVER_TEST_CONVERSATION_ID="conv_x"
 .\gradlew.bat :cli:run -PcliArgs="app-server-smoke --message `"hello`""
+```
+
+Expected output includes:
+
+```text
+[app-server] connect ws://127.0.0.1:4500
+[lifecycle] Started
+[stream] ...
+[lifecycle] Completed
 ```
 
 Set `APP_SERVER_TEST_TOKEN` or pass `--token` when connecting to a non-loopback

@@ -96,6 +96,32 @@ class AppServerServeCommandTest {
     }
 
     @Test
+    fun `non loopback listen requires websocket auth`() {
+        assertThrows(UsageError::class.java) {
+            buildAppServerServeCommand(
+                AppServerServeSpec(listen = "ws://0.0.0.0:4500"),
+            )
+        }
+    }
+
+    @Test
+    fun `localhost listen can run without websocket auth`() {
+        val command = buildAppServerServeCommand(
+            AppServerServeSpec(listen = "ws://localhost:4500"),
+        )
+
+        assertEquals(
+            listOf(
+                "letta",
+                "app-server",
+                "--listen",
+                "ws://localhost:4500",
+            ),
+            command,
+        )
+    }
+
+    @Test
     fun `blank values fail before launching process`() {
         assertThrows(UsageError::class.java) {
             buildAppServerServeCommand(

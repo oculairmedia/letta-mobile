@@ -19,6 +19,13 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/**
+ * Ktor-backed App Server transport.
+ *
+ * `bearerToken` is intentionally optional: loopback App Server runs omit WS
+ * auth, while non-loopback/headless hosts should launch `letta app-server` with
+ * `--ws-auth` and pass the matching bearer token here.
+ */
 class KtorAppServerWebSocketTransport(
     private val httpClient: HttpClient,
     private val baseUrl: String,

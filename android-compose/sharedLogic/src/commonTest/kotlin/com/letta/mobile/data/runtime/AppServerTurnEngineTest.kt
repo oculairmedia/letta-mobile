@@ -77,6 +77,51 @@ class AppServerTurnEngineTest {
         first.await()
     }
 
+    @Test
+    fun runTurnStartsNewRuntimeWhenAgentOrConversationChanges() = runTest {
+        var requestId = 0
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            requestIdFactory = {
+                requestId += 1
+                "runtime-start-$requestId"
+            },
+        )
+
+        engine.runTurn(command).test {
+            awaitItem()
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            awaitItem()
+            awaitComplete()
+        }
+
+        val secondRuntime = AppServerRuntimeScope("agent-2", "conv-2")
+        val secondCommand = command.copy(
+            agentId = AgentId(secondRuntime.agentId),
+            conversationId = ConversationId(secondRuntime.conversationId),
+            input = TurnInput.UserMessage("local-2", "second"),
+        )
+
+        engine.runTurn(secondCommand).test {
+            awaitItem()
+            val input = assertIs<AppServerCommand.Input>(client.sentCommands.last())
+            assertEquals(secondRuntime, input.runtime)
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-2", runtime = secondRuntime))
+            awaitItem()
+            awaitComplete()
+        }
+
+        assertEquals(
+            listOf("agent-1", "agent-2"),
+            client.runtimeStartCommands.map { it.agentId },
+        )
+        assertEquals(
+            listOf("runtime-start-1", "runtime-start-2"),
+            client.runtimeStartCommands.map { it.requestId },
+        )
+    }
+
     companion object {
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")
         val command = TurnCommand(
@@ -102,7 +147,10 @@ private class FakeAppServerClient : AppServerClient {
         return AppServerInboundFrame.RuntimeStartResponse(
             requestId = command.requestId,
             success = true,
-            runtime = AppServerTurnEngineTest.runtime,
+            runtime = AppServerRuntimeScope(
+                agentId = requireNotNull(command.agentId),
+                conversationId = requireNotNull(command.conversationId),
+            ),
         )
     }
 
@@ -134,9 +182,13 @@ private class FakeAppServerClient : AppServerClient {
     }
 }
 
-private fun streamDelta(messageType: String, runId: String): AppServerInboundFrame.StreamDelta =
+private fun streamDelta(
+    messageType: String,
+    runId: String,
+    runtime: AppServerRuntimeScope = AppServerTurnEngineTest.runtime,
+): AppServerInboundFrame.StreamDelta =
     AppServerInboundFrame.StreamDelta(
-        runtime = AppServerTurnEngineTest.runtime,
+        runtime = runtime,
         eventSeq = 1,
         emittedAt = "2026-06-24T00:00:00Z",
         idempotencyKey = "evt-1",

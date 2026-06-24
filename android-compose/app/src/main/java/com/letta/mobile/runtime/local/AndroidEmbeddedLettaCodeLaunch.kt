@@ -20,6 +20,8 @@ data class AndroidEmbeddedLettaCodeLaunchSpec(
     val preloadRequireFiles: List<File>,
     val environment: Map<String, String>,
 ) {
+    // Android keeps the stream-json bridge until the bundled Letta Code version
+    // exposes app-server on a nodejs-mobile-compatible Node runtime.
     fun toStreamJsonNodeStartRequest(session: EmbeddedLettaCodeSessionKey): LettaCodeNodeStartRequest =
         LettaCodeNodeStartRequest(
             arguments = buildList {

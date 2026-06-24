@@ -20,6 +20,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 
+/**
+ * TurnEngine backed by one App Server client/control owner.
+ *
+ * This class serializes turns per engine instance and caches a started runtime
+ * only for the same agent/conversation pair. Hosts that share one App Server
+ * process across several UI clients still need an external fanout controller.
+ */
 class AppServerTurnEngine(
     private val client: AppServerClient,
     private val mapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper(),
@@ -63,7 +70,9 @@ class AppServerTurnEngine(
     }
 
     private suspend fun ensureRuntime(command: TurnCommand): AppServerRuntimeScope {
-        runtime?.let { return it }
+        runtime?.let { cached ->
+            if (cached.matches(command)) return cached
+        }
         val response = client.runtimeStart(
             AppServerCommand.RuntimeStart(
                 requestId = requestIdFactory(),
@@ -82,6 +91,9 @@ class AppServerTurnEngine(
         runtime = returnedRuntime
         return returnedRuntime
     }
+
+    private fun AppServerRuntimeScope.matches(command: TurnCommand): Boolean =
+        agentId == command.agentId.value && conversationId == command.conversationId.value
 
     private fun TurnCommand.toInputCommand(scope: AppServerRuntimeScope): AppServerCommand.Input =
         when (val turnInput = input) {

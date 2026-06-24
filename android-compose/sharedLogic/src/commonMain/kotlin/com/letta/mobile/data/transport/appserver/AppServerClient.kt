@@ -2,6 +2,15 @@ package com.letta.mobile.data.transport.appserver
 
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Typed client for one Letta Code App Server process.
+ *
+ * The upstream App Server exposes one writable control channel per process plus
+ * a receive-only stream channel. Use one direct client/transport as the control
+ * owner for a runtime process; multi-client remote access needs an external
+ * fanout/arbitration layer instead of several clients writing to the same
+ * process.
+ */
 interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>
 

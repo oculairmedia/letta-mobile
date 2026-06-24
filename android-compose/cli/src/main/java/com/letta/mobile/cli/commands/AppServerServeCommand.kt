@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.long
+import java.net.URI
 
 internal class AppServerServeCommand : CliktCommand(
     name = "app-server-serve",
@@ -99,7 +100,9 @@ internal fun buildAppServerServeCommand(spec: AppServerServeSpec): List<String> 
     }
     command += "app-server"
     command += "--listen"
-    command += requireNonBlank(spec.listen, "--listen")
+    val listen = requireNonBlank(spec.listen, "--listen")
+    requireRemoteAuthForNonLoopback(listen, spec.wsAuth)
+    command += listen
 
     spec.wsAuth?.let {
         val authMode = requireNonBlank(it, "--ws-auth")
@@ -121,6 +124,26 @@ internal fun buildAppServerServeCommand(spec: AppServerServeSpec): List<String> 
     }
 
     return command
+}
+
+private fun requireRemoteAuthForNonLoopback(listen: String, wsAuth: String?) {
+    val uri = runCatching { URI(listen) }.getOrElse {
+        throw UsageError("--listen must be a valid ws:// URL")
+    }
+    if (uri.scheme != "ws" || uri.host.isNullOrBlank()) {
+        throw UsageError("--listen must be a valid ws:// URL")
+    }
+    if (!uri.host.isLoopbackHost() && wsAuth.isNullOrBlank()) {
+        throw UsageError("--ws-auth is required when --listen is not a loopback host")
+    }
+}
+
+private fun String.isLoopbackHost(): Boolean {
+    val normalized = trim().removePrefix("[").removeSuffix("]").lowercase()
+    return normalized == "localhost" ||
+        normalized == "127.0.0.1" ||
+        normalized == "::1" ||
+        normalized.startsWith("127.")
 }
 
 internal fun formatProcessCommand(command: List<String>): String =
