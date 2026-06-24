@@ -46,9 +46,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +65,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.customColors
@@ -321,6 +322,7 @@ private fun BlockLibraryCard(
     onLongPress: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val selectionColors = MaterialTheme.customColors
     val containerColor = if (isSelected) {
         selectionColors.selectionContainer
@@ -334,7 +336,7 @@ private fun BlockLibraryCard(
             .combinedClickable(
                 onClick = onTap,
                 onLongClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    HapticEffects.longPress(haptic, view)
                     onLongPress()
                 },
             ),

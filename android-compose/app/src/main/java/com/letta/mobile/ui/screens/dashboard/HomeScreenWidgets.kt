@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.screens.dashboard
 
-import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -47,6 +45,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.LettaCardDefaults
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableList
 import sh.calvin.reorderable.ReorderableItem
@@ -67,6 +66,7 @@ internal fun PinnedAgentCard(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val scale by animateFloatAsState(
         targetValue = if (isDragging) 1.05f else 1f,
@@ -85,7 +85,7 @@ internal fun PinnedAgentCard(
         Modifier.combinedClickable(
             onClick = onClick,
             onLongClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                HapticEffects.longPress(haptic, view)
                 showMenu = true
             },
         )
@@ -206,6 +206,7 @@ internal fun DashboardWidgetTile(
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var showMenu by remember { mutableStateOf(false) }
 
     // letta-mobile-f8v: dashboard widget tiles share the Conversations
@@ -237,7 +238,7 @@ internal fun DashboardWidgetTile(
         Modifier.combinedClickable(
             onClick = onClick,
             onLongClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                HapticEffects.longPress(haptic, view)
                 showMenu = true
             },
         )
@@ -327,7 +328,7 @@ internal fun ReorderableWidgetGrid(
         currentList = currentList.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
-        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+        HapticEffects.reorderSwapTick(view)
     }
 
     // Commit the new order to the caller when no item is being dragged.
@@ -374,10 +375,10 @@ internal fun ReorderableWidgetGrid(
                         .height(tileHeight)
                         .longPressDraggableHandle(
                             onDragStarted = {
-                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+                                HapticEffects.reorderDragStart(view)
                             },
                             onDragStopped = {
-                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                                HapticEffects.reorderDragEnd(view)
                             },
                         ),
                 )
@@ -407,7 +408,7 @@ internal fun ReorderablePinnedItemsGrid(
         currentList = currentList.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
-        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+        HapticEffects.reorderSwapTick(view)
     }
 
     LaunchedEffect(reorderableState, currentList) {
@@ -445,10 +446,10 @@ internal fun ReorderablePinnedItemsGrid(
                     .height(tileHeight)
                     .longPressDraggableHandle(
                         onDragStarted = {
-                            view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+                            HapticEffects.reorderDragStart(view)
                         },
                         onDragStopped = {
-                            view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                            HapticEffects.reorderDragEnd(view)
                         },
                     )
                 when (item) {
@@ -494,7 +495,7 @@ internal fun ReorderableAgentGrid(
         currentList = currentList.toMutableList().apply {
             add(to.index, removeAt(from.index))
         }
-        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_FREQUENT_TICK)
+        HapticEffects.reorderSwapTick(view)
     }
 
     LaunchedEffect(reorderableState, currentList) {
@@ -537,10 +538,10 @@ internal fun ReorderableAgentGrid(
                         .height(tileHeight)
                         .longPressDraggableHandle(
                             onDragStarted = {
-                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_START)
+                                HapticEffects.reorderDragStart(view)
                             },
                             onDragStopped = {
-                                view.performHapticFeedback(HapticFeedbackConstants.GESTURE_END)
+                                HapticEffects.reorderDragEnd(view)
                             },
                         ),
                 )
