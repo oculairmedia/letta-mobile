@@ -25,6 +25,24 @@ plugins {
 }
 
 // ---------------------------------------------------------------------------
+// Kotlin 2.4.0 + Dagger/Hilt metadata compatibility (letta-mobile, 2026-06-24)
+// ---------------------------------------------------------------------------
+// Dagger/Hilt 2.59.2 bundles a kotlin-metadata-jvm that only understands
+// Kotlin Metadata version <= 2.3.0, so on Kotlin 2.4.0 the Hilt annotation
+// processor fails: "Provided Metadata instance has version 2.4.0, while
+// maximum supported version is 2.3.0." This is upstream Dagger lag (issue
+// google/dagger#5190 / #5180). The maintainer-endorsed workaround is to force
+// a 2.4-aware kotlin-metadata-jvm onto every module's KSP processor classpath.
+// Remove once Dagger ships a release that bundles a 2.4+ metadata reader.
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy {
+            force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // cleanKotlinIC — wipe Kotlin incremental compilation caches across all
 // modules.  Run this when builds fail with .tab corruption errors instead
 // of nuking the entire build/ tree.
