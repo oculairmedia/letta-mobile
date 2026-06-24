@@ -1,6 +1,7 @@
 package com.letta.mobile.data.memory
 
 import androidx.compose.runtime.Immutable
+import kotlinx.serialization.Serializable
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayMapper
 import com.letta.mobile.data.channel.ChannelDisplayStatus
@@ -12,6 +13,7 @@ import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.runtime.BackendDescriptor
 
+@Serializable
 @Immutable
 data class MemoryParityState(
     val selectedAgentId: String? = null,
@@ -29,6 +31,7 @@ data class MemoryParityState(
             ?: "Skills, memory, schedules, and channels for the active backend."
 }
 
+@Serializable
 @Immutable
 data class MemoryParitySummary(
     val skillCount: Int = 0,
@@ -55,6 +58,7 @@ data class MemoryParitySummary(
     )
 }
 
+@Serializable
 @Immutable
 data class MemorySummaryMetric(
     val kind: MemorySummaryMetricKind,
@@ -62,6 +66,7 @@ data class MemorySummaryMetric(
     val value: String,
 )
 
+@Serializable
 enum class MemorySummaryMetricKind {
     Skills,
     Blocks,
@@ -70,6 +75,7 @@ enum class MemorySummaryMetricKind {
     Context,
 }
 
+@Serializable
 @Immutable
 data class MemoryParitySection(
     val kind: MemoryParitySectionKind,
@@ -79,6 +85,7 @@ data class MemoryParitySection(
     val items: List<MemoryParityItem>,
 )
 
+@Serializable
 enum class MemoryParitySectionKind {
     Skills,
     Memory,
@@ -86,6 +93,7 @@ enum class MemoryParitySectionKind {
     Channels,
 }
 
+@Serializable
 enum class MemoryAccentRole {
     Primary,
     Secondary,
@@ -102,6 +110,7 @@ val MemoryParitySectionKind.accentRole: MemoryAccentRole
         MemoryParitySectionKind.Channels -> MemoryAccentRole.Neutral
     }
 
+@Serializable
 @Immutable
 data class MemoryParityGraph(
     val nodes: List<MemoryGraphNode> = emptyList(),
@@ -114,6 +123,7 @@ data class MemoryParityGraph(
         get() = "${nodes.size} nodes / ${edges.size} links"
 }
 
+@Serializable
 @Immutable
 data class MemoryGraphNode(
     val id: String,
@@ -124,6 +134,7 @@ data class MemoryGraphNode(
     val status: MemoryChannelStatus? = null,
 )
 
+@Serializable
 @Immutable
 data class MemoryGraphEdge(
     val id: String,
@@ -133,6 +144,7 @@ data class MemoryGraphEdge(
     val kind: MemoryGraphEdgeKind,
 )
 
+@Serializable
 enum class MemoryGraphNodeKind {
     Agent,
     Backend,
@@ -151,6 +163,7 @@ fun MemoryGraphNodeKind.accentRole(status: MemoryChannelStatus?): MemoryAccentRo
     MemoryGraphNodeKind.Channel -> status?.accentRole ?: MemoryAccentRole.Neutral
 }
 
+@Serializable
 enum class MemoryGraphEdgeKind {
     Uses,
     Remembers,
@@ -158,6 +171,7 @@ enum class MemoryGraphEdgeKind {
     Delivers,
 }
 
+@Serializable
 @Immutable
 data class MemoryTextLink(
     val start: Int,
@@ -167,6 +181,7 @@ data class MemoryTextLink(
     val kind: MemoryTextLinkKind,
 )
 
+@Serializable
 enum class MemoryTextLinkKind {
     Url,
     Mention,
@@ -177,6 +192,7 @@ enum class MemoryTextLinkKind {
     Channel,
 }
 
+@Serializable
 @Immutable
 data class MemoryTextSegment(
     val text: String,
@@ -228,6 +244,7 @@ private fun MemoryTextLink.overlaps(other: MemoryTextLink): Boolean =
     start < other.end && other.start < end
 
 @Immutable
+@Serializable
 sealed interface MemoryParityItem {
     val id: String
     val title: String
@@ -236,7 +253,8 @@ sealed interface MemoryParityItem {
     val metadataLabels: List<String>
     val links: List<MemoryTextLink>
 
-    @Immutable
+    @Serializable
+@Immutable
     data class Skill(
         override val id: String,
         override val title: String,
@@ -248,7 +266,8 @@ sealed interface MemoryParityItem {
         val tags: List<String>,
     ) : MemoryParityItem
 
-    @Immutable
+    @Serializable
+@Immutable
     data class MemoryBlock(
         override val id: String,
         override val title: String,
@@ -261,7 +280,8 @@ sealed interface MemoryParityItem {
         val readOnly: Boolean,
     ) : MemoryParityItem
 
-    @Immutable
+    @Serializable
+@Immutable
     data class Schedule(
         override val id: String,
         override val title: String,
@@ -273,7 +293,8 @@ sealed interface MemoryParityItem {
         val nextRunLabel: String,
     ) : MemoryParityItem
 
-    @Immutable
+    @Serializable
+@Immutable
     data class Channel(
         override val id: String,
         override val title: String,
@@ -285,6 +306,7 @@ sealed interface MemoryParityItem {
     ) : MemoryParityItem
 }
 
+@Serializable
 enum class MemoryChannelStatus {
     Connected,
     Connecting,
