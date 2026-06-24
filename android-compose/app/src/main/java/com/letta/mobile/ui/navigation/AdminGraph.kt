@@ -9,6 +9,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
+import com.letta.mobile.BuildConfig
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.dashboard.HomeScreen
@@ -224,6 +225,7 @@ fun NavGraphBuilder.adminGraph(
                     popUpTo(0) { inclusive = true }
                 }
             },
+            appVersion = BuildConfig.VERSION_NAME,
         )
     }
 

@@ -19,6 +19,7 @@ plugins {
     id("com.google.devtools.ksp") version "2.3.8" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
     id("org.jetbrains.kotlin.plugin.allopen") version "2.3.20" apply false
+    id("com.mikepenz.aboutlibraries.plugin.android") version "14.2.1" apply false
     id("io.sentry.android.gradle") version "6.8.1" apply false
     id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
 }
