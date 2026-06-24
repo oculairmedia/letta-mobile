@@ -52,7 +52,6 @@ kotlin {
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=org.jetbrains.jewel.foundation.ExperimentalJewelApi",
-            "-Xcontext-parameters",
         )
     }
 }
