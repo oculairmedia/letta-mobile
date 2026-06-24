@@ -1,7 +1,5 @@
 package com.letta.mobile.data.schedules
 
-import com.letta.mobile.data.model.CronTask
-import com.letta.mobile.data.model.CronTaskStatus
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -133,17 +131,28 @@ object ScheduleProjection {
     private const val RUNNING_WINDOW_SECONDS = 90L
     private const val DEFAULT_RELIABILITY_SQUARES = 12
 
-    fun CronTask.toScheduleDef(zone: TimeZone): ScheduleDef = ScheduleDef(
-        id = id,
-        name = name.ifBlank { description.ifBlank { "Schedule" } },
-        cron = cron.takeIf { recurring && it.isNotBlank() },
-        oneShotAt = (scheduledFor ?: expiresAt)?.let { runCatching { Instant.parse(it) }.getOrNull() }
-            ?.takeIf { !recurring },
-        active = status == CronTaskStatus.ACTIVE,
-        lastFiredAt = lastFiredAt?.let { runCatching { Instant.parse(it) }.getOrNull() },
-        fireCount = fireCount,
-        zone = zone,
-    )
+    /**
+     * Adapt a [CronTask] (the slim `/v1/crons` wire shape) into a platform-
+     * neutral [ScheduleDef]. The cron is evaluated in the task's own time zone
+     * when it declares one, so absolute fire instants are correct regardless of
+     * the viewer's zone; the UI then formats those instants in the viewer's
+     * zone. The slim wire shape carries no run history, so fireCount/lastFired
+     * default empty and the History view degrades accordingly.
+     */
+    fun CronTask.toScheduleDef(viewerZone: TimeZone): ScheduleDef {
+        val taskZone = timezone?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: viewerZone
+        return ScheduleDef(
+            id = id,
+            name = name?.takeIf { it.isNotBlank() }
+                ?: description?.takeIf { it.isNotBlank() }
+                ?: prompt?.takeIf { it.isNotBlank() }?.take(40)
+                ?: "Schedule",
+            cron = cron?.takeIf { recurring && it.isNotBlank() },
+            oneShotAt = null,
+            active = true,
+            zone = taskZone,
+        )
+    }
 
     fun toScheduleDefs(crons: List<CronTask>, zone: TimeZone): List<ScheduleDef> =
         crons.map { it.toScheduleDef(zone) }

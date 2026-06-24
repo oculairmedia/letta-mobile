@@ -128,7 +128,7 @@ import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
+import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.data.commands.AgentSlashCommand
@@ -1748,7 +1748,7 @@ private fun DestinationContent(
         return
     }
     if (destination == DesktopDestination.Schedules) {
-        DesktopScheduleLibrarySurface(
+        DesktopScheduleSurface(
             state = scheduleLibraryState,
             onRefresh = onSchedulesRefresh,
             onAgentSelected = onScheduleAgentSelected,
