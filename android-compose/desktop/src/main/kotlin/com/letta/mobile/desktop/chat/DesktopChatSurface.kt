@@ -354,6 +354,9 @@ private fun NewConversationWelcome(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 480.dp),
             )
+            // First-run 2×2 action grid (Phase 5), category-colored. Each card
+            // pre-fills the composer so a fresh agent has an obvious first move.
+            FirstRunActionGrid(onAction = onStarterPrompt)
             if (onOnboardingTask != null) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -396,6 +399,72 @@ private fun NewConversationWelcome(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * First-run 2×2 action grid (Phase 5 / Penpot "Desktop · New agent first-run"):
+ * four category-colored cards — Start a conversation (primary), Seed a memory
+ * (human), Connect a tool (project), Schedule a task (onboarding) — each
+ * pre-filling the composer with a sensible opener.
+ */
+@Composable
+private fun FirstRunActionGrid(onAction: (String) -> Unit) {
+    val cc = MaterialTheme.customColors
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            FirstRunCard("Start a conversation", "Just say hello", MaterialTheme.colorScheme.primary, Modifier.weight(1f)) {
+                onAction("Hi! Let's get started.")
+            }
+            FirstRunCard("Seed a memory", "Tell me about you", cc.categoryHumanColor, Modifier.weight(1f)) {
+                onAction("Remember this about me: ")
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+            FirstRunCard("Connect a tool", "See what I can use", cc.categoryProjectColor, Modifier.weight(1f)) {
+                onAction("What tools can you use?")
+            }
+            FirstRunCard("Schedule a task", "Automate a routine", cc.categoryOnboardingColor, Modifier.weight(1f)) {
+                onAction("Schedule a daily summary for me")
+            }
+        }
+    }
+}
+
+@Composable
+private fun FirstRunCard(
+    title: String,
+    subtitle: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(accent))
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.customColors.onSurfaceMutedColor,
+                )
             }
         }
     }
