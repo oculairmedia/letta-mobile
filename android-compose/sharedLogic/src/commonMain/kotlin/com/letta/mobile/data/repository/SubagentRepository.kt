@@ -94,11 +94,14 @@ open class SubagentRepository(
      * deferred so the shim never sees duplicate `subagent_list` frames.
      */
     override suspend fun refresh(): Result<List<SubagentEntry>> {
-        inFlightRefresh.value?.takeIf { !it.isCompleted }?.let { return it.await() }
-        val deferred = CompletableDeferred<Result<List<SubagentEntry>>>()
-        val previous = inFlightRefresh.getAndSet(deferred)
-        previous?.takeIf { !it.isCompleted }?.cancel()
-        val result = runCatching {
+        while (true) {
+            val current = inFlightRefresh.value
+            if (current != null && !current.isCompleted) {
+                return current.await()
+            }
+            val deferred = CompletableDeferred<Result<List<SubagentEntry>>>()
+            if (inFlightRefresh.compareAndSet(current, deferred)) {
+                val result = runCatching {
             val response = transport.sendSubagentList(all = includeAll)
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "subagent_list failed")
@@ -107,9 +110,11 @@ open class SubagentRepository(
             state.value = subagents
             subagents
         }
-        deferred.complete(result)
-        inFlightRefresh.compareAndSet(deferred, null)
-        return result
+                deferred.complete(result)
+                inFlightRefresh.compareAndSet(deferred, null)
+                return result
+            }
+        }
     }
 
     /**
