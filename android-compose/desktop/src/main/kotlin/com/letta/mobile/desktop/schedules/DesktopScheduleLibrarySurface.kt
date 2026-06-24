@@ -42,6 +42,8 @@ import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.ScheduleLibraryItem
 import com.letta.mobile.data.schedules.ScheduleTiming
 import com.letta.mobile.desktop.DesktopButtonContent
+import com.letta.mobile.desktop.chat.AgentActivity
+import com.letta.mobile.desktop.chat.AgentActivityOrb
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopOutlinedButton
@@ -270,12 +272,23 @@ private fun CronRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 3.dp)
-                    .size(10.dp)
-                    .background(MaterialTheme.colorScheme.tertiary, MaterialTheme.shapes.small),
-            )
+            // Active (recurring) schedules get the animated "firing" heartbeat
+            // orb (Penpot schedule animated states); one-shot schedules stay a
+            // static dot.
+            if (cron.recurring) {
+                AgentActivityOrb(
+                    size = 20.dp,
+                    activity = AgentActivity.Firing,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 3.dp)
+                        .size(10.dp)
+                        .background(MaterialTheme.colorScheme.tertiary, MaterialTheme.shapes.small),
+                )
+            }
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),

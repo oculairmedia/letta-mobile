@@ -165,7 +165,7 @@ fun AgentScaffold(
     onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
-    onNavigateToSchedules: (() -> Unit)? = null,
+    onNavigateToSchedules: ((String) -> Unit)? = null,
     viewModelKey: String? = null,
 ) {
     AgentScaffoldContent(
@@ -198,7 +198,7 @@ internal fun AgentScaffoldContent(
     onViewSubagentConversation: ((String, String) -> Unit)? = null,
     onNavigateToAdmin: (() -> Unit)? = null,
     onNavigateToConversationList: (() -> Unit)? = null,
-    onNavigateToSchedules: (() -> Unit)? = null,
+    onNavigateToSchedules: ((String) -> Unit)? = null,
     conversationRepository: IConversationRepository? = null,
     viewModel: AdminChatViewModel,
 ) {
@@ -341,7 +341,7 @@ internal fun AgentScaffoldContent(
                     },
                     onNavigateToSchedules = {
                         scope.launch { drawerState.close() }
-                        onNavigateToSchedules?.invoke()
+                        onNavigateToSchedules?.invoke(agentIdValue)
                     },
                     onClose = { scope.launch { drawerState.close() } },
                     modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),

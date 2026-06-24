@@ -43,6 +43,7 @@ import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopRadioChip
 import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
@@ -164,7 +165,15 @@ private fun SkillsTabContent(
                         }
                     }
                 }
-                skillsError?.let { item { InfoCard(it, isError = true) } }
+                skillsError?.let {
+                    item {
+                        DesktopInlineError(
+                            message = it,
+                            onRetry = onRefreshSkills,
+                            retrying = skillsLoading,
+                        )
+                    }
+                }
                 if (skillsLoading && skills.isEmpty()) {
                     item { InfoCard("Loading skills from the active backend.") }
                 } else if (visible.isEmpty()) {

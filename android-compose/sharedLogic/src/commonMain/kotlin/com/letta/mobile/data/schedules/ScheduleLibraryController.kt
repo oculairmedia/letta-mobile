@@ -1,7 +1,7 @@
 package com.letta.mobile.data.schedules
 
 import androidx.compose.runtime.Immutable
-import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -17,22 +17,49 @@ import kotlinx.coroutines.launch
 
 @Immutable
 data class ScheduleLibraryState(
-    val agents: List<Agent> = emptyList(),
+    /**
+     * Slim agent projection for the picker dropdown — only id+name+description
+     * are needed to render the list and select by id. Sourced via
+     * [IAgentRepository.listAgentSummaries] (the admin-shim's
+     * `GET /v1/agents?slim=true`), NOT the full ~621KB agents payload.
+     */
+    val agents: List<AgentSummary> = emptyList(),
     val selectedAgentId: String? = null,
     val schedules: List<ScheduledMessage> = emptyList(),
     val scheduleAdminAvailable: Boolean = true,
     val scheduleAdminMessage: String? = null,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
+    /**
+     * Cron tasks served by the backend's `/v1/crons` route, used as a
+     * fallback for backends that don't serve the Letta-native
+     * `/v1/agents/{id}/schedule` admin route (e.g. self-hosted servers
+     * behind the admin-shim). When [cronMode] is true the UI renders
+     * these instead of [schedules]. Mirrors the desktop schedules surface.
+     */
+    val crons: List<CronTask> = emptyList(),
+    /**
+     * True when this backend is cron-backed: the native schedule route was
+     * unavailable but the cron route answered. An empty cron list in this
+     * mode is a real "0 schedules", NOT a signal that admin is unavailable.
+     */
+    val cronMode: Boolean = false,
 ) {
-    val selectedAgent: Agent?
+    val selectedAgent: AgentSummary?
         get() = agents.firstOrNull { it.id.value == selectedAgentId }
+
+    /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
+    val cronsForSelectedAgent: List<CronTask>
+        get() = selectedAgentId?.let { agentId ->
+            crons.filter { it.agentId == null || it.agentId == agentId }
+        } ?: crons
 
     val displayItems: List<ScheduleLibraryItem>
         get() = schedules.map { it.toScheduleLibraryItem() }
 
     val emptyMessage: String
         get() = when {
+            cronMode -> "No schedules for this agent."
             !scheduleAdminAvailable -> scheduleAdminMessage ?: SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE
             selectedAgentId == null -> "No agents available."
             else -> "No schedules for this agent."
@@ -71,6 +98,26 @@ class ScheduleLibraryController(
         throwable.message ?: fallback
     },
     private val scheduleAdminUnavailableMatcher: (Throwable) -> Boolean = { false },
+    /**
+     * Optional cron-backed fallback. When the native schedule route is
+     * unavailable (matched by [scheduleAdminUnavailableMatcher]), the
+     * controller lists crons via this source (the backend's `/v1/crons`
+     * route) instead of dead-ending on the "admin unavailable" state.
+     * Parity with the desktop schedules surface. Defaults to null, which
+     * preserves the legacy behaviour for callers that don't wire it.
+     */
+    private val cronSource: CronScheduleSource? = null,
+    /**
+     * Optional agent to pre-select when the surface is opened from a context
+     * that already knows the "current" agent (e.g. the chat drawer's
+     * Schedules entry point). When non-null and present in the loaded agents
+     * list, it is preferred as the initial selection; otherwise selection
+     * falls back to the existing [resolveSelection] behaviour (first agent).
+     * Defaults to null so every other entry point (admin/conversations
+     * menus) keeps the original "no pre-selected agent" behaviour. Mirrors
+     * the Memory surface, which carries the agent id through MemoryRoute.
+     */
+    private val initialAgentId: String? = null,
 ) : AutoCloseable {
     private val stateFlow = MutableStateFlow(ScheduleLibraryState())
     val state: StateFlow<ScheduleLibraryState> = stateFlow
@@ -78,8 +125,31 @@ class ScheduleLibraryController(
     private var loadJob: Job? = null
     private var mutationJob: Job? = null
 
+    /**
+     * Per-controller-instance verdict: once the native
+     * `/v1/agents/{id}/schedule` route has answered with an
+     * "admin unavailable" error (404/405/501, matched by
+     * [scheduleAdminUnavailableMatcher]) AND a [cronSource] is wired, we
+     * latch this to true and stop re-attempting the doomed native round-trip
+     * on subsequent loads/selects. Every later load goes straight to the
+     * cron source. This is intentionally NOT persisted: a fresh controller
+     * starts Unknown (false) and probes the native route once, so switching
+     * to a backend that serves the native route re-probes from scratch.
+     *
+     * Backends that DO serve the native route never latch this — the native
+     * path is used on every load, so their behaviour is completely unchanged.
+     */
+    private var nativeScheduleRouteUnavailable = false
+
     fun start() {
         if (stateFlow.value.agents.isEmpty() && stateFlow.value.schedules.isEmpty()) {
+            // Seed the requested agent BEFORE loading so loadData()'s
+            // resolveSelection prefers it (when it exists in the agents list)
+            // and otherwise falls back gracefully. A null initialAgentId
+            // leaves selectedAgentId null, preserving the legacy default.
+            if (initialAgentId != null && stateFlow.value.selectedAgentId == null) {
+                stateFlow.update { it.copy(selectedAgentId = initialAgentId) }
+            }
             loadData()
         }
     }
@@ -88,10 +158,23 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
+            // Picker only needs id+name+description; pull the slim agents
+            // projection (admin-shim `?slim=true`) instead of the full
+            // ~621KB refreshAgents() payload. Keeps other screens' shared
+            // full-agent cache untouched. Captured outside the try so the
+            // schedule-unavailable fallback can reuse the agents it loaded.
+            var loadedAgents: List<AgentSummary> = stateFlow.value.agents
             try {
-                agentRepository.refreshAgents()
-                val agents = agentRepository.agents.value
+                val agents = agentRepository.listAgentSummaries()
+                loadedAgents = agents
                 val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                // If a prior load already proved the native schedule route is
+                // unavailable on this backend, skip the doomed native round-trip
+                // and go straight to the cron-backed source.
+                if (nativeScheduleRouteUnavailable) {
+                    publishCronFallbackOrUnavailable(agents, selectedAgentId)
+                    return@launch
+                }
                 val schedules = selectedAgentId?.let { loadSchedulesForAgent(it) }.orEmpty()
                 stateFlow.value = ScheduleLibraryState(
                     agents = agents,
@@ -106,7 +189,10 @@ class ScheduleLibraryController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    publishUnavailableState(agentRepository.agents.value, stateFlow.value.selectedAgentId)
+                    val agents = loadedAgents
+                    val selectedAgentId = agents.resolveSelection(stateFlow.value.selectedAgentId)
+                    latchNativeUnavailableIfCronBacked()
+                    publishCronFallbackOrUnavailable(agents, selectedAgentId)
                 } else {
                     stateFlow.update {
                         it.copy(
@@ -123,6 +209,17 @@ class ScheduleLibraryController(
         loadJob?.cancel()
         loadJob = scope.launch {
             val current = stateFlow.value
+            // If a prior load already proved the native schedule route is
+            // unavailable on this backend, skip the doomed native round-trip
+            // and go straight to the cron-backed source.
+            if (nativeScheduleRouteUnavailable) {
+                publishCronFallbackOrUnavailable(
+                    agents = current.agents,
+                    selectedAgentId = agentId,
+                    base = current.copy(selectedAgentId = agentId),
+                )
+                return@launch
+            }
             try {
                 val schedules = loadSchedulesForAgent(agentId)
                 stateFlow.value = current.copy(
@@ -137,13 +234,11 @@ class ScheduleLibraryController(
                 throw cancelled
             } catch (t: Throwable) {
                 if (scheduleAdminUnavailableMatcher(t)) {
-                    stateFlow.value = current.copy(
+                    latchNativeUnavailableIfCronBacked()
+                    publishCronFallbackOrUnavailable(
+                        agents = current.agents,
                         selectedAgentId = agentId,
-                        schedules = emptyList(),
-                        scheduleAdminAvailable = false,
-                        scheduleAdminMessage = SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE,
-                        isLoading = false,
-                        errorMessage = null,
+                        base = current.copy(selectedAgentId = agentId),
                     )
                 } else {
                     stateFlow.value = current.copy(
@@ -247,8 +342,56 @@ class ScheduleLibraryController(
         return scheduleRepository.getSchedules(agentId).first()
     }
 
+    /**
+     * Latch the "native schedule route is unavailable" verdict so subsequent
+     * loads skip the doomed native round-trip. Only latched when a [cronSource]
+     * is wired (i.e. the backend is genuinely cron-backed); without a cron
+     * source the controller keeps probing native and lands on the same
+     * unavailable state either way, so latching there would change nothing.
+     */
+    private fun latchNativeUnavailableIfCronBacked() {
+        if (cronSource != null) {
+            nativeScheduleRouteUnavailable = true
+        }
+    }
+
+    /**
+     * Native schedule route is unavailable. Try the cron-backed fallback
+     * (the backend's `/v1/crons` route, served by self-hosted / admin-shim
+     * servers). If crons load — even an empty list — publish a
+     * cron-backed state (a real "0 schedules", NOT the unavailable wall).
+     * Only if the cron route is ALSO unavailable do we fall back to the
+     * unavailable state. Parity with the desktop schedules surface.
+     */
+    private suspend fun publishCronFallbackOrUnavailable(
+        agents: List<AgentSummary>,
+        selectedAgentId: String?,
+        base: ScheduleLibraryState? = null,
+    ) {
+        val source = cronSource
+        if (source != null) {
+            val crons = runCatching { source.listCrons(selectedAgentId) }.getOrNull()
+            if (crons != null) {
+                val resolved = base ?: ScheduleLibraryState()
+                stateFlow.value = resolved.copy(
+                    agents = agents,
+                    selectedAgentId = selectedAgentId,
+                    schedules = emptyList(),
+                    crons = crons,
+                    cronMode = true,
+                    scheduleAdminAvailable = true,
+                    scheduleAdminMessage = null,
+                    isLoading = false,
+                    errorMessage = null,
+                )
+                return
+            }
+        }
+        publishUnavailableState(agents, selectedAgentId)
+    }
+
     private fun publishUnavailableState(
-        fallbackAgents: List<Agent>,
+        fallbackAgents: List<AgentSummary>,
         requestedAgentId: String?,
     ) {
         val selectedAgentId = fallbackAgents.resolveSelection(requestedAgentId)
@@ -263,7 +406,7 @@ class ScheduleLibraryController(
         )
     }
 
-    private fun List<Agent>.resolveSelection(requestedAgentId: String?): String? =
+    private fun List<AgentSummary>.resolveSelection(requestedAgentId: String?): String? =
         if (requestedAgentId != null && any { it.id.value == requestedAgentId }) {
             requestedAgentId
         } else {
@@ -272,3 +415,15 @@ class ScheduleLibraryController(
 }
 
 const val SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE = "Schedule admin isn't available on this Letta server."
+
+/**
+ * Cron-backed schedule source. Implemented on each platform over the
+ * backend's `/v1/crons` route (the route self-hosted / admin-shim servers
+ * serve when the Letta-native `/v1/agents/{id}/schedule` admin route 404s).
+ * Returns the cron tasks, optionally scoped to [agentId]. Used by
+ * [ScheduleLibraryController] as a fallback so mobile reaches parity with
+ * the desktop schedules surface.
+ */
+fun interface CronScheduleSource {
+    suspend fun listCrons(agentId: String?): List<CronTask>
+}

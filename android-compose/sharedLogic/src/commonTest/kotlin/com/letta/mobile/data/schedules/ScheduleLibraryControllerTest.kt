@@ -3,6 +3,7 @@ package com.letta.mobile.data.schedules
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
@@ -39,6 +40,22 @@ class ScheduleLibraryControllerTest {
 
         assertEquals("a1", controller.state.value.selectedAgentId)
         assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun loadDataPopulatesDropdownFromSlimAgentSummariesNotFullRefresh() = runTest {
+        val agentRepository = FakeAgentRepository()
+        val controller = controller(agentRepository = agentRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        // Dropdown populated from the slim summaries path...
+        assertEquals(listOf("a1", "a2"), controller.state.value.agents.map { it.id.value })
+        assertEquals(listOf("Agent One", "Agent Two"), controller.state.value.agents.map { it.name })
+        assertTrue(agentRepository.calls.contains("listAgentSummaries"))
+        // ...and NOT the full ~621KB refreshAgents() payload.
+        assertTrue(agentRepository.calls.none { it == "refreshAgents" })
     }
 
     @Test
@@ -134,6 +151,175 @@ class ScheduleLibraryControllerTest {
     }
 
     @Test
+    fun nativeRouteUnavailableFallsBackToCronListNotUnavailableState() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val crons = listOf(
+            CronTask(id = "c1", agentId = "a1", name = "Daily digest", cron = "0 9 * * *", recurring = true),
+            CronTask(id = "c2", agentId = "a1", name = "Hourly", cron = "0 * * * *", recurring = true),
+        )
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { crons },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(listOf("c1", "c2"), state.crons.map { it.id })
+        assertEquals("No schedules for this agent.", state.emptyMessage)
+    }
+
+    @Test
+    fun nativeRouteUnavailableWithEmptyCronListShowsEmptyNotUnavailable() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { emptyList() },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(emptyList(), state.crons)
+        assertEquals("No schedules for this agent.", state.emptyMessage)
+    }
+
+    @Test
+    fun bothNativeAndCronRoutesUnavailableShowsUnavailableState() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { throw RouteUnavailableException() },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(false, state.cronMode)
+        assertEquals(false, state.scheduleAdminAvailable)
+        assertEquals(SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE, state.scheduleAdminMessage)
+        assertEquals(emptyList(), state.crons)
+    }
+
+    @Test
+    fun nativeRouteUnavailableWithoutCronSourceStillShowsUnavailable() = runTest {
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val controller = controller(scheduleRepository = scheduleRepository)
+
+        controller.start()
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals(false, state.cronMode)
+        assertEquals(false, state.scheduleAdminAvailable)
+        assertEquals(SCHEDULE_ADMIN_UNAVAILABLE_MESSAGE, state.scheduleAdminMessage)
+    }
+
+    @Test
+    fun selectAgentOnUnavailableRouteFallsBackToCronList() = runTest {
+        val scheduleRepository = FakeScheduleRepository()
+        val crons = listOf(CronTask(id = "c1", agentId = "a2", name = "A2 cron", cron = "0 9 * * *", recurring = true))
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { crons },
+        )
+        controller.start()
+        advanceUntilIdle()
+
+        // Now make the native route unavailable and switch agents.
+        scheduleRepository.error = RouteUnavailableException()
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertEquals("a2", state.selectedAgentId)
+        assertEquals(true, state.cronMode)
+        assertEquals(true, state.scheduleAdminAvailable)
+        assertEquals(listOf("c1"), state.crons.map { it.id })
+    }
+
+    @Test
+    fun cronBackedVerdictLatchesSoSecondLoadSkipsDoomedNativeRoute() = runTest {
+        // Native route 404s; cron source answers. After the first load the
+        // controller should remember the backend is cron-backed and NOT
+        // re-attempt the doomed native round-trip on subsequent loads.
+        val scheduleRepository = FakeScheduleRepository().apply {
+            error = RouteUnavailableException()
+        }
+        val crons = listOf(CronTask(id = "c1", agentId = "a1", name = "Daily", cron = "0 9 * * *", recurring = true))
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { crons },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+
+        // First load probed the native route exactly once and fell back to cron.
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(true, controller.state.value.cronMode)
+
+        // A subsequent selectAgent must NOT re-probe the native route.
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(0, scheduleRepository.getSchedulesCallCount)
+        assertEquals(true, controller.state.value.cronMode)
+        assertEquals("a2", controller.state.value.selectedAgentId)
+
+        // A subsequent full loadData must NOT re-probe the native route either.
+        controller.loadData()
+        advanceUntilIdle()
+
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(0, scheduleRepository.getSchedulesCallCount)
+        assertEquals(true, controller.state.value.cronMode)
+    }
+
+    @Test
+    fun nativeRouteServingBackendUsesNativeOnEveryLoadAndNeverLatches() = runTest {
+        // Backend serves the native route: the verdict must never latch, so
+        // native is used on every load/select with zero behaviour change.
+        val scheduleRepository = FakeScheduleRepository()
+        val controller = controller(
+            scheduleRepository = scheduleRepository,
+            cronSource = CronScheduleSource { error("cron should never be consulted") },
+        )
+
+        controller.start()
+        advanceUntilIdle()
+        assertEquals(1, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(false, controller.state.value.cronMode)
+        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+
+        controller.selectAgent("a2")
+        advanceUntilIdle()
+        assertEquals(2, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+
+        controller.loadData()
+        advanceUntilIdle()
+        assertEquals(3, scheduleRepository.refreshScheduleCallCount)
+        assertEquals(false, controller.state.value.cronMode)
+    }
+
+    @Test
     fun malformedAndEmptySchedulesConvertGracefullyWithoutCrashing() {
         val emptyMessageSchedule = ScheduledMessage(
             id = "empty",
@@ -158,14 +344,51 @@ class ScheduleLibraryControllerTest {
         assertEquals("", (item2.timing as ScheduleTiming.OneTime).displayTime)
     }
 
+    @Test
+    fun `initialAgentId pre-selects that agent instead of the first`() = runTest {
+        val controller = controller(initialAgentId = "a2")
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a2", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s2"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun `null initialAgentId falls back to existing first-agent behaviour`() = runTest {
+        val controller = controller(initialAgentId = null)
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
+    @Test
+    fun `initialAgentId not in agent list falls back gracefully to first agent`() = runTest {
+        val controller = controller(initialAgentId = "does-not-exist")
+
+        controller.start()
+        advanceUntilIdle()
+
+        assertEquals("a1", controller.state.value.selectedAgentId)
+        assertEquals(listOf("s1"), controller.state.value.schedules.map { it.id })
+    }
+
     private fun TestScope.controller(
         agentRepository: FakeAgentRepository = FakeAgentRepository(),
         scheduleRepository: FakeScheduleRepository = FakeScheduleRepository(),
+        cronSource: CronScheduleSource? = null,
+        initialAgentId: String? = null,
     ) = ScheduleLibraryController(
         agentRepository = agentRepository,
         scheduleRepository = scheduleRepository,
         scope = this,
         scheduleAdminUnavailableMatcher = { it is RouteUnavailableException },
+        cronSource = cronSource,
+        initialAgentId = initialAgentId,
     )
 
     private class RouteUnavailableException : RuntimeException("route unavailable")
@@ -177,12 +400,20 @@ class ScheduleLibraryControllerTest {
                 Agent(id = AgentId("a2"), name = "Agent Two"),
             ),
         )
+        val calls = mutableListOf<String>()
         override val agents: StateFlow<List<Agent>> = agentsFlow.asStateFlow()
         override val isRefreshing: StateFlow<Boolean> = MutableStateFlow(false)
         override val refreshError: StateFlow<Throwable?> = MutableStateFlow(null)
 
         override suspend fun countAgents(): Int = agents.value.size
-        override suspend fun refreshAgents() = Unit
+        override suspend fun refreshAgents() {
+            calls += "refreshAgents"
+        }
+
+        override suspend fun listAgentSummaries(): List<AgentSummary> {
+            calls += "listAgentSummaries"
+            return agents.value.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
+        }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = false
         override fun getCachedAgent(id: AgentId): Agent? = agents.value.firstOrNull { it.id == id }
         override fun getAgent(id: AgentId): Flow<Agent> = flowOf(checkNotNull(getCachedAgent(id)))
@@ -214,14 +445,25 @@ class ScheduleLibraryControllerTest {
         val createdSchedules = mutableListOf<ScheduleCreateParams>()
         val deletedScheduleIds = mutableListOf<String>()
 
+        /** Number of times the native refresh round-trip was attempted. */
+        var refreshScheduleCallCount = 0
+            private set
+
+        /** Number of times the native getSchedules round-trip was attempted. */
+        var getSchedulesCallCount = 0
+            private set
+
         fun clearSchedules() {
             schedulesByAgent.clear()
         }
 
-        override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> =
-            flowOf(schedulesByAgent[agentId].orEmpty())
+        override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> {
+            getSchedulesCallCount++
+            return flowOf(schedulesByAgent[agentId].orEmpty())
+        }
 
         override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
+            refreshScheduleCallCount++
             error?.let { throw it }
         }
 

@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository.api
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -31,6 +32,27 @@ interface IAgentRepository {
     val refreshError: StateFlow<Throwable?>
     suspend fun countAgents(): Int
     suspend fun refreshAgents()
+
+    /**
+     * Lightweight agent list for picker UIs (e.g. the Schedules dropdown).
+     *
+     * Returns only the minimal `{id, name, description}` projection a picker
+     * needs — selected by id, rendered by name — WITHOUT pulling the full
+     * ~621KB agents payload that [refreshAgents]/[agents] carries for
+     * full-object consumers. Concrete remote repositories override this to hit
+     * the admin-shim's opt-in `GET /v1/agents?slim=true` path.
+     *
+     * The default implementation derives summaries from the shared full
+     * [agents] cache (refreshing it first if empty). This keeps test doubles
+     * and non-remote implementations correct without each having to wire a
+     * slim endpoint; only the wire-size win requires the override.
+     */
+    suspend fun listAgentSummaries(): List<AgentSummary> {
+        if (agents.value.isEmpty()) {
+            refreshAgents()
+        }
+        return agents.value.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
+    }
     suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean
     fun getCachedAgent(id: AgentId): Agent?
     fun getCachedAgent(id: String): Agent? = getCachedAgent(AgentId(id))

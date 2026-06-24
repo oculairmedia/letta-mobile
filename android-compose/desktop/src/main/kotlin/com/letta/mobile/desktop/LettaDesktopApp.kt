@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Memory
@@ -57,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,6 +70,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -81,6 +84,16 @@ import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.composer.MentionKind
+import com.letta.mobile.data.composer.Mentionable
+import com.letta.mobile.data.lens.LensDestination
+import com.letta.mobile.data.memory.MemoryParityItem
+import com.letta.mobile.data.lens.WorkPlayLens
+import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.onboarding.OnboardingTaskKind
+import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
@@ -91,6 +104,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.data.search.PaletteItem
+import com.letta.mobile.data.search.PaletteItemKind
+import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
+import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
+import com.letta.mobile.desktop.chat.DesktopCommandPalette
+import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
+import com.letta.mobile.desktop.data.DesktopWsChannelTransport
 import com.letta.mobile.desktop.chat.ComposerCommand
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
@@ -219,6 +239,45 @@ fun LettaDesktopApp(
         activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
     }
     var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
+    // Active-subagent registry (Background tasks). Desktop streams chat over SSE,
+    // but the subagent registry only exists on the shim's mobile WS protocol, so
+    // we open a lean WS side-channel and feed the shared SubagentRepository.
+    val subagentTransport = remember(activeConfig) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() }
+            ?.let { DesktopWsChannelTransport(chatScope) }
+    }
+    val subagentRepository = remember(subagentTransport) {
+        subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    }
+    DisposableEffect(subagentTransport) {
+        val transport = subagentTransport
+        if (transport != null) {
+            chatScope.launch {
+                runCatching {
+                    transport.connect(
+                        baseShimUrl = activeConfig.serverUrl,
+                        token = activeConfig.accessToken.orEmpty(),
+                        deviceId = "letta-desktop",
+                        clientVersion = "letta-desktop",
+                    )
+                }
+            }
+        }
+        onDispose { transport?.close() }
+    }
+    val activeSubagents by produceState(emptyList<SubagentEntry>(), subagentRepository) {
+        val repo = subagentRepository
+        if (repo == null) {
+            value = emptyList()
+        } else {
+            repo.activeSubagentsFlow().collect { value = it }
+        }
+    }
+    var showBackgroundTasks by remember { mutableStateOf(false) }
+    // Work | Play presentation lens over the same agents/memory/conversations.
+    var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
+    var showModelPicker by remember { mutableStateOf(false) }
+    var showCommandPalette by remember { mutableStateOf(false) }
     val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
         DesktopMemoryController(
             sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -247,6 +306,24 @@ fun LettaDesktopApp(
         )
     }
     val toolLibraryState by toolLibraryController.state.collectAsState()
+    // Cmd/Ctrl-K opens the command palette (Penpot shows the ⌘K hint). A global
+    // AWT key dispatcher fires regardless of which Compose field has focus.
+    DisposableEffect(Unit) {
+        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val dispatcher = java.awt.KeyEventDispatcher { event ->
+            if (event.id == java.awt.event.KeyEvent.KEY_PRESSED &&
+                event.keyCode == java.awt.event.KeyEvent.VK_K &&
+                (event.isControlDown || event.isMetaDown)
+            ) {
+                showCommandPalette = true
+                true
+            } else {
+                false
+            }
+        }
+        focusManager.addKeyEventDispatcher(dispatcher)
+        onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
+    }
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
@@ -338,6 +415,60 @@ fun LettaDesktopApp(
     val agentConversations = remember(chatState.conversations, selectedAgentId) {
         chatState.conversations.filter { it.agentId == selectedAgentId }
     }
+    // @mention candidates: other agents + the focused agent's memory blocks.
+    // (Files need a client-side index — tracked as a follow-up.)
+    val mentionables = remember(railAgents, memoryState) {
+        buildList {
+            railAgents.forEach { (id, name) ->
+                add(Mentionable(id = id, label = name, sublabel = "agent", kind = MentionKind.Agent, insertText = name))
+            }
+            memoryState.memory.sections
+                .flatMap { it.items }
+                .filterIsInstance<MemoryParityItem.MemoryBlock>()
+                .forEach { block ->
+                    add(
+                        Mentionable(
+                            id = block.id,
+                            label = block.title,
+                            sublabel = "core block",
+                            kind = MentionKind.Memory,
+                            insertText = block.title,
+                        ),
+                    )
+                }
+        }
+    }
+    // Cmd/Ctrl-K command palette over conversations, agents, and destinations.
+    val paletteItems = remember(chatState.conversations, railAgents, workPlayMode) {
+        buildList {
+            chatState.conversations.forEach { conversation ->
+                val orbIndex = railAgents.indexOfFirst { it.first == conversation.agentId }.coerceAtLeast(0)
+                add(
+                    PaletteItem(
+                        id = conversation.id,
+                        label = conversation.title,
+                        sublabel = conversation.agentName,
+                        kind = PaletteItemKind.Conversation,
+                        orbIndex = orbIndex,
+                    ),
+                )
+            }
+            railAgents.forEachIndexed { index, (id, name) ->
+                add(PaletteItem(id = id, label = name, sublabel = "agent", kind = PaletteItemKind.Agent, orbIndex = index))
+            }
+            WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
+                val target = lensNavTarget(workPlayMode, lensDestination)
+                add(
+                    PaletteItem(
+                        id = target.first.name,
+                        label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination),
+                        sublabel = null,
+                        kind = PaletteItemKind.Destination,
+                    ),
+                )
+            }
+        }
+    }
     // A conversation is "thinking" from the moment a prompt is sent until the
     // agent's reply starts landing (tracked by the controller — `isSending`
     // alone clears too early, while the reply streams over a separate channel).
@@ -396,7 +527,7 @@ fun LettaDesktopApp(
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onNewSession = { showNewAgentDialog = true },
-                    onSearch = { selectedDestination = DesktopDestination.Conversations },
+                    onSearch = { showCommandPalette = true },
                     onSettings = { selectedDestination = DesktopDestination.Settings },
                 )
                 RailDivider()
@@ -409,6 +540,8 @@ fun LettaDesktopApp(
                     thinkingConversationId = thinkingConversationId,
                     deletingConversationIds = deletingConversationIds,
                     selectedDestination = selectedDestination,
+                    mode = workPlayMode,
+                    onModeChange = { workPlayMode = it },
                     onDestinationSelected = { selectedDestination = it },
                     onConversationSelected = {
                         chatController.selectConversation(it)
@@ -452,6 +585,17 @@ fun LettaDesktopApp(
                         ChatDetailPane(
                             state = chatState,
                             isThinking = isThinkingSelected,
+                            composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
+                            onOpenModelPicker = { showModelPicker = true },
+                            onOnboardingTask = { kind ->
+                                when (kind) {
+                                    OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
+                                    OnboardingTaskKind.ConnectChannel ->
+                                        selectedDestination = DesktopDestination.Channels
+                                    OnboardingTaskKind.AddSkills ->
+                                        selectedDestination = DesktopDestination.Agents
+                                }
+                            },
                             modelOptions = modelOptions,
                             onComposerTextChanged = chatController::updateComposerText,
                             onSend = chatController::send,
@@ -460,6 +604,7 @@ fun LettaDesktopApp(
                             onRetryConnection = chatController::retryConnection,
                             onModelSelected = chatController::setConversationModel,
                             commands = composerCommands,
+                            mentionables = mentionables,
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {
@@ -566,6 +711,56 @@ fun LettaDesktopApp(
                         )
                     }
                 }
+                if (showBackgroundTasks && subagentRepository != null) {
+                    RailDivider()
+                    DesktopBackgroundTasksPanel(
+                        subagents = activeSubagents,
+                        onClose = { showBackgroundTasks = false },
+                        onFetchTodos = subagentRepository?.let { repo ->
+                            { toolCallId -> repo.todos(toolCallId).getOrDefault(emptyList()) }
+                        },
+                    )
+                }
+            }
+            if (selectedDestination == DesktopDestination.Conversations &&
+                !showBackgroundTasks &&
+                subagentRepository != null
+            ) {
+                DesktopBackgroundTasksToggle(
+                    runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
+                    onClick = { showBackgroundTasks = true },
+                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp),
+                )
+            }
+            if (showModelPicker) {
+                DesktopModelPickerSheet(
+                    models = availableModels,
+                    selectedValue = chatState.composerModelLabel,
+                    onSelect = chatController::setConversationModel,
+                    onDismiss = { showModelPicker = false },
+                )
+            }
+            if (showCommandPalette) {
+                DesktopCommandPalette(
+                    items = paletteItems,
+                    onSelect = { item ->
+                        when (item.kind) {
+                            PaletteItemKind.Conversation -> {
+                                chatController.selectConversation(item.id)
+                                selectedDestination = DesktopDestination.Conversations
+                            }
+                            PaletteItemKind.Agent -> {
+                                chatState.conversations.firstOrNull { it.agentId == item.id }
+                                    ?.let { chatController.selectConversation(it.id) }
+                                selectedDestination = DesktopDestination.Conversations
+                            }
+                            PaletteItemKind.Destination ->
+                                DesktopDestination.entries.firstOrNull { it.name == item.id }
+                                    ?.let { selectedDestination = it }
+                        }
+                    },
+                    onDismiss = { showCommandPalette = false },
+                )
             }
             val editingAgentId = editAgentId
             if (editingAgentId != null) {
@@ -1007,6 +1202,8 @@ private fun DesktopAgentSidebar(
     thinkingConversationId: String?,
     deletingConversationIds: Set<String> = emptySet(),
     selectedDestination: DesktopDestination,
+    mode: WorkPlayMode,
+    onModeChange: (WorkPlayMode) -> Unit,
     onDestinationSelected: (DesktopDestination) -> Unit,
     onConversationSelected: (String) -> Unit,
     onDeleteConversation: (String) -> Unit,
@@ -1021,6 +1218,12 @@ private fun DesktopAgentSidebar(
             .padding(horizontal = 14.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        // Work | Play lens switcher (Penpot "App Mockups v2": top of sidebar).
+        WorkPlaySwitcher(
+            mode = mode,
+            onModeChange = onModeChange,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        )
         // Agent header.
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1078,39 +1281,24 @@ private fun DesktopAgentSidebar(
             }
         }
 
+        WorkPlayLens.navDestinations(mode).forEach { lensDestination ->
+            val target = lensNavTarget(mode, lensDestination)
+            DesktopNavRow(
+                label = WorkPlayLens.destinationLabel(mode, lensDestination),
+                icon = target.second,
+                selected = selectedDestination == target.first,
+                onClick = { onDestinationSelected(target.first) },
+            )
+        }
         DesktopNavRow(
-            label = "Memory",
-            icon = Icons.Outlined.Psychology,
-            selected = selectedDestination == DesktopDestination.Memory,
-            onClick = { onDestinationSelected(DesktopDestination.Memory) },
-        )
-        DesktopNavRow(
-            label = "Schedules",
-            icon = Icons.Outlined.Schedule,
-            selected = selectedDestination == DesktopDestination.Schedules,
-            onClick = { onDestinationSelected(DesktopDestination.Schedules) },
-        )
-        DesktopNavRow(
-            label = "Channels",
-            icon = Icons.Outlined.Hub,
-            selected = selectedDestination == DesktopDestination.Channels,
-            onClick = { onDestinationSelected(DesktopDestination.Channels) },
-        )
-        DesktopNavRow(
-            label = "Skills",
-            icon = Icons.Outlined.Build,
-            selected = selectedDestination == DesktopDestination.Agents,
-            onClick = { onDestinationSelected(DesktopDestination.Agents) },
-        )
-        DesktopNavRow(
-            label = "New chat",
+            label = WorkPlayLens.newConversationLabel(mode),
             icon = Icons.Outlined.Edit,
             selected = false,
             onClick = onNewChat,
         )
 
-        // Pinned conversations.
-        SidebarSection("Pinned")
+        // Pinned conversations / scenes.
+        SidebarSection(WorkPlayLens.conversationsHeader(mode))
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1389,6 +1577,62 @@ private fun SidebarSection(label: String) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(top = 10.dp, start = 4.dp, bottom = 2.dp),
     )
+}
+
+/** Maps a lens nav item to its concrete desktop destination + icon for the mode. */
+private fun lensNavTarget(
+    mode: WorkPlayMode,
+    destination: LensDestination,
+): Pair<DesktopDestination, ImageVector> = when (destination) {
+    LensDestination.Memory -> DesktopDestination.Memory to Icons.Outlined.Psychology
+    LensDestination.Schedules -> DesktopDestination.Schedules to Icons.Outlined.Schedule
+    LensDestination.Channels -> DesktopDestination.Channels to Icons.Outlined.Hub
+    LensDestination.Skills -> DesktopDestination.Agents to
+        if (mode == WorkPlayMode.Play) Icons.Outlined.Group else Icons.Outlined.Build
+    LensDestination.Conversations -> DesktopDestination.Conversations to Icons.Outlined.ChatBubbleOutline
+}
+
+/** Segmented Work | Play toggle (Penpot "App Mockups v2", top of the sidebar). */
+@Composable
+private fun WorkPlaySwitcher(
+    mode: WorkPlayMode,
+    onModeChange: (WorkPlayMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Row(modifier = Modifier.padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            WorkPlayMode.entries.forEach { option ->
+                val selected = option == mode
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            if (selected) MaterialTheme.colorScheme.surfaceContainerLowest else Color.Transparent,
+                        )
+                        .clickable { onModeChange(option) }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = WorkPlayLens.modeLabel(option),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

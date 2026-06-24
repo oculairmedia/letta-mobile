@@ -211,6 +211,40 @@ class AgentRepositoryTest {
     }
 
     @Test
+    fun `listAgentSummaries uses slim endpoint and does not touch shared full-agent cache`() = runTest {
+        fakeApi.agents.addAll(
+            listOf(
+                TestData.agent(id = "a1", name = "Agent One", description = "first"),
+                TestData.agent(id = "a2", name = "Agent Two", description = null),
+            )
+        )
+
+        val summaries = repository.listAgentSummaries()
+
+        assertEquals(listOf("a1", "a2"), summaries.map { it.id.value })
+        assertEquals(listOf("Agent One", "Agent Two"), summaries.map { it.name })
+        assertEquals("first", summaries[0].description)
+        // Slim path only — never the full listAgents, and the shared full
+        // agents StateFlow stays untouched (other screens still own it).
+        assertTrue(fakeApi.calls.contains("listAgentsSlim"))
+        assertFalse(fakeApi.calls.contains("listAgents"))
+        assertTrue(repository.agents.value.isEmpty())
+    }
+
+    @Test
+    fun `listAgentSummaries pages through slim endpoint`() = runTest {
+        repeat(125) { index ->
+            fakeApi.agents.add(TestData.agent(id = "a$index", name = "Agent $index"))
+        }
+
+        val summaries = repository.listAgentSummaries()
+
+        assertEquals(125, summaries.size)
+        assertEquals(listOf(50, 50, 50), fakeApi.slimLimits)
+        assertEquals(listOf(0, 50, 100), fakeApi.slimOffsets)
+    }
+
+    @Test
     fun `concurrent refreshAgentsIfStale callers share one list request`() = runTest {
         fakeApi.agents.add(TestData.agent(id = "a1", name = "Agent One"))
         fakeApi.listDelayMillis = 1L

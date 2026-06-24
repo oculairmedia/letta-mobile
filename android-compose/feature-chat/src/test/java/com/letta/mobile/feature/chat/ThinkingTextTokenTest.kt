@@ -102,6 +102,27 @@ class ThinkingTextTokenTest {
     }
 
     @Test
+    fun `shows delay subtitle when message becomes non-null while not typing`() {
+        var delayMessage by mutableStateOf<String?>(null)
+
+        composeRule.setContent {
+            ThemedToken(
+                visible = false,
+                delayMessage = delayMessage,
+                reducedMotion = true,
+            )
+        }
+
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(0)
+
+        composeRule.runOnIdle { delayMessage = "Still working..." }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Still working...").assertIsDisplayed()
+    }
+
+    @Test
     fun `reducedMotion still renders the text`() {
         composeRule.setContent {
             ThemedToken(visible = true, delayMessage = null, reducedMotion = true)
