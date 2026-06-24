@@ -1,14 +1,13 @@
 package com.letta.mobile.ui.screens.about
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +20,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -29,6 +27,9 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.sectionTitle
+import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
+import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,6 +39,7 @@ fun AboutScreen(
     appVersion: String = "1.0.0",
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    val libraries by produceLibraries(R.raw.aboutlibraries)
 
     Scaffold(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
@@ -53,45 +55,34 @@ fun AboutScreen(
             )
         },
     ) { paddingValues ->
-        Column(
+        LibrariesContainer(
+            libraries = libraries,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = "Letta Mobile",
-                style = MaterialTheme.typography.headlineMedium,
-            )
-
-            Text(
-                text = "Version $appVersion",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "A mobile client for the Letta AI platform. Manage agents, conversations, tools, and memory from your phone.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            OutlinedButton(
-                onClick = { showLogoutDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-            ) {
-                Text(stringResource(R.string.screen_about_clear_data_button))
-            }
-        }
+                .padding(paddingValues),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            showDescription = false,
+            showFundingBadges = false,
+            divider = {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
+            },
+            header = {
+                item(key = "about-header") {
+                    AboutHeader(
+                        appVersion = appVersion,
+                        onClearDataClick = { showLogoutDialog = true },
+                    )
+                }
+                item(key = "about-open-source-title") {
+                    Text(
+                        text = stringResource(R.string.screen_about_open_source_title),
+                        style = MaterialTheme.typography.sectionTitle,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp),
+                    )
+                }
+            },
+        )
     }
 
     ConfirmDialog(
@@ -104,4 +95,44 @@ fun AboutScreen(
         onDismiss = { showLogoutDialog = false },
         destructive = true,
     )
+}
+
+@Composable
+private fun AboutHeader(
+    appVersion: String,
+    onClearDataClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 24.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Text(
+            text = stringResource(R.string.screen_about_version_format, appVersion),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text(
+            text = stringResource(R.string.screen_about_description),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+        OutlinedButton(
+            onClick = onClearDataClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 24.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+        ) {
+            Text(stringResource(R.string.screen_about_clear_data_button))
+        }
+    }
 }
