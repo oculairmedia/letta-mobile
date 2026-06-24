@@ -232,6 +232,9 @@ internal fun DesktopTextArea(
     undecorated: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions(),
+    // Pads the inner text content away from the field border (e.g. the memory
+    // block value area, which otherwise crowds its edges).
+    decorationBoxModifier: Modifier = Modifier,
 ) {
     var fieldValue by remember { mutableStateOf(TextFieldValue(value)) }
     LaunchedEffect(value) {
@@ -257,5 +260,6 @@ internal fun DesktopTextArea(
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
         modifier = modifier,
+        decorationBoxModifier = decorationBoxModifier,
     )
 }

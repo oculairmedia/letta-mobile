@@ -803,6 +803,7 @@ private fun BlockEditorPanel(
                 enabled = !busy && !loadFailed,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 placeholder = "Block contents…",
+                decorationBoxModifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             )
         }
 

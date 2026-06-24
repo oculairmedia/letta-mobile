@@ -200,16 +200,6 @@ internal fun ChatDetailPane(
             .background(MaterialTheme.colorScheme.background),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Floating agent island (Penpot "App Mockups v2" top island): agent
-            // identity + a live activity cluster, shown once a conversation with
-            // messages is open. Hidden on the state/welcome panels so the
-            // first-run surface stays uncluttered.
-            if (!state.shouldShowStatePanel && state.renderItems.isNotEmpty()) {
-                AgentIslandHeader(
-                    agentName = state.selectedConversation?.agentName,
-                    isThinking = isThinking,
-                )
-            }
             if (state.shouldShowStatePanel) {
                 ChatStatePanel(
                     state = state,
@@ -247,69 +237,6 @@ internal fun ChatDetailPane(
                 onAttachImage = onAttachImage,
                 onRemoveImageAttachment = onRemoveImageAttachment,
             )
-        }
-    }
-}
-
-/**
- * Floating "agent island" header (Phase 2/3): a rounded, shadowed
- * `surfaceContainer` card holding the agent avatar/activity orb, the agent
- * name, and a live status line (pulsing amber while the agent works, neutral
- * "Ready" otherwise). Desktop keeps navigation in the rail/sidebar, so the
- * island carries no hamburger — just identity + status.
- */
-@Composable
-private fun AgentIslandHeader(
-    agentName: String?,
-    isThinking: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 8.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AgentActivityOrb(
-                size = 36.dp,
-                activity = if (isThinking) AgentActivity.Working else AgentActivity.Idle,
-            )
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    agentName?.takeIf { it.isNotBlank() } ?: "Agent",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isThinking) {
-                                    MaterialTheme.customColors.runningColor
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            ),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        if (isThinking) "Working…" else "Ready",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.customColors.onSurfaceMutedColor,
-                    )
-                }
-            }
         }
     }
 }
