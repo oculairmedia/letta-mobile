@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -64,8 +63,13 @@ import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
+import com.kizitonwose.calendar.compose.WeekCalendar
+import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
+import com.kizitonwose.calendar.core.WeekDay
+import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.datetime.LocalDate
+import kotlinx.datetime.minus
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.datetime.DateTimeUnit
@@ -322,29 +326,47 @@ private fun AgendaView(
 
 @Composable
 private fun AgendaDateStrip(selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
-    val days = remember(today) { (-7..21).map { today.plus(it, DateTimeUnit.DAY) } }
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(items = days, key = { it.toString() }) { date ->
-            val selected = date == selectedDate
-            val isToday = date == today
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer)
-                    .border(
-                        width = 1.dp,
-                        color = if (isToday && !selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .clickable { onSelect(date) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-            ) {
-                val onColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                Text(ScheduleFormat.weekdayShort(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, color = onColor)
-                Text("${date.day}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
-            }
-        }
+    // Kizitonwose WeekCalendar (Compose Multiplatform) drives the date strip:
+    // a horizontally-pageable 7-day week row using kotlinx-datetime, which
+    // matches our shared projection's date type.
+    val state = rememberWeekCalendarState(
+        startDate = today.minus(14, DateTimeUnit.DAY),
+        endDate = today.plus(120, DateTimeUnit.DAY),
+        firstVisibleWeekDate = selectedDate,
+        firstDayOfWeek = firstDayOfWeekFromLocale(),
+    )
+    WeekCalendar(
+        state = state,
+        dayContent = { day: WeekDay -> AgendaDayCell(day.date, selectedDate, today, onSelect) },
+    )
+}
+
+@Composable
+private fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
+    val selected = date == selectedDate
+    val isToday = date == today
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .padding(4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer)
+            .border(
+                width = 1.dp,
+                color = if (isToday && !selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                shape = RoundedCornerShape(10.dp),
+            )
+            .clickable { onSelect(date) }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        val onColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        Text(ScheduleFormat.weekdayShort(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, color = onColor)
+        Text(
+            "${date.day}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
