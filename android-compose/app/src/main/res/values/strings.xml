@@ -1133,6 +1133,9 @@
     <string name="screen_drawer_edit_agent">Edit Agent</string>
     <string name="screen_drawer_archival">Archival Memory</string>
     <string name="screen_about_title">About</string>
+    <string name="screen_about_version_format">Version %1$s</string>
+    <string name="screen_about_description">A mobile client for the Letta AI platform. Manage agents, conversations, tools, and memory from your phone.</string>
+    <string name="screen_about_open_source_title">Open source notices</string>
     <string name="screen_about_clear_data_button">Clear Data &amp; Logout</string>
     <string name="screen_about_clear_data_dialog_title">Clear Data?</string>
     <string name="screen_about_clear_data_dialog_message">This will remove all server configurations and cached data. You will need to set up the app again.</string>
