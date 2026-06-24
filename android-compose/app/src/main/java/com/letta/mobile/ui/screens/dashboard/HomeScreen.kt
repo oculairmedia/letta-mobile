@@ -41,9 +41,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +56,7 @@ import com.letta.mobile.ui.components.ExpandableSearchField
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ShimmerBox
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.customColors
@@ -100,6 +101,7 @@ fun HomeScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -176,7 +178,7 @@ fun HomeScreen(
                                             shortcutNavigator(shortcut)()
                                         },
                                         onLongClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            HapticEffects.longPress(haptic, view)
                                             if (isPinned) {
                                                 viewModel.unpinShortcut(shortcut)
                                                 android.widget.Toast
