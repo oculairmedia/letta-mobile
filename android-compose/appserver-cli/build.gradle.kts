@@ -50,18 +50,5 @@ tasks.withType<AbstractCopyTask>().configureEach {
 }
 
 tasks.named<CreateStartScripts>("startScripts") {
-    doLast {
-        unixScript.replaceLine(
-            pattern = Regex("(?m)^CLASSPATH=.*$"),
-            replacement = "CLASSPATH=\$APP_HOME/lib/*",
-        )
-        windowsScript.replaceLine(
-            pattern = Regex("(?m)^set CLASSPATH=.*$"),
-            replacement = "set CLASSPATH=%APP_HOME%\\lib\\*",
-        )
-    }
-}
-
-fun File.replaceLine(pattern: Regex, replacement: String) {
-    writeText(pattern.replace(readText()) { replacement })
+    enabled = false
 }
