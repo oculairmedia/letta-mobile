@@ -9,8 +9,8 @@ class MarkdownTextPerfTest {
 
     @Test
     fun `containsLikelyInlineMath uses precompiled regex correctly`() {
-        assertTrue(containsLikelyInlineMath("Here is some math: $x + y$."))
-        assertTrue(containsLikelyInlineMath("$E=mc^2$ is a famous equation."))
+        assertTrue(containsLikelyInlineMath("Here is some math: \$x + y$."))
+        assertTrue(containsLikelyInlineMath("\$E=mc^2$ is a famous equation."))
 
         assertFalse(containsLikelyInlineMath("This is just $100 and $200."))
         assertFalse(containsLikelyInlineMath("No math here."))

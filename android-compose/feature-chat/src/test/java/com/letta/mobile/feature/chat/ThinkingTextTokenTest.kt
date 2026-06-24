@@ -1,5 +1,8 @@
 package com.letta.mobile.feature.chat
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -67,11 +70,80 @@ class ThinkingTextTokenTest {
     }
 
     @Test
+    fun `keeps token mounted while reserved streaming slot is active`() {
+        var visible by mutableStateOf(true)
+        var reserveSpace by mutableStateOf(true)
+
+        composeRule.setContent {
+            ThemedToken(
+                visible = visible,
+                delayMessage = null,
+                reducedMotion = true,
+                reserveSpace = reserveSpace,
+            )
+        }
+
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
+
+        composeRule.runOnIdle { visible = false }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
+
+        composeRule.runOnIdle { visible = true }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            visible = false
+            reserveSpace = false
+        }
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(0)
+    }
+
+    @Test
+    fun `shows delay subtitle when message becomes non-null while not typing`() {
+        var delayMessage by mutableStateOf<String?>(null)
+
+        composeRule.setContent {
+            ThemedToken(
+                visible = false,
+                delayMessage = delayMessage,
+                reducedMotion = true,
+            )
+        }
+
+        composeRule.onAllNodesWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertCountEquals(0)
+
+        composeRule.runOnIdle { delayMessage = "Still working..." }
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("Still working...").assertIsDisplayed()
+    }
+
+    @Test
     fun `reducedMotion still renders the text`() {
         composeRule.setContent {
             ThemedToken(visible = true, delayMessage = null, reducedMotion = true)
         }
         composeRule.onNodeWithText("Thinking…").assertIsDisplayed()
+    }
+
+    @Test
+    fun `nested visibility block keeps text mounted when reserveSpace is true`() {
+        composeRule.setContent {
+            ThemedToken(
+                visible = false,
+                delayMessage = null,
+                reducedMotion = true,
+                reserveSpace = true,
+            )
+        }
+
+        // This is a test-only guard to ensure future nested visibility gates fail tests
+        // if they incorrectly dismount the thinking indicator while streaming.
+        composeRule.onNodeWithTag(THINKING_TEXT_TOKEN_TEST_TAG).assertIsDisplayed()
     }
 }
 
@@ -80,6 +152,7 @@ private fun ThemedToken(
     visible: Boolean,
     delayMessage: String?,
     reducedMotion: Boolean = false,
+    reserveSpace: Boolean = visible || !delayMessage.isNullOrBlank(),
 ) {
     LettaTheme(
         appTheme = AppTheme.LIGHT,
@@ -91,6 +164,7 @@ private fun ThemedToken(
                 visible = visible,
                 delayMessage = delayMessage,
                 reducedMotion = reducedMotion,
+                reserveSpace = reserveSpace,
             )
         }
     }

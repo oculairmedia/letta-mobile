@@ -45,6 +45,24 @@ class TableCellInlineMarkdownTest {
         assertTrue(parsed.spanStyles.isEmpty())
     }
 
+    @Test
+    fun `table cell parser does not drop characters for consecutive and adjacent tags`() {
+        val parsed1 = buildTableCellAnnotatedString("before **bold** `code` after")
+        assertEquals("before bold code after", parsed1.text)
+
+        val parsed2 = buildTableCellAnnotatedString("**bold**`code`")
+        assertEquals("boldcode", parsed2.text)
+
+        val parsed3 = buildTableCellAnnotatedString("text **bold**and`code`")
+        assertEquals("text boldandcode", parsed3.text)
+
+        val parsed4 = buildTableCellAnnotatedString("**bold**_italic_`code`~~gone~~[docs](https://example.com)")
+        assertEquals("bolditaliccodegonedocs", parsed4.text)
+
+        val parsed5 = buildTableCellAnnotatedString("one **two** three `four` five")
+        assertEquals("one two three four five", parsed5.text)
+    }
+
     private fun AnnotatedString.spanFor(text: String): SpanStyle {
         val start = this.text.indexOf(text)
         val end = start + text.length

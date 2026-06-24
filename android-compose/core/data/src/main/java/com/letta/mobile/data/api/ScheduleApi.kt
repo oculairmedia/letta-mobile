@@ -3,6 +3,7 @@ package com.letta.mobile.data.api
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.schedules.CronTask
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -67,4 +68,31 @@ open class ScheduleApi @Inject constructor(
             throw ApiException(response.status.value, response.bodyAsText())
         }
     }
+
+    /**
+     * List cron tasks from the backend's `/v1/crons` route. This is the
+     * cron-backed fallback for self-hosted / admin-shim servers that don't
+     * serve the Letta-native `/v1/agents/{id}/schedule` admin route (it
+     * 404s there). Parity with the desktop schedules surface, which reads
+     * the same route via `CronApi`. Optionally scoped to [agentId].
+     */
+    open suspend fun listCrons(agentId: String? = null): List<CronTask> {
+        val (client, baseUrl) = apiClient.session()
+
+        val response = client.get("$baseUrl/v1/crons")
+        if (response.status.value !in 200..299) {
+            throw ApiException(response.status.value, response.bodyAsText())
+        }
+        val tasks = response.body<CronsResponse>().tasks
+        return if (agentId == null) {
+            tasks
+        } else {
+            tasks.filter { it.agentId == null || it.agentId == agentId }
+        }
+    }
 }
+
+@kotlinx.serialization.Serializable
+private data class CronsResponse(
+    val tasks: List<CronTask> = emptyList(),
+)

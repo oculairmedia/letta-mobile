@@ -60,6 +60,59 @@ class AgentApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
     }
 
     @Test
+    fun `listAgentsSlim hits slim endpoint and parses summaries including null description`() = runTest {
+        var capturedMethod: HttpMethod? = null
+        var capturedUrl: String? = null
+        val client = trackClient(HttpClient(MockEngine { request ->
+            capturedMethod = request.method
+            capturedUrl = request.url.toString()
+            respond(
+                """[{"id":"a1","name":"Agent One","description":"first"},{"id":"a2","name":"Agent Two","description":null}]""",
+                HttpStatusCode.OK,
+                jsonHeaders,
+            ) }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val summaries = api.listAgentsSlim()
+
+        assertEquals(HttpMethod.Get, capturedMethod)
+        assertTrue(capturedUrl!!.contains("/v1/agents"))
+        assertTrue(capturedUrl!!.contains("slim=true"))
+        assertEquals(2, summaries.size)
+        assertEquals("a1", summaries[0].id.value)
+        assertEquals("Agent One", summaries[0].name)
+        assertEquals("first", summaries[0].description)
+        assertEquals("a2", summaries[1].id.value)
+        assertEquals(null, summaries[1].description)
+    }
+
+    @Test
+    fun `listAgentsSlim passes pagination parameters`() = runTest {
+        var capturedUrl: String? = null
+        val client = trackClient(HttpClient(MockEngine { request ->
+            capturedUrl = request.url.toString()
+            respond("[]", HttpStatusCode.OK, jsonHeaders) }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+        api.listAgentsSlim(limit = 50, offset = 100)
+        assertTrue(capturedUrl!!.contains("slim=true"))
+        assertTrue(capturedUrl!!.contains("limit=50"))
+        assertTrue(capturedUrl!!.contains("offset=100"))
+    }
+
+    @Test(expected = ApiException::class)
+    fun `listAgentsSlim throws ApiException on 500`() = runTest {
+        val client = trackClient(HttpClient(MockEngine { respond("""{"error":"server error"}""", HttpStatusCode.InternalServerError, jsonHeaders) }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+        api.listAgentsSlim()
+    }
+
+    @Test
     fun `getAgent sends GET with agent ID`() = runTest {
         var capturedUrl: String? = null
         val client = trackClient(HttpClient(MockEngine { request ->
@@ -119,6 +172,53 @@ class AgentApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
             kotlinx.coroutines.runBlocking { api.getContextWindow("a1") }
         }
         assertEquals(HttpStatusCode.PayloadTooLarge.value, exception.code)
+    }
+
+    @Test
+    fun `getContextWindow rejects incremental response larger than max bytes`() = runTest {
+        val client = trackClient(HttpClient(MockEngine {
+            // Emulate chunked transfer by omitting Content-Length and writing a large body
+            // We'll write slightly more than MAX_CONTEXT_WINDOW_RESPONSE_BYTES
+            val largeBody = "a".repeat(512 * 1024 + 10)
+            respond(
+                largeBody,
+                HttpStatusCode.OK,
+                headersOf(
+                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString())
+                ),
+            )
+        }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val exception = assertThrows(AgentApi.ResponseTooLargeException::class.java) {
+            kotlinx.coroutines.runBlocking { api.getContextWindow("a1") }
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge.value, exception.code)
+    }
+
+    @Test
+    fun `getContextWindow succeeds for small response`() = runTest {
+        val client = trackClient(HttpClient(MockEngine {
+            respond(
+                """{"context_window_size_max":8192,"context_window_size_current":1024,"num_messages":5}""",
+                HttpStatusCode.OK,
+                headersOf(
+                    HttpHeaders.ContentType to listOf(ContentType.Application.Json.toString()),
+                    // Explicitly set content length
+                    HttpHeaders.ContentLength to listOf("88"),
+                ),
+            )
+        }) { install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true; isLenient = true })
+        } })
+        val api = createApi(client)
+
+        val overview = api.getContextWindow("a1")
+        assertEquals(8192, overview.contextWindowSizeMax)
+        assertEquals(1024, overview.contextWindowSizeCurrent)
+        assertEquals(5, overview.numMessages)
     }
 
     @Test

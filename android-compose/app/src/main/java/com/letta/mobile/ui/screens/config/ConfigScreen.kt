@@ -542,6 +542,13 @@ private fun EmbeddedRuntimeStatusItem(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (status.runnable) {
+                    Text(
+                        text = stringResource(R.string.screen_config_embedded_runtime_notifications_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         @OptIn(ExperimentalLayoutApi::class)

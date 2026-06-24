@@ -70,7 +70,7 @@ fun NavGraphBuilder.adminGraph(
             onNavigateToGroups = { navController.navigate(GroupsRoute) },
             onNavigateToProviders = { navController.navigate(ProvidersRoute) },
             onNavigateToIdentities = { navController.navigate(IdentitiesRoute) },
-            onNavigateToSchedules = { navController.navigate(SchedulesRoute) },
+            onNavigateToSchedules = { navController.navigate(SchedulesRoute()) },
             onNavigateToRuns = { navController.navigate(RunsRoute) },
             onNavigateToJobs = { navController.navigate(JobsRoute) },
             onNavigateToMessageBatches = { navController.navigate(MessageBatchesRoute) },

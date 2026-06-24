@@ -559,11 +559,14 @@ internal fun ChatScreen(
                     // A2UI surfaces and the composer while awaiting the agent's
                     // first frame. Driven by `isAgentTyping`; switches to the
                     // delay subtitle on the 60s A2UI timeout.
+                    val thinkingTokenActive = state.isStreaming ||
+                        state.isAgentTyping ||
+                        !state.a2uiThinkingDelayMessage.isNullOrBlank()
                     ThinkingTextToken(
-                        visible = state.isAgentTyping,
+                        visible = thinkingTokenActive,
                         delayMessage = state.a2uiThinkingDelayMessage,
                         reducedMotion = reducedMotion,
-                        reserveSpace = state.isStreaming || state.isAgentTyping || !state.a2uiThinkingDelayMessage.isNullOrBlank(),
+                        reserveSpace = thinkingTokenActive,
                     )
 
                     val launchPicker = rememberImageAttachmentPicker(
