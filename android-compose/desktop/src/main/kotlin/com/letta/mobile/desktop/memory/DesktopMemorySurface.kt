@@ -64,6 +64,8 @@ import com.dk.kuiver.ui.EdgeLabelStyle
 import com.dk.kuiver.ui.LabelPlacement
 import com.dk.kuiver.ui.StyledEdgeContent
 import com.letta.mobile.data.memory.MemoryAccentRole
+import com.letta.mobile.data.memory.MemoryCategories
+import com.letta.mobile.data.memory.MemoryCategory
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
@@ -73,6 +75,7 @@ import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.data.memory.MemorySummaryMetricKind
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.data.memory.MemoryTextLink
 import com.letta.mobile.data.memory.accentRole
 import com.letta.mobile.data.memory.validForText
@@ -454,7 +457,13 @@ private fun MemoryGraphNodeChip(
     onClick: (() -> Unit)? = null,
 ) {
     val resolvedNode = node ?: return
-    val accentColor = resolvedNode.kind.accentRole(resolvedNode.status).color()
+    // Memory blocks are color-coded by category (Phase 6); other node kinds
+    // keep their role-based accent.
+    val accentColor = if (resolvedNode.kind == MemoryGraphNodeKind.Memory) {
+        MemoryCategories.categorize(resolvedNode.title).categoryColor()
+    } else {
+        resolvedNode.kind.accentRole(resolvedNode.status).color()
+    }
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surface,
@@ -869,4 +878,13 @@ private fun MemoryAccentRole.color(): Color = when (this) {
     MemoryAccentRole.Tertiary -> MaterialTheme.colorScheme.tertiary
     MemoryAccentRole.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
     MemoryAccentRole.Error -> MaterialTheme.colorScheme.error
+}
+
+@Composable
+private fun MemoryCategory.categoryColor(): Color = when (this) {
+    MemoryCategory.Persona -> MaterialTheme.customColors.categoryPersonaColor
+    MemoryCategory.Human -> MaterialTheme.customColors.categoryHumanColor
+    MemoryCategory.Onboarding -> MaterialTheme.customColors.categoryOnboardingColor
+    MemoryCategory.Project -> MaterialTheme.customColors.categoryProjectColor
+    MemoryCategory.Archival -> MaterialTheme.customColors.categoryArchivalColor
 }
