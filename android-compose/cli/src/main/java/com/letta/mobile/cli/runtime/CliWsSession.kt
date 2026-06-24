@@ -172,6 +172,15 @@ internal class CliWsSession(
             is WsTimelineEvent.UserActionOutcome -> {
                 if (printEvents) println("[ws] user_action outcome=${event.outcome} frameId=${event.frameId}")
             }
+            is WsTimelineEvent.SubscribeDone -> {
+                if (printEvents) println("[ws] subscribe_done runId=${event.runId} status=${event.status}")
+            }
+            is WsTimelineEvent.GoalsUpdated -> {
+                if (printEvents) println("[ws] goals_updated reason=${event.reason}")
+            }
+            is WsTimelineEvent.AgentUpdated -> {
+                if (printEvents) println("[ws] agent_updated reason=${event.reason}")
+            }
         }
     }
 }

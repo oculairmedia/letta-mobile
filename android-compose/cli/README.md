@@ -14,6 +14,9 @@ The CLI now has two useful modes:
   related resources can be managed without opening the Android UI.
 - `setup apply` / `setup export` provide a declarative JSON/YAML format for
   replaying profile and server setup from a workstation.
+- `app-server smoke` is the reserved smoke surface for the official
+  `letta app-server` WebSocket path. It currently prints the planned frame
+  sequence until the shared typed client from `letta-mobile-ph9ws.8` lands.
 - `stream` keeps the older direct REST/SSE tracer for low-level comparison when
   debugging server wire frames or merge behavior.
 
@@ -412,6 +415,41 @@ Use `ref` to connect resources created in the same file through `links` or
 agent-scoped schedules. `--dry-run` prints the mutation plan without changing
 profiles or server state. Server mutations require a token; profile-only setup
 does not.
+
+### `app-server smoke`
+
+Reserved smoke command for the official App Server WebSocket host:
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="app-server smoke --url ws://127.0.0.1:8283 --message `"hello`" --print-plan"
+```
+
+Inputs:
+
+- `APP_SERVER_TEST_URL` / `--url`: running App Server WebSocket URL. HTTP(S)
+  URLs are normalized to WS(S) for convenience.
+- `APP_SERVER_TOKEN` / `--token`: optional `--ws-auth` bearer token.
+- `--message` / `-m`: one user turn to send.
+- `--cwd`: runtime working directory for `runtime_start`.
+
+Current status: this branch does not contain the shared typed App Server client
+or real WebSocket transport from `letta-mobile-ph9ws.8`, so execution fails
+with a usage error unless `--print-plan` is used. Once that dependency merges,
+wire this command to the shared client and keep live integration tests gated by
+`APP_SERVER_TEST_URL` so normal CI never requires a running App Server.
+
+Headless installable plan for Phase C:
+
+1. Ship a workstation CLI entrypoint that can start/supervise `letta app-server`
+   with explicit host, port, and `--ws-auth` token options.
+2. Store only App Server connection profile data locally; do not mirror admin
+   REST endpoints or recreate the bespoke shim API.
+3. Use the same shared typed App Server client as Android loopback and desktop.
+4. Treat one active App Server control session per process as a product
+   constraint: either one process per client, or a future single controller that
+   fans out events to multiple local clients.
+5. Keep legacy admin-shim commands available until the migration explicitly
+   removes that dependency.
 
 ### `stream`
 

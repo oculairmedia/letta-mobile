@@ -3,6 +3,8 @@ package com.letta.mobile.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
+import com.letta.mobile.cli.commands.AppServerCommand
+import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.ConnectCommand
 import com.letta.mobile.cli.commands.CaptureCommand
 import com.letta.mobile.cli.commands.DisconnectCommand
@@ -74,6 +76,9 @@ object Main {
                     SetupApplyCommand(),
                     SetupExportCommand(),
                 ),
+                AppServerCommand().subcommands(
+                    AppServerSmokeCommand(),
+                ),
                 *buildResourceCommands().toTypedArray(),
                 StreamCommand(),
             )
@@ -99,6 +104,7 @@ object Main {
           rest           Call arbitrary authenticated Letta REST endpoints.
           profile        Manage local CLI backend profiles and defaults.
           setup          Apply/export declarative CLI app/server setup files.
+          app-server     Plan and smoke-test the official App Server WS path.
           agents         Manage agents and agent-scoped attachments/messages.
           conversations  Manage conversations and conversation messages.
           tools          Manage tools and tool-agent attachments.
