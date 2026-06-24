@@ -46,6 +46,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Terminal
@@ -58,6 +59,8 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Card
@@ -65,11 +68,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -91,7 +97,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
@@ -106,6 +119,17 @@ import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.composer.AutocompleteTrigger
+import com.letta.mobile.data.composer.ComposerAutocomplete
+import com.letta.mobile.data.composer.ComposerEffort
+import com.letta.mobile.data.diff.DiffLineKind
+import com.letta.mobile.data.diff.UnifiedDiff
+import com.letta.mobile.data.composer.MentionCatalog
+import com.letta.mobile.data.composer.MentionKind
+import com.letta.mobile.data.composer.Mentionable
+import com.letta.mobile.data.onboarding.AgentOnboarding
+import com.letta.mobile.data.onboarding.OnboardingTask
+import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
@@ -123,7 +147,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 
 @Composable
 internal fun ChatDetailPane(
@@ -137,6 +166,10 @@ internal fun ChatDetailPane(
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
+    mentionables: List<Mentionable> = emptyList(),
+    composerPlaceholder: String = "Message…",
+    onOpenModelPicker: (() -> Unit)? = null,
+    onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     // Drive the ambient glow off the thinking state: a teal breath while the
@@ -175,6 +208,8 @@ internal fun ChatDetailPane(
             } else if (state.renderItems.isEmpty() && !isThinking) {
                 NewConversationWelcome(
                     agentName = state.selectedConversation?.agentName,
+                    onStarterPrompt = onComposerTextChanged,
+                    onOnboardingTask = onOnboardingTask,
                     modifier = Modifier.weight(1f),
                 )
             } else {
@@ -193,6 +228,9 @@ internal fun ChatDetailPane(
                 modelOptions = modelOptions,
                 onModelSelected = onModelSelected,
                 commands = commands,
+                mentionables = mentionables,
+                placeholder = composerPlaceholder,
+                onOpenModelPicker = onOpenModelPicker,
                 onTextChanged = onComposerTextChanged,
                 onSend = onSend,
                 onAttachImage = onAttachImage,
@@ -203,13 +241,16 @@ internal fun ChatDetailPane(
 }
 
 /**
- * Empty-state shown for a fresh conversation (no messages yet): the agent's
- * gradient sphere, a greeting, and a hint — matching the Penpot
- * "Desktop · New conversation" board.
+ * First-run / empty-state for a fresh conversation (Penpot "Desktop · New agent
+ * first-run"): the agent's gradient sphere, a greeting, a setup checklist
+ * (persona / channel / skills), and "or just start chatting" starter prompts.
+ * Copy + tasks come from the shared [AgentOnboarding].
  */
 @Composable
 private fun NewConversationWelcome(
     agentName: String?,
+    onStarterPrompt: (String) -> Unit,
+    onOnboardingTask: ((OnboardingTaskKind) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -221,29 +262,109 @@ private fun NewConversationWelcome(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.widthIn(max = 620.dp),
         ) {
             AgentSphere(size = 72.dp)
             Text(
-                text = agentName?.takeIf { it.isNotBlank() }?.let { "Chat with $it" } ?: "New conversation",
+                text = AgentOnboarding.greeting(agentName),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = "Ask a question, paste an error, or point me at a repo — I can read code, run tools, and help you ship.",
+                text = AgentOnboarding.SUBTITLE,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.widthIn(max = 460.dp),
+                modifier = Modifier.widthIn(max = 480.dp),
+            )
+            if (onOnboardingTask != null) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Column {
+                        AgentOnboarding.tasks(agentName).forEachIndexed { index, task ->
+                            if (index > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                                )
+                            }
+                            OnboardingTaskRow(task = task, onClick = { onOnboardingTask(task.kind) })
+                        }
+                    }
+                }
+            }
+            Text(
+                text = AgentOnboarding.STARTER_HEADER,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AgentOnboarding.starterPrompts.forEach { prompt ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.clickable { onStarterPrompt(prompt) },
+                    ) {
+                        Text(
+                            text = prompt,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingTaskRow(task: OnboardingTask, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = when (task.kind) {
+                OnboardingTaskKind.SetPersona -> Icons.Outlined.Edit
+                OnboardingTaskKind.ConnectChannel -> Icons.Outlined.Hub
+                OnboardingTaskKind.AddSkills -> Icons.Outlined.Build
+            },
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = task.title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
             )
             Text(
-                text = "@ to add files   ·   / for commands   ·   ⏎ to send",
+                text = task.subtitle,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Text(
+            text = "Set up",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
@@ -379,10 +500,40 @@ private fun MessageList(
                 items = renderItems,
                 key = { it.key },
             ) { item ->
-                Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
-                    when (item) {
-                        is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
-                        is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                val interaction = remember { MutableInteractionSource() }
+                val hovered by interaction.collectIsHoveredAsState()
+                Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .hoverable(interaction),
+                    ) {
+                        when (item) {
+                            is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
+                            is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                        }
+                        // Only plain message bubbles get the hover copy toolbar — a
+                        // RunBlock has its own header chevron at the top-right, which
+                        // the floating toolbar would otherwise cover.
+                        val copyText = item.copyableText()
+                        if (hovered && copyText.isNotBlank() && item is ChatRenderItem.Single) {
+                            MessageHoverToolbar(
+                                text = copyText,
+                                modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp),
+                            )
+                        }
+                    }
+                    // Per-message clock timestamp (Penpot "Grouping + timestamps"),
+                    // aligned to the sender side.
+                    messageClockLabel(item.boundaryTimestamp)?.let { clock ->
+                        val isUser = (item as? ChatRenderItem.Single)?.message?.role == "user"
+                        Text(
+                            text = clock,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textAlign = if (isUser) TextAlign.End else TextAlign.Start,
+                            modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
+                        )
                     }
                 }
             }
@@ -673,11 +824,24 @@ private fun StepStatusCircle(state: StepState) {
 
 /** Inset output block (monospace) with light per-line colorization. */
 @Composable
-private fun ToolOutputBlock(text: String) {
+private fun ToolOutputBlock(text: String, isError: Boolean = false) {
+    // Unified diffs (file-edit tool output) render as a reviewable diff block
+    // (Penpot "Diff review") rather than plain monospace lines.
+    if (!isError && UnifiedDiff.looksLikeDiff(text)) {
+        DiffBlock(text)
+        return
+    }
+    // The "Tool error + retry" board renders failed output on a dark-red inset
+    // instead of the neutral surface, so the failure reads at a glance.
+    val blockColor = if (isError) {
+        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = blockColor,
     ) {
         SelectionContainer {
             Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -685,7 +849,7 @@ private fun ToolOutputBlock(text: String) {
                     Text(
                         text = line,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = outputLineColor(line),
+                        color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(line),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -693,6 +857,77 @@ private fun ToolOutputBlock(text: String) {
             }
         }
     }
+}
+
+/**
+ * Renders a unified diff (Penpot "Diff review"): a line-numbered gutter (old |
+ * new) with red removed rows, green added rows, and muted hunk headers. Parsing
+ * is shared via [UnifiedDiff]; git metadata (diff/index/--- /+++) is dropped.
+ */
+@Composable
+private fun DiffBlock(text: String) {
+    val lines = remember(text) {
+        UnifiedDiff.parse(text).filterNot { it.kind == DiffLineKind.FileHeader }
+    }
+    val added = Color(0xFF2EA043)
+    val removed = Color(0xFFE5484D)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        SelectionContainer {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                lines.take(200).forEach { line ->
+                    val (rowColor, marker, textColor) = when (line.kind) {
+                        DiffLineKind.Added -> Triple(added.copy(alpha = 0.12f), "+", added)
+                        DiffLineKind.Removed -> Triple(removed.copy(alpha = 0.12f), "-", removed)
+                        DiffLineKind.Hunk -> Triple(
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.7f),
+                            "",
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        else -> Triple(Color.Transparent, "", MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(rowColor)
+                            .padding(horizontal = 8.dp, vertical = 1.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        DiffGutter(line.oldLine)
+                        DiffGutter(line.newLine)
+                        Text(
+                            text = marker,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = textColor,
+                            modifier = Modifier.width(12.dp),
+                        )
+                        Text(
+                            text = line.text,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = textColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiffGutter(lineNumber: Int?) {
+    Text(
+        text = lineNumber?.toString().orEmpty(),
+        style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        maxLines = 1,
+        modifier = Modifier.width(34.dp).padding(end = 6.dp),
+    )
 }
 
 @Composable
@@ -807,9 +1042,9 @@ private fun ThinkingMessageRow() {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        AgentSphere(size = 28.dp)
+        AgentActivityOrb(size = 40.dp, activity = AgentActivity.Working)
         val transition = rememberInfiniteTransition(label = "thinkingDots")
         Row(
             horizontalArrangement = Arrangement.spacedBy(5.dp),
@@ -838,6 +1073,67 @@ private fun ThinkingMessageRow() {
     }
 }
 
+/**
+ * Floating per-message toolbar (Penpot "Reasoning + hover toolbar" board) shown
+ * at the top-right of a message on hover. Only the Copy action is wired — it
+ * copies the message text to the clipboard; regenerate/branch/edit need backend
+ * support and are intentionally omitted rather than shown as dead controls.
+ */
+@Composable
+private fun MessageHoverToolbar(text: String, modifier: Modifier = Modifier) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1200)
+            copied = false
+        }
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 2.dp,
+    ) {
+        Box(
+            modifier = Modifier
+                .clickable {
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                }
+                .padding(8.dp),
+        ) {
+            Icon(
+                imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                contentDescription = if (copied) "Copied" else "Copy message",
+                tint = if (copied) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp),
+            )
+        }
+    }
+}
+
+/** Formats a message's ISO timestamp as a local clock label, e.g. "9:41 AM". */
+private fun messageClockLabel(iso: String): String? {
+    if (iso.isBlank()) return null
+    val zone = java.time.ZoneId.systemDefault()
+    val zoned = runCatching { java.time.Instant.parse(iso).atZone(zone) }
+        .recoverCatching { java.time.OffsetDateTime.parse(iso).atZoneSameInstant(zone) }
+        .recoverCatching { java.time.LocalDateTime.parse(iso).atZone(zone) }
+        .getOrNull() ?: return null
+    return zoned.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
+}
+
+/** The message text a hover toolbar's Copy action puts on the clipboard. */
+private fun ChatRenderItem.copyableText(): String = when (this) {
+    is ChatRenderItem.Single -> message.content
+    is ChatRenderItem.RunBlock -> messages
+        .map { it.first }
+        .filter { !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
+        .joinToString("\n\n") { it.content }
+}
+
 /** Plain agent narration text, full width (no bubble), per the detailed board. */
 @Composable
 private fun AgentText(text: String, isError: Boolean) {
@@ -858,11 +1154,17 @@ private fun AgentText(text: String, isError: Boolean) {
 @Composable
 private fun ToolCard(toolCall: UiToolCall) {
     var expanded by remember { mutableStateOf(true) }
+    val isError = toolCall.status?.let {
+        it.equals("error", ignoreCase = true) || it.equals("failed", ignoreCase = true)
+    } == true
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(
+            1.dp,
+            if (isError) MaterialTheme.colorScheme.error.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outlineVariant,
+        ),
     ) {
         Column {
             Row(
@@ -919,7 +1221,7 @@ private fun ToolCard(toolCall: UiToolCall) {
                             )
                         }
                     }
-                    toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it) }
+                    toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it, isError = isError) }
                     DesktopImageAttachmentsGrid(
                         attachments = toolCall.generatedImageAttachments,
                         modifier = Modifier.fillMaxWidth(),
@@ -1130,15 +1432,27 @@ private fun ComposerBar(
     modelOptions: List<Pair<String, String>>,
     onModelSelected: (String) -> Unit,
     commands: List<ComposerCommand>,
+    mentionables: List<Mentionable>,
+    placeholder: String,
+    onOpenModelPicker: (() -> Unit)? = null,
     onTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
     onRemoveImageAttachment: (Int) -> Unit,
 ) {
     val canSend = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty())
-    val slashQuery = text.trimStart().takeIf { it.startsWith("/") }?.drop(1)
-    val matchedCommands = if (slashQuery != null && commands.isNotEmpty()) {
-        commands.filter { it.label.contains(slashQuery, ignoreCase = true) }
+    // Trigger detection (/, @) is shared in commonMain so desktop and mobile
+    // resolve autocomplete identically (ComposerAutocomplete).
+    val activeToken = ComposerAutocomplete.activeToken(text)
+    val commandToken = activeToken?.takeIf { it.trigger == AutocompleteTrigger.Command }
+    val mentionToken = activeToken?.takeIf { it.trigger == AutocompleteTrigger.Mention }
+    val matchedCommands = if (commandToken != null && commands.isNotEmpty()) {
+        commands.filter { it.label.contains(commandToken.query, ignoreCase = true) }
+    } else {
+        emptyList()
+    }
+    val mentionGroups = if (mentionToken != null && mentionables.isNotEmpty()) {
+        MentionCatalog.grouped(mentionables, mentionToken.query)
     } else {
         emptyList()
     }
@@ -1186,6 +1500,16 @@ private fun ComposerBar(
                     }
                 }
             }
+        }
+        if (mentionGroups.isNotEmpty() && mentionToken != null) {
+            MentionPopup(
+                groups = mentionGroups,
+                onSelect = { mention ->
+                    onTextChanged(
+                        ComposerAutocomplete.replaceToken(text, mentionToken, "@${mention.insertText} "),
+                    )
+                },
+            )
         }
         Surface(
             modifier = Modifier
@@ -1243,7 +1567,7 @@ private fun ComposerBar(
                             }
                         },
                     maxLines = 5,
-                    placeholder = "Message Meridian…",
+                    placeholder = placeholder,
                     undecorated = true,
                 )
                 Row(
@@ -1262,14 +1586,19 @@ private fun ComposerBar(
                     )
                     val modelDisplay = modelOptions.firstOrNull { it.second == modelLabel }?.first
                         ?: modelLabel.ifBlank { "Model" }
-                    ComposerDropdownChip(
-                        label = modelDisplay,
-                        options = modelOptions.map { it.first },
-                        emptyHint = "No models available",
-                        onSelect = { selected ->
-                            modelOptions.firstOrNull { it.first == selected }?.let { onModelSelected(it.second) }
-                        },
-                    )
+                    if (onOpenModelPicker != null) {
+                        // Rich, searchable, provider-grouped picker sheet.
+                        ComposerActionChip(label = modelDisplay, onClick = onOpenModelPicker)
+                    } else {
+                        ComposerDropdownChip(
+                            label = modelDisplay,
+                            options = modelOptions.map { it.first },
+                            emptyHint = "No models available",
+                            onSelect = { selected ->
+                                modelOptions.firstOrNull { it.first == selected }?.let { onModelSelected(it.second) }
+                            },
+                        )
+                    }
                     var safety by remember { mutableStateOf("Unrestricted") }
                     ComposerDropdownChip(
                         label = safety,
@@ -1279,11 +1608,13 @@ private fun ComposerBar(
                         contentColor = MaterialTheme.customColors.runningColor
                             .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary,
                     )
-                    var effort by remember { mutableStateOf("Medium") }
-                    ComposerDropdownChip(
-                        label = effort,
-                        options = listOf("Low", "Medium", "High"),
-                        onSelect = { effort = it },
+                    var effort by remember { mutableStateOf(ComposerEffort.Medium) }
+                    var thinking by remember { mutableStateOf(true) }
+                    ComposerEffortChip(
+                        effort = effort,
+                        thinking = thinking,
+                        onEffortChange = { effort = it },
+                        onThinkingChange = { thinking = it },
                     )
                     Spacer(Modifier.weight(1f))
                     Surface(
@@ -1332,6 +1663,218 @@ private fun ComposerBar(
  * A functional pill selector in the composer control row (model / safety /
  * effort): click opens a popup of [options]; selecting one fires [onSelect].
  */
+/**
+ * The `@mention` popup (Penpot "Composer (@ mentions)"): FILES / AGENTS / MEMORY
+ * sections of mentionables, filtered by the shared MentionCatalog. Selecting one
+ * inserts an `@label` token into the composer.
+ */
+@Composable
+private fun MentionPopup(
+    groups: List<Pair<MentionKind, List<Mentionable>>>,
+    onSelect: (Mentionable) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).heightIn(max = 320.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
+            groups.forEach { (kind, items) ->
+                Text(
+                    text = MentionCatalog.sectionTitle(kind).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 2.dp),
+                )
+                items.take(6).forEach { mention ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(mention) }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = when (kind) {
+                                MentionKind.File -> Icons.Outlined.Description
+                                MentionKind.Agent -> Icons.Outlined.SmartToy
+                                MentionKind.Memory -> Icons.Outlined.Memory
+                            },
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = mention.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        mention.sublabel?.let {
+                            Text(
+                                text = it,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Composer effort chip + popover (Penpot "Effort popover"): an OPTIONS section
+ * with a Thinking toggle and an EFFORT section (Minimal … Max) with the selected
+ * level checked. Effort levels come from the shared [ComposerEffort].
+ */
+@Composable
+private fun ComposerEffortChip(
+    effort: ComposerEffort,
+    thinking: Boolean,
+    onEffortChange: (ComposerEffort) -> Unit,
+    onThinkingChange: (Boolean) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        ComposerActionChip(label = effort.label, onClick = { open = !open })
+        if (open) {
+            val positionProvider = object : PopupPositionProvider {
+                override fun calculatePosition(
+                    anchorBounds: IntRect,
+                    windowSize: IntSize,
+                    layoutDirection: LayoutDirection,
+                    popupContentSize: IntSize,
+                ): IntOffset = IntOffset(
+                    x = anchorBounds.left,
+                    y = anchorBounds.top - popupContentSize.height - 6,
+                )
+            }
+            Popup(
+                popupPositionProvider = positionProvider,
+                onDismissRequest = { open = false },
+                properties = PopupProperties(focusable = true),
+            ) {
+                Surface(
+                    modifier = Modifier.width(230.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        EffortSectionHeader("Options")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Thinking",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Switch(checked = thinking, onCheckedChange = onThinkingChange)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(1.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        )
+                        EffortSectionHeader("Effort")
+                        ComposerEffort.entries.forEach { level ->
+                            val selected = level == effort
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onEffortChange(level); open = false }
+                                    .padding(horizontal = 14.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = level.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (selected) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Check,
+                                        contentDescription = "Selected",
+                                        tint = Color(0xFF00BFA5),
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EffortSectionHeader(text: String) {
+    Text(
+        text = text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 4.dp),
+    )
+}
+
+/** A composer chip that opens a separate picker (vs. an inline dropdown). */
+@Composable
+private fun ComposerActionChip(
+    label: String,
+    onClick: () -> Unit,
+    leadingIcon: ImageVector? = null,
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(text = label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Icon(
+                imageVector = Icons.Outlined.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @Composable
 private fun ComposerDropdownChip(
     label: String,

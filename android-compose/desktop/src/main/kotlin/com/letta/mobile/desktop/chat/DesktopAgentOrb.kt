@@ -1,17 +1,27 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -93,3 +103,76 @@ fun AgentSphere(
         )
     }
 }
+
+/**
+ * Activity state for the agent orb, matching the animated "working / firing /
+ * error" orb states in the Penpot "App Mockups v2" desktop boards (Background
+ * tasks panel, schedule heartbeat, tool error). Each non-idle state radiates
+ * concentric, breathing rings in a state color around the identity sphere.
+ */
+enum class AgentActivity { Idle, Working, Firing, Error }
+
+/** State color for the radiating activity rings (per the desktop mockups). */
+private fun AgentActivity.ringColor(): Color = when (this) {
+    AgentActivity.Idle -> Color.Transparent
+    AgentActivity.Working -> Color(0xFFE0A33E) // amber — "working…"
+    AgentActivity.Firing -> Color(0xFF34C759) // green — scheduled run firing
+    AgentActivity.Error -> Color(0xFFE5484D) // red — tool/agent error
+}
+
+/**
+ * The agent identity sphere wrapped in an animated activity halo. When
+ * [activity] is not [AgentActivity.Idle], two staggered rings expand outward
+ * from the sphere and fade — the "heartbeat" pulse the mockups use to signal
+ * that the agent (or a background task) is alive and working.
+ *
+ * [size] is the full footprint; the inner sphere is drawn at ~62% so the rings
+ * have room to breathe without being clipped.
+ */
+@Composable
+fun AgentActivityOrb(
+    size: Dp,
+    activity: AgentActivity,
+    modifier: Modifier = Modifier,
+) {
+    val sphereSize = size * SphereFraction
+    Box(modifier = modifier.size(size), contentAlignment = Alignment.Center) {
+        if (activity != AgentActivity.Idle) {
+            val color = activity.ringColor()
+            val transition = rememberInfiniteTransition(label = "agentActivity")
+            val ringProgress = (0 until ActivityRingCount).map { ring ->
+                transition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(durationMillis = ActivityRingPeriodMs, easing = LinearEasing),
+                        repeatMode = RepeatMode.Restart,
+                        // Stagger the rings evenly across the period so the pulse is continuous.
+                        initialStartOffset = StartOffset(ring * ActivityRingPeriodMs / ActivityRingCount),
+                    ),
+                    label = "activityRing$ring",
+                )
+            }
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val maxRadius = this.size.minDimension / 2f
+                val innerRadius = maxRadius * SphereFraction
+                val stroke = maxRadius * 0.08f
+                ringProgress.forEach { progress ->
+                    val p = progress.value
+                    val radius = innerRadius + (maxRadius - innerRadius) * p
+                    drawCircle(
+                        color = color.copy(alpha = (1f - p) * 0.55f),
+                        radius = radius,
+                        center = Offset(this.size.width / 2f, this.size.height / 2f),
+                        style = Stroke(width = stroke),
+                    )
+                }
+            }
+        }
+        AgentSphere(size = sphereSize)
+    }
+}
+
+private const val SphereFraction = 0.62f
+private const val ActivityRingCount = 2
+private const val ActivityRingPeriodMs = 1600

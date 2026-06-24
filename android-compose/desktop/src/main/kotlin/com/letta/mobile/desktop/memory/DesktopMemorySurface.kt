@@ -79,6 +79,7 @@ import com.letta.mobile.data.memory.validForText
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopRadioChip
 import com.letta.mobile.desktop.DesktopTextArea
@@ -119,7 +120,11 @@ fun DesktopMemorySurface(
             val errorMessage = state.errorMessage
             if (errorMessage != null) {
                 item {
-                    MemoryErrorBanner(errorMessage)
+                    DesktopInlineError(
+                        message = errorMessage,
+                        onRetry = onRefresh,
+                        retrying = state.isLoading,
+                    )
                 }
             }
             if (state.agents.isNotEmpty()) {
@@ -216,22 +221,6 @@ private fun MemoryHeader(
                 icon = Icons.Outlined.Refresh,
             )
         }
-    }
-}
-
-@Composable
-private fun MemoryErrorBanner(message: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(16.dp),
-        )
     }
 }
 
