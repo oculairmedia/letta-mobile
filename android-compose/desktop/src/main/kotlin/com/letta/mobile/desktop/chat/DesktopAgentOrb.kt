@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.theme.customColors
 
 /**
  * Gradient agent identity orbs, matching the Penpot "App Mockups v2" desktop
@@ -113,11 +115,15 @@ fun AgentSphere(
 enum class AgentActivity { Idle, Working, Firing, Error }
 
 /** State color for the radiating activity rings (per the desktop mockups). */
+@Composable
 private fun AgentActivity.ringColor(): Color = when (this) {
     AgentActivity.Idle -> Color.Transparent
-    AgentActivity.Working -> Color(0xFFE0A33E) // amber — "working…"
-    AgentActivity.Firing -> Color(0xFF34C759) // green — scheduled run firing
-    AgentActivity.Error -> Color(0xFFE5484D) // red — tool/agent error
+    AgentActivity.Working -> MaterialTheme.customColors.warningTextColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary
+    AgentActivity.Firing -> MaterialTheme.customColors.successColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.primary
+    AgentActivity.Error -> MaterialTheme.customColors.errorTextColor
+        .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.error
 }
 
 /**
