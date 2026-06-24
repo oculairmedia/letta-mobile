@@ -49,6 +49,7 @@ kotlin {
 
 dependencies {
     implementation(project(":core:data"))
+    implementation(project(":sharedLogic"))
 
     implementation("com.github.ajalt.clikt:clikt:5.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
@@ -57,6 +58,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
     implementation("io.ktor:ktor-client-core:3.5.0")
     implementation("io.ktor:ktor-client-okhttp:3.5.0")
+    implementation("io.ktor:ktor-client-websockets:3.5.0")
     implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.2")
