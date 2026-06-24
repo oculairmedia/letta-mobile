@@ -3,6 +3,9 @@ package com.letta.mobile.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
@@ -18,13 +21,22 @@ fun Modifier.statefulFadingEdges(
     backgroundColor: Color,
     fadeLength: Dp = 32.dp,
 ): Modifier = composed {
-    val canScrollBackward = scrollState.firstVisibleItemIndex > 0 ||
-        scrollState.firstVisibleItemScrollOffset > 0
-    val visibleItems = scrollState.layoutInfo.visibleItemsInfo
-    val canScrollForward = visibleItems.lastOrNull()?.let { lastVisible ->
-        lastVisible.index < scrollState.layoutInfo.totalItemsCount - 1 ||
-            lastVisible.offset + lastVisible.size > scrollState.layoutInfo.viewportEndOffset
-    } ?: false
+    val canScrollBackward by remember(scrollState) {
+        derivedStateOf {
+            scrollState.firstVisibleItemIndex > 0 ||
+                scrollState.firstVisibleItemScrollOffset > 0
+        }
+    }
+
+    val canScrollForward by remember(scrollState) {
+        derivedStateOf {
+            val visibleItems = scrollState.layoutInfo.visibleItemsInfo
+            visibleItems.lastOrNull()?.let { lastVisible ->
+                lastVisible.index < scrollState.layoutInfo.totalItemsCount - 1 ||
+                    lastVisible.offset + lastVisible.size > scrollState.layoutInfo.viewportEndOffset
+            } ?: false
+        }
+    }
 
     val leftAlpha = animateFloatAsState(
         targetValue = if (canScrollBackward) EdgeVisibleAlpha else EdgeHiddenAlpha,
