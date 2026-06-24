@@ -23,6 +23,7 @@ plugins {
     id("io.gitlab.arturbosch.detekt")
     id("io.sentry.android.gradle")
     id("androidx.baselineprofile")
+    id("com.mikepenz.aboutlibraries.plugin.android")
     id("org.jetbrains.kotlinx.kover") // version inherited from root
 }
 
@@ -1439,6 +1440,9 @@ dependencies {
 
     // Timeline visualization
     implementation("io.github.pushpalroy:jetlime:4.3.0")
+
+    // Open source notices
+    implementation("com.mikepenz:aboutlibraries-compose-m3:14.2.1")
 
     // Paging 3
     implementation("androidx.paging:paging-runtime-ktx:3.5.0")

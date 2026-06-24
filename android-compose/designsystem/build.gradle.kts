@@ -38,6 +38,7 @@ android {
 
     testOptions {
         unitTests {
+            isIncludeAndroidResources = true
             isReturnDefaultValues = true
             all {
                 it.useJUnitPlatform()
@@ -91,6 +92,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
     api("com.composables:icons-lucide:1.1.0")
+    implementation("io.github.compose-jindong:jindong-core:1.1.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:0.41.0")
     implementation("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
@@ -107,8 +109,11 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
+    testImplementation("org.robolectric:robolectric:4.16.1")
+    testImplementation("androidx.compose.ui:ui-test-junit4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
 // Test tier tasks

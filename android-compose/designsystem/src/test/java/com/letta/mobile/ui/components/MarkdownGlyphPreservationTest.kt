@@ -20,7 +20,7 @@ class MarkdownGlyphPreservationTest {
 
     private fun assertRendersText(sourceText: String, expectedVisibleText: String) {
         composeTestRule.setContent {
-            MarkdownText(text = sourceText, isStreaming = false)
+            MarkdownText(text = sourceText)
         }
         val treeString = composeTestRule.onRoot().printToString()
         assertTrue(

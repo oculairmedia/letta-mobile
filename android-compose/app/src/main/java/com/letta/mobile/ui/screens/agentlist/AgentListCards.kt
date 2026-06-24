@@ -28,8 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,6 +39,7 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.navigation.agentAvatarSharedElementKey
@@ -212,6 +213,7 @@ internal fun AgentCard(
     var showContextMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val toolCount = agent.tools.size
     val blockCount = agent.blocks.size
@@ -227,7 +229,7 @@ internal fun AgentCard(
                 onClick = onClick,
                 onLongClick = if (contextualActionsEnabled) {
                     {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        HapticEffects.longPress(haptic, view)
                         showContextMenu = true
                     }
                 } else {
@@ -386,6 +388,7 @@ internal fun CompactAgentCard(
     var showContextMenu by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     Surface(
         modifier = modifier
@@ -395,7 +398,7 @@ internal fun CompactAgentCard(
                 onClick = onClick,
                 onLongClick = if (contextualActionsEnabled) {
                     {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        HapticEffects.longPress(haptic, view)
                         showContextMenu = true
                     }
                 } else {
