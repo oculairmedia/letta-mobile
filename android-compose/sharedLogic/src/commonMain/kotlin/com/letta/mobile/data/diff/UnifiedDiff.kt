@@ -51,6 +51,7 @@ object UnifiedDiff {
                     out.add(DiffLine(DiffLineKind.Removed, raw.substring(1), oldLine, null))
                     oldLine++
                 }
+                raw.startsWith("\\") -> continue
                 else -> {
                     out.add(DiffLine(DiffLineKind.Context, raw.removePrefix(" "), oldLine, newLine))
                     oldLine++

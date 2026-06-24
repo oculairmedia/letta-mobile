@@ -52,4 +52,35 @@ class UnifiedDiffTest {
         assertEquals(1, added)
         assertEquals(1, removed)
     }
+
+    @Test
+    fun skipsNoNewlineMetadata() {
+        val diffWithNoNewline = """
+            diff --git a/file.txt b/file.txt
+            --- a/file.txt
+            +++ b/file.txt
+            @@ -1,2 +1,3 @@
+             line1
+            -line2
+            \ No newline at end of file
+            +line2
+            +line3
+        """.trimIndent()
+        
+        val lines = UnifiedDiff.parse(diffWithNoNewline)
+        
+        // Ensure the metadata line is not in the output
+        assertFalse(lines.any { it.text.contains("No newline at end of file") })
+        
+        val removed = lines.first { it.kind == DiffLineKind.Removed }
+        assertEquals("line2", removed.text)
+        assertEquals(2, removed.oldLine)
+        
+        val added = lines.filter { it.kind == DiffLineKind.Added }
+        assertEquals(2, added.size)
+        assertEquals("line2", added[0].text)
+        assertEquals(2, added[0].newLine)
+        assertEquals("line3", added[1].text)
+        assertEquals(3, added[1].newLine)
+    }
 }
