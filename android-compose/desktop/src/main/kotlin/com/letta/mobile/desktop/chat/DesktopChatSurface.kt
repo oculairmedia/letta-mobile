@@ -502,24 +502,37 @@ private fun MessageList(
             ) { item ->
                 val interaction = remember { MutableInteractionSource() }
                 val hovered by interaction.collectIsHoveredAsState()
-                Box(
-                    modifier = Modifier
-                        .widthIn(max = ChatColumnMaxWidth)
-                        .fillMaxWidth()
-                        .hoverable(interaction),
-                ) {
-                    when (item) {
-                        is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
-                        is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .hoverable(interaction),
+                    ) {
+                        when (item) {
+                            is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
+                            is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                        }
+                        // Only plain message bubbles get the hover copy toolbar — a
+                        // RunBlock has its own header chevron at the top-right, which
+                        // the floating toolbar would otherwise cover.
+                        val copyText = item.copyableText()
+                        if (hovered && copyText.isNotBlank() && item is ChatRenderItem.Single) {
+                            MessageHoverToolbar(
+                                text = copyText,
+                                modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp),
+                            )
+                        }
                     }
-                    // Only plain message bubbles get the hover copy toolbar — a
-                    // RunBlock has its own header chevron at the top-right, which
-                    // the floating toolbar would otherwise cover.
-                    val copyText = item.copyableText()
-                    if (hovered && copyText.isNotBlank() && item is ChatRenderItem.Single) {
-                        MessageHoverToolbar(
-                            text = copyText,
-                            modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp),
+                    // Per-message clock timestamp (Penpot "Grouping + timestamps"),
+                    // aligned to the sender side.
+                    messageClockLabel(item.boundaryTimestamp)?.let { clock ->
+                        val isUser = (item as? ChatRenderItem.Single)?.message?.role == "user"
+                        Text(
+                            text = clock,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textAlign = if (isUser) TextAlign.End else TextAlign.Start,
+                            modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
                         )
                     }
                 }
@@ -1099,6 +1112,17 @@ private fun MessageHoverToolbar(text: String, modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+/** Formats a message's ISO timestamp as a local clock label, e.g. "9:41 AM". */
+private fun messageClockLabel(iso: String): String? {
+    if (iso.isBlank()) return null
+    val zone = java.time.ZoneId.systemDefault()
+    val zoned = runCatching { java.time.Instant.parse(iso).atZone(zone) }
+        .recoverCatching { java.time.OffsetDateTime.parse(iso).atZoneSameInstant(zone) }
+        .recoverCatching { java.time.LocalDateTime.parse(iso).atZone(zone) }
+        .getOrNull() ?: return null
+    return zoned.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
 }
 
 /** The message text a hover toolbar's Copy action puts on the clipboard. */
