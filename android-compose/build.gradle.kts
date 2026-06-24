@@ -3,8 +3,8 @@ plugins {
     id("com.android.application") version "9.2.0" apply false
     id("com.android.library") version "9.2.0" apply false
     id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
-    id("org.jetbrains.kotlin.multiplatform") version "2.3.20" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.multiplatform") version "2.4.0" apply false
     // Pinned to 1.10.0 to match Jewel 0.37.0-262.4852.51, which is built against
     // Compose foundation 1.10.0. Compose 1.11.x changed the return type of
     // TextContextMenu.TextManager.getCut() (Function0 -> Action), which makes
@@ -13,13 +13,12 @@ plugins {
     id("org.jetbrains.compose") version "1.10.0" apply false
     id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
     id("io.github.takahirom.roborazzi") version "1.63.0" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.3.20" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0" apply false
     id("com.google.dagger.hilt.android") version "2.59.2" apply false
-    id("com.google.devtools.ksp") version "2.3.8" apply false
+    id("com.google.devtools.ksp") version "2.3.9" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
-    id("org.jetbrains.kotlin.plugin.allopen") version "2.3.20" apply false
-    id("com.mikepenz.aboutlibraries.plugin.android") version "14.2.1" apply false
+    id("org.jetbrains.kotlin.plugin.allopen") version "2.4.0" apply false
     id("io.sentry.android.gradle") version "6.8.1" apply false
     id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
 }
@@ -110,6 +109,26 @@ subprojects {
             if (requested.group == "org.ow2.asm" && requested.name in java26CompatibleAsmModules) {
                 useVersion(java26CompatibleAsmVersion)
                 because("Java 26 unit tests need ASM support for Java 26 class files.")
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Kotlin 2.4 annotation processing compatibility
+// ---------------------------------------------------------------------------
+// Dagger/Hilt 2.59.2 is the latest release, but its compiler artifacts declare
+// kotlin-metadata-jvm 2.2.20. Hilt's Java annotation processor must read
+// Kotlin 2.4 metadata, so keep that processor classpath on the matching
+// metadata reader until Dagger publishes a release that does this natively.
+val kotlinMetadataJvmVersion = "2.4.0"
+
+subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-metadata-jvm") {
+                useVersion(kotlinMetadataJvmVersion)
+                because("Hilt annotation processing must read Kotlin 2.4 metadata.")
             }
         }
     }
