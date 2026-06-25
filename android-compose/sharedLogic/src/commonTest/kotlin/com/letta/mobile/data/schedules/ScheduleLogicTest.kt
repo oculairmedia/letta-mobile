@@ -1,8 +1,14 @@
 package com.letta.mobile.data.schedules
 
+import com.letta.mobile.data.model.ScheduleDefinition
+import com.letta.mobile.data.model.ScheduleMessage
+import com.letta.mobile.data.model.SchedulePayload
+import com.letta.mobile.data.model.ScheduledMessage
 import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -201,6 +207,90 @@ class ScheduleLogicTest {
         assertEquals(1, rel.failed)
         assertEquals(listOf(true, false), rel.squares)
         assertEquals(0.5, withHistory.overallSuccessRate)
+    }
+
+    // --- Review-fix regressions (letta-mobile-9qqa5) ------------------------
+
+    @Test
+    fun pausedScheduleProjectsNoRuns() {
+        val active = dailyDef("on", "0 9 * * *")
+        val paused = active.copy(id = "off", active = false)
+        // A paused schedule has no upcoming run; an active one still does (#15).
+        assertNull(ScheduleProjection.nextRun(paused, now))
+        assertNotNull(ScheduleProjection.nextRun(active, now))
+        // Neither Agenda nor Week materialize the paused schedule's runs.
+        val today = now.toLocalDateTime(utc).date
+        val agenda = ScheduleProjection.agenda(listOf(active, paused), today, now, utc)
+        assertTrue(agenda.runs.all { it.scheduleId == "on" })
+        val monday = ScheduleProjection.mondayOf(today)
+        val week = ScheduleProjection.week(listOf(active, paused), monday, now, utc)
+        assertTrue(week.runs.all { it.run.scheduleId == "on" })
+    }
+
+    @Test
+    fun oneShotCronTaskStillMaterializes() {
+        // recurring=false one-off: the adapter keeps the cron so the task can
+        // still produce a run instead of vanishing (#16).
+        val task = CronTask(id = "once", cron = "30 14 25 12 *", recurring = false)
+        val def = ScheduleProjection.toScheduleDefs(listOf(task), utc).single()
+        assertEquals("30 14 25 12 *", def.cron)
+        assertNotNull(ScheduleProjection.nextRun(def, now))
+    }
+
+    @Test
+    fun leapDayScheduleResolvesWithinLookahead() {
+        // 0 0 29 2 * fires only on Feb 29 — the next can be ~4 years out, past
+        // the old 400-day window (#14).
+        val expr = CronSchedule.parse("0 0 29 2 *")!!
+        val next = CronSchedule.nextRun(expr, now, utc)
+        assertNotNull(next)
+        val ldt = next.toLocalDateTime(utc)
+        assertEquals(2, ldt.month.ordinal + 1)
+        assertEquals(29, ldt.day)
+    }
+
+    @Test
+    fun weeklyBuilderRejectsOutOfRangeWeekday() {
+        // Out-of-range ISO weekday → null instead of a bad cron string (#13).
+        assertNull(
+            CronBuilder.toExpression(
+                CronBuilderState(CronCadence.Weekly, minute = 0, hour = 9, daysOfWeek = setOf(8)),
+            ),
+        )
+        assertNotNull(
+            CronBuilder.toExpression(
+                CronBuilderState(CronCadence.Weekly, minute = 0, hour = 9, daysOfWeek = setOf(1, 7)),
+            ),
+        )
+    }
+
+    @Test
+    fun timelineAnchorsToStartDate() {
+        // Lanes span the requested week, not today's (#1).
+        val defs = listOf(dailyDef("a", "0 9 * * *"))
+        val nextWeekStart = ScheduleProjection.mondayOf(now.toLocalDateTime(utc).date).plus(7, DateTimeUnit.DAY)
+        val timeline = ScheduleProjection.timeline(defs, now, utc, startDate = nextWeekStart, days = 7)
+        val ticks = timeline.lanes.single().ticks
+        assertEquals(7, ticks.size)
+        ticks.forEach { tick ->
+            val date = tick.instant.toLocalDateTime(utc).date
+            assertTrue(date >= nextWeekStart && date < nextWeekStart.plus(7, DateTimeUnit.DAY))
+        }
+    }
+
+    @Test
+    fun nativeScheduleAdapterSurfacesRecurringSchedule() {
+        // Native schedule-admin schedules project alongside crons (#5).
+        val native = ScheduledMessage(
+            id = "r",
+            agentId = "agent",
+            message = SchedulePayload(messages = listOf(ScheduleMessage(content = "Daily digest", role = "user"))),
+            schedule = ScheduleDefinition(type = "recurring", cronExpression = "0 9 * * *"),
+        )
+        val def = ScheduleProjection.toScheduleDefsFromNative(listOf(native), utc).single()
+        assertEquals("0 9 * * *", def.cron)
+        assertEquals("Daily digest", def.name)
+        assertNotNull(ScheduleProjection.nextRun(def, now))
     }
 
     // --- ScheduleFormat -----------------------------------------------------
