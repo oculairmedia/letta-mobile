@@ -1,5 +1,6 @@
 package com.letta.mobile.ui.components
 
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyListState
@@ -23,18 +24,23 @@ fun Modifier.statefulFadingEdges(
 ): Modifier = composed {
     val canScrollBackward by remember(scrollState) {
         derivedStateOf {
-            scrollState.firstVisibleItemIndex > 0 ||
-                scrollState.firstVisibleItemScrollOffset > 0
+            calculateCanScrollBackward(
+                firstVisibleItemIndex = scrollState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = scrollState.firstVisibleItemScrollOffset
+            )
         }
     }
 
     val canScrollForward by remember(scrollState) {
         derivedStateOf {
             val visibleItems = scrollState.layoutInfo.visibleItemsInfo
-            visibleItems.lastOrNull()?.let { lastVisible ->
-                lastVisible.index < scrollState.layoutInfo.totalItemsCount - 1 ||
-                    lastVisible.offset + lastVisible.size > scrollState.layoutInfo.viewportEndOffset
-            } ?: false
+            val lastVisible = visibleItems.lastOrNull()
+            calculateCanScrollForward(
+                lastVisibleIndex = lastVisible?.index,
+                lastVisibleEndOffset = lastVisible?.let { it.offset + it.size },
+                totalItemsCount = scrollState.layoutInfo.totalItemsCount,
+                viewportEndOffset = scrollState.layoutInfo.viewportEndOffset
+            )
         }
     }
 
@@ -76,6 +82,25 @@ fun Modifier.statefulFadingEdges(
             )
         }
     }
+}
+
+@VisibleForTesting
+internal fun calculateCanScrollBackward(
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int
+): Boolean {
+    return firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0
+}
+
+@VisibleForTesting
+internal fun calculateCanScrollForward(
+    lastVisibleIndex: Int?,
+    lastVisibleEndOffset: Int?,
+    totalItemsCount: Int,
+    viewportEndOffset: Int
+): Boolean {
+    if (lastVisibleIndex == null || lastVisibleEndOffset == null) return false
+    return lastVisibleIndex < totalItemsCount - 1 || lastVisibleEndOffset > viewportEndOffset
 }
 
 private const val EdgeFadeMillis = 300
