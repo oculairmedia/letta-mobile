@@ -1246,6 +1246,7 @@ internal enum class ChatAutoScrollAction {
 
 private const val StreamingAutoScrollSnapThrottleMs = 96L
 
+@androidx.annotation.VisibleForTesting
 internal fun autoScrollAction(
     signature: ChatAutoScrollSignature,
     isStreaming: Boolean,
