@@ -112,7 +112,7 @@ fun DesktopMemorySurface(
     var editorTarget by remember { mutableStateOf<BlockEditorTarget?>(null) }
     val agentId = state.memory.selectedAgentId
 
-    Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
+    Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
         // A fixed (non-scrolling) column: the header/agent/stats are fixed
         // height and the graph takes the rest, so the page never scrolls.
         Column(
@@ -295,7 +295,7 @@ private fun MemoryGraphPanel(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+        color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
@@ -375,9 +375,7 @@ private fun MemoryGraphPanel(
                     contentPadding = 0.72f,
                     animateInitialPlacement = false,
                 ),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.36f)),
+                modifier = Modifier.fillMaxSize(),
                 nodeContent = { node ->
                     val resolved = nodesById[node.id]
                     val clickable = resolved?.kind == MemoryGraphNodeKind.Memory
