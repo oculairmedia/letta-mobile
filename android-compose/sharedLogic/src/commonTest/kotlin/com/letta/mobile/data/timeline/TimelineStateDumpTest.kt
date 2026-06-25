@@ -53,7 +53,7 @@ class TimelineStateDumpTest {
             position = 1.0,
             otid = "otid_local",
             content = "local content\nwith newline",
-            sentAt = TimelineInstant.now(),
+            sentAt = timelineNow(),
             deliveryState = DeliveryState.SENDING
         )
         val confirmedEvent = TimelineEvent.Confirmed(
@@ -62,7 +62,7 @@ class TimelineStateDumpTest {
             serverId = "srv_1",
             content = longContent,
             messageType = TimelineMessageType.ASSISTANT,
-            date = TimelineInstant.now(),
+            date = timelineNow(),
             runId = "run_1",
             stepId = "step_1"
         )
