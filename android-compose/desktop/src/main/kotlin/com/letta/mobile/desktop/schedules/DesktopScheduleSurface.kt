@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -527,19 +528,22 @@ private fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: Local
 @Composable
 private fun AgendaRow(run: ScheduleRun, now: Instant, zone: TimeZone, onClick: () -> Unit) {
     val ldt = run.instant.toLocalDateTime(zone)
+    val time = "${ScheduleFormat.pad2(ldt.hour)}:${ScheduleFormat.pad2(ldt.minute)}"
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onClick),
         verticalAlignment = Alignment.Top,
     ) {
-        Text("${ScheduleFormat.pad2(ldt.hour)}:${ScheduleFormat.pad2(ldt.minute)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(52.dp))
-        Box(Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
-            Box(Modifier.padding(top = 4.dp).size(10.dp).clip(CircleShape).background(statusColor(run.status)))
+        Text(time, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(52.dp).padding(top = 12.dp))
+        // Status dot on a connecting vertical line.
+        Box(Modifier.width(24.dp).fillMaxHeight()) {
+            Box(Modifier.align(Alignment.Center).width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)))
+            Box(Modifier.align(Alignment.TopCenter).padding(top = 14.dp).size(10.dp).clip(CircleShape).background(statusColor(run.status)))
         }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
             Text(run.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val (label, color) = agendaStatusLabel(run, now)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = color)
+        Text(if (run.status == RunStatus.Done) "Ran $time" else label, style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(top = 12.dp))
     }
 }
 
