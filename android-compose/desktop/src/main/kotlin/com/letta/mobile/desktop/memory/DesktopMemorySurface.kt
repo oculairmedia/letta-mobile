@@ -117,8 +117,8 @@ fun DesktopMemorySurface(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(horizontal = 32.dp, vertical = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 28.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
                 MemoryHeader(
@@ -196,24 +196,13 @@ private fun MemoryHeader(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Text(
+            text = "Memory",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
-        ) {
-            Texty(
-                text = "Memory",
-                displayStyle = DisplayStyle.Basic(),
-                textStyle = MaterialTheme.typography.headlineMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-            Text(
-                text = state.memory.scopeSubtitle,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        )
         DesktopDefaultButton(
             onClick = onRefresh,
             enabled = !state.isLoading,
@@ -232,32 +221,30 @@ private fun AgentSelector(
     selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        shape = MaterialTheme.shapes.medium,
+    // Slim inline agent strip (no card) — keeps the top compact like the
+    // Schedules header.
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        item {
             Text(
                 text = "Agent",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.customColors.onSurfaceMutedColor,
+                modifier = Modifier.padding(end = 4.dp),
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(
-                    items = agents,
-                    key = { it.id },
-                ) { agent ->
-                    DesktopRadioChip(
-                        selected = agent.id == selectedAgentId,
-                        onClick = { onAgentSelected(agent.id) },
-                    ) {
-                        DesktopControlText(agent.name)
-                    }
-                }
+        }
+        items(
+            items = agents,
+            key = { it.id },
+        ) { agent ->
+            DesktopRadioChip(
+                selected = agent.id == selectedAgentId,
+                onClick = { onAgentSelected(agent.id) },
+            ) {
+                DesktopControlText(agent.name)
             }
         }
     }
@@ -272,9 +259,9 @@ private fun MemorySummaryCard(summary: MemoryParitySummary) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             summary.metrics.forEach { metric ->
                 SummaryMetric(
@@ -291,20 +278,22 @@ private fun SummaryMetric(
     metric: MemorySummaryMetric,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Bottom,
         modifier = modifier,
     ) {
         Text(
             text = metric.value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onPrimaryContainer,
         )
         Text(
             text = metric.label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+            modifier = Modifier.padding(bottom = 1.dp),
         )
     }
 }
