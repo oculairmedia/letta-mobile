@@ -15,10 +15,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Hub
@@ -63,7 +70,11 @@ import com.dk.kuiver.renderer.KuiverViewerConfig
 import com.dk.kuiver.ui.EdgeLabelStyle
 import com.dk.kuiver.ui.LabelPlacement
 import com.dk.kuiver.ui.StyledEdgeContent
+import com.letta.mobile.desktop.components.DesktopChipTab
+import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.data.memory.MemoryAccentRole
+import com.letta.mobile.data.memory.MemoryCategories
+import com.letta.mobile.data.memory.MemoryCategory
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
@@ -73,6 +84,7 @@ import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetric
 import com.letta.mobile.data.memory.MemorySummaryMetricKind
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.data.memory.MemoryTextLink
 import com.letta.mobile.data.memory.accentRole
 import com.letta.mobile.data.memory.validForText
@@ -103,63 +115,55 @@ fun DesktopMemorySurface(
     var editorTarget by remember { mutableStateOf<BlockEditorTarget?>(null) }
     val agentId = state.memory.selectedAgentId
 
-    Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
-        LazyColumn(
+    Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
+        // A fixed (non-scrolling) column: the header/agent/stats are fixed
+        // height and the graph takes the rest, so the page never scrolls.
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(horizontal = 32.dp, vertical = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(horizontal = 28.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                MemoryHeader(
-                    state = state,
-                    onRefresh = onRefresh,
+            MemoryHeader(
+                state = state,
+                onRefresh = onRefresh,
+                // Re-expose block creation: the graph-only redesign dropped the
+                // only entry point for adding a memory block (Codex review #7).
+                // The editor panel needs both an agent and a block API, so gate
+                // the action on the same preconditions.
+                onNewBlock = if (agentId != null && blockApi != null) {
+                    { editorTarget = BlockEditorTarget.New }
+                } else {
+                    null
+                },
+            )
+            state.errorMessage?.let { errorMessage ->
+                DesktopInlineError(
+                    message = errorMessage,
+                    onRetry = onRefresh,
+                    retrying = state.isLoading,
                 )
-            }
-            val errorMessage = state.errorMessage
-            if (errorMessage != null) {
-                item {
-                    DesktopInlineError(
-                        message = errorMessage,
-                        onRetry = onRefresh,
-                        retrying = state.isLoading,
-                    )
-                }
             }
             if (state.agents.isNotEmpty()) {
-                item {
-                    AgentSelector(
-                        agents = state.agents,
-                        selectedAgentId = state.memory.selectedAgentId,
-                        onAgentSelected = onAgentSelected,
-                    )
-                }
-            }
-            item {
-                MemorySummaryCard(state.memory.summary)
-            }
-            item {
-                MemoryGraphPanel(
-                    graph = state.memory.graph,
-                    onBlockNodeClick = { node ->
-                        if (agentId != null) {
-                            editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
-                        }
-                    },
+                AgentSelector(
+                    agents = state.agents,
+                    selectedAgentId = state.memory.selectedAgentId,
+                    onAgentSelected = onAgentSelected,
                 )
             }
-            items(
-                items = state.memory.sections,
-                key = { section -> section.kind.name },
-            ) { section ->
-                MemorySectionCard(
-                    section = section,
-                    canEdit = agentId != null && blockApi != null,
-                    onBlockClick = { block -> editorTarget = BlockEditorTarget.Existing(block.title, block.id) },
-                    onNewBlock = { editorTarget = BlockEditorTarget.New },
-                )
-            }
+            MemorySummaryCard(state.memory.summary)
+            // The graph is the focus — it takes the remaining height. Memory
+            // blocks stay editable by clicking their graph nodes.
+            MemoryGraphPanel(
+                graph = state.memory.graph,
+                onBlockNodeClick = { node ->
+                    if (agentId != null) {
+                        editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            )
         }
 
         val target = editorTarget
@@ -188,39 +192,26 @@ fun DesktopMemorySurface(
 private fun MemoryHeader(
     state: DesktopMemorySurfaceState,
     onRefresh: () -> Unit,
+    onNewBlock: (() -> Unit)? = null,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Text(
+            text = "Memory",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
-        ) {
-            Texty(
-                text = "Memory",
-                displayStyle = DisplayStyle.Basic(),
-                textStyle = MaterialTheme.typography.headlineMedium.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-            Text(
-                text = state.memory.scopeSubtitle,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        )
+        onNewBlock?.let { newBlock ->
+            DesktopDefaultButton(onClick = newBlock) {
+                DesktopButtonContent(text = "New block", icon = Icons.Outlined.Add)
+            }
         }
-        DesktopDefaultButton(
-            onClick = onRefresh,
-            enabled = !state.isLoading,
-        ) {
-            DesktopButtonContent(
-                text = if (state.isLoading) "Refreshing" else "Refresh",
-                icon = Icons.Outlined.Refresh,
-            )
-        }
+        DesktopRefreshAction(onRefresh = onRefresh, enabled = !state.isLoading)
     }
 }
 
@@ -230,49 +221,48 @@ private fun AgentSelector(
     selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        shape = MaterialTheme.shapes.medium,
+    // Slim inline agent strip (no card) — keeps the top compact like the
+    // Schedules header.
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
+        item {
             Text(
                 text = "Agent",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.customColors.onSurfaceMutedColor,
+                modifier = Modifier.padding(end = 4.dp),
             )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(
-                    items = agents,
-                    key = { it.id },
-                ) { agent ->
-                    DesktopRadioChip(
-                        selected = agent.id == selectedAgentId,
-                        onClick = { onAgentSelected(agent.id) },
-                    ) {
-                        DesktopControlText(agent.name)
-                    }
-                }
-            }
+        }
+        items(
+            items = agents,
+            key = { it.id },
+        ) { agent ->
+            DesktopChipTab(
+                text = agent.name,
+                active = agent.id == selectedAgentId,
+                onClick = { onAgentSelected(agent.id) },
+            )
         }
     }
 }
 
 @Composable
 private fun MemorySummaryCard(summary: MemoryParitySummary) {
-    ElevatedCard(
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+    // Neutral stats strip — these are reference counts, not a status to flag,
+    // so no colour highlight.
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             summary.metrics.forEach { metric ->
                 SummaryMetric(
@@ -289,20 +279,22 @@ private fun SummaryMetric(
     metric: MemorySummaryMetric,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Bottom,
         modifier = modifier,
     ) {
         Text(
             text = metric.value,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = metric.label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+            color = MaterialTheme.customColors.onSurfaceMutedColor,
+            modifier = Modifier.padding(bottom = 1.dp),
         )
     }
 }
@@ -311,15 +303,14 @@ private fun SummaryMetric(
 private fun MemoryGraphPanel(
     graph: MemoryParityGraph,
     onBlockNodeClick: (MemoryGraphNode) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+        color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(420.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
         if (graph.isEmpty) {
             Box(
@@ -335,21 +326,48 @@ private fun MemoryGraphPanel(
             return@Surface
         }
 
-        val nodesById = remember(graph.nodes) { graph.nodes.associateBy { it.id } }
-        val edgesById = remember(graph.edges) { graph.edges.associateBy { it.id } }
-        val kuiver = remember(graph) {
+        // Entity-type filter (Zep "Entity Types"): toggle which node kinds show.
+        val kindsPresent = remember(graph.nodes) {
+            MemoryGraphNodeKind.entries.filter { kind -> graph.nodes.any { it.kind == kind } }
+        }
+        var enabledKinds by remember(graph) { mutableStateOf(kindsPresent.toSet()) }
+        val visibleNodes = remember(graph.nodes, enabledKinds) { graph.nodes.filter { it.kind in enabledKinds } }
+        val visibleIds = remember(visibleNodes) { visibleNodes.map { it.id }.toSet() }
+        val visibleEdges = remember(graph.edges, visibleIds) {
+            graph.edges.filter { it.fromId in visibleIds && it.toId in visibleIds }
+        }
+
+        val nodesById = remember(visibleNodes) { visibleNodes.associateBy { it.id } }
+        // Node degree drives circle size + which nodes get labels (hubs), so the
+        // graph reads like Zep's: a few large labeled hubs, many small leaves.
+        val degreeById = remember(visibleEdges) {
+            val degrees = HashMap<String, Int>()
+            visibleEdges.forEach { edge ->
+                degrees[edge.fromId] = (degrees[edge.fromId] ?: 0) + 1
+                degrees[edge.toId] = (degrees[edge.toId] ?: 0) + 1
+            }
+            degrees
+        }
+        val kuiver = remember(visibleNodes, visibleEdges) {
             buildKuiver {
-                nodes(graph.nodes.map { it.id })
-                graph.edges.forEach { edge ->
+                nodes(visibleNodes.map { it.id })
+                visibleEdges.forEach { edge ->
                     edge(edge.fromId, edge.toId)
                 }
             }
         }
+        // Organic force-directed layout (like Zep / Cosmograph), not a tree:
+        // nodes repel, edges pull, so hubs settle in the middle.
         val layoutConfig = remember {
-            LayoutConfig.Hierarchical(
-                direction = LayoutDirection.HORIZONTAL,
-                levelSpacing = 210f,
-                nodeSpacing = 92f,
+            // Tuned softer than the default: lower repulsion + higher attraction
+            // so clusters stay compact instead of flinging apart.
+            LayoutConfig.ForceDirected(
+                iterations = 420,
+                repulsionStrength = 3200f,
+                attractionStrength = 0.14f,
+                damping = 0.82f,
+                width = 1000f,
+                height = 680f,
             )
         }
         val viewerState = rememberKuiverViewerState(
@@ -368,14 +386,13 @@ private fun MemoryGraphPanel(
                     contentPadding = 0.72f,
                     animateInitialPlacement = false,
                 ),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.36f)),
+                modifier = Modifier.fillMaxSize(),
                 nodeContent = { node ->
                     val resolved = nodesById[node.id]
                     val clickable = resolved?.kind == MemoryGraphNodeKind.Memory
-                    MemoryGraphNodeChip(
+                    MemoryGraphNodeDot(
                         node = resolved,
+                        degree = degreeById[node.id] ?: 0,
                         onClick = if (clickable && resolved != null) {
                             { onBlockNodeClick(resolved) }
                         } else {
@@ -384,32 +401,88 @@ private fun MemoryGraphPanel(
                     )
                 },
                 edgeContent = { edge, from, to ->
-                    val commonEdge = edgesById["${edge.fromId}->${edge.toId}"]
+                    // Thin, unlabeled links — Zep keeps the graph clean and lets
+                    // the node clusters carry the meaning.
                     StyledEdgeContent(
                         edge = edge,
                         from = from,
                         to = to,
-                        baseColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.78f),
-                        backEdgeColor = MaterialTheme.colorScheme.error,
-                        strokeWidth = 2.2f,
-                        label = commonEdge?.label,
-                        labelPlacement = LabelPlacement.CENTER,
-                        labelStyle = EdgeLabelStyle(
-                            textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                            borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                            fontSize = 11.sp,
-                        ),
+                        baseColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
+                        backEdgeColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
+                        strokeWidth = 1.2f,
+                        // No arrowheads — Zep draws plain links.
+                        arrowDrawer = { _, _, _ -> },
+                        label = null,
                     )
                 },
             )
 
-            GraphLegend(
+            EntityTypeFilterBar(
+                kinds = kindsPresent,
+                enabled = enabledKinds,
                 summaryLabel = graph.summaryLabel,
+                onToggle = { kind ->
+                    enabledKinds = if (kind in enabledKinds && enabledKinds.size > 1) {
+                        enabledKinds - kind
+                    } else {
+                        enabledKinds + kind
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(14.dp),
             )
+        }
+    }
+}
+
+/**
+ * Zep-style "Entity Types" filter bar: a toggle chip per node kind present in
+ * the graph (color dot + label). Tapping a chip hides/shows that kind; the last
+ * enabled kind can't be turned off (so the graph is never blank).
+ */
+@Composable
+private fun EntityTypeFilterBar(
+    kinds: List<MemoryGraphNodeKind>,
+    enabled: Set<MemoryGraphNodeKind>,
+    summaryLabel: String,
+    onToggle: (MemoryGraphNodeKind) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier,
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Entity Types", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(summaryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                kinds.forEach { kind ->
+                    val on = kind in enabled
+                    val color = kind.accentRole(null).color()
+                    Row(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .background(if (on) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
+                            .clickable { onToggle(kind) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(color.copy(alpha = if (on) 1f else 0.35f)))
+                        Text(
+                            memoryNodeKindLabel(kind),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -448,59 +521,112 @@ private fun GraphLegend(
     }
 }
 
+/**
+ * A graph node rendered the way Zep / Cosmograph do: a filled circle whose
+ * radius grows with the node's [degree] (so hubs are visibly bigger), colored
+ * by memory category / node kind, with a label shown only for hub nodes so the
+ * canvas stays readable.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun MemoryGraphNodeChip(
+private fun MemoryGraphNodeDot(
     node: MemoryGraphNode?,
+    degree: Int,
     onClick: (() -> Unit)? = null,
 ) {
     val resolvedNode = node ?: return
-    val accentColor = resolvedNode.kind.accentRole(resolvedNode.status).color()
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.46f)),
-        shadowElevation = 2.dp,
-        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
+    val accentColor = if (resolvedNode.kind == MemoryGraphNodeKind.Memory) {
+        MemoryCategories.categorize(resolvedNode.title).categoryColor()
+    } else {
+        resolvedNode.kind.accentRole(resolvedNode.status).color()
+    }
+    // Hubs (well-connected nodes) + Agent/Backend read as primary, so they get
+    // a stronger label; every other node still gets a label underneath, just
+    // lighter — so the whole graph is legible at a glance.
+    val isHub = degree >= 3 ||
+        resolvedNode.kind == MemoryGraphNodeKind.Agent ||
+        resolvedNode.kind == MemoryGraphNodeKind.Backend
+    val diameter = (16 + degree * 4).coerceIn(14, 40).dp
+
+    TooltipArea(
+        tooltip = { MemoryNodeTooltip(resolvedNode, degree, accentColor) },
+        delayMillis = 250,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(12.dp, 12.dp)),
     ) {
-        Row(
-            modifier = Modifier
-                .border(
-                    width = 3.dp,
-                    color = accentColor.copy(alpha = 0.18f),
-                    shape = MaterialTheme.shapes.medium,
-                )
-                .padding(horizontal = 14.dp, vertical = 11.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier,
         ) {
             Box(
                 modifier = Modifier
-                    .padding(top = 4.dp)
-                    .size(9.dp)
-                    .background(accentColor, MaterialTheme.shapes.small),
+                    .size(diameter)
+                    .clip(CircleShape)
+                    .background(accentColor)
+                    .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
             )
-            Column(
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-                modifier = Modifier.width(172.dp),
-            ) {
+            Text(
+                text = resolvedNode.title,
+                style = if (isHub) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
+                fontWeight = if (isHub) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isHub) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 120.dp),
+            )
+        }
+    }
+}
+
+/** Hover card for a graph node — name, type, connection count, char count,
+ *  and the summary (Zep shows the entity's details on hover/click). */
+@Composable
+private fun MemoryNodeTooltip(node: MemoryGraphNode, degree: Int, accentColor: Color) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shadowElevation = 6.dp,
+    ) {
+        Column(Modifier.widthIn(max = 280.dp).padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(accentColor))
+                Text(node.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TooltipStat("Type", memoryNodeKindLabel(node.kind))
+                TooltipStat("Links", degree.toString())
+                TooltipStat("Chars", node.subtitle.length.toString())
+            }
+            if (node.subtitle.isNotBlank()) {
                 Text(
-                    text = resolvedNode.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = resolvedNode.subtitle,
-                    style = MaterialTheme.typography.labelMedium,
+                    node.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 5,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
     }
+}
+
+@Composable
+private fun TooltipStat(label: String, value: String) {
+    Column {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Text(value, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+private fun memoryNodeKindLabel(kind: MemoryGraphNodeKind): String = when (kind) {
+    MemoryGraphNodeKind.Agent -> "Agent"
+    MemoryGraphNodeKind.Backend -> "Backend"
+    MemoryGraphNodeKind.Skill -> "Skill"
+    MemoryGraphNodeKind.Memory -> "Memory"
+    MemoryGraphNodeKind.Schedule -> "Schedule"
+    MemoryGraphNodeKind.Channel -> "Channel"
 }
 
 @Composable
@@ -794,6 +920,7 @@ private fun BlockEditorPanel(
                 enabled = !busy && !loadFailed,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 placeholder = "Block contents…",
+                decorationBoxModifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             )
         }
 
@@ -869,4 +996,13 @@ private fun MemoryAccentRole.color(): Color = when (this) {
     MemoryAccentRole.Tertiary -> MaterialTheme.colorScheme.tertiary
     MemoryAccentRole.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
     MemoryAccentRole.Error -> MaterialTheme.colorScheme.error
+}
+
+@Composable
+private fun MemoryCategory.categoryColor(): Color = when (this) {
+    MemoryCategory.Persona -> MaterialTheme.customColors.categoryPersonaColor
+    MemoryCategory.Human -> MaterialTheme.customColors.categoryHumanColor
+    MemoryCategory.Onboarding -> MaterialTheme.customColors.categoryOnboardingColor
+    MemoryCategory.Project -> MaterialTheme.customColors.categoryProjectColor
+    MemoryCategory.Archival -> MaterialTheme.customColors.categoryArchivalColor
 }

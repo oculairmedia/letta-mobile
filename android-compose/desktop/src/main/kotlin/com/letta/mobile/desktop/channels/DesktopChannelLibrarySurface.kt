@@ -1,38 +1,35 @@
 package com.letta.mobile.desktop.channels
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
-import com.letta.mobile.desktop.DesktopButtonContent
-import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.components.DesktopCatalogCard
+import com.letta.mobile.desktop.components.DesktopRefreshAction
+import com.letta.mobile.desktop.components.DesktopCatalogGridPadding
+import com.letta.mobile.desktop.components.DesktopCatalogHeader
+import com.letta.mobile.desktop.components.DesktopChipTab
+import com.letta.mobile.desktop.components.DesktopInfoBox
+import com.letta.mobile.desktop.components.DesktopPill
+import com.letta.mobile.desktop.components.desktopCardGrid
+import com.letta.mobile.ui.theme.customColors
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun DesktopChannelLibrarySurface(
@@ -40,128 +37,48 @@ fun DesktopChannelLibrarySurface(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier = modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 32.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            ChannelsHeader(
-                state = state,
-                onRefresh = onRefresh,
-            )
-        }
-        if (state.isEmpty) {
-            item {
-                ChannelsInfoCard("No live channels are available for the active backend.")
-            }
-        } else {
-            items(
-                items = state.channels,
-                key = { channel -> channel.id },
-            ) { channel ->
-                ChannelRow(channel)
-            }
-        }
-    }
-}
+    var query by remember { mutableStateOf("") }
+    var statusFilter by remember { mutableStateOf<ChannelDisplayStatus?>(null) }
 
-@Composable
-private fun ChannelsHeader(
-    state: DesktopChannelLibraryState,
-    onRefresh: () -> Unit,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.weight(1f),
-        ) {
-            Text(
-                text = "Channels",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = state.summaryLabel,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        DesktopDefaultButton(onClick = onRefresh) {
-            DesktopButtonContent(
-                text = "Refresh",
-                icon = Icons.Outlined.Refresh,
-            )
-        }
+    val statusesPresent = ChannelDisplayStatus.entries.filter { s -> state.channels.any { it.status == s } }
+    val filtered = state.channels.filter { channel ->
+        (statusFilter == null || channel.status == statusFilter) &&
+            (
+                query.isBlank() ||
+                    channel.title.contains(query, true) ||
+                    channel.subtitle.contains(query, true) ||
+                    channel.detailText.contains(query, true)
+                )
     }
-}
+    // Group by connection status — each status is a labelled section in the grid.
+    val sections = statusesPresent.mapNotNull { status ->
+        filtered.filter { it.status == status }.takeIf { it.isNotEmpty() }?.let { status.label to it }
+    }
 
-@Composable
-@OptIn(ExperimentalLayoutApi::class)
-private fun ChannelRow(channel: ChannelDisplayItem) {
-    val accent = channel.status.color()
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 3.dp)
-                    .size(10.dp)
-                    .background(accent, MaterialTheme.shapes.small),
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+    Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
+        DesktopCatalogHeader(
+            title = "Channels",
+            query = query,
+            onQuery = { query = it },
+            searchPlaceholder = "Search channels",
+            actions = { DesktopRefreshAction(onRefresh) },
+            chips = {
+                DesktopChipTab("All channels", statusFilter == null) { statusFilter = null }
+                statusesPresent.forEach { status ->
+                    DesktopChipTab(status.label, statusFilter == status) { statusFilter = status }
+                }
+            },
+        )
+        when {
+            state.channels.isEmpty() -> DesktopInfoBox("No live channels are available for the active backend.")
+            filtered.isEmpty() -> DesktopInfoBox("No channels match your filter.")
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                contentPadding = DesktopCatalogGridPadding,
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Hub,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        text = channel.title,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Text(
-                    text = channel.subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = channel.detailText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    channel.metadataLabels.forEach { label ->
-                        MetadataPill(label, accent)
-                    }
+                desktopCardGrid(sections, keyOf = { it.id }) { channel, cardModifier ->
+                    ChannelCard(channel, cardModifier)
                 }
             }
         }
@@ -169,47 +86,37 @@ private fun ChannelRow(channel: ChannelDisplayItem) {
 }
 
 @Composable
-private fun ChannelsInfoCard(message: String) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
-        modifier = Modifier.fillMaxWidth(),
+private fun ChannelCard(channel: ChannelDisplayItem, modifier: Modifier) {
+    val accent = channel.status.accent()
+    // Keep it terse: the status pill already says the status, so don't repeat it
+    // in the description — show the detail text only when it adds information.
+    val description = channel.detailText
+        .takeIf { it.isNotBlank() && !it.equals(channel.status.label, ignoreCase = true) }
+        ?: channel.subtitle.takeIf { it.isNotBlank() && !it.equals(channel.status.label, ignoreCase = true) }
+    DesktopCatalogCard(
+        title = channel.title,
+        description = description,
+        accent = accent,
+        onClick = {},
+        modifier = modifier,
     ) {
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(16.dp),
-        )
+        // Status pill plus any diagnostic metadata (Code 4401, Auth, catalog,
+        // device ids, …) the mapper attached — these carry the failure /
+        // transport detail and were dropped when only the pill was shown
+        // (Codex review).
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            DesktopPill(channel.status.label, accent)
+            channel.metadataLabels
+                .filterNot { it.equals(channel.status.label, ignoreCase = true) }
+                .forEach { label -> DesktopPill(label, MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
     }
 }
 
 @Composable
-private fun MetadataPill(
-    text: String,
-    color: Color,
-) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = color.copy(alpha = 0.12f),
-        contentColor = color,
-        border = BorderStroke(1.dp, color.copy(alpha = 0.18f)),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-        )
-    }
-}
-
-@Composable
-private fun ChannelDisplayStatus.color(): Color = when (this) {
-    ChannelDisplayStatus.Connected -> MaterialTheme.colorScheme.tertiary
-    ChannelDisplayStatus.Connecting -> MaterialTheme.colorScheme.primary
+private fun ChannelDisplayStatus.accent(): Color = when (this) {
+    ChannelDisplayStatus.Connected -> MaterialTheme.customColors.successColor
+    ChannelDisplayStatus.Connecting -> MaterialTheme.customColors.runningColor
     ChannelDisplayStatus.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
     ChannelDisplayStatus.Disconnected -> MaterialTheme.colorScheme.error
 }
