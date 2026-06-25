@@ -142,6 +142,10 @@ class SettingsRepository internal constructor(
         // keep the legacy fresh-chat path until the flag is flipped explicitly.
         val RESUME_RECENT_CONVERSATION = booleanPreferencesKey("resume_recent_conversation")
         val HUGGING_FACE_TOKEN = stringPreferencesKey("hugging_face_token")
+        // Master switch for the expressive Jindong activity haptics
+        // (streaming + tool-call pattern cues). Default-on; absence of the key
+        // reads as enabled so existing installs feel the new haptics.
+        val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
     }
 
     init {
@@ -567,6 +571,16 @@ class SettingsRepository internal constructor(
 
     override fun getEnableProjects(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.ENABLE_PROJECTS] ?: false
+    }
+
+    override fun getHapticsEnabled(): Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[Keys.HAPTICS_ENABLED] ?: true
+    }
+
+    override suspend fun setHapticsEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[Keys.HAPTICS_ENABLED] = enabled
+        }
     }
 
     /**
