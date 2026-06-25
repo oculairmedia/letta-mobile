@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,16 +25,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.ChevronLeft
+import androidx.compose.material.icons.outlined.ChevronRight
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,66 +42,68 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.schedules.CronTask
+import com.kizitonwose.calendar.compose.WeekCalendar
+import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
+import com.kizitonwose.calendar.core.WeekDay
+import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
 import com.letta.mobile.data.schedules.CronBuilder
 import com.letta.mobile.data.schedules.CronBuilderState
 import com.letta.mobile.data.schedules.CronCadence
 import com.letta.mobile.data.schedules.CronSchedule
+import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.schedules.RunStatus
 import com.letta.mobile.data.schedules.ScheduleDef
 import com.letta.mobile.data.schedules.ScheduleFormat
 import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.desktop.DesktopButtonContent
-import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
-import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
-import com.kizitonwose.calendar.compose.WeekCalendar
-import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
-import com.kizitonwose.calendar.core.WeekDay
-import com.kizitonwose.calendar.core.firstDayOfWeekFromLocale
 import com.letta.mobile.ui.theme.customColors
-import kotlinx.datetime.LocalDate
-import kotlinx.datetime.minus
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.plus
 import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-/** The segmented views over one schedule dataset (Phase 7). */
+/** The four schedule views (Penpot "Desktop · Schedules (week/timeline)"). */
 private enum class ScheduleView(val label: String) {
-    Agenda("Agenda"),
     Week("Week"),
+    Agenda("Agenda"),
     Timeline("Timeline"),
     History("History"),
-    Rules("Rules"),
 }
 
-/** What the master-detail right rail is showing. */
 private sealed interface RailState {
-    data object Hidden : RailState
+    data object Overview : RailState
     data class Detail(val scheduleId: String) : RailState
     data class Run(val run: ScheduleRun) : RailState
-    data class Builder(val editingId: String?, val draft: CronBuilderState, val name: String, val prompt: String) :
-        RailState
 }
 
+private val RAIL_WIDTH = 372.dp
+private val HOUR_HEIGHT = 44.dp
+private const val GRID_HOURS = 24
+private const val HOUR_LABEL_STEP = 3
+private const val WEEK_GRID_MAX_PER_DAY = 4
+
 /**
- * The Phase-7 Schedules surface: a view switcher (Agenda / Week / Timeline /
- * History / Rules) over one cron dataset, with a master-detail right rail
- * (schedule detail, run detail, and a cron builder). All view logic comes from
- * the shared [ScheduleProjection]; this file is binding-only so the same logic
- * ports to mobile. Supersedes the flat [DesktopScheduleLibrarySurface], which
- * is now embedded as the "Rules" tab.
+ * Phase-7 Schedules surface, rebuilt to the Penpot mockups: a Week / Agenda /
+ * Timeline / History tab switcher with a persistent right rail (OVERVIEW stats
+ * + active-schedule list, switching to a master-detail / run-detail on click),
+ * and a centered "New schedule" modal. All view data is computed by the shared
+ * [ScheduleProjection]; this file is binding-only.
  */
 @Composable
 fun DesktopScheduleSurface(
@@ -117,149 +119,136 @@ fun DesktopScheduleSurface(
         { _, _, _, _, _, _ -> },
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
-    // Captured once per entry — a stable "now" for the whole projection pass.
     val now = remember { Clock.System.now() }
     val today = remember(now, zone) { now.toLocalDateTime(zone).date }
 
-    var filterAgentId by remember(focusedAgentId) { mutableStateOf(focusedAgentId) }
+    val filterAgentId = focusedAgentId
     val filteredCrons = remember(crons, filterAgentId) {
         if (filterAgentId == null) crons else crons.filter { it.agentId == null || it.agentId == filterAgentId }
     }
     val defs = remember(filteredCrons, zone) { ScheduleProjection.toScheduleDefs(filteredCrons, zone) }
     val defsById = remember(defs) { defs.associateBy { it.id } }
+    val historySummary = remember(defs, now) { ScheduleProjection.history(defs, now, zone) }
 
-    var view by remember { mutableStateOf(ScheduleView.Agenda) }
-    var rail by remember { mutableStateOf<RailState>(RailState.Hidden) }
+    var view by remember { mutableStateOf(ScheduleView.Week) }
+    var rail by remember { mutableStateOf<RailState>(RailState.Overview) }
     var selectedDate by remember(today) { mutableStateOf(today) }
     var weekStart by remember(today) { mutableStateOf(ScheduleProjection.mondayOf(today)) }
+    var showCreate by remember { mutableStateOf(false) }
 
-    Column(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        ScheduleSurfaceHeader(
-            count = filteredCrons.size,
-            isLoading = state.isLoading,
-            canCreate = canCreate,
-            onRefresh = onRefresh,
-            onNew = {
-                rail = RailState.Builder(
-                    editingId = null,
-                    draft = CronBuilderState(),
-                    name = "",
-                    prompt = "",
-                )
-            },
-        )
-        ScheduleTabs(selected = view, onSelect = { view = it; rail = RailState.Hidden })
-        Row(modifier = Modifier.fillMaxSize()) {
-            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                when (view) {
-                    ScheduleView.Agenda -> AgendaView(defs, selectedDate, today, now, zone, onSelectDate = { selectedDate = it }) { run ->
-                        rail = RailState.Run(run)
+    val weekRange = remember(weekStart) {
+        // "June 22 – 28, 2026" (don't repeat the month when the week stays in it).
+        val end = weekStart.plus(6, DateTimeUnit.DAY)
+        val month = fullMonth(weekStart.month.ordinal + 1)
+        if (end.month == weekStart.month) {
+            "$month ${weekStart.day} – ${end.day}, ${weekStart.year}"
+        } else {
+            "$month ${weekStart.day} – ${fullMonth(end.month.ordinal + 1)} ${end.day}, ${end.year}"
+        }
+    }
+    val selectedId = (rail as? RailState.Detail)?.scheduleId
+
+    Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(Modifier.fillMaxSize()) {
+            ScheduleHeader(
+                view = view,
+                onView = { view = it },
+                rangeLabel = weekRange,
+                showRange = view == ScheduleView.Week || view == ScheduleView.Timeline,
+                onPrev = { weekStart = weekStart.minus(7, DateTimeUnit.DAY) },
+                onNext = { weekStart = weekStart.plus(7, DateTimeUnit.DAY) },
+                canCreate = canCreate,
+                onNew = { showCreate = true },
+            )
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    if (defs.isEmpty()) {
+                        ScheduleEmptyState(canCreate)
+                    } else {
+                        when (view) {
+                            ScheduleView.Week -> WeekView(defs, weekStart, today, now, zone, selectedId) { rail = RailState.Run(it) }
+                            ScheduleView.Agenda -> AgendaView(defs, selectedDate, today, now, zone, { selectedDate = it }) { rail = RailState.Run(it) }
+                            ScheduleView.Timeline -> TimelineView(defs, weekStart, today, now, zone) { rail = RailState.Detail(it) }
+                            ScheduleView.History -> HistoryView(historySummary)
+                        }
                     }
-                    ScheduleView.Week -> WeekView(defs, weekStart, now, zone, onShiftWeek = { weekStart = weekStart.plus(it * 7, DateTimeUnit.DAY) }) { run ->
-                        rail = RailState.Run(run)
-                    }
-                    ScheduleView.Timeline -> TimelineView(defs, now, zone) { scheduleId ->
-                        rail = RailState.Detail(scheduleId)
-                    }
-                    ScheduleView.History -> HistoryView(defs, now, zone) { scheduleId ->
-                        rail = RailState.Detail(scheduleId)
-                    }
-                    ScheduleView.Rules -> DesktopScheduleLibrarySurface(
-                        state = state,
-                        onRefresh = onRefresh,
-                        onAgentSelected = onAgentSelected,
-                        crons = crons,
-                        focusedAgentId = focusedAgentId,
-                        onDeleteCron = onDeleteCron,
-                        canCreate = canCreate,
-                        onCreateCron = onCreateCron,
+                }
+                // Week/Agenda always show the rail (Overview or detail). Timeline
+                // and History are full-width like the mockups, unless a schedule
+                // is selected (then the detail panel appears).
+                val showRail = rail !is RailState.Overview || view == ScheduleView.Week || view == ScheduleView.Agenda
+                if (showRail) {
+                    ScheduleRail(
+                        rail = rail,
+                        defs = defs,
+                        defsById = defsById,
+                        history = historySummary,
+                        now = now,
+                        zone = zone,
+                        onSelectSchedule = { rail = RailState.Detail(it) },
+                        onBackToOverview = { rail = RailState.Overview },
+                        onDelete = { onDeleteCron(it); rail = RailState.Overview },
                     )
                 }
-                // Empty-state hint for the projection views (Rules has its own).
-                if (view != ScheduleView.Rules && defs.isEmpty()) {
-                    ScheduleEmptyState(canCreate)
-                }
             }
-            val current = rail
-            if (current != RailState.Hidden) {
-                Box(
-                    modifier = Modifier
-                        .width(360.dp)
-                        .fillMaxHeight()
-                        .border(width = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                ) {
-                    when (current) {
-                        is RailState.Detail -> defsById[current.scheduleId]?.let { def ->
-                            ScheduleDetailRail(
-                                def = def,
-                                now = now,
-                                zone = zone,
-                                onBack = { rail = RailState.Hidden },
-                                onEdit = {
-                                    val draft = def.cron?.let { CronBuilder.fromExpression(it) } ?: CronBuilderState()
-                                    rail = RailState.Builder(def.id, draft, def.name, "")
-                                },
-                                onDelete = {
-                                    onDeleteCron(def.id)
-                                    rail = RailState.Hidden
-                                },
-                            )
-                        } ?: run { rail = RailState.Hidden }
-                        is RailState.Run -> RunDetailRail(
-                            run = current.run,
-                            zone = zone,
-                            onBack = { rail = RailState.Hidden },
-                            onGoToSchedule = { rail = RailState.Detail(current.run.scheduleId) },
-                        )
-                        is RailState.Builder -> CronBuilderRail(
-                            initial = current,
-                            now = now,
-                            zone = zone,
-                            canCreate = canCreate,
-                            onCancel = { rail = RailState.Hidden },
-                            onSubmit = { expression, name, prompt ->
-                                // Edit = delete-then-recreate (no update endpoint).
-                                current.editingId?.let(onDeleteCron)
-                                onCreateCron(filterAgentId, name, prompt, expression, true, zone.id)
-                                rail = RailState.Hidden
-                            },
-                        )
-                        RailState.Hidden -> Unit
-                    }
-                }
-            }
+        }
+
+        if (showCreate) {
+            CreateScheduleModal(
+                now = now,
+                zone = zone,
+                canCreate = canCreate,
+                onDismiss = { showCreate = false },
+                onCreate = { name, prompt, cron ->
+                    onCreateCron(filterAgentId, name, prompt, cron, true, zone.id)
+                    showCreate = false
+                },
+            )
         }
     }
 }
 
-// --- Header + tabs ----------------------------------------------------------
+// --- Header -----------------------------------------------------------------
 
 @Composable
-private fun ScheduleSurfaceHeader(
-    count: Int,
-    isLoading: Boolean,
+private fun ScheduleHeader(
+    view: ScheduleView,
+    onView: (ScheduleView) -> Unit,
+    rangeLabel: String,
+    showRange: Boolean,
+    onPrev: () -> Unit,
+    onNext: () -> Unit,
     canCreate: Boolean,
-    onRefresh: () -> Unit,
     onNew: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Outlined.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(10.dp))
-        Text("Schedules", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.width(10.dp))
-        Text("$count", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Text("Schedules", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.weight(1f))
-        DesktopOutlinedButton(onClick = onRefresh, enabled = !isLoading) {
-            DesktopButtonContent(if (isLoading) "Refreshing" else "Refresh", Icons.Outlined.Refresh)
+        ScheduleTabs(view, onView)
+        if (showRange) {
+            Spacer(Modifier.width(18.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconBtn(Icons.Outlined.ChevronLeft, "Previous", onPrev)
+                Text(rangeLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(horizontal = 8.dp))
+                IconBtn(Icons.Outlined.ChevronRight, "Next", onNext)
+            }
         }
+        Spacer(Modifier.weight(1f))
         if (canCreate) {
-            Spacer(Modifier.width(10.dp))
-            DesktopDefaultButton(onClick = onNew) {
-                DesktopButtonContent("New schedule", Icons.Outlined.Add)
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .clickable(onClick = onNew)
+                    .padding(horizontal = 16.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Add, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("New schedule", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary)
             }
         }
     }
@@ -269,8 +258,8 @@ private fun ScheduleSurfaceHeader(
 private fun ScheduleTabs(selected: ScheduleView, onSelect: (ScheduleView) -> Unit) {
     Row(
         modifier = Modifier
-            .padding(horizontal = 28.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
             .padding(3.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -282,7 +271,7 @@ private fun ScheduleTabs(selected: ScheduleView, onSelect: (ScheduleView) -> Uni
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (active) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
                     .clickable { onSelect(view) }
-                    .padding(horizontal = 16.dp, vertical = 7.dp),
+                    .padding(horizontal = 18.dp, vertical = 7.dp),
             ) {
                 Text(
                     view.label,
@@ -293,7 +282,162 @@ private fun ScheduleTabs(selected: ScheduleView, onSelect: (ScheduleView) -> Uni
             }
         }
     }
-    Spacer(Modifier.height(14.dp))
+}
+
+// --- Week time-grid ---------------------------------------------------------
+
+@Composable
+private fun WeekView(
+    defs: List<ScheduleDef>,
+    weekStart: LocalDate,
+    today: LocalDate,
+    now: Instant,
+    zone: TimeZone,
+    selectedId: String?,
+    onRunClick: (ScheduleRun) -> Unit,
+) {
+    val grid = remember(defs, weekStart, now) { ScheduleProjection.week(defs, weekStart, now, zone) }
+    val nowMinutes = remember(now, zone) { now.toLocalDateTime(zone).let { it.hour * 60 + it.minute } }
+    val todayInWeek = today in grid.days
+    val gutter = 56.dp
+
+    // The week grid is for discrete daily/weekly schedules. Sub-daily schedules
+    // (hourly and faster) would fill every row into a wall, so — like the
+    // mockup — they're excluded here and surfaced in the rail + Timeline view.
+    val frequent = remember(grid) {
+        grid.runs.groupBy { it.run.scheduleId }.filterValues { it.size > 7 * WEEK_GRID_MAX_PER_DAY }.keys
+    }
+    val visibleRuns = remember(grid, frequent) { grid.runs.filter { it.run.scheduleId !in frequent } }
+    val hiddenCount = remember(frequent) { frequent.size }
+
+    Column(Modifier.fillMaxSize()) {
+        // Day header row.
+        Row(Modifier.fillMaxWidth().padding(start = gutter, end = 4.dp)) {
+            grid.days.forEach { date ->
+                val isToday = date == today
+                Box(Modifier.weight(1f).padding(horizontal = 4.dp, vertical = 6.dp), contentAlignment = Alignment.Center) {
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isToday) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
+                            .padding(vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(ScheduleFormat.weekdayShort(date.dayOfWeek), style = MaterialTheme.typography.labelMedium, color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            "${date.day}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isToday) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+        if (visibleRuns.isEmpty() && hiddenCount > 0) {
+            Box(
+                Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 6.dp)
+                    .clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    "$hiddenCount high-frequency schedule${if (hiddenCount == 1) "" else "s"} run every hour — see the Timeline view for their run density.",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.customColors.onSurfaceMutedColor,
+                )
+            }
+        }
+        val scroll = rememberScrollState()
+        val density = LocalDensity.current
+        LaunchedEffect(Unit) { scroll.scrollTo(with(density) { (HOUR_HEIGHT * 5).roundToPx() }) }
+        Box(Modifier.fillMaxSize().verticalScroll(scroll)) {
+            Row(Modifier.fillMaxWidth().height(HOUR_HEIGHT * GRID_HOURS)) {
+                // Hour gutter — label every 3 hours, aligned to the gridline.
+                Column(Modifier.width(gutter)) {
+                    (0 until GRID_HOURS).forEach { h ->
+                        Box(Modifier.height(HOUR_HEIGHT).fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
+                            if (h % HOUR_LABEL_STEP == 0) {
+                                Text(
+                                    "${ScheduleFormat.pad2(h)}:00",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.customColors.onSurfaceMutedColor,
+                                    modifier = Modifier.offset(y = (-6).dp).padding(end = 10.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+                // Day columns.
+                grid.days.forEachIndexed { dayIndex, date ->
+                    val isToday = date == today
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(if (isToday) MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.4f) else Color.Transparent),
+                    ) {
+                        // Hour grid lines (stronger every 3 hours).
+                        Column(Modifier.fillMaxSize()) {
+                            (0 until GRID_HOURS).forEach { h ->
+                                Box(
+                                    Modifier.height(HOUR_HEIGHT).fillMaxWidth().border(
+                                        width = 0.5.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (h % HOUR_LABEL_STEP == 0) 0.4f else 0.18f),
+                                    ),
+                                )
+                            }
+                        }
+                        // Left column divider.
+                        Box(Modifier.fillMaxHeight().width(0.5.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)))
+                        // Run bars (discrete daily/weekly schedules only).
+                        visibleRuns.filter { it.dayIndex == dayIndex }.forEach { wr ->
+                            val emphasized = selectedId == null || wr.run.scheduleId == selectedId
+                            WeekRunBar(wr.run, wr.minuteOfDay, emphasized, onClick = { onRunClick(wr.run) })
+                        }
+                    }
+                }
+            }
+            // Now line across the day columns, with a dot at the gutter edge.
+            if (todayInWeek) {
+                Row(
+                    Modifier.fillMaxWidth().offset(y = HOUR_HEIGHT * (nowMinutes / 60f)),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.width(gutter), contentAlignment = Alignment.CenterEnd) {
+                        Box(Modifier.size(8.dp).offset(x = 4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                    }
+                    Box(Modifier.weight(1f).height(2.dp).background(MaterialTheme.colorScheme.primary))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeekRunBar(run: ScheduleRun, minuteOfDay: Int, emphasized: Boolean, onClick: () -> Unit) {
+    val color = statusColor(run.status)
+    val filled = run.status == RunStatus.Done || run.status == RunStatus.Running
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 3.dp)
+            .offset(y = HOUR_HEIGHT * (minuteOfDay / 60f))
+            .height(18.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (filled) color.copy(alpha = if (emphasized) 0.9f else 0.4f) else Color.Transparent)
+            .border(1.dp, color.copy(alpha = if (emphasized) 1f else 0.4f), RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 5.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            run.scheduleName,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (filled) MaterialTheme.colorScheme.onSurface else color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 // --- Agenda -----------------------------------------------------------------
@@ -309,15 +453,32 @@ private fun AgendaView(
     onRunClick: (ScheduleRun) -> Unit,
 ) {
     val agenda = remember(defs, selectedDate, now) { ScheduleProjection.agenda(defs, selectedDate, now, zone) }
+    val completed = agenda.runs.count { it.status == RunStatus.Done }
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("${ScheduleFormat.monthShort(selectedDate.month.ordinal + 1)} ${selectedDate.year}".uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            Spacer(Modifier.weight(1f))
+            val isToday = selectedDate == today
+            Box(
+                Modifier.clip(RoundedCornerShape(8.dp))
+                    .background(if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .clickable { onSelectDate(today) }
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+            ) {
+                Text("Today", style = MaterialTheme.typography.labelMedium, color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
         AgendaDateStrip(selectedDate, today, onSelectDate)
         Spacer(Modifier.height(16.dp))
+        Text(dayHeading(selectedDate, today), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Text("${agenda.runs.size} scheduled runs · $completed completed", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Spacer(Modifier.height(12.dp))
         if (agenda.runs.isEmpty()) {
-            Text("No runs scheduled for this day.", color = MaterialTheme.customColors.onSurfaceMutedColor, style = MaterialTheme.typography.bodyMedium)
+            Text("No runs scheduled for this day.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn {
                 items(items = agenda.runs, key = { it.scheduleId + it.instant.toString() }) { run ->
-                    AgendaRow(run, zone, onClick = { onRunClick(run) })
+                    AgendaRow(run, now, zone, onClick = { onRunClick(run) })
                 }
             }
         }
@@ -326,139 +487,59 @@ private fun AgendaView(
 
 @Composable
 private fun AgendaDateStrip(selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
-    // Kizitonwose WeekCalendar (Compose Multiplatform) drives the date strip:
-    // a horizontally-pageable 7-day week row using kotlinx-datetime, which
-    // matches our shared projection's date type.
     val state = rememberWeekCalendarState(
         startDate = today.minus(14, DateTimeUnit.DAY),
         endDate = today.plus(120, DateTimeUnit.DAY),
         firstVisibleWeekDate = selectedDate,
         firstDayOfWeek = firstDayOfWeekFromLocale(),
     )
-    WeekCalendar(
-        state = state,
-        dayContent = { day: WeekDay -> AgendaDayCell(day.date, selectedDate, today, onSelect) },
-    )
+    WeekCalendar(state = state, dayContent = { day: WeekDay -> AgendaDayCell(day.date, selectedDate, today, onSelect) })
 }
 
 @Composable
 private fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: LocalDate, onSelect: (LocalDate) -> Unit) {
     val selected = date == selectedDate
-    val isToday = date == today
     Column(
+        Modifier.padding(2.dp).clickable { onSelect(date) }.padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .padding(4.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer)
-            .border(
-                width = 1.dp,
-                color = if (isToday && !selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                shape = RoundedCornerShape(10.dp),
-            )
-            .clickable { onSelect(date) }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        val onColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-        Text(ScheduleFormat.weekdayShort(date.dayOfWeek), style = MaterialTheme.typography.labelSmall, color = onColor)
-        Text(
-            "${date.day}",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun AgendaRow(run: ScheduleRun, zone: TimeZone, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        StatusDot(run.status)
-        Spacer(Modifier.width(12.dp))
-        Text(ScheduleFormat.timeOfDay(run.instant, zone), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.width(84.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(run.scheduleName, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        StatusPill(run.status)
-    }
-}
-
-// --- Week time-grid ---------------------------------------------------------
-
-@Composable
-private fun WeekView(
-    defs: List<ScheduleDef>,
-    weekStart: LocalDate,
-    now: Instant,
-    zone: TimeZone,
-    onShiftWeek: (Int) -> Unit,
-    onRunClick: (ScheduleRun) -> Unit,
-) {
-    val grid = remember(defs, weekStart, now) { ScheduleProjection.week(defs, weekStart, now, zone) }
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
-            DesktopIconButton(Icons.Outlined.ArrowBack, "Previous week", onClick = { onShiftWeek(-1) })
+        Text(ScheduleFormat.weekdayShort(date.dayOfWeek).take(1), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Spacer(Modifier.height(4.dp))
+        Box(
+            Modifier.size(34.dp).clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
-                "${monthDayLabel(grid.days.first())} – ${monthDayLabel(grid.days.last())}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp),
+                "${date.day}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = when {
+                    selected -> MaterialTheme.colorScheme.onPrimary
+                    date == today -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             )
-            DesktopIconButton(Icons.Outlined.PlayArrow, "Next week", onClick = { onShiftWeek(1) })
         }
-        // Day header row.
-        Row(Modifier.fillMaxWidth().padding(start = 44.dp)) {
-            grid.days.forEach { date ->
-                Text(
-                    "${ScheduleFormat.weekdayShort(date.dayOfWeek)} ${date.day}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+    }
+}
+
+@Composable
+private fun AgendaRow(run: ScheduleRun, now: Instant, zone: TimeZone, onClick: () -> Unit) {
+    val ldt = run.instant.toLocalDateTime(zone)
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text("${ScheduleFormat.pad2(ldt.hour)}:${ScheduleFormat.pad2(ldt.minute)}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(52.dp))
+        Box(Modifier.width(24.dp).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+            Box(Modifier.padding(top = 4.dp).size(10.dp).clip(CircleShape).background(statusColor(run.status)))
         }
-        val scroll = rememberScrollState()
-        Column(Modifier.fillMaxSize().verticalScroll(scroll)) {
-            (0..23).forEach { hour ->
-                Row(Modifier.fillMaxWidth().height(38.dp)) {
-                    Text(
-                        ScheduleFormat.pad2(hour),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.customColors.onSurfaceMutedColor,
-                        modifier = Modifier.width(44.dp),
-                    )
-                    (0..6).forEach { day ->
-                        val cellRuns = grid.runs.filter { it.dayIndex == day && it.minuteOfDay / 60 == hour }
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                cellRuns.take(4).forEach { wr ->
-                                    Box(
-                                        Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(statusColor(wr.run.status))
-                                            .clickable { onRunClick(wr.run) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+        Column(Modifier.weight(1f)) {
+            Text(run.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+        val (label, color) = agendaStatusLabel(run, now)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = color)
     }
 }
 
@@ -467,81 +548,178 @@ private fun WeekView(
 @Composable
 private fun TimelineView(
     defs: List<ScheduleDef>,
+    weekStart: LocalDate,
+    today: LocalDate,
     now: Instant,
     zone: TimeZone,
     onLaneClick: (String) -> Unit,
 ) {
-    val timeline = remember(defs, now) { ScheduleProjection.timeline(defs, now, zone, days = 7) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(items = timeline.lanes, key = { it.scheduleId }) { lane ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { onLaneClick(lane.scheduleId) }
-                    .padding(14.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(lane.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(lane.cadence, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    if (lane.ticks.isEmpty()) {
-                        Text("No runs in the next 7 days", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-                    } else {
-                        lane.ticks.take(40).forEach { tick ->
-                            Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor(tick.status)))
+    val timeline = remember(defs, weekStart, now) { ScheduleProjection.timeline(defs, now, zone, days = 7) }
+    val days = remember(weekStart) { (0..6).map { weekStart.plus(it, DateTimeUnit.DAY) } }
+    val nowFrac = remember(now, zone) { now.toLocalDateTime(zone).let { (it.hour * 60 + it.minute) / 1440f } }
+    val laneLabelWidth = 200.dp
+    Column(Modifier.fillMaxSize().padding(start = 28.dp, end = 28.dp)) {
+        // Day header (today gets a "now" pill).
+        Row(Modifier.fillMaxWidth().padding(start = laneLabelWidth, bottom = 8.dp)) {
+            days.forEach { date ->
+                val isToday = date == today
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("${ScheduleFormat.weekdayShort(date.dayOfWeek)} ${date.day}", style = MaterialTheme.typography.labelSmall, color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (isToday) {
+                        Spacer(Modifier.height(2.dp))
+                        Box(Modifier.clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.primary).padding(horizontal = 7.dp, vertical = 1.dp)) {
+                            Text("now", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimary)
                         }
                     }
                 }
             }
         }
+        LazyColumn(Modifier.weight(1f)) {
+            items(items = timeline.lanes, key = { it.scheduleId }) { lane ->
+                val highFreq = lane.ticks.size > 7 * WEEK_GRID_MAX_PER_DAY
+                Row(
+                    Modifier.fillMaxWidth().height(56.dp).clickable { onLaneClick(lane.scheduleId) }
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.width(laneLabelWidth).padding(end = 12.dp)) {
+                        Text(lane.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(lane.cadence, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    days.forEach { date ->
+                        TimelineDayCell(
+                            date = date,
+                            today = today,
+                            highFreq = highFreq,
+                            nowFrac = nowFrac,
+                            ticks = lane.ticks.filter { it.instant.toLocalDateTime(zone).date == date },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+        }
+        TimelineLegend()
+    }
+}
+
+@Composable
+private fun TimelineDayCell(
+    date: LocalDate,
+    today: LocalDate,
+    highFreq: Boolean,
+    nowFrac: Float,
+    ticks: List<com.letta.mobile.data.schedules.TimelineTick>,
+    modifier: Modifier = Modifier,
+) {
+    val success = MaterialTheme.customColors.successColor
+    val upcoming = MaterialTheme.colorScheme.outline
+    val isToday = date == today
+    Box(
+        modifier.fillMaxHeight().border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (highFreq) {
+            // Hourly+ schedules render as a continuous bar (filled = past).
+            Row(Modifier.fillMaxWidth(0.86f).height(14.dp).clip(RoundedCornerShape(3.dp))) {
+                when {
+                    date < today -> Box(Modifier.fillMaxSize().background(success))
+                    date > today -> Box(Modifier.fillMaxSize().border(1.dp, upcoming, RoundedCornerShape(3.dp)))
+                    else -> {
+                        val frac = nowFrac.coerceIn(0.02f, 0.98f)
+                        Box(Modifier.weight(frac).fillMaxHeight().background(success))
+                        Box(Modifier.weight(1f - frac).fillMaxHeight().border(1.dp, upcoming))
+                    }
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                ticks.take(6).forEach { tick ->
+                    val past = tick.status == RunStatus.Done || tick.status == RunStatus.Failed
+                    Box(
+                        Modifier.size(width = 6.dp, height = 18.dp).clip(RoundedCornerShape(2.dp))
+                            .background(if (past) statusColor(tick.status) else Color.Transparent)
+                            .border(1.dp, statusColor(tick.status).copy(alpha = if (past) 1f else 0.6f), RoundedCornerShape(2.dp)),
+                    )
+                }
+            }
+        }
+        // Vertical now-line through today's cell.
+        if (isToday) {
+            Row(Modifier.fillMaxSize()) {
+                Spacer(Modifier.weight(nowFrac.coerceIn(0.01f, 0.99f)))
+                Box(Modifier.width(2.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primary))
+                Spacer(Modifier.weight(1f - nowFrac.coerceIn(0.01f, 0.99f)))
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimelineLegend() {
+    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        LegendItem(MaterialTheme.customColors.successColor, "success", filled = true)
+        LegendItem(MaterialTheme.colorScheme.error, "failed", filled = true)
+        LegendItem(MaterialTheme.colorScheme.outline, "upcoming", filled = false)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(width = 2.dp, height = 14.dp).background(MaterialTheme.colorScheme.primary))
+            Spacer(Modifier.width(5.dp))
+            Text("now", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun LegendItem(color: Color, label: String, filled: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(10.dp).clip(RoundedCornerShape(2.dp)).background(if (filled) color else Color.Transparent).border(1.dp, color, RoundedCornerShape(2.dp)))
+        Spacer(Modifier.width(5.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 // --- History ----------------------------------------------------------------
 
 @Composable
-private fun HistoryView(
-    defs: List<ScheduleDef>,
-    now: Instant,
-    zone: TimeZone,
-    onScheduleClick: (String) -> Unit,
-) {
-    val summary = remember(defs, now) { ScheduleProjection.history(defs, now, zone) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val rate = summary.overallSuccessRate
-                Text(
-                    if (rate == null) "—" else "${(rate * 100).toInt()}%",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.customColors.successColor,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text("success rate · ${summary.totalRuns} runs", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
-            }
-        }
+private fun HistoryView(summary: com.letta.mobile.data.schedules.HistorySummary) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { StatsCard(summary) }
+        item { Text("RELIABILITY · LAST 12 RUNS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor) }
         items(items = summary.schedules, key = { it.scheduleId }) { rel ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .clickable { onScheduleClick(rel.scheduleId) }
-                    .padding(14.dp),
-            ) {
+            Column(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(rel.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text("${rel.succeeded}/${rel.total}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(rel.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                    val ok = rel.failed == 0
+                    Text("${rel.succeeded}/${rel.total}", style = MaterialTheme.typography.labelMedium, color = if (ok) MaterialTheme.customColors.successColor else MaterialTheme.customColors.runningColor)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 ReliabilityStrip(rel.squares)
             }
         }
+        if (summary.totalRuns == 0) {
+            item {
+                Text("No run history recorded yet — schedules will populate this as they fire.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatsCard(summary: com.letta.mobile.data.schedules.HistorySummary) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(vertical = 18.dp),
+    ) {
+        StatCell("${summary.totalRuns}", "runs · 30d", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+        StatCell(summary.overallSuccessRate?.let { "${(it * 100).toInt()}%" } ?: "—", "success", MaterialTheme.customColors.successColor, Modifier.weight(1f))
+        StatCell("—", "avg run", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun StatCell(value: String, label: String, valueColor: Color, modifier: Modifier) {
+    Column(modifier.padding(horizontal = 18.dp)) {
+        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = valueColor)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
 }
 
@@ -555,80 +733,170 @@ private fun ReliabilityStrip(squares: List<Boolean?>, count: Int = 12) {
                 false -> MaterialTheme.colorScheme.error
                 null -> MaterialTheme.colorScheme.surfaceContainerHighest
             }
-            Box(Modifier.size(14.dp).clip(RoundedCornerShape(3.dp)).background(color))
+            Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(color))
         }
     }
 }
 
-// --- Right rail: schedule detail --------------------------------------------
+// --- Right rail -------------------------------------------------------------
 
 @Composable
-private fun ScheduleDetailRail(
+private fun ScheduleRail(
+    rail: RailState,
+    defs: List<ScheduleDef>,
+    defsById: Map<String, ScheduleDef>,
+    history: com.letta.mobile.data.schedules.HistorySummary,
+    now: Instant,
+    zone: TimeZone,
+    onSelectSchedule: (String) -> Unit,
+    onBackToOverview: () -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    Box(
+        Modifier.width(RAIL_WIDTH).fillMaxHeight()
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(20.dp),
+    ) {
+        when (rail) {
+            RailState.Overview -> OverviewRail(defs, history, now, zone, onSelectSchedule)
+            is RailState.Detail -> defsById[rail.scheduleId]?.let { def ->
+                DetailRail(def, history.schedules.firstOrNull { it.scheduleId == def.id }, now, zone, onBackToOverview, onDelete)
+            } ?: OverviewRail(defs, history, now, zone, onSelectSchedule)
+            is RailState.Run -> RunDetailRail(rail.run, zone, onBackToOverview)
+        }
+    }
+}
+
+@Composable
+private fun OverviewRail(
+    defs: List<ScheduleDef>,
+    history: com.letta.mobile.data.schedules.HistorySummary,
+    now: Instant,
+    zone: TimeZone,
+    onSelectSchedule: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Text("OVERVIEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth()) {
+            StatCell("${history.totalRuns}", "runs · 30d", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+            StatCell(history.overallSuccessRate?.let { "${(it * 100).toInt()}%" } ?: "—", "success", MaterialTheme.customColors.successColor, Modifier.weight(1f))
+            StatCell("—", "avg", MaterialTheme.colorScheme.onSurface, Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(20.dp))
+        Text("ACTIVE SCHEDULES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Spacer(Modifier.height(10.dp))
+        val globalNext = defs.mapNotNull { ScheduleProjection.nextRun(it, now) }.minOrNull()
+        defs.forEach { def ->
+            ActiveScheduleRow(def, now, zone, isNext = ScheduleProjection.nextRun(def, now) == globalNext && globalNext != null) { onSelectSchedule(def.id) }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+@Composable
+private fun ActiveScheduleRow(def: ScheduleDef, now: Instant, zone: TimeZone, isNext: Boolean, onClick: () -> Unit) {
+    val next = ScheduleProjection.nextRun(def, now)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(if (isNext) MaterialTheme.customColors.runningColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(def.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Text(
+            if (next != null) ScheduleFormat.relative(now, next) else "—",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isNext) MaterialTheme.customColors.runningColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DetailRail(
     def: ScheduleDef,
+    reliability: com.letta.mobile.data.schedules.ScheduleReliability?,
     now: Instant,
     zone: TimeZone,
     onBack: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
+    onDelete: (String) -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
-        RailBackHeader(onBack)
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(def.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-            ActivePill(def.active)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
+            Icon(Icons.Outlined.ArrowBack, "Overview", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Spacer(Modifier.height(12.dp))
-        val next = ScheduleProjection.nextRun(def, now)
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp)) {
-            Text("NEXT RUN", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                if (next == null) "No upcoming run" else ScheduleFormat.relative(now, next),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.customColors.runningColor,
-            )
-            if (next != null) {
-                Text(ScheduleFormat.dateLabel(next, zone) + " · " + ScheduleFormat.timeOfDay(next, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        Spacer(Modifier.height(10.dp))
+        Text(def.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, MaterialTheme.customColors.successColor, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 3.dp)) {
+            Text(if (def.active) "Active" else "Paused", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.successColor)
         }
         Spacer(Modifier.height(14.dp))
-        DefRow("Cadence", def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time")
-        DefRow("Fired", "${def.fireCount} times")
-        def.lastFiredAt?.let { DefRow("Last run", ScheduleFormat.relative(now, it)) }
+        val next = ScheduleProjection.nextRun(def, now)
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(if (next != null) "Runs ${ScheduleFormat.relative(now, next)}" else "No upcoming run", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                if (next != null) {
+                    Text("${ScheduleFormat.dateLabel(next, zone)} ${ScheduleFormat.timeOfDay(next, zone)} · ${def.zone.id}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
         Spacer(Modifier.height(16.dp))
+        DefRow("Cadence", def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time")
+        DefRow("Agent", def.name)
+        DefRow("If missed", "Skip — don't catch up")
+        Spacer(Modifier.height(14.dp))
+        if (reliability != null && reliability.total > 0) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("RELIABILITY", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.weight(1f))
+                Text("${reliability.succeeded}/${reliability.total}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(6.dp))
+            ReliabilityStrip(reliability.squares)
+            Spacer(Modifier.height(14.dp))
+        }
+        DesktopDefaultButton(onClick = { /* run now: backend-gated */ }, enabled = false, modifier = Modifier.fillMaxWidth()) {
+            DesktopButtonContent("Run now")
+        }
+        Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DesktopDefaultButton(onClick = onEdit) { DesktopButtonContent("Edit", Icons.Outlined.Edit) }
-            DesktopOutlinedButton(onClick = onDelete) { DesktopButtonContent("Delete", Icons.Outlined.Delete) }
+            DesktopOutlinedButton(onClick = {}, enabled = false) { DesktopButtonContent("Pause") }
+            DesktopOutlinedButton(onClick = { onDelete(def.id) }) { DesktopButtonContent("Delete") }
         }
         Spacer(Modifier.height(8.dp))
         Text("Run now / Pause need a backend control endpoint (not available yet).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
 }
 
-// --- Right rail: run detail -------------------------------------------------
-
 @Composable
-private fun RunDetailRail(
-    run: ScheduleRun,
-    zone: TimeZone,
-    onBack: () -> Unit,
-    onGoToSchedule: () -> Unit,
-) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
-        RailBackHeader(onBack)
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusDot(run.status)
-            Spacer(Modifier.width(8.dp))
-            Text(run.scheduleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+private fun RunDetailRail(run: ScheduleRun, zone: TimeZone, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
+            Icon(Icons.Outlined.ArrowBack, "Back", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(10.dp))
-        DefRow("When", ScheduleFormat.dateLabel(run.instant, zone) + " · " + ScheduleFormat.timeOfDay(run.instant, zone))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor(run.status)))
+            Spacer(Modifier.width(8.dp))
+            Text(run.scheduleName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+        }
+        Spacer(Modifier.height(10.dp))
+        DefRow("When", "${ScheduleFormat.dateLabel(run.instant, zone)} · ${ScheduleFormat.timeOfDay(run.instant, zone)}")
         DefRow("Status", run.status.name)
         run.durationMillis?.let { DefRow("Duration", ScheduleFormat.duration(it)) }
-        run.exitCode?.let { DefRow("Exit code", it.toString()) }
         Spacer(Modifier.height(12.dp))
         Text("OUTPUT LOG", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
         Spacer(Modifier.height(4.dp))
@@ -639,203 +907,176 @@ private fun RunDetailRail(
                 color = if (run.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Spacer(Modifier.height(14.dp))
-        DesktopOutlinedButton(onClick = onGoToSchedule) { DesktopButtonContent("Go to schedule", Icons.Outlined.Schedule) }
     }
 }
 
-// --- Right rail: cron builder ----------------------------------------------
+// --- Create modal -----------------------------------------------------------
 
 @Composable
-private fun CronBuilderRail(
-    initial: RailState.Builder,
+private fun CreateScheduleModal(
     now: Instant,
     zone: TimeZone,
     canCreate: Boolean,
-    onCancel: () -> Unit,
-    onSubmit: (expression: String, name: String, prompt: String) -> Unit,
+    onDismiss: () -> Unit,
+    onCreate: (name: String, prompt: String, cron: String) -> Unit,
 ) {
-    var draft by remember(initial) { mutableStateOf(initial.draft) }
-    var name by remember(initial) { mutableStateOf(initial.name) }
-    var prompt by remember(initial) { mutableStateOf(initial.prompt) }
+    var name by remember { mutableStateOf("") }
+    var prompt by remember { mutableStateOf("") }
+    var draft by remember { mutableStateOf(CronBuilderState()) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp)) {
-        RailBackHeader(onCancel)
-        Text(if (initial.editingId == null) "New schedule" else "Edit schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        Spacer(Modifier.height(14.dp))
-
-        SectionLabel("CADENCE")
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            listOf(
-                CronCadence.EveryNMinutes to "Every N min",
-                CronCadence.Hourly to "Hourly",
-                CronCadence.Daily to "Daily",
-            ).forEach { (cadence, label) ->
-                CadenceChip(label, draft.cadence == cadence) { draft = draft.copy(cadence = cadence) }
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.width(720.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                .clickable(enabled = false) {}.padding(24.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("New schedule", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+                Icon(Icons.Outlined.Close, "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp).clickable(onClick = onDismiss))
             }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-            CadenceChip("Weekly", draft.cadence == CronCadence.Weekly) { draft = draft.copy(cadence = CronCadence.Weekly) }
-            CadenceChip("Custom", draft.cadence == CronCadence.Custom) { draft = draft.copy(cadence = CronCadence.Custom) }
-        }
-        Spacer(Modifier.height(14.dp))
-
-        when (draft.cadence) {
-            CronCadence.EveryNMinutes -> {
-                SectionLabel("INTERVAL (MINUTES)")
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(5, 10, 15, 30).forEach { n ->
-                        CadenceChip("$n", draft.intervalMinutes == n) { draft = draft.copy(intervalMinutes = n) }
+            Spacer(Modifier.height(16.dp))
+            Text("NAME", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            Spacer(Modifier.height(6.dp))
+            DesktopTextField(value = name, onValueChange = { name = it }, placeholder = "Morning briefing", modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(14.dp))
+            Text("PROMPT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            Spacer(Modifier.height(6.dp))
+            DesktopTextArea(
+                value = prompt,
+                onValueChange = { prompt = it },
+                placeholder = "What should the agent do when this fires?",
+                modifier = Modifier.fillMaxWidth().height(140.dp),
+                decorationBoxModifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            )
+            Spacer(Modifier.height(14.dp))
+            Text("WHEN", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            Spacer(Modifier.height(6.dp))
+            CadencePicker(draft) { draft = it }
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp)) {
+                Column {
+                    Text(CronBuilder.preview(draft), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                    CronBuilder.previewRuns(draft, now, zone, 3).forEach {
+                        Text("• ${ScheduleFormat.dateLabel(it, zone)} · ${ScheduleFormat.timeOfDay(it, zone)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
-            CronCadence.Hourly -> {
-                SectionLabel("MINUTE OF HOUR")
-                NumberStepper(draft.minute, 0, 59) { draft = draft.copy(minute = it) }
+            Spacer(Modifier.height(20.dp))
+            val expression = CronBuilder.toExpression(draft)
+            val valid = expression != null && name.isNotBlank() && prompt.isNotBlank() && canCreate
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable(onClick = onDismiss).padding(horizontal = 16.dp, vertical = 8.dp))
+                Spacer(Modifier.width(10.dp))
+                Box(
+                    Modifier.clip(RoundedCornerShape(10.dp))
+                        .background(if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable(enabled = valid) { expression?.let { onCreate(name.trim(), prompt.trim(), it) } }
+                        .padding(horizontal = 18.dp, vertical = 9.dp),
+                ) {
+                    Text("Create schedule", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = if (valid) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            CronCadence.Daily -> TimeOfDayPicker(draft.hour, draft.minute, { draft = draft.copy(hour = it) }, { draft = draft.copy(minute = it) })
-            CronCadence.Weekly -> {
-                TimeOfDayPicker(draft.hour, draft.minute, { draft = draft.copy(hour = it) }, { draft = draft.copy(minute = it) })
-                Spacer(Modifier.height(10.dp))
-                SectionLabel("DAYS")
+            if (!canCreate) {
+                Spacer(Modifier.height(6.dp))
+                Text("This backend doesn't allow creating schedules.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CadencePicker(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
+    Column {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            cadenceChip("Every N min", draft.cadence == CronCadence.EveryNMinutes) { onChange(draft.copy(cadence = CronCadence.EveryNMinutes)) }
+            cadenceChip("Hourly", draft.cadence == CronCadence.Hourly) { onChange(draft.copy(cadence = CronCadence.Hourly)) }
+            cadenceChip("Daily", draft.cadence == CronCadence.Daily) { onChange(draft.copy(cadence = CronCadence.Daily)) }
+            cadenceChip("Weekly", draft.cadence == CronCadence.Weekly) { onChange(draft.copy(cadence = CronCadence.Weekly)) }
+            cadenceChip("Custom", draft.cadence == CronCadence.Custom) { onChange(draft.copy(cadence = CronCadence.Custom)) }
+        }
+        Spacer(Modifier.height(10.dp))
+        when (draft.cadence) {
+            CronCadence.EveryNMinutes -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(5, 10, 15, 30).forEach { n -> cadenceChip("$n", draft.intervalMinutes == n) { onChange(draft.copy(intervalMinutes = n)) } }
+            }
+            CronCadence.Hourly -> TimeRow("Minute", draft.minute, 0, 59) { onChange(draft.copy(minute = it)) }
+            CronCadence.Daily -> TimeOfDayRow(draft) { onChange(it) }
+            CronCadence.Weekly -> Column {
+                TimeOfDayRow(draft) { onChange(it) }
+                Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     (1..7).forEach { iso ->
                         val on = iso in draft.daysOfWeek
-                        CadenceChip(ScheduleFormat.weekdayShort(iso).take(1), on) {
-                            draft = draft.copy(daysOfWeek = if (on) draft.daysOfWeek - iso else draft.daysOfWeek + iso)
+                        cadenceChip(ScheduleFormat.weekdayShort(iso).take(1), on) {
+                            onChange(draft.copy(daysOfWeek = if (on) draft.daysOfWeek - iso else draft.daysOfWeek + iso))
                         }
                     }
                 }
             }
-            CronCadence.Custom -> {
-                SectionLabel("CRON EXPRESSION")
-                DesktopTextField(value = draft.customExpression, onValueChange = { draft = draft.copy(customExpression = it) }, placeholder = "*/15 * * * *", modifier = Modifier.fillMaxWidth())
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-        // Live preview.
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(12.dp)) {
-            Text(CronBuilder.preview(draft), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
-            val previews = remember(draft, now) { CronBuilder.previewRuns(draft, now, zone, 3) }
-            previews.forEach {
-                Text("• " + ScheduleFormat.dateLabel(it, zone) + " · " + ScheduleFormat.timeOfDay(it, zone), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
-        SectionLabel("NAME")
-        DesktopTextField(value = name, onValueChange = { name = it }, placeholder = "Morning briefing", modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(10.dp))
-        SectionLabel("PROMPT")
-        DesktopTextArea(value = prompt, onValueChange = { prompt = it }, placeholder = "What should the agent do?", modifier = Modifier.fillMaxWidth().height(80.dp))
-
-        Spacer(Modifier.height(16.dp))
-        val expression = CronBuilder.toExpression(draft)
-        val valid = expression != null && name.isNotBlank() && prompt.isNotBlank() && canCreate
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DesktopDefaultButton(onClick = { expression?.let { onSubmit(it, name.trim(), prompt.trim()) } }, enabled = valid) {
-                DesktopButtonContent(if (initial.editingId == null) "Create" else "Save", Icons.Outlined.CheckCircle)
-            }
-            DesktopOutlinedButton(onClick = onCancel) { DesktopButtonContent("Cancel") }
-        }
-        if (!canCreate) {
-            Spacer(Modifier.height(6.dp))
-            Text("This backend doesn't allow creating schedules.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+            CronCadence.Custom -> DesktopTextField(value = draft.customExpression, onValueChange = { onChange(draft.copy(customExpression = it)) }, placeholder = "*/15 * * * *", modifier = Modifier.fillMaxWidth())
         }
     }
 }
 
-// --- Small shared bits ------------------------------------------------------
-
 @Composable
-private fun RailBackHeader(onBack: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
-        Icon(Icons.Outlined.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text("Back", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun TimeOfDayRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TimeRow("Hour", draft.hour, 0, 23) { onChange(draft.copy(hour = it)) }
+        TimeRow("Minute", draft.minute, 0, 59) { onChange(draft.copy(minute = it)) }
+        Text(ScheduleFormat.clockLabel(draft.hour, draft.minute), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
-    Spacer(Modifier.height(6.dp))
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-    Spacer(Modifier.height(6.dp))
+private fun TimeRow(label: String, value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        IconBtn(Icons.Outlined.ChevronLeft, "−", { onChange((value - 1).coerceAtLeast(min)) })
+        Text(ScheduleFormat.pad2(value), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+        IconBtn(Icons.Outlined.ChevronRight, "+", { onChange((value + 1).coerceAtMost(max)) })
+    }
 }
+
+// --- Shared bits ------------------------------------------------------------
 
 @Composable
 private fun DefRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.width(96.dp))
-        Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Spacer(Modifier.height(2.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)))
     }
 }
 
 @Composable
-private fun CadenceChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun cadenceChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
+        Modifier.clip(RoundedCornerShape(8.dp))
             .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun NumberStepper(value: Int, min: Int, max: Int, onChange: (Int) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        DesktopIconButton(Icons.Outlined.ArrowBack, "Decrease", onClick = { onChange((value - 1).coerceAtLeast(min)) })
-        Text(ScheduleFormat.pad2(value), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-        DesktopIconButton(Icons.Outlined.PlayArrow, "Increase", onClick = { onChange((value + 1).coerceAtMost(max)) })
-    }
-}
-
-@Composable
-private fun TimeOfDayPicker(hour: Int, minute: Int, onHour: (Int) -> Unit, onMinute: (Int) -> Unit) {
-    Column {
-        SectionLabel("TIME")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            NumberStepper(hour, 0, 23, onHour)
-            Text(" : ", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            NumberStepper(minute, 0, 59, onMinute)
-            Spacer(Modifier.width(10.dp))
-            Text(ScheduleFormat.clockLabel(hour, minute), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
-        }
-    }
-}
-
-@Composable
-private fun StatusDot(status: RunStatus) {
-    Box(Modifier.size(10.dp).clip(CircleShape).background(statusColor(status)))
-}
-
-@Composable
-private fun StatusPill(status: RunStatus) {
-    val color = statusColor(status)
+private fun IconBtn(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, onClick: () -> Unit) {
     Box(
-        Modifier.clip(RoundedCornerShape(6.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 3.dp),
+        Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(status.name, style = MaterialTheme.typography.labelSmall, color = color)
-    }
-}
-
-@Composable
-private fun ActivePill(active: Boolean) {
-    val color = if (active) MaterialTheme.customColors.successColor else MaterialTheme.customColors.runningColor
-    Box(Modifier.clip(RoundedCornerShape(6.dp)).background(color.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 3.dp)) {
-        Text(if (active) "Active" else "Paused", style = MaterialTheme.typography.labelSmall, color = color)
+        Icon(icon, desc, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
     }
 }
 
 @Composable
 private fun ScheduleEmptyState(canCreate: Boolean) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Outlined.Schedule, contentDescription = null, tint = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.size(40.dp))
+        Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.customColors.onSurfaceMutedColor, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(10.dp))
         Text("No schedules yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
         Text(
@@ -854,6 +1095,33 @@ private fun statusColor(status: RunStatus): Color = when (status) {
     RunStatus.Upcoming -> MaterialTheme.colorScheme.outline
 }
 
-/** A short `Jun 24`-style label for a date (no Instant conversion needed). */
+@Composable
+private fun agendaStatusLabel(run: ScheduleRun, now: Instant): Pair<String, Color> = when (run.status) {
+    RunStatus.Done -> "Ran" to MaterialTheme.customColors.successColor
+    RunStatus.Failed -> "Failed" to MaterialTheme.colorScheme.error
+    RunStatus.Running -> "running" to MaterialTheme.customColors.runningColor
+    RunStatus.Next -> ScheduleFormat.relative(now, run.instant) to MaterialTheme.customColors.runningColor
+    RunStatus.Upcoming -> "scheduled" to MaterialTheme.colorScheme.onSurfaceVariant
+}
+
 private fun monthDayLabel(date: LocalDate): String =
     "${ScheduleFormat.monthShort(date.month.ordinal + 1)} ${date.day}"
+
+private fun dayHeading(date: LocalDate, today: LocalDate): String {
+    val delta = (date.toEpochDays() - today.toEpochDays()).toInt()
+    return when (delta) {
+        0 -> "Today"
+        1 -> "Tomorrow"
+        -1 -> "Yesterday"
+        else -> "${fullWeekday(date.dayOfWeek.isoDayNumber)}, ${monthDayLabel(date)}"
+    }
+}
+
+private fun fullWeekday(iso: Int): String =
+    listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")[(iso - 1).coerceIn(0, 6)]
+
+private fun fullMonth(monthNumber: Int): String =
+    listOf(
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December",
+    )[(monthNumber - 1).coerceIn(0, 11)]
