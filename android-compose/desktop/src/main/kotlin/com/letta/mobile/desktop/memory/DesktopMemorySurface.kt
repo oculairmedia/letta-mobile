@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Hub
@@ -127,6 +128,15 @@ fun DesktopMemorySurface(
             MemoryHeader(
                 state = state,
                 onRefresh = onRefresh,
+                // Re-expose block creation: the graph-only redesign dropped the
+                // only entry point for adding a memory block (Codex review #7).
+                // The editor panel needs both an agent and a block API, so gate
+                // the action on the same preconditions.
+                onNewBlock = if (agentId != null && blockApi != null) {
+                    { editorTarget = BlockEditorTarget.New }
+                } else {
+                    null
+                },
             )
             state.errorMessage?.let { errorMessage ->
                 DesktopInlineError(
@@ -182,6 +192,7 @@ fun DesktopMemorySurface(
 private fun MemoryHeader(
     state: DesktopMemorySurfaceState,
     onRefresh: () -> Unit,
+    onNewBlock: (() -> Unit)? = null,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -195,6 +206,11 @@ private fun MemoryHeader(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
+        onNewBlock?.let { newBlock ->
+            DesktopDefaultButton(onClick = newBlock) {
+                DesktopButtonContent(text = "New block", icon = Icons.Outlined.Add)
+            }
+        }
         DesktopRefreshAction(onRefresh = onRefresh, enabled = !state.isLoading)
     }
 }

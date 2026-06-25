@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -134,11 +135,14 @@ fun DesktopSkillsSurface(
                 onClose = { selectedSkill = null },
                 onInstall = onInstallSkill,
                 onUninstall = onUninstallSkill,
+                onRetry = onRefreshSkills,
             )
             SkillsTab.Tools -> ToolsContent(
                 toolState = toolState,
                 onRefresh = onToolsRefresh,
                 onLoadMore = onToolsLoadMore,
+                onTagToggled = onToolsTagToggled,
+                onClearTags = onToolsClearTags,
             )
         }
     }
@@ -161,6 +165,7 @@ private fun SkillsContent(
     onClose: () -> Unit,
     onInstall: (String) -> Unit,
     onUninstall: (String) -> Unit,
+    onRetry: () -> Unit,
 ) {
     val installedExtras = remember(installedSkillNames, skills) {
         val known = skills.map { it.name }.toSet()
@@ -178,7 +183,7 @@ private fun SkillsContent(
         Column(Modifier.weight(1f).fillMaxHeight()) {
             skillsError?.let {
                 Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
-                    DesktopInlineError(message = it, onRetry = {}, retrying = skillsLoading)
+                    DesktopInlineError(message = it, onRetry = onRetry, retrying = skillsLoading)
                 }
             }
             when {
@@ -230,6 +235,8 @@ private fun ToolsContent(
     toolState: DesktopToolLibraryState,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
+    onTagToggled: (String) -> Unit,
+    onClearTags: () -> Unit,
 ) {
     val tools = toolState.filteredTools
     val grouped = remember(tools) { SkillCategories.grouped(tools, nameOf = { it.name }, tagsOf = { it.tags }) }
@@ -238,6 +245,23 @@ private fun ToolsContent(
         toolState.errorMessage?.let {
             Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
                 DesktopInlineError(message = it, onRetry = onRefresh, retrying = toolState.isLoading)
+            }
+        }
+        // Tag filters — a horizontally scrollable strip so a long registry of
+        // tags can't overflow the row. The unified header dropped these, which
+        // removed the only way to filter tools by tag (Codex review #6).
+        val tags = toolState.allTags
+        if (tags.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 32.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DesktopChipTab("All", toolState.selectedTags.isEmpty()) { onClearTags() }
+                tags.forEach { tag ->
+                    DesktopChipTab(tag, tag in toolState.selectedTags) { onTagToggled(tag) }
+                }
             }
         }
         when {
@@ -259,12 +283,17 @@ private fun ToolsContent(
                         tool.toolType?.takeIf { it.isNotBlank() }?.let { DesktopPill(it, MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
-                item("load-more") {
-                    if (toolState.isLoadingMore) {
-                        DesktopInfoBox("Loading more tools…")
-                    } else {
-                        Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
-                            DesktopOutlinedButton(onClick = onLoadMore) { DesktopButtonContent("Load more") }
+                // Only offer paging when more pages exist and no local search is
+                // narrowing the list — otherwise the button no-ops at the end or
+                // fetches unrelated pages mid-search (Codex review #4).
+                if (toolState.hasMorePages && toolState.searchQuery.isBlank()) {
+                    item("load-more") {
+                        if (toolState.isLoadingMore) {
+                            DesktopInfoBox("Loading more tools…")
+                        } else {
+                            Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                                DesktopOutlinedButton(onClick = onLoadMore) { DesktopButtonContent("Load more") }
+                            }
                         }
                     }
                 }

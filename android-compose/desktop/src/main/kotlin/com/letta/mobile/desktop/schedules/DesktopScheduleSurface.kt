@@ -100,6 +100,7 @@ private val HOUR_HEIGHT = 44.dp
 private const val GRID_HOURS = 24
 private const val HOUR_LABEL_STEP = 3
 private const val WEEK_GRID_MAX_PER_DAY = 4
+private const val NOW_TICK_MILLIS = 30_000L
 
 /**
  * Phase-7 Schedules surface, rebuilt to the Penpot mockups: a Week / Agenda /
@@ -122,14 +123,39 @@ fun DesktopScheduleSurface(
         { _, _, _, _, _, _ -> },
 ) {
     val zone = remember { TimeZone.currentSystemDefault() }
-    val now = remember { Clock.System.now() }
+    // Keep `now` advancing so countdown labels, the now-line, and the
+    // Running/Next classification stay live while the screen is open instead of
+    // freezing at first composition (Codex/CodeRabbit review #2). A 30s tick is
+    // enough for minute-granularity labels; the projections it keys are cheap.
+    var now by remember { mutableStateOf(Clock.System.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(NOW_TICK_MILLIS)
+            now = Clock.System.now()
+        }
+    }
     val today = remember(now, zone) { now.toLocalDateTime(zone).date }
 
     val filterAgentId = focusedAgentId
     val filteredCrons = remember(crons, filterAgentId) {
         if (filterAgentId == null) crons else crons.filter { it.agentId == null || it.agentId == filterAgentId }
     }
-    val defs = remember(filteredCrons, zone) { ScheduleProjection.toScheduleDefs(filteredCrons, zone) }
+    // Native schedule-admin schedules (state.schedules) are a parallel source to
+    // /v1/crons. Projecting from crons alone hid real schedules on backends that
+    // serve the native route but no crons (Codex review #5), so merge both —
+    // crons first, then any native schedule not already represented by id.
+    val nativeSchedules = state.schedules
+    val defs = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
+        val cronDefs = ScheduleProjection.toScheduleDefs(filteredCrons, zone)
+        val filteredNative = if (filterAgentId == null) {
+            nativeSchedules
+        } else {
+            nativeSchedules.filter { it.agentId == filterAgentId }
+        }
+        val nativeDefs = ScheduleProjection.toScheduleDefsFromNative(filteredNative, zone)
+        val seen = cronDefs.mapTo(HashSet()) { it.id }
+        cronDefs + nativeDefs.filter { it.id !in seen }
+    }
     val defsById = remember(defs) { defs.associateBy { it.id } }
     val historySummary = remember(defs, now) { ScheduleProjection.history(defs, now, zone) }
 
@@ -542,7 +568,9 @@ private fun TimelineView(
     zone: TimeZone,
     onLaneClick: (String) -> Unit,
 ) {
-    val timeline = remember(defs, weekStart, now) { ScheduleProjection.timeline(defs, now, zone, days = 7) }
+    val timeline = remember(defs, weekStart, now) {
+        ScheduleProjection.timeline(defs, now, zone, startDate = weekStart, days = 7)
+    }
     val days = remember(weekStart) { (0..6).map { weekStart.plus(it, DateTimeUnit.DAY) } }
     val nowFrac = remember(now, zone) { now.toLocalDateTime(zone).let { (it.hour * 60 + it.minute) / 1440f } }
     val laneLabelWidth = 200.dp

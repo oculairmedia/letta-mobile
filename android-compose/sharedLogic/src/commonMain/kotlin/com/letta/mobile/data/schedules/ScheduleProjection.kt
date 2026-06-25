@@ -1,5 +1,6 @@
 package com.letta.mobile.data.schedules
 
+import com.letta.mobile.data.model.ScheduledMessage
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -147,7 +148,13 @@ object ScheduleProjection {
                 ?: description?.takeIf { it.isNotBlank() }
                 ?: prompt?.takeIf { it.isNotBlank() }?.take(40)
                 ?: "Schedule",
-            cron = cron?.takeIf { recurring && it.isNotBlank() },
+            // Keep the cron for one-shot tasks (recurring=false) too: the slim
+            // /v1/crons shape carries no separate one-shot timestamp, and a
+            // one-off is persisted as a fully-specified cron. Dropping it here
+            // erased the only fire-time source, so non-recurring tasks never
+            // materialized a run (Codex review #16). The richer schedule-admin
+            // path supplies a real oneShotAt where one exists.
+            cron = cron?.takeIf { it.isNotBlank() },
             oneShotAt = null,
             active = true,
             zone = taskZone,
@@ -157,8 +164,35 @@ object ScheduleProjection {
     fun toScheduleDefs(crons: List<CronTask>, zone: TimeZone): List<ScheduleDef> =
         crons.map { it.toScheduleDef(zone) }
 
+    /**
+     * Adapt a native schedule-admin [ScheduledMessage] (the
+     * `/v1/agents/{id}/schedule` shape) into a [ScheduleDef]. Backends that
+     * serve the native route but no `/v1/crons` expose schedules only here, so
+     * a surface that projects from crons alone hides them (Codex review #5).
+     * `scheduled_at` is interpreted as Unix epoch seconds for one-shots; the
+     * wire shape carries no per-schedule time zone, so the viewer's zone is
+     * used.
+     */
+    fun ScheduledMessage.toScheduleDef(viewerZone: TimeZone): ScheduleDef {
+        val recurring = schedule.type == "recurring"
+        val label = message.messages.firstOrNull()?.content?.trim()?.takeIf { it.isNotBlank() }
+        return ScheduleDef(
+            id = id,
+            name = label?.take(40) ?: "Schedule",
+            cron = if (recurring) schedule.cronExpression?.takeIf { it.isNotBlank() } else null,
+            oneShotAt = if (!recurring) schedule.scheduledAt?.let { Instant.fromEpochSeconds(it.toLong()) } else null,
+            active = true,
+            zone = viewerZone,
+        )
+    }
+
+    fun toScheduleDefsFromNative(schedules: List<ScheduledMessage>, zone: TimeZone): List<ScheduleDef> =
+        schedules.map { it.toScheduleDef(zone) }
+
     /** The single next run instant for [def] strictly after [now]. */
     fun nextRun(def: ScheduleDef, now: Instant): Instant? = when {
+        // A paused schedule has no upcoming run (Codex review #15).
+        !def.active -> null
         def.cron != null -> CronSchedule.parse(def.cron)?.let { CronSchedule.nextRun(it, now, def.zone) }
         def.oneShotAt != null -> def.oneShotAt.takeIf { it > now }
         else -> null
@@ -166,6 +200,10 @@ object ScheduleProjection {
 
     /** Materialize a schedule's runs within `[start, end)`. */
     private fun runsBetween(def: ScheduleDef, start: Instant, end: Instant): List<Instant> = when {
+        // Paused schedules don't project future runs (Codex review #15). Past
+        // runs still surface via the History overlay, which doesn't go through
+        // this path.
+        !def.active -> emptyList()
         def.cron != null ->
             CronSchedule.parse(def.cron)?.let { CronSchedule.runsBetween(it, start, end, def.zone) }.orEmpty()
         def.oneShotAt != null -> listOfNotNull(def.oneShotAt.takeIf { it >= start && it < end })
@@ -251,17 +289,24 @@ object ScheduleProjection {
         return WeekGrid(weekStart, days, weekRuns)
     }
 
-    /** Timeline swimlanes over the next [days] days (default a week). */
+    /**
+     * Timeline swimlanes spanning [days] days from [startDate] (defaults to the
+     * day containing [now]). The caller passes the displayed week's start so the
+     * lanes line up with the column headers; [now] still drives run
+     * classification (Done/Running/Next). Without an explicit [startDate] the
+     * lanes were always anchored to today, so navigating weeks left the ticks
+     * mismatched against the headers (Codex/CodeRabbit review #1).
+     */
     fun timeline(
         defs: List<ScheduleDef>,
         now: Instant,
         zone: TimeZone,
+        startDate: LocalDate = now.toLocalDateTime(zone).date,
         days: Int = 7,
         history: Map<String, List<RunRecord>> = emptyMap(),
     ): Timeline {
-        val today = now.toLocalDateTime(zone).date
-        val start = today.atStartOfDayIn(zone)
-        val end = today.plus(days, DateTimeUnit.DAY).atStartOfDayIn(zone)
+        val start = startDate.atStartOfDayIn(zone)
+        val end = startDate.plus(days, DateTimeUnit.DAY).atStartOfDayIn(zone)
         val globalNext = globalNextInstant(defs, now)
         val lanes = defs.map { def ->
             val ticks = runsBetween(def, start, end).map { instant ->

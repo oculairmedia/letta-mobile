@@ -256,5 +256,10 @@ object CronSchedule {
     private const val MAX_MONTH = 12
     private const val MIN_DOW = 0
     private const val MAX_DOW = 7
-    private const val DEFAULT_LOOKAHEAD_DAYS = 400
+    // Must exceed the longest gap between valid fires so leap-day schedules
+    // (`0 0 29 2 *`) resolve: Feb 29 recurs every 4 years (~1461 days), so a
+    // 400-day window returned null for a perfectly valid expression
+    // (CodeRabbit review #14). 1500 covers the leap cycle with margin while
+    // still bounding a never-firing expression (e.g. Feb 30).
+    private const val DEFAULT_LOOKAHEAD_DAYS = 1500
 }

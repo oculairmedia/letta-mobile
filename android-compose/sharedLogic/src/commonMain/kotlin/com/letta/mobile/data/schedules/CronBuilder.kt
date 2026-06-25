@@ -79,7 +79,12 @@ object CronBuilder {
             if (validTime(state)) "${state.minute} ${state.hour} * * *" else null
         }
         CronCadence.Weekly -> {
-            if (!validTime(state) || state.daysOfWeek.isEmpty()) {
+            // Reject out-of-range weekdays (ISO Mon=1..Sun=7) so an invalid
+            // selection yields null instead of a bad cron string the caller
+            // treats as creatable (CodeRabbit review #13).
+            if (!validTime(state) || state.daysOfWeek.isEmpty() ||
+                state.daysOfWeek.any { it !in 1..7 }
+            ) {
                 null
             } else {
                 val dow = state.daysOfWeek.sorted().joinToString(",")
