@@ -45,7 +45,6 @@ data class ConfigUiState(
     val themePreset: ThemePreset = ThemePreset.DEFAULT,
     val dynamicColor: Boolean = false,
     val enableProjects: Boolean = false,
-    val hapticsEnabled: Boolean = true,
     val localModelPath: String = "",
     val localModelHandle: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_HANDLE,
     val localModelAccelerator: String = ConfigViewModel.DEFAULT_LOCAL_MODEL_ACCELERATOR,
@@ -111,7 +110,6 @@ class ConfigViewModel @Inject constructor(
                 val themePreset = settingsRepository.getThemePreset().first()
                 val dynamicColor = settingsRepository.getDynamicColor().first()
                 val enableProjects = settingsRepository.getEnableProjects().first()
-                val hapticsEnabled = settingsRepository.getHapticsEnabled().first()
                 val configUiState = if (activeConfig != null && !createNew) {
                     ConfigUiState(
                         mode = activeConfig.mode.toServerMode(),
@@ -121,7 +119,6 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
-                        hapticsEnabled = hapticsEnabled,
                         localModelPath = activeConfig.localModelPath.orEmpty(),
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -145,7 +142,6 @@ class ConfigViewModel @Inject constructor(
                         themePreset = themePreset,
                         dynamicColor = dynamicColor,
                         enableProjects = enableProjects,
-                        hapticsEnabled = hapticsEnabled,
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -233,16 +229,6 @@ class ConfigViewModel @Inject constructor(
             _uiState.value = UiState.Success(currentState.copy(enableProjects = enabled))
             viewModelScope.launch {
                 settingsRepository.setEnableProjects(enabled)
-            }
-        }
-    }
-
-    fun updateHapticsEnabled(enabled: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hapticsEnabled = enabled))
-            viewModelScope.launch {
-                settingsRepository.setHapticsEnabled(enabled)
             }
         }
     }

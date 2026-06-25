@@ -33,7 +33,6 @@ enum class LettaHapticPlayback {
 }
 
 enum class LettaHapticIntensity(val value: Float) {
-    Feather(0.12f),
     Light(0.25f),
     Medium(0.5f),
     Strong(0.75f),
@@ -70,34 +69,36 @@ object LettaHapticPatterns {
     fun patternFor(cue: LettaHapticCue): LettaHapticPattern? = when (cue) {
         LettaHapticCue.StreamingStart -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 10L, intensity = LettaHapticIntensity.Light),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 18L, intensity = LettaHapticIntensity.Medium),
+                LettaHapticPulse(startTimeMs = 42L, durationMs = 24L, intensity = LettaHapticIntensity.Light),
             ),
         )
         LettaHapticCue.StreamingPulse -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 2L, intensity = LettaHapticIntensity.Feather),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 12L, intensity = LettaHapticIntensity.Light),
             ),
         )
         LettaHapticCue.StreamingComplete -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 14L, intensity = LettaHapticIntensity.Light),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 22L, intensity = LettaHapticIntensity.Medium),
+                LettaHapticPulse(startTimeMs = 48L, durationMs = 28L, intensity = LettaHapticIntensity.Strong),
             ),
         )
         LettaHapticCue.ToolCallStarted -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 8L, intensity = LettaHapticIntensity.Light),
-                LettaHapticPulse(startTimeMs = 44L, durationMs = 8L, intensity = LettaHapticIntensity.Light),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 20L, intensity = LettaHapticIntensity.Medium),
+                LettaHapticPulse(startTimeMs = 56L, durationMs = 20L, intensity = LettaHapticIntensity.Medium),
             ),
         )
         LettaHapticCue.ToolCallSucceeded -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 12L, intensity = LettaHapticIntensity.Medium),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 24L, intensity = LettaHapticIntensity.Strong),
             ),
         )
         LettaHapticCue.ToolCallFailed -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 16L, intensity = LettaHapticIntensity.Medium),
-                LettaHapticPulse(startTimeMs = 58L, durationMs = 18L, intensity = LettaHapticIntensity.Medium),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 35L, intensity = LettaHapticIntensity.Strong),
+                LettaHapticPulse(startTimeMs = 78L, durationMs = 45L, intensity = LettaHapticIntensity.High),
             ),
         )
         else -> null

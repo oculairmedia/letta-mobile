@@ -182,28 +182,6 @@ class StreamingMarkdownDocumentTest {
     }
 
     @Test
-    fun `incremental parsing preserves every streamed prefix source`() {
-        val markdown = """
-            Sounds — we’ll keep the current tuning:
-
-            - `Feather`
-            - `2ms`
-            - `96ms` debounce
-
-            reveal-synced
-
-            That’s a solid middle ground: still perceptible, but better than the earlier punchy/metronome feel.
-        """.trimIndent()
-        val state = StreamingMarkdownDocumentState()
-
-        markdown.forEachIndexed { index, _ ->
-            val prefix = markdown.substring(0, index + 1)
-            val document = state.update(prefix)
-            assertEquals(prefix, document.blocks.joinToString(separator = "") { it.source })
-        }
-    }
-
-    @Test
     fun `structural blocks do not accept inline cursor glyphs`() {
         val state = StreamingMarkdownDocumentState()
 

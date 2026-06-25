@@ -5,7 +5,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -36,10 +35,8 @@ fun rememberSmoothedStreamingText(
     rawText: String,
     isStreaming: Boolean,
     seedText: String = "",
-    onRevealStep: ((String) -> Unit)? = null,
 ): String {
     val smoother = remember { StreamingDisplayTextSmoother() }
-    val currentOnRevealStep by rememberUpdatedState(onRevealStep)
 
     // letta-mobile-uoiu6: seed the smoother (and the initial displayed value)
     // with the prefix that was already painted before streaming engaged.
@@ -78,19 +75,11 @@ fun rememberSmoothedStreamingText(
     // while the pure smoother still estimates velocity from monotonic time.
     LaunchedEffect(rawText, isStreaming) {
         while (isActive && !(smoother.isFullyRevealed && !isStreaming)) {
-            val nextText = smoother.step(nowMs())
-            if (nextText.length > displayedText.length) {
-                currentOnRevealStep?.invoke(nextText)
-            }
-            displayedText = nextText
+            displayedText = smoother.step(nowMs())
             delay(STREAMING_TEXT_PAINT_INTERVAL_MS)
         }
         // Final step to ensure we don't leave a partial reveal.
-        val finalText = smoother.step(nowMs())
-        if (finalText.length > displayedText.length) {
-            currentOnRevealStep?.invoke(finalText)
-        }
-        displayedText = finalText
+        displayedText = smoother.step(nowMs())
     }
 
     return displayedText

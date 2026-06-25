@@ -541,13 +541,6 @@ private fun MarkdownTextRaw(
             components = components,
             extendedSpans = extendedSpans,
             imageTransformer = Coil3ImageTransformerImpl,
-            // letta-mobile: MUST stay true. retainState caches the parsed AST +
-            // span layout across recompositions so committed markdown blocks do
-            // NOT reparse on every streaming tick — per-chunk reparse is a
-            // visible temporal flicker (regressed once when this was flipped to
-            // false). The dropped-character bug that prompted the flip was a
-            // separate streaming-fence repair bug, fixed in StreamingMarkdownRepair.
-            // Do not set this to false to "fix" rendering; verify on device first.
             retainState = true,
             // Editorial breathing room: generous spacing between list items,
             // paragraphs, and blocks so prose feels loose and magazine-like.

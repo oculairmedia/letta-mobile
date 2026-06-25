@@ -389,11 +389,6 @@ internal class AdminChatViewModel @Inject constructor(
     val chatFontScale: StateFlow<Float> = settingsRepository.getChatFontScale()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
 
-    // Master switch for the expressive Jindong activity haptics (streaming +
-    // tool-call pattern cues). Default-on; gates the new ChatScreen effects.
-    val hapticsEnabled: StateFlow<Boolean> = settingsRepository.getHapticsEnabled()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
     val availableAgents: StateFlow<List<Agent>> = agentRepository.agents
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

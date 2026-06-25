@@ -50,7 +50,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.letta.mobile.feature.chat.render.LocalStreamingRevealHapticPulse
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -101,7 +100,6 @@ import com.letta.mobile.feature.chat.subagent.SubagentTodoSheet
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetState
 import com.letta.mobile.feature.chat.subagent.subagentTodoSheetStateFrom
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
-import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.ChatBackground
@@ -123,11 +121,6 @@ import kotlin.math.max
  * the row without any other change.
  */
 private const val TOOL_AFFORDANCE_ROW_ENABLED = true
-
-// letta-mobile-gi9o0: minimum gap between reveal-synchronized streaming
-// haptics. Pulses are triggered by the smoothed text actually revealing (word
-// boundaries / small character buckets), not by an independent timer.
-private const val STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS = 96L
 
 @Composable
 internal fun ChatScreen(
@@ -158,7 +151,6 @@ internal fun ChatScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
-    val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
     val projectBindings = viewModel.projectBindings
 
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
@@ -317,88 +309,6 @@ internal fun ChatScreen(
             }
         }
 
-        // letta-mobile-gi9o0: expressive Jindong activity haptics. These were
-        // wired into the cue model but never invoked. Three effects cover the
-        // streaming lifecycle and tool-call outcomes; all gate on the
-        // `hapticsEnabled` master switch (Settings → Haptic feedback).
-        //
-        // 1) Streaming edges — a soft double-tap when the agent starts
-        //    streaming, a firmer resolve when it finishes. Tracks our own
-        //    rising/falling edge so a recomposition mid-stream doesn't refire.
-        var streamingHapticActive by remember { mutableStateOf(false) }
-        LaunchedEffect(state.isStreaming, state.error, hapticsEnabled) {
-            if (!hapticsEnabled) {
-                streamingHapticActive = false
-                return@LaunchedEffect
-            }
-            when {
-                state.isStreaming && !streamingHapticActive -> {
-                    streamingHapticActive = true
-                    HapticEffects.streamingStart(view, enabled = true)
-                }
-                !state.isStreaming && streamingHapticActive -> {
-                    streamingHapticActive = false
-                    if (state.error != null) {
-                        HapticEffects.toolCallFailed(view, enabled = true)
-                    } else {
-                        HapticEffects.streamingComplete(view, enabled = true)
-                    }
-                }
-            }
-        }
-
-        // 2) Streaming pulse — a tiny tick when the smoothed renderer actually
-        //    reveals more text. This follows the visible reveal cadence instead
-        //    of running as a generic background frequency against raw chunks.
-        var lastRevealHapticAt by remember { mutableLongStateOf(0L) }
-        val streamingRevealPulse: () -> Unit = {
-            if (hapticsEnabled) {
-                val now = System.currentTimeMillis()
-                if (now - lastRevealHapticAt >= STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS) {
-                    lastRevealHapticAt = now
-                    HapticEffects.streamingPulse(view, enabled = true)
-                }
-            }
-        }
-
-        // 3) Tool-call outcomes — buzz when a tool call we saw START reaches a
-        //    terminal state. Scoping terminal cues to ids we already greeted as
-        //    pending keeps history replay (loading old tool calls) silent.
-        val greetedToolIds = remember { HashSet<String>() }
-        val resolvedToolIds = remember { HashSet<String>() }
-        LaunchedEffect(state.pendingTools, hapticsEnabled) {
-            if (!hapticsEnabled) return@LaunchedEffect
-            state.pendingTools.forEach { pending ->
-                if (greetedToolIds.add(pending.id)) {
-                    HapticEffects.toolCallStarted(view, enabled = true)
-                }
-            }
-        }
-        LaunchedEffect(state.messages, hapticsEnabled) {
-            if (!hapticsEnabled) return@LaunchedEffect
-            // Hot-path guard: while streaming text, `state.messages` churns on
-            // every token but no tool is awaiting resolution. Skip the scan
-            // unless some greeted tool is still unresolved.
-            if (greetedToolIds.size == resolvedToolIds.size) return@LaunchedEffect
-            state.messages.forEach { message ->
-                message.toolCalls?.forEach toolCall@{ toolCall ->
-                    val id = toolCall.toolCallId ?: return@toolCall
-                    if (id !in greetedToolIds) return@toolCall
-                    val isTerminal = ToolReturnStatus.isError(toolCall.status) ||
-                        toolCall.result != null ||
-                        toolCall.status == ToolReturnStatus.SUCCESS ||
-                        toolCall.status == "warning"
-                    if (isTerminal && resolvedToolIds.add(id)) {
-                        if (ToolReturnStatus.isError(toolCall.status)) {
-                            HapticEffects.toolCallFailed(view, enabled = true)
-                        } else {
-                            HapticEffects.toolCallSucceeded(view, enabled = true)
-                        }
-                    }
-                }
-            }
-        }
-
         // letta-mobile-ndtc.3: the 60s delay subtitle is rendered inline by
         // ThinkingTextToken below (not as a snackbar/banner). The ViewModel
         // keeps `a2uiThinkingDelayMessage` set until the next thinking start
@@ -490,7 +400,6 @@ internal fun ChatScreen(
 
                 CompositionLocalProvider(
                     LocalSubagentTodoSheetOpener provides openSubagentTarget,
-                    LocalStreamingRevealHapticPulse provides streamingRevealPulse,
                 ) {
                     Crossfade(
                         targetState = contentPhase,

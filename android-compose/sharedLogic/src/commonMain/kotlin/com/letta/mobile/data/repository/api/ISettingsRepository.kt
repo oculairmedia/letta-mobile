@@ -78,15 +78,8 @@ interface ISettingsRepository {
     fun getChatFontScale(): Flow<Float>
     suspend fun setChatFontScale(scale: Float)
     fun getEnableProjects(): Flow<Boolean>
-    /**
-     * Master switch for the expressive Jindong-backed activity haptics
-     * (streaming start/pulse/complete + tool-call started/succeeded/failed).
-     * Defaults to enabled. Simple tap/toggle platform cues are unaffected.
-     */
-    fun getHapticsEnabled(): Flow<Boolean>
     suspend fun setTheme(theme: AppTheme)
     suspend fun setThemePreset(themePreset: ThemePreset)
     suspend fun setDynamicColor(enabled: Boolean)
     suspend fun setEnableProjects(enabled: Boolean)
-    suspend fun setHapticsEnabled(enabled: Boolean)
 }

@@ -59,7 +59,6 @@ class FakeSettingsRepository(
     private val chatBackgroundKeyState = MutableStateFlow("default")
     private val chatFontScaleState = MutableStateFlow(1f)
     private val enableProjectsState = MutableStateFlow(false)
-    private val hapticsEnabledState = MutableStateFlow(true)
 
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 
@@ -223,12 +222,6 @@ class FakeSettingsRepository(
     }
 
     override fun getEnableProjects(): Flow<Boolean> = enableProjectsState
-
-    override fun getHapticsEnabled(): Flow<Boolean> = hapticsEnabledState
-
-    override suspend fun setHapticsEnabled(enabled: Boolean) {
-        hapticsEnabledState.value = enabled
-    }
 
     override suspend fun setTheme(theme: AppTheme) {
         themeState.value = theme

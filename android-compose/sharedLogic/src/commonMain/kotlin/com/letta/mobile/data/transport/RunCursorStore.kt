@@ -1,5 +1,7 @@
 package com.letta.mobile.data.transport
 
+import java.util.concurrent.ConcurrentHashMap
+
 /**
  * Persistent map of `{conversationId -> {runId -> lastSeq}}` for
  * non-terminal mobile WebSocket runs.
@@ -42,44 +44,55 @@ interface RunCursorStore {
 }
 
 internal class InMemoryRunCursorStore : RunCursorStore {
-    private val active = mutableMapOf<String, MutableMap<String, Long>>()
-    private val terminal = mutableMapOf<String, MutableSet<String>>()
+    private val active = ConcurrentHashMap<String, ConcurrentHashMap<String, Long>>()
+    private val terminal = ConcurrentHashMap<String, MutableSet<String>>()
 
     override fun ensureLoaded() { /* no-op */ }
 
     override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
-        if (isTerminal) {
-            active[conversationId]?.remove(runId)
-            if (active[conversationId]?.isEmpty() == true) active.remove(conversationId)
-            terminal.getOrPut(conversationId) { mutableSetOf() }.add(runId)
-            return
-        }
-        if (terminal[conversationId]?.contains(runId) == true) return
-        val perConversation = active.getOrPut(conversationId) { mutableMapOf() }
-        val existing = perConversation[runId]
-        if (existing == null || seq > existing) {
-            perConversation[runId] = seq
+        synchronized(this) {
+            if (isTerminal) {
+                active[conversationId]?.remove(runId)
+                if (active[conversationId]?.isEmpty() == true) active.remove(conversationId)
+                terminal.getOrPut(conversationId) { ConcurrentHashMap.newKeySet() }.add(runId)
+                return
+            }
+            if (terminal[conversationId]?.contains(runId) == true) return
+            val perConversation = active.getOrPut(conversationId) { ConcurrentHashMap() }
+            val existing = perConversation[runId]
+            if (existing == null || seq > existing) {
+                perConversation[runId] = seq
+            }
         }
     }
 
     override fun clear(conversationId: String, runId: String) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
-        val perConversation = active[conversationId] ?: return
-        if (perConversation.remove(runId) == null) return
-        if (perConversation.isEmpty()) active.remove(conversationId)
+        synchronized(this) {
+            val perConversation = active[conversationId] ?: return
+            if (perConversation.remove(runId) == null) return
+            if (perConversation.isEmpty()) active.remove(conversationId)
+        }
     }
 
     override fun clearTerminal(conversationId: String, runId: String) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
-        clear(conversationId, runId)
-        terminal[conversationId]?.remove(runId)
-        if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
+        synchronized(this) {
+            val perConversation = active[conversationId]
+            if (perConversation?.remove(runId) != null) {
+                if (perConversation.isEmpty()) active.remove(conversationId)
+            }
+            terminal[conversationId]?.remove(runId)
+            if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
+        }
     }
 
-    override fun allActiveRuns(): Map<String, Map<String, Long>> =
-        active.mapValues { (_, runs) -> runs.toMap() }
+    override fun allActiveRuns(): Map<String, Map<String, Long>> {
+        return active.mapValues { (_, runs) -> runs.toMap() }
+    }
 
-    override fun activeRuns(conversationId: String): Map<String, Long> =
-        active[conversationId]?.toMap().orEmpty()
+    override fun activeRuns(conversationId: String): Map<String, Long> {
+        return active[conversationId]?.toMap().orEmpty()
+    }
 }
