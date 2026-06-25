@@ -349,8 +349,9 @@ internal fun DesktopBackgroundTasksToggle(
     }
 }
 
-private fun SubagentEntry.entryKey(): String =
-    toolCallId.takeIf { it.isNotBlank() } ?: taskId?.takeIf { it.isNotBlank() } ?: description
+@androidx.annotation.VisibleForTesting
+internal fun SubagentEntry.entryKey(): String =
+    toolCallId.takeIf { it.isNotBlank() } ?: taskId?.takeIf { it.isNotBlank() } ?: "${startedAt.orEmpty()}_${subagentType}_$description"
 
 private fun SubagentEntry.taskTitle(): String =
     description.takeIf { it.isNotBlank() } ?: subagentType.takeIf { it.isNotBlank() } ?: "Subagent"

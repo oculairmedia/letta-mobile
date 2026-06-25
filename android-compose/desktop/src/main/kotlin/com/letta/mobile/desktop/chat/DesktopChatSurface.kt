@@ -1818,17 +1818,7 @@ private fun ComposerEffortChip(
     Box {
         ComposerActionChip(label = effort.label, onClick = { open = !open })
         if (open) {
-            val positionProvider = object : PopupPositionProvider {
-                override fun calculatePosition(
-                    anchorBounds: IntRect,
-                    windowSize: IntSize,
-                    layoutDirection: LayoutDirection,
-                    popupContentSize: IntSize,
-                ): IntOffset = IntOffset(
-                    x = anchorBounds.left,
-                    y = anchorBounds.top - popupContentSize.height - 6,
-                )
-            }
+            val positionProvider = ViewportClampedPopupPositionProvider(yOffsetPx = -6)
             Popup(
                 popupPositionProvider = positionProvider,
                 onDismissRequest = { open = false },

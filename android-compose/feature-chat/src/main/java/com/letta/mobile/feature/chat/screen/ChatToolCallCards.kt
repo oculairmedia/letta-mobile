@@ -71,6 +71,7 @@ import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
@@ -672,7 +673,7 @@ internal fun ToolCallCard(
                         imageVector = LettaIcons.Warning,
                         contentDescription = "Warning",
                         modifier = Modifier.size(LettaIconSizing.Inline),
-                        tint = MaterialTheme.colorScheme.tertiary,
+                        tint = MaterialTheme.customColors.warningTextColor,
                     )
                 } else if (isComplete) {
                     Icon(
@@ -1387,7 +1388,7 @@ internal fun CompactToolCallRow(
                 style = MaterialTheme.typography.chatBubbleSender
                     .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily)
                     .scaledBy(fontScale),
-                color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+                color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.customColors.warningTextColor else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -1414,7 +1415,7 @@ internal fun CompactToolCallRow(
                     imageVector = LettaIcons.Warning,
                     contentDescription = "Warning",
                     modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = MaterialTheme.colorScheme.tertiary,
+                    tint = MaterialTheme.customColors.warningTextColor,
                 )
                 isComplete -> Icon(
                     imageVector = LettaIcons.CheckCircle,
@@ -1661,7 +1662,7 @@ internal fun ToolSummaryLine(
             color = if (isError) {
                 MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
             } else if (isWarning) {
-                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.8f)
+                MaterialTheme.customColors.warningTextColor.copy(alpha = 0.8f)
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
             },
@@ -1669,7 +1670,7 @@ internal fun ToolSummaryLine(
         Text(
             text = value,
             style = MaterialTheme.typography.listItemSupporting.scaledBy(fontScale),
-            color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.customColors.warningTextColor else MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
