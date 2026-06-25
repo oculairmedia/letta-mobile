@@ -344,22 +344,32 @@ private fun MemoryGraphPanel(
             return@Surface
         }
 
-        val nodesById = remember(graph.nodes) { graph.nodes.associateBy { it.id } }
-        val edgesById = remember(graph.edges) { graph.edges.associateBy { it.id } }
+        // Entity-type filter (Zep "Entity Types"): toggle which node kinds show.
+        val kindsPresent = remember(graph.nodes) {
+            MemoryGraphNodeKind.entries.filter { kind -> graph.nodes.any { it.kind == kind } }
+        }
+        var enabledKinds by remember(graph) { mutableStateOf(kindsPresent.toSet()) }
+        val visibleNodes = remember(graph.nodes, enabledKinds) { graph.nodes.filter { it.kind in enabledKinds } }
+        val visibleIds = remember(visibleNodes) { visibleNodes.map { it.id }.toSet() }
+        val visibleEdges = remember(graph.edges, visibleIds) {
+            graph.edges.filter { it.fromId in visibleIds && it.toId in visibleIds }
+        }
+
+        val nodesById = remember(visibleNodes) { visibleNodes.associateBy { it.id } }
         // Node degree drives circle size + which nodes get labels (hubs), so the
         // graph reads like Zep's: a few large labeled hubs, many small leaves.
-        val degreeById = remember(graph.edges) {
+        val degreeById = remember(visibleEdges) {
             val degrees = HashMap<String, Int>()
-            graph.edges.forEach { edge ->
+            visibleEdges.forEach { edge ->
                 degrees[edge.fromId] = (degrees[edge.fromId] ?: 0) + 1
                 degrees[edge.toId] = (degrees[edge.toId] ?: 0) + 1
             }
             degrees
         }
-        val kuiver = remember(graph) {
+        val kuiver = remember(visibleNodes, visibleEdges) {
             buildKuiver {
-                nodes(graph.nodes.map { it.id })
-                graph.edges.forEach { edge ->
+                nodes(visibleNodes.map { it.id })
+                visibleEdges.forEach { edge ->
                     edge(edge.fromId, edge.toId)
                 }
             }
@@ -420,17 +430,79 @@ private fun MemoryGraphPanel(
                         baseColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
                         backEdgeColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
                         strokeWidth = 1.2f,
+                        // No arrowheads — Zep draws plain links.
+                        arrowDrawer = { _, _, _ -> },
                         label = null,
                     )
                 },
             )
 
-            GraphLegend(
+            EntityTypeFilterBar(
+                kinds = kindsPresent,
+                enabled = enabledKinds,
                 summaryLabel = graph.summaryLabel,
+                onToggle = { kind ->
+                    enabledKinds = if (kind in enabledKinds && enabledKinds.size > 1) {
+                        enabledKinds - kind
+                    } else {
+                        enabledKinds + kind
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(14.dp),
             )
+        }
+    }
+}
+
+/**
+ * Zep-style "Entity Types" filter bar: a toggle chip per node kind present in
+ * the graph (color dot + label). Tapping a chip hides/shows that kind; the last
+ * enabled kind can't be turned off (so the graph is never blank).
+ */
+@Composable
+private fun EntityTypeFilterBar(
+    kinds: List<MemoryGraphNodeKind>,
+    enabled: Set<MemoryGraphNodeKind>,
+    summaryLabel: String,
+    onToggle: (MemoryGraphNodeKind) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = modifier,
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Entity Types", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(summaryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                kinds.forEach { kind ->
+                    val on = kind in enabled
+                    val color = kind.accentRole(null).color()
+                    Row(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .background(if (on) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
+                            .clickable { onToggle(kind) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(8.dp).clip(CircleShape).background(color.copy(alpha = if (on) 1f else 0.35f)))
+                        Text(
+                            memoryNodeKindLabel(kind),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        )
+                    }
+                }
+            }
         }
     }
 }
