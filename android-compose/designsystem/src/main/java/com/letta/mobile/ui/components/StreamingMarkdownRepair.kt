@@ -306,8 +306,11 @@ private fun inlineMarkdownClosersForLastLine(text: String): String {
 }
 
 private fun String.isCodeFenceMarkerLine(): Boolean {
-    val trimmed = trimStart()
-    return trimmed.startsWith("```") || trimmed.startsWith("~~~")
+    val leadingSpaces = takeWhile { it == ' ' }.length
+    if (leadingSpaces > 3) return false
+    val trimmed = drop(leadingSpaces)
+    if (trimmed.isEmpty()) return false
+    return trimmed.all { it == '`' } || trimmed.all { it == '~' }
 }
 
 private fun backtickRunLength(line: String, index: Int): Int {
