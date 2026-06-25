@@ -113,55 +113,45 @@ fun DesktopMemorySurface(
     val agentId = state.memory.selectedAgentId
 
     Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
-        LazyColumn(
+        // A fixed (non-scrolling) column: the header/agent/stats are fixed
+        // height and the graph takes the rest, so the page never scrolls.
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .padding(horizontal = 28.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item {
-                MemoryHeader(
-                    state = state,
-                    onRefresh = onRefresh,
+            MemoryHeader(
+                state = state,
+                onRefresh = onRefresh,
+            )
+            state.errorMessage?.let { errorMessage ->
+                DesktopInlineError(
+                    message = errorMessage,
+                    onRetry = onRefresh,
+                    retrying = state.isLoading,
                 )
-            }
-            val errorMessage = state.errorMessage
-            if (errorMessage != null) {
-                item {
-                    DesktopInlineError(
-                        message = errorMessage,
-                        onRetry = onRefresh,
-                        retrying = state.isLoading,
-                    )
-                }
             }
             if (state.agents.isNotEmpty()) {
-                item {
-                    AgentSelector(
-                        agents = state.agents,
-                        selectedAgentId = state.memory.selectedAgentId,
-                        onAgentSelected = onAgentSelected,
-                    )
-                }
-            }
-            item {
-                MemorySummaryCard(state.memory.summary)
-            }
-            item {
-                // The graph is the focus — it fills the space the section cards
-                // used to occupy. Memory blocks stay editable by clicking their
-                // graph nodes.
-                MemoryGraphPanel(
-                    graph = state.memory.graph,
-                    onBlockNodeClick = { node ->
-                        if (agentId != null) {
-                            editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
-                        }
-                    },
-                    modifier = Modifier.fillParentMaxHeight(0.82f),
+                AgentSelector(
+                    agents = state.agents,
+                    selectedAgentId = state.memory.selectedAgentId,
+                    onAgentSelected = onAgentSelected,
                 )
             }
+            MemorySummaryCard(state.memory.summary)
+            // The graph is the focus — it takes the remaining height. Memory
+            // blocks stay editable by clicking their graph nodes.
+            MemoryGraphPanel(
+                graph = state.memory.graph,
+                onBlockNodeClick = { node ->
+                    if (agentId != null) {
+                        editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
+                    }
+                },
+                modifier = Modifier.weight(1f),
+            )
         }
 
         val target = editorTarget
