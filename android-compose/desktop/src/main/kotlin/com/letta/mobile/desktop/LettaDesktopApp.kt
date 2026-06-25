@@ -101,6 +101,7 @@ import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
@@ -1941,12 +1942,11 @@ private fun BackendSettingsCard(
                 DesktopSettingsFieldLabel("Mode")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LettaConfig.Mode.entries.forEach { option ->
-                        DesktopRadioChip(
-                            selected = mode == option,
+                        DesktopChipTab(
+                            text = option.label,
+                            active = mode == option,
                             onClick = { mode = option },
-                        ) {
-                            DesktopControlText(option.label)
-                        }
+                        )
                     }
                 }
             }
