@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,6 +30,8 @@ import com.letta.mobile.feature.chat.screen.SubagentNotificationCard
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import androidx.annotation.VisibleForTesting
 import kotlinx.collections.immutable.toImmutableList
+
+internal val LocalStreamingRevealHapticPulse = compositionLocalOf<() -> Unit> { {} }
 
 internal interface MessageContentRenderer {
     fun canRender(message: UiMessage): Boolean
@@ -69,6 +72,8 @@ private fun AssistantResponseText(
         if (isStreaming && textHasGrown) hasStreamed = true
     }
     val hasTable = remember(text) { text.containsMarkdownTable() }
+    val streamingRevealHapticPulse = LocalStreamingRevealHapticPulse.current
+    var lastHapticRevealLength by remember(messageId) { mutableStateOf(initialText.length) }
 
     // Gate every "use the streaming renderer / smoother" decision on real
     // text growth, not just the bare `isStreaming` flag. The flag flickers
@@ -93,6 +98,17 @@ private fun AssistantResponseText(
             rawText = text,
             isStreaming = isStreaming && textHasGrown,
             seedText = initialText,
+            onRevealStep = { revealedText ->
+                val revealedLength = revealedText.length
+                if (shouldPulseForStreamingReveal(
+                        previousLength = lastHapticRevealLength,
+                        revealedText = revealedText,
+                    )
+                ) {
+                    lastHapticRevealLength = revealedLength
+                    streamingRevealHapticPulse()
+                }
+            },
         )
     } else {
         text
@@ -620,6 +636,21 @@ private fun String.isInsideInlineCodeAt(index: Int): Boolean {
 }
 
 private fun Char.isWordChar(): Boolean = isLetterOrDigit() || this == '_'
+
+@VisibleForTesting
+internal fun shouldPulseForStreamingReveal(
+    previousLength: Int,
+    revealedText: String,
+): Boolean {
+    val revealedLength = revealedText.length
+    if (revealedLength <= previousLength) return false
+    if (revealedLength - previousLength >= STREAMING_REVEAL_HAPTIC_MIN_CHARS) return true
+    val lastChar = revealedText.lastOrNull() ?: return false
+    return lastChar.isWhitespace() || lastChar in STREAMING_REVEAL_HAPTIC_BOUNDARY_CHARS
+}
+
+private const val STREAMING_REVEAL_HAPTIC_MIN_CHARS = 10
+private const val STREAMING_REVEAL_HAPTIC_BOUNDARY_CHARS = ".,;:!?)]}"
 
 private const val MAX_SIMPLE_INLINE_MATH_CHARS = 3
 
