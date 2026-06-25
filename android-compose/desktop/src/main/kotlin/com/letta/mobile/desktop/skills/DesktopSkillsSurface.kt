@@ -2,11 +2,14 @@ package com.letta.mobile.desktop.skills
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,16 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,19 +38,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.skills.Skill
+import com.letta.mobile.data.skills.SkillCategories
+import com.letta.mobile.data.skills.SkillCategory
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopRadioChip
+import com.letta.mobile.desktop.DesktopTextField
 import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
+import com.letta.mobile.ui.theme.customColors
 
 private enum class SkillsTab { Skills, Tools }
 
@@ -71,7 +79,7 @@ fun DesktopSkillsSurface(
     modifier: Modifier = Modifier,
 ) {
     var tab by remember { mutableStateOf(SkillsTab.Skills) }
-    Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.surface)) {
+    Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
         TabRow(tab = tab, onSelect = { tab = it })
         when (tab) {
             SkillsTab.Skills -> SkillsTabContent(
@@ -129,74 +137,85 @@ private fun SkillsTabContent(
     onUninstallSkill: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showInstalledOnly by remember { mutableStateOf(true) }
+    var assignedOnly by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
     var selectedSkill by remember { mutableStateOf<Skill?>(null) }
-    val installed = remember(skills, installedSkillNames) { skills.filter { it.name in installedSkillNames } }
-    // The agent's installed list may include skills not present in the registry feed.
+
+    // The agent's installed list may include skills not present in the registry.
     val installedExtras = remember(installedSkillNames, skills) {
         val known = skills.map { it.name }.toSet()
         installedSkillNames.filter { it !in known }.map { Skill(name = it) }
     }
-    val visible = if (showInstalledOnly) installed + installedExtras else skills
+    val all = remember(skills, installedExtras) { skills + installedExtras }
+    val base = if (assignedOnly) all.filter { it.name in installedSkillNames } else all
+    val filtered = remember(base, query) {
+        if (query.isBlank()) {
+            base
+        } else {
+            base.filter { it.name.contains(query, ignoreCase = true) || it.description?.contains(query, ignoreCase = true) == true }
+        }
+    }
+    val grouped = remember(filtered) {
+        SkillCategories.grouped(filtered, nameOf = { it.name }, tagsOf = { it.tags })
+    }
 
     Row(modifier = modifier) {
-        Column(
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-        ) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                item {
-                    SkillsHeader(
-                        installedCount = installedSkillNames.size,
-                        totalCount = skills.size,
-                        loading = skillsLoading,
-                        onRefresh = onRefreshSkills,
-                    )
+        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+            SkillsHeader(
+                installedCount = installedSkillNames.size,
+                totalCount = skills.size,
+                assignedOnly = assignedOnly,
+                onSelectAll = { assignedOnly = false },
+                onSelectAssigned = { assignedOnly = true },
+                query = query,
+                onQuery = { query = it },
+                loading = skillsLoading,
+                onRefresh = onRefreshSkills,
+            )
+            skillsError?.let {
+                Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
+                    DesktopInlineError(message = it, onRetry = onRefreshSkills, retrying = skillsLoading)
                 }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        DesktopRadioChip(selected = showInstalledOnly, onClick = { showInstalledOnly = true }) {
-                            DesktopControlText("Installed (${installedSkillNames.size})")
+            }
+            when {
+                skillsLoading && skills.isEmpty() -> InfoBox("Loading skills from the active backend.")
+                filtered.isEmpty() -> InfoBox(
+                    if (assignedOnly) {
+                        "No skills assigned to ${focusedAgentName ?: "this agent"} yet."
+                    } else {
+                        "No skills match your search."
+                    },
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp),
+                ) {
+                    grouped.forEach { (category, sectionSkills) ->
+                        item(key = "section-${category.name}") {
+                            Text(
+                                text = category.label,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        DesktopRadioChip(selected = !showInstalledOnly, onClick = { showInstalledOnly = false }) {
-                            DesktopControlText("All (${skills.size})")
+                        items(items = sectionSkills.chunked(2), key = { it.first().name }) { rowSkills ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                rowSkills.forEach { skill ->
+                                    SkillCard(
+                                        skill = skill,
+                                        installed = skill.name in installedSkillNames,
+                                        canManage = canManageSkills,
+                                        onClick = { selectedSkill = skill },
+                                        onInstall = { onInstallSkill(skill.name) },
+                                        onUninstall = { onUninstallSkill(skill.name) },
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                                if (rowSkills.size == 1) Spacer(Modifier.weight(1f))
+                            }
                         }
-                    }
-                }
-                skillsError?.let {
-                    item {
-                        DesktopInlineError(
-                            message = it,
-                            onRetry = onRefreshSkills,
-                            retrying = skillsLoading,
-                        )
-                    }
-                }
-                if (skillsLoading && skills.isEmpty()) {
-                    item { InfoCard("Loading skills from the active backend.") }
-                } else if (visible.isEmpty()) {
-                    item {
-                        InfoCard(
-                            if (showInstalledOnly) {
-                                "No skills installed on ${focusedAgentName ?: "this agent"}. Switch to All to browse the registry."
-                            } else {
-                                "No skills available."
-                            },
-                        )
-                    }
-                } else {
-                    items(items = visible, key = { it.name }) { skill ->
-                        SkillRow(
-                            skill = skill,
-                            installed = skill.name in installedSkillNames,
-                            canManage = canManageSkills,
-                            selected = selectedSkill?.name == skill.name,
-                            onClick = { selectedSkill = skill },
-                            onInstall = { onInstallSkill(skill.name) },
-                            onUninstall = { onUninstallSkill(skill.name) },
-                        )
                     }
                 }
             }
@@ -218,21 +237,26 @@ private fun SkillsTabContent(
 private fun SkillsHeader(
     installedCount: Int,
     totalCount: Int,
+    assignedOnly: Boolean,
+    onSelectAll: () -> Unit,
+    onSelectAssigned: () -> Unit,
+    query: String,
+    onQuery: (String) -> Unit,
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 8.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-            Text("Skills", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                text = "$installedCount installed · $totalCount in registry",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Text("Skills", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.width(6.dp))
+        HeaderTab("All skills", !assignedOnly, onSelectAll)
+        HeaderTab("Assigned · $installedCount", assignedOnly, onSelectAssigned)
+        Spacer(Modifier.weight(1f))
+        Box(Modifier.width(220.dp)) {
+            DesktopTextField(value = query, onValueChange = onQuery, placeholder = "Search skills", modifier = Modifier.fillMaxWidth())
         }
         DesktopOutlinedButton(onClick = onRefresh, enabled = !loading) {
             DesktopButtonContent(text = if (loading) "Refreshing" else "Refresh", icon = Icons.Outlined.Refresh)
@@ -241,60 +265,91 @@ private fun SkillsHeader(
 }
 
 @Composable
-private fun SkillRow(
+private fun HeaderTab(text: String, active: Boolean, onClick: () -> Unit) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 5.dp),
+    )
+}
+
+@Composable
+private fun SkillCard(
     skill: Skill,
     installed: Boolean,
     canManage: Boolean,
-    selected: Boolean,
     onClick: () -> Unit,
     onInstall: () -> Unit,
     onUninstall: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    val accent = SkillCategories.categorize(skill.name, skill.tags).accentColor()
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
+        Box(
+            Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.2f)),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Bolt,
-                contentDescription = null,
-                tint = if (installed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp).size(18.dp),
+            Text(
+                skill.name.firstOrNull()?.uppercase() ?: "?",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = accent,
             )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = skill.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    skill.version?.takeIf { it.isNotBlank() }?.let { Pill("v$it", MaterialTheme.colorScheme.secondary) }
-                    if (installed) Pill("installed", MaterialTheme.colorScheme.primary)
-                }
-                skill.description?.takeIf { it.isNotBlank() }?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (skill.tags.isNotEmpty() || skill.author != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        skill.author?.takeIf { it.isNotBlank() }?.let { Pill("@$it", MaterialTheme.colorScheme.tertiary) }
-                        skill.tags.take(3).forEach { Pill(it, MaterialTheme.colorScheme.secondary) }
-                    }
-                }
-            }
-            SkillActionButton(installed, canManage, onInstall, onUninstall)
         }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(skill.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+            skill.description?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        SkillAddButton(installed, canManage, onInstall, onUninstall)
     }
+}
+
+@Composable
+private fun SkillAddButton(installed: Boolean, canManage: Boolean, onInstall: () -> Unit, onUninstall: () -> Unit) {
+    val bg = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHighest
+    Box(
+        Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(bg)
+            .clickable(enabled = canManage) { if (installed) onUninstall() else onInstall() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (installed) Icons.Outlined.Check else Icons.Outlined.Add,
+            contentDescription = if (installed) "Remove skill" else "Add skill",
+            tint = if (installed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun InfoBox(message: String) {
+    Box(Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 12.dp)) {
+        InfoCard(message)
+    }
+}
+
+@Composable
+private fun SkillCategory.accentColor(): Color = when (this) {
+    SkillCategory.Developer -> MaterialTheme.customColors.agentBColor
+    SkillCategory.Productivity -> MaterialTheme.colorScheme.primary
+    SkillCategory.Data -> MaterialTheme.customColors.runningColor
+    SkillCategory.Design -> MaterialTheme.customColors.agentCColor
+    SkillCategory.Communication -> MaterialTheme.customColors.agentAColor
+    SkillCategory.Automation -> MaterialTheme.customColors.successColor
+    SkillCategory.Other -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 @Composable
