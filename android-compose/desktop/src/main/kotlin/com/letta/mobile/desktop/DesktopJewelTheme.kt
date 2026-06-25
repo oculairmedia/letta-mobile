@@ -1,7 +1,10 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -113,6 +116,19 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
     }
 
     CompositionLocalProvider(LocalCustomColors provides customColors) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme, shapes = DesktopShapes, content = content)
     }
 }
+
+/**
+ * Desktop corner-radius token scale — tighter than the Material 3 defaults
+ * (4/8/12/16/28) so cards and chips read crisp rather than pill-soft. Surfaces
+ * should reference `MaterialTheme.shapes.*` rather than hard-coding radii.
+ */
+private val DesktopShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(8.dp),
+    large = RoundedCornerShape(12.dp),
+    extraLarge = RoundedCornerShape(16.dp),
+)

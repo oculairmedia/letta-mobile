@@ -245,21 +245,23 @@ private fun SkillsHeader(
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier = Modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Skills", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(6.dp))
-        HeaderTab("All skills", !assignedOnly, onSelectAll)
-        HeaderTab("Assigned · $installedCount", assignedOnly, onSelectAssigned)
-        Spacer(Modifier.weight(1f))
-        Box(Modifier.width(220.dp)) {
-            DesktopTextField(value = query, onValueChange = onQuery, placeholder = "Search skills", modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Skills", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Box(Modifier.width(220.dp)) {
+                DesktopTextField(value = query, onValueChange = onQuery, placeholder = "Search skills", modifier = Modifier.fillMaxWidth())
+            }
+            DesktopOutlinedButton(onClick = onRefresh, enabled = !loading) {
+                DesktopButtonContent(text = if (loading) "Refreshing" else "Refresh", icon = Icons.Outlined.Refresh)
+            }
         }
-        DesktopOutlinedButton(onClick = onRefresh, enabled = !loading) {
-            DesktopButtonContent(text = if (loading) "Refreshing" else "Refresh", icon = Icons.Outlined.Refresh)
+        // Filter chips sit on their own row, underneath the title.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            HeaderTab("All skills", !assignedOnly, onSelectAll)
+            HeaderTab("Assigned · $installedCount", assignedOnly, onSelectAssigned)
         }
     }
 }
@@ -268,10 +270,15 @@ private fun SkillsHeader(
 private fun HeaderTab(text: String, active: Boolean, onClick: () -> Unit) {
     Text(
         text = text,
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.labelMedium,
         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
         color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 5.dp),
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.small)
+            .background(if (active) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }
 
@@ -288,16 +295,16 @@ private fun SkillCard(
     val accent = SkillCategories.categorize(skill.name, skill.tags).accentColor()
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(accent.copy(alpha = 0.2f)),
+            Modifier.size(38.dp).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -321,7 +328,7 @@ private fun SkillCard(
 private fun SkillAddButton(installed: Boolean, canManage: Boolean, onInstall: () -> Unit, onUninstall: () -> Unit) {
     val bg = if (installed) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceContainerHighest
     Box(
-        Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(bg)
+        Modifier.size(30.dp).clip(MaterialTheme.shapes.small).background(bg)
             .clickable(enabled = canManage) { if (installed) onUninstall() else onInstall() },
         contentAlignment = Alignment.Center,
     ) {
