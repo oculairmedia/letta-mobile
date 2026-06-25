@@ -293,6 +293,24 @@ class ScheduleLogicTest {
         assertNotNull(ScheduleProjection.nextRun(def, now))
     }
 
+    @Test
+    fun nativeOneShotFallsBackToNextScheduledTime() {
+        // One-time native schedule with only next_scheduled_time (no scheduled_at)
+        // still materializes via the ISO fallback (#6).
+        val fire = Instant.parse("2030-01-01T00:00:00Z")
+        val native = ScheduledMessage(
+            id = "o",
+            agentId = "agent",
+            message = SchedulePayload(messages = listOf(ScheduleMessage(content = "One off", role = "user"))),
+            nextScheduledTime = fire.toString(),
+            schedule = ScheduleDefinition(type = "one_time"),
+        )
+        val def = ScheduleProjection.toScheduleDefsFromNative(listOf(native), utc).single()
+        assertNull(def.cron)
+        assertEquals(fire, def.oneShotAt)
+        assertEquals(fire, ScheduleProjection.nextRun(def, now))
+    }
+
     // --- ScheduleFormat -----------------------------------------------------
 
     @Test

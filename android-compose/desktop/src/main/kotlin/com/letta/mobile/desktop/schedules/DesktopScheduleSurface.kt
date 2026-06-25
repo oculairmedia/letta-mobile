@@ -67,6 +67,7 @@ import com.letta.mobile.data.schedules.ScheduleProjection
 import com.letta.mobile.data.schedules.ScheduleRun
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTextField
@@ -137,24 +138,34 @@ fun DesktopScheduleSurface(
     val today = remember(now, zone) { now.toLocalDateTime(zone).date }
 
     val filterAgentId = focusedAgentId
+    // Native schedule-admin schedules are loaded per-agent by the controller
+    // (only for state.selectedAgentId). When the surface is focused on a
+    // specific agent, drive that selection so we load and show that agent's
+    // schedules instead of filtering the previously-loaded agent's to empty
+    // (Codex review). The agent chips were removed, so this is the only switch.
+    LaunchedEffect(focusedAgentId, state.selectedAgentId) {
+        if (!focusedAgentId.isNullOrBlank() && focusedAgentId != state.selectedAgentId) {
+            onAgentSelected(focusedAgentId)
+        }
+    }
     val filteredCrons = remember(crons, filterAgentId) {
         if (filterAgentId == null) crons else crons.filter { it.agentId == null || it.agentId == filterAgentId }
     }
     // Native schedule-admin schedules (state.schedules) are a parallel source to
     // /v1/crons. Projecting from crons alone hid real schedules on backends that
     // serve the native route but no crons (Codex review #5), so merge both —
-    // crons first, then any native schedule not already represented by id.
+    // crons first, then any native schedule not already represented by id. The
+    // native-sourced ids are tracked so the rail can route Delete correctly
+    // (native schedules aren't deletable through the cron API).
     val nativeSchedules = state.schedules
-    val defs = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
+    val (defs, nativeDefIds) = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
         val cronDefs = ScheduleProjection.toScheduleDefs(filteredCrons, zone)
-        val filteredNative = if (filterAgentId == null) {
-            nativeSchedules
-        } else {
-            nativeSchedules.filter { it.agentId == filterAgentId }
-        }
-        val nativeDefs = ScheduleProjection.toScheduleDefsFromNative(filteredNative, zone)
-        val seen = cronDefs.mapTo(HashSet()) { it.id }
-        cronDefs + nativeDefs.filter { it.id !in seen }
+        val cronIds = cronDefs.mapTo(HashSet()) { it.id }
+        // Native schedules are already agent-scoped by the controller; don't
+        // re-filter by focusedAgentId (that empties them when selection lags).
+        val nativeDefs = ScheduleProjection.toScheduleDefsFromNative(nativeSchedules, zone)
+            .filter { it.id !in cronIds }
+        (cronDefs + nativeDefs) to nativeDefs.mapTo(HashSet()) { it.id }
     }
     val defsById = remember(defs) { defs.associateBy { it.id } }
     val historySummary = remember(defs, now) { ScheduleProjection.history(defs, now, zone) }
@@ -191,15 +202,27 @@ fun DesktopScheduleSurface(
             )
             Row(Modifier.fillMaxSize()) {
                 Box(Modifier.weight(1f).fillMaxHeight()) {
-                    if (defs.isEmpty()) {
-                        ScheduleEmptyState(canCreate)
-                    } else {
-                        when (view) {
+                    // Local copy: errorMessage is a cross-module property, so it
+                    // can't smart-cast inline in the when below.
+                    val scheduleError = state.errorMessage
+                    when {
+                        // Show data as soon as anything projects, even while a
+                        // parallel source is still loading.
+                        defs.isNotEmpty() -> when (view) {
                             ScheduleView.Week -> WeekView(defs, weekStart, today, now, zone, selectedId) { rail = RailState.Run(it) }
                             ScheduleView.Agenda -> AgendaView(defs, selectedDate, today, now, zone, { selectedDate = it }) { rail = RailState.Run(it) }
                             ScheduleView.Timeline -> TimelineView(defs, weekStart, today, now, zone) { rail = RailState.Detail(it) }
                             ScheduleView.History -> HistoryView(historySummary)
                         }
+                        // Surface backend failures with a retry instead of
+                        // masking them as "No schedules yet" (Codex review).
+                        scheduleError != null -> Box(Modifier.fillMaxSize().padding(28.dp), contentAlignment = Alignment.TopCenter) {
+                            DesktopInlineError(message = scheduleError, onRetry = onRefresh, retrying = state.isLoading)
+                        }
+                        state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Loading schedules…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
+                        }
+                        else -> ScheduleEmptyState(canCreate)
                     }
                 }
                 // Week/Agenda always show the rail (Overview or detail). Timeline
@@ -214,6 +237,7 @@ fun DesktopScheduleSurface(
                         history = historySummary,
                         now = now,
                         zone = zone,
+                        nativeDefIds = nativeDefIds,
                         onSelectSchedule = { rail = RailState.Detail(it) },
                         onBackToOverview = { rail = RailState.Overview },
                         onDelete = { onDeleteCron(it); rail = RailState.Overview },
@@ -635,8 +659,10 @@ private fun TimelineDayCell(
         modifier.fillMaxHeight().border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (highFreq) {
-            // Hourly+ schedules render as a continuous bar (filled = past).
+        if (highFreq && ticks.isNotEmpty()) {
+            // Hourly+ schedules render as a continuous bar (filled = past). Only
+            // paint days that actually have ticks, so a day-restricted
+            // high-frequency cron doesn't show density on its off days.
             Row(Modifier.fillMaxWidth(0.86f).height(14.dp).clip(RoundedCornerShape(3.dp))) {
                 when {
                     date < today -> Box(Modifier.fillMaxSize().background(success))
@@ -764,6 +790,7 @@ private fun ScheduleRail(
     history: com.letta.mobile.data.schedules.HistorySummary,
     now: Instant,
     zone: TimeZone,
+    nativeDefIds: Set<String>,
     onSelectSchedule: (String) -> Unit,
     onBackToOverview: () -> Unit,
     onDelete: (String) -> Unit,
@@ -777,7 +804,17 @@ private fun ScheduleRail(
         when (rail) {
             RailState.Overview -> OverviewRail(defs, history, now, zone, onSelectSchedule)
             is RailState.Detail -> defsById[rail.scheduleId]?.let { def ->
-                DetailRail(def, history.schedules.firstOrNull { it.scheduleId == def.id }, now, zone, onBackToOverview, onDelete)
+                DetailRail(
+                    def = def,
+                    reliability = history.schedules.firstOrNull { it.scheduleId == def.id },
+                    now = now,
+                    zone = zone,
+                    // Native schedule-admin schedules aren't deletable via the
+                    // cron API, so only offer Delete for cron-backed defs.
+                    canDelete = def.id !in nativeDefIds,
+                    onBack = onBackToOverview,
+                    onDelete = onDelete,
+                )
             } ?: OverviewRail(defs, history, now, zone, onSelectSchedule)
             is RailState.Run -> RunDetailRail(rail.run, zone, onBackToOverview)
         }
@@ -838,6 +875,7 @@ private fun DetailRail(
     reliability: com.letta.mobile.data.schedules.ScheduleReliability?,
     now: Instant,
     zone: TimeZone,
+    canDelete: Boolean,
     onBack: () -> Unit,
     onDelete: (String) -> Unit,
 ) {
@@ -888,10 +926,19 @@ private fun DetailRail(
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DesktopOutlinedButton(onClick = {}, enabled = false) { DesktopButtonContent("Pause") }
-            DesktopOutlinedButton(onClick = { onDelete(def.id) }) { DesktopButtonContent("Delete") }
+            // Delete only for cron-backed schedules — the wired callback hits
+            // the cron API, which can't delete native schedule-admin schedules.
+            if (canDelete) {
+                DesktopOutlinedButton(onClick = { onDelete(def.id) }) { DesktopButtonContent("Delete") }
+            }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Run now / Pause need a backend control endpoint (not available yet).", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        val controlNote = if (canDelete) {
+            "Run now / Pause need a backend control endpoint (not available yet)."
+        } else {
+            "Run now / Pause / Delete need the native schedule control endpoints (not available yet)."
+        }
+        Text(controlNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
 }
 

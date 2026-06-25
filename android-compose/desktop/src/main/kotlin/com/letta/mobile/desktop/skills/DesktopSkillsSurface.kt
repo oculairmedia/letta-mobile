@@ -272,7 +272,11 @@ private fun ToolsContent(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 contentPadding = DesktopCatalogGridPadding,
             ) {
-                desktopCardGrid(grouped.map { it.first.label to it.second }, keyOf = { it.name }) { tool, cardModifier ->
+                // Key by the stable tool id, not the display name: MCP servers
+                // commonly expose same-named tools, and duplicate LazyColumn
+                // keys crash/recycle wrongly (Codex review). The controller
+                // dedups by id.value, so it is unique here.
+                desktopCardGrid(grouped.map { it.first.label to it.second }, keyOf = { it.id.value }) { tool, cardModifier ->
                     DesktopCatalogCard(
                         title = tool.name,
                         description = tool.description,

@@ -169,18 +169,26 @@ object ScheduleProjection {
      * `/v1/agents/{id}/schedule` shape) into a [ScheduleDef]. Backends that
      * serve the native route but no `/v1/crons` expose schedules only here, so
      * a surface that projects from crons alone hides them (Codex review #5).
-     * `scheduled_at` is interpreted as Unix epoch seconds for one-shots; the
-     * wire shape carries no per-schedule time zone, so the viewer's zone is
-     * used.
+     * For one-shots the fire instant comes from `scheduled_at` (Unix epoch
+     * seconds) or, when absent, the `next_scheduled_time` ISO timestamp
+     * fallback (Codex review #6) — otherwise a one-time schedule would carry
+     * neither cron nor oneShotAt and never materialize. The wire shape carries
+     * no per-schedule time zone, so the viewer's zone is used.
      */
     fun ScheduledMessage.toScheduleDef(viewerZone: TimeZone): ScheduleDef {
         val recurring = schedule.type == "recurring"
         val label = message.messages.firstOrNull()?.content?.trim()?.takeIf { it.isNotBlank() }
+        val oneShot = if (recurring) {
+            null
+        } else {
+            schedule.scheduledAt?.let { Instant.fromEpochSeconds(it.toLong()) }
+                ?: nextScheduledTime?.let { runCatching { Instant.parse(it) }.getOrNull() }
+        }
         return ScheduleDef(
             id = id,
             name = label?.take(40) ?: "Schedule",
             cron = if (recurring) schedule.cronExpression?.takeIf { it.isNotBlank() } else null,
-            oneShotAt = if (!recurring) schedule.scheduledAt?.let { Instant.fromEpochSeconds(it.toLong()) } else null,
+            oneShotAt = oneShot,
             active = true,
             zone = viewerZone,
         )
