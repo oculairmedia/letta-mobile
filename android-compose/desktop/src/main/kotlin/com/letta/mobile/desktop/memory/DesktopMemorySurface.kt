@@ -529,8 +529,9 @@ private fun MemoryGraphNodeDot(
     } else {
         resolvedNode.kind.accentRole(resolvedNode.status).color()
     }
-    // Hubs (well-connected nodes) and the always-important Agent/Backend nodes
-    // get a name label; leaf nodes stay as bare dots.
+    // Hubs (well-connected nodes) + Agent/Backend read as primary, so they get
+    // a stronger label; every other node still gets a label underneath, just
+    // lighter — so the whole graph is legible at a glance.
     val isHub = degree >= 3 ||
         resolvedNode.kind == MemoryGraphNodeKind.Agent ||
         resolvedNode.kind == MemoryGraphNodeKind.Backend
@@ -553,17 +554,15 @@ private fun MemoryGraphNodeDot(
                     .background(accentColor)
                     .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape),
             )
-            if (isHub) {
-                Text(
-                    text = resolvedNode.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 140.dp),
-                )
-            }
+            Text(
+                text = resolvedNode.title,
+                style = if (isHub) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelSmall,
+                fontWeight = if (isHub) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isHub) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 120.dp),
+            )
         }
     }
 }
