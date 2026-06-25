@@ -254,7 +254,9 @@ private object JindongHapticPatternPlayer {
     )
 
     private fun LettaHapticIntensity.toJindongIntensity(): JindongHapticIntensity = when (this) {
-        LettaHapticIntensity.Light -> JindongHapticIntensity.LIGHT
+        LettaHapticIntensity.Feather,
+        LettaHapticIntensity.Light,
+        -> JindongHapticIntensity.LIGHT
         LettaHapticIntensity.Medium -> JindongHapticIntensity.MEDIUM
         LettaHapticIntensity.Strong -> JindongHapticIntensity.STRONG
         LettaHapticIntensity.High -> JindongHapticIntensity.HIGH

@@ -33,6 +33,7 @@ enum class LettaHapticPlayback {
 }
 
 enum class LettaHapticIntensity(val value: Float) {
+    Feather(0.12f),
     Light(0.25f),
     Medium(0.5f),
     Strong(0.75f),
@@ -74,7 +75,7 @@ object LettaHapticPatterns {
         )
         LettaHapticCue.StreamingPulse -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 6L, intensity = LettaHapticIntensity.Light),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 4L, intensity = LettaHapticIntensity.Feather),
             ),
         )
         LettaHapticCue.StreamingComplete -> LettaHapticPattern(
