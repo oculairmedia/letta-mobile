@@ -140,29 +140,42 @@ object ScheduleProjection {
      * zone. The slim wire shape carries no run history, so fireCount/lastFired
      * default empty and the History view degrades accordingly.
      */
-    fun CronTask.toScheduleDef(viewerZone: TimeZone): ScheduleDef {
+    fun CronTask.toScheduleDef(viewerZone: TimeZone, now: Instant): ScheduleDef {
         val taskZone = timezone?.let { runCatching { TimeZone.of(it) }.getOrNull() } ?: viewerZone
-        return ScheduleDef(
-            id = id,
-            name = name?.takeIf { it.isNotBlank() }
-                ?: description?.takeIf { it.isNotBlank() }
-                ?: prompt?.takeIf { it.isNotBlank() }?.take(40)
-                ?: "Schedule",
-            // Keep the cron for one-shot tasks (recurring=false) too: the slim
-            // /v1/crons shape carries no separate one-shot timestamp, and a
-            // one-off is persisted as a fully-specified cron. Dropping it here
-            // erased the only fire-time source, so non-recurring tasks never
-            // materialized a run (Codex review #16). The richer schedule-admin
-            // path supplies a real oneShotAt where one exists.
-            cron = cron?.takeIf { it.isNotBlank() },
-            oneShotAt = null,
-            active = true,
-            zone = taskZone,
-        )
+        val displayName = name?.takeIf { it.isNotBlank() }
+            ?: description?.takeIf { it.isNotBlank() }
+            ?: prompt?.takeIf { it.isNotBlank() }?.take(40)
+            ?: "Schedule"
+        val rawCron = cron?.takeIf { it.isNotBlank() }
+        // A one-off is persisted as a fully-specified cron with no year, and the
+        // slim /v1/crons shape carries no separate timestamp. Keeping the cron
+        // (Codex review #16) made the projection treat it as a yearly recurring
+        // schedule (Codex review #16b). Resolve it to a single bounded instant
+        // instead: cron=null + oneShotAt = the next occurrence from [now], so it
+        // materializes exactly once and never recurs.
+        return if (recurring || rawCron == null) {
+            ScheduleDef(
+                id = id,
+                name = displayName,
+                cron = rawCron,
+                oneShotAt = null,
+                active = true,
+                zone = taskZone,
+            )
+        } else {
+            ScheduleDef(
+                id = id,
+                name = displayName,
+                cron = null,
+                oneShotAt = CronSchedule.parse(rawCron)?.let { CronSchedule.nextRun(it, now, taskZone) },
+                active = true,
+                zone = taskZone,
+            )
+        }
     }
 
-    fun toScheduleDefs(crons: List<CronTask>, zone: TimeZone): List<ScheduleDef> =
-        crons.map { it.toScheduleDef(zone) }
+    fun toScheduleDefs(crons: List<CronTask>, zone: TimeZone, now: Instant): List<ScheduleDef> =
+        crons.map { it.toScheduleDef(zone, now) }
 
     /**
      * Adapt a native schedule-admin [ScheduledMessage] (the

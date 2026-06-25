@@ -159,7 +159,10 @@ fun DesktopScheduleSurface(
     // (native schedules aren't deletable through the cron API).
     val nativeSchedules = state.schedules
     val (defs, nativeDefIds) = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
-        val cronDefs = ScheduleProjection.toScheduleDefs(filteredCrons, zone)
+        // `now` is read but intentionally NOT a key: one-shot crons resolve to a
+        // single instant at build time and must stay fixed (re-resolving each
+        // tick would jump a just-fired one-shot to next year).
+        val cronDefs = ScheduleProjection.toScheduleDefs(filteredCrons, zone, now)
         val cronIds = cronDefs.mapTo(HashSet()) { it.id }
         // Native schedules are already agent-scoped by the controller; don't
         // re-filter by focusedAgentId (that empties them when selection lags).

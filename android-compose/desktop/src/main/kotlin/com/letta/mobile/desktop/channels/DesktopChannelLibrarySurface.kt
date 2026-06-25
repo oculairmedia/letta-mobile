@@ -27,6 +27,8 @@ import com.letta.mobile.desktop.components.DesktopPill
 import com.letta.mobile.desktop.components.desktopCardGrid
 import com.letta.mobile.ui.theme.customColors
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -98,7 +100,16 @@ private fun ChannelCard(channel: ChannelDisplayItem, modifier: Modifier) {
         onClick = {},
         modifier = modifier,
     ) {
-        DesktopPill(channel.status.label, accent)
+        // Status pill plus any diagnostic metadata (Code 4401, Auth, catalog,
+        // device ids, …) the mapper attached — these carry the failure /
+        // transport detail and were dropped when only the pill was shown
+        // (Codex review).
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            DesktopPill(channel.status.label, accent)
+            channel.metadataLabels
+                .filterNot { it.equals(channel.status.label, ignoreCase = true) }
+                .forEach { label -> DesktopPill(label, MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
     }
 }
 

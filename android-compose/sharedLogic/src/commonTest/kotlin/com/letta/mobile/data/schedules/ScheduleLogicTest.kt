@@ -228,13 +228,17 @@ class ScheduleLogicTest {
     }
 
     @Test
-    fun oneShotCronTaskStillMaterializes() {
-        // recurring=false one-off: the adapter keeps the cron so the task can
-        // still produce a run instead of vanishing (#16).
+    fun oneShotCronTaskResolvesToSingleInstant() {
+        // recurring=false one-off: resolved to a single bounded instant (cron
+        // null so it doesn't recur annually), materializing once (#16 / #16b).
         val task = CronTask(id = "once", cron = "30 14 25 12 *", recurring = false)
-        val def = ScheduleProjection.toScheduleDefs(listOf(task), utc).single()
-        assertEquals("30 14 25 12 *", def.cron)
-        assertNotNull(ScheduleProjection.nextRun(def, now))
+        val def = ScheduleProjection.toScheduleDefs(listOf(task), utc, now).single()
+        assertNull(def.cron)
+        val fire = def.oneShotAt
+        assertNotNull(fire)
+        // The single fire is the next Dec 25 14:30 after `now` (2026-06-24).
+        assertEquals(Instant.parse("2026-12-25T14:30:00Z"), fire)
+        assertEquals(fire, ScheduleProjection.nextRun(def, now))
     }
 
     @Test

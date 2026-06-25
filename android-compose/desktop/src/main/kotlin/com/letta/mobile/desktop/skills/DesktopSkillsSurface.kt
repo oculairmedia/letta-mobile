@@ -272,6 +272,12 @@ private fun ToolsContent(
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 contentPadding = DesktopCatalogGridPadding,
             ) {
+                // Backend tools have loaded but MCP handshakes may still be in
+                // flight; keep that visible so server tools don't look missing
+                // until they suddenly appear (Codex review).
+                if (toolState.isLoadingMcpTools) {
+                    item("mcp-loading") { DesktopInfoBox("Loading MCP server tools…") }
+                }
                 // Key by the stable tool id, not the display name: MCP servers
                 // commonly expose same-named tools, and duplicate LazyColumn
                 // keys crash/recycle wrongly (Codex review). The controller
