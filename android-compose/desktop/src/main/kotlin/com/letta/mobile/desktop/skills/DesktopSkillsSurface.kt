@@ -58,6 +58,7 @@ import com.letta.mobile.desktop.components.DesktopChipDivider
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.components.DesktopInfoBox
 import com.letta.mobile.desktop.components.DesktopPill
+import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.desktop.components.desktopCardGrid
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.theme.customColors
@@ -103,12 +104,10 @@ fun DesktopSkillsSurface(
             onQuery = { q -> if (tab == SkillsTab.Skills) skillQuery = q else onToolsSearchQueryChanged(q) },
             searchPlaceholder = if (tab == SkillsTab.Skills) "Search skills" else "Search tools",
             actions = {
-                DesktopOutlinedButton(
-                    onClick = { if (tab == SkillsTab.Skills) onRefreshSkills() else onToolsRefresh() },
+                DesktopRefreshAction(
+                    onRefresh = { if (tab == SkillsTab.Skills) onRefreshSkills() else onToolsRefresh() },
                     enabled = !loading,
-                ) {
-                    DesktopButtonContent(text = if (loading) "Refreshing" else "Refresh", icon = Icons.Outlined.Refresh)
-                }
+                )
             },
             chips = {
                 DesktopChipTab("Skills", tab == SkillsTab.Skills) { tab = SkillsTab.Skills; selectedSkill = null }

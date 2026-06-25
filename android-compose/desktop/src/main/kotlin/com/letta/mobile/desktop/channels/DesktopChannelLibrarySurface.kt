@@ -17,9 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
-import com.letta.mobile.desktop.DesktopButtonContent
-import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.components.DesktopCatalogCard
+import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.desktop.components.DesktopCatalogGridPadding
 import com.letta.mobile.desktop.components.DesktopCatalogHeader
 import com.letta.mobile.desktop.components.DesktopChipTab
@@ -60,11 +59,7 @@ fun DesktopChannelLibrarySurface(
             query = query,
             onQuery = { query = it },
             searchPlaceholder = "Search channels",
-            actions = {
-                DesktopOutlinedButton(onClick = onRefresh) {
-                    DesktopButtonContent(text = "Refresh", icon = Icons.Outlined.Refresh)
-                }
-            },
+            actions = { DesktopRefreshAction(onRefresh) },
             chips = {
                 DesktopChipTab("All channels", statusFilter == null) { statusFilter = null }
                 statusesPresent.forEach { status ->
@@ -91,9 +86,14 @@ fun DesktopChannelLibrarySurface(
 @Composable
 private fun ChannelCard(channel: ChannelDisplayItem, modifier: Modifier) {
     val accent = channel.status.accent()
+    // Keep it terse: the status pill already says the status, so don't repeat it
+    // in the description — show the detail text only when it adds information.
+    val description = channel.detailText
+        .takeIf { it.isNotBlank() && !it.equals(channel.status.label, ignoreCase = true) }
+        ?: channel.subtitle.takeIf { it.isNotBlank() && !it.equals(channel.status.label, ignoreCase = true) }
     DesktopCatalogCard(
         title = channel.title,
-        description = channel.subtitle.ifBlank { channel.detailText },
+        description = description,
         accent = accent,
         onClick = {},
         modifier = modifier,

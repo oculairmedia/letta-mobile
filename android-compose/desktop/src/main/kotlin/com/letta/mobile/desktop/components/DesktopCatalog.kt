@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextField
 
 /**
@@ -66,6 +69,17 @@ internal fun DesktopCatalogHeader(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = chips)
         }
     }
+}
+
+/** Icon-only refresh action for catalog/page headers (no button chrome). */
+@Composable
+internal fun DesktopRefreshAction(onRefresh: () -> Unit, enabled: Boolean = true) {
+    DesktopIconButton(
+        imageVector = Icons.Outlined.Refresh,
+        contentDescription = "Refresh",
+        onClick = onRefresh,
+        enabled = enabled,
+    )
 }
 
 /** A small, tokenized filter/segment chip used in catalog headers. */

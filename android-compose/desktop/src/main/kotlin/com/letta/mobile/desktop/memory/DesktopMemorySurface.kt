@@ -69,6 +69,8 @@ import com.dk.kuiver.renderer.KuiverViewerConfig
 import com.dk.kuiver.ui.EdgeLabelStyle
 import com.dk.kuiver.ui.LabelPlacement
 import com.dk.kuiver.ui.StyledEdgeContent
+import com.letta.mobile.desktop.components.DesktopChipTab
+import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.data.memory.MemoryAccentRole
 import com.letta.mobile.data.memory.MemoryCategories
 import com.letta.mobile.data.memory.MemoryCategory
@@ -193,15 +195,7 @@ private fun MemoryHeader(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
-        DesktopDefaultButton(
-            onClick = onRefresh,
-            enabled = !state.isLoading,
-        ) {
-            DesktopButtonContent(
-                text = if (state.isLoading) "Refreshing" else "Refresh",
-                icon = Icons.Outlined.Refresh,
-            )
-        }
+        DesktopRefreshAction(onRefresh = onRefresh, enabled = !state.isLoading)
     }
 }
 
@@ -230,22 +224,23 @@ private fun AgentSelector(
             items = agents,
             key = { it.id },
         ) { agent ->
-            DesktopRadioChip(
-                selected = agent.id == selectedAgentId,
+            DesktopChipTab(
+                text = agent.name,
+                active = agent.id == selectedAgentId,
                 onClick = { onAgentSelected(agent.id) },
-            ) {
-                DesktopControlText(agent.name)
-            }
+            )
         }
     }
 }
 
 @Composable
 private fun MemorySummaryCard(summary: MemoryParitySummary) {
-    ElevatedCard(
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-        ),
+    // Neutral stats strip — these are reference counts, not a status to flag,
+    // so no colour highlight.
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = MaterialTheme.shapes.medium,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -277,12 +272,12 @@ private fun SummaryMetric(
             text = metric.value,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = metric.label,
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+            color = MaterialTheme.customColors.onSurfaceMutedColor,
             modifier = Modifier.padding(bottom = 1.dp),
         )
     }
