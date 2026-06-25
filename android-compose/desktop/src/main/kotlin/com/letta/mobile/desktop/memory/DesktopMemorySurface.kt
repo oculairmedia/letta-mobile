@@ -149,6 +149,9 @@ fun DesktopMemorySurface(
                 MemorySummaryCard(state.memory.summary)
             }
             item {
+                // The graph is the focus — it fills the space the section cards
+                // used to occupy. Memory blocks stay editable by clicking their
+                // graph nodes.
                 MemoryGraphPanel(
                     graph = state.memory.graph,
                     onBlockNodeClick = { node ->
@@ -156,17 +159,7 @@ fun DesktopMemorySurface(
                             editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
                         }
                     },
-                )
-            }
-            items(
-                items = state.memory.sections,
-                key = { section -> section.kind.name },
-            ) { section ->
-                MemorySectionCard(
-                    section = section,
-                    canEdit = agentId != null && blockApi != null,
-                    onBlockClick = { block -> editorTarget = BlockEditorTarget.Existing(block.title, block.id) },
-                    onNewBlock = { editorTarget = BlockEditorTarget.New },
+                    modifier = Modifier.fillParentMaxHeight(0.82f),
                 )
             }
         }
@@ -320,15 +313,14 @@ private fun SummaryMetric(
 private fun MemoryGraphPanel(
     graph: MemoryParityGraph,
     onBlockNodeClick: (MemoryGraphNode) -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = MaterialTheme.shapes.medium,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(420.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
         if (graph.isEmpty) {
             Box(
