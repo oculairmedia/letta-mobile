@@ -127,7 +127,7 @@ private const val TOOL_AFFORDANCE_ROW_ENABLED = true
 // letta-mobile-gi9o0: minimum gap between reveal-synchronized streaming
 // haptics. Pulses are triggered by the smoothed text actually revealing (word
 // boundaries / small character buckets), not by an independent timer.
-private const val STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS = 180L
+private const val STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS = 96L
 
 @Composable
 internal fun ChatScreen(
