@@ -455,6 +455,9 @@ private fun AgendaView(
 ) {
     val agenda = remember(defs, selectedDate, now) { ScheduleProjection.agenda(defs, selectedDate, now, zone) }
     val completed = agenda.runs.count { it.status == RunStatus.Done }
+    val cadenceById = remember(defs) {
+        defs.associate { it.id to (it.cron?.let { c -> CronSchedule.parse(c)?.let(CronSchedule::describe) } ?: "One-time") }
+    }
     Column(Modifier.fillMaxSize().padding(horizontal = 28.dp)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("${ScheduleFormat.monthShort(selectedDate.month.ordinal + 1)} ${selectedDate.year}".uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.customColors.onSurfaceMutedColor)
@@ -479,7 +482,7 @@ private fun AgendaView(
         } else {
             LazyColumn {
                 items(items = agenda.runs, key = { it.scheduleId + it.instant.toString() }) { run ->
-                    AgendaRow(run, now, zone, onClick = { onRunClick(run) })
+                    AgendaRow(run, cadenceById[run.scheduleId], now, zone, onClick = { onRunClick(run) })
                 }
             }
         }
@@ -526,7 +529,7 @@ private fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: Local
 }
 
 @Composable
-private fun AgendaRow(run: ScheduleRun, now: Instant, zone: TimeZone, onClick: () -> Unit) {
+private fun AgendaRow(run: ScheduleRun, subtitle: String?, now: Instant, zone: TimeZone, onClick: () -> Unit) {
     val ldt = run.instant.toLocalDateTime(zone)
     val time = "${ScheduleFormat.pad2(ldt.hour)}:${ScheduleFormat.pad2(ldt.minute)}"
     Row(
@@ -541,6 +544,9 @@ private fun AgendaRow(run: ScheduleRun, now: Instant, zone: TimeZone, onClick: (
         }
         Column(Modifier.weight(1f).padding(vertical = 12.dp)) {
             Text(run.scheduleName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrBlank()) {
+                Text(subtitle, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
         val (label, color) = agendaStatusLabel(run, now)
         Text(if (run.status == RunStatus.Done) "Ran $time" else label, style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(top = 12.dp))
