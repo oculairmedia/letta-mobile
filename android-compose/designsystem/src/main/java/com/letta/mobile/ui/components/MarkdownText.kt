@@ -541,7 +541,10 @@ private fun MarkdownTextRaw(
             components = components,
             extendedSpans = extendedSpans,
             imageTransformer = Coil3ImageTransformerImpl,
-            retainState = true,
+            // Avoid retaining parser/span layout state across recycled chat/run-step
+            // markdown nodes. Retained state can visually clip inline-code spans
+            // after streaming/recomposition even though source text is intact.
+            retainState = false,
             // Editorial breathing room: generous spacing between list items,
             // paragraphs, and blocks so prose feels loose and magazine-like.
             padding = markdownPadding(
