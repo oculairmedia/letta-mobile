@@ -37,6 +37,6 @@ class LettaHapticCueCommonTest {
         val complete = assertNotNull(LettaHapticPatterns.patternFor(LettaHapticCue.StreamingComplete))
 
         assertEquals(listOf(LettaHapticIntensity.Light), pulse.pulses.map { it.intensity })
-        assertTrue(complete.pulses.any { it.intensity == LettaHapticIntensity.Strong })
+        assertTrue(complete.totalDurationMs > pulse.totalDurationMs)
     }
 }

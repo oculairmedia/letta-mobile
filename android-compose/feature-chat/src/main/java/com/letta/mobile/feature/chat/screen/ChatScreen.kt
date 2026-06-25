@@ -50,7 +50,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
+import com.letta.mobile.feature.chat.render.LocalStreamingRevealHapticPulse
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -124,10 +124,10 @@ import kotlin.math.max
  */
 private const val TOOL_AFFORDANCE_ROW_ENABLED = true
 
-// letta-mobile-gi9o0: minimum gap between streaming-pulse haptics. A streamed
-// response advances many times per second; ~320ms keeps the pulse felt as a
-// gentle "tokens flowing" heartbeat instead of a continuous buzz.
-private const val STREAMING_PULSE_MIN_INTERVAL_MS = 320L
+// letta-mobile-gi9o0: minimum gap between reveal-synchronized streaming
+// haptics. Pulses are triggered by the smoothed text actually revealing (word
+// boundaries / small character buckets), not by an independent timer.
+private const val STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS = 180L
 
 @Composable
 internal fun ChatScreen(
@@ -347,23 +347,15 @@ internal fun ChatScreen(
             }
         }
 
-        // 2) Streaming pulse — a light tick as streamed text advances,
-        //    throttled so a fast token stream never buzzes faster than
-        //    STREAMING_PULSE_MIN_INTERVAL_MS. The signal is the length of the
-        //    last (in-flight) message's content; it stays quiet during pauses
-        //    and stops at end-of-stream. snapshotFlow conflates equal reads so
-        //    a re-render without growth emits nothing.
-        LaunchedEffect(hapticsEnabled, view) {
-            if (!hapticsEnabled) return@LaunchedEffect
-            var lastPulseAt = 0L
-            snapshotFlow {
-                if (!state.isStreaming) -1
-                else state.messages.lastOrNull()?.content?.length ?: 0
-            }.collect { length ->
-                if (length <= 0) return@collect
+        // 2) Streaming pulse — a tiny tick when the smoothed renderer actually
+        //    reveals more text. This follows the visible reveal cadence instead
+        //    of running as a generic background frequency against raw chunks.
+        var lastRevealHapticAt by remember { mutableLongStateOf(0L) }
+        val streamingRevealPulse: () -> Unit = {
+            if (hapticsEnabled) {
                 val now = System.currentTimeMillis()
-                if (now - lastPulseAt >= STREAMING_PULSE_MIN_INTERVAL_MS) {
-                    lastPulseAt = now
+                if (now - lastRevealHapticAt >= STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS) {
+                    lastRevealHapticAt = now
                     HapticEffects.streamingPulse(view, enabled = true)
                 }
             }
@@ -498,6 +490,7 @@ internal fun ChatScreen(
 
                 CompositionLocalProvider(
                     LocalSubagentTodoSheetOpener provides openSubagentTarget,
+                    LocalStreamingRevealHapticPulse provides streamingRevealPulse,
                 ) {
                     Crossfade(
                         targetState = contentPhase,
