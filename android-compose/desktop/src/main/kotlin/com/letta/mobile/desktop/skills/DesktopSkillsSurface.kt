@@ -13,14 +13,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -43,22 +43,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillCategories
 import com.letta.mobile.data.skills.SkillCategory
 import com.letta.mobile.desktop.DesktopButtonContent
-import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
-import com.letta.mobile.desktop.DesktopRadioChip
 import com.letta.mobile.desktop.DesktopTextField
-import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.ui.theme.customColors
 
-private enum class SkillsTab { Skills, Tools }
+private enum class SkillsTab(val label: String) { Skills("Skills"), Tools("Tools") }
 
+/**
+ * Unified Skills & Tools surface. A single header carries the title with the
+ * Skills/Tools toggle (and the skills sub-filters) UNDERNEATH it, and both tabs
+ * render the same category-grouped 2-column card grid so they read as one
+ * coherent page (matching the design mockups + the Schedules/Memory layout
+ * conventions). Radii come from the desktop shape tokens.
+ */
 @Composable
 fun DesktopSkillsSurface(
     skills: List<Skill>,
@@ -79,195 +84,94 @@ fun DesktopSkillsSurface(
     modifier: Modifier = Modifier,
 ) {
     var tab by remember { mutableStateOf(SkillsTab.Skills) }
+    var assignedOnly by remember { mutableStateOf(false) }
+    var skillQuery by remember { mutableStateOf("") }
+    var selectedSkill by remember { mutableStateOf<Skill?>(null) }
+
     Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
-        TabRow(tab = tab, onSelect = { tab = it })
+        SkillsToolsHeader(
+            tab = tab,
+            onTab = { tab = it; selectedSkill = null },
+            assignedOnly = assignedOnly,
+            onAssigned = { assignedOnly = it },
+            installedCount = installedSkillNames.size,
+            query = if (tab == SkillsTab.Skills) skillQuery else toolState.searchQuery,
+            onQuery = { q -> if (tab == SkillsTab.Skills) skillQuery = q else onToolsSearchQueryChanged(q) },
+            loading = if (tab == SkillsTab.Skills) skillsLoading else toolState.isLoading,
+            onRefresh = { if (tab == SkillsTab.Skills) onRefreshSkills() else onToolsRefresh() },
+        )
         when (tab) {
-            SkillsTab.Skills -> SkillsTabContent(
+            SkillsTab.Skills -> SkillsContent(
                 skills = skills,
                 installedSkillNames = installedSkillNames,
                 skillsLoading = skillsLoading,
                 skillsError = skillsError,
-                canManageSkills = canManageSkills,
-                focusedAgentName = focusedAgentName,
-                onRefreshSkills = onRefreshSkills,
-                onInstallSkill = onInstallSkill,
-                onUninstallSkill = onUninstallSkill,
-                modifier = Modifier.fillMaxSize(),
-            )
-            SkillsTab.Tools -> DesktopToolLibrarySurface(
-                state = toolState,
-                onRefresh = onToolsRefresh,
-                onSearchQueryChanged = onToolsSearchQueryChanged,
-                onTagToggled = onToolsTagToggled,
-                onClearTags = onToolsClearTags,
-                onLoadMore = onToolsLoadMore,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun TabRow(tab: SkillsTab, onSelect: (SkillsTab) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 32.dp, top = 24.dp, end = 32.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        DesktopRadioChip(selected = tab == SkillsTab.Skills, onClick = { onSelect(SkillsTab.Skills) }) {
-            DesktopControlText("Skills")
-        }
-        DesktopRadioChip(selected = tab == SkillsTab.Tools, onClick = { onSelect(SkillsTab.Tools) }) {
-            DesktopControlText("Tools")
-        }
-    }
-}
-
-@Composable
-private fun SkillsTabContent(
-    skills: List<Skill>,
-    installedSkillNames: Set<String>,
-    skillsLoading: Boolean,
-    skillsError: String?,
-    canManageSkills: Boolean,
-    focusedAgentName: String?,
-    onRefreshSkills: () -> Unit,
-    onInstallSkill: (String) -> Unit,
-    onUninstallSkill: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var assignedOnly by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    var selectedSkill by remember { mutableStateOf<Skill?>(null) }
-
-    // The agent's installed list may include skills not present in the registry.
-    val installedExtras = remember(installedSkillNames, skills) {
-        val known = skills.map { it.name }.toSet()
-        installedSkillNames.filter { it !in known }.map { Skill(name = it) }
-    }
-    val all = remember(skills, installedExtras) { skills + installedExtras }
-    val base = if (assignedOnly) all.filter { it.name in installedSkillNames } else all
-    val filtered = remember(base, query) {
-        if (query.isBlank()) {
-            base
-        } else {
-            base.filter { it.name.contains(query, ignoreCase = true) || it.description?.contains(query, ignoreCase = true) == true }
-        }
-    }
-    val grouped = remember(filtered) {
-        SkillCategories.grouped(filtered, nameOf = { it.name }, tagsOf = { it.tags })
-    }
-
-    Row(modifier = modifier) {
-        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-            SkillsHeader(
-                installedCount = installedSkillNames.size,
-                totalCount = skills.size,
-                assignedOnly = assignedOnly,
-                onSelectAll = { assignedOnly = false },
-                onSelectAssigned = { assignedOnly = true },
-                query = query,
-                onQuery = { query = it },
-                loading = skillsLoading,
-                onRefresh = onRefreshSkills,
-            )
-            skillsError?.let {
-                Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
-                    DesktopInlineError(message = it, onRetry = onRefreshSkills, retrying = skillsLoading)
-                }
-            }
-            when {
-                skillsLoading && skills.isEmpty() -> InfoBox("Loading skills from the active backend.")
-                filtered.isEmpty() -> InfoBox(
-                    if (assignedOnly) {
-                        "No skills assigned to ${focusedAgentName ?: "this agent"} yet."
-                    } else {
-                        "No skills match your search."
-                    },
-                )
-                else -> LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                    contentPadding = PaddingValues(vertical = 16.dp),
-                ) {
-                    grouped.forEach { (category, sectionSkills) ->
-                        item(key = "section-${category.name}") {
-                            Text(
-                                text = category.label,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        items(items = sectionSkills.chunked(2), key = { it.first().name }) { rowSkills ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                rowSkills.forEach { skill ->
-                                    SkillCard(
-                                        skill = skill,
-                                        installed = skill.name in installedSkillNames,
-                                        canManage = canManageSkills,
-                                        onClick = { selectedSkill = skill },
-                                        onInstall = { onInstallSkill(skill.name) },
-                                        onUninstall = { onUninstallSkill(skill.name) },
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                                if (rowSkills.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        selectedSkill?.let { skill ->
-            SkillDetailPanel(
-                skill = skill,
-                installed = skill.name in installedSkillNames,
                 canManage = canManageSkills,
-                onInstall = { onInstallSkill(skill.name) },
-                onUninstall = { onUninstallSkill(skill.name) },
+                focusedAgentName = focusedAgentName,
+                assignedOnly = assignedOnly,
+                query = skillQuery,
+                selectedSkill = selectedSkill,
+                onSelect = { selectedSkill = it },
                 onClose = { selectedSkill = null },
+                onInstall = onInstallSkill,
+                onUninstall = onUninstallSkill,
+            )
+            SkillsTab.Tools -> ToolsContent(
+                toolState = toolState,
+                onRefresh = onToolsRefresh,
+                onLoadMore = onToolsLoadMore,
             )
         }
     }
 }
 
+// --- Header -----------------------------------------------------------------
+
 @Composable
-private fun SkillsHeader(
-    installedCount: Int,
-    totalCount: Int,
+private fun SkillsToolsHeader(
+    tab: SkillsTab,
+    onTab: (SkillsTab) -> Unit,
     assignedOnly: Boolean,
-    onSelectAll: () -> Unit,
-    onSelectAssigned: () -> Unit,
+    onAssigned: (Boolean) -> Unit,
+    installedCount: Int,
     query: String,
     onQuery: (String) -> Unit,
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp, top = 12.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 32.dp, end = 32.dp, top = 16.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Skills", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text("Skills & Tools", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             Box(Modifier.width(220.dp)) {
-                DesktopTextField(value = query, onValueChange = onQuery, placeholder = "Search skills", modifier = Modifier.fillMaxWidth())
+                DesktopTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    placeholder = if (tab == SkillsTab.Skills) "Search skills" else "Search tools",
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
             DesktopOutlinedButton(onClick = onRefresh, enabled = !loading) {
                 DesktopButtonContent(text = if (loading) "Refreshing" else "Refresh", icon = Icons.Outlined.Refresh)
             }
         }
-        // Filter chips sit on their own row, underneath the title.
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HeaderTab("All skills", !assignedOnly, onSelectAll)
-            HeaderTab("Assigned · $installedCount", assignedOnly, onSelectAssigned)
+        // Toggle + sub-filters live on their own row, beneath the title.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            SegChip("Skills", tab == SkillsTab.Skills) { onTab(SkillsTab.Skills) }
+            SegChip("Tools", tab == SkillsTab.Tools) { onTab(SkillsTab.Tools) }
+            if (tab == SkillsTab.Skills) {
+                Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(20.dp).background(MaterialTheme.colorScheme.outlineVariant))
+                SegChip("All skills", !assignedOnly) { onAssigned(false) }
+                SegChip("Assigned · $installedCount", assignedOnly) { onAssigned(true) }
+            }
         }
     }
 }
 
 @Composable
-private fun HeaderTab(text: String, active: Boolean, onClick: () -> Unit) {
+private fun SegChip(text: String, active: Boolean, onClick: () -> Unit) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelMedium,
@@ -282,17 +186,169 @@ private fun HeaderTab(text: String, active: Boolean, onClick: () -> Unit) {
     )
 }
 
+// --- Skills content ---------------------------------------------------------
+
 @Composable
-private fun SkillCard(
-    skill: Skill,
-    installed: Boolean,
+private fun SkillsContent(
+    skills: List<Skill>,
+    installedSkillNames: Set<String>,
+    skillsLoading: Boolean,
+    skillsError: String?,
     canManage: Boolean,
-    onClick: () -> Unit,
-    onInstall: () -> Unit,
-    onUninstall: () -> Unit,
-    modifier: Modifier = Modifier,
+    focusedAgentName: String?,
+    assignedOnly: Boolean,
+    query: String,
+    selectedSkill: Skill?,
+    onSelect: (Skill) -> Unit,
+    onClose: () -> Unit,
+    onInstall: (String) -> Unit,
+    onUninstall: (String) -> Unit,
 ) {
-    val accent = SkillCategories.categorize(skill.name, skill.tags).accentColor()
+    val installedExtras = remember(installedSkillNames, skills) {
+        val known = skills.map { it.name }.toSet()
+        installedSkillNames.filter { it !in known }.map { Skill(name = it) }
+    }
+    val all = remember(skills, installedExtras) { skills + installedExtras }
+    val base = if (assignedOnly) all.filter { it.name in installedSkillNames } else all
+    val filtered = remember(base, query) {
+        if (query.isBlank()) base
+        else base.filter { it.name.contains(query, true) || it.description?.contains(query, true) == true }
+    }
+    val grouped = remember(filtered) { SkillCategories.grouped(filtered, nameOf = { it.name }, tagsOf = { it.tags }) }
+
+    Row(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            skillsError?.let {
+                Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
+                    DesktopInlineError(message = it, onRetry = {}, retrying = skillsLoading)
+                }
+            }
+            when {
+                skillsLoading && skills.isEmpty() -> InfoBox("Loading skills from the active backend.")
+                filtered.isEmpty() -> InfoBox(
+                    if (assignedOnly) "No skills assigned to ${focusedAgentName ?: "this agent"} yet." else "No skills match your search.",
+                )
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp),
+                ) {
+                    categoryGrid(grouped, keyOf = { it.name }) { skill, cardModifier ->
+                        CatalogCard(
+                            name = skill.name,
+                            description = skill.description,
+                            accent = SkillCategories.categorize(skill.name, skill.tags).accentColor(),
+                            onClick = { onSelect(skill) },
+                            modifier = cardModifier,
+                        ) {
+                            SkillAddButton(
+                                installed = skill.name in installedSkillNames,
+                                canManage = canManage,
+                                onInstall = { onInstall(skill.name) },
+                                onUninstall = { onUninstall(skill.name) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        selectedSkill?.let { skill ->
+            SkillDetailPanel(
+                skill = skill,
+                installed = skill.name in installedSkillNames,
+                canManage = canManage,
+                onInstall = { onInstall(skill.name) },
+                onUninstall = { onUninstall(skill.name) },
+                onClose = onClose,
+            )
+        }
+    }
+}
+
+// --- Tools content ----------------------------------------------------------
+
+@Composable
+private fun ToolsContent(
+    toolState: DesktopToolLibraryState,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+) {
+    val tools = toolState.filteredTools
+    val grouped = remember(tools) { SkillCategories.grouped(tools, nameOf = { it.name }, tagsOf = { it.tags }) }
+
+    Column(Modifier.fillMaxSize()) {
+        toolState.errorMessage?.let {
+            Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
+                DesktopInlineError(message = it, onRetry = onRefresh, retrying = toolState.isLoading)
+            }
+        }
+        when {
+            toolState.isLoading && tools.isEmpty() -> InfoBox("Loading tools from the active backend.")
+            tools.isEmpty() -> InfoBox("No tools match your search.")
+            else -> LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                contentPadding = PaddingValues(vertical = 16.dp),
+            ) {
+                categoryGrid(grouped, keyOf = { it.name }) { tool, cardModifier ->
+                    CatalogCard(
+                        name = tool.name,
+                        description = tool.description,
+                        accent = SkillCategories.categorize(tool.name, tool.tags).accentColor(),
+                        onClick = {},
+                        modifier = cardModifier,
+                    ) {
+                        tool.toolType?.takeIf { it.isNotBlank() }?.let { Pill(it, MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+                item("load-more") {
+                    if (toolState.isLoadingMore) {
+                        InfoBox("Loading more tools…")
+                    } else {
+                        Box(Modifier.fillMaxWidth().padding(top = 4.dp), contentAlignment = Alignment.Center) {
+                            DesktopOutlinedButton(onClick = onLoadMore) { DesktopButtonContent("Load more") }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Shared grid + card -----------------------------------------------------
+
+private fun <T> LazyListScope.categoryGrid(
+    grouped: List<Pair<SkillCategory, List<T>>>,
+    keyOf: (T) -> String,
+    card: @Composable (T, Modifier) -> Unit,
+) {
+    grouped.forEach { (category, items) ->
+        item(key = "section-${category.name}") {
+            Text(
+                text = category.label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        items(items = items.chunked(2), key = { keyOf(it.first()) }) { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                row.forEach { item -> card(item, Modifier.weight(1f)) }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CatalogCard(
+    name: String,
+    description: String?,
+    accent: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit = {},
+) {
     Row(
         modifier = modifier
             .clip(MaterialTheme.shapes.medium)
@@ -307,20 +363,15 @@ private fun SkillCard(
             Modifier.size(38.dp).clip(MaterialTheme.shapes.small).background(accent.copy(alpha = 0.2f)),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                skill.name.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = accent,
-            )
+            Text(name.firstOrNull()?.uppercase() ?: "?", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = accent)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(skill.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
-            skill.description?.takeIf { it.isNotBlank() }?.let {
+            Text(name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+            description?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
-        SkillAddButton(installed, canManage, onInstall, onUninstall)
+        trailing()
     }
 }
 
