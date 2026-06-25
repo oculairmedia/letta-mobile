@@ -75,7 +75,7 @@ object LettaHapticPatterns {
         )
         LettaHapticCue.StreamingPulse -> LettaHapticPattern(
             pulses = listOf(
-                LettaHapticPulse(startTimeMs = 0L, durationMs = 4L, intensity = LettaHapticIntensity.Feather),
+                LettaHapticPulse(startTimeMs = 0L, durationMs = 2L, intensity = LettaHapticIntensity.Feather),
             ),
         )
         LettaHapticCue.StreamingComplete -> LettaHapticPattern(
