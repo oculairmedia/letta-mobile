@@ -250,6 +250,24 @@ class SubagentRepositoryTest {
         assertEquals("registry unavailable", result.exceptionOrNull()?.message)
     }
 
+
+    @Test
+    fun `refresh concurrent callers share one deferred and do not cancel each other`() = runTest {
+        transport.subagentListDelayMs = 50
+        transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
+        val repo = SubagentRepository(transport, backgroundScope)
+
+        val r1 = async { repo.refresh() }
+        val r2 = async { repo.refresh() }
+
+        val res1 = r1.await()
+        val res2 = r2.await()
+
+        assertTrue("First caller should succeed", res1.isSuccess)
+        assertTrue("Second caller should succeed", res2.isSuccess)
+        assertEquals(1, transport.subagentListCalls.size)
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────
 
     private fun connectedState() = ChannelTransportState.Connected(

@@ -50,10 +50,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -83,6 +83,7 @@ import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.components.TelemetryGrid
+import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
@@ -319,6 +320,7 @@ private fun RunCard(
 ) {
     val clipboard = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     val active = isActiveRunStatus(run.status)
     val containerColor = runCardContainerColor(run.status)
 
@@ -439,7 +441,7 @@ private fun RunCard(
                         .clip(RoundedCornerShape(4.dp))
                         .clickable {
                             clipboard.setText(AnnotatedString(run.id))
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            HapticEffects.longPress(haptic, view)
                         }
                         .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -1196,6 +1198,7 @@ private fun StepTraceAccordion(
 ) {
     val clipboard = LocalClipboardManager.current
     val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
     val pretty = remember(json) { json.toPrettyJsonString() }
     val truncated = remember(pretty) { truncateJsonForDisplay(pretty) }
@@ -1236,7 +1239,7 @@ private fun StepTraceAccordion(
                     TextButton(
                         onClick = {
                             clipboard.setText(AnnotatedString(pretty))
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            HapticEffects.longPress(haptic, view)
                         },
                     ) {
                         Text(stringResource(R.string.screen_runs_step_trace_copy_full))

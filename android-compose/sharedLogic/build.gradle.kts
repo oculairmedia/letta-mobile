@@ -15,12 +15,6 @@ detekt {
 }
 
 kotlin {
-    compilerOptions {
-        freeCompilerArgs.addAll(
-            "-Xcontext-parameters",
-        )
-    }
-
     android {
         namespace = "com.letta.mobile.sharedlogic"
         compileSdk = 36

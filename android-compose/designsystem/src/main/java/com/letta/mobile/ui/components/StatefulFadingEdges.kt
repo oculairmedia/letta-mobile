@@ -1,8 +1,12 @@
 package com.letta.mobile.ui.components
 
+import androidx.annotation.VisibleForTesting
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
@@ -18,13 +22,27 @@ fun Modifier.statefulFadingEdges(
     backgroundColor: Color,
     fadeLength: Dp = 32.dp,
 ): Modifier = composed {
-    val canScrollBackward = scrollState.firstVisibleItemIndex > 0 ||
-        scrollState.firstVisibleItemScrollOffset > 0
-    val visibleItems = scrollState.layoutInfo.visibleItemsInfo
-    val canScrollForward = visibleItems.lastOrNull()?.let { lastVisible ->
-        lastVisible.index < scrollState.layoutInfo.totalItemsCount - 1 ||
-            lastVisible.offset + lastVisible.size > scrollState.layoutInfo.viewportEndOffset
-    } ?: false
+    val canScrollBackward by remember(scrollState) {
+        derivedStateOf {
+            calculateCanScrollBackward(
+                firstVisibleItemIndex = scrollState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = scrollState.firstVisibleItemScrollOffset
+            )
+        }
+    }
+
+    val canScrollForward by remember(scrollState) {
+        derivedStateOf {
+            val visibleItems = scrollState.layoutInfo.visibleItemsInfo
+            val lastVisible = visibleItems.lastOrNull()
+            calculateCanScrollForward(
+                lastVisibleIndex = lastVisible?.index,
+                lastVisibleEndOffset = lastVisible?.let { it.offset + it.size },
+                totalItemsCount = scrollState.layoutInfo.totalItemsCount,
+                viewportEndOffset = scrollState.layoutInfo.viewportEndOffset
+            )
+        }
+    }
 
     val leftAlpha = animateFloatAsState(
         targetValue = if (canScrollBackward) EdgeVisibleAlpha else EdgeHiddenAlpha,
@@ -64,6 +82,25 @@ fun Modifier.statefulFadingEdges(
             )
         }
     }
+}
+
+@VisibleForTesting
+internal fun calculateCanScrollBackward(
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int
+): Boolean {
+    return firstVisibleItemIndex > 0 || firstVisibleItemScrollOffset > 0
+}
+
+@VisibleForTesting
+internal fun calculateCanScrollForward(
+    lastVisibleIndex: Int?,
+    lastVisibleEndOffset: Int?,
+    totalItemsCount: Int,
+    viewportEndOffset: Int
+): Boolean {
+    if (lastVisibleIndex == null || lastVisibleEndOffset == null) return false
+    return lastVisibleIndex < totalItemsCount - 1 || lastVisibleEndOffset > viewportEndOffset
 }
 
 private const val EdgeFadeMillis = 300
