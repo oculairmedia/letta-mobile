@@ -145,6 +145,7 @@ fun ConfigScreen(
                 onThemePresetChange = { viewModel.updateThemePreset(it) },
                 onDynamicColorChange = { viewModel.updateDynamicColor(it) },
                 onEnableProjectsChange = { viewModel.updateEnableProjects(it) },
+                onHapticsEnabledChange = { viewModel.updateHapticsEnabled(it) },
                 onLocalModelPathChange = { viewModel.updateLocalModelPath(it) },
                 onLocalModelHandleChange = { viewModel.updateLocalModelHandle(it) },
                 onLocalModelAcceleratorChange = { viewModel.updateLocalModelAccelerator(it) },
@@ -208,6 +209,7 @@ private fun ConfigContent(
     onThemePresetChange: (ThemePreset) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onEnableProjectsChange: (Boolean) -> Unit,
+    onHapticsEnabledChange: (Boolean) -> Unit,
     onLocalModelPathChange: (String) -> Unit,
     onLocalModelHandleChange: (String) -> Unit,
     onLocalModelAcceleratorChange: (String) -> Unit,
@@ -442,6 +444,16 @@ private fun ConfigContent(
                     HapticSwitch(
                         checked = state.enableProjects,
                         onCheckedChange = onEnableProjectsChange,
+                    )
+                },
+            )
+            item(
+                headlineContent = { Text(stringResource(R.string.screen_config_haptics)) },
+                supportingContent = { Text(stringResource(R.string.screen_config_haptics_description)) },
+                trailingContent = {
+                    HapticSwitch(
+                        checked = state.hapticsEnabled,
+                        onCheckedChange = onHapticsEnabledChange,
                     )
                 },
             )
