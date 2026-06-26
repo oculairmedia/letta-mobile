@@ -79,7 +79,7 @@ fun mergeStreamText(
         maxOf(k, longestCommonSuffixLength(existing, incoming))
     } else 0
     val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
-        (overlapLen + 2 >= maxMatch)
+        (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
         canUseSnapshotMerge && incoming == existing -> StreamTextMergeBranch.EQUAL
