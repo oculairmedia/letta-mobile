@@ -169,6 +169,14 @@ class StreamingMarkdownDocumentTest {
         )
         assertEquals(
             false,
+            state.update("See &#124; for details").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("Math: \$x_i\$ is small").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
             state.update("# Heading").blocks.single().supportsPlainTextHeightPrediction(),
         )
         assertEquals(
