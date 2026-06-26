@@ -6,6 +6,28 @@ import org.junit.Test
 class UrlAutolinkTest {
 
     @Test
+    fun `escapeBareIssueReferences preserves following character after issue reference`() {
+        assertEquals(
+            "\\#750 likely fixed the stream churn.",
+            escapeBareIssueReferences("#750 likely fixed the stream churn."),
+        )
+        assertEquals(
+            "- \\#746 smooth streaming reveal",
+            escapeBareIssueReferences("- #746 smooth streaming reveal"),
+        )
+    }
+
+    @Test
+    fun `escapeBareIssueReferences leaves headings and protected spans untouched`() {
+        assertEquals("# Heading", escapeBareIssueReferences("# Heading"))
+        assertEquals("## Section", escapeBareIssueReferences("## Section"))
+        assertEquals("Use `#750` likely", escapeBareIssueReferences("Use `#750` likely"))
+        assertEquals("[#750](https://example.com) likely", escapeBareIssueReferences("[#750](https://example.com) likely"))
+        assertEquals("Already \\#750 likely", escapeBareIssueReferences("Already \\#750 likely"))
+        assertEquals("https://example.com/#750 likely", escapeBareIssueReferences("https://example.com/#750 likely"))
+    }
+
+    @Test
     fun `autolinkBareUrls wraps bare HTTP URLs in markdown link syntax`() {
         val input = "Check out https://example.com for more info"
         val expected = "Check out [https://example.com](https://example.com) for more info"
