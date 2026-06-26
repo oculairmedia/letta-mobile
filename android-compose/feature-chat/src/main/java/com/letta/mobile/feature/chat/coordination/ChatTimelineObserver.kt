@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
@@ -180,16 +181,18 @@ internal class ChatTimelineObserver(
                         clearA2uiThinkingOnResponse()
                     }
                     val a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived
-                    val nextIsStreaming = if (streamInFlight) prev.isStreaming
-                        else if (isReplyStreaming) true
-                        else if (a2uiThinkingActive) true
-                        else if (duplicateInitialMessageInFlight) true
-                        else anyLettaServerLocalPending
-                    val nextIsAgentTyping = if (streamInFlight) prev.isAgentTyping
-                        else if (isReplyStreaming) true
-                        else if (a2uiThinkingActive) true
-                        else if (duplicateInitialMessageInFlight) true
-                        else (anyLettaServerLocalPending && !tailIsAssistant)
+                    val presence = ChatStreamingPresencePolicy.derive(
+                        previousIsStreaming = prev.isStreaming,
+                        previousIsAgentTyping = prev.isAgentTyping,
+                        anyServerLocalPending = anyLettaServerLocalPending,
+                        tailIsAssistant = tailIsAssistant,
+                        replyStreaming = isReplyStreaming,
+                        clientModeStreamInFlight = streamInFlight,
+                        a2uiThinkingActive = a2uiThinkingActive,
+                        duplicateInitialMessageInFlight = duplicateInitialMessageInFlight,
+                    )
+                    val nextIsStreaming = presence.isStreaming
+                    val nextIsAgentTyping = presence.isAgentTyping
 
                     uiState.value = collapseCompletedRunsIfStreamingFinished(
                         prev,
