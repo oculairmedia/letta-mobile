@@ -121,6 +121,8 @@ import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
+import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
+import com.letta.mobile.desktop.agent.avatarStyle
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
@@ -162,6 +164,9 @@ fun LettaDesktopApp(
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     var showNewAgentDialog by remember { mutableStateOf(false) }
+    // Avatar styles chosen via the editor this session, applied immediately to the
+    // orbs regardless of whether the backend round-trips agent metadata.
+    var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
     var editAgentId by remember { mutableStateOf<String?>(null) }
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
@@ -413,7 +418,19 @@ fun LettaDesktopApp(
     }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
-    val selectedAgentOrbIndex = railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
+    // Per-agent avatar-style override chosen in the editor (stored in agent
+    // metadata). Re-derived whenever the roster changes — which includes the
+    // post-save reload — so a freshly-saved icon is reflected on the orbs.
+    // Agents without an override fall back to their position-derived colour.
+    val cachedAvatarStyles = remember(railAgents) {
+        val repo = dataBindings.sessionGraphProvider.current.agentRepository
+        railAgents.mapNotNull { (id, _) -> repo.getCachedAgent(AgentId(id))?.avatarStyle()?.let { id to it } }.toMap()
+    }
+    // Session overrides win over the cached/backend value so a just-saved icon
+    // shows instantly.
+    val avatarStyleByAgentId = cachedAvatarStyles + avatarOverrides
+    val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
+        ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
         ?: chatState.selectedConversation?.agentName ?: "Letta"
     // List every conversation across the selected stack (all agents sharing the
@@ -539,9 +556,11 @@ fun LettaDesktopApp(
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
                     agents = railAgents,
+                    avatarStyleByAgentId = avatarStyleByAgentId,
                     selectedAgentId = selectedAgentId,
                     thinkingAgentId = thinkingAgentId,
                     onAgentSelected = { agentId ->
+                        editAgentId = null
                         chatState.conversations
                             .firstOrNull { it.agentId == agentId }
                             ?.let { chatController.selectConversation(it.id) }
@@ -549,7 +568,7 @@ fun LettaDesktopApp(
                     },
                     onNewSession = { showNewAgentDialog = true },
                     onSearch = { showCommandPalette = true },
-                    onSettings = { selectedDestination = DesktopDestination.Settings },
+                    onSettings = { editAgentId = null; selectedDestination = DesktopDestination.Settings },
                 )
                 RailDivider()
                 // Agent sidebar: agent header + nav + conversations.
@@ -563,13 +582,15 @@ fun LettaDesktopApp(
                     selectedDestination = selectedDestination,
                     mode = workPlayMode,
                     onModeChange = { workPlayMode = it },
-                    onDestinationSelected = { selectedDestination = it },
+                    onDestinationSelected = { editAgentId = null; selectedDestination = it },
                     onConversationSelected = {
+                        editAgentId = null
                         chatController.selectConversation(it)
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onDeleteConversation = chatController::deleteConversation,
                     onNewChat = {
+                        editAgentId = null
                         selectedDestination = DesktopDestination.Conversations
                         chatController.createConversation()
                     },
@@ -578,7 +599,23 @@ fun LettaDesktopApp(
                 RailDivider()
                 // Main content pane.
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    if (selectedDestination == DesktopDestination.Conversations) {
+                    val editing = editAgentId
+                    if (editing != null) {
+                        DesktopEditAgentSurface(
+                            agentId = editing,
+                            modelOptions = modelOptions,
+                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                            blockApi = blockApi,
+                            scope = chatScope,
+                            onClose = { editAgentId = null },
+                            onSaved = { style ->
+                                avatarOverrides = avatarOverrides + (editing to style)
+                                editAgentId = null
+                                chatController.retryConnection()
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (selectedDestination == DesktopDestination.Conversations) {
                         val composerCommands = buildList {
                             add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
                             add(ComposerCommand("agent", "Create a new agent") { showNewAgentDialog = true })
@@ -784,20 +821,8 @@ fun LettaDesktopApp(
                     onDismiss = { showCommandPalette = false },
                 )
             }
-            val editingAgentId = editAgentId
-            if (editingAgentId != null) {
-                EditAgentDialog(
-                    agentId = editingAgentId,
-                    modelOptions = modelOptions,
-                    agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                    scope = chatScope,
-                    onDismiss = { editAgentId = null },
-                    onSaved = {
-                        editAgentId = null
-                        chatController.retryConnection()
-                    },
-                )
-            }
+            // Edit agent is now a full-page surface in the main content pane
+            // (see DesktopEditAgentSurface), not a modal overlay.
             if (showNewAgentDialog) {
                 NewAgentDialog(
                     modelOptions = modelOptions,
@@ -922,140 +947,6 @@ private fun NewAgentDialog(
 }
 
 /**
- * Modal for editing an existing agent: name, model, and system prompt, applied
- * via the real agent repository (PATCH /v1/agents/{id}).
- */
-@Composable
-private fun EditAgentDialog(
-    agentId: String,
-    modelOptions: List<Pair<String, String>>,
-    agentRepository: IAgentRepository,
-    scope: CoroutineScope,
-    onDismiss: () -> Unit,
-    onSaved: () -> Unit,
-) {
-    var name by remember(agentId) { mutableStateOf(TextFieldValue("")) }
-    var modelValue by remember(agentId) { mutableStateOf<String?>(null) }
-    var system by remember(agentId) { mutableStateOf("") }
-    var modelMenuOpen by remember { mutableStateOf(false) }
-    var loading by remember(agentId) { mutableStateOf(true) }
-    var busy by remember(agentId) { mutableStateOf(false) }
-    var error by remember(agentId) { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(agentId) {
-        val agent = agentRepository.getCachedAgent(agentId)
-            ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
-        if (agent != null) {
-            name = TextFieldValue(agent.name)
-            modelValue = agent.model
-            system = agent.system.orEmpty()
-        } else {
-            error = "Could not load agent"
-        }
-        loading = false
-    }
-    val modelLabel = modelOptions.firstOrNull { it.second == modelValue }?.first
-        ?: modelValue ?: "Default"
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier.width(480.dp).clickable(enabled = false) {},
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Text(
-                    text = "Edit agent",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (loading) {
-                    Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Text("Name", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    JewelTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
-
-                    Text("Model", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Box {
-                        Surface(
-                            onClick = { modelMenuOpen = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(modelLabel, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        if (modelMenuOpen) {
-                            JewelPopupMenu(onDismissRequest = { modelMenuOpen = false; true }, horizontalAlignment = Alignment.Start) {
-                                modelOptions.forEach { (label, value) ->
-                                    selectableItem(selected = modelValue == value, onClick = { modelMenuOpen = false; modelValue = value }) {
-                                        DesktopControlText(label)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Text("System prompt", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    DesktopTextArea(
-                        value = system,
-                        onValueChange = { system = it },
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        placeholder = "System prompt…",
-                    )
-                }
-                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                ) {
-                    DesktopOutlinedButton(onClick = onDismiss, enabled = !busy) { DesktopButtonContent("Cancel") }
-                    DesktopDefaultButton(
-                        onClick = {
-                            busy = true; error = null
-                            scope.launch {
-                                runCatching {
-                                    agentRepository.updateAgent(
-                                        AgentId(agentId),
-                                        AgentUpdateParams(
-                                            name = name.text.trim().takeIf { it.isNotBlank() },
-                                            model = modelValue,
-                                            system = system.takeIf { it.isNotBlank() },
-                                        ),
-                                    )
-                                }
-                                    .onSuccess { onSaved() }
-                                    .onFailure { error = it.message ?: "Save failed"; busy = false }
-                            }
-                        },
-                        enabled = !busy && !loading,
-                    ) { DesktopButtonContent(if (busy) "Saving…" else "Save") }
-                }
-            }
-        }
-    }
-}
-
-/**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
  * (now / 5m / 2h / 4d / 3w / 2mo). Non-ISO values are returned unchanged.
  */
@@ -1111,6 +1002,7 @@ private fun ThinkingRing(
 @Composable
 private fun DesktopAgentRail(
     agents: List<Pair<String, String>>,
+    avatarStyleByAgentId: Map<String, Int>,
     selectedAgentId: String?,
     thinkingAgentId: String?,
     onAgentSelected: (String) -> Unit,
@@ -1170,6 +1062,9 @@ private fun DesktopAgentRail(
                 // Clicking a stack opens its already-selected member if one is
                 // selected, otherwise its first (most-recent) member.
                 val targetAgentId = group.agentIds.firstOrNull { it == selectedAgentId } ?: group.agentIds.first()
+                // Use the stack member's saved avatar style if any set one,
+                // otherwise the position-derived colour.
+                val orbStyle = group.agentIds.firstNotNullOfOrNull { avatarStyleByAgentId[it] } ?: index
                 val tooltip = buildString {
                     append(group.name)
                     if (count > 1) append(" · $count agents")
@@ -1192,7 +1087,7 @@ private fun DesktopAgentRail(
                             ThinkingRing(diameter = 44.dp, cornerRadius = 10.dp)
                         }
                         AgentOrb(
-                            index = index,
+                            index = orbStyle,
                             size = 36.dp,
                             onClick = { onAgentSelected(targetAgentId) },
                         ) {
