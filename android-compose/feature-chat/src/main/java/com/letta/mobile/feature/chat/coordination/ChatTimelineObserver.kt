@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
@@ -18,7 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.letta.mobile.ui.chat.render.ChatTimelineProjector
+import com.letta.mobile.ui.chat.render.ChatPresenceSignals
+import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
@@ -28,13 +28,13 @@ import com.letta.mobile.feature.chat.screen.AdminChatViewModel
  * conversation, but this collaborator owns observer job lifecycle, hydration
  * signals, older-page prefix merging, and streaming/typing flag projection.
  *
- * The pure Timeline→message projection (incremental tail cache, dedupe, A2UI
- * extraction, [com.letta.mobile.data.chat.projection.ChatMessageListChange]
- * computation) lives in the shared [ChatTimelineProjector] so Android and
- * desktop share identical streaming output. This class keeps only the
+ * The Timeline→presentation transform (incremental tail cache, dedupe, A2UI
+ * extraction, [com.letta.mobile.data.chat.projection.ChatMessageListChange], and
+ * streaming/typing derivation) lives in the shared [ChatTimelinePresenter] so
+ * Android and desktop share identical output. This class keeps only the
  * Android-side driver: the subscription loop, the frame-pace coalescing, the
- * hydrate-signal handling, and the streaming/typing derivation that depends on
- * ViewModel-supplied signals.
+ * hydrate-signal handling, and computing the platform stream signals the
+ * presenter's presence derivation needs.
  */
 internal class ChatTimelineObserver(
     private val scope: CoroutineScope,
@@ -58,8 +58,8 @@ internal class ChatTimelineObserver(
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
 
-    /** Pure, stateful Timeline→message projection (cache + incremental tail). */
-    private val projector = ChatTimelineProjector()
+    /** Shared presentation core: projection (cache + incremental tail) + presence. */
+    private val presenter = ChatTimelinePresenter()
 
     /** Agent/conversation id pair the current observer job is bound to. */
     private var observerBinding: TimelineObserverBinding? = null
@@ -70,7 +70,7 @@ internal class ChatTimelineObserver(
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
         observerBinding = null
-        projector.reset()
+        presenter.reset()
     }
 
     fun start(conversationId: String) = start(agentId = null, conversationId = conversationId)
@@ -83,7 +83,7 @@ internal class ChatTimelineObserver(
 
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
-        projector.reset()
+        presenter.reset()
         observerBinding = binding
         observerJob = scope.launch {
             val flow = try {
@@ -140,10 +140,10 @@ internal class ChatTimelineObserver(
                 // delta, so Compose hit-testing / gesture handling get a clean
                 // pass and tool-card taps land mid-stream.
                 flow.collect { timeline ->
-                    val prefix = projector.olderPrefixFor(conversationId)
+                    val prefix = presenter.olderPrefixFor(conversationId)
                     val previousState = uiState.value
                     val projection = withContext(projectionDispatcher) {
-                        projector.project(
+                        presenter.project(
                             timeline = timeline,
                             prefix = prefix,
                             previousState = previousState,
@@ -155,7 +155,7 @@ internal class ChatTimelineObserver(
                     // byte-identical to the screen. Skip the uiState write so we
                     // don't allocate a new ChatUiState and force a recomposition
                     // storm over every tool card. Telemetry was already emitted
-                    // as uiProjection.suppressed by the projector.
+                    // as uiProjection.suppressed by the presenter.
                     if (projection.noChange) {
                         return@collect
                     }
@@ -169,10 +169,13 @@ internal class ChatTimelineObserver(
                     if (isFollowingDuplicateInitialMessageInFlight() && tailIsAssistant) {
                         clearFollowingDuplicateInitialMessageInFlight()
                     }
-                    val duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight()
+                    // Platform stream signals — computed on the collect coroutine
+                    // (NOT the projection dispatcher) because they read/clear
+                    // ViewModel flags and inspect the projected list. The shared
+                    // presenter then derives the streaming/typing presence.
+                    // prev is captured before the a2ui side effect, matching the
+                    // pre-refactor ordering.
                     val prev = uiState.value
-                    val isReplyStreaming = activeReplyStreams.value.contains(conversationId)
-                    val streamInFlight = isClientModeStreamInFlight()
                     val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
                     val a2uiResponseArrived = a2uiStartMessageCount != null && ui
                         .drop(a2uiStartMessageCount)
@@ -180,19 +183,19 @@ internal class ChatTimelineObserver(
                     if (a2uiResponseArrived) {
                         clearA2uiThinkingOnResponse()
                     }
-                    val a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived
-                    val presence = ChatStreamingPresencePolicy.derive(
+                    val presentation = presenter.present(
+                        projection = projection,
+                        signals = ChatPresenceSignals(
+                            replyStreaming = activeReplyStreams.value.contains(conversationId),
+                            clientModeStreamInFlight = isClientModeStreamInFlight(),
+                            a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
+                            duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
+                        ),
                         previousIsStreaming = prev.isStreaming,
                         previousIsAgentTyping = prev.isAgentTyping,
-                        anyServerLocalPending = anyLettaServerLocalPending,
-                        tailIsAssistant = tailIsAssistant,
-                        replyStreaming = isReplyStreaming,
-                        clientModeStreamInFlight = streamInFlight,
-                        a2uiThinkingActive = a2uiThinkingActive,
-                        duplicateInitialMessageInFlight = duplicateInitialMessageInFlight,
                     )
-                    val nextIsStreaming = presence.isStreaming
-                    val nextIsAgentTyping = presence.isAgentTyping
+                    val nextIsStreaming = presentation.isStreaming
+                    val nextIsAgentTyping = presentation.isAgentTyping
 
                     uiState.value = collapseCompletedRunsIfStreamingFinished(
                         prev,
@@ -230,7 +233,7 @@ internal class ChatTimelineObserver(
         conversationId: String,
         olderMessages: List<UiMessage>,
         existingMessages: List<UiMessage>,
-    ): List<UiMessage> = projector.mergeOlderPage(conversationId, olderMessages, existingMessages)
+    ): List<UiMessage> = presenter.mergeOlderPage(conversationId, olderMessages, existingMessages)
 
     private data class TimelineObserverBinding(
         val agentId: String?,
