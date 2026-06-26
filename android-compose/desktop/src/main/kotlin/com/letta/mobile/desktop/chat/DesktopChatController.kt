@@ -4,6 +4,8 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
+import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
@@ -23,8 +25,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -95,6 +101,52 @@ class DesktopChatController(
      * rebind in [selectRemoteConversation].
      */
     private val timelineProjector = ChatTimelineProjector()
+
+    /**
+     * The bound conversation's latest projection facts that the shared streaming-
+     * presence policy needs. Updated on every projected timeline emit (and reset
+     * on rebind) so [replyPresence] can re-derive without re-projecting.
+     */
+    private data class BoundPresenceFacts(
+        val conversationId: String? = null,
+        val tailIsAssistant: Boolean = false,
+        val anyServerLocalPending: Boolean = false,
+    )
+
+    private val _boundPresenceFacts = MutableStateFlow(BoundPresenceFacts())
+
+    /**
+     * The selected conversation's "agent is working" presence, derived by the
+     * SHARED [ChatStreamingPresencePolicy] — the same rules Android's chat uses —
+     * from the bound conversation's projection facts plus the active reply-stream
+     * signal. Desktop is server-mode only, so the client-mode / A2UI-thinking /
+     * duplicate-initial branches are inert here.
+     *
+     * Reactive over both inputs: it re-derives when the timeline re-projects
+     * ([_boundPresenceFacts]) AND when a reply stream starts or stops
+     * ([_streamingConversationId]) — the latter can change with no new timeline
+     * emission, so a per-emission value alone would go stale. This is the
+     * desktop-side surfacing of the shared presentation's streaming/typing flags;
+     * [isStreaming] gates the progressive streamed-text reveal.
+     */
+    val replyPresence: StateFlow<ChatStreamingPresence> = combine(
+        _boundPresenceFacts,
+        _streamingConversationId,
+        state.map { it.selectedConversationId },
+    ) { facts, streamingConversationId, selectedConversationId ->
+        val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
+        ChatStreamingPresencePolicy.derive(
+            // Held only on the inert client-mode branch, so the value is unused.
+            previousIsStreaming = false,
+            previousIsAgentTyping = false,
+            anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
+            tailIsAssistant = factsForSelected && facts.tailIsAssistant,
+            replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
+            clientModeStreamInFlight = false,
+            a2uiThinkingActive = false,
+            duplicateInitialMessageInFlight = false,
+        )
+    }.stateIn(scope, SharingStarted.Eagerly, ChatStreamingPresence(isStreaming = false, isAgentTyping = false))
 
     private var gateway: DesktopChatGateway? = null
 
@@ -502,8 +554,9 @@ class DesktopChatController(
 
         timelineJob?.cancel()
         activeLoop?.close()
-        // Fresh projection cache for the newly-bound conversation.
+        // Fresh projection cache + presence facts for the newly-bound conversation.
         timelineProjector.reset()
+        _boundPresenceFacts.value = BoundPresenceFacts()
 
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
@@ -556,6 +609,15 @@ class DesktopChatController(
         // A no-op tick (the tail re-emitted unchanged) projects to a UI
         // byte-identical to the current one — skip the state write so a streamed
         // delta burst doesn't churn recompositions.
+        // Feed the shared presence policy (via replyPresence) the bound
+        // conversation's latest facts. Set before the no-change early-out so the
+        // first projection of a conversation always seeds presence; a no-op tick
+        // re-emits identical facts, which the StateFlow dedupes.
+        _boundPresenceFacts.value = BoundPresenceFacts(
+            conversationId = conversationId,
+            tailIsAssistant = projection.tailIsAssistant,
+            anyServerLocalPending = projection.anyLettaServerLocalPending,
+        )
         if (projection.noChange) return
         val messages = projection.ui
         // Stop "thinking" once the agent's reply begins to land. Use the
