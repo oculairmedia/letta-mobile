@@ -405,11 +405,16 @@ fun LettaDesktopApp(
     // Distinct agents (by id, since many agents share a display name) that have
     // conversations — these are the rail orbs. Same-named agents are stacked in
     // the rail, and the sidebar lists the whole stack's conversations together.
+    // The most-recent updatedAtLabel per agent id is also tracked so the stack
+    // grouping can pick the freshest member when no member is already selected.
     val railAgents = remember(chatState.conversations) {
         chatState.conversations
             .filter { !it.agentId.isNullOrBlank() }
-            .distinctBy { it.agentId }
-            .map { it.agentId!! to it.agentName }
+            .groupBy { it.agentId!! }
+            .map { (agentId, summaries) ->
+                val latest = summaries.maxByOrNull { parseRailTimestamp(it.updatedAtLabel) ?: java.time.Instant.MIN }
+                Triple(agentId, latest?.agentName ?: summaries.first().agentName, latest?.updatedAtLabel ?: "")
+            }
     }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
@@ -538,7 +543,7 @@ fun LettaDesktopApp(
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
-                    agents = railAgents,
+                    agents = railAgents.map { Triple(it.first, it.second, it.third) },
                     selectedAgentId = selectedAgentId,
                     thinkingAgentId = thinkingAgentId,
                     onAgentSelected = { agentId ->
@@ -1072,6 +1077,34 @@ private fun formatRelativeTimestamp(raw: String): String {
     }
 }
 
+/**
+ * Parse a conversation's `updatedAtLabel` (ISO-8601) into a timestamp.
+ * Returns null for non-parseable values so callers can fall back to
+ * insertion order rather than pinning unparseable entries to MAX.
+ */
+internal fun parseRailTimestamp(raw: String): java.time.Instant? =
+    runCatching { java.time.Instant.parse(raw) }.getOrNull()
+
+/**
+ * Group agents by display name into same-name stacks. Within each stack,
+ * members are ordered newest-first by their last-updated timestamp; members
+ * whose timestamp fails to parse sort last so recent activity always
+ * surfaces first. Exposed (internal) for unit tests.
+ */
+internal fun groupRailAgentsByName(
+    agents: List<Triple<String, String, String>>,
+): List<AgentRailGroup> =
+    agents
+        .groupBy { it.second }
+        .map { (name, members) ->
+            val sorted = members.sortedWith(
+                compareByDescending<Triple<String, String, String>> { parseRailTimestamp(it.third) }
+                    .thenBy { parseRailTimestamp(it.third) == null }
+                    .thenByDescending { it.first }
+            )
+            AgentRailGroup(name = name, agentIds = sorted.map { it.first })
+        }
+
 @Composable
 private fun RailDivider() {
     Box(
@@ -1110,7 +1143,7 @@ private fun ThinkingRing(
  */
 @Composable
 private fun DesktopAgentRail(
-    agents: List<Pair<String, String>>,
+    agents: List<Triple<String, String, String>>,
     selectedAgentId: String?,
     thinkingAgentId: String?,
     onAgentSelected: (String) -> Unit,
@@ -1121,11 +1154,11 @@ private fun DesktopAgentRail(
     // Collapse agents that share a display name — e.g. the many ephemeral
     // "Letta Code" agents spawned per task — into a single stacked orb with a
     // count chip, so the rail doesn't grow unbounded with near-duplicate spawns.
-    // Order follows first appearance in [agents].
-    val groups = remember(agents) {
-        agents.groupBy { it.second }
-            .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
-    }
+    // Within a stack, the fallback member for clicks is the freshest
+    // (most-recent updatedAtLabel) agent, not the first-seen one. parseRailTimestamp
+    // returns null for non-parseable labels so genuine pending/undated entries
+    // fall back to insertion order.
+    val groups = remember(agents) { groupRailAgentsByName(agents) }
     Column(
         modifier = Modifier
             .width(56.dp)
@@ -1233,7 +1266,7 @@ private fun DesktopAgentRail(
 }
 
 /** A rail entry: one or more agents that share a display name, stacked together. */
-private data class AgentRailGroup(
+internal data class AgentRailGroup(
     val name: String,
     val agentIds: List<String>,
 )
