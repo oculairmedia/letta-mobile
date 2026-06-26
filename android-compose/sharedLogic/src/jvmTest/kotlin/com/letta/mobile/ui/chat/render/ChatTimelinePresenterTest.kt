@@ -100,4 +100,44 @@ class ChatTimelinePresenterTest {
         assertTrue(presentation.isStreaming)
         assertFalse(presentation.isAgentTyping)
     }
+
+    @Test
+    fun zeroMessageOpenCloseCycle_limitation_heartbeatsOnlyAffectPresenceNotMessages() {
+        val presenter = ChatTimelinePresenter()
+        val projection = projectionOf(presenter)
+        
+        // Simulating a stream open heartbeat
+        val openPresentation = presenter.present(
+            projection = projection,
+            signals = ChatPresenceSignals(
+                replyStreaming = false,
+                clientModeStreamInFlight = true,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+            ),
+            previousIsStreaming = true,
+            previousIsAgentTyping = false,
+        )
+        assertTrue(openPresentation.isStreaming)
+        assertFalse(openPresentation.isAgentTyping)
+        assertEquals(2, openPresentation.messages.size)
+        assertEquals(ChatMessageListChange.Full, openPresentation.messageListChange)
+
+        // Simulating a stream close heartbeat
+        val closePresentation = presenter.present(
+            projection = projection,
+            signals = ChatPresenceSignals(
+                replyStreaming = false,
+                clientModeStreamInFlight = false,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+            ),
+            previousIsStreaming = false,
+            previousIsAgentTyping = false,
+        )
+        assertFalse(closePresentation.isStreaming)
+        assertFalse(closePresentation.isAgentTyping)
+        assertEquals(2, closePresentation.messages.size)
+        assertEquals(ChatMessageListChange.Full, closePresentation.messageListChange)
+    }
 }
