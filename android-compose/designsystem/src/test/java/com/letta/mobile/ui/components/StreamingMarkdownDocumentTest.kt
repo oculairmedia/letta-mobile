@@ -157,6 +157,14 @@ class StreamingMarkdownDocumentTest {
         )
         assertEquals(
             false,
+            state.update("Already \\#750 likely").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("See https://example.com/#750").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
             state.update("Here is **bold** text").blocks.single().supportsPlainTextHeightPrediction(),
         )
         assertEquals(

@@ -71,6 +71,8 @@ internal fun StreamingMarkdownDocumentBlock.supportsPlainTextHeightPrediction(
 
 private fun String.isPlainStreamingProse(): Boolean {
     if (isBlank()) return false
+    if (contains("http://") || contains("https://") || contains("www.")) return false
+    if (contains("\\#")) return false
     return none { char -> char in markdownLayoutChangingChars }
 }
 

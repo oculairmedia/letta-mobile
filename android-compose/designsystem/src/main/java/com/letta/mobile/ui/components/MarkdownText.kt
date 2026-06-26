@@ -317,7 +317,9 @@ internal fun escapeBareIssueReferences(text: String): String {
     val ignoredRanges = findCodeFenceRanges(text) +
         findInlineCodeRanges(text) +
         findMarkdownLinkRanges(text) +
-        findBareUrlRanges(text)
+        findBareUrlRanges(text) +
+        findHtmlEntityRanges(text) +
+        findIndentedCodeBlockRanges(text)
     val result = StringBuilder(text.length)
     var index = 0
     var changed = false
@@ -448,14 +450,22 @@ private fun stripTrailingPunctuation(url: String): String {
 }
 
 private val codeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
-private val inlineCodeRegex = Regex("`[^`\n]+?`")
+private val unclosedCodeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*\z""")
+private val inlineCodeRegex = Regex("(`+)([\\s\\S]*?)\\1")
 private val markdownLinkRegex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
+private val htmlEntityRegex = Regex("&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);")
+private val indentedCodeBlockRegex = Regex("""(?m)^(?: {4}|\t).*""")
 
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {
     val ranges = mutableListOf<IntRange>()
     for (match in codeFenceRegex.findAll(text)) {
         ranges.add(match.range)
+    }
+    for (match in unclosedCodeFenceRegex.findAll(text)) {
+        if (ranges.none { match.range.first in it }) {
+            ranges.add(match.range)
+        }
     }
     return ranges
 }
@@ -485,6 +495,22 @@ private fun findBareUrlRanges(text: String): List<IntRange> {
     val urlMatcher = Patterns.WEB_URL.matcher(text)
     while (urlMatcher.find()) {
         ranges.add(urlMatcher.start() until urlMatcher.end())
+    }
+    return ranges
+}
+
+private fun findHtmlEntityRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    for (match in htmlEntityRegex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
+private fun findIndentedCodeBlockRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    for (match in indentedCodeBlockRegex.findAll(text)) {
+        ranges.add(match.range)
     }
     return ranges
 }

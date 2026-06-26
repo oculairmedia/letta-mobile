@@ -22,9 +22,13 @@ class UrlAutolinkTest {
         assertEquals("# Heading", escapeBareIssueReferences("# Heading"))
         assertEquals("## Section", escapeBareIssueReferences("## Section"))
         assertEquals("Use `#750` likely", escapeBareIssueReferences("Use `#750` likely"))
+        assertEquals("Use ``#750`` literally", escapeBareIssueReferences("Use ``#750`` literally"))
         assertEquals("[#750](https://example.com) likely", escapeBareIssueReferences("[#750](https://example.com) likely"))
         assertEquals("Already \\#750 likely", escapeBareIssueReferences("Already \\#750 likely"))
         assertEquals("https://example.com/#750 likely", escapeBareIssueReferences("https://example.com/#750 likely"))
+        assertEquals("Entity &#124; likely", escapeBareIssueReferences("Entity &#124; likely"))
+        assertEquals("```kotlin\n#750\n", escapeBareIssueReferences("```kotlin\n#750\n"))
+        assertEquals("    #750", escapeBareIssueReferences("    #750"))
     }
 
     @Test
