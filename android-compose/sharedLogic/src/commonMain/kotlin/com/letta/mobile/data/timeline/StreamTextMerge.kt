@@ -40,6 +40,21 @@ data class StreamTextMergeResult(
  * re-delivered snapshot colliding with a stranded partial; appending it would
  * duplicate/garble the body, so we keep the longer (complete) text instead.
  * Defaults to true so existing callers keep the historical append behaviour.
+ *
+ * letta-mobile-mvcr4: a forward (higher-seq) snapshot whose body overlaps
+ * the existing text WITHOUT a clean prefix/suffix relationship is also
+ * effectively a non-clean snapshot — the same upstream re-tokenization or
+ * repair can produce a near-match either at the start or mid/tail. With
+ * the original APPEND rule, we duplicated the partial body and the
+ * reveal/smoother downstream then visibly dropped the duplicated chars
+ * (e.g. "complet " + "completed" -> "complet complet ed" -> rendered
+ * truncated). Treat such near-overlap forward snapshots the same as
+ * SNAPSHOT_CONFLICT: keep the longer complete text. This is strictly
+ * safer than APPEND for seq-carrying snapshots and does not regress
+ * forward delta appending because genuine forward deltas that share no
+ * prefix/suffix (e.g. "Y" + "es ...") are exactly the case the test
+ * suite guards; any near-match there is a coalesced snapshot, not an
+ * increment.
  */
 fun mergeStreamText(
     existing: String,
@@ -47,12 +62,33 @@ fun mergeStreamText(
     canUseSnapshotMerge: Boolean,
     incomingIsForwardDelta: Boolean = true,
 ): StreamTextMergeResult {
+    // letta-mobile-mvcr4: a forward (higher-seq) snapshot whose body
+    // overlaps the existing text by NEARLY all of one side (only differs
+    // by the leading or trailing few chars) is a re-tokenized snapshot,
+    // not a forward delta. Without this branch we APPEND and duplicate
+    // the partial body, and the downstream reveal then visibly
+    // truncates the duplicate. We require a substantial overlap
+    // (>= 4 chars in common AND overlap covers all but a few chars of
+    // the shorter side) so genuine tiny forward deltas like "Y" + "es ..."
+    // still APPEND.
+    val shortLen = minOf(existing.length, incoming.length)
+    val maxMatch = maxOf(existing.length, incoming.length)
+    val overlapLen = if (shortLen >= 4) {
+        // best suffix-of-incoming equal to prefix-of-existing length
+        val k = longestCommonPrefixLength(existing, incoming)
+        maxOf(k, longestCommonSuffixLength(existing, incoming))
+    } else 0
+    val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
+        (overlapLen + 2 >= maxMatch)
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
         canUseSnapshotMerge && incoming == existing -> StreamTextMergeBranch.EQUAL
         canUseSnapshotMerge && incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
+        // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce
+        // to the longer complete text instead of duplicating.
+        nearOverlaps -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
         // letta-mobile-k9y5d: both frames carry a seq id but neither is a clean
         // prefix/suffix of the other. If the incoming is NOT a forward delta it
         // is a replayed/out-of-order snapshot, not a new continuation — appending
@@ -78,4 +114,18 @@ fun mergeStreamText(
             incoming.isNotEmpty() &&
             incoming.length < existing.length / 2,
     )
+}
+
+private fun longestCommonPrefixLength(a: String, b: String): Int {
+    val n = minOf(a.length, b.length)
+    var i = 0
+    while (i < n && a[i] == b[i]) i++
+    return i
+}
+
+private fun longestCommonSuffixLength(a: String, b: String): Int {
+    val n = minOf(a.length, b.length)
+    var i = 0
+    while (i < n && a[a.length - 1 - i] == b[b.length - 1 - i]) i++
+    return i
 }
