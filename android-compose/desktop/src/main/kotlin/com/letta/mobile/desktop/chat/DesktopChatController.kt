@@ -25,12 +25,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -129,24 +127,33 @@ class DesktopChatController(
      * desktop-side surfacing of the shared presentation's streaming/typing flags;
      * [isStreaming] gates the progressive streamed-text reveal.
      */
-    val replyPresence: StateFlow<ChatStreamingPresence> = combine(
-        _boundPresenceFacts,
-        _streamingConversationId,
-        state.map { it.selectedConversationId },
-    ) { facts, streamingConversationId, selectedConversationId ->
-        val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
-        ChatStreamingPresencePolicy.derive(
-            // Held only on the inert client-mode branch, so the value is unused.
-            previousIsStreaming = false,
-            previousIsAgentTyping = false,
-            anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
-            tailIsAssistant = factsForSelected && facts.tailIsAssistant,
-            replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
-            clientModeStreamInFlight = false,
-            a2uiThinkingActive = false,
-            duplicateInitialMessageInFlight = false,
-        )
-    }.stateIn(scope, SharingStarted.Eagerly, ChatStreamingPresence(isStreaming = false, isAgentTyping = false))
+    private val _replyPresence = MutableStateFlow(ChatStreamingPresence(isStreaming = false, isAgentTyping = false))
+    val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
+
+    // Keeps [replyPresence] in sync with its inputs for the controller's life.
+    // Cancelled in [close] (NOT retryConnection — presence must survive a
+    // reconnect); collecting into a field-backed StateFlow rather than stateIn so
+    // the collector is owned and torn down explicitly instead of leaking [scope].
+    private val presenceJob: Job = scope.launch {
+        combine(
+            _boundPresenceFacts,
+            _streamingConversationId,
+            state.map { it.selectedConversationId },
+        ) { facts, streamingConversationId, selectedConversationId ->
+            val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
+            ChatStreamingPresencePolicy.derive(
+                // Held only on the inert client-mode branch, so the value is unused.
+                previousIsStreaming = false,
+                previousIsAgentTyping = false,
+                anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
+                tailIsAssistant = factsForSelected && facts.tailIsAssistant,
+                replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                clientModeStreamInFlight = false,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+            )
+        }.collect { _replyPresence.value = it }
+    }
 
     private var gateway: DesktopChatGateway? = null
 
@@ -195,6 +202,7 @@ class DesktopChatController(
     fun close() {
         if (closed) return
         closed = true
+        presenceJob.cancel()
         loadJob?.cancel()
         selectJob?.cancel()
         sendJob?.cancel()
