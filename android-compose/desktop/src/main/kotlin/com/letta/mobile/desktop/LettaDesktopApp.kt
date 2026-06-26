@@ -481,10 +481,12 @@ fun LettaDesktopApp(
         thinkingConversationId == chatState.selectedConversationId
     // Reply is actively streaming for the selected conversation — outlives
     // "thinking" (which clears at the first token), so it gates the streamed-
-    // text smoother in the message list.
-    val streamingConversationId by chatController.streamingConversationId.collectAsState()
-    val isStreamingReplySelected = streamingConversationId != null &&
-        streamingConversationId == chatState.selectedConversationId
+    // text smoother in the message list. Derived by the shared
+    // ChatStreamingPresencePolicy (the same rules Android uses) rather than a
+    // bespoke desktop check, so the "is the agent working" semantics stay in one
+    // place across platforms.
+    val replyPresence by chatController.replyPresence.collectAsState()
+    val isStreamingReplySelected = replyPresence.isStreaming
 
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).

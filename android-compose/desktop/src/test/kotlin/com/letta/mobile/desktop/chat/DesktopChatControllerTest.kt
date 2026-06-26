@@ -203,6 +203,51 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun replyPresenceStreamsWhileSendInFlightThenClears() = runTest {
+        val loop = SuspendingSendDesktopLoop("conv-1")
+        val controller = testController(
+            gateway = FakeDesktopChatGateway(),
+            loopFactory = { _, _, _ -> loop },
+        )
+
+        controller.start()
+        runCurrent()
+        // Idle before any send.
+        assertFalse(controller.replyPresence.value.isStreaming)
+
+        controller.updateComposerText("hey")
+        controller.send()
+        runCurrent()
+        // The reply stream is in flight (send suspends), so the shared presence
+        // policy reports streaming for the selected conversation.
+        assertTrue(controller.replyPresence.value.isStreaming)
+
+        loop.releaseSend()
+        runCurrent()
+        // Send completed → reply stream cleared → presence settles to idle.
+        assertFalse(controller.replyPresence.value.isStreaming)
+
+        controller.close()
+    }
+
+    @Test
+    fun replyPresenceClearsOnceAgentReplyLands() = runTest {
+        val controller = testController(FakeDesktopChatGateway())
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("hey")
+        controller.send()
+        runCurrent()
+
+        // The agent reply landed and the send completed, so presence is idle.
+        assertFalse(controller.replyPresence.value.isStreaming)
+        assertTrue(controller.state.value.selectedMessages.any { it.role == "assistant" })
+
+        controller.close()
+    }
+
+    @Test
     fun sendIncludesPendingImageAttachmentInContentPartsAndClearsComposer() = runTest {
         val gateway = FakeDesktopChatGateway()
         val controller = testController(gateway)
@@ -671,6 +716,37 @@ private class FakeDesktopTimelineLoop(
 
     fun completeHydrate() {
         hydrateGate.complete(Unit)
+    }
+}
+
+/**
+ * A loop whose `send` stays suspended until [releaseSend], so a reply stream can
+ * be observed mid-flight (e.g. for streaming-presence assertions). Hydrate
+ * completes immediately so the conversation reaches Live.
+ */
+private class SuspendingSendDesktopLoop(conversationId: String) : DesktopTimelineLoop {
+    override val state = MutableStateFlow(Timeline(conversationId))
+    private val sendGate = CompletableDeferred<Unit>()
+    var closeCount = 0
+        private set
+
+    override suspend fun hydrate(limit: Int, recordConversationCursor: Boolean) = Unit
+
+    override suspend fun send(
+        content: String,
+        attachments: List<MessageContentPart.Image>,
+    ): String {
+        sendGate.await()
+        return "client-suspending"
+    }
+
+    fun releaseSend() {
+        sendGate.complete(Unit)
+    }
+
+    override fun close() {
+        closeCount++
+        sendGate.cancel(CancellationException("closed"))
     }
 }
 
