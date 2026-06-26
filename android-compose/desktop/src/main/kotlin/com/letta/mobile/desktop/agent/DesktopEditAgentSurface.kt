@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopButtonContent
@@ -56,26 +58,43 @@ import com.letta.mobile.desktop.DesktopTextField
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
 private val ToneOptions = listOf("Concise", "Friendly", "Technical", "Mentor", "Playful", "Formal")
 private val VoiceOptions = listOf("Caring", "Neutral", "Warm", "Energetic", "Calm", "Direct")
 private const val AvatarStyleCount = 6
 
+// Core-memory block labels the editor reads/writes. Persona is the standard
+// Letta persona block; the rest are app-defined labelled blocks so the values
+// actually sit in the agent's context (and so they round-trip with zero backend
+// work — block CRUD already exists). Avatar style and voice are pure display
+// config and live in desktop-local settings instead, to avoid burning context.
+private const val PersonaLabel = "persona"
+private const val ToneLabel = "tone"
+private const val InstructionsLabel = "instructions"
+private const val InterestsLabel = "interests"
+
+internal fun agentAvatarStyleKey(agentId: String): String = "agent.$agentId.avatar_style"
+internal fun agentVoiceKey(agentId: String): String = "agent.$agentId.voice"
+
 /**
  * Full-page agent editor (Penpot "Desktop · Edit Agent"). Rendered in the main
  * content pane while [agentId] is being edited, with the rail + sidebar still
- * visible. The behavioural fields map to real agent data — Name and Default
- * model via [IAgentRepository.updateAgent], Persona · Backstory to the agent's
- * `persona` memory block — while the softer presentation fields (avatar style,
- * tone, custom instructions, interests, voice) round-trip through the agent's
- * `metadata`, leaving the raw system prompt and functional tags untouched.
+ * visible.
+ *
+ * Storage is tiered by whether a field belongs in the agent's context:
+ *  - Name and Default model -> [IAgentRepository.updateAgent].
+ *  - Persona, Tone, Custom instructions, Interests -> labelled core-memory
+ *    BLOCKS via [DesktopBlockApi] (created+attached on first save, updated
+ *    thereafter), so they persist AND actually steer the agent.
+ *  - Avatar style and Voice -> desktop-local [SecureSettingsStore], since
+ *    display-only config shouldn't occupy the context window.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -84,9 +103,10 @@ internal fun DesktopEditAgentSurface(
     modelOptions: List<Pair<String, String>>,
     agentRepository: IAgentRepository,
     blockApi: DesktopBlockApi?,
+    settings: SecureSettingsStore,
     scope: CoroutineScope,
     onClose: () -> Unit,
-    onSaved: (avatarStyle: Int) -> Unit,
+    onSaved: (avatarStyle: Int, nameChanged: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var name by remember(agentId) { mutableStateOf("") }
@@ -99,15 +119,29 @@ internal fun DesktopEditAgentSurface(
     var modelValue by remember(agentId) { mutableStateOf<String?>(null) }
 
     var personaBlockId by remember(agentId) { mutableStateOf<String?>(null) }
-    var existingMetadata by remember(agentId) { mutableStateOf<Map<String, JsonElement>>(emptyMap()) }
+    var toneBlockId by remember(agentId) { mutableStateOf<String?>(null) }
+    var instructionsBlockId by remember(agentId) { mutableStateOf<String?>(null) }
+    var interestsBlockId by remember(agentId) { mutableStateOf<String?>(null) }
     var loading by remember(agentId) { mutableStateOf(true) }
     var busy by remember(agentId) { mutableStateOf(false) }
     var error by remember(agentId) { mutableStateOf<String?>(null) }
     var newInterest by remember(agentId) { mutableStateOf("") }
 
+    // Originals captured at load so save only writes fields that actually changed.
+    var loadedName by remember(agentId) { mutableStateOf("") }
+    var loadedModel by remember(agentId) { mutableStateOf<String?>(null) }
+    var loadedPersona by remember(agentId) { mutableStateOf("") }
+    var loadedTone by remember(agentId) { mutableStateOf<String?>(null) }
+    var loadedInstructions by remember(agentId) { mutableStateOf("") }
+    var loadedInterests by remember(agentId) { mutableStateOf("") }
+
     LaunchedEffect(agentId) {
-        val agent = agentRepository.getCachedAgent(agentId)
-            ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
+        // Fetch fresh — the flow's last emission re-fetches and refreshes the
+        // cache — so a persona/block edited last time isn't shown stale on reopen
+        // (and its block ids are current, so a re-save updates rather than
+        // creating a duplicate). Fall back to any cached copy if the fetch fails.
+        val agent = runCatching { agentRepository.getAgent(agentId).last() }.getOrNull()
+            ?: agentRepository.getCachedAgent(agentId)
         if (agent == null) {
             error = "Could not load agent"
             loading = false
@@ -115,16 +149,23 @@ internal fun DesktopEditAgentSurface(
         }
         name = agent.name
         modelValue = agent.model
-        existingMetadata = agent.metadata
-        avatarStyle = agent.metadata["avatar_style"].asInt() ?: 0
-        tone = agent.metadata["tone"].asString()?.takeIf { it in ToneOptions }
-        customInstructions = agent.metadata["custom_instructions"].asString().orEmpty()
-        voice = agent.metadata["voice"].asString()?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
-        interests.clear()
-        agent.metadata["interests"].asStringList()?.let { interests.addAll(it) }
-        val personaBlock = agent.blocks.firstOrNull { it.label == "persona" }
-        personaBlockId = personaBlock?.id?.value
-        persona = personaBlock?.value.orEmpty()
+        fun block(label: String) = agent.blocks.firstOrNull { it.label == label }
+        block(PersonaLabel).let { personaBlockId = it?.id?.value; persona = it?.value.orEmpty() }
+        block(ToneLabel).let { toneBlockId = it?.id?.value; tone = it?.value?.takeIf { v -> v in ToneOptions } }
+        block(InstructionsLabel).let { instructionsBlockId = it?.id?.value; customInstructions = it?.value.orEmpty() }
+        block(InterestsLabel).let { b ->
+            interestsBlockId = b?.id?.value
+            interests.clear()
+            b?.value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.let { interests.addAll(it) }
+        }
+        avatarStyle = settings.getString(agentAvatarStyleKey(agentId))?.toIntOrNull()?.coerceIn(0, AvatarStyleCount - 1) ?: 0
+        voice = settings.getString(agentVoiceKey(agentId))?.takeIf { it in VoiceOptions } ?: VoiceOptions.first()
+        loadedName = name
+        loadedModel = modelValue
+        loadedPersona = persona
+        loadedTone = tone
+        loadedInstructions = customInstructions
+        loadedInterests = interests.joinToString(", ")
         loading = false
     }
 
@@ -132,36 +173,58 @@ internal fun DesktopEditAgentSurface(
     val accent = MaterialTheme.colorScheme.primary
 
     fun save() {
+        // Commit a pending interest the user typed but didn't enter (no trailing
+        // comma), so it isn't silently dropped on save.
+        newInterest.trim().takeIf { it.isNotEmpty() && it !in interests }?.let { interests.add(it) }
+        newInterest = ""
         busy = true
         error = null
+        // Only the name affects the rail/sidebar, so only a name change needs the
+        // (heavy) roster reload after save.
+        val nameChanged = name.trim() != loadedName.trim()
         scope.launch {
             runCatching {
-                val mergedMeta = existingMetadata.toMutableMap().apply {
-                    put("avatar_style", JsonPrimitive(avatarStyle))
-                    put("voice", JsonPrimitive(voice))
-                    put("interests", JsonArray(interests.map { JsonPrimitive(it) }))
-                    if (tone != null) put("tone", JsonPrimitive(tone)) else remove("tone")
-                    if (customInstructions.isNotBlank()) {
-                        put("custom_instructions", JsonPrimitive(customInstructions.trim()))
-                    } else {
-                        remove("custom_instructions")
-                    }
+                // Returns the block's id (existing or freshly-created) so it's
+                // captured back into state — a re-save then UPDATEs in place
+                // instead of attaching a second block.
+                suspend fun upsertBlock(label: String, value: String, existingId: String?): String? = when {
+                    existingId != null -> { blockApi?.updateBlockById(existingId, value); existingId }
+                    value.isNotBlank() -> blockApi?.createAndAttachBlock(agentId, label, value)?.id?.value
+                    else -> existingId
                 }
-                agentRepository.updateAgent(
-                    AgentId(agentId),
-                    AgentUpdateParams(
-                        name = name.trim().takeIf { it.isNotBlank() },
-                        model = modelValue,
-                        metadata = mergedMeta,
-                    ),
-                )
-                val existingPersonaId = personaBlockId
-                when {
-                    existingPersonaId != null -> blockApi?.updateBlockById(existingPersonaId, persona)
-                    persona.isNotBlank() -> blockApi?.createAndAttachBlock(agentId, "persona", persona)
+                // Write ONLY the fields that changed, and run those writes
+                // concurrently — the agent PATCH alone re-fetches the whole roster
+                // and each block is its own round-trip, so doing them in series is
+                // the save lag. Unchanged fields cost nothing.
+                coroutineScope {
+                    buildList<Deferred<Unit>> {
+                        if (nameChanged || modelValue != loadedModel) add(
+                            async {
+                                agentRepository.updateAgent(
+                                    AgentId(agentId),
+                                    AgentUpdateParams(
+                                        name = name.trim().takeIf { it.isNotBlank() },
+                                        model = modelValue,
+                                    ),
+                                )
+                                Unit
+                            },
+                        )
+                        if (persona != loadedPersona) add(async { personaBlockId = upsertBlock(PersonaLabel, persona, personaBlockId) })
+                        if (tone != loadedTone) add(async { toneBlockId = upsertBlock(ToneLabel, tone.orEmpty(), toneBlockId) })
+                        if (customInstructions.trim() != loadedInstructions.trim()) {
+                            add(async { instructionsBlockId = upsertBlock(InstructionsLabel, customInstructions.trim(), instructionsBlockId) })
+                        }
+                        if (interests.joinToString(", ") != loadedInterests) {
+                            add(async { interestsBlockId = upsertBlock(InterestsLabel, interests.joinToString(", "), interestsBlockId) })
+                        }
+                    }.awaitAll()
                 }
+                // Display-only config stays local (and out of the context window).
+                settings.putString(agentAvatarStyleKey(agentId), avatarStyle.toString())
+                settings.putString(agentVoiceKey(agentId), voice)
             }
-                .onSuccess { onSaved(avatarStyle) }
+                .onSuccess { onSaved(avatarStyle, nameChanged) }
                 .onFailure { error = it.message ?: "Save failed"; busy = false }
         }
     }
@@ -169,61 +232,59 @@ internal fun DesktopEditAgentSurface(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 40.dp, vertical = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+            .background(MaterialTheme.colorScheme.background),
     ) {
-        // Header: back · title · Save changes
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Back",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = "Edit agent",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.weight(1f))
-            DesktopDefaultButton(onClick = ::save, enabled = !busy && !loading) {
-                DesktopButtonContent(if (busy) "Saving…" else "Save changes")
-            }
-        }
-
-        if (loading) {
-            Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            return@Column
-        }
-
+        // Scrollable content; the Save bar is pinned to the bottom (below).
         Column(
-            modifier = Modifier.widthIn(max = 980.dp).fillMaxWidth(),
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 40.dp, top = 28.dp, end = 40.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
+            // Header: back · title
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "Edit agent",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            if (loading) {
+                Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Column(
+                    modifier = Modifier.widthIn(max = 980.dp).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
             // Avatar + Name
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Top) {
                 AgentOrb(index = avatarStyle, size = 64.dp, cornerRadius = 12.dp)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SectionLabel("Name", accent)
+                LabeledSection("Name", accent, Modifier.weight(1f)) {
                     DesktopTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
                 }
             }
 
             // Avatar style swatches
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Avatar style", accent)
+            LabeledSection("Avatar style", accent) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     repeat(AvatarStyleCount) { i ->
                         val selected = i == avatarStyle
@@ -246,8 +307,7 @@ internal fun DesktopEditAgentSurface(
             }
 
             // Persona · backstory → persona memory block
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SectionLabel("Persona · backstory", accent)
+            LabeledSection("Persona · backstory", accent) {
                 DesktopTextArea(
                     value = persona,
                     onValueChange = { persona = it },
@@ -263,8 +323,7 @@ internal fun DesktopEditAgentSurface(
             }
 
             // Tone
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Tone", accent)
+            LabeledSection("Tone", accent) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     ToneOptions.forEach { option ->
                         SelectChip(text = option, selected = tone == option) {
@@ -275,8 +334,7 @@ internal fun DesktopEditAgentSurface(
             }
 
             // Custom instructions
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SectionLabel("Custom instructions", accent)
+            LabeledSection("Custom instructions", accent) {
                 DesktopTextArea(
                     value = customInstructions,
                     onValueChange = { customInstructions = it },
@@ -287,8 +345,7 @@ internal fun DesktopEditAgentSurface(
             }
 
             // Interests
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel("Interests", accent)
+            LabeledSection("Interests", accent) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     interests.forEach { interest ->
                         InterestChip(text = interest) { interests.remove(interest) }
@@ -297,7 +354,6 @@ internal fun DesktopEditAgentSurface(
                         DesktopTextField(
                             value = newInterest,
                             onValueChange = { value ->
-                                // Commit on a trailing comma/newline; otherwise keep typing.
                                 if (value.endsWith(",") || value.endsWith("\n")) {
                                     val tag = value.trimEnd(',', '\n').trim()
                                     if (tag.isNotEmpty() && tag !in interests) interests.add(tag)
@@ -315,8 +371,7 @@ internal fun DesktopEditAgentSurface(
 
             // Voice + Default model (side by side)
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel("Voice", accent)
+                LabeledSection("Voice", accent, Modifier.weight(1f)) {
                     DropdownSelector(
                         leading = {
                             Icon(Icons.Outlined.PlayArrow, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -327,8 +382,7 @@ internal fun DesktopEditAgentSurface(
                         onSelect = { voice = it },
                     )
                 }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SectionLabel("Default model", accent)
+                LabeledSection("Default model", accent, Modifier.weight(1f)) {
                     DropdownSelector(
                         leading = null,
                         label = modelLabel,
@@ -339,9 +393,44 @@ internal fun DesktopEditAgentSurface(
                 }
             }
 
-            error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-            Spacer(Modifier.height(8.dp))
+                    error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
         }
+
+        // Pinned Save bar at the bottom — actions stay put without scrolling, and
+        // out from under the rail's tooltips up top.
+        Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 40.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            DesktopDefaultButton(onClick = ::save, enabled = !busy && !loading) {
+                DesktopButtonContent(if (busy) "Saving…" else "Save changes")
+            }
+        }
+    }
+}
+
+/**
+ * One labelled form section: the accent caption + its field(s) with a single,
+ * consistent label→content gap. Every section on this screen goes through here
+ * so the spacing can't drift field-to-field.
+ */
+@Composable
+private fun LabeledSection(
+    label: String,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(label, accent)
+        content()
     }
 }
 
@@ -434,15 +523,3 @@ private fun DropdownSelector(
         }
     }
 }
-
-private fun JsonElement?.asString(): String? = (this as? JsonPrimitive)?.contentOrNull
-private fun JsonElement?.asInt(): Int? = (this as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
-private fun JsonElement?.asStringList(): List<String>? =
-    (this as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-
-/**
- * The agent's chosen avatar-style index (set by the editor's "Avatar style"
- * swatches and stored in metadata), or null if it has never been set — in which
- * case callers fall back to the agent's position-derived orb colour.
- */
-internal fun com.letta.mobile.data.model.Agent.avatarStyle(): Int? = metadata["avatar_style"].asInt()

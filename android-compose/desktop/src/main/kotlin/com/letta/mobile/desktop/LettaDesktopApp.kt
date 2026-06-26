@@ -122,7 +122,7 @@ import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
-import com.letta.mobile.desktop.agent.avatarStyle
+import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
@@ -410,8 +410,11 @@ fun LettaDesktopApp(
     // Distinct agents (by id, since many agents share a display name) that have
     // conversations — these are the rail orbs. Same-named agents are stacked in
     // the rail, and the sidebar lists the whole stack's conversations together.
+    // Ordered most-recent-first so each stack's "first" member (the click/open
+    // fallback) is the one with the most recent conversation, not just first-seen.
     val railAgents = remember(chatState.conversations) {
         chatState.conversations
+            .sortedByDescending { conversationRecency(it.updatedAtLabel) }
             .filter { !it.agentId.isNullOrBlank() }
             .distinctBy { it.agentId }
             .map { it.agentId!! to it.agentName }
@@ -423,8 +426,9 @@ fun LettaDesktopApp(
     // post-save reload — so a freshly-saved icon is reflected on the orbs.
     // Agents without an override fall back to their position-derived colour.
     val cachedAvatarStyles = remember(railAgents) {
-        val repo = dataBindings.sessionGraphProvider.current.agentRepository
-        railAgents.mapNotNull { (id, _) -> repo.getCachedAgent(AgentId(id))?.avatarStyle()?.let { id to it } }.toMap()
+        railAgents.mapNotNull { (id, _) ->
+            secureSettingsStore.getString(agentAvatarStyleKey(id))?.toIntOrNull()?.let { id to it }
+        }.toMap()
     }
     // Session overrides win over the cached/backend value so a just-saved icon
     // shows instantly.
@@ -439,11 +443,7 @@ fun LettaDesktopApp(
     val agentConversations = remember(chatState.conversations, selectedAgentName) {
         chatState.conversations
             .filter { it.agentName == selectedAgentName }
-            .sortedByDescending {
-                // Non-timestamp labels ("Queued", "Remote") are brand-new/local —
-                // treat them as newest so they sort to the top.
-                runCatching { java.time.Instant.parse(it.updatedAtLabel) }.getOrNull() ?: java.time.Instant.MAX
-            }
+            .sortedByDescending { conversationRecency(it.updatedAtLabel) }
     }
     // @mention candidates: other agents + the focused agent's memory blocks.
     // (Files need a client-side index — tracked as a follow-up.)
@@ -568,7 +568,6 @@ fun LettaDesktopApp(
                     },
                     onNewSession = { showNewAgentDialog = true },
                     onSearch = { showCommandPalette = true },
-                    onSettings = { editAgentId = null; selectedDestination = DesktopDestination.Settings },
                 )
                 RailDivider()
                 // Agent sidebar: agent header + nav + conversations.
@@ -606,12 +605,15 @@ fun LettaDesktopApp(
                             modelOptions = modelOptions,
                             agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
                             blockApi = blockApi,
+                            settings = secureSettingsStore,
                             scope = chatScope,
                             onClose = { editAgentId = null },
-                            onSaved = { style ->
+                            onSaved = { style, nameChanged ->
                                 avatarOverrides = avatarOverrides + (editing to style)
                                 editAgentId = null
-                                chatController.retryConnection()
+                                // Only a name change is visible in the rail/sidebar,
+                                // so skip the heavy reconnect otherwise.
+                                if (nameChanged) chatController.retryConnection()
                             },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -947,6 +949,17 @@ private fun NewAgentDialog(
 }
 
 /**
+ * Sort key for a conversation's relative-time label. Real ISO timestamps sort by
+ * recency; the local "Queued" placeholder floats to the top (it's a just-sent
+ * message), while any other unparseable label (e.g. "Remote" — a conversation
+ * with no activity timestamp at all) sorts to the bottom rather than being
+ * treated as newest, since the stores already return rows in recency order.
+ */
+private fun conversationRecency(label: String): java.time.Instant =
+    runCatching { java.time.Instant.parse(label) }.getOrNull()
+        ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
+
+/**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
  * (now / 5m / 2h / 4d / 3w / 2mo). Non-ISO values are returned unchanged.
  */
@@ -1008,7 +1021,6 @@ private fun DesktopAgentRail(
     onAgentSelected: (String) -> Unit,
     onNewSession: () -> Unit,
     onSearch: () -> Unit,
-    onSettings: () -> Unit,
 ) {
     // Collapse agents that share a display name — e.g. the many ephemeral
     // "Letta Code" agents spawned per task — into a single stacked orb with a
@@ -1102,10 +1114,10 @@ private fun DesktopAgentRail(
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                                    .defaultMinSize(minWidth = 19.dp, minHeight = 19.dp)
                                     .background(MaterialTheme.colorScheme.primary, CircleShape)
                                     .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
-                                    .padding(horizontal = 3.dp),
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
@@ -1122,8 +1134,6 @@ private fun DesktopAgentRail(
         }
 
         RailActionIcon(Icons.Outlined.Search, "Search", onSearch)
-        RailActionIcon(Icons.Outlined.Settings, "Settings", onSettings)
-        RailActionIcon(Icons.Outlined.AccountCircle, "Account", onSettings)
     }
 }
 
