@@ -45,11 +45,19 @@ class TimelineStateTransitionHandler(
         writeMutex.withLock {
             val existing = state.value.findByOtid(event.otid)
             if (existing is TimelineEvent.Local && existing.deliveryState == DeliveryState.FAILED) {
-                state.value = state.value.copy(events = state.value.events.map {
+                // Recompute the fingerprint: the retried message may be a NON-tail
+                // event, and data class copy() reuses stablePrefixVersion, so the
+                // projector's fast path would otherwise suppress the FAILED→SENDING
+                // repaint (Codex review).
+                val persisted = state.value.events.map {
                     if (it.otid == event.otid && it is TimelineEvent.Local) {
                         it.copy(deliveryState = DeliveryState.SENDING)
                     } else it
-                }.toTimelinePersistentList())
+                }.toTimelinePersistentList()
+                state.value = state.value.copy(
+                    events = persisted,
+                    stablePrefixVersion = persisted.stablePrefixFingerprint(),
+                )
                 sendQueue.send(PendingSend(event.otid, existing.content, existing.attachments))
             }
         }

@@ -60,6 +60,15 @@ fun applyReturnsAndResponsesFromSnapshot(
         )
     }
     if (newEvents !== state.value.events) {
-        state.value = state.value.copy(events = newEvents.toTimelinePersistentList())
+        // Recompute the stable-prefix fingerprint: this reconcile can attach a
+        // tool return/approval to a NON-tail tool-call event. data class copy()
+        // reuses the existing stablePrefixVersion, so without this the projector's
+        // replace-tail fast path would treat the (unchanged size/version/tail)
+        // timeline as a no-op and never repaint the updated card (Codex review).
+        val persisted = newEvents.toTimelinePersistentList()
+        state.value = state.value.copy(
+            events = persisted,
+            stablePrefixVersion = persisted.stablePrefixFingerprint(),
+        )
     }
 }

@@ -394,7 +394,7 @@ data class Timeline(
     }
 }
 
-private fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
+internal fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
     var fingerprint = 1125899906842597L
     for (index in 0 until lastIndex) {
         fingerprint = fingerprint * 31 + this[index].hashCode()
