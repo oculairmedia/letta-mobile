@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -66,20 +67,25 @@ class ChatTimelineRestartOverlapTest {
         val userIdx = initialProjection.ui.indexOfFirst { it.role == "user" }
         val a1Idx = initialProjection.ui.indexOfFirst { it.content == "I am here." }
         val a2Idx = initialProjection.ui.indexOfFirst { it.content == "What do you need?" }
-        
+
+        val userId = initialProjection.ui[userIdx].id
         val a1Id = initialProjection.ui[a1Idx].id
         val a2Id = initialProjection.ui[a2Idx].id
 
-        // 2. Hydrate from server sync/backfill with the exact same content (overlap)
+        // 2. Hydrate from server sync/backfill with the exact same content (overlap).
+        // This mirrors TimelineHydrator: timelineBeforeFetch is the pre-fetch
+        // in-memory state, and the server page includes the whole visible slice
+        // (user + assistant messages), not only the assistant overlap.
         val backfillMessages = listOf(
+            UserMessage(id = "user-1", contentRaw = JsonPrimitive("hello"), date = "2026-04-19T06:00:00Z"),
             AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("I am here."), runId = "run-1", seqId = 1, date = "2026-04-19T06:00:00Z"),
             AssistantMessage(id = "assistant-2", contentRaw = JsonPrimitive("What do you need?"), runId = "run-1", seqId = 2, date = "2026-04-19T06:00:00Z")
         )
         val hydratedResult = TimelineHydrationReducer.reduce(
             conversationId = conv,
             serverMessagesChronological = backfillMessages,
-            timelineBeforeFetch = Timeline(conv),
-            currentTimeline = initialTimeline, // merging into existing
+            timelineBeforeFetch = initialTimeline,
+            currentTimeline = initialTimeline,
             diskRecords = emptyList()
         )
         val hydratedTimeline = hydratedResult.timeline
@@ -101,12 +107,16 @@ class ChatTimelineRestartOverlapTest {
         // Assert idempotency: stable IDs, no duplicates, no reordered text
         assertEquals(3, overlappedProjection.ui.size)
         
+        val newUserIdx = overlappedProjection.ui.indexOfFirst { it.role == "user" }
         val newA1Idx = overlappedProjection.ui.indexOfFirst { it.content == "I am here." }
         val newA2Idx = overlappedProjection.ui.indexOfFirst { it.content == "What do you need?" }
-        
+
+        assertEquals("hello", overlappedProjection.ui[newUserIdx].content)
         assertEquals("I am here.", overlappedProjection.ui[newA1Idx].content)
         assertEquals("What do you need?", overlappedProjection.ui[newA2Idx].content)
+        assertEquals(true, newUserIdx < newA1Idx, "User message should remain before assistant messages")
         assertEquals(true, newA1Idx < newA2Idx, "First assistant message should be before the second assistant message")
+        assertEquals(userId, overlappedProjection.ui[newUserIdx].id, "Stable ID for user message")
         assertEquals(a1Id, overlappedProjection.ui[newA1Idx].id, "Stable ID for first assistant message")
         assertEquals(a2Id, overlappedProjection.ui[newA2Idx].id, "Stable ID for second assistant message")
     }
