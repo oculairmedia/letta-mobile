@@ -263,5 +263,15 @@ class PushStateRouterTest : WordSpec({
 
             mapToNormalizedEvent(frame) shouldBe null
         }
+
+        "return null for unrecognized frame types through decodePush" {
+            // Route an unknown wire-type through the full deserialize+map path
+            // so a serializer regression that fails to produce ServerFrame.Unknown
+            // would surface here (the bare mapToNormalizedEvent case does not).
+            val event = decodePush(
+                """{ "v": 1, "type": "some_unknown_push", "id": "un-2", "ts": "2026-01-01T00:00:00Z" }"""
+            )
+            event shouldBe null
+        }
     }
 })
