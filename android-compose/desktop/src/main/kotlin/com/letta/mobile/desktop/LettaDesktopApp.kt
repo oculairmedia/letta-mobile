@@ -428,9 +428,13 @@ fun LettaDesktopApp(
         chatState.conversations
             .filter { it.agentName == selectedAgentName }
             .sortedByDescending {
-                // Non-timestamp labels ("Queued", "Remote") are brand-new/local —
-                // treat them as newest so they sort to the top.
-                runCatching { java.time.Instant.parse(it.updatedAtLabel) }.getOrNull() ?: java.time.Instant.MAX
+                // Parseable timestamps sort newest-first. Genuine local pending
+                // entries (e.g. "Queued" before the first server sync) still
+                // surface at the top because they typically haven't been
+                // timestamped yet; remote rows with unparseable labels fall
+                // LAST so they don't pin above genuinely newer chats.
+                runCatching { java.time.Instant.parse(it.updatedAtLabel) }.getOrNull()
+                    ?: if (it.updatedAtLabel.isBlank()) java.time.Instant.MAX else java.time.Instant.MIN
             }
     }
     // @mention candidates: other agents + the focused agent's memory blocks.
