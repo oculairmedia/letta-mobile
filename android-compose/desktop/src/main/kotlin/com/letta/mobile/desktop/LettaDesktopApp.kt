@@ -479,6 +479,12 @@ fun LettaDesktopApp(
     }
     val isThinkingSelected = thinkingConversationId != null &&
         thinkingConversationId == chatState.selectedConversationId
+    // Reply is actively streaming for the selected conversation — outlives
+    // "thinking" (which clears at the first token), so it gates the streamed-
+    // text smoother in the message list.
+    val streamingConversationId by chatController.streamingConversationId.collectAsState()
+    val isStreamingReplySelected = streamingConversationId != null &&
+        streamingConversationId == chatState.selectedConversationId
 
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
@@ -586,6 +592,7 @@ fun LettaDesktopApp(
                         ChatDetailPane(
                             state = chatState,
                             isThinking = isThinkingSelected,
+                            isStreamingReply = isStreamingReplySelected,
                             composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                             onOpenModelPicker = { showModelPicker = true },
                             onOnboardingTask = { kind ->
