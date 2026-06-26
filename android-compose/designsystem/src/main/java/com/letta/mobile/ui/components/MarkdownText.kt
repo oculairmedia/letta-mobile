@@ -1202,8 +1202,6 @@ private fun stripTrailingPunctuation(url: String): String {
     return cleaned
 }
 
-private val codeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
-private val unclosedCodeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*\z""")
 private val inlineCodeRegex = Regex("(`+)([\\s\\S]*?)\\1")
 private val markdownLinkRegex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
 private val htmlEntityRegex = Regex("&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);")
@@ -1211,16 +1209,9 @@ private val indentedCodeBlockRegex = Regex("""(?m)^(?: {4}|\t).*""")
 
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {
-    val ranges = mutableListOf<IntRange>()
-    for (match in codeFenceRegex.findAll(text)) {
-        ranges.add(match.range)
-    }
-    for (match in unclosedCodeFenceRegex.findAll(text)) {
-        if (ranges.none { match.range.first in it }) {
-            ranges.add(match.range)
-        }
-    }
-    return ranges
+    return StreamingMarkdownDocumentParser.parse(text)
+        .filter { it.kind == StreamingMarkdownBlockKind.CodeFence }
+        .map { it.startOffset until (it.startOffset + it.source.length) }
 }
 
 /** Find ranges of inline code (`...`) to exclude from URL linkification. */

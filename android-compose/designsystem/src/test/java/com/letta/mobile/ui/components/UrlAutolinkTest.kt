@@ -28,6 +28,8 @@ class UrlAutolinkTest {
         assertEquals("https://example.com/#750 likely", escapeBareIssueReferences("https://example.com/#750 likely"))
         assertEquals("Entity &#124; likely", escapeBareIssueReferences("Entity &#124; likely"))
         assertEquals("```kotlin\n#750\n", escapeBareIssueReferences("```kotlin\n#750\n"))
+        assertEquals(" ```kotlin\n#750\n````", escapeBareIssueReferences(" ```kotlin\n#750\n````"))
+        assertEquals("```\nclosed\n```\n\n```kotlin\n#750\n", escapeBareIssueReferences("```\nclosed\n```\n\n```kotlin\n#750\n"))
         assertEquals("    #750", escapeBareIssueReferences("    #750"))
     }
 
