@@ -13,9 +13,12 @@ import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -400,8 +403,8 @@ fun LettaDesktopApp(
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
     // Distinct agents (by id, since many agents share a display name) that have
-    // conversations — these are the rail orbs. Conversations in the sidebar are
-    // filtered to the currently-selected agent only.
+    // conversations — these are the rail orbs. Same-named agents are stacked in
+    // the rail, and the sidebar lists the whole stack's conversations together.
     val railAgents = remember(chatState.conversations) {
         chatState.conversations
             .filter { !it.agentId.isNullOrBlank() }
@@ -413,8 +416,17 @@ fun LettaDesktopApp(
     val selectedAgentOrbIndex = railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
         ?: chatState.selectedConversation?.agentName ?: "Letta"
-    val agentConversations = remember(chatState.conversations, selectedAgentId) {
-        chatState.conversations.filter { it.agentId == selectedAgentId }
+    // List every conversation across the selected stack (all agents sharing the
+    // display name), newest first — so the "Letta Code" stack shows all its
+    // spawns' conversations in one time-ordered list rather than just one agent's.
+    val agentConversations = remember(chatState.conversations, selectedAgentName) {
+        chatState.conversations
+            .filter { it.agentName == selectedAgentName }
+            .sortedByDescending {
+                // Non-timestamp labels ("Queued", "Remote") are brand-new/local —
+                // treat them as newest so they sort to the top.
+                runCatching { java.time.Instant.parse(it.updatedAtLabel) }.getOrNull() ?: java.time.Instant.MAX
+            }
     }
     // @mention candidates: other agents + the focused agent's memory blocks.
     // (Files need a client-side index — tracked as a follow-up.)
@@ -1106,6 +1118,14 @@ private fun DesktopAgentRail(
     onSearch: () -> Unit,
     onSettings: () -> Unit,
 ) {
+    // Collapse agents that share a display name — e.g. the many ephemeral
+    // "Letta Code" agents spawned per task — into a single stacked orb with a
+    // count chip, so the rail doesn't grow unbounded with near-duplicate spawns.
+    // Order follows first appearance in [agents].
+    val groups = remember(agents) {
+        agents.groupBy { it.second }
+            .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
+    }
     Column(
         modifier = Modifier
             .width(56.dp)
@@ -1132,48 +1152,90 @@ private fun DesktopAgentRail(
             }
         }
         Spacer(Modifier.height(8.dp))
-        agents.forEachIndexed { index, (agentId, name) ->
-            val selected = agentId == selectedAgentId
-            val thinking = agentId == thinkingAgentId
-            DesktopTooltip(text = if (thinking) "$name · thinking…" else name) {
-                Box(
-                    modifier = Modifier.size(width = 46.dp, height = 40.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .size(width = 3.dp, height = 28.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
-                        )
-                    }
-                    if (thinking) {
-                        ThinkingRing(diameter = 44.dp, cornerRadius = 10.dp)
-                    }
-                    AgentOrb(
-                        index = index,
-                        size = 36.dp,
-                        modifier = Modifier.clickable { onAgentSelected(agentId) },
+        // The agent list scrolls so a long roster never pushes the bottom
+        // actions (search/settings/account) off-screen.
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            groups.forEachIndexed { index, group ->
+                val selected = selectedAgentId != null && selectedAgentId in group.agentIds
+                val thinking = thinkingAgentId != null && thinkingAgentId in group.agentIds
+                val count = group.agentIds.size
+                // Clicking a stack opens its already-selected member if one is
+                // selected, otherwise its first (most-recent) member.
+                val targetAgentId = group.agentIds.firstOrNull { it == selectedAgentId } ?: group.agentIds.first()
+                val tooltip = buildString {
+                    append(group.name)
+                    if (count > 1) append(" · $count agents")
+                    if (thinking) append(" · thinking…")
+                }
+                DesktopTooltip(text = tooltip) {
+                    Box(
+                        modifier = Modifier.size(width = 46.dp, height = 40.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = name.firstOrNull()?.uppercase() ?: "?",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                        )
+                        if (selected) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .size(width = 3.dp, height = 28.dp)
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                            )
+                        }
+                        if (thinking) {
+                            ThinkingRing(diameter = 44.dp, cornerRadius = 10.dp)
+                        }
+                        AgentOrb(
+                            index = index,
+                            size = 36.dp,
+                            modifier = Modifier.clickable { onAgentSelected(targetAgentId) },
+                        ) {
+                            Text(
+                                text = group.name.firstOrNull()?.uppercase() ?: "?",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                            )
+                        }
+                        if (count > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                    .padding(horizontal = 3.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = if (count > 99) "99+" else count.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
-
-        Spacer(Modifier.weight(1f))
 
         RailActionIcon(Icons.Outlined.Search, "Search", onSearch)
         RailActionIcon(Icons.Outlined.Settings, "Settings", onSettings)
         RailActionIcon(Icons.Outlined.AccountCircle, "Account", onSettings)
     }
 }
+
+/** A rail entry: one or more agents that share a display name, stacked together. */
+private data class AgentRailGroup(
+    val name: String,
+    val agentIds: List<String>,
+)
 
 @Composable
 private fun RailActionIcon(
