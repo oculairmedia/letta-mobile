@@ -312,6 +312,34 @@ private val displayMathRegex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
  * - Skips URLs already inside markdown link syntax [text](url)
  * - Skips URLs inside inline code (`...`) and code fences (```...```)
  */
+internal fun escapeBareIssueReferences(text: String): String {
+    if (!text.contains('#')) return text
+    val ignoredRanges = findCodeFenceRanges(text) +
+        findInlineCodeRanges(text) +
+        findMarkdownLinkRanges(text) +
+        findBareUrlRanges(text)
+    val result = StringBuilder(text.length)
+    var index = 0
+    var changed = false
+    while (index < text.length) {
+        val char = text[index]
+        if (
+            char == '#' &&
+            index + 1 < text.length &&
+            text[index + 1].isDigit() &&
+            (index == 0 || text[index - 1] != '\\') &&
+            ignoredRanges.none { index in it }
+        ) {
+            result.append("\\#")
+            changed = true
+        } else {
+            result.append(char)
+        }
+        index++
+    }
+    return if (changed) result.toString() else text
+}
+
 internal fun autolinkBareUrls(text: String): String {
     // Quick bail-out if no URL-like patterns exist
     if (!text.contains("http://") && !text.contains("https://") && !text.contains("www.")) {
@@ -451,6 +479,16 @@ private fun findMarkdownLinkRanges(text: String): List<IntRange> {
     return ranges
 }
 
+/** Find bare URL ranges so URL fragments like #section or #123 are not escaped. */
+private fun findBareUrlRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    val urlMatcher = Patterns.WEB_URL.matcher(text)
+    while (urlMatcher.find()) {
+        ranges.add(urlMatcher.start() until urlMatcher.end())
+    }
+    return ranges
+}
+
 private val a2uiJsonTagRegex = Regex(
     pattern = """<a2ui-json\b[^>]*>([\s\S]*?)</a2ui-json>""",
     options = setOf(RegexOption.IGNORE_CASE),
@@ -464,7 +502,7 @@ private fun MarkdownTextRaw(
     textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     // Auto-linkify bare URLs before passing to the markdown renderer
-    val linkedText = remember(text) { autolinkBareUrls(text) }
+    val linkedText = remember(text) { autolinkBareUrls(escapeBareIssueReferences(text)) }
     val fontScale = LocalChatFontScale.current
     val isDarkTheme = isSystemInDarkTheme()
 

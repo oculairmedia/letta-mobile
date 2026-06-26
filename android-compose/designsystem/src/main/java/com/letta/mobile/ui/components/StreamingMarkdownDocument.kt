@@ -80,7 +80,6 @@ private val markdownLayoutChangingChars = setOf(
     '_',
     '[',
     ']',
-    '#',
     '|',
     '~',
     '<',
