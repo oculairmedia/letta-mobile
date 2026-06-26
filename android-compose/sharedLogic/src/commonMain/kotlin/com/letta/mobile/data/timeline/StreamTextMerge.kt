@@ -63,23 +63,24 @@ fun mergeStreamText(
     incomingIsForwardDelta: Boolean = true,
 ): StreamTextMergeResult {
     // letta-mobile-mvcr4: a forward (higher-seq) snapshot whose body
-    // overlaps the existing text by NEARLY all of one side (only differs
-    // by the leading or trailing few chars) is a re-tokenized snapshot,
-    // not a forward delta. Without this branch we APPEND and duplicate
-    // the partial body, and the downstream reveal then visibly
-    // truncates the duplicate. We require a substantial overlap
-    // (>= 4 chars in common AND overlap covers all but a few chars of
-    // the shorter side) so genuine tiny forward deltas like "Y" + "es ..."
-    // still APPEND.
+    // overlaps the existing text by most of one side (differs by only a
+    // small portion of the longer side) is a re-tokenized snapshot, not
+    // a forward delta. Without this branch we APPEND and duplicate the
+    // partial body, and the downstream reveal then visibly truncates the
+    // duplicate. We require a substantial overlap (>= 4 chars in common
+    // AND the overlap covers at least 75% of the longer side) so genuine
+    // tiny forward deltas like "Y" + "es ..." still APPEND. The 75%
+    // threshold catches both the 1-char trailing-drop case
+    // ("completed" -> "complet ") and the re-tokenization case where the
+    // new snapshot drops/adds a few words mid-body.
     val shortLen = minOf(existing.length, incoming.length)
     val maxMatch = maxOf(existing.length, incoming.length)
     val overlapLen = if (shortLen >= 4) {
-        // best suffix-of-incoming equal to prefix-of-existing length
         val k = longestCommonPrefixLength(existing, incoming)
         maxOf(k, longestCommonSuffixLength(existing, incoming))
     } else 0
     val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
-        (overlapLen + 2 >= maxMatch)
+        (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
         canUseSnapshotMerge && incoming == existing -> StreamTextMergeBranch.EQUAL
