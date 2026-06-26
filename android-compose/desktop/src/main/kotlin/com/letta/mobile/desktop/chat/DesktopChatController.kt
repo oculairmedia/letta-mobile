@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
-import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
@@ -16,6 +15,8 @@ import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.ui.chat.render.ChatTimelineProjector
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.desktop.DesktopBootstrapState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +86,15 @@ class DesktopChatController(
 
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
+
+    /**
+     * Shared Timeline→message projection (the same one Android uses). Gives the
+     * desktop list the incremental tail cache, optimistic-twin dedup, A2UI
+     * history stripping, and no-change suppression instead of a plain re-map of
+     * every event on every emit. Stateful per bound conversation — reset on
+     * rebind in [selectRemoteConversation].
+     */
+    private val timelineProjector = ChatTimelineProjector()
 
     private var gateway: DesktopChatGateway? = null
 
@@ -492,6 +502,8 @@ class DesktopChatController(
 
         timelineJob?.cancel()
         activeLoop?.close()
+        // Fresh projection cache for the newly-bound conversation.
+        timelineProjector.reset()
 
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
@@ -532,9 +544,20 @@ class DesktopChatController(
 
     private fun updateTimelineMessages(conversationId: String, generation: Long, timeline: Timeline) {
         if (closed) return
-        val messages = timeline.events
-            .sortedBy { it.position }
-            .mapNotNull(::timelineEventToUiMessage)
+        // Project through the shared ChatTimelineProjector: incremental tail
+        // cache, optimistic-twin dedup, and A2UI history stripping (so raw
+        // <a2ui-json> blocks no longer leak into assistant text). previousState
+        // is only read for telemetry, so a default is fine here.
+        val projection = timelineProjector.project(
+            timeline = timeline,
+            prefix = timelineProjector.olderPrefixFor(conversationId),
+            previousState = ChatUiState(),
+        )
+        // A no-op tick (the tail re-emitted unchanged) projects to a UI
+        // byte-identical to the current one — skip the state write so a streamed
+        // delta burst doesn't churn recompositions.
+        if (projection.noChange) return
+        val messages = projection.ui
         // Stop "thinking" once the agent's reply begins to land (the latest
         // message is no longer the user's own prompt).
         if (_thinkingConversationId.value == conversationId &&
