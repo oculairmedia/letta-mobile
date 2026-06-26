@@ -55,6 +55,28 @@ open class TimelineRepository(
     }
 
     /**
+     * Some legacy call sites only know [conversationId], while newer chat paths
+     * pass (agentId, conversationId). Treat the unscoped key as an alias when
+     * there is exactly one live loop for the conversation so those paths don't
+     * spawn duplicate persistent SSE subscribers. If two agents genuinely reuse
+     * the same conversation id, keep them isolated by refusing to guess.
+     */
+    private fun getAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
+        val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
+        if (!canAlias(match.key, key)) return null
+        return getLoopLocked(match.key)
+    }
+
+    private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
+        val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
+        if (!canAlias(match.key, key)) return null
+        return loops.remove(match.key)
+    }
+
+    private fun canAlias(existing: TimelineCacheKey, requested: TimelineCacheKey): Boolean =
+        existing.agentId == requested.agentId || existing.agentId == null || requested.agentId == null
+
+    /**
      * Listener the :app module can install to receive inbound-message events
      * from every TimelineSyncLoop we manage. Used to post system notifications
      * when messages arrive while the relevant chat isn't foregrounded.
@@ -75,7 +97,7 @@ open class TimelineRepository(
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
-        loopsMutex.withLock { getLoopLocked(key) }?.let {
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.let {
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
                 "agentId" to agentId.orEmpty(),
@@ -112,6 +134,7 @@ open class TimelineRepository(
         // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
         loopsMutex.withLock {
             getLoopLocked(key)?.let { return@withLock it }
+            getAliasedLoopLocked(key)?.let { return@withLock it }
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheMiss",
                 "agentId" to key.agentId.orEmpty(),
@@ -235,12 +258,14 @@ open class TimelineRepository(
     }
 
     suspend fun postHandlerCollapse(conversationId: String) {
-        val loop = loopsMutex.withLock { getLoopLocked(TimelineCacheKey(null, conversationId)) }
+        val key = TimelineCacheKey(null, conversationId)
+        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }
         loop?.postHandlerCollapse()
     }
 
     suspend fun postHandlerCollapse(agentId: String?, conversationId: String) {
-        val loop = loopsMutex.withLock { getLoopLocked(TimelineCacheKey(agentId, conversationId)) }
+        val key = TimelineCacheKey(agentId, conversationId)
+        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }
         loop?.postHandlerCollapse()
     }
 
@@ -298,11 +323,13 @@ open class TimelineRepository(
      * stream subscriber resumes ingesting messages for idle-period coverage.
      */
     override suspend fun clearExternalTransportActive(conversationId: String) {
-        loopsMutex.withLock { getLoopLocked(TimelineCacheKey(null, conversationId)) }?.clearExternalTransportActive()
+        val key = TimelineCacheKey(null, conversationId)
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.clearExternalTransportActive()
     }
 
     override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) {
-        loopsMutex.withLock { getLoopLocked(TimelineCacheKey(agentId, conversationId)) }?.clearExternalTransportActive()
+        val key = TimelineCacheKey(agentId, conversationId)
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.clearExternalTransportActive()
     }
 
     /**
@@ -375,7 +402,8 @@ open class TimelineRepository(
 
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
-        loops.remove(TimelineCacheKey(null, conversationId))?.let { loop ->
+        val key = TimelineCacheKey(null, conversationId)
+        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
@@ -385,7 +413,8 @@ open class TimelineRepository(
     }
 
     suspend fun clear(agentId: String?, conversationId: String) = loopsMutex.withLock {
-        loops.remove(TimelineCacheKey(agentId, conversationId))?.let { loop ->
+        val key = TimelineCacheKey(agentId, conversationId)
+        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",

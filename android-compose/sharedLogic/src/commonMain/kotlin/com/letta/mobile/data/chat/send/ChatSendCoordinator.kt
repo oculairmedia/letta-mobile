@@ -9,6 +9,7 @@ import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.util.Telemetry
+import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
