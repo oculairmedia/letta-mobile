@@ -3,41 +3,47 @@ package com.letta.mobile.ui.theme
 import com.letta.mobile.data.model.ThemePreset
 
 object LettaColorTokens {
-    const val darkSurface = 0xFF121212
-    const val darkSurfaceVariant = 0xFF1E1E1E
-    const val darkSurfaceContainer = 0xFF2A2A2A
+    // Neutrals — "cool slate" retune (2026-06-23): a subtle cool blue-grey
+    // undertone over the older true-greys. Teal primary #00BFA5 unchanged.
+    // Single source of truth for both desktop and Android (default preset).
+    const val darkSurface = 0xFF13161B
+    const val darkSurfaceVariant = 0xFF1A1E25
+    const val darkSurfaceContainer = 0xFF1A1E25
     const val darkPrimary = 0xFF00BFA5
-    const val darkPrimaryVariant = 0xFF009688
-    const val darkOnSurface = 0xFFE0E0E0
-    const val darkOnSurfaceVariant = 0xFFBDBDBD
+    const val darkPrimaryVariant = 0xFF0E8C7E
+    const val darkOnSurface = 0xFFE6E9EF
+    const val darkOnSurfaceVariant = 0xFFAEB6C2
+    const val darkOnSurfaceMuted = 0xFF717A87
     const val darkError = 0xFFCF6679
     const val darkOnError = 0xFF000000
-    const val darkBackground = 0xFF0A0A0A
-    const val darkOutline = 0xFF424242
+    const val darkBackground = 0xFF0B0D11
+    const val darkOutline = 0xFF3A414E
 
-    const val lightSurface = 0xFFFAFAFA
-    const val lightSurfaceVariant = 0xFFEEEEEE
-    const val lightSurfaceContainer = 0xFFE0E0E0
+    const val lightSurface = 0xFFF5F7FA
+    const val lightSurfaceVariant = 0xFFEAEEF3
+    const val lightSurfaceContainer = 0xFFDDE3EA
     const val lightPrimary = 0xFF00897B
     const val lightPrimaryVariant = 0xFF00695C
-    const val lightOnSurface = 0xFF1A1A1A
-    const val lightOnSurfaceVariant = 0xFF424242
+    const val lightOnSurface = 0xFF161A20
+    const val lightOnSurfaceVariant = 0xFF4A5360
+    const val lightOnSurfaceMuted = 0xFF6B7480
     const val lightError = 0xFFB00020
     const val lightOnError = 0xFFFFFFFF
-    const val lightBackground = 0xFFFFFFFF
-    const val lightOutline = 0xFFBDBDBD
+    const val lightBackground = 0xFFFBFCFD
+    const val lightOutline = 0xFFB4BCC8
 
     const val tealAccent = 0xFF1DE9B6
     const val cyanAccent = 0xFF00E5FF
     const val amberAccent = 0xFFFFD740
 
-    // Surface levels (dark) used by the desktop scheme + template chrome.
-    const val darkSurfaceContainerLowest = 0xFF0D0D0D
-    const val darkSurfaceContainerLow = 0xFF121212
-    const val darkSurfaceContainerDefault = 0xFF1E1E1E
-    const val darkSurfaceContainerHigh = 0xFF2A2A2A
-    const val darkSurfaceContainerHighest = 0xFF353535
-    const val darkOutlineVariant = 0xFF303030
+    // Surface levels (dark) used by the desktop scheme + template chrome
+    // (cool-slate retune).
+    const val darkSurfaceContainerLowest = 0xFF0D0F13
+    const val darkSurfaceContainerLow = 0xFF13161B
+    const val darkSurfaceContainerDefault = 0xFF1A1E25
+    const val darkSurfaceContainerHigh = 0xFF242A33
+    const val darkSurfaceContainerHighest = 0xFF2E343F
+    const val darkOutlineVariant = 0xFF2A2F39
 
     // Agent status tokens (fixed brand values — not derived from the scheme).
     const val darkRunning = 0xFFE0A458
@@ -54,6 +60,19 @@ object LettaColorTokens {
     const val lightAgentB = 0xFF1A73E8
     const val darkAgentC = 0xFFE36FB3
     const val lightAgentC = 0xFFC03D8E
+
+    // Memory-block category tokens (Phase 6 / §1.1b). Distinct from agentA/B/C
+    // (subagent identity) — these color-code memory blocks by category.
+    const val darkCategoryPersona = 0xFF00BFA5
+    const val lightCategoryPersona = 0xFF00BFA5
+    const val darkCategoryHuman = 0xFF5C9BD6
+    const val lightCategoryHuman = 0xFF2F6FB0
+    const val darkCategoryOnboarding = 0xFFD1A05A
+    const val lightCategoryOnboarding = 0xFF9A6A1F
+    const val darkCategoryProject = 0xFF9B8AE0
+    const val lightCategoryProject = 0xFF6E5BB8
+    const val darkCategoryArchival = 0xFF828B98
+    const val lightCategoryArchival = 0xFF5F6469
 }
 
 data class LettaThemePaletteTokens(
