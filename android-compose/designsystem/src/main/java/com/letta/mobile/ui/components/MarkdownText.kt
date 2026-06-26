@@ -756,6 +756,8 @@ package com.letta.mobile.ui.components
 import com.letta.mobile.ui.theme.LettaCodeFont
 
 import android.util.Patterns
+import java.util.Collections
+import kotlin.collections.sortedSetOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -1067,32 +1069,77 @@ private val displayMathRegex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
  */
 internal fun escapeBareIssueReferences(text: String): String {
     if (!text.contains('#')) return text
-    val ignoredRanges = findCodeFenceRanges(text) +
-        findInlineCodeRanges(text) +
-        findMarkdownLinkRanges(text) +
-        findBareUrlRanges(text) +
-        findHtmlEntityRanges(text) +
-        findIndentedCodeBlockRanges(text)
-    val result = StringBuilder(text.length)
+    // StreamingMarkdownDocumentParser normalizes CRLF -> LF before computing
+    // code-fence ranges. If we operate on the original CRLF text directly,
+    // those LF-relative ranges can fall outside the original indexes around
+    // every \r (so issue refs near the end of CRLF fences or HTML-attr-like
+    // ranges get escaped when they shouldn't). Normalize once, translate the
+    // escape decisions back to the original CRLF positions, and emit text
+    // that preserves the original line endings.
+    val crlf = text.contains("\r\n")
+    val normalized = if (crlf) text.replace("\r\n", "\n") else text
+    val ignoredRangesNormalized = if (crlf) {
+        findCodeFenceRanges(normalized) +
+            findInlineCodeRanges(normalized) +
+            findMarkdownLinkRanges(normalized) +
+            findBareUrlRanges(normalized) +
+            findHtmlEntityRanges(normalized) +
+            findIndentedCodeBlockRanges(normalized) +
+            findRawHtmlTagRanges(normalized)
+    } else {
+        findCodeFenceRanges(text) +
+            findInlineCodeRanges(text) +
+            findMarkdownLinkRanges(text) +
+            findBareUrlRanges(text) +
+            findHtmlEntityRanges(text) +
+            findIndentedCodeBlockRanges(text) +
+            findRawHtmlTagRanges(text)
+    }
+    // Decide escape positions in normalized coordinates, then translate to
+    // original indices by skipping the \r that precedes every \n.
+    val escapeAt = sortedSetOf<Int>()
     var index = 0
-    var changed = false
-    while (index < text.length) {
-        val char = text[index]
+    while (index < normalized.length) {
+        val char = normalized[index]
         if (
             char == '#' &&
-            index + 1 < text.length &&
-            text[index + 1].isDigit() &&
-            (index == 0 || text[index - 1] != '\\') &&
-            ignoredRanges.none { index in it }
+            index + 1 < normalized.length &&
+            normalized[index + 1].isDigit() &&
+            (index == 0 || normalized[index - 1] != '\\') &&
+            ignoredRangesNormalized.none { index in it }
         ) {
-            result.append("\\#")
-            changed = true
-        } else {
-            result.append(char)
+            escapeAt.add(index)
         }
         index++
     }
-    return if (changed) result.toString() else text
+    if (escapeAt.isEmpty()) return text
+    val result = StringBuilder(text.length)
+    var normIndex = 0
+    var origIndex = 0
+    val escapeSet = escapeAt
+    while (origIndex < text.length) {
+        if (normIndex in escapeSet) {
+            // Emit "\\#" and advance past the original '#'.
+            result.append("\\#")
+            normIndex += 1
+            origIndex += 1
+        } else {
+            // CRLF: when we've already emitted the '\r' via the previous
+            // escape branch's pair-emit, skip it here so we don't double it.
+            // The original char at origIndex was the '\r' that precedes the '\n'
+            // the normalized index is about to consume.
+            if (crlf && origIndex + 1 < text.length && text[origIndex] == '\r' && text[origIndex + 1] == '\n') {
+                result.append('\r').append('\n')
+                origIndex += 2
+                normIndex += 1
+            } else {
+                result.append(text[origIndex])
+                origIndex += 1
+                normIndex += 1
+            }
+        }
+    }
+    return result.toString()
 }
 
 internal fun autolinkBareUrls(text: String): String {
@@ -1206,6 +1253,7 @@ private val inlineCodeRegex = Regex("(`+)([\\s\\S]*?)\\1")
 private val markdownLinkRegex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
 private val htmlEntityRegex = Regex("&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);")
 private val indentedCodeBlockRegex = Regex("""(?m)^(?: {4}|\t).*""")
+private val rawHtmlTagRegex = Regex("<[A-Za-z][^>]*>")
 
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {
@@ -1254,6 +1302,14 @@ private fun findHtmlEntityRanges(text: String): List<IntRange> {
 private fun findIndentedCodeBlockRanges(text: String): List<IntRange> {
     val ranges = mutableListOf<IntRange>()
     for (match in indentedCodeBlockRegex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
+private fun findRawHtmlTagRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    for (match in rawHtmlTagRegex.findAll(text)) {
         ranges.add(match.range)
     }
     return ranges
