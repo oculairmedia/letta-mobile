@@ -1,12 +1,16 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,7 +46,22 @@ internal fun DesktopTooltip(
     content: @Composable () -> Unit,
 ) {
     TooltipArea(
-        tooltip = { DesktopControlText(text = text) },
+        tooltip = {
+            // A proper tooltip chip — rounded, bordered, padded, lightly raised —
+            // instead of bare floating text.
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 6.dp,
+            ) {
+                DesktopControlText(
+                    text = text,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                )
+            }
+        },
         modifier = modifier,
         delayMillis = 450,
         tooltipPlacement = TooltipPlacement.CursorPoint(
