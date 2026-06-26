@@ -72,6 +72,20 @@ class DesktopChatController(
     // for a newer send in the same conversation.
     private var thinkingGeneration = 0
 
+    /**
+     * Conversation whose reply is actively streaming — set on send and cleared
+     * only when the send job (which suspends for the whole reply stream)
+     * completes, fails, or is cancelled. Unlike [thinkingConversationId], which
+     * clears the instant the first token lands, this survives the entire stream,
+     * so it (not "thinking") is the correct gate for revealing streamed text
+     * progressively in the message list.
+     */
+    private val _streamingConversationId = MutableStateFlow<String?>(null)
+    val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
+
+    // Same stale-guard rationale as thinkingGeneration.
+    private var streamingGeneration = 0
+
     private var gateway: DesktopChatGateway? = null
 
     // Per-conversation model overrides set this session (the picker). The
@@ -347,6 +361,11 @@ class DesktopChatController(
             it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
         beginThinking(sendingConversationId)
+        // Mark the reply as streaming for the whole send-stream lifetime (the
+        // send job below suspends until the stream completes), so the message
+        // list can reveal streamed text progressively the entire time.
+        _streamingConversationId.value = sendingConversationId
+        val streamGen = ++streamingGeneration
         sendJob?.cancel()
         sendJob = scope.launch {
             try {
@@ -371,6 +390,13 @@ class DesktopChatController(
                             errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
                         ),
                     )
+                }
+            } finally {
+                // Clears on normal completion, failure, and cancellation. The
+                // generation guard prevents a cancelled prior send from clearing
+                // a newer same-conversation send's streaming flag.
+                if (streamGen == streamingGeneration && _streamingConversationId.value == sendingConversationId) {
+                    _streamingConversationId.value = null
                 }
             }
         }

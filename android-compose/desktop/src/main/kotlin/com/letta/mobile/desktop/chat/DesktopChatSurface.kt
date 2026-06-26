@@ -132,6 +132,7 @@ import com.letta.mobile.data.onboarding.AgentOnboarding
 import com.letta.mobile.data.onboarding.OnboardingTask
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
@@ -159,6 +160,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 internal fun ChatDetailPane(
     state: DesktopChatSurfaceState,
     isThinking: Boolean,
+    isStreamingReply: Boolean = false,
     onComposerTextChanged: (String) -> Unit,
     onSend: () -> Unit,
     onAttachImage: () -> Unit,
@@ -218,6 +220,7 @@ internal fun ChatDetailPane(
                     conversationId = state.selectedConversationId,
                     renderItems = state.renderItems,
                     isSending = isThinking,
+                    isStreamingReply = isStreamingReply,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -508,6 +511,7 @@ private fun MessageList(
     conversationId: String?,
     renderItems: List<ChatRenderItem>,
     isSending: Boolean,
+    isStreamingReply: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -515,6 +519,13 @@ private fun MessageList(
     val scope = rememberCoroutineScope()
     var followLatest by remember(conversationId) { mutableStateOf(true) }
     val latestItemKey = renderItems.lastOrNull()?.key
+
+    // The single assistant message currently being revealed: the newest
+    // assistant narration of the tail (bottom-most) render item, but only while
+    // the reply is actively streaming ([isStreamingReply], which spans the whole
+    // stream — unlike [isSending]/"thinking", which clears at the first token).
+    // Everything else is settled history.
+    val streamingMessageId = if (isStreamingReply) renderItems.lastOrNull()?.streamingCandidateMessageId() else null
 
     LaunchedEffect(conversationId) {
         followLatest = true
@@ -579,8 +590,8 @@ private fun MessageList(
                             .hoverable(interaction),
                     ) {
                         when (item) {
-                            is ChatRenderItem.Single -> DesktopMessageBubble(item.message)
-                            is ChatRenderItem.RunBlock -> DesktopRunBlock(item)
+                            is ChatRenderItem.Single -> DesktopMessageBubble(item.message, streamingMessageId)
+                            is ChatRenderItem.RunBlock -> DesktopRunBlock(item, streamingMessageId)
                         }
                         // Only plain message bubbles get the hover copy toolbar — a
                         // RunBlock has its own header chevron at the top-right, which
@@ -657,7 +668,7 @@ private fun LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): Chat
  * "Run · N steps" card (one row per tool call), then the agent's narration.
  */
 @Composable
-private fun DesktopRunBlock(item: ChatRenderItem.RunBlock) {
+private fun DesktopRunBlock(item: ChatRenderItem.RunBlock, streamingMessageId: String? = null) {
     val messages = item.messages.map { it.first }
     val reasoning = messages.filter { it.isReasoning && it.content.isNotBlank() }
     val toolCalls = messages.flatMap { it.toolCalls.orEmpty() }
@@ -669,7 +680,7 @@ private fun DesktopRunBlock(item: ChatRenderItem.RunBlock) {
         if (toolCalls.isNotEmpty()) {
             RunStepsCard(toolCalls)
         }
-        narration.forEach { AgentText(it.content, it.isError) }
+        narration.forEach { AgentText(it.content, it.isError, isStreaming = it.id == streamingMessageId) }
         messages.forEach { message ->
             message.generatedUi?.let { GeneratedUiCard(it) }
             message.approvalRequest?.let { ApprovalRequestCard(it) }
@@ -1033,7 +1044,7 @@ data class ComposerCommand(
 )
 
 @Composable
-private fun DesktopMessageBubble(message: UiMessage) {
+private fun DesktopMessageBubble(message: UiMessage, streamingMessageId: String? = null) {
     if (message.role == "user") {
         UserPrompt(message)
         return
@@ -1043,7 +1054,7 @@ private fun DesktopMessageBubble(message: UiMessage) {
         if (message.isReasoning && message.content.isNotBlank()) {
             ReasoningRow(message.content)
         } else if (message.content.isNotBlank()) {
-            AgentText(message.content, message.isError)
+            AgentText(message.content, message.isError, isStreaming = message.id == streamingMessageId)
         }
         DesktopImageAttachmentsGrid(
             attachments = message.attachments,
@@ -1195,6 +1206,23 @@ private fun messageClockLabel(iso: String): String? {
     return zoned.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
 }
 
+/**
+ * The id of the assistant message inside this render item that should be
+ * smoothed while a reply is in flight: the newest non-reasoning, non-tool,
+ * non-blank assistant narration. Within a [ChatRenderItem.RunBlock] the
+ * messages are in chat order (oldest first), so the newest narration is the
+ * last matching one. Returns null for user prompts or items with no narration.
+ */
+private fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this) {
+    is ChatRenderItem.Single -> message
+        .takeIf { it.role != "user" && !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
+        ?.id
+    is ChatRenderItem.RunBlock -> messages
+        .map { it.first }
+        .lastOrNull { !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
+        ?.id
+}
+
 /** The message text a hover toolbar's Copy action puts on the clipboard. */
 private fun ChatRenderItem.copyableText(): String = when (this) {
     is ChatRenderItem.Single -> message.content
@@ -1206,10 +1234,21 @@ private fun ChatRenderItem.copyableText(): String = when (this) {
 
 /** Plain agent narration text, full width (no bubble), per the detailed board. */
 @Composable
-private fun AgentText(text: String, isError: Boolean) {
+private fun AgentText(text: String, isError: Boolean, isStreaming: Boolean = false) {
+    // While the agent's reply is still landing, reveal the latest assistant
+    // message progressively via the shared smoother (the same hook Android
+    // uses) instead of snapping in each raw chunk. Settled history renders the
+    // full text directly. The smoother continues revealing the buffered tail at
+    // its own cadence even after [isStreaming] flips back to false, so the reply
+    // still finishes smoothly once the in-flight signal clears.
+    val displayText = if (isStreaming) {
+        rememberSmoothedStreamingText(rawText = text, isStreaming = true)
+    } else {
+        text
+    }
     SelectionContainer {
         Text(
-            text = text,
+            text = displayText,
             style = MaterialTheme.typography.bodyMedium,
             color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
         )

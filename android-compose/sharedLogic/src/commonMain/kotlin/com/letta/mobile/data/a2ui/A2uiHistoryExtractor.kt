@@ -1,10 +1,11 @@
-package com.letta.mobile.feature.chat.a2ui
+package com.letta.mobile.data.a2ui
 
-import com.letta.mobile.data.a2ui.A2uiMessage
-import com.letta.mobile.data.a2ui.A2uiProtocolJson
-import com.letta.mobile.data.a2ui.decodeA2uiMessages
-import com.letta.mobile.data.a2ui.decodeA2uiMessagesLenient
-
+/**
+ * Pulls inline `<a2ui-json>…</a2ui-json>` blocks out of an assistant message's
+ * text content and decodes them into [A2uiMessage]s, returning the cleaned
+ * text plus the extracted messages. Pure and platform-neutral so the shared
+ * chat-timeline projection can run identically on Android and desktop.
+ */
 internal data class A2uiHistoryExtraction(
     val content: String,
     val messages: List<A2uiMessage>,
