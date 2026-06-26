@@ -877,9 +877,8 @@ private fun NewAgentDialog(
                 )
                 Box {
                     Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { modelMenuOpen = true },
+                        onClick = { modelMenuOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -990,7 +989,8 @@ private fun EditAgentDialog(
                     Text("Model", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Box {
                         Surface(
-                            modifier = Modifier.fillMaxWidth().clickable { modelMenuOpen = true },
+                            onClick = { modelMenuOpen = true },
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = MaterialTheme.colorScheme.onSurface,
@@ -1139,7 +1139,8 @@ private fun DesktopAgentRail(
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(onClick = onNewSession),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1193,7 +1194,7 @@ private fun DesktopAgentRail(
                         AgentOrb(
                             index = index,
                             size = 36.dp,
-                            modifier = Modifier.clickable { onAgentSelected(targetAgentId) },
+                            onClick = { onAgentSelected(targetAgentId) },
                         ) {
                             Text(
                                 text = group.name.firstOrNull()?.uppercase() ?: "?",
@@ -1247,6 +1248,7 @@ private fun RailActionIcon(
         Box(
             modifier = Modifier
                 .size(34.dp)
+                .clip(CircleShape)
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -1446,13 +1448,15 @@ private fun SidebarConversationRow(
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .hoverable(interactionSource)
-            .clickable(enabled = !deleting, onClick = onClick),
+        onClick = onClick,
+        enabled = !deleting,
+        modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
         color = container,
         contentColor = MaterialTheme.colorScheme.onSurface,
+        // Drives both the click ripple (now clipped to the rounded shape) and the
+        // `hovered` state below, so no separate .hoverable is needed.
+        interactionSource = interactionSource,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),

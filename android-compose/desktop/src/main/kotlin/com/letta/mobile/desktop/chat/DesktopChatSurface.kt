@@ -326,9 +326,9 @@ private fun NewConversationWelcome(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 AgentOnboarding.starterPrompts.forEach { prompt ->
                     Surface(
+                        onClick = { onStarterPrompt(prompt) },
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.clickable { onStarterPrompt(prompt) },
                     ) {
                         Text(
                             text = prompt,
@@ -381,7 +381,8 @@ private fun FirstRunCard(
     onClick: () -> Unit,
 ) {
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        onClick = onClick,
+        modifier = modifier,
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -674,16 +675,16 @@ private fun MessageList(
 
         if (ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling))) {
             Surface(
+                onClick = {
+                    followLatest = true
+                    scope.launch {
+                        listState.animateScrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 18.dp)
-                    .size(44.dp)
-                    .clickable {
-                        followLatest = true
-                        scope.launch {
-                            listState.animateScrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
-                        }
-                    },
+                    .size(44.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1818,9 +1819,9 @@ private fun ComposerBar(
                     )
                     Spacer(Modifier.weight(1f))
                     Surface(
-                        modifier = Modifier
-                            .size(38.dp)
-                            .clickable(enabled = canSend, onClick = onSend),
+                        onClick = onSend,
+                        enabled = canSend,
+                        modifier = Modifier.size(38.dp),
                         shape = CircleShape,
                         color = if (canSend) {
                             MaterialTheme.colorScheme.primary
@@ -2036,10 +2037,10 @@ private fun ComposerActionChip(
     leadingIcon: ImageVector? = null,
 ) {
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -2077,10 +2078,10 @@ private fun ComposerDropdownChip(
     var open by remember { mutableStateOf(false) }
     Box {
         Surface(
+            onClick = { open = !open },
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = contentColor,
-            modifier = Modifier.clickable { open = !open },
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),

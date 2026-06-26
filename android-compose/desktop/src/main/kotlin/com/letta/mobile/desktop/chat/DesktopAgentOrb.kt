@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -17,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,12 +60,19 @@ fun AgentOrb(
     size: Dp,
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 7.dp,
+    onClick: (() -> Unit)? = null,
     content: @Composable (() -> Unit)? = null,
 ) {
+    val shape = RoundedCornerShape(cornerRadius)
     Box(
+        // clip BEFORE clickable so the hover/press indication follows the orb's
+        // rounded shape instead of a rectangle. onClick is applied here (not by
+        // the caller's modifier) so it sits inside the clip.
         modifier = modifier
             .size(size)
-            .background(agentOrbBrush(index), RoundedCornerShape(cornerRadius)),
+            .clip(shape)
+            .background(agentOrbBrush(index))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         content?.invoke()
