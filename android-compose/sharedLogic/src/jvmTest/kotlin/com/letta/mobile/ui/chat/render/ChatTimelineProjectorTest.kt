@@ -187,4 +187,25 @@ class ChatTimelineProjectorTest {
         assertEquals("old1", projection.ui[0].id)
         assertEquals("newest", projection.ui[1].content)
     }
+
+    @Test
+    fun zeroMessageOpenCloseCycle_limitation_heartbeatsDoNotMutateProjectorState() {
+        val projector = ChatTimelineProjector()
+        
+        // Simulating stream open with 0 messages
+        val firstEmptyProjection = projector.projectLive(emptyList(), version = 1)
+        
+        assertEquals(0, firstEmptyProjection.ui.size)
+        assertEquals(ChatMessageListChange.Full, firstEmptyProjection.messageListChange)
+        assertFalse(firstEmptyProjection.noChange)
+
+        // Simulating stream close with 0 messages, same stablePrefixVersion
+        val secondEmptyProjection = projector.projectLive(emptyList(), version = 1)
+
+        assertEquals(0, secondEmptyProjection.ui.size)
+        // Limitation: ChatTimelineProjector.tailProjectionFastPath explicitly bails on empty event lists,
+        // so it falls through to a full projection rather than taking the no-op fast path.
+        // The render model (UI list) remains unchanged (empty), but noChange is false.
+        assertFalse(secondEmptyProjection.noChange)
+    }
 }
