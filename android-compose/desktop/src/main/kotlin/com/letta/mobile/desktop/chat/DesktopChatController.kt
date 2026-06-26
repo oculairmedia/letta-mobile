@@ -558,11 +558,15 @@ class DesktopChatController(
         // delta burst doesn't churn recompositions.
         if (projection.noChange) return
         val messages = projection.ui
-        // Stop "thinking" once the agent's reply begins to land (the latest
-        // message is no longer the user's own prompt).
-        if (_thinkingConversationId.value == conversationId &&
+        // Stop "thinking" once the agent's reply begins to land. Use the
+        // timeline tail (projection.tailIsAssistant) as well as the projected
+        // list: an A2UI-only reply is extracted out of the rendered text, so
+        // projection.ui still ends with the user's prompt even though an
+        // assistant event landed — without the tailIsAssistant check the
+        // indicator would hang until the safety timeout (Codex review).
+        val agentReplyLanded = projection.tailIsAssistant ||
             messages.lastOrNull()?.role?.equals("user", ignoreCase = true) == false
-        ) {
+        if (_thinkingConversationId.value == conversationId && agentReplyLanded) {
             _thinkingConversationId.value = null
         }
         _state.update { current ->

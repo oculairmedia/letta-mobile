@@ -134,6 +134,34 @@ class ChatTimelineProjectorTest {
     }
 
     @Test
+    fun nonTailMutationIsReprojectedNotSuppressed() {
+        // A reconcile can change a NON-tail event (e.g. attach a tool return to
+        // an earlier tool call) while size + tail stay the same. The reducers
+        // recompute stablePrefixVersion in that case, so the version differs and
+        // the projector must do a full re-projection rather than take its
+        // replace-tail/no-change fast path and suppress the update (Codex review
+        // on the desktop projector adoption).
+        val projector = ChatTimelineProjector()
+        projector.projectLive(
+            listOf(
+                confirmed(TimelineMessageType.ASSISTANT, "first", "a1", 1.0),
+                confirmed(TimelineMessageType.ASSISTANT, "tail", "a2", 2.0),
+            ),
+            version = 10,
+        )
+        // Non-tail event a1 changed; the (fixed) reconcile bumped the version.
+        val projection = projector.projectLive(
+            listOf(
+                confirmed(TimelineMessageType.ASSISTANT, "EDITED", "a1", 1.0),
+                confirmed(TimelineMessageType.ASSISTANT, "tail", "a2", 2.0),
+            ),
+            version = 11,
+        )
+        assertFalse(projection.noChange)
+        assertEquals("EDITED", projection.ui[0].content)
+    }
+
+    @Test
     fun mergeOlderPagePrependsOlderMessages() {
         val projector = ChatTimelineProjector()
         val first = projector.projectLive(
