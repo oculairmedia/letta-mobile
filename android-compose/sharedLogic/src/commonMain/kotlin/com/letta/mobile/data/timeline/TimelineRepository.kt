@@ -56,15 +56,19 @@ open class TimelineRepository(
 
     /**
      * Some legacy call sites only know [conversationId], while newer chat paths
-     * pass (agentId, conversationId). Treat the unscoped key as an alias when
-     * there is exactly one live loop for the conversation so those paths don't
-     * spawn duplicate persistent SSE subscribers. If two agents genuinely reuse
-     * the same conversation id, keep them isolated by refusing to guess.
+     * pass (agentId, conversationId). Treat the unscoped key as an alias only
+     * when there is exactly one compatible live loop for the conversation. When
+     * a scoped caller claims an unscoped loop, promote the cache key to that
+     * scope so a later different agent cannot accidentally share it.
      */
     private fun getAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
         val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
-        if (!canAlias(match.key, key)) return null
-        return getLoopLocked(match.key)
+        val existingKey = match.key
+        if (!canAlias(existingKey, key)) return null
+        val loop = loops.remove(existingKey) ?: return null
+        val promotedKey = if (existingKey.agentId == null && key.agentId != null) key else existingKey
+        loops[promotedKey] = loop
+        return loop
     }
 
     private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
@@ -74,7 +78,9 @@ open class TimelineRepository(
     }
 
     private fun canAlias(existing: TimelineCacheKey, requested: TimelineCacheKey): Boolean =
-        existing.agentId == requested.agentId || existing.agentId == null || requested.agentId == null
+        existing.agentId == requested.agentId ||
+            existing.agentId == null ||
+            requested.agentId == null
 
     /**
      * Listener the :app module can install to receive inbound-message events
