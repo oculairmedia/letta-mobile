@@ -1,12 +1,16 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.TooltipArea
 import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,12 +46,32 @@ internal fun DesktopTooltip(
     content: @Composable () -> Unit,
 ) {
     TooltipArea(
-        tooltip = { DesktopControlText(text = text) },
+        tooltip = {
+            // A proper tooltip chip — rounded, bordered, padded, lightly raised —
+            // instead of bare floating text.
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 6.dp,
+            ) {
+                DesktopControlText(
+                    text = text,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                )
+            }
+        },
         modifier = modifier,
         delayMillis = 450,
-        tooltipPlacement = TooltipPlacement.CursorPoint(
-            alignment = Alignment.BottomEnd,
-            offset = DpOffset(10.dp, 10.dp),
+        // Anchor the tooltip just to the RIGHT of the element (outside it) rather
+        // than following the cursor or sitting below — below-center overlapped the
+        // element because the label is wider than the narrow rail/nav items. The
+        // anchored provider clamps to the window, so it stays on-screen.
+        tooltipPlacement = TooltipPlacement.ComponentRect(
+            anchor = Alignment.CenterEnd,
+            alignment = Alignment.CenterStart,
+            offset = DpOffset(8.dp, 0.dp),
         ),
         content = content,
     )
