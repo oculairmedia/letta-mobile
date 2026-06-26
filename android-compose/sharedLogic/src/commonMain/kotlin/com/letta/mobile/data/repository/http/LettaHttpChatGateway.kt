@@ -57,12 +57,13 @@ open class LettaHttpChatGateway(
 ) : ChatGateway, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
-    override suspend fun listConversations(limit: Int): List<Conversation> {
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
         val response = httpClient.get("$baseUrl/v1/conversations") {
             applyAuth()
             parameter("limit", limit)
             parameter("order", "desc")
             parameter("order_by", "last_message_at")
+            archiveStatus?.let { parameter("archive_status", it) }
         }
         response.requireSuccess()
         return response.body()
@@ -204,6 +205,17 @@ open class LettaHttpChatGateway(
             applyAuth()
             contentType(ContentType.Application.Json)
             setBody(ConversationUpdateParams(model = model))
+        }
+        response.requireSuccess()
+        return response.body()
+    }
+
+    /** Archive or restore (un-archive) an existing conversation — non-destructive. */
+    suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {
+        val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
+            applyAuth()
+            contentType(ContentType.Application.Json)
+            setBody(ConversationUpdateParams(archived = archived))
         }
         response.requireSuccess()
         return response.body()

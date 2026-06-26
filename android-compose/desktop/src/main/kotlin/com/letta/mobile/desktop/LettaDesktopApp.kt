@@ -36,6 +36,9 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.foundation.ContextMenuArea
+import androidx.compose.foundation.ContextMenuItem
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
@@ -46,6 +49,7 @@ import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -106,8 +110,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
@@ -157,6 +163,7 @@ import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 private const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
+private const val ARCHIVED_CONVERSATION_IDS_KEY = "conversations.archived_ids"
 
 @Composable
 fun LettaDesktopApp(
@@ -216,6 +223,17 @@ fun LettaDesktopApp(
                     model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
                 }
                 resolved
+            },
+            loadArchivedConversationIds = {
+                secureSettingsStore.getString(ARCHIVED_CONVERSATION_IDS_KEY)
+                    ?.split(',')
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?.toSet()
+                    ?: emptySet()
+            },
+            persistArchivedConversationIds = { ids ->
+                secureSettingsStore.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
             },
         )
     }
@@ -440,9 +458,17 @@ fun LettaDesktopApp(
     // List every conversation across the selected stack (all agents sharing the
     // display name), newest first — so the "Letta Code" stack shows all its
     // spawns' conversations in one time-ordered list rather than just one agent's.
-    val agentConversations = remember(chatState.conversations, selectedAgentName) {
+    val archiveFilter by chatController.archiveFilter.collectAsState()
+    val agentConversations = remember(chatState.conversations, selectedAgentName, archiveFilter) {
         chatState.conversations
             .filter { it.agentName == selectedAgentName }
+            .filter { c ->
+                when (archiveFilter) {
+                    ConversationArchiveFilter.Active -> !c.archived
+                    ConversationArchiveFilter.Archived -> c.archived
+                    ConversationArchiveFilter.All -> true
+                }
+            }
             .sortedByDescending { conversationRecency(it.updatedAtLabel) }
     }
     // @mention candidates: other agents + the focused agent's memory blocks.
@@ -578,6 +604,9 @@ fun LettaDesktopApp(
                     selectedConversationId = chatState.selectedConversationId,
                     thinkingConversationId = thinkingConversationId,
                     deletingConversationIds = deletingConversationIds,
+                    archiveFilter = archiveFilter,
+                    onArchiveFilterChange = chatController::setArchiveFilter,
+                    onArchiveConversation = chatController::setConversationArchived,
                     selectedDestination = selectedDestination,
                     mode = workPlayMode,
                     onModeChange = { workPlayMode = it },
@@ -1096,7 +1125,10 @@ private fun DesktopAgentRail(
                             )
                         }
                         if (thinking) {
-                            ThinkingRing(diameter = 44.dp, cornerRadius = 10.dp)
+                            // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
+                            // and sized to fit the 40dp slot so it doesn't crowd
+                            // neighbouring orbs.
+                            ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
                         }
                         AgentOrb(
                             index = orbStyle,
@@ -1180,6 +1212,9 @@ private fun DesktopAgentSidebar(
     selectedConversationId: String?,
     thinkingConversationId: String?,
     deletingConversationIds: Set<String> = emptySet(),
+    archiveFilter: ConversationArchiveFilter,
+    onArchiveFilterChange: (ConversationArchiveFilter) -> Unit,
+    onArchiveConversation: (id: String, archived: Boolean) -> Unit,
     selectedDestination: DesktopDestination,
     mode: WorkPlayMode,
     onModeChange: (WorkPlayMode) -> Unit,
@@ -1209,16 +1244,27 @@ private fun DesktopAgentSidebar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(start = 2.dp, bottom = 16.dp),
         ) {
-            AgentOrb(index = agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
-            Text(
-                text = agentName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            // Tapping the agent (orb + name) opens its Edit Agent settings; the
+            // ⋮ menu keeps the other actions.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onEditAgent),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AgentOrb(index = agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
+                Text(
+                    text = agentName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             var menuOpen by remember { mutableStateOf(false) }
             Box {
                 Icon(
@@ -1278,6 +1324,17 @@ private fun DesktopAgentSidebar(
 
         // Pinned conversations / scenes.
         SidebarSection(WorkPlayLens.conversationsHeader(mode))
+        // Active / Archived / All status filter.
+        Row(
+            modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            ConversationArchiveFilter.entries.forEach { filter ->
+                DesktopChipTab(text = filter.label, active = archiveFilter == filter) {
+                    onArchiveFilterChange(filter)
+                }
+            }
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1292,7 +1349,9 @@ private fun DesktopAgentSidebar(
                         conversation.id == selectedConversationId,
                     thinking = conversation.id == thinkingConversationId,
                     deleting = conversation.id in deletingConversationIds,
+                    archived = conversation.archived,
                     onClick = { onConversationSelected(conversation.id) },
+                    onArchiveToggle = { onArchiveConversation(conversation.id, !conversation.archived) },
                     onDelete = { onDeleteConversation(conversation.id) },
                 )
             }
@@ -1327,12 +1386,13 @@ private fun SidebarConversationRow(
     selected: Boolean,
     thinking: Boolean,
     deleting: Boolean,
+    archived: Boolean,
     onClick: () -> Unit,
+    onArchiveToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val container = if (selected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent
     // While thinking, the conversation icon pulses in the primary (teal) color.
@@ -1352,88 +1412,76 @@ private fun SidebarConversationRow(
         selected -> MaterialTheme.colorScheme.onSurface
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Surface(
-        onClick = onClick,
-        enabled = !deleting,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        color = container,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        // Drives both the click ripple (now clipped to the rounded shape) and the
-        // `hovered` state below, so no separate .hoverable is needed.
-        interactionSource = interactionSource,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    // Right-click anywhere on the row for the archive/restore + delete actions.
+    ContextMenuArea(
+        items = {
             if (deleting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                emptyList()
             } else {
-                Icon(
-                    imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = if (thinking) "thinking" else null,
-                    tint = iconColor,
-                    modifier = Modifier.size(15.dp),
+                listOf(
+                    ContextMenuItem(if (archived) "Restore chat" else "Archive chat", onArchiveToggle),
+                    ContextMenuItem("Delete chat") { confirmDelete = true },
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (deleting) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            when {
-                deleting -> Text(
-                    text = "Deleting…",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                // Hover (or an open menu) swaps the timestamp for an overflow menu.
-                hovered || menuOpen -> Box {
-                    Icon(
-                        imageVector = Icons.Outlined.MoreVert,
-                        contentDescription = "Conversation menu",
+        },
+    ) {
+        Surface(
+            onClick = onClick,
+            enabled = !deleting,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            color = container,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            // Drives both the click ripple (now clipped to the rounded shape) and the
+            // `hovered` state below, so no separate .hoverable is needed.
+            interactionSource = interactionSource,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when {
+                    deleting -> CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    // On hover the leading icon becomes a one-click archive/restore button.
+                    hovered -> Icon(
+                        imageVector = if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                        contentDescription = if (archived) "Restore chat" else "Archive chat",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .size(16.dp)
-                            .clickable { menuOpen = true },
+                            .size(15.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = onArchiveToggle,
+                            ),
                     )
-                    if (menuOpen) {
-                        JewelPopupMenu(
-                            onDismissRequest = {
-                                menuOpen = false
-                                true
-                            },
-                            horizontalAlignment = Alignment.End,
-                        ) {
-                            selectableItem(
-                                selected = false,
-                                onClick = {
-                                    menuOpen = false
-                                    confirmDelete = true
-                                },
-                            ) {
-                                DesktopControlText("Delete chat")
-                            }
-                        }
-                    }
+                    else -> Icon(
+                        imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = if (thinking) "thinking" else null,
+                        tint = iconColor,
+                        modifier = Modifier.size(15.dp),
+                    )
                 }
-                else -> Text(
-                    text = timeLabel,
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (deleting) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (deleting) "Deleting…" else timeLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

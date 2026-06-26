@@ -321,7 +321,7 @@ class DesktopChatControllerTest {
     fun unavailableBackendShowsOfflineStateWithoutLocalPreview() = runTest {
         val controller = testController(
             object : FakeDesktopChatGateway() {
-                override suspend fun listConversations(limit: Int): List<Conversation> {
+                override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
                     error("backend offline")
                 }
             },
@@ -392,7 +392,7 @@ class DesktopChatControllerTest {
     fun retryConnectionReloadsAfterOfflineFailure() = runTest {
         val gateways = ArrayDeque<DesktopChatGateway>()
         gateways += object : FakeDesktopChatGateway() {
-            override suspend fun listConversations(limit: Int): List<Conversation> {
+            override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
                 error("first backend offline")
             }
         }
@@ -599,7 +599,7 @@ open class FakeDesktopChatGateway(
     val conversationMessageRequests = mutableListOf<String>()
     val agentMessageRequests = mutableListOf<Pair<String, String?>>()
 
-    override suspend fun listConversations(limit: Int): List<Conversation> =
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
         conversationIds.mapIndexed { index, conversationId ->
             Conversation(
                 id = ConversationId(conversationId),
@@ -673,7 +673,7 @@ private class CloseTrackingGateway(
     var closeCount = 0
         private set
 
-    override suspend fun listConversations(limit: Int): List<Conversation> =
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
         listConversationsBlock()
 
     override fun close() {

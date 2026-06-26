@@ -286,17 +286,8 @@ private fun ScheduleHeader(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Schedules", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
             if (canCreate) {
-                Row(
-                    modifier = Modifier
-                        .clip(MaterialTheme.shapes.medium)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .clickable(onClick = onNew)
-                        .padding(horizontal = 16.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Outlined.Add, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("New schedule", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimary)
+                DesktopDefaultButton(onClick = onNew) {
+                    DesktopButtonContent(text = "New schedule", icon = Icons.Outlined.Add)
                 }
             }
         }
@@ -1034,15 +1025,13 @@ private fun CreateScheduleModal(
             val expression = CronBuilder.toExpression(draft)
             val valid = expression != null && name.isNotBlank() && prompt.isNotBlank() && canCreate
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                Text("Cancel", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.clickable(onClick = onDismiss).padding(horizontal = 16.dp, vertical = 8.dp))
+                DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
                 Spacer(Modifier.width(10.dp))
-                Box(
-                    Modifier.clip(RoundedCornerShape(10.dp))
-                        .background(if (valid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable(enabled = valid) { expression?.let { onCreate(name.trim(), prompt.trim(), it) } }
-                        .padding(horizontal = 18.dp, vertical = 9.dp),
+                DesktopDefaultButton(
+                    onClick = { expression?.let { onCreate(name.trim(), prompt.trim(), it) } },
+                    enabled = valid,
                 ) {
-                    Text("Create schedule", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = if (valid) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    DesktopButtonContent(text = "Create schedule")
                 }
             }
             if (!canCreate) {
