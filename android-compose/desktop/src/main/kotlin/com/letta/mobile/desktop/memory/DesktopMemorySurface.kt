@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -121,10 +122,14 @@ fun DesktopMemorySurface(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
-                .padding(horizontal = 28.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .fillMaxHeight(),
         ) {
+            // Header / selector / summary keep their inset; the graph below runs
+            // edge-to-edge so it doesn't waste space.
+            Column(
+                modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
             MemoryHeader(
                 state = state,
                 onRefresh = onRefresh,
@@ -153,8 +158,10 @@ fun DesktopMemorySurface(
                 )
             }
             MemorySummaryCard(state.memory.summary)
-            // The graph is the focus — it takes the remaining height. Memory
-            // blocks stay editable by clicking their graph nodes.
+            }
+            Spacer(Modifier.height(12.dp))
+            // The graph is the focus — it takes the remaining height, flush to the
+            // pane edges. Blocks stay editable by clicking their graph nodes.
             MemoryGraphPanel(
                 graph = state.memory.graph,
                 onBlockNodeClick = { node ->
@@ -162,7 +169,7 @@ fun DesktopMemorySurface(
                         editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
                     }
                 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
             )
         }
 
@@ -308,8 +315,6 @@ private fun MemoryGraphPanel(
     Surface(
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
         modifier = modifier.fillMaxWidth(),
     ) {
         if (graph.isEmpty) {

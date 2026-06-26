@@ -1776,15 +1776,24 @@ private fun ComposerBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    DesktopIconButton(
-                        imageVector = Icons.Outlined.Add,
-                        contentDescription = "Attach",
-                        onClick = onAttachImage,
-                        enabled = enabled,
-                        iconModifier = Modifier.size(18.dp),
-                        modifier = Modifier.size(28.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    // Plain Box button (not Jewel's IconButton, whose own height
+                    // metrics left it misaligned with the Surface chips beside it).
+                    DesktopTooltip(text = "Attach") {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .clickable(enabled = enabled, onClick = onAttachImage),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Add,
+                                contentDescription = "Attach",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     val modelDisplay = modelOptions.firstOrNull { it.second == modelLabel }?.first
                         ?: modelLabel.ifBlank { "Model" }
                     if (onOpenModelPicker != null) {
