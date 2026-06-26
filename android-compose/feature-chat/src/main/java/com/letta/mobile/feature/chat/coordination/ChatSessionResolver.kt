@@ -1,57 +1,39 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.chat.runtime.SharedChatSessionResolver
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
+/**
+ * Android-side adapter over the platform-neutral [SharedChatSessionResolver].
+ *
+ * The conversation-lifecycle resolution itself (agent-name lookup, most-recent
+ * conversation selection, stale-cache refresh) now lives in sharedLogic so
+ * desktop no longer needs its own copy. This class only owns the Android wiring
+ * (the [CoroutineScope] for background refresh comes from the ViewModel) and
+ * delegates every decision to the shared resolver — there is intentionally no
+ * Android-specific behavior here.
+ */
 internal class ChatSessionResolver(
-    private val agentRepository: IAgentRepository,
-    private val conversationRepository: IConversationRepository,
-    private val backgroundRefreshScope: CoroutineScope? = null,
+    agentRepository: IAgentRepository,
+    conversationRepository: IConversationRepository,
+    backgroundRefreshScope: CoroutineScope? = null,
 ) {
-    fun cachedAgentName(agentId: String): String? {
-        return agentRepository.getCachedAgent(AgentId(agentId))
-            ?.name
-            ?.takeIf { it.isNotBlank() }
-    }
+    private val delegate = SharedChatSessionResolver(
+        agentRepository = agentRepository,
+        conversationRepository = conversationRepository,
+        backgroundRefreshScope = backgroundRefreshScope,
+    )
 
-    fun observeCachedAgentName(agentId: String): Flow<String> {
-        return agentRepository.agents
-            .map { agents -> agents.firstOrNull { it.id.value == agentId }?.name.orEmpty() }
-            .distinctUntilChanged()
-    }
+    fun cachedAgentName(agentId: String): String? = delegate.cachedAgentName(agentId)
+
+    fun observeCachedAgentName(agentId: String): Flow<String> =
+        delegate.observeCachedAgentName(agentId)
 
     suspend fun resolveMostRecentConversation(
         agentId: String,
         maxAgeMs: Long,
-    ): String? {
-        mostRecentCachedConversationId(agentId)?.let { cachedConversationId ->
-            if (!conversationRepository.hasFreshConversations(AgentId(agentId), maxAgeMs)) {
-                backgroundRefreshScope?.launch {
-                    runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
-                } ?: runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
-            }
-            return cachedConversationId
-        }
-        conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs)
-        return mostRecentCachedConversationId(agentId)
-    }
-
-    private fun mostRecentCachedConversationId(agentId: String): String? {
-        return conversationRepository.getCachedConversations(AgentId(agentId))
-            .filterNot { it.id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX) }
-            .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
-            .firstOrNull()
-            ?.id
-            ?.value
-    }
-
-    private companion object {
-        const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
-    }
+    ): String? = delegate.resolveMostRecentConversation(agentId, maxAgeMs)
 }
