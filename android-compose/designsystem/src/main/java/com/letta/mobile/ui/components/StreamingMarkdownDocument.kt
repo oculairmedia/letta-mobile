@@ -69,8 +69,19 @@ internal fun StreamingMarkdownDocumentBlock.supportsPlainTextHeightPrediction(
     kind == StreamingMarkdownBlockKind.Paragraph &&
         sourceOverride.isPlainStreamingProse()
 
+private val htmlEntityRegex = Regex("&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);")
+private val inlineMathDelimiterRegex = Regex("\\$[^\\$\\n]+\\$")
+
 private fun String.isPlainStreamingProse(): Boolean {
     if (isBlank()) return false
+    if (contains("http://") || contains("https://") || contains("www.")) return false
+    if (contains("\\#")) return false
+    // Streamed paragraphs containing HTML entities (e.g. &#124;) or inline math
+    // (e.g. $x_i$) must stay on the Markdown rendering path so entity
+    // decoding and the inline-math splitter still run. The plain-Text fast
+    // path would render the literal &#124; or $...$ delimiters.
+    if (htmlEntityRegex.containsMatchIn(this)) return false
+    if (inlineMathDelimiterRegex.containsMatchIn(this)) return false
     return none { char -> char in markdownLayoutChangingChars }
 }
 
@@ -80,7 +91,6 @@ private val markdownLayoutChangingChars = setOf(
     '_',
     '[',
     ']',
-    '#',
     '|',
     '~',
     '<',

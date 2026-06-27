@@ -152,8 +152,32 @@ class StreamingMarkdownDocumentTest {
             state.update("Plain streaming prose.").blocks.single().supportsPlainTextHeightPrediction(),
         )
         assertEquals(
+            true,
+            state.update("#750 likely fixed the stream churn.").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("Already \\#750 likely").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("See https://example.com/#750").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
             false,
             state.update("Here is **bold** text").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("See &#124; for details").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("Math: \$x_i\$ is small").blocks.single().supportsPlainTextHeightPrediction(),
+        )
+        assertEquals(
+            false,
+            state.update("# Heading").blocks.single().supportsPlainTextHeightPrediction(),
         )
         assertEquals(
             false,

@@ -6,6 +6,52 @@ import org.junit.Test
 class UrlAutolinkTest {
 
     @Test
+    fun `escapeBareIssueReferences preserves following character after issue reference`() {
+        assertEquals(
+            "\\#750 likely fixed the stream churn.",
+            escapeBareIssueReferences("#750 likely fixed the stream churn."),
+        )
+        assertEquals(
+            "- \\#746 smooth streaming reveal",
+            escapeBareIssueReferences("- #746 smooth streaming reveal"),
+        )
+    }
+
+    @Test
+    fun `escapeBareIssueReferences leaves headings and protected spans untouched`() {
+        assertEquals("# Heading", escapeBareIssueReferences("# Heading"))
+        assertEquals("## Section", escapeBareIssueReferences("## Section"))
+        assertEquals("Use `#750` likely", escapeBareIssueReferences("Use `#750` likely"))
+        assertEquals("Use ``#750`` literally", escapeBareIssueReferences("Use ``#750`` literally"))
+        assertEquals("[#750](https://example.com) likely", escapeBareIssueReferences("[#750](https://example.com) likely"))
+        assertEquals("Already \\#750 likely", escapeBareIssueReferences("Already \\#750 likely"))
+        assertEquals("https://example.com/#750 likely", escapeBareIssueReferences("https://example.com/#750 likely"))
+        assertEquals("Entity &#124; likely", escapeBareIssueReferences("Entity &#124; likely"))
+        assertEquals("```kotlin\n#750\n", escapeBareIssueReferences("```kotlin\n#750\n"))
+        assertEquals(" ```kotlin\n#750\n````", escapeBareIssueReferences(" ```kotlin\n#750\n````"))
+        assertEquals("```\nclosed\n```\n\n```kotlin\n#750\n", escapeBareIssueReferences("```\nclosed\n```\n\n```kotlin\n#750\n"))
+        assertEquals("    #750", escapeBareIssueReferences("    #750"))
+    }
+
+    @Test
+    fun `escapeBareIssueReferences preserves CRLF offsets across fences and HTML attrs`() {
+        // letta-mobile-pr753 review: StreamingMarkdownDocumentParser normalizes
+        // CRLF -> LF before computing ranges. If we operate on the original
+        // text, the LF-relative ranges can land outside the original indexes
+        // around every \r, so issue refs near the end of CRLF fences or HTML
+        // tag spans get escaped when they shouldn't. The fix normalizes once
+        // and translates escape decisions back to the original CRLF positions.
+        assertEquals(
+            "line one\r\n```kotlin\r\n#750\r\n```\r\nend",
+            escapeBareIssueReferences("line one\r\n```kotlin\r\n#750\r\n```\r\nend"),
+        )
+        assertEquals(
+            "<a href=\"#750\">section</a>",
+            escapeBareIssueReferences("<a href=\"#750\">section</a>"),
+        )
+    }
+
+    @Test
     fun `autolinkBareUrls wraps bare HTTP URLs in markdown link syntax`() {
         val input = "Check out https://example.com for more info"
         val expected = "Check out [https://example.com](https://example.com) for more info"

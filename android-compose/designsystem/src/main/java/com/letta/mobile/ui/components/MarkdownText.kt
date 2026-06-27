@@ -3,6 +3,8 @@ package com.letta.mobile.ui.components
 import com.letta.mobile.ui.theme.LettaCodeFont
 
 import android.util.Patterns
+import java.util.Collections
+import kotlin.collections.sortedSetOf
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -312,6 +314,81 @@ private val displayMathRegex = Regex("\\$\\$([\\s\\S]+?)\\$\\$")
  * - Skips URLs already inside markdown link syntax [text](url)
  * - Skips URLs inside inline code (`...`) and code fences (```...```)
  */
+internal fun escapeBareIssueReferences(text: String): String {
+    if (!text.contains('#')) return text
+    // StreamingMarkdownDocumentParser normalizes CRLF -> LF before computing
+    // code-fence ranges. If we operate on the original CRLF text directly,
+    // those LF-relative ranges can fall outside the original indexes around
+    // every \r (so issue refs near the end of CRLF fences or HTML-attr-like
+    // ranges get escaped when they shouldn't). Normalize once, translate the
+    // escape decisions back to the original CRLF positions, and emit text
+    // that preserves the original line endings.
+    val crlf = text.contains("\r\n")
+    val normalized = if (crlf) text.replace("\r\n", "\n") else text
+    val ignoredRangesNormalized = if (crlf) {
+        findCodeFenceRanges(normalized) +
+            findInlineCodeRanges(normalized) +
+            findMarkdownLinkRanges(normalized) +
+            findBareUrlRanges(normalized) +
+            findHtmlEntityRanges(normalized) +
+            findIndentedCodeBlockRanges(normalized) +
+            findRawHtmlTagRanges(normalized)
+    } else {
+        findCodeFenceRanges(text) +
+            findInlineCodeRanges(text) +
+            findMarkdownLinkRanges(text) +
+            findBareUrlRanges(text) +
+            findHtmlEntityRanges(text) +
+            findIndentedCodeBlockRanges(text) +
+            findRawHtmlTagRanges(text)
+    }
+    // Decide escape positions in normalized coordinates, then translate to
+    // original indices by skipping the \r that precedes every \n.
+    val escapeAt = sortedSetOf<Int>()
+    var index = 0
+    while (index < normalized.length) {
+        val char = normalized[index]
+        if (
+            char == '#' &&
+            index + 1 < normalized.length &&
+            normalized[index + 1].isDigit() &&
+            (index == 0 || normalized[index - 1] != '\\') &&
+            ignoredRangesNormalized.none { index in it }
+        ) {
+            escapeAt.add(index)
+        }
+        index++
+    }
+    if (escapeAt.isEmpty()) return text
+    val result = StringBuilder(text.length)
+    var normIndex = 0
+    var origIndex = 0
+    val escapeSet = escapeAt
+    while (origIndex < text.length) {
+        if (normIndex in escapeSet) {
+            // Emit "\\#" and advance past the original '#'.
+            result.append("\\#")
+            normIndex += 1
+            origIndex += 1
+        } else {
+            // CRLF: when we've already emitted the '\r' via the previous
+            // escape branch's pair-emit, skip it here so we don't double it.
+            // The original char at origIndex was the '\r' that precedes the '\n'
+            // the normalized index is about to consume.
+            if (crlf && origIndex + 1 < text.length && text[origIndex] == '\r' && text[origIndex + 1] == '\n') {
+                result.append('\r').append('\n')
+                origIndex += 2
+                normIndex += 1
+            } else {
+                result.append(text[origIndex])
+                origIndex += 1
+                normIndex += 1
+            }
+        }
+    }
+    return result.toString()
+}
+
 internal fun autolinkBareUrls(text: String): String {
     // Quick bail-out if no URL-like patterns exist
     if (!text.contains("http://") && !text.contains("https://") && !text.contains("www.")) {
@@ -419,17 +496,17 @@ private fun stripTrailingPunctuation(url: String): String {
     return cleaned
 }
 
-private val codeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
-private val inlineCodeRegex = Regex("`[^`\n]+?`")
+private val inlineCodeRegex = Regex("(`+)([\\s\\S]*?)\\1")
 private val markdownLinkRegex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
+private val htmlEntityRegex = Regex("&(?:#[0-9]+|#x[0-9A-Fa-f]+|[A-Za-z][A-Za-z0-9]+);")
+private val indentedCodeBlockRegex = Regex("""(?m)^(?: {4}|\t).*""")
+private val rawHtmlTagRegex = Regex("<[A-Za-z][^>]*>")
 
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {
-    val ranges = mutableListOf<IntRange>()
-    for (match in codeFenceRegex.findAll(text)) {
-        ranges.add(match.range)
-    }
-    return ranges
+    return StreamingMarkdownDocumentParser.parse(text)
+        .filter { it.kind == StreamingMarkdownBlockKind.CodeFence }
+        .map { it.startOffset until (it.startOffset + it.source.length) }
 }
 
 /** Find ranges of inline code (`...`) to exclude from URL linkification. */
@@ -451,6 +528,40 @@ private fun findMarkdownLinkRanges(text: String): List<IntRange> {
     return ranges
 }
 
+/** Find bare URL ranges so URL fragments like #section or #123 are not escaped. */
+private fun findBareUrlRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    val urlMatcher = Patterns.WEB_URL.matcher(text)
+    while (urlMatcher.find()) {
+        ranges.add(urlMatcher.start() until urlMatcher.end())
+    }
+    return ranges
+}
+
+private fun findHtmlEntityRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    for (match in htmlEntityRegex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
+private fun findIndentedCodeBlockRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    for (match in indentedCodeBlockRegex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
+private fun findRawHtmlTagRanges(text: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    for (match in rawHtmlTagRegex.findAll(text)) {
+        ranges.add(match.range)
+    }
+    return ranges
+}
+
 private val a2uiJsonTagRegex = Regex(
     pattern = """<a2ui-json\b[^>]*>([\s\S]*?)</a2ui-json>""",
     options = setOf(RegexOption.IGNORE_CASE),
@@ -464,7 +575,7 @@ private fun MarkdownTextRaw(
     textColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     // Auto-linkify bare URLs before passing to the markdown renderer
-    val linkedText = remember(text) { autolinkBareUrls(text) }
+    val linkedText = remember(text) { autolinkBareUrls(escapeBareIssueReferences(text)) }
     val fontScale = LocalChatFontScale.current
     val isDarkTheme = isSystemInDarkTheme()
 
