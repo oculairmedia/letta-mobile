@@ -3,7 +3,9 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import computer.iroh.Endpoint
+import computer.iroh.EndpointAddr
 import computer.iroh.EndpointOptions
+import computer.iroh.EndpointTicket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -16,16 +18,40 @@ class IrohNodeEndpoint(
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
 
-    fun nodeIdHex(): String {
+    /**
+     * Returns the full EndpointAddr (node ID + relay + direct addresses).
+     * This is the canonical dialable address for this endpoint.
+     */
+    fun addr(): EndpointAddr {
         val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
-        val addr = ep.addr()
-        return addr.toString()
+        return ep.addr()
+    }
+
+    /**
+     * Returns the node ID as a hex string (64 hex characters = 32 bytes).
+     */
+    fun nodeIdHex(): String {
+        val endpointAddr = addr()
+        val nodeIdBytes = endpointAddr.id().toBytes()
+        return nodeIdBytes.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Returns a serialized iroh ticket string that encodes the full endpoint address
+     * (node ID + relay URL + direct addresses). This can be parsed back into an
+     * EndpointAddr for dialing.
+     */
+    fun ticketString(): String {
+        val endpointAddr = addr()
+        val ticket = EndpointTicket.Companion.fromAddr(endpointAddr)
+        return ticket.toString()
     }
 
     fun asAppServerEndpoint(): AppServerEndpoint {
+        // Use the ticket format which includes direct addresses, so loopback works
         return AppServerEndpoint(
             scheme = "iroh",
-            address = nodeIdHex(),
+            address = ticketString(),
             bearerToken = null,
         )
     }

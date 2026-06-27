@@ -35,14 +35,25 @@ class IrohNodeEndpointTest {
             val endpoint = IrohNodeEndpoint(alpn, scope)
             endpoint.create()
 
+            // Verify the node ID is available as a hex string
             val nodeIdHex = endpoint.nodeIdHex()
             assertNotNull(nodeIdHex)
             assertTrue(nodeIdHex.isNotEmpty())
             assertTrue(nodeIdHex.matches(Regex("^[0-9a-f]{64}$")))
 
+            // Verify the endpoint is exposed as an AppServerEndpoint with an iroh ticket
             val appServerEndpoint = endpoint.asAppServerEndpoint()
             assertEquals("iroh", appServerEndpoint.scheme)
-            assertEquals(nodeIdHex, appServerEndpoint.address)
+            assertNotNull(appServerEndpoint.address)
+            assertTrue(appServerEndpoint.address.isNotEmpty())
+            
+            // The address should be a ticket (not a bare hex ID), which can be parsed
+            val ticket = computer.iroh.EndpointTicket.Companion.fromString(appServerEndpoint.address)
+            val endpointAddr = ticket.endpointAddr()
+            
+            // Verify the ticket contains the correct node ID
+            val ticketNodeIdHex = endpointAddr.id().toBytes().joinToString("") { "%02x".format(it) }
+            assertEquals(nodeIdHex, ticketNodeIdHex)
 
             endpoint.shutdown()
         } finally {
@@ -59,17 +70,13 @@ class IrohNodeEndpointTest {
             serverEndpoint.create()
             serverEndpoint.start(mockController)
 
-            val serverAddr = serverEndpoint.asAppServerEndpoint()
+            // For loopback connections, use the full EndpointAddr which includes
+            // direct addresses. This is what the working IrohLoopbackRoundTripTest does.
+            val serverAddr = serverEndpoint.addr()
             val clientEndpoint = Endpoint.bind(EndpointOptions())
             try {
-                val nodeIdBytes = serverAddr.address.chunked(2)
-                    .map { it.toInt(16).toByte() }
-                    .toByteArray()
-                val endpointId = computer.iroh.EndpointId.fromBytes(nodeIdBytes)
-                val remoteAddr = computer.iroh.EndpointAddr(endpointId, null, emptyList())
-
                 withTimeout(10_000L) {
-                    val connection = clientEndpoint.connect(remoteAddr, alpn)
+                    val connection = clientEndpoint.connect(serverAddr, alpn)
                     assertNotNull(connection)
                     val bi = connection.openBi()
                     assertNotNull(bi)

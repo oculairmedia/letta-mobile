@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerTransportRegistry
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointId
+import computer.iroh.EndpointTicket
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -70,28 +71,33 @@ class IrohAppServerTransportAdapter(
      * Parses an iroh address from the endpoint address string.
      * 
      * Supported formats:
-     * - Hex-encoded node ID (64 hex chars = 32 bytes)
-     * - Future: iroh ticket format
+     * - Iroh ticket (includes node ID + relay + direct addresses) - PREFERRED for loopback
+     * - Hex-encoded node ID (64 hex chars = 32 bytes) - requires relay/discovery
      */
     private fun parseIrohAddress(address: String): EndpointAddr {
-        // Try to parse as hex node ID
-        if (address.matches(Regex("^[0-9a-fA-F]{64}$"))) {
-            // Decode hex to bytes
-            val nodeIdBytes = address.chunked(2)
-                .map { it.toInt(16).toByte() }
-                .toByteArray()
-            
-            val endpointId = EndpointId.fromBytes(nodeIdBytes)
-            // EndpointAddr constructor takes just the ID, with no relay/direct addrs
-            return EndpointAddr(endpointId, null, emptyList())
+        // First, try to parse as an iroh ticket (which includes direct addresses)
+        // This is the preferred format for loopback connections.
+        if (!address.matches(Regex("^[0-9a-fA-F]{64}$"))) {
+            try {
+                val ticket = EndpointTicket.Companion.fromString(address)
+                return ticket.endpointAddr()
+            } catch (e: Exception) {
+                throw IllegalArgumentException(
+                    "Invalid iroh address: '$address'. Expected either an iroh ticket or 64 hex characters (node ID).",
+                    e
+                )
+            }
         }
         
-        // If not a simple hex ID, try parsing as iroh ticket/addr format
-        // For now, we'll assume it's a node ID and throw if invalid
-        throw IllegalArgumentException(
-            "Invalid iroh address: '$address'. Expected 64 hex characters (node ID). " +
-            "Example: 'd6dfd712061fd55bdfc4c1c6e6e7ed8c8f8f9a5a2e8e8e8e8e8e8e8e8e8e8e8e'"
-        )
+        // Fall back to parsing as a bare hex node ID (no direct addresses)
+        // This requires relay/discovery to work and will NOT work for loopback.
+        val nodeIdBytes = address.chunked(2)
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
+        
+        val endpointId = EndpointId.fromBytes(nodeIdBytes)
+        // EndpointAddr constructor takes just the ID, with no relay/direct addrs
+        return EndpointAddr(endpointId, null, emptyList())
     }
 
     companion object {

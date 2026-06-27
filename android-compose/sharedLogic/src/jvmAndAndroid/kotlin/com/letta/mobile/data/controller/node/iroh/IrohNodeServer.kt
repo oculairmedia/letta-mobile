@@ -15,10 +15,9 @@ class IrohNodeServer(
     private var started = false
 
     override suspend fun advertise(): NodeIdentity {
-        val irohAppServerEndpoint = irohEndpoint.asAppServerEndpoint()
-        return baseIdentity.copy(
-            endpoints = baseIdentity.endpoints + irohAppServerEndpoint,
-        )
+        // The base identity already includes the iroh endpoint,
+        // so just return it as-is
+        return baseIdentity
     }
 
     override suspend fun hostedRuntimes(): List<CanonicalRuntime> {
@@ -44,14 +43,16 @@ class IrohNodeServer(
             scope: CoroutineScope,
             alpn: ByteArray = IrohNodeEndpoint.DEFAULT_ALPN,
         ): IrohNodeServer = runBlocking {
+            // Create the iroh endpoint first
+            val irohEndpoint = IrohNodeEndpoint(alpn, scope)
+            irohEndpoint.create()
+
+            // Create the base identity with the iroh endpoint
             val baseIdentity = NodeIdentity(
                 id = id,
                 displayName = displayName,
-                endpoints = emptySet(),
+                endpoints = setOf(irohEndpoint.asAppServerEndpoint()),
             )
-
-            val irohEndpoint = IrohNodeEndpoint(alpn, scope)
-            irohEndpoint.create()
 
             IrohNodeServer(baseIdentity, controller, irohEndpoint)
         }
