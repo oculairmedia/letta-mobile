@@ -41,6 +41,11 @@ class DesktopChatController(
     },
     private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
     private val agentModelByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
+    // The backend doesn't yet persist a conversation's archived flag, so we keep a
+    // local, durable record of archived ids and overlay it on every load. Still
+    // PATCHes the server so this lights up automatically once the backend lands.
+    private val loadArchivedConversationIds: () -> Set<String> = { emptySet() },
+    private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
     private val loopFactory: (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
@@ -59,6 +64,21 @@ class DesktopChatController(
 
     private val _availableModels = MutableStateFlow<List<LlmModel>>(emptyList())
     val availableModels: StateFlow<List<LlmModel>> = _availableModels.asStateFlow()
+
+    /** Active / Archived / All filter for the conversation list (re-fetches). */
+    private val _archiveFilter = MutableStateFlow(ConversationArchiveFilter.Active)
+    val archiveFilter: StateFlow<ConversationArchiveFilter> = _archiveFilter.asStateFlow()
+
+    /**
+     * A freshly-created conversation the user hasn't sent anything to yet. We
+     * auto-remove it when they navigate away or spin up another, so accidental
+     * "New chat" taps don't spam the history. Cleared the moment a message is
+     * sent into it.
+     */
+    private var unsentConversationId: String? = null
+
+    /** Locally-tracked archived conversation ids (durable; see constructor note). */
+    private var locallyArchivedIds: Set<String> = loadArchivedConversationIds()
 
     /** Conversations whose delete is in flight — the sidebar shows a spinner. */
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
@@ -215,6 +235,7 @@ class DesktopChatController(
 
     fun selectConversation(conversationId: String) {
         if (closed) return
+        cleanupUnsentConversation(except = conversationId)
         var generation: Long? = null
         var shouldLoadRemote = false
         _state.update { current ->
@@ -238,6 +259,7 @@ class DesktopChatController(
 
     fun deleteConversation(conversationId: String) {
         if (closed) return
+        if (conversationId == unsentConversationId) unsentConversationId = null
         if (conversationId in _deletingConversationIds.value) return
         scope.launch {
             val nextGateway = gateway ?: return@launch
@@ -292,7 +314,15 @@ class DesktopChatController(
         }
         scope.launch {
             try {
+                // Drop the previous untouched chat first so the reload below
+                // doesn't surface it (and it never piles up in the history).
+                val priorUnsent = unsentConversationId
+                unsentConversationId = null
+                if (priorUnsent != null) {
+                    runCatching { httpGateway?.deleteConversation(priorUnsent) }
+                }
                 val created = httpGateway?.createConversation(agentId) ?: return@launch
+                unsentConversationId = created.id.value
                 reloadConversationsAndSelect(preferConversationId = created.id.value)
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -301,6 +331,31 @@ class DesktopChatController(
                     it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not create chat")
                 }
             }
+        }
+    }
+
+    /**
+     * Remove the pending unsent conversation when the user moves off it without
+     * sending. [except] keeps it alive when that conversation is the one being
+     * navigated *to* (e.g. re-selecting it). Server-side these should be
+     * hard-deleted, not archived — there is nothing to recover.
+     */
+    private fun cleanupUnsentConversation(except: String?) {
+        val pending = unsentConversationId ?: return
+        if (pending == except) return
+        unsentConversationId = null
+        val gw = gateway ?: return
+        scope.launch {
+            runCatching { gw.deleteConversation(pending) }
+                .onSuccess {
+                    if (!closed) {
+                        _state.update {
+                            it.withRuntimeState(
+                                ChatSessionReducer.conversationDeleted(it.runtimeState, pending),
+                            )
+                        }
+                    }
+                }
         }
     }
 
@@ -358,6 +413,41 @@ class DesktopChatController(
                         it.copy(errorMessage = t.message ?: "Could not change model")
                     }
                 }
+        }
+    }
+
+    /** Switch the conversation list between Active / Archived / All (display-only). */
+    fun setArchiveFilter(filter: ConversationArchiveFilter) {
+        if (closed) return
+        _archiveFilter.value = filter
+    }
+
+    /**
+     * Archive (non-destructive, recoverable) or restore a conversation, then
+     * re-list so it leaves/joins the current filter view. Selection is preserved
+     * when the affected conversation isn't the one being archived away.
+     */
+    fun setConversationArchived(conversationId: String, archived: Boolean) {
+        if (closed) return
+        // Update the durable local record + the visible flag immediately so the row
+        // leaves/joins the filtered list right away (the server flag is a no-op today).
+        locallyArchivedIds = if (archived) locallyArchivedIds + conversationId else locallyArchivedIds - conversationId
+        persistArchivedConversationIds(locallyArchivedIds)
+        _state.update { current ->
+            val runtime = current.runtimeState
+            current.withRuntimeState(
+                runtime.copy(
+                    conversations = runtime.conversations.map {
+                        if (it.id == conversationId) it.copy(archived = archived) else it
+                    },
+                ),
+            )
+        }
+        // Forward-compatible: tell the server too, so this becomes authoritative
+        // once the backend persists `archived`. A failure here doesn't undo the
+        // local archive — that's the source of truth for now.
+        scope.launch {
+            runCatching { httpGateway?.setConversationArchived(conversationId, archived) }
         }
     }
 
@@ -427,6 +517,10 @@ class DesktopChatController(
         }
 
         val sendingConversationId = _state.value.selectedConversationId
+        // This conversation now has content — it's no longer a throwaway.
+        if (sendingConversationId != null && sendingConversationId == unsentConversationId) {
+            unsentConversationId = null
+        }
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
@@ -537,10 +631,14 @@ class DesktopChatController(
      */
     private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
         val nextGateway = gateway ?: return
-        val conversations = nextGateway.listConversations()
+        // Fetch every conversation (active + archived, newest first); the UI filters
+        // the displayed list by [archiveFilter] so switching is instant and the
+        // rail stays stable.
+        val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
         val summaries = conversations.toChatConversationSummaries(agentNamesById)
+            .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
         if (closed) return
         val loadedRuntime = ChatSessionReducer.conversationsLoaded(
             state = _state.value.runtimeState,
@@ -650,6 +748,13 @@ class DesktopChatController(
             )
         }
     }
+}
+
+/** Conversation-list scope filter, mapped to the `archive_status` query param. */
+enum class ConversationArchiveFilter(val apiValue: String, val label: String) {
+    Active("active", "Active"),
+    Archived("archived", "Archived"),
+    All("all", "All"),
 }
 
 private fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {

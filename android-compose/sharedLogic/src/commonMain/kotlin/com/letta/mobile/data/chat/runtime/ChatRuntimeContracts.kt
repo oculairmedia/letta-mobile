@@ -27,6 +27,7 @@ data class ChatConversationSummary(
     val lastMessagePreview: String,
     val unreadCount: Int = 0,
     val agentId: String? = null,
+    val archived: Boolean = false,
 )
 
 @Immutable
@@ -83,6 +84,7 @@ fun Conversation.toChatConversationSummary(
         updatedAtLabel = updatedLabel,
         lastMessagePreview = "Loaded from backend",
         agentId = agentIdValue,
+        archived = archived == true,
     )
 }
 

@@ -13,9 +13,12 @@ import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,6 +36,9 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Build
+import androidx.compose.foundation.ContextMenuArea
+import androidx.compose.foundation.ContextMenuItem
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
@@ -43,6 +49,7 @@ import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -103,8 +110,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
@@ -118,6 +127,8 @@ import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
+import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
+import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
@@ -152,6 +163,7 @@ import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 private const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
+private const val ARCHIVED_CONVERSATION_IDS_KEY = "conversations.archived_ids"
 
 @Composable
 fun LettaDesktopApp(
@@ -159,6 +171,9 @@ fun LettaDesktopApp(
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     var showNewAgentDialog by remember { mutableStateOf(false) }
+    // Avatar styles chosen via the editor this session, applied immediately to the
+    // orbs regardless of whether the backend round-trips agent metadata.
+    var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
     var editAgentId by remember { mutableStateOf<String?>(null) }
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
@@ -208,6 +223,17 @@ fun LettaDesktopApp(
                     model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
                 }
                 resolved
+            },
+            loadArchivedConversationIds = {
+                secureSettingsStore.getString(ARCHIVED_CONVERSATION_IDS_KEY)
+                    ?.split(',')
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?.toSet()
+                    ?: emptySet()
+            },
+            persistArchivedConversationIds = { ids ->
+                secureSettingsStore.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
             },
         )
     }
@@ -400,21 +426,50 @@ fun LettaDesktopApp(
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
     // Distinct agents (by id, since many agents share a display name) that have
-    // conversations — these are the rail orbs. Conversations in the sidebar are
-    // filtered to the currently-selected agent only.
+    // conversations — these are the rail orbs. Same-named agents are stacked in
+    // the rail, and the sidebar lists the whole stack's conversations together.
+    // Ordered most-recent-first so each stack's "first" member (the click/open
+    // fallback) is the one with the most recent conversation, not just first-seen.
     val railAgents = remember(chatState.conversations) {
         chatState.conversations
+            .sortedByDescending { conversationRecency(it.updatedAtLabel) }
             .filter { !it.agentId.isNullOrBlank() }
             .distinctBy { it.agentId }
             .map { it.agentId!! to it.agentName }
     }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
-    val selectedAgentOrbIndex = railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
+    // Per-agent avatar-style override chosen in the editor (stored in agent
+    // metadata). Re-derived whenever the roster changes — which includes the
+    // post-save reload — so a freshly-saved icon is reflected on the orbs.
+    // Agents without an override fall back to their position-derived colour.
+    val cachedAvatarStyles = remember(railAgents) {
+        railAgents.mapNotNull { (id, _) ->
+            secureSettingsStore.getString(agentAvatarStyleKey(id))?.toIntOrNull()?.let { id to it }
+        }.toMap()
+    }
+    // Session overrides win over the cached/backend value so a just-saved icon
+    // shows instantly.
+    val avatarStyleByAgentId = cachedAvatarStyles + avatarOverrides
+    val selectedAgentOrbIndex = avatarStyleByAgentId[selectedAgentId]
+        ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
         ?: chatState.selectedConversation?.agentName ?: "Letta"
-    val agentConversations = remember(chatState.conversations, selectedAgentId) {
-        chatState.conversations.filter { it.agentId == selectedAgentId }
+    // List every conversation across the selected stack (all agents sharing the
+    // display name), newest first — so the "Letta Code" stack shows all its
+    // spawns' conversations in one time-ordered list rather than just one agent's.
+    val archiveFilter by chatController.archiveFilter.collectAsState()
+    val agentConversations = remember(chatState.conversations, selectedAgentName, archiveFilter) {
+        chatState.conversations
+            .filter { it.agentName == selectedAgentName }
+            .filter { c ->
+                when (archiveFilter) {
+                    ConversationArchiveFilter.Active -> !c.archived
+                    ConversationArchiveFilter.Archived -> c.archived
+                    ConversationArchiveFilter.All -> true
+                }
+            }
+            .sortedByDescending { conversationRecency(it.updatedAtLabel) }
     }
     // @mention candidates: other agents + the focused agent's memory blocks.
     // (Files need a client-side index — tracked as a follow-up.)
@@ -527,9 +582,11 @@ fun LettaDesktopApp(
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
                     agents = railAgents,
+                    avatarStyleByAgentId = avatarStyleByAgentId,
                     selectedAgentId = selectedAgentId,
                     thinkingAgentId = thinkingAgentId,
                     onAgentSelected = { agentId ->
+                        editAgentId = null
                         chatState.conversations
                             .firstOrNull { it.agentId == agentId }
                             ?.let { chatController.selectConversation(it.id) }
@@ -537,7 +594,6 @@ fun LettaDesktopApp(
                     },
                     onNewSession = { showNewAgentDialog = true },
                     onSearch = { showCommandPalette = true },
-                    onSettings = { selectedDestination = DesktopDestination.Settings },
                 )
                 RailDivider()
                 // Agent sidebar: agent header + nav + conversations.
@@ -548,16 +604,21 @@ fun LettaDesktopApp(
                     selectedConversationId = chatState.selectedConversationId,
                     thinkingConversationId = thinkingConversationId,
                     deletingConversationIds = deletingConversationIds,
+                    archiveFilter = archiveFilter,
+                    onArchiveFilterChange = chatController::setArchiveFilter,
+                    onArchiveConversation = chatController::setConversationArchived,
                     selectedDestination = selectedDestination,
                     mode = workPlayMode,
                     onModeChange = { workPlayMode = it },
-                    onDestinationSelected = { selectedDestination = it },
+                    onDestinationSelected = { editAgentId = null; selectedDestination = it },
                     onConversationSelected = {
+                        editAgentId = null
                         chatController.selectConversation(it)
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onDeleteConversation = chatController::deleteConversation,
                     onNewChat = {
+                        editAgentId = null
                         selectedDestination = DesktopDestination.Conversations
                         chatController.createConversation()
                     },
@@ -566,7 +627,26 @@ fun LettaDesktopApp(
                 RailDivider()
                 // Main content pane.
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    if (selectedDestination == DesktopDestination.Conversations) {
+                    val editing = editAgentId
+                    if (editing != null) {
+                        DesktopEditAgentSurface(
+                            agentId = editing,
+                            modelOptions = modelOptions,
+                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                            blockApi = blockApi,
+                            settings = secureSettingsStore,
+                            scope = chatScope,
+                            onClose = { editAgentId = null },
+                            onSaved = { style, nameChanged ->
+                                avatarOverrides = avatarOverrides + (editing to style)
+                                editAgentId = null
+                                // Only a name change is visible in the rail/sidebar,
+                                // so skip the heavy reconnect otherwise.
+                                if (nameChanged) chatController.retryConnection()
+                            },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (selectedDestination == DesktopDestination.Conversations) {
                         val composerCommands = buildList {
                             add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
                             add(ComposerCommand("agent", "Create a new agent") { showNewAgentDialog = true })
@@ -772,20 +852,8 @@ fun LettaDesktopApp(
                     onDismiss = { showCommandPalette = false },
                 )
             }
-            val editingAgentId = editAgentId
-            if (editingAgentId != null) {
-                EditAgentDialog(
-                    agentId = editingAgentId,
-                    modelOptions = modelOptions,
-                    agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                    scope = chatScope,
-                    onDismiss = { editAgentId = null },
-                    onSaved = {
-                        editAgentId = null
-                        chatController.retryConnection()
-                    },
-                )
-            }
+            // Edit agent is now a full-page surface in the main content pane
+            // (see DesktopEditAgentSurface), not a modal overlay.
             if (showNewAgentDialog) {
                 NewAgentDialog(
                     modelOptions = modelOptions,
@@ -865,9 +933,8 @@ private fun NewAgentDialog(
                 )
                 Box {
                     Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { modelMenuOpen = true },
+                        onClick = { modelMenuOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -911,137 +978,15 @@ private fun NewAgentDialog(
 }
 
 /**
- * Modal for editing an existing agent: name, model, and system prompt, applied
- * via the real agent repository (PATCH /v1/agents/{id}).
+ * Sort key for a conversation's relative-time label. Real ISO timestamps sort by
+ * recency; the local "Queued" placeholder floats to the top (it's a just-sent
+ * message), while any other unparseable label (e.g. "Remote" — a conversation
+ * with no activity timestamp at all) sorts to the bottom rather than being
+ * treated as newest, since the stores already return rows in recency order.
  */
-@Composable
-private fun EditAgentDialog(
-    agentId: String,
-    modelOptions: List<Pair<String, String>>,
-    agentRepository: IAgentRepository,
-    scope: CoroutineScope,
-    onDismiss: () -> Unit,
-    onSaved: () -> Unit,
-) {
-    var name by remember(agentId) { mutableStateOf(TextFieldValue("")) }
-    var modelValue by remember(agentId) { mutableStateOf<String?>(null) }
-    var system by remember(agentId) { mutableStateOf("") }
-    var modelMenuOpen by remember { mutableStateOf(false) }
-    var loading by remember(agentId) { mutableStateOf(true) }
-    var busy by remember(agentId) { mutableStateOf(false) }
-    var error by remember(agentId) { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(agentId) {
-        val agent = agentRepository.getCachedAgent(agentId)
-            ?: runCatching { agentRepository.getAgent(agentId).first() }.getOrNull()
-        if (agent != null) {
-            name = TextFieldValue(agent.name)
-            modelValue = agent.model
-            system = agent.system.orEmpty()
-        } else {
-            error = "Could not load agent"
-        }
-        loading = false
-    }
-    val modelLabel = modelOptions.firstOrNull { it.second == modelValue }?.first
-        ?: modelValue ?: "Default"
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f))
-            .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier.width(480.dp).clickable(enabled = false) {},
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Column(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Text(
-                    text = "Edit agent",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (loading) {
-                    Text("Loading…", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Text("Name", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    JewelTextField(value = name, onValueChange = { name = it }, modifier = Modifier.fillMaxWidth())
-
-                    Text("Model", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Box {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().clickable { modelMenuOpen = true },
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurface,
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(modelLabel, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                                Icon(Icons.Outlined.KeyboardArrowDown, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        if (modelMenuOpen) {
-                            JewelPopupMenu(onDismissRequest = { modelMenuOpen = false; true }, horizontalAlignment = Alignment.Start) {
-                                modelOptions.forEach { (label, value) ->
-                                    selectableItem(selected = modelValue == value, onClick = { modelMenuOpen = false; modelValue = value }) {
-                                        DesktopControlText(label)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Text("System prompt", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    DesktopTextArea(
-                        value = system,
-                        onValueChange = { system = it },
-                        enabled = !busy,
-                        modifier = Modifier.fillMaxWidth().height(200.dp),
-                        placeholder = "System prompt…",
-                    )
-                }
-                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                ) {
-                    DesktopOutlinedButton(onClick = onDismiss, enabled = !busy) { DesktopButtonContent("Cancel") }
-                    DesktopDefaultButton(
-                        onClick = {
-                            busy = true; error = null
-                            scope.launch {
-                                runCatching {
-                                    agentRepository.updateAgent(
-                                        AgentId(agentId),
-                                        AgentUpdateParams(
-                                            name = name.text.trim().takeIf { it.isNotBlank() },
-                                            model = modelValue,
-                                            system = system.takeIf { it.isNotBlank() },
-                                        ),
-                                    )
-                                }
-                                    .onSuccess { onSaved() }
-                                    .onFailure { error = it.message ?: "Save failed"; busy = false }
-                            }
-                        },
-                        enabled = !busy && !loading,
-                    ) { DesktopButtonContent(if (busy) "Saving…" else "Save") }
-                }
-            }
-        }
-    }
-}
+private fun conversationRecency(label: String): java.time.Instant =
+    runCatching { java.time.Instant.parse(label) }.getOrNull()
+        ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
 
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
@@ -1099,13 +1044,21 @@ private fun ThinkingRing(
 @Composable
 private fun DesktopAgentRail(
     agents: List<Pair<String, String>>,
+    avatarStyleByAgentId: Map<String, Int>,
     selectedAgentId: String?,
     thinkingAgentId: String?,
     onAgentSelected: (String) -> Unit,
     onNewSession: () -> Unit,
     onSearch: () -> Unit,
-    onSettings: () -> Unit,
 ) {
+    // Collapse agents that share a display name — e.g. the many ephemeral
+    // "Letta Code" agents spawned per task — into a single stacked orb with a
+    // count chip, so the rail doesn't grow unbounded with near-duplicate spawns.
+    // Order follows first appearance in [agents].
+    val groups = remember(agents) {
+        agents.groupBy { it.second }
+            .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
+    }
     Column(
         modifier = Modifier
             .width(56.dp)
@@ -1119,7 +1072,8 @@ private fun DesktopAgentRail(
             Box(
                 modifier = Modifier
                     .size(28.dp)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(onClick = onNewSession),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1132,48 +1086,94 @@ private fun DesktopAgentRail(
             }
         }
         Spacer(Modifier.height(8.dp))
-        agents.forEachIndexed { index, (agentId, name) ->
-            val selected = agentId == selectedAgentId
-            val thinking = agentId == thinkingAgentId
-            DesktopTooltip(text = if (thinking) "$name · thinking…" else name) {
-                Box(
-                    modifier = Modifier.size(width = 46.dp, height = 40.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .size(width = 3.dp, height = 28.dp)
-                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
-                        )
-                    }
-                    if (thinking) {
-                        ThinkingRing(diameter = 44.dp, cornerRadius = 10.dp)
-                    }
-                    AgentOrb(
-                        index = index,
-                        size = 36.dp,
-                        modifier = Modifier.clickable { onAgentSelected(agentId) },
+        // The agent list scrolls so a long roster never pushes the bottom
+        // actions (search/settings/account) off-screen.
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            groups.forEachIndexed { index, group ->
+                val selected = selectedAgentId != null && selectedAgentId in group.agentIds
+                val thinking = thinkingAgentId != null && thinkingAgentId in group.agentIds
+                val count = group.agentIds.size
+                // Clicking a stack opens its already-selected member if one is
+                // selected, otherwise its first (most-recent) member.
+                val targetAgentId = group.agentIds.firstOrNull { it == selectedAgentId } ?: group.agentIds.first()
+                // Use the stack member's saved avatar style if any set one,
+                // otherwise the position-derived colour.
+                val orbStyle = group.agentIds.firstNotNullOfOrNull { avatarStyleByAgentId[it] } ?: index
+                val tooltip = buildString {
+                    append(group.name)
+                    if (count > 1) append(" · $count agents")
+                    if (thinking) append(" · thinking…")
+                }
+                DesktopTooltip(text = tooltip) {
+                    Box(
+                        modifier = Modifier.size(width = 46.dp, height = 40.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            text = name.firstOrNull()?.uppercase() ?: "?",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                        )
+                        if (selected) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .size(width = 3.dp, height = 28.dp)
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+                            )
+                        }
+                        if (thinking) {
+                            // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
+                            // and sized to fit the 40dp slot so it doesn't crowd
+                            // neighbouring orbs.
+                            ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
+                        }
+                        AgentOrb(
+                            index = orbStyle,
+                            size = 36.dp,
+                            onClick = { onAgentSelected(targetAgentId) },
+                        ) {
+                            Text(
+                                text = group.name.firstOrNull()?.uppercase() ?: "?",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
+                            )
+                        }
+                        if (count > 1) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .defaultMinSize(minWidth = 19.dp, minHeight = 19.dp)
+                                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+                                    .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = if (count > 99) "99+" else count.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
 
-        Spacer(Modifier.weight(1f))
-
         RailActionIcon(Icons.Outlined.Search, "Search", onSearch)
-        RailActionIcon(Icons.Outlined.Settings, "Settings", onSettings)
-        RailActionIcon(Icons.Outlined.AccountCircle, "Account", onSettings)
     }
 }
+
+/** A rail entry: one or more agents that share a display name, stacked together. */
+private data class AgentRailGroup(
+    val name: String,
+    val agentIds: List<String>,
+)
 
 @Composable
 private fun RailActionIcon(
@@ -1185,6 +1185,7 @@ private fun RailActionIcon(
         Box(
             modifier = Modifier
                 .size(34.dp)
+                .clip(CircleShape)
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
@@ -1211,6 +1212,9 @@ private fun DesktopAgentSidebar(
     selectedConversationId: String?,
     thinkingConversationId: String?,
     deletingConversationIds: Set<String> = emptySet(),
+    archiveFilter: ConversationArchiveFilter,
+    onArchiveFilterChange: (ConversationArchiveFilter) -> Unit,
+    onArchiveConversation: (id: String, archived: Boolean) -> Unit,
     selectedDestination: DesktopDestination,
     mode: WorkPlayMode,
     onModeChange: (WorkPlayMode) -> Unit,
@@ -1240,16 +1244,27 @@ private fun DesktopAgentSidebar(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.padding(start = 2.dp, bottom = 16.dp),
         ) {
-            AgentOrb(index = agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
-            Text(
-                text = agentName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            // Tapping the agent (orb + name) opens its Edit Agent settings; the
+            // ⋮ menu keeps the other actions.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onEditAgent),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                AgentOrb(index = agentOrbIndex, size = 30.dp, cornerRadius = 6.dp)
+                Text(
+                    text = agentName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             var menuOpen by remember { mutableStateOf(false) }
             Box {
                 Icon(
@@ -1309,6 +1324,17 @@ private fun DesktopAgentSidebar(
 
         // Pinned conversations / scenes.
         SidebarSection(WorkPlayLens.conversationsHeader(mode))
+        // Active / Archived / All status filter.
+        Row(
+            modifier = Modifier.padding(start = 4.dp, top = 2.dp, bottom = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            ConversationArchiveFilter.entries.forEach { filter ->
+                DesktopChipTab(text = filter.label, active = archiveFilter == filter) {
+                    onArchiveFilterChange(filter)
+                }
+            }
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1323,7 +1349,9 @@ private fun DesktopAgentSidebar(
                         conversation.id == selectedConversationId,
                     thinking = conversation.id == thinkingConversationId,
                     deleting = conversation.id in deletingConversationIds,
+                    archived = conversation.archived,
                     onClick = { onConversationSelected(conversation.id) },
+                    onArchiveToggle = { onArchiveConversation(conversation.id, !conversation.archived) },
                     onDelete = { onDeleteConversation(conversation.id) },
                 )
             }
@@ -1358,12 +1386,13 @@ private fun SidebarConversationRow(
     selected: Boolean,
     thinking: Boolean,
     deleting: Boolean,
+    archived: Boolean,
     onClick: () -> Unit,
+    onArchiveToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val container = if (selected) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent
     // While thinking, the conversation icon pulses in the primary (teal) color.
@@ -1383,86 +1412,76 @@ private fun SidebarConversationRow(
         selected -> MaterialTheme.colorScheme.onSurface
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .hoverable(interactionSource)
-            .clickable(enabled = !deleting, onClick = onClick),
-        shape = MaterialTheme.shapes.small,
-        color = container,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    // Right-click anywhere on the row for the archive/restore + delete actions.
+    ContextMenuArea(
+        items = {
             if (deleting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                emptyList()
             } else {
-                Icon(
-                    imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = if (thinking) "thinking" else null,
-                    tint = iconColor,
-                    modifier = Modifier.size(15.dp),
+                listOf(
+                    ContextMenuItem(if (archived) "Restore chat" else "Archive chat", onArchiveToggle),
+                    ContextMenuItem("Delete chat") { confirmDelete = true },
                 )
             }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (deleting) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            when {
-                deleting -> Text(
-                    text = "Deleting…",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                // Hover (or an open menu) swaps the timestamp for an overflow menu.
-                hovered || menuOpen -> Box {
-                    Icon(
-                        imageVector = Icons.Outlined.MoreVert,
-                        contentDescription = "Conversation menu",
+        },
+    ) {
+        Surface(
+            onClick = onClick,
+            enabled = !deleting,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.small,
+            color = container,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            // Drives both the click ripple (now clipped to the rounded shape) and the
+            // `hovered` state below, so no separate .hoverable is needed.
+            interactionSource = interactionSource,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                when {
+                    deleting -> CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    // On hover the leading icon becomes a one-click archive/restore button.
+                    hovered -> Icon(
+                        imageVector = if (archived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                        contentDescription = if (archived) "Restore chat" else "Archive chat",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier
-                            .size(16.dp)
-                            .clickable { menuOpen = true },
+                            .size(15.dp)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = onArchiveToggle,
+                            ),
                     )
-                    if (menuOpen) {
-                        JewelPopupMenu(
-                            onDismissRequest = {
-                                menuOpen = false
-                                true
-                            },
-                            horizontalAlignment = Alignment.End,
-                        ) {
-                            selectableItem(
-                                selected = false,
-                                onClick = {
-                                    menuOpen = false
-                                    confirmDelete = true
-                                },
-                            ) {
-                                DesktopControlText("Delete chat")
-                            }
-                        }
-                    }
+                    else -> Icon(
+                        imageVector = if (thinking) Icons.Outlined.Autorenew else Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = if (thinking) "thinking" else null,
+                        tint = iconColor,
+                        modifier = Modifier.size(15.dp),
+                    )
                 }
-                else -> Text(
-                    text = timeLabel,
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (deleting) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = if (deleting) "Deleting…" else timeLabel,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

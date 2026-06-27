@@ -219,12 +219,11 @@ internal fun ChatComposer(
             itemSpacing = ChatComposerInputItemSpacing,
             leadingContent = {
                 Surface(
-                    modifier = Modifier
-                        .size(ChatComposerAttachButtonSize)
-                        .clickable {
-                            HapticEffects.contextClick(haptic, view)
-                            onAttachImage()
-                        },
+                    onClick = {
+                        HapticEffects.contextClick(haptic, view)
+                        onAttachImage()
+                    },
+                    modifier = Modifier.size(ChatComposerAttachButtonSize),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -382,10 +381,10 @@ private fun AttachmentThumbnail(
 
     Box(modifier = Modifier.size(64.dp)) {
         Surface(
+            onClick = onPreview,
             modifier = Modifier
                 .size(64.dp)
-                .testTag(ChatComposerTestTags.AttachmentThumbnail)
-                .clickable(onClick = onPreview),
+                .testTag(ChatComposerTestTags.AttachmentThumbnail),
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {

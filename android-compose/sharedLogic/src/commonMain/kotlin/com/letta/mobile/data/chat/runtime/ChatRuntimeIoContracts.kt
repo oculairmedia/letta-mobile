@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 
 interface ChatGateway : TimelineTransport {
-    suspend fun listConversations(limit: Int = DEFAULT_CONVERSATION_LIMIT): List<Conversation>
+    suspend fun listConversations(limit: Int = DEFAULT_CONVERSATION_LIMIT, archiveStatus: String? = null): List<Conversation>
     suspend fun getConversation(conversationId: String): Conversation
     suspend fun deleteConversation(conversationId: String) {
         throw UnsupportedOperationException("deleteConversation is not supported by this gateway")

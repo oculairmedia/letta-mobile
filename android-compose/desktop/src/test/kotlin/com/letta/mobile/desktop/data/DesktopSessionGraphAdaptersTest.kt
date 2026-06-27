@@ -193,7 +193,7 @@ class DesktopSessionGraphAdaptersTest {
         val chatGraph = DesktopChatSessionGraph(
             repositories = repositoryGraph,
             gateway = object : ChatGateway, AutoCloseable {
-                override suspend fun listConversations(limit: Int) = emptyList<Conversation>()
+                override suspend fun listConversations(limit: Int, archiveStatus: String?) = emptyList<Conversation>()
                 override suspend fun getConversation(conversationId: String): Conversation =
                     error("not used")
 

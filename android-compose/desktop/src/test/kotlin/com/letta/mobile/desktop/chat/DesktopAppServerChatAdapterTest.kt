@@ -77,7 +77,7 @@ class DesktopAppServerChatAdapterTest {
 }
 
 private class EmptyDesktopChatGateway : DesktopChatGateway {
-    override suspend fun listConversations(limit: Int): List<Conversation> = emptyList()
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> = emptyList()
 
     override suspend fun getConversation(conversationId: String): Conversation =
         error("not used")

@@ -708,9 +708,8 @@ private fun ProjectIssueTimelineEvent(
     highlighted: Boolean = false,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = if (highlighted) {
             MaterialTheme.colorScheme.primaryContainer
@@ -754,9 +753,8 @@ private fun ProjectIssueCard(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = LettaCardDefaults.listContainerColor,
         tonalElevation = 2.dp,

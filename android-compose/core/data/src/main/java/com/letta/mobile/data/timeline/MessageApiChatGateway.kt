@@ -15,10 +15,11 @@ class MessageApiChatGateway(
 ) : ChatGateway {
     private val timelineTransport = MessageApiTimelineTransport(messageApi)
 
-    override suspend fun listConversations(limit: Int): List<Conversation> =
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
         translateConversationApiErrors {
             conversationApi.listConversations(
                 limit = limit,
+                archiveStatus = archiveStatus,
                 order = "desc",
                 orderBy = "last_message_at",
             )
