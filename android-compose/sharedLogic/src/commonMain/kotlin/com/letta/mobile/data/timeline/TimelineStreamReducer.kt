@@ -296,14 +296,6 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
 ): TimelineEvent.Confirmed? {
     if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
     val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() } ?: return null
-    // letta-mobile-ujz3x: the very first delta (seqId==1) for a new logical
-    // assistant message is always a genuine message start, never a late
-    // prefix replay. Without this guard, a post-tool-return assistant that
-    // starts with a token that happens to be a prefix of a PREVIOUS
-    // same-run assistant message (e.g. "Yes" after "Yes — the Agent tool
-    // takes...") would be dropped, clipping the first character from the
-    // rendered message.
-    if (incoming.seqId == 1) return null
     val incomingText = incoming.content.trim()
     return events
         .asSequence()
@@ -314,9 +306,18 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
             if (existing.runId != incomingRunId) return@firstOrNull false
 
             val existingText = existing.content.trim()
-            existingText.isNotBlank() &&
+            val isReplayPrefix = existingText.isNotBlank() &&
                 (incomingText.isBlank() ||
                     (existingText.length > incomingText.length && existingText.startsWith(incomingText)))
+            if (!isReplayPrefix) return@firstOrNull false
+
+            // letta-mobile-ujz3x: preserve the one-character first token of a
+            // genuine post-tool assistant continuation ("Y" -> "Yes ...") even
+            // though it may be a prefix of an earlier same-run assistant. The
+            // post-install replay bug, however, replays multi-character prefixes
+            // like "Got" with seqId=1; those should still be dropped.
+            if (incoming.seqId == 1 && incomingText.length <= 1) return@firstOrNull false
+            true
         }
 }
 
