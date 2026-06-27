@@ -101,6 +101,7 @@ import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
@@ -128,7 +129,7 @@ import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibrarySurface
+import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.data.commands.AgentSlashCommand
@@ -478,6 +479,14 @@ fun LettaDesktopApp(
     }
     val isThinkingSelected = thinkingConversationId != null &&
         thinkingConversationId == chatState.selectedConversationId
+    // Reply is actively streaming for the selected conversation — outlives
+    // "thinking" (which clears at the first token), so it gates the streamed-
+    // text smoother in the message list. Derived by the shared
+    // ChatStreamingPresencePolicy (the same rules Android uses) rather than a
+    // bespoke desktop check, so the "is the agent working" semantics stay in one
+    // place across platforms.
+    val replyPresence by chatController.replyPresence.collectAsState()
+    val isStreamingReplySelected = replyPresence.isStreaming
 
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
@@ -585,6 +594,7 @@ fun LettaDesktopApp(
                         ChatDetailPane(
                             state = chatState,
                             isThinking = isThinkingSelected,
+                            isStreamingReply = isStreamingReplySelected,
                             composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
                             onOpenModelPicker = { showModelPicker = true },
                             onOnboardingTask = { kind ->
@@ -1748,7 +1758,7 @@ private fun DestinationContent(
         return
     }
     if (destination == DesktopDestination.Schedules) {
-        DesktopScheduleLibrarySurface(
+        DesktopScheduleSurface(
             state = scheduleLibraryState,
             onRefresh = onSchedulesRefresh,
             onAgentSelected = onScheduleAgentSelected,
@@ -1794,20 +1804,20 @@ private fun DestinationContent(
     LazyColumn(
         modifier = modifier
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 32.dp, vertical = 28.dp),
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = 32.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = destination.label,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = destination.summary,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -1941,12 +1951,11 @@ private fun BackendSettingsCard(
                 DesktopSettingsFieldLabel("Mode")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LettaConfig.Mode.entries.forEach { option ->
-                        DesktopRadioChip(
-                            selected = mode == option,
+                        DesktopChipTab(
+                            text = option.label,
+                            active = mode == option,
                             onClick = { mode = option },
-                        ) {
-                            DesktopControlText(option.label)
-                        }
+                        )
                     }
                 }
             }

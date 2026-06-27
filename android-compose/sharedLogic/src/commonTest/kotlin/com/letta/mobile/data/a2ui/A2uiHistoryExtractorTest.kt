@@ -1,14 +1,12 @@
-package com.letta.mobile.feature.chat
+package com.letta.mobile.data.a2ui
 
-import com.letta.mobile.data.a2ui.A2uiMessage
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import com.letta.mobile.feature.chat.a2ui.A2uiHistoryExtractor
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class A2uiHistoryExtractorTest {
     @Test
-    fun `extract strips valid a2ui blocks and returns decoded messages`() {
+    fun extractStripsValidA2uiBlocksAndReturnsDecodedMessages() {
         val extraction = A2uiHistoryExtractor.extract(
             """
             Intro
@@ -29,7 +27,7 @@ class A2uiHistoryExtractorTest {
     }
 
     @Test
-    fun `extract leaves invalid a2ui block visible`() {
+    fun extractLeavesInvalidA2uiBlockVisible() {
         val raw = "<a2ui-json>{not-json}</a2ui-json>"
 
         val extraction = A2uiHistoryExtractor.extract(raw)
@@ -39,7 +37,7 @@ class A2uiHistoryExtractorTest {
     }
 
     @Test
-    fun `extract repairs truncated a2ui json`() {
+    fun extractRepairsTruncatedA2uiJson() {
         val extraction = A2uiHistoryExtractor.extract(
             """
             <a2ui-json>

@@ -1,10 +1,11 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
-import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
+import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
@@ -16,6 +17,8 @@ import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.ui.chat.render.ChatTimelineProjector
+import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.desktop.DesktopBootstrapState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -24,6 +27,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -72,6 +77,84 @@ class DesktopChatController(
     // for a newer send in the same conversation.
     private var thinkingGeneration = 0
 
+    /**
+     * Conversation whose reply is actively streaming — set on send and cleared
+     * only when the send job (which suspends for the whole reply stream)
+     * completes, fails, or is cancelled. Unlike [thinkingConversationId], which
+     * clears the instant the first token lands, this survives the entire stream,
+     * so it (not "thinking") is the correct gate for revealing streamed text
+     * progressively in the message list.
+     */
+    private val _streamingConversationId = MutableStateFlow<String?>(null)
+    val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
+
+    // Same stale-guard rationale as thinkingGeneration.
+    private var streamingGeneration = 0
+
+    /**
+     * Shared Timeline→message projection (the same one Android uses). Gives the
+     * desktop list the incremental tail cache, optimistic-twin dedup, A2UI
+     * history stripping, and no-change suppression instead of a plain re-map of
+     * every event on every emit. Stateful per bound conversation — reset on
+     * rebind in [selectRemoteConversation].
+     */
+    private val timelineProjector = ChatTimelineProjector()
+
+    /**
+     * The bound conversation's latest projection facts that the shared streaming-
+     * presence policy needs. Updated on every projected timeline emit (and reset
+     * on rebind) so [replyPresence] can re-derive without re-projecting.
+     */
+    private data class BoundPresenceFacts(
+        val conversationId: String? = null,
+        val tailIsAssistant: Boolean = false,
+        val anyServerLocalPending: Boolean = false,
+    )
+
+    private val _boundPresenceFacts = MutableStateFlow(BoundPresenceFacts())
+
+    /**
+     * The selected conversation's "agent is working" presence, derived by the
+     * SHARED [ChatStreamingPresencePolicy] — the same rules Android's chat uses —
+     * from the bound conversation's projection facts plus the active reply-stream
+     * signal. Desktop is server-mode only, so the client-mode / A2UI-thinking /
+     * duplicate-initial branches are inert here.
+     *
+     * Reactive over both inputs: it re-derives when the timeline re-projects
+     * ([_boundPresenceFacts]) AND when a reply stream starts or stops
+     * ([_streamingConversationId]) — the latter can change with no new timeline
+     * emission, so a per-emission value alone would go stale. This is the
+     * desktop-side surfacing of the shared presentation's streaming/typing flags;
+     * [isStreaming] gates the progressive streamed-text reveal.
+     */
+    private val _replyPresence = MutableStateFlow(ChatStreamingPresence(isStreaming = false, isAgentTyping = false))
+    val replyPresence: StateFlow<ChatStreamingPresence> = _replyPresence.asStateFlow()
+
+    // Keeps [replyPresence] in sync with its inputs for the controller's life.
+    // Cancelled in [close] (NOT retryConnection — presence must survive a
+    // reconnect); collecting into a field-backed StateFlow rather than stateIn so
+    // the collector is owned and torn down explicitly instead of leaking [scope].
+    private val presenceJob: Job = scope.launch {
+        combine(
+            _boundPresenceFacts,
+            _streamingConversationId,
+            state.map { it.selectedConversationId },
+        ) { facts, streamingConversationId, selectedConversationId ->
+            val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
+            ChatStreamingPresencePolicy.derive(
+                // Held only on the inert client-mode branch, so the value is unused.
+                previousIsStreaming = false,
+                previousIsAgentTyping = false,
+                anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
+                tailIsAssistant = factsForSelected && facts.tailIsAssistant,
+                replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                clientModeStreamInFlight = false,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+            )
+        }.collect { _replyPresence.value = it }
+    }
+
     private var gateway: DesktopChatGateway? = null
 
     // Per-conversation model overrides set this session (the picker). The
@@ -119,6 +202,7 @@ class DesktopChatController(
     fun close() {
         if (closed) return
         closed = true
+        presenceJob.cancel()
         loadJob?.cancel()
         selectJob?.cancel()
         sendJob?.cancel()
@@ -347,6 +431,11 @@ class DesktopChatController(
             it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
         beginThinking(sendingConversationId)
+        // Mark the reply as streaming for the whole send-stream lifetime (the
+        // send job below suspends until the stream completes), so the message
+        // list can reveal streamed text progressively the entire time.
+        _streamingConversationId.value = sendingConversationId
+        val streamGen = ++streamingGeneration
         sendJob?.cancel()
         sendJob = scope.launch {
             try {
@@ -371,6 +460,13 @@ class DesktopChatController(
                             errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
                         ),
                     )
+                }
+            } finally {
+                // Clears on normal completion, failure, and cancellation. The
+                // generation guard prevents a cancelled prior send from clearing
+                // a newer same-conversation send's streaming flag.
+                if (streamGen == streamingGeneration && _streamingConversationId.value == sendingConversationId) {
+                    _streamingConversationId.value = null
                 }
             }
         }
@@ -466,6 +562,9 @@ class DesktopChatController(
 
         timelineJob?.cancel()
         activeLoop?.close()
+        // Fresh projection cache + presence facts for the newly-bound conversation.
+        timelineProjector.reset()
+        _boundPresenceFacts.value = BoundPresenceFacts()
 
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
@@ -506,14 +605,38 @@ class DesktopChatController(
 
     private fun updateTimelineMessages(conversationId: String, generation: Long, timeline: Timeline) {
         if (closed) return
-        val messages = timeline.events
-            .sortedBy { it.position }
-            .mapNotNull(::timelineEventToUiMessage)
-        // Stop "thinking" once the agent's reply begins to land (the latest
-        // message is no longer the user's own prompt).
-        if (_thinkingConversationId.value == conversationId &&
+        // Project through the shared ChatTimelineProjector: incremental tail
+        // cache, optimistic-twin dedup, and A2UI history stripping (so raw
+        // <a2ui-json> blocks no longer leak into assistant text). previousState
+        // is only read for telemetry, so a default is fine here.
+        val projection = timelineProjector.project(
+            timeline = timeline,
+            prefix = timelineProjector.olderPrefixFor(conversationId),
+            previousState = ChatUiState(),
+        )
+        // A no-op tick (the tail re-emitted unchanged) projects to a UI
+        // byte-identical to the current one — skip the state write so a streamed
+        // delta burst doesn't churn recompositions.
+        // Feed the shared presence policy (via replyPresence) the bound
+        // conversation's latest facts. Set before the no-change early-out so the
+        // first projection of a conversation always seeds presence; a no-op tick
+        // re-emits identical facts, which the StateFlow dedupes.
+        _boundPresenceFacts.value = BoundPresenceFacts(
+            conversationId = conversationId,
+            tailIsAssistant = projection.tailIsAssistant,
+            anyServerLocalPending = projection.anyLettaServerLocalPending,
+        )
+        if (projection.noChange) return
+        val messages = projection.ui
+        // Stop "thinking" once the agent's reply begins to land. Use the
+        // timeline tail (projection.tailIsAssistant) as well as the projected
+        // list: an A2UI-only reply is extracted out of the rendered text, so
+        // projection.ui still ends with the user's prompt even though an
+        // assistant event landed — without the tailIsAssistant check the
+        // indicator would hang until the safety timeout (Codex review).
+        val agentReplyLanded = projection.tailIsAssistant ||
             messages.lastOrNull()?.role?.equals("user", ignoreCase = true) == false
-        ) {
+        if (_thinkingConversationId.value == conversationId && agentReplyLanded) {
             _thinkingConversationId.value = null
         }
         _state.update { current ->

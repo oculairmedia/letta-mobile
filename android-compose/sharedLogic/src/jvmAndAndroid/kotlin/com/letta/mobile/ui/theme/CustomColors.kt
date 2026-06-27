@@ -48,6 +48,17 @@ data class CustomColors(
     val agentBColor: Color = Color.Unspecified,
     val agentCColor: Color = Color.Unspecified,
 
+    // Muted section captions (darker than onSurfaceVariant — Phase 6).
+    val onSurfaceMutedColor: Color = Color.Unspecified,
+
+    // Memory-block category colors (Phase 6 / §1.1b) — color-code blocks by
+    // category; distinct from agentA/B/C subagent identity.
+    val categoryPersonaColor: Color = Color.Unspecified,
+    val categoryHumanColor: Color = Color.Unspecified,
+    val categoryOnboardingColor: Color = Color.Unspecified,
+    val categoryProjectColor: Color = Color.Unspecified,
+    val categoryArchivalColor: Color = Color.Unspecified,
+
     // Connection status
     val onlineColor: Color = Color.Unspecified,
     val offlineColor: Color = Color.Unspecified,

@@ -51,6 +51,12 @@ kotlin {
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.5.0-beta01")
+                // Multiplatform date/time for the shared cron evaluator +
+                // schedule projection (Phase 7). Calendar-aware next-run math
+                // can't use java.time in commonMain.
+                // 0.7.1 to match the version the Compose calendar library
+                // (kizitonwose) pulls; 0.7.0 moved Instant to kotlin.time.
+                api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
                 api("org.jetbrains.compose.runtime:runtime:1.10.0")
                 api("io.ktor:ktor-http:3.5.0")
                 api("io.ktor:ktor-io:3.5.0")

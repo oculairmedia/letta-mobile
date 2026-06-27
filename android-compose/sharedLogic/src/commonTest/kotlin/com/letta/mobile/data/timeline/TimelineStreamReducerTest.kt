@@ -525,6 +525,35 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `post install replay prefix with seq one is dropped`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "rest-assistant",
+                contentRaw = JsonPrimitive("Got it — I can check the latest build and keep going."),
+                runId = "run-replayed-after-install",
+                seqId = 24,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "ws-replayed-prefix",
+                contentRaw = JsonPrimitive("Got"),
+                runId = "run-replayed-after-install",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "rest-assistant"
+        event.content shouldBe "Got it — I can check the latest build and keep going."
+        output.emittedEvents shouldBe emptyList()
+        output.notification shouldBe null
+    }
+
+    @Test
     fun `assistant prefix from a different run is preserved`() {
         val seeded = reduce(
             frame = AssistantMessage(

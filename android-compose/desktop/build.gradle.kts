@@ -11,6 +11,11 @@ val jewelVersion = "0.37.0-262.4852.51"
 val kuiverVersion = "0.3.0"
 val autoLinkTextVersion = "2.0.2"
 val textyVersion = "1.0.0-alpha"
+// Kizitonwose Calendar (Compose Multiplatform) — backs the Schedules surface's
+// Agenda date-strip (WeekCalendar) and History reliability grid
+// (HeatMapCalendar). Uses kotlinx-datetime types, matching our shared
+// schedule projection (Phase 7).
+val calendarVersion = "2.10.1"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -68,6 +73,7 @@ dependencies {
     implementation("io.github.justdeko:kuiver:$kuiverVersion")
     implementation("sh.calvin.autolinktext:autolinktext:$autoLinkTextVersion")
     implementation("com.arjunjadeja:texty:$textyVersion")
+    implementation("com.kizitonwose.calendar:compose-multiplatform:$calendarVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-websockets:$ktorVersion")
@@ -83,6 +89,11 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
+// RUNTIME NOTE: this module compiles to JVM 17 bytecode, but the Jewel UI
+// dependency ships class-file version 69 (Java 25). Running the app (`:desktop:run`
+// or a packaged distribution) therefore requires a JDK 25+ at runtime — an
+// older JRE (e.g. JDK 17/21) fails at startup with UnsupportedClassVersionError
+// loading org.jetbrains.jewel.*. Compilation and unit tests are unaffected.
 compose.desktop {
     application {
         mainClass = "com.letta.mobile.desktop.MainKt"

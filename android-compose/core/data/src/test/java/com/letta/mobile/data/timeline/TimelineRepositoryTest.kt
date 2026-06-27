@@ -115,6 +115,58 @@ class TimelineRepositoryTest {
     }
 
     @Test
+    fun `scoped access reuses existing unscoped loop for same conversation`() = runBlocking {
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+
+        val unscoped = repository.getOrCreate("conv-shared")
+        api.awaitActive("conv-shared")
+
+        val scoped = repository.getOrCreate("agent-a", "conv-shared")
+
+        assertTrue("scoped access should reuse the already-live unscoped loop", unscoped === scoped)
+        assertEquals("same conversation must not create duplicate persistent stream loops", 1, repository.cachedLoopCount())
+        assertEquals("only one stream should be active for the conversation", 1, api.activeCount("conv-shared"))
+
+        repository.clearAll()
+    }
+
+    @Test
+    fun `unscoped access reuses existing scoped loop for same conversation`() = runBlocking {
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+
+        val scoped = repository.getOrCreate("agent-a", "conv-shared")
+        api.awaitActive("conv-shared")
+
+        val unscoped = repository.getOrCreate("conv-shared")
+
+        assertTrue("unscoped access should reuse the already-live scoped loop", scoped === unscoped)
+        assertEquals("same conversation must not create duplicate persistent stream loops", 1, repository.cachedLoopCount())
+        assertEquals("only one stream should be active for the conversation", 1, api.activeCount("conv-shared"))
+
+        repository.clearAll()
+    }
+
+    @Test
+    fun `unscoped loop promoted to first scoped agent is not reused by different agent`() = runBlocking {
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+
+        val unscoped = repository.getOrCreate("conv-shared")
+        api.awaitActive("conv-shared")
+        val agentA = repository.getOrCreate("agent-a", "conv-shared")
+        val agentB = repository.getOrCreate("agent-b", "conv-shared")
+
+        assertTrue("first scoped caller should claim the unscoped loop", unscoped === agentA)
+        assertFalse("different scoped agents must remain isolated", agentA === agentB)
+        assertEquals("agent-b should create its own loop after agent-a claims the unscoped loop", 2, repository.cachedLoopCount())
+        assertEquals("two isolated agent scopes should have two active streams", 2, api.activeCount("conv-shared"))
+
+        repository.clearAll()
+    }
+
+    @Test
     fun `cursor repair hydrates the scoped loop when agent is present`() = runBlocking {
         val api = CancellableStreamApi()
         val cursorStore = RepositoryRecordingConversationCursorStore()
@@ -191,6 +243,8 @@ private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
 
     fun isActive(conversationId: String): Boolean =
         activeStreams[conversationId]?.get()?.let { it > 0 } == true
+
+    fun activeCount(conversationId: String): Int = activeStreams[conversationId]?.get() ?: 0
 
     suspend fun awaitActive(conversationId: String) = withTimeout(5_000) {
         while (!isActive(conversationId)) delay(10)
