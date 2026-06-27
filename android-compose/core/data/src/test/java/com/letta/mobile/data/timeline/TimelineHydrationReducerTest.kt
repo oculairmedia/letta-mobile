@@ -212,4 +212,66 @@ class TimelineHydrationReducerTest {
         assertEquals(1, confirmed.size)
         assertEquals("rest-assistant", confirmed.single().serverId)
     }
+
+    @Test
+    fun `reduce collapses duplicate assistant rows within the server snapshot`() {
+        // Cold-start replay after a rebuild: the server snapshot itself carries
+        // the same logical assistant message twice — same run_id + content, but
+        // a different server id (and otids that do not collide). Without semantic
+        // dedup in hydration, both rows survive and the UI shows a doubled bubble.
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                AssistantMessage(
+                    id = "assistant-original",
+                    contentRaw = JsonPrimitive("Got it, I can check the latest build."),
+                    date = "2026-06-27T07:30:00Z",
+                    runId = "run-replay",
+                ),
+                AssistantMessage(
+                    id = "assistant-replayed",
+                    contentRaw = JsonPrimitive("Got it, I can check the latest build."),
+                    date = "2026-06-27T07:30:01Z",
+                    runId = "run-replay",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1"),
+            diskRecords = emptyList(),
+        )
+
+        val confirmed = result.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(1, confirmed.size)
+        assertEquals("assistant-original", confirmed.single().serverId)
+        assertEquals("Got it, I can check the latest build.", confirmed.single().content)
+    }
+
+    @Test
+    fun `reduce keeps distinct assistant rows from different runs`() {
+        // Guard: two assistant messages with identical content but DIFFERENT
+        // run ids are genuinely distinct turns and must both survive.
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conversation-1",
+            serverMessagesChronological = listOf(
+                AssistantMessage(
+                    id = "assistant-run-a",
+                    contentRaw = JsonPrimitive("Done."),
+                    date = "2026-06-27T07:30:00Z",
+                    runId = "run-a",
+                ),
+                AssistantMessage(
+                    id = "assistant-run-b",
+                    contentRaw = JsonPrimitive("Done."),
+                    date = "2026-06-27T07:31:00Z",
+                    runId = "run-b",
+                ),
+            ),
+            timelineBeforeFetch = Timeline("conversation-1"),
+            currentTimeline = Timeline("conversation-1"),
+            diskRecords = emptyList(),
+        )
+
+        val confirmed = result.timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
+        assertEquals(2, confirmed.size)
+    }
 }
