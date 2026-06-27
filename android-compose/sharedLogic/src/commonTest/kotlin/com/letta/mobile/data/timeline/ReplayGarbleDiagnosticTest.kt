@@ -209,4 +209,87 @@ class ReplayGarbleDiagnosticTest {
             "near-suffix forward delta must not truncate trailing chars",
         )
     }
+
+    // letta-mobile-mvcr4: additional regression coverage for the near-overlap
+    // SNAPSHOT_CONFLICT branch added in #760. These guard rails lock in the
+    // remaining branches' behavior so a future refactor cannot quietly
+    // re-route these shapes to APPEND (which would duplicate the body).
+
+    @Test
+    fun `non-overlap forward delta still appends`() {
+        val res = mergeStreamText(
+            existing = "hello",
+            incoming = " world",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = true,
+        )
+        assertEquals(StreamTextMergeBranch.APPEND, res.branch)
+        assertEquals("hello world", res.text)
+    }
+
+    @Test
+    fun `tiny forward delta still appends`() {
+        val res = mergeStreamText(
+            existing = "Y",
+            incoming = "es confirmed",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = true,
+        )
+        assertEquals(StreamTextMergeBranch.APPEND, res.branch)
+        assertEquals("Yes confirmed", res.text)
+    }
+
+    @Test
+    fun `forward snapshot where existing is strict superstring takes existing`() {
+        // existing = "hello world today", incoming = "world today" — a small
+        // snapshot whose body is a strict suffix of the existing buffer. The
+        // SUFFIX_DUPLICATE branch keeps the existing text (the more complete).
+        // A regression that re-routed this shape to APPEND would produce
+        // "hello world todayworld today".
+        val res = mergeStreamText(
+            existing = "hello world today",
+            incoming = "world today",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = true,
+        )
+        assertEquals(StreamTextMergeBranch.SUFFIX_DUPLICATE, res.branch)
+        assertEquals("hello world today", res.text)
+    }
+
+    @Test
+    fun `forward snapshot where incoming is strict substring takes incoming`() {
+        // existing = "hello world", incoming = "hello world today" — the
+        // classic cumulative snapshot case. Stale keeps the existing text;
+        // CUMULATIVE replaces with the longer incoming. Since incoming is the
+        // longer body, CUMULATIVE wins.
+        val res = mergeStreamText(
+            existing = "hello world",
+            incoming = "hello world today",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = true,
+        )
+        assertEquals(StreamTextMergeBranch.CUMULATIVE, res.branch)
+        assertEquals("hello world today", res.text)
+    }
+
+    @Test
+    fun `forward snapshot with substantial overlap keeps longer side`() {
+        // Existing buffer already includes the assistant's full reply; the
+        // incoming snapshot re-tokenizes a few words. With the new
+        // near-overlap SNAPSHOT_CONFLICT branch, the longer existing
+        // text is preserved. Without it, APPEND would duplicate the shared
+        // body. Strings chosen so the common substring spans the middle
+        // (no clean prefix/suffix), the overlap covers > 75% of the
+        // longer side, and the longer buffer is preserved.
+        val existing = "ok one moment the assistant will respond in just a second please wait"
+        val incoming = "ok one moment the assistant will respond in just a second hold on"
+        val res = mergeStreamText(
+            existing = existing,
+            incoming = incoming,
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = true,
+        )
+        assertEquals(StreamTextMergeBranch.SNAPSHOT_CONFLICT, res.branch)
+        assertEquals(existing, res.text)
+    }
 }
