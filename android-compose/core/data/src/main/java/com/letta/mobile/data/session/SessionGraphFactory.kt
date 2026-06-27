@@ -50,6 +50,7 @@ import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.runtime.BackendCapabilities
@@ -175,10 +176,10 @@ class SessionGraphFactory internal constructor(
             conversationDao.deleteAllRefreshStates()
         }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val channelTransport = if (localRuntimeBackend == null) {
-            ChannelTransport(scope, runCursorStore, conversationCursorStore)
-        } else {
-            NoOpChannelTransport()
+        val channelTransport = when {
+            localRuntimeBackend != null -> NoOpChannelTransport()
+            IrohChannelTransport.isIrohUrl(activeConfig?.serverUrl) -> IrohChannelTransport(scope)
+            else -> ChannelTransport(scope, runCursorStore, conversationCursorStore)
         }
         val agentRepository = AgentRepository(
             agentApi = agentApi,
