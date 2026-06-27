@@ -65,6 +65,7 @@ kotlin {
                 // repositories live once in commonMain instead of being
                 // duplicated per platform (letta-mobile-mqzkc).
                 api("io.ktor:ktor-client-core:3.5.0")
+                api("io.ktor:ktor-client-websockets:3.5.0")
             }
         }
 
@@ -98,6 +99,7 @@ kotlin {
         getByName("jvmTest") {
             dependencies {
                 implementation(compose.desktop.currentOs)
+                implementation("io.ktor:ktor-client-cio:3.5.0")
             }
         }
 

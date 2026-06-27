@@ -20,6 +20,7 @@ import io.mockk.spyk
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -35,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,6 +44,11 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidLettaCodeRuntimeControllerTest {
+    @After
+    fun tearDown() {
+        unmockkStatic(ContextCompat::class)
+    }
+
     @Test
     fun `disabled status fails before starting bridge or node`() = runTest {
         val nodeBridge = FakeNodeBridge()

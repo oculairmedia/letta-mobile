@@ -129,6 +129,9 @@ jobs:
       - name: Build and test desktop module
         run: ./gradlew :desktop:test
 
+      - name: Build App Server CLI distribution
+        run: ./gradlew :appserver-cli:test :appserver-cli:distZip
+
   build-apk:
     runs-on: ubuntu-latest
     needs: test

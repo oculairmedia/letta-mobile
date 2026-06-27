@@ -26,6 +26,8 @@ import com.letta.mobile.cli.commands.RestPostCommand
 import com.letta.mobile.cli.commands.RestPutCommand
 import com.letta.mobile.cli.commands.ReplayCommand
 import com.letta.mobile.cli.commands.SendCommand
+import com.letta.mobile.cli.commands.AppServerServeCommand
+import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.SetupApplyCommand
 import com.letta.mobile.cli.commands.SetupCommand
 import com.letta.mobile.cli.commands.SetupExportCommand
@@ -75,6 +77,8 @@ object Main {
                     SetupExportCommand(),
                 ),
                 *buildResourceCommands().toTypedArray(),
+                AppServerServeCommand(),
+                AppServerSmokeCommand(),
                 StreamCommand(),
             )
             .main(args)
@@ -111,6 +115,8 @@ object Main {
           mcp            Manage MCP servers and tools.
           runs/jobs/steps Inspect and mutate execution resources.
           projects       Manage Vibesync projects and beads remotes.
+          app-server-serve  Launch host letta app-server with optional WS auth.
+          app-server-smoke  Send one turn through a running Letta App Server.
           stream         Direct Letta REST/SSE path for low-level comparison.
 
         Run with --help on any subcommand for details.
