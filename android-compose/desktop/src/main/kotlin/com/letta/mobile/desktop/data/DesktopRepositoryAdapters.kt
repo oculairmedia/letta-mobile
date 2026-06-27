@@ -35,7 +35,7 @@ import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.desktop.chat.DesktopLettaHttpChatGateway
+import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -206,7 +206,7 @@ fun defaultDesktopChatSessionGraphFactory(
 ): DesktopChatSessionGraphFactory =
     DesktopChatSessionGraphFactory(
         repositoryGraphFactory = repositoryGraphFactory,
-        gatewayFactory = { DesktopLettaHttpChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
+        gatewayFactory = { createDefaultDesktopChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
     )
 
 class DesktopRepositoryAdapters(config: LettaConfig? = null) {

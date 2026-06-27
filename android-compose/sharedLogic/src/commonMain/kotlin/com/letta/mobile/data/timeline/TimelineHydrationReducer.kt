@@ -86,8 +86,28 @@ object TimelineHydrationReducer {
         conversationId: String,
         events: List<TimelineEvent>,
     ): List<TimelineEvent> {
-        val seen = HashSet<String>()
-        val deduped = events.filter { event -> seen.add(event.otid) }
+        val seenOtids = HashSet<String>()
+        // letta-mobile: the server snapshot itself can carry the SAME logical
+        // assistant/reasoning/tool_call message twice — same run_id + same
+        // content but a different server message id and a non-colliding otid
+        // (e.g. when a run is replayed on cold start after a rebuild). otid
+        // dedup alone keeps both rows, producing a doubled bubble in the UI.
+        // Also collapse by semantic identity key (type:run_id:content), the
+        // same key the stream reducer uses to dedupe a hydrate-then-stream
+        // re-delivery. Empty keys (no run_id / user / tool_return) fall back to
+        // otid-only behaviour so distinct messages are never merged.
+        val seenSemantic = HashSet<String>()
+        val deduped = events.filter { event ->
+            val otidNovel = seenOtids.add(event.otid)
+            val semanticKey = (event as? TimelineEvent.Confirmed)
+                ?.semanticIdentityKeyOrNull()
+            if (semanticKey == null) {
+                otidNovel
+            } else {
+                val semanticNovel = seenSemantic.add(semanticKey)
+                otidNovel && semanticNovel
+            }
+        }
         if (deduped.size != events.size) {
             Telemetry.event(
                 "Timeline", "hydrate.duplicateOtidDropped",

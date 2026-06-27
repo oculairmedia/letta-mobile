@@ -37,7 +37,7 @@ class DesktopChatController(
     private val scope: CoroutineScope,
     private val attachmentLimits: AttachmentLimits = AttachmentLimits.Default,
     private val gatewayFactory: () -> DesktopChatGateway = {
-        DesktopLettaHttpChatGateway(bootstrapState.config)
+        createDefaultDesktopChatGateway(bootstrapState.config)
     },
     private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
     private val agentModelByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },

@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+APP_HOME=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+if [ -n "${JAVA_HOME:-}" ]; then
+  JAVA_EXE="$JAVA_HOME/bin/java"
+else
+  JAVA_EXE="java"
+fi
+
+exec "$JAVA_EXE" ${JAVA_OPTS:-} ${MERIDIAN_APP_SERVER_OPTS:-} -cp "$APP_HOME/lib/*" com.letta.mobile.appservercli.Main "$@"

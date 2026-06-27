@@ -14,6 +14,9 @@ The CLI now has two useful modes:
   related resources can be managed without opening the Android UI.
 - `setup apply` / `setup export` provide a declarative JSON/YAML format for
   replaying profile and server setup from a workstation.
+- `app-server-serve` / `app-server-smoke` exercise the official Letta App
+  Server path: launch a host `letta app-server` process, then send a typed turn
+  through the shared App Server client.
 - `stream` keeps the older direct REST/SSE tracer for low-level comparison when
   debugging server wire frames or merge behavior.
 
@@ -68,8 +71,8 @@ configuration for CLI runs.
 ```
 
 Profile defaults are used by `send`, `dump-timeline`, `replay`, `capture`,
-`record`, `reconnect`, `stream`, `rest`, and the typed resource command groups when
-explicit flags/env vars are omitted.
+`record`, `reconnect`, `stream`, `rest`, and the typed resource command groups
+when explicit flags/env vars are omitted.
 
 ## Commands
 
@@ -425,6 +428,59 @@ For each SSE frame, it prints the message type, server id, merge branch, old
 text, new text, and output text. The tracer calls the same production
 `mergeStreamText` helper used by the live reducer, so CLI diagnostics and app
 behavior stay aligned.
+
+### `app-server-serve`
+
+Launch the official host Letta App Server process from the mobile CLI. This is
+the Phase C seam for replacing the shim as a required remote dependency: the
+mobile CLI does not implement a parallel server, it starts `letta app-server`
+with the same listen and WebSocket auth flags exposed by Letta Code.
+
+For the installable host distribution, build `:appserver-cli:distZip` and run
+`bin/meridian-app-server` from the unzipped artifact. The Gradle-backed `:cli`
+command below remains useful when debugging the broader mobile CLI harness.
+
+```powershell
+.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.27.15 --letta-arg=--backend --letta-arg local --listen ws://127.0.0.1:4500"
+.\gradlew.bat :cli:run -PcliArgs="app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>"
+.\gradlew.bat :cli:run -PcliArgs="app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.27.15 --dry-run"
+```
+
+Use `--dry-run` to print the generated process command without launching a
+server. Use repeated `--letta-arg` values when the host Letta command is a tool
+wrapper such as `pnpm dlx @letta-ai/letta-code@0.27.15`.
+
+Loopback development uses no WebSocket auth. Any non-loopback listen host must
+be launched with `--ws-auth`; clients then pass the same token as
+`Authorization: Bearer <token>`.
+
+Use one direct control owner per App Server process. If several product clients
+need the same process, put a fanout controller in front of it instead of letting
+every client write to `/ws?channel=control`.
+
+### `app-server-smoke`
+
+Connect to a running App Server and send one turn through the shared
+`AppServerTurnEngine`.
+
+```powershell
+$env:APP_SERVER_TEST_URL="ws://127.0.0.1:4500"
+$env:APP_SERVER_TEST_AGENT_ID="agt_x"
+$env:APP_SERVER_TEST_CONVERSATION_ID="conv_x"
+.\gradlew.bat :cli:run -PcliArgs="app-server-smoke --message `"hello`""
+```
+
+Expected output includes:
+
+```text
+[app-server] connect ws://127.0.0.1:4500
+[lifecycle] Started
+[stream] ...
+[lifecycle] Completed
+```
+
+Set `APP_SERVER_TEST_TOKEN` or pass `--token` when connecting to a non-loopback
+server that requires bearer auth.
 
 ## Fixture workflow
 

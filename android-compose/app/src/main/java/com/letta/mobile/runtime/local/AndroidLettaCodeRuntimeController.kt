@@ -31,8 +31,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
-private val embeddedProviderAuthJson = Json { prettyPrint = true }
-
 interface LettaCodeRuntimeController {
     fun submit(command: TurnCommand, config: LettaConfig): Flow<String>
 
@@ -384,17 +382,11 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         androidNetworkBridgeBaseUrl: String,
         androidNetworkBridgeToken: String,
     ): LettaCodeNodeStartRequest {
-        workingDirectory.mkdirs()
-        storageDirectory.mkdirs()
-        homeDirectory.mkdirs()
-        val modelCacheDirectory = File(storageDirectory, "model-cache").apply { mkdirs() }
-        val tempDirectory = File(storageDirectory.parentFile, "tmp").apply { mkdirs() }
-        val backgroundDirectory = File(storageDirectory.parentFile, "background").apply { mkdirs() }
         // Per-agent model: letta.js overwrites the agent's model with the
         // --model argv on resume. The current config selection is therefore
         // authoritative for embedded model switches and reseeds the stored
         // agent model before letta.js resumes it.
-        val modelHandle = if (onDeviceProviderBaseUrl == null) modelSelection.modelHandle else modelSelection.lettaCodeModelHandle
+        val modelHandle = modelSelection.androidEmbeddedLaunchModelHandle(onDeviceProviderBaseUrl)
         // One line per session start: which model letta.js was actually given.
         // A session pinned to the wrong model (e.g. the 2026-06-12 codexmini
         // detour) is otherwise impossible to diagnose after the fact because
@@ -405,246 +397,15 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 "customProvider=${modelSelection.isCustomProvider} providerBaseUrl=$onDeviceProviderBaseUrl",
         )
         localBackendStore.seedAgent(session.agentId, modelHandle)
-        if (onDeviceProviderBaseUrl != null) {
-            writeEmbeddedLettaCodeProviderAuth(
-                baseUrl = onDeviceProviderBaseUrl,
-                apiKey = onDeviceProviderApiKey ?: "not-needed",
-                modelId = modelSelection.openAiModelId,
-            )
-        }
-        return LettaCodeNodeStartRequest(
-            arguments = buildList {
-                add("node")
-                add("--max-old-space-size=384")
-                add("--max-semi-space-size=16")
-                // ICU-less V8 rejects \p{...} regexes; preload a RegExp wrapper
-                // that rewrites them through regexpu-core (see asset prep task).
-                embeddedLettaCodePreloadRequireFiles(projectDir).forEach { preload ->
-                    add("--require")
-                    add(preload.absolutePath)
-                }
-                add(entrypoint.absolutePath)
-                add("--backend")
-                add("local")
-                add("--model")
-                add(modelHandle)
-                add("--agent")
-                add(session.agentId)
-                // letta.js rejects --conversation <custom-id> together with
-                // --agent ("--conversation cannot be used with --agent") —
-                // only the literal "default" is allowed alongside --agent.
-                // The Kotlin session key still tracks the real conversation id;
-                // the embedded process is bound to one session anyway.
-                add("--conversation")
-                add("default")
-                add("--input-format")
-                add("stream-json")
-                add("--output-format")
-                add("stream-json")
-                // The app has no approval channel yet (ToolApprovalResponse is
-                // ignored), so gated tools would stall a turn forever. The
-                // embedded runtime runs on the user's own device against the
-                // app sandbox; unrestricted is the deliberate interim policy
-                // until an approvals UI exists (letta-mobile-bm6x2).
-                add("--permission-mode")
-                add("unrestricted")
-            },
-            environment = buildMap {
-                put("HOME", homeDirectory.absolutePath)
-                put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
-                put("LETTA_LOCAL_BACKEND_DIR", storageDirectory.absolutePath)
-                put("LETTA_LOCAL_BACKEND_EXECUTOR", "pi")
-                putAll(memfsEnvironment())
-                // letta-mobile-nojhc: declare which custom-provider models are
-                // image-capable. Consumed by the build-time letta.js patch on
-                // customOpenAICompatibleModel (matched as case-insensitive
-                // substrings against the model id), mirroring the shim's
-                // LETTA_VISION_MODELS so both surfaces share one list.
-                put("LETTA_CODE_VISION_MODEL_IDS", VISION_MODEL_PATTERNS.joinToString(","))
-                put("LETTA_ANDROID_ON_DEVICE_MODEL_HANDLE", modelHandle)
-                put("LETTA_ANDROID_ON_DEVICE_MODEL_RUNTIME", modelSelection.runtime)
-                put("LETTA_ANDROID_ON_DEVICE_MODEL_ACCELERATOR", modelSelection.accelerator)
-                put("LETTA_ANDROID_ON_DEVICE_MODEL_MAX_TOKENS", modelSelection.maxTokens.toString())
-                put("LETTA_ANDROID_ON_DEVICE_MODEL_CACHE_DIR", modelCacheDirectory.absolutePath)
-                onDeviceProviderBaseUrl?.let { put("LMSTUDIO_BASE_URL", it) }
-                onDeviceProviderApiKey?.let { put("LMSTUDIO_API_KEY", it) }
-                modelSelection.modelPath?.let { put("LETTA_ANDROID_ON_DEVICE_MODEL_PATH", it) }
-                // letta.js's Bash tool resolves its shell from $SHELL first,
-                // then /bin/bash, /bin/sh, /usr/bin/env … — none of which
-                // exist on Android. Without this the Bash tool is dead on
-                // device ("there is no bash"); toybox sh handles -c fine.
-                put("SHELL", "/system/bin/sh")
-                put("NO_COLOR", "1")
-                put("UV_USE_IO_URING", "0")
-                put("UV_THREADPOOL_SIZE", "2")
-                put("TMPDIR", tempDirectory.absolutePath)
-                put("TMP", tempDirectory.absolutePath)
-                put("TEMP", tempDirectory.absolutePath)
-                put("LETTA_BACKGROUND_DIR", backgroundDirectory.absolutePath)
-                put("LETTA_TASK_OUTPUT_DIR", backgroundDirectory.absolutePath)
-                put("LETTA_ANDROID_NETWORK_BRIDGE_URL", androidNetworkBridgeBaseUrl)
-                put("LETTA_ANDROID_NETWORK_BRIDGE_TOKEN", androidNetworkBridgeToken)
-                deviceSensorGroundingWriter?.let {
-                    put("LETTA_MOBILE_DEVICE_SENSOR_GROUNDING_PATH", it.outputFile.absolutePath)
-                }
-                put("NODE_OPTIONS", "--max-old-space-size=384 --max-semi-space-size=16")
-            },
-            workingDirectory = workingDirectory,
-        )
-    }
-
-    /**
-     * Local memfs (letta-mobile-xa92p): letta.js memory-git spawns the
-     * literal binary "git" via PATH, which Android lacks. We ship git built
-     * for android-arm64 as a jniLib (libgit.so — app filesDir is noexec on
-     * API 29+, but nativeLibraryDir is executable) and symlink it onto a
-     * PATH entry for the node process. When the binary isn't packaged
-     * (builds without scripts/build-android-git.sh output), memfs stays
-     * disabled so turns keep working.
-     */
-    private fun PreparedLettaCodeProject.memfsEnvironment(): Map<String, String> {
-        val binDirectory = File(storageDirectory.parentFile, "bin").apply { mkdirs() }
-        // letta.js's Bash tool spawns the literal executable "bash" via PATH
-        // on every non-Windows platform — no launcher fallback, no $SHELL
-        // (shell-runner.ts spawnCommand). Android ships no bash, so without
-        // this link every Bash tool call fails with "Executable not found:
-        // bash". Prefer the bundled real bash (libbash.so, executable in
-        // nativeLibraryDir); fall back to aliasing /system/bin/sh, which
-        // runs simple commands but with toybox/mksh semantics, not bash's.
-        val bashLib = File(context.applicationInfo.nativeLibraryDir, "libbash.so")
-        val bashTarget = if (bashLib.canExecute()) bashLib.absolutePath else "/system/bin/sh"
-        val bashLink = File(binDirectory, "bash")
-        // nativeLibraryDir changes across installs; recreate unless the link
-        // already resolves to the wanted target and is executable.
-        val bashLinkCurrent = runCatching { android.system.Os.readlink(bashLink.absolutePath) }.getOrNull()
-        if (bashLinkCurrent != bashTarget || !bashLink.canExecute()) {
-            bashLink.delete()
-            runCatching { android.system.Os.symlink(bashTarget, bashLink.absolutePath) }
-                .onFailure { error -> Log.w(TAG, "Failed to link bash; Bash tool will be unavailable", error) }
-        }
-        linkPackagedTool(binDirectory, "curl", "libcurl.so", "curl helper")
-        linkPackagedTool(binDirectory, "node", "libnodecli.so", "node CLI")
-        // npm: the data partition is noexec, so a shell-script wrapper in
-        // files/ can't be exec'd via PATH. Instead the node launcher is
-        // argv0-aware — symlink `npm` to the same native binary and point it at
-        // npm-cli.js via LETTA_NPM_CLI_JS. See letta-mobile-iq24j.
-        val npmCli = File(projectDir, "node_modules/npm/bin/npm-cli.js")
-        val nodeLink = File(binDirectory, "node")
-        val npmEnvironment = if (npmCli.isFile && nodeLink.canExecute()) {
-            linkPackagedTool(binDirectory, "npm", "libnodecli.so", "npm launcher")
-            mapOf(
-                "LETTA_NPM_CLI_JS" to npmCli.absolutePath,
-                "LETTA_NODE_BIN" to nodeLink.absolutePath,
-            )
-        } else {
-            Log.i(TAG, "npm-cli.js not bundled or node missing; npm unavailable")
-            emptyMap()
-        }
-        val pathEnvironment = mapOf(
-            "PATH" to "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}",
-        ) + npmEnvironment
-        if (!linkPackagedTool(binDirectory, "git", "libgit.so", "git-backed local memfs")) {
-            return pathEnvironment + ("LETTA_LOCAL_BACKEND_NO_MEMFS" to "1")
-        }
-        // letta.js memory-git installs bash pre/post-commit hooks; the repo
-        // lives on the noexec data partition (and Android has no bash), so
-        // any hook exec fails the commit. Route hook lookup to an empty dir:
-        // pre-commit is advisory frontmatter linting and post-commit only
-        // pushes when a remote memory repository is configured.
-        val disabledHooksDirectory = File(storageDirectory.parentFile, "git-hooks-disabled").apply { mkdirs() }
-        // Regenerated every start — it's ours, and hooksPath must track the
-        // current path.
-        File(homeDirectory, ".gitconfig").writeText(
-            """
-            [user]
-            	name = Letta Mobile
-            	email = letta-mobile@localhost
-            [core]
-            	hooksPath = ${disabledHooksDirectory.absolutePath}
-            [maintenance]
-            	auto = false
-            [safe]
-            	directory = *
-            """.trimIndent() + "\n",
-        )
-        return pathEnvironment + mapOf(
-            "GIT_EXEC_PATH" to binDirectory.absolutePath,
-            "GIT_TEMPLATE_DIR" to "",
-            "GIT_CONFIG_NOSYSTEM" to "1",
-        )
-    }
-
-    private fun PreparedLettaCodeProject.writeEmbeddedLettaCodeProviderAuth(
-        baseUrl: String,
-        apiKey: String,
-        modelId: String,
-    ) {
-        val authFile = File(storageDirectory, "providers/auth.json")
-        val root = buildJsonObject {
-            put("version", 1)
-            put(
-                "providers",
-                buildJsonObject {
-                    put(
-                        "lc-lmstudio",
-                        buildJsonObject {
-                            put("id", "local-provider-lc-lmstudio")
-                            put("name", "lc-lmstudio")
-                            put("provider_type", "lmstudio")
-                            put("provider_category", "byok")
-                            put(
-                                "auth",
-                                buildJsonObject {
-                                    put("type", "api")
-                                    put("key", apiKey)
-                                },
-                            )
-                            put("base_url", baseUrl)
-                            put(
-                                "models",
-                                buildJsonArray {
-                                    add(
-                                        buildJsonObject {
-                                            put("id", modelId)
-                                            put("contextWindow", DEFAULT_LOCAL_CONTEXT_WINDOW)
-                                            put("maxTokens", EmbeddedLettaCodeModelSelection.DEFAULT_MAX_TOKENS)
-                                            put("input", buildJsonArray {
-                                                add(JsonPrimitive("text"))
-                                            })
-                                            put("cost", buildJsonObject {
-                                                put("input", 0)
-                                                put("output", 0)
-                                            })
-                                        },
-                                    )
-                                },
-                            )
-                        },
-                    )
-                },
-            )
-        }
-        authFile.parentFile?.mkdirs()
-        authFile.writeText(embeddedProviderAuthJson.encodeToString(JsonObject.serializer(), root))
-    }
-
-    private fun linkPackagedTool(binDirectory: File, commandName: String, libraryName: String, label: String): Boolean {
-        val library = File(context.applicationInfo.nativeLibraryDir, libraryName)
-        if (!library.canExecute()) {
-            Log.i(TAG, "$libraryName not packaged; $label unavailable")
-            return false
-        }
-        val link = File(binDirectory, commandName)
-        val current = runCatching { android.system.Os.readlink(link.absolutePath) }.getOrNull()
-        if (current != library.absolutePath || !link.canExecute()) {
-            link.delete()
-            runCatching { android.system.Os.symlink(library.absolutePath, link.absolutePath) }
-                .onFailure { error ->
-                    Log.w(TAG, "Failed to link $commandName; $label will be unavailable", error)
-                    return false
-                }
-        }
-        return link.canExecute()
+        return prepareAndroidEmbeddedLettaCodeLaunchSpec(
+            modelSelection = modelSelection,
+            onDeviceProviderBaseUrl = onDeviceProviderBaseUrl,
+            onDeviceProviderApiKey = onDeviceProviderApiKey,
+            androidNetworkBridgeBaseUrl = androidNetworkBridgeBaseUrl,
+            androidNetworkBridgeToken = androidNetworkBridgeToken,
+            deviceSensorGroundingWriter = deviceSensorGroundingWriter,
+            toolInstaller = AndroidContextEmbeddedToolInstaller(context),
+        ).toStreamJsonNodeStartRequest(session)
     }
 
     private fun TurnCommand.toWireLine(): String = when (val input = input) {
@@ -674,19 +435,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         private const val TAG = "LettaCodeRuntime"
         private const val TURN_SILENCE_MS = 120_000L
         private const val TURN_ABSOLUTE_MAX_MS = 30 * 60 * 1000L
-        private const val DEFAULT_LOCAL_CONTEXT_WINDOW = 128_000
-
-        /**
-         * Vision-capable model id substrings (case-insensitive). KEEP IN SYNC
-         * with the shim's VISION_MODEL_PATTERNS (admin-shim/lib/model-catalog.ts
-         * → LETTA_VISION_MODELS) so the embedded runtime and the remote shim
-         * agree on which custom models accept images (letta-mobile-nojhc).
-         */
-        private val VISION_MODEL_PATTERNS = listOf(
-            "llava", "vision", "opus", "sonnet", "haiku", "claude", "fable",
-            "gpt-", "gpt5", "gemini", "grok", "minimax",
-            "qwen-vl", "qwen2-vl", "qwen2.5-vl",
-        )
     }
 }
 
