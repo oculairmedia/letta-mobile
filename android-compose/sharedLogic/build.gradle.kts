@@ -87,8 +87,10 @@ kotlin {
                 api("org.jetbrains.compose.ui:ui:1.10.0")
                 // iroh-ffi Kotlin/JVM binding (JNI-backed, Android + JVM only).
                 // NOT in commonMain — native lib binding won't work with Kotlin/Native.
+                // Use implementation (not api): iroh 1.0 requires JVM 21 and must not
+                // leak onto downstream JVM-17 compile classpaths (e.g. :core:domain).
                 // g3cva.1: prove iroh endpoint create/connect works.
-                api("computer.iroh:iroh:1.0.0")
+                implementation("computer.iroh:iroh:1.0.0")
             }
         }
 

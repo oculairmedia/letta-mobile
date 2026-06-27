@@ -61,6 +61,8 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.2")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation(kotlin("test"))
+    testImplementation("computer.iroh:iroh:1.0.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 
