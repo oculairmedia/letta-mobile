@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.CanonicalRuntime
+import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.controller.node.NodeIdentity
 import com.letta.mobile.data.controller.node.NodeServer
 import kotlinx.coroutines.CoroutineScope
@@ -42,9 +43,10 @@ class IrohNodeServer(
             controller: AppServerController,
             scope: CoroutineScope,
             alpn: ByteArray = IrohNodeEndpoint.DEFAULT_ALPN,
+            relayConfig: IrohRelayConfig = IrohRelayConfig.Default,
         ): IrohNodeServer = runBlocking {
             // Create the iroh endpoint first
-            val irohEndpoint = IrohNodeEndpoint(alpn, scope)
+            val irohEndpoint = IrohNodeEndpoint(alpn, scope, relayConfig)
             irohEndpoint.create()
 
             // Create the base identity with the iroh endpoint

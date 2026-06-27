@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 class IrohNodeEndpoint(
     private val alpn: ByteArray = DEFAULT_ALPN,
     private val scope: CoroutineScope,
+    private val relayConfig: IrohRelayConfig = IrohRelayConfig.Default,
 ) {
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
@@ -58,7 +60,13 @@ class IrohNodeEndpoint(
 
     suspend fun create() {
         require(endpoint == null) { "IrohNodeEndpoint already created" }
-        endpoint = Endpoint.bind(EndpointOptions(alpns = listOf(alpn)))
+        val relayMode = IrohRelayConfigMapper.toRelayMode(relayConfig)
+        endpoint = Endpoint.bind(
+            EndpointOptions(
+                alpns = listOf(alpn),
+                relayMode = relayMode,
+            )
+        )
     }
 
     fun start(controller: AppServerController) {
