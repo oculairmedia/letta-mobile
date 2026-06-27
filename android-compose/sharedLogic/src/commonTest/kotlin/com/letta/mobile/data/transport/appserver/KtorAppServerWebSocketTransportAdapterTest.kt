@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class KtorAppServerWebSocketTransportAdapterTest {
@@ -67,9 +68,9 @@ class KtorAppServerWebSocketTransportAdapterTest {
         val exception = assertFailsWith<IllegalArgumentException> {
             adapter.createTransport(endpoint, backgroundScope)
         }
-        assert(exception.message!!.contains("ws"))
-        assert(exception.message!!.contains("wss"))
-        assert(exception.message!!.contains("iroh"))
+        assertTrue(exception.message!!.contains("ws"))
+        assertTrue(exception.message!!.contains("wss"))
+        assertTrue(exception.message!!.contains("iroh"))
     }
 
     @Test

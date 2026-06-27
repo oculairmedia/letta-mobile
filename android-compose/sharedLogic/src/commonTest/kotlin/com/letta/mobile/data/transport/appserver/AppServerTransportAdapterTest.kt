@@ -13,6 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -83,8 +84,8 @@ class AppServerTransportAdapterTest {
             AppServerTransportRegistry.createTransport(endpoint, backgroundScope)
         }
         assertNotNull(exception.message)
-        assert(exception.message!!.contains("No transport adapter registered"))
-        assert(exception.message!!.contains("unregistered"))
+        assertTrue(exception.message!!.contains("No transport adapter registered"))
+        assertTrue(exception.message!!.contains("unregistered"))
     }
 
     @Test
@@ -96,8 +97,8 @@ class AppServerTransportAdapterTest {
         val exception = assertFailsWith<IllegalArgumentException> {
             AppServerTransportRegistry.createTransport(endpoint, backgroundScope)
         }
-        assert(exception.message!!.contains("iroh"))
-        assert(exception.message!!.contains("ws"))
+        assertTrue(exception.message!!.contains("iroh"))
+        assertTrue(exception.message!!.contains("ws"))
     }
 
     @Test
