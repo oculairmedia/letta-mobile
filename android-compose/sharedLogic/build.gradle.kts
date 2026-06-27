@@ -28,7 +28,8 @@ kotlin {
 
     jvm {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            // JVM 21 required for iroh-ffi binding (computer.iroh:iroh:1.0.0)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
     }
 
@@ -84,6 +85,10 @@ kotlin {
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")
+                // iroh-ffi Kotlin/JVM binding (JNI-backed, Android + JVM only).
+                // NOT in commonMain — native lib binding won't work with Kotlin/Native.
+                // g3cva.1: prove iroh endpoint create/connect works.
+                api("computer.iroh:iroh:1.0.0")
             }
         }
 
