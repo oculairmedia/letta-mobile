@@ -19,6 +19,8 @@ import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
+import computer.iroh.RelayMode
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -74,7 +76,15 @@ class IrohChannelTransport(
         disconnect()
         _state.value = ChannelTransportState.Connecting()
         onConnect()
-        val localEndpoint = Endpoint.bind(EndpointOptions())
+        val localEndpoint = runCatching {
+            Endpoint.bind(
+                EndpointOptions(relayMode = RelayMode.Companion.disabled())
+            )
+        }.onFailure { t ->
+            com.letta.mobile.util.Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
+            _state.value = ChannelTransportState.Disconnected(0, "bind_failed: ${t.message}")
+            return
+        }.getOrThrow()
         val transport = IrohAppServerTransportAdapter(localEndpoint).createTransport(
             endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
             scope = scope,
