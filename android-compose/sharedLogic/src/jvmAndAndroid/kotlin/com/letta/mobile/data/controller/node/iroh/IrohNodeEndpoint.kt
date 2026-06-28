@@ -12,6 +12,8 @@ import kotlinx.coroutines.Job
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 
 class IrohNodeEndpoint(
     private val alpn: ByteArray = DEFAULT_ALPN,
@@ -77,7 +79,9 @@ class IrohNodeEndpoint(
         acceptJob = scope.launch {
             while (isActive) {
                 try {
-                    val incoming = ep.acceptNext() ?: break
+                    val incoming = withTimeout(ACCEPT_TIMEOUT_MS) {
+                        ep.acceptNext()
+                    } ?: break
                     Telemetry.event("IrohNode", "incoming.accepting")
                     val accepting = incoming.accept()
                     val connection = accepting.connect()
@@ -86,8 +90,11 @@ class IrohNodeEndpoint(
                     launch {
                         IrohNodeConnection(connection, controller, alpn).serve()
                     }
+                } catch (_: TimeoutCancellationException) {
+                    continue
                 } catch (e: Exception) {
                     if (!isActive) break
+                    Telemetry.event("IrohNode", "incoming.accept.failed", "error" to (e.message ?: e.toString()), "class" to e::class.simpleName)
                 }
             }
         }
@@ -106,5 +113,6 @@ class IrohNodeEndpoint(
 
     companion object {
         val DEFAULT_ALPN = "/letta/appserver/0".toByteArray()
+        private const val ACCEPT_TIMEOUT_MS = 30_000L
     }
 }

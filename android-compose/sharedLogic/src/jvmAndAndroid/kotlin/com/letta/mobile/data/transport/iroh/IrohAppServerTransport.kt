@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import com.letta.mobile.util.Telemetry
@@ -119,14 +120,17 @@ class IrohAppServerTransport(
     private suspend fun runControlChannel() = coroutineScope {
         // Establish connection and open control bi-stream
         try {
-            connection = endpoint.connect(remoteAddr, alpn)
+            connection = withTimeout(CONNECT_TIMEOUT_MS) {
+                endpoint.connect(remoteAddr, alpn)
+            }
             Telemetry.event("IrohTransport", "connect.ok")
             controlBiStream = connection.openBi()
             Telemetry.event("IrohTransport", "control.opened")
             connectionReady.complete(Unit)
         } catch (t: Throwable) {
+            Telemetry.event("IrohTransport", "connect.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
             connectionReady.completeExceptionally(t)
-            throw t
+            return@coroutineScope
         }
 
         val sender = controlCommandQueue
@@ -241,6 +245,7 @@ class IrohAppServerTransport(
         // typical QUIC idle timeouts (~30s) so the path never goes cold between
         // user messages.
         const val KEEPALIVE_INTERVAL_MS = 15_000L
+        const val CONNECT_TIMEOUT_MS = 30_000L
         val KEEPALIVE_PAYLOAD = byteArrayOf(0)
     }
 }
