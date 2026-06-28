@@ -70,7 +70,7 @@ class IrohChannelTransport(
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
         val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
             ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
-            ?: baseShimUrl
+            ?: baseShimUrl.trimStart().removePrefix("https://").removePrefix("http://")
         val ticket = effectiveUrl.removePrefix(IROH_URL_PREFIX).takeIf { it != effectiveUrl && it.isNotBlank() }
             ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
         disconnect()
@@ -264,6 +264,11 @@ class IrohChannelTransport(
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
         private const val DEBUG_FORCE_IROH_URL = "iroh://endpointacuxnaqqjdi7wof6bliicgttjs6fxpiillx6adetl5cfus7yx5e2wmqbaafggaabs6saeaiamro74dexuqbacafmceaadf5eaiaqblaraeazpjacaeakyeicagl2iaqbacwbcaybs6saeaiavqiqiamxuqbacafmcecqdf5eaiaqblarayazpjacaeakyeihagl2iaqbacwbccabs6saeaiavqiqsamxuqbacafmcefadf5eaiaqblarbmazpjacaeakyeimagl2iaqbacwbcdibs6saeaiavqiq4amxuqbacafmcehqdf5eaiaqblarcaazpjacaeakyeiragl2iaqbacwbceqbs6saeaiavqirgamxuqbacafmcekadf5eaiaqblarcuazpjacaeakyeiwagl2iaqbacwbcfybs6saeaiavqirqamxuqbacafmcemqdf5eaiaqblardiazpjacaeakyei3agl2iaqbacwbchabs6saeaiavqir2amxuqbacafmcepqdf5eaiaqblareaazpjacaeakyejlagl2iaqbacwbclabs6saeaiavqis2amxuqbacafmcexqdf5eaiaqblargmazpjacaeakyejzagl2iaqbacwbcsybs6saeaiavqiveamxuqbacafmcfladf5eaiaqblarneazpjacaeakyemcagl2iaqbacwbiaabs6saeaiavqlaaamxuqbacafmdaaadf5eaiaqbqfigjnjpjacaeambkhqagl2iaq"
-        fun isIrohUrl(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || url?.startsWith(IROH_URL_PREFIX) == true
+        fun isIrohUrl(url: String?): Boolean {
+            // Handle bare iroh://, https://iroh:// (corrupted saved config), etc.
+            if (url == null) return false
+            val stripped = url.trimStart().removePrefix("https://").removePrefix("http://")
+            return stripped.startsWith(IROH_URL_PREFIX)
+        }
     }
 }
