@@ -66,6 +66,7 @@ class IrohNodeEndpoint(
         val relayMode = IrohRelayConfigMapper.toRelayMode(relayConfig)
         endpoint = Endpoint.bind(
             EndpointOptions(
+                bindAddr = "0.0.0.0:0",
                 alpns = listOf(alpn),
                 relayMode = relayMode,
             )
