@@ -78,7 +78,7 @@ class IrohChannelTransport(
         onConnect()
         val localEndpoint = runCatching {
             Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.Companion.disabled())
+                EndpointOptions(relayMode = RelayMode.Companion.defaultMode())
             )
         }.onFailure { t ->
             com.letta.mobile.util.Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)

@@ -11,6 +11,7 @@ import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -61,11 +62,19 @@ class IrohAppServerTransport(
     private lateinit var streamBiStream: BiStream
     private val connectionReady = CompletableDeferred<Unit>()
 
-    private val controlJob = scope.launch {
+    // Catches any Iroh FFI exception that escapes per-coroutine error handling
+    // (e.g. IrohError timed out from keepalive, stream reader, or accept loops).
+    // Without this, an uncaught IrohException in a scope.launch propagates to
+    // the thread's default uncaught exception handler and crashes the app.
+    private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        Telemetry.event("IrohTransport", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
+    }
+
+    private val controlJob = scope.launch(irohExceptionHandler) {
         runControlChannel()
     }
 
-    private val streamJob = scope.launch {
+    private val streamJob = scope.launch(irohExceptionHandler) {
         connectionReady.await()
         runStreamChannel()
     }
