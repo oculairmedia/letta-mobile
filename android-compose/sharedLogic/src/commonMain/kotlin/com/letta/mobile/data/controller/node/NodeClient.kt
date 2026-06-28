@@ -13,6 +13,8 @@ import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Client-side interface for a node that CONNECTS TO remote nodes.
@@ -40,8 +42,12 @@ interface NodeClient {
      * @throws IllegalArgumentException if the identity has no endpoints
      */
     suspend fun connectTo(identity: NodeIdentity): RemoteNodeHandle {
-        val endpoint = identity.endpoints.firstOrNull()
-            ?: throw IllegalArgumentException("NodeIdentity has no endpoints")
+        val endpoint = identity.endpoints.firstOrNull { endpoint ->
+            AppServerTransportRegistry.getAdapter(endpoint.scheme) != null
+        } ?: throw IllegalArgumentException(
+            "NodeIdentity has no supported endpoints. " +
+                "Advertised schemes: ${identity.endpoints.map { it.scheme }.sorted()}"
+        )
         return connectTo(endpoint)
     }
 
@@ -150,19 +156,19 @@ class DefaultNodeClient(
     private val controllerFactory: (com.letta.mobile.data.transport.appserver.AppServerClient) -> AppServerController =
         { client -> com.letta.mobile.data.controller.DefaultAppServerController(client) },
 ) : NodeClient {
-    override suspend fun connectTo(endpoint: AppServerEndpoint): RemoteNodeHandle {
-        // Resolve endpoint to transport via the registry
-        val transport = AppServerTransportRegistry.createTransport(
-            endpoint = endpoint,
-            scope = scope,
-        )
+    override suspend fun connectTo(endpoint: AppServerEndpoint): RemoteNodeHandle = sharedHandleMutex.withLock {
+        sharedHandlesByEndpoint.getOrPut(endpoint) {
+            val transport = AppServerTransportRegistry.createTransport(
+                endpoint = endpoint,
+                scope = scope,
+            )
+            val client = com.letta.mobile.data.transport.appserver.DefaultAppServerClient(transport)
+            RemoteNodeHandle(controllerFactory(client))
+        }
+    }
 
-        // Create a client from the transport using DefaultAppServerClient
-        val client = com.letta.mobile.data.transport.appserver.DefaultAppServerClient(transport)
-
-        // Wrap in a controller
-        val controller = controllerFactory(client)
-
-        return RemoteNodeHandle(controller)
+    companion object {
+        private val sharedHandleMutex = Mutex()
+        private val sharedHandlesByEndpoint = mutableMapOf<AppServerEndpoint, RemoteNodeHandle>()
     }
 }

@@ -85,10 +85,8 @@ class DefaultNodeServer(
     override suspend fun advertise(): NodeIdentity = identity
 
     override suspend fun hostedRuntimes(): List<CanonicalRuntime> {
-        // NOTE: The controller doesn't expose a runtime list API yet.
-        // In a real implementation, this would query the controller's runtime registry.
-        // For now, return the cached list (which can be manually populated for testing).
-        return runtimesCache.toList()
+        val controllerRuntimes = controller.hostedRuntimes()
+        return if (controllerRuntimes.isNotEmpty()) controllerRuntimes else runtimesCache.toList()
     }
 
     override suspend fun acceptConnections(port: Int) {

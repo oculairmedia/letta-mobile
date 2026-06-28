@@ -38,12 +38,21 @@ class KtorAppServerWebSocketTransportAdapter(
 
         return KtorAppServerWebSocketTransport(
             httpClient = httpClient,
-            baseUrl = endpoint.address,
+            baseUrl = normalizeWsAddress(endpoint.address, endpoint.scheme),
             scope = scope,
             bearerToken = endpoint.bearerToken,
             protocol = protocol,
         )
     }
+
+    /**
+     * Normalizes a WebSocket address to a proper ws:// or wss:// URL.
+     * If the address is a bare host:port (no scheme), prepends ws:// or wss://
+     * so URLBuilder can parse it correctly (fixes P2 Codex review: normalize
+     * host:port WebSocket endpoints before dialing).
+     */
+    private fun normalizeWsAddress(address: String, scheme: String): String =
+        if (address.contains("://")) address else "$scheme://$address"
 
     companion object {
         /**
