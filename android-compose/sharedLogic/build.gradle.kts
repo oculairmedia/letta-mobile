@@ -84,6 +84,11 @@ kotlin {
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")
+                // Iroh QUIC transport binding (JNI-backed, Android + JVM only).
+                // NOT in commonMain — native lib doesn't work with Kotlin/Native.
+                // Use implementation (not api): iroh 1.0 requires JVM 21 and must
+                // not leak onto downstream JVM-17 compile classpaths (:core:domain).
+                implementation("computer.iroh:iroh:1.0.0")
             }
         }
 

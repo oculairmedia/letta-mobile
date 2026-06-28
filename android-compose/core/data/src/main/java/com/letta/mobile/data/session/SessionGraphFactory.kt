@@ -50,6 +50,9 @@ import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
 import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.ChannelTransport
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.runtime.BackendCapabilities
@@ -97,9 +100,11 @@ class SessionGraphFactory internal constructor(
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val localModelSource: LocalRuntimeModelSource? = null,
+    @ApplicationContext private val appContext: Context,
 ) : SessionRepositoryGraphFactory<SessionGraph> {
     @Inject
     constructor(
+        @ApplicationContext appContext: Context,
         agentApi: AgentApi,
         agentDao: AgentDao,
         conversationApi: ConversationApi,
@@ -153,6 +158,7 @@ class SessionGraphFactory internal constructor(
         runCursorStore = runCursorStore,
         conversationCursorStore = conversationCursorStore,
         settingsRepository = settingsRepository,
+        appContext = appContext,
         localConversationSource = localConversationSource,
         localAgentSource = localAgentSource,
         localModelSource = localModelSource,
@@ -175,10 +181,31 @@ class SessionGraphFactory internal constructor(
             conversationDao.deleteAllRefreshStates()
         }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val channelTransport = if (localRuntimeBackend == null) {
-            ChannelTransport(scope, runCursorStore, conversationCursorStore)
-        } else {
-            NoOpChannelTransport()
+        val channelTransport = when {
+            localRuntimeBackend != null -> {
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohSelect", "transport", "chosen" to "noop-local",
+                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
+                )
+                NoOpChannelTransport()
+            }
+            IrohChannelTransport.isIrohUrl(activeConfig?.serverUrl) -> {
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohSelect", "transport", "chosen" to "iroh",
+                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
+                )
+                IrohChannelTransport(
+                    scope = scope,
+                    onConnect = { com.letta.mobile.runtime.iroh.IrohAndroidInit.install(appContext) },
+                )
+            }
+            else -> {
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohSelect", "transport", "chosen" to "ws-default",
+                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
+                )
+                ChannelTransport(scope, runCursorStore, conversationCursorStore)
+            }
         }
         val agentRepository = AgentRepository(
             agentApi = agentApi,
