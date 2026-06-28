@@ -2,12 +2,15 @@ package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolDefinition
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolsGroup
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
@@ -31,6 +34,7 @@ class DefaultAppServerController(
     private val client: AppServerClient,
     private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
     private val requestIdFactory: () -> String = ::defaultRequestId,
+    private val externalToolRegistry: ExternalToolRegistry? = null,
 ) : AppServerController {
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
     override val state: StateFlow<AppServerControllerState> = _state.asStateFlow()
@@ -78,6 +82,7 @@ class DefaultAppServerController(
                     mode = mode,
                     clientInfo = clientInfo,
                     recoverApprovals = recoverApprovals,
+                    externalTools = externalToolsForRuntime(),
                     forceDeviceStatus = forceDeviceStatus,
                 ),
             )
@@ -174,9 +179,33 @@ class DefaultAppServerController(
     fun clearRuntimeCache() {
         runtimeCache.clear()
     }
+
+    override suspend fun hostedRuntimes(): List<CanonicalRuntime> = runtimeMutex.withLock {
+        runtimeCache.values.toList()
+    }
+
+    private fun externalToolsForRuntime(): List<AppServerExternalToolsGroup>? {
+        val tools = externalToolRegistry?.listAdvertisedTools().orEmpty()
+        if (tools.isEmpty()) return null
+        return listOf(
+            AppServerExternalToolsGroup(
+                scopeId = EXTERNAL_TOOLS_SCOPE_ID,
+                tools = tools.map { tool ->
+                    AppServerExternalToolDefinition(
+                        name = tool.name,
+                        description = tool.description,
+                        parameters = tool.inputSchema ?: kotlinx.serialization.json.buildJsonObject {},
+                    )
+                },
+            ),
+        )
+    }
+
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
+        private const val EXTERNAL_TOOLS_SCOPE_ID = "letta-mobile"
+
         private val DEFAULT_CLIENT_INFO = AppServerRuntimeStartClientInfo(
             name = "letta-mobile-controller",
             title = "Letta Mobile Controller",

@@ -148,7 +148,8 @@ class RuntimeEventFanout {
      * @param frame The inbound frame to route
      */
     suspend fun route(frame: AppServerInboundFrame) {
-        val runtime = frame.runtime ?: return // Only route events with a runtime scope
+        if (!frame.isRuntimeEventFrame()) return
+        val runtime = frame.runtime ?: return
 
         val key = RuntimeKey(runtime.agentId, runtime.conversationId)
 
@@ -255,6 +256,13 @@ class RuntimeEventFanout {
 
     companion object {
         private val nextSubscriberId = java.util.concurrent.atomic.AtomicInteger(0)
+
+        private fun AppServerInboundFrame.isRuntimeEventFrame(): Boolean =
+            this is AppServerInboundFrame.StreamDelta ||
+                this is AppServerInboundFrame.UpdateLoopStatus ||
+                this is AppServerInboundFrame.UpdateDeviceStatus ||
+                this is AppServerInboundFrame.UpdateQueue ||
+                this is AppServerInboundFrame.UpdateSubagentState
 
         /**
          * Generates a unique subscriber ID.
