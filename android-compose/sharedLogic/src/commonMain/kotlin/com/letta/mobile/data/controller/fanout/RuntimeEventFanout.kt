@@ -88,9 +88,12 @@ class RuntimeEventFanout {
     suspend fun subscribe(
         agentId: AgentId,
         conversationId: ConversationId,
-        subscriberId: String = generateSubscriberId(),
+        subscriberId: String? = null,
     ): Pair<String, Flow<AppServerInboundFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
+        // Generate subscriber ID INSIDE the lock so concurrent calls cannot
+        // race and produce duplicates (critical fix, Codex review).
+        val sid = subscriberId ?: generateSubscriberId()
 
         // Get or create the shared flow for this runtime
         val flow = runtimeFlows.getOrPut(key) {
@@ -101,9 +104,9 @@ class RuntimeEventFanout {
         }
 
         // Register the subscriber
-        subscribers[subscriberId] = key
+        subscribers[sid] = key
 
-        subscriberId to flow.asSharedFlow()
+        sid to flow.asSharedFlow()
     }
 
     /**
@@ -121,9 +124,12 @@ class RuntimeEventFanout {
         val hasRemainingSubscribers = subscribers.values.any { it == key }
 
         if (!hasRemainingSubscribers) {
-            // No more subscribers for this runtime, clean up the flow and lock
+            // No more subscribers for this runtime, clean up the flow.
+            // Keep runtimeTurnLocks alive — an in-flight turn may still hold
+            // the Mutex.lock. Removing the lock from the map while a turn is
+            // active would orphan the Mutex and create a fresh (uncontended)
+            // one on the next acquireTurnLock, breaking per-runtime serialization.
             runtimeFlows.remove(key)
-            runtimeTurnLocks.remove(key)
         }
 
         true
@@ -248,14 +254,14 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
-        private var nextSubscriberId = 0
+        private val nextSubscriberId = java.util.concurrent.atomic.AtomicInteger(0)
 
         /**
          * Generates a unique subscriber ID.
+         * Thread-safe via AtomicInteger even if called outside the stateMutex.
          */
         private fun generateSubscriberId(): String {
-            nextSubscriberId += 1
-            return "subscriber-$nextSubscriberId"
+            return "subscriber-${nextSubscriberId.incrementAndGet()}"
         }
     }
 }

@@ -121,7 +121,7 @@ class DefaultAppServerController(
         forceDeviceStatus: Boolean,
     ): AppServerInboundFrame.SyncResponse {
         return try {
-            client.sync(
+            val response = client.sync(
                 AppServerCommand.Sync(
                     runtime = runtime,
                     requestId = requestIdFactory(),
@@ -129,6 +129,13 @@ class DefaultAppServerController(
                     forceDeviceStatus = forceDeviceStatus,
                 ),
             )
+            if (!response.success) {
+                _state.value = AppServerControllerState.Error(
+                    message = "Sync failed: ${response.error ?: "Unknown error"}",
+                )
+                throw AppServerControllerException("Sync failed: ${response.error ?: "Unknown error"}")
+            }
+            response
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to sync runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
@@ -139,21 +146,34 @@ class DefaultAppServerController(
         runId: String?,
     ): AppServerInboundFrame.AbortMessageResponse {
         return try {
-            client.abort(
+            val response = client.abort(
                 AppServerCommand.AbortMessage(
                     runtime = runtime,
                     requestId = requestIdFactory(),
                     runId = runId,
                 ),
             )
+            if (!response.success) {
+                _state.value = AppServerControllerState.Error(
+                    message = "Abort failed: ${response.error ?: "Unknown error"}",
+                )
+                throw AppServerControllerException("Abort failed: ${response.error ?: "Unknown error"}")
+            }
+            response
         } catch (e: Exception) {
             throw AppServerControllerException("Failed to abort runtime ${runtime.agentId}/${runtime.conversationId}", e)
         }
     }
 
     /**
-     * Internal key for runtime cache.
+     * Clears all cached runtimes. Called by ReconnectCoordinator when the
+     * App Server connection drops — stale cached scopes must not survive a
+     * reconnect (the server process may have restarted underneath us).
+     * Codex review: force runtime_start after reconnect.
      */
+    fun clearRuntimeCache() {
+        runtimeCache.clear()
+    }
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
@@ -163,11 +183,10 @@ class DefaultAppServerController(
             version = "0.2.0",
         )
 
-        private var nextRequestId = 0
+        private val nextRequestId = java.util.concurrent.atomic.AtomicInteger(0)
 
         private fun defaultRequestId(): String {
-            nextRequestId += 1
-            return "controller-req-$nextRequestId"
+            return "controller-req-${nextRequestId.incrementAndGet()}"
         }
     }
 }
