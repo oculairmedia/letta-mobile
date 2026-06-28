@@ -130,6 +130,13 @@ class ServerHealthRepository(
 
     private suspend fun probe(config: LettaConfig) {
         val baseUrl = config.serverUrl.trim().trimEnd('/')
+        // Skip non-HTTP URLs (e.g. iroh://) — they have no HTTP health
+        // endpoint and probing them would fail DNS/resolution, marking
+        // a valid transport config as OFFLINE.
+        if (!baseUrl.startsWith("http://", ignoreCase = true) &&
+            !baseUrl.startsWith("https://", ignoreCase = true)) {
+            return
+        }
         val target = "$baseUrl/v1/health/"
         // Bare try/catch (not runCatching) so a CancellationException
         // — e.g. parent scope cancelled while a probe is mid-flight —
