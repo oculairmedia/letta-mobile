@@ -113,6 +113,6 @@ class IrohNodeEndpoint(
 
     companion object {
         val DEFAULT_ALPN = "/letta/appserver/0".toByteArray()
-        private const val ACCEPT_TIMEOUT_MS = 30_000L
+        private const val ACCEPT_TIMEOUT_MS = 120_000L
     }
 }

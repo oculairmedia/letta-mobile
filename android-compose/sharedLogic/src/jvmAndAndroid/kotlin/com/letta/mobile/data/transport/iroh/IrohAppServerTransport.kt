@@ -245,7 +245,7 @@ class IrohAppServerTransport(
         // typical QUIC idle timeouts (~30s) so the path never goes cold between
         // user messages.
         const val KEEPALIVE_INTERVAL_MS = 15_000L
-        const val CONNECT_TIMEOUT_MS = 30_000L
+        const val CONNECT_TIMEOUT_MS = 120_000L
         val KEEPALIVE_PAYLOAD = byteArrayOf(0)
     }
 }
