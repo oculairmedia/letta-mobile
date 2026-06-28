@@ -23,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -279,6 +280,70 @@ class IrohChannelTransportEndToEndTest {
             sawStarted
         }
         assertTrue(turn2Ran, "Turn 2 must run after turn 1's idle timeout — the engine must not stay jammed.")
+    }
+
+    @Test
+    fun consecutiveMultiTurnWithLatencyPasses() = runBlocking {
+        // Simulates real-world timing: first turn takes 500ms (LLM latency),
+        // second turn should still work after it completes (c0qm0 regression guard).
+        val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        server.create()
+        server.start(LatentEchoController(delayMs = 500))
+        val ticket = server.ticketString()
+
+        val transport = IrohChannelTransport(
+            scope = clientScope,
+            onConnect = {},
+            forcedIrohUrl = "iroh://$ticket",
+        )
+        try {
+            transport.connect("iroh://$ticket", "", "harness-device", "harness-1")
+
+            val frames = mutableListOf<ServerFrame>()
+            val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+
+            // Turn 1
+            transport.send("agent-test", "conv-test", "turn-1", "otid-1", null, false)
+            withTimeout(10_000) {
+                while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50)
+            }
+
+            // Wait a bit then send turn 2
+            delay(100)
+            transport.send("agent-test", "conv-test", "turn-2", "otid-2", null, false)
+            withTimeout(10_000) {
+                while (frames.count { it is ServerFrame.TurnDone } < 2) delay(50)
+            }
+
+            val assistant = frames.filterIsInstance<ServerFrame.AssistantMessage>()
+            assertTrue(assistant.any { it.content.contains("reply-for-turn-1") }, "Turn 1 assistant")
+            assertTrue(assistant.any { it.content.contains("reply-for-turn-2") }, "Turn 2 assistant")
+            collector.cancel()
+        } finally {
+            runCatching { transport.disconnect() }
+            runCatching { server.shutdown() }
+        }
+    }
+
+    /**
+     * Controller that adds a configurable delay before emitting each turn's response,
+     * simulating real LLM latency.
+     */
+    private class LatentEchoController(private val delayMs: Long) : AppServerController {
+        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
+        override suspend fun startRuntime(agentId: AgentId, conversationId: ConversationId, cwd: String?, mode: AppServerPermissionMode?, recoverApprovals: Boolean, forceDeviceStatus: Boolean): CanonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value), agent = null, conversation = null, created = null)
+
+        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
+            val turnN = (command.input as? TurnInput.UserMessage)?.text?.let { t -> t.substringAfterLast('-').ifEmpty { "1" } } ?: "1"
+            return flow {
+                delay(delayMs)
+                emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RemoteStreamFrame("f-$turnN", "msg-$turnN", "assistant_message", "reply-for-turn-$turnN")))
+                delay(delayMs / 2)
+                emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
+            }
+        }
+        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
+        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
     /** Emits one assistant reply per turn, echoing the input text so each turn is distinguishable. */
