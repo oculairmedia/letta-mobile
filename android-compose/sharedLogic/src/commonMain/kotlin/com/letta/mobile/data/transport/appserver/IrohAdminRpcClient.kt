@@ -84,11 +84,10 @@ class IrohAdminRpcClient(
     companion object {
         const val DEFAULT_RPC_TIMEOUT_MS: Long = 30_000L
 
-        private var nextId = 0
+        private val nextId = kotlinx.atomicfu.atomic(0)
 
         private fun nextRequestId(): String {
-            nextId += 1
-            return "rpc-${nextId}"
+            return "rpc-${nextId.getAndIncrement()}"
         }
     }
 }
