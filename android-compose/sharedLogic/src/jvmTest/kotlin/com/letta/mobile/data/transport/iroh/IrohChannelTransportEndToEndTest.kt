@@ -389,6 +389,40 @@ class IrohChannelTransportEndToEndTest {
         override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
     }
 
+    /** Emits a single excessively large frame to exercise the OOM guard line buffer. */
+    private class BigFrameController : AppServerController {
+        override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
+        override suspend fun startRuntime(agentId: AgentId, conversationId: ConversationId, cwd: String?, mode: AppServerPermissionMode?, recoverApprovals: Boolean, forceDeviceStatus: Boolean): CanonicalRuntime =
+            CanonicalRuntime(scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value), agent = null, conversation = null, created = null)
+        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
+            // Emit a frame larger than MAX_LINE_BYTES (1MB) to trigger the overflow guard
+            val big = "x".repeat(2_000_000)
+            emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime,
+                payload = RuntimeEventPayload.RemoteStreamFrame("big", "big", "assistant_message", big)))
+            emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime,
+                payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
+        }
+        override suspend fun sync(runtime: AppServerRuntimeScope, recoverApprovals: Boolean, forceDeviceStatus: Boolean): AppServerInboundFrame.SyncResponse = throw UnsupportedOperationException()
+        override suspend fun abort(runtime: AppServerRuntimeScope, runId: String?): AppServerInboundFrame.AbortMessageResponse = throw UnsupportedOperationException()
+    }
+
+    @Test
+    fun largeFrameDoesNotCauseOom() = runBlocking {
+        val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        server.create(); server.start(BigFrameController())
+        val transport = IrohChannelTransport(scope = clientScope, onConnect = {}, forcedIrohUrl = "iroh://${server.ticketString()}")
+        try {
+            transport.connect("iroh://${server.ticketString()}", "", "h", "h")
+            val frames = mutableListOf<ServerFrame>()
+            val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+            transport.send("a", "c", "hi", "otid-1", null, false)
+            withTimeout(15_000) { while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50) }
+            // Should have completed without OOM — the big frame should be handled gracefully
+            assertTrue(frames.any { it is ServerFrame.TurnDone }, "Turn should complete even with oversized frame")
+            collector.cancel()
+        } finally { runCatching { transport.disconnect() }; runCatching { server.shutdown() } }
+    }
+
     private companion object {
         const val ASSISTANT_REPLY = "harness-assistant-reply-OK"
     }

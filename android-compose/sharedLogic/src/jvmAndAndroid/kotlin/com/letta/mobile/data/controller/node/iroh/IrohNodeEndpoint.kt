@@ -7,6 +7,7 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointOptions
 import computer.iroh.EndpointTicket
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import com.letta.mobile.util.Telemetry
@@ -87,11 +88,15 @@ class IrohNodeEndpoint(
         )
     }
 
+    private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        com.letta.mobile.util.Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
+    }
+
     fun start(controller: AppServerController) {
         val ep = checkNotNull(endpoint) { "IrohNodeEndpoint not created yet" }
         require(acceptJob == null) { "IrohNodeEndpoint already started" }
 
-        acceptJob = scope.launch {
+        acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {
                 try {
                     val incoming = withTimeout(ACCEPT_TIMEOUT_MS) {

@@ -100,10 +100,12 @@ class IrohNodeConnection(
                             Telemetry.event("IrohNode", "control.recv", "bytes" to frameJson.length)
 
                             launch {
-                                val response = handleControlFrame(frameJson, streamSend)
-                                if (response != null) {
-                                    sendStream.writeAll(response.toByteArray())
-                                    sendStream.writeAll("\n".toByteArray())
+                                runCatching {
+                                    val response = handleControlFrame(frameJson, streamSend)
+                                    if (response != null) {
+                                        sendStream.writeAll(response.toByteArray())
+                                        sendStream.writeAll("\n".toByteArray())
+                                    }
                                 }
                             }
                         }
