@@ -77,6 +77,7 @@ class IrohChannelTransport(
     private var endpoint: Endpoint? = null
     private var turnEngine: AppServerTurnEngine? = null
     private var connectedTicket: String? = null
+    private var activeSendJob: kotlinx.coroutines.Job? = null
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
         val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
@@ -123,7 +124,7 @@ class IrohChannelTransport(
         val engine = turnEngine ?: return false
         val runId = "iroh-run-${UUID.randomUUID()}"
         val turnId = "iroh-turn-${UUID.randomUUID()}"
-        scope.launch {
+        val sendJob = scope.launch {
             _events.emit(
                 ServerFrame.TurnStarted(
                     id = frameId("turn_started"),
@@ -171,6 +172,7 @@ class IrohChannelTransport(
                 )
             }
         }
+        activeSendJob = sendJob
         return true
     }
 
@@ -217,7 +219,22 @@ class IrohChannelTransport(
         }
     }
 
-    override fun cancel(conversationId: String): Boolean = false
+    override fun cancel(conversationId: String): Boolean {
+        activeSendJob?.cancel()
+        activeSendJob = null
+        scope.launch {
+            _events.emit(
+                ServerFrame.TurnDone(
+                    id = frameId("cancelled"),
+                    ts = nowIso(),
+                    turnId = "cancelled-${UUID.randomUUID()}",
+                    runId = "cancelled-${UUID.randomUUID()}",
+                    status = "cancelled",
+                ),
+            )
+        }
+        return true
+    }
     override fun bye(): Boolean = true
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
