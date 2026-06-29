@@ -42,6 +42,12 @@ class IrohNodeConnection(
     private val connection: Connection,
     private val controller: AppServerController,
     private val alpn: ByteArray,
+    /**
+     * Router for admin RPC calls. Domain handlers register here.
+     * Defaults to an empty router — methods register on the same instance
+     * before connections arrive (e.g. in IrohNodeEndpoint.start).
+     */
+    private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(controller),
 ) {
     suspend fun serve() = coroutineScope {
         try {
@@ -128,6 +134,14 @@ class IrohNodeConnection(
                 "input" -> {
                     handleInput(frameJson, streamSend)
                     null
+                }
+                "admin_rpc" -> {
+                    val method = obj["method"]?.jsonPrimitive?.content
+                    if (method == null || requestId == null) {
+                        """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
+                    } else {
+                        adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
+                    }
                 }
                 "sync" -> {
                     if (requestId == null) {

@@ -34,6 +34,7 @@ class AppServerRuntimeEventMapper {
             -> listOf(received.toExternalTransportDraft(command))
             is AppServerInboundFrame.ExternalToolCallRequest -> frame.toToolCallDraft(command)
             is AppServerInboundFrame.ControlRequest -> frame.toApprovalOrExternalDraft(command, received)
+            is AppServerInboundFrame.AdminRpcResponse -> emptyList() // handled by IrohAdminRpcClient
             is AppServerInboundFrame.Unknown -> listOf(received.toExternalTransportDraft(command))
         }
 
