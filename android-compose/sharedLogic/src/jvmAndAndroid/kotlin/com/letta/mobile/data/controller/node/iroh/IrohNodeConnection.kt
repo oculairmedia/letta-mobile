@@ -86,6 +86,13 @@ class IrohNodeConnection(
             val buffer = mutableListOf<Byte>()
 
             while (true) {
+                // Safety limit: prevent unbounded buffer growth if a peer sends
+                // data without newlines (same guard as client-side receiveFrames).
+                if (buffer.size > MAX_LINE_BYTES) {
+                    Telemetry.event("IrohNode", "control.line_overflow", "bytes" to buffer.size)
+                    buffer.clear()
+                }
+
                 val chunk = runCatching {
                     recvStream.read(8192u)
                 }.getOrNull() ?: break
@@ -297,5 +304,8 @@ class IrohNodeConnection(
 
     private companion object {
         var nextEventSeq: Long = 1L
+        // Max bytes per line before the control frame reader clears its buffer
+        // as an unbounded-growth safety guard (same value as client-side guard).
+        const val MAX_LINE_BYTES = 1_048_576 // 1MB
     }
 }

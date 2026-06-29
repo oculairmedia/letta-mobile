@@ -114,8 +114,8 @@ class AppServerTurnEngine(
         }
         try {
             client.events.collect { received ->
-                lastFrameAt.value = currentTimeMs()
                 if (!received.matches(scope)) return@collect
+                lastFrameAt.value = currentTimeMs()
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
                     emit(draft)
