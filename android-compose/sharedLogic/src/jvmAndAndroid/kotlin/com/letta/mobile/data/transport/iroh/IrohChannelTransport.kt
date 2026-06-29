@@ -63,6 +63,17 @@ class IrohChannelTransport(
     private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
+    // Bridge _events to _frameEvents so WsChatBridge's merged flow
+    // (frameEvents + state) sees all Iroh ServerFrames. Without this,
+    // the chat UI never renders Iroh turn data.
+    init {
+        scope.launch {
+            _events.collect { frame ->
+                _frameEvents.emit(TransportFrameEvent(frame = frame))
+            }
+        }
+    }
+
     private var endpoint: Endpoint? = null
     private var turnEngine: AppServerTurnEngine? = null
     private var connectedTicket: String? = null
