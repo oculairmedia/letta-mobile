@@ -100,7 +100,7 @@ class IrohChannelTransport(
         val transport = IrohAppServerTransportAdapter(localEndpoint).createTransport(
             endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
             scope = scope,
-        )
+        ) as IrohAppServerTransport
         endpoint = localEndpoint
         connectedTicket = ticket
         turnEngine = AppServerTurnEngine(
@@ -110,6 +110,16 @@ class IrohChannelTransport(
                 version = clientVersion,
             ),
         )
+        // Await actual QUIC connection before marking Connected. If the
+        // handshake fails, the state stays Disconnected and the caller
+        // can retry rather than getting a false "Connected" signal.
+        runCatching {
+            transport.awaitConnectionReady()
+        }.onFailure { t ->
+            com.letta.mobile.util.Telemetry.event("IrohTransport", "connect.failed", "error" to (t.message ?: t.toString()))
+            _state.value = ChannelTransportState.Disconnected(0, "connect_failed: ${t.message}")
+            return
+        }
         _state.value = ChannelTransportState.Connected(serverId = "iroh-app-server", sessionId = connectedTicket.hashCode().toString(), deviceId = deviceId, a2uiEnabled = false, a2uiCatalog = null, canonicalLiveTransport = "iroh")
     }
 

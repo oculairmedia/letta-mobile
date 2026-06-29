@@ -62,6 +62,15 @@ class IrohAppServerTransport(
     private lateinit var streamBiStream: BiStream
     private val connectionReady = CompletableDeferred<Unit>()
 
+    /**
+     * Awaits the initial QUIC connection completion (success or failure).
+     * The transport is not fully usable until this completes successfully.
+     * Throws the connection error if the handshake failed.
+     */
+    suspend fun awaitConnectionReady() {
+        connectionReady.await()
+    }
+
     // Catches any Iroh FFI exception that escapes per-coroutine error handling
     // (e.g. IrohError timed out from keepalive, stream reader, or accept loops).
     // Without this, an uncaught IrohException in a scope.launch propagates to
