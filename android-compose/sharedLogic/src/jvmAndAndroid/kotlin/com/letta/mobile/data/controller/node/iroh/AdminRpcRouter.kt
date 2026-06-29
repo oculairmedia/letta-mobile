@@ -24,7 +24,6 @@ import kotlinx.serialization.json.jsonObject
  * @param json JSON instance for parsing
  */
 class AdminRpcRouter(
-    private val controller: AppServerController,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val handlers = mutableMapOf<String, suspend (JsonObject?) -> JsonElement>()

@@ -47,7 +47,7 @@ class IrohNodeConnection(
      * Defaults to an empty router — methods register on the same instance
      * before connections arrive (e.g. in IrohNodeEndpoint.start).
      */
-    private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(controller),
+    private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
 ) {
     suspend fun serve() = coroutineScope {
         try {

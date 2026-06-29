@@ -22,6 +22,20 @@ class IrohNodeEndpoint(
 ) {
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
+    private var _adminRpcRouter: AdminRpcRouter? = null
+
+    /**
+     * The admin RPC router for this endpoint. Created lazily so handlers can
+     * register before [start] is called. Passed to every incoming connection.
+     */
+    val adminRpcRouter: AdminRpcRouter
+        get() {
+            val r = _adminRpcRouter
+            if (r != null) return r
+            val created = AdminRpcRouter()
+            _adminRpcRouter = created
+            return created
+        }
 
     /**
      * Returns the full EndpointAddr (node ID + relay + direct addresses).
@@ -89,7 +103,12 @@ class IrohNodeEndpoint(
                     Telemetry.event("IrohNode", "incoming.connected")
 
                     launch {
-                        IrohNodeConnection(connection, controller, alpn).serve()
+                        IrohNodeConnection(
+                            connection = connection,
+                            controller = controller,
+                            alpn = alpn,
+                            adminRpcRouter = adminRpcRouter,
+                        ).serve()
                     }
                 } catch (_: TimeoutCancellationException) {
                     continue
