@@ -200,19 +200,20 @@ class IrohNodeConnection(
         streamSend: SendStream,
     ) {
         val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.Input
-        val text = (input.payload as? AppServerInputPayload.CreateMessage)
+        val userMsg = (input.payload as? AppServerInputPayload.CreateMessage)
             ?.messages
             ?.firstOrNull { it.role == "user" }
-            ?.content
+        val text = userMsg?.content
             ?.let { (it as? JsonPrimitive)?.contentOrNull ?: it.toString() }
             ?: ""
+        val clientMsgId = userMsg?.clientMessageId
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
             runtimeId = RuntimeId("iroh-node:${input.runtime.agentId}:${input.runtime.conversationId}"),
             agentId = AgentId(input.runtime.agentId),
             conversationId = ConversationId(input.runtime.conversationId),
             input = TurnInput.UserMessage(
-                localMessageId = "iroh-${UUID.randomUUID()}",
+                localMessageId = clientMsgId ?: "iroh-${UUID.randomUUID()}",
                 text = text,
             ),
         )
