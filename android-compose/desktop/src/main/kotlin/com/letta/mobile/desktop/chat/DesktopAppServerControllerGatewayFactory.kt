@@ -8,6 +8,12 @@ import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.serialization.kotlinx.json.json
 
 /**
  * Factory for creating a desktop chat gateway backed by the App Server controller.
@@ -58,7 +64,7 @@ class DesktopAppServerControllerGatewayFactory(
         // Create the WebSocket transport
         // The endpoint.address is the full WebSocket URL for WebSocket endpoints
         val transport = KtorAppServerWebSocketTransport(
-            httpClient = createDesktopLettaHttpClient(),
+            httpClient = createDesktopWsClient(),
             baseUrl = endpoint.address,
             scope = controllerScope,
             bearerToken = endpoint.bearerToken,
@@ -84,5 +90,17 @@ class DesktopAppServerControllerGatewayFactory(
             controller = controller,
             httpGateway = httpGateway,
         )
+    }
+
+    private fun createDesktopWsClient(): HttpClient = HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(desktopChatJson)
+        }
+        install(HttpTimeout) {
+            connectTimeoutMillis = 15_000
+            requestTimeoutMillis = 60_000
+            socketTimeoutMillis = 60_000
+        }
+        install(WebSockets)
     }
 }

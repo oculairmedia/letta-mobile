@@ -62,7 +62,8 @@ class RuntimeRegistryCoordinator(
                     agentId = record.agentId,
                     conversationId = record.conversationId,
                     cwd = record.cwd,
-                    // Use defaults for mode, recoverApprovals, forceDeviceStatus
+                    mode = record.mode,
+                    // Use defaults for recoverApprovals, forceDeviceStatus
                     // These can be overridden later if needed
                 )
 

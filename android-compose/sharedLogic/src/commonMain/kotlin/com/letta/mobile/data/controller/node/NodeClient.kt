@@ -156,6 +156,9 @@ class DefaultNodeClient(
     private val controllerFactory: (com.letta.mobile.data.transport.appserver.AppServerClient) -> AppServerController =
         { client -> com.letta.mobile.data.controller.DefaultAppServerController(client) },
 ) : NodeClient {
+    private val sharedHandleMutex = Mutex()
+    private val sharedHandlesByEndpoint = mutableMapOf<AppServerEndpoint, RemoteNodeHandle>()
+
     override suspend fun connectTo(endpoint: AppServerEndpoint): RemoteNodeHandle = sharedHandleMutex.withLock {
         sharedHandlesByEndpoint.getOrPut(endpoint) {
             val transport = AppServerTransportRegistry.createTransport(
@@ -165,10 +168,5 @@ class DefaultNodeClient(
             val client = com.letta.mobile.data.transport.appserver.DefaultAppServerClient(transport)
             RemoteNodeHandle(controllerFactory(client))
         }
-    }
-
-    companion object {
-        private val sharedHandleMutex = Mutex()
-        private val sharedHandlesByEndpoint = mutableMapOf<AppServerEndpoint, RemoteNodeHandle>()
     }
 }

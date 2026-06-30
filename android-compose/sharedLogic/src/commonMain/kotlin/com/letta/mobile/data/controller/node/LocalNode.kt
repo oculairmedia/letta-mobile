@@ -105,7 +105,7 @@ data class LocalNode(
             identity: NodeIdentity,
             controller: AppServerController,
             scope: CoroutineScope,
-            httpClient: HttpClient = HttpClient(),
+            httpClient: HttpClient,
         ): LocalNode {
             KtorAppServerWebSocketTransportAdapter.registerDefault(httpClient)
             val server = DefaultNodeServer(identity, controller)

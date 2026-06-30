@@ -4,6 +4,8 @@ import com.letta.mobile.data.controller.capability.Capability
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.add
 
 /**
  * Image hydration external tool.
@@ -23,9 +25,9 @@ class ImageHydrationTool : ExternalTool {
                 put("description", "The ID of the image to hydrate")
             })
         })
-        put("required", buildJsonObject {
+        putJsonArray("required") {
             // Empty array for now - image_id could be optional
-        })
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
@@ -63,9 +65,9 @@ class GoalsTool : ExternalTool {
                 put("description", "The goal text (for add/update)")
             })
         })
-        put("required", buildJsonObject {
-            // action is required
-        })
+        putJsonArray("required") {
+            add("action")
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
@@ -104,9 +106,9 @@ class SchedulesTool : ExternalTool {
                 put("description", "Description of the task to schedule")
             })
         })
-        put("required", buildJsonObject {
-            // action is required
-        })
+        putJsonArray("required") {
+            add("action")
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
@@ -140,9 +142,9 @@ class SlashCommandsTool : ExternalTool {
                 })
             })
         })
-        put("required", buildJsonObject {
-            // command is required
-        })
+        putJsonArray("required") {
+            add("command")
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
@@ -177,9 +179,9 @@ class SubagentChipsTool : ExternalTool {
                 put("description", "Additional metadata about the subagent state")
             })
         })
-        put("required", buildJsonObject {
-            // subagent_id is required
-        })
+        putJsonArray("required") {
+            add("subagent_id")
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
@@ -210,9 +212,9 @@ class ReflectionTool : ExternalTool {
                 put("description", "Scope of the reflection: memory, context, state")
             })
         })
-        put("required", buildJsonObject {
-            // query is required
-        })
+        putJsonArray("required") {
+            add("query")
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
@@ -246,9 +248,9 @@ class SlimAgentsTool : ExternalTool {
                 put("description", "Type of projection: summary, state, capabilities")
             })
         })
-        put("required", buildJsonObject {
-            // agent_ids is required
-        })
+        putJsonArray("required") {
+            add("agent_ids")
+        }
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {

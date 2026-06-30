@@ -56,6 +56,7 @@ class DefaultAppServerController(
             client = client,
             clientInfo = clientInfo,
             requestIdFactory = requestIdFactory,
+            externalToolRegistry = externalToolRegistry,
         )
     }
 

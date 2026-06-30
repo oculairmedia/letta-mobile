@@ -16,6 +16,13 @@ import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolResultContent
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
@@ -36,6 +43,7 @@ class AppServerTurnEngine(
     ),
     private val permissionMode: AppServerPermissionMode = AppServerPermissionMode.Standard,
     private val requestIdFactory: () -> String = ::defaultRequestId,
+    private val externalToolRegistry: ExternalToolRegistry? = null,
 ) : TurnEngine {
     private val activeTurn = Mutex()
     private var runtime: AppServerRuntimeScope? = null
@@ -50,19 +58,68 @@ class AppServerTurnEngine(
             emit(command.startedDraft())
             client.input(command.toInputCommand(scope))
 
-            try {
-                client.events.collect { received ->
-                    if (!received.matches(scope)) return@collect
-                    val drafts = mapper.map(command, received)
-                    drafts.forEach { draft ->
-                        emit(draft)
-                        if (draft.isTerminalLifecycle()) {
-                            throw TurnCompleted
+            coroutineScope {
+                try {
+                    client.events.collect { received ->
+                        if (!received.matches(scope)) return@collect
+
+                        val frame = received.frame
+                        if (frame is AppServerInboundFrame.ExternalToolCallRequest && externalToolRegistry != null) {
+                            launch {
+                                try {
+                                    val result = externalToolRegistry.invoke(frame.toolName, frame.input)
+                                    val toolResult = when (result) {
+                                        is ExternalToolResult.Success -> {
+                                            AppServerExternalToolResult(
+                                                content = listOf(
+                                                    AppServerExternalToolResultContent(
+                                                        type = "text",
+                                                        text = result.content
+                                                    )
+                                                ),
+                                                isError = false
+                                            )
+                                        }
+                                        is ExternalToolResult.Error -> {
+                                            AppServerExternalToolResult(
+                                                content = listOf(
+                                                    AppServerExternalToolResultContent(
+                                                        type = "text",
+                                                        text = result.error
+                                                    )
+                                                ),
+                                                isError = true
+                                            )
+                                        }
+                                    }
+                                    client.sendExternalToolResponse(
+                                        AppServerCommand.ExternalToolCallResponse(
+                                            requestId = frame.requestId,
+                                            result = toolResult,
+                                        )
+                                    )
+                                } catch (e: Exception) {
+                                    client.sendExternalToolResponse(
+                                        AppServerCommand.ExternalToolCallResponse(
+                                            requestId = frame.requestId,
+                                            error = e.message ?: "Failed to execute external tool"
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        val drafts = mapper.map(command, received)
+                        drafts.forEach { draft ->
+                            emit(draft)
+                            if (draft.isTerminalLifecycle()) {
+                                throw TurnCompleted
+                            }
                         }
                     }
+                } catch (completed: TurnCompletedMarker) {
+                    // Flow completed after a terminal App Server lifecycle event.
                 }
-            } catch (completed: TurnCompletedMarker) {
-                // Flow completed after a terminal App Server lifecycle event.
             }
         } finally {
             activeTurn.unlock()
