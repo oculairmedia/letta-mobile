@@ -15,6 +15,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -45,6 +47,26 @@ class KtorAppServerWebSocketTransport(
 
     override val controlFrames: Flow<AppServerReceivedFrame> = controlFrameFlow.asSharedFlow()
     override val streamFrames: Flow<AppServerReceivedFrame> = streamFrameFlow.asSharedFlow()
+
+    private val isConnectedFlow = MutableStateFlow(true)
+    override val isConnected: Flow<Boolean> = isConnectedFlow.asStateFlow()
+
+    init {
+        scope.launch {
+            try {
+                controlJob.join()
+            } finally {
+                isConnectedFlow.value = false
+            }
+        }
+        scope.launch {
+            try {
+                streamJob.join()
+            } finally {
+                isConnectedFlow.value = false
+            }
+        }
+    }
 
     override suspend fun sendControl(command: AppServerCommand) {
         controlCommandQueue.send(command)

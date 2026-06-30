@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.merge
 interface AppServerTransport {
     val controlFrames: Flow<AppServerReceivedFrame>
     val streamFrames: Flow<AppServerReceivedFrame>
+    val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
     suspend fun sendControl(command: AppServerCommand)
 }

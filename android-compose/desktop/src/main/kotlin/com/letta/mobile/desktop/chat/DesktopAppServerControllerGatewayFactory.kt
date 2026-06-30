@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.capability.CapabilityNegotiator
+import com.letta.mobile.data.controller.capability.ExtendedCapabilityAdvertiser
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
@@ -71,11 +74,20 @@ class DesktopAppServerControllerGatewayFactory(
             bearerToken = endpoint.bearerToken,
         )
 
+        // Negotiate capabilities (statically based on extended capabilities config)
+        val negotiator = CapabilityNegotiator(ExtendedCapabilityAdvertiser())
+        val capabilities = kotlinx.coroutines.runBlocking { negotiator.negotiate() }
+        val toolRegistry = ExternalToolRegistry.standard(capabilities)
+
         // Create the App Server client
         val client = DefaultAppServerClient(transport)
 
         // Create the controller
-        val controller = DefaultAppServerController(client)
+        val controller = DefaultAppServerController(
+            client = client,
+            externalToolRegistry = toolRegistry,
+            scope = controllerScope,
+        )
 
         // Create the HTTP gateway for delegation
         // The App Server doesn't yet expose conversation listing, message history,

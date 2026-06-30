@@ -66,7 +66,7 @@ class ExternalToolRegistryTest {
     }
 
     @Test
-    fun invokeSucceedsForAdvertisedTool() = runTest {
+    fun invokeReturnsErrorForAdvertisedUnimplementedTool() = runTest {
         val capabilities = RemoteCapabilities(imageHydration = true)
         val registry = ExternalToolRegistry.standard(capabilities)
 
@@ -76,7 +76,7 @@ class ExternalToolRegistryTest {
 
         val result = registry.invoke("image_hydration", input)
 
-        assertIs<ExternalToolResult.Success>(result, "Should return success for advertised tool")
+        assertIs<ExternalToolResult.Error>(result, "Should return error for advertised but unimplemented tool")
     }
 
     @Test

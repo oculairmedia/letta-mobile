@@ -31,8 +31,7 @@ class ImageHydrationTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Image hydration not yet implemented")
+        return ExternalToolResult.Error("Image hydration not yet implemented")
     }
 }
 
@@ -52,9 +51,12 @@ class GoalsTool : ExternalTool {
             put("action", buildJsonObject {
                 put("type", "string")
                 put("description", "Action to perform: list, add, update, remove")
-                put("enum", buildJsonObject {
-                    // Could add enum values here
-                })
+                putJsonArray("enum") {
+                    add("list")
+                    add("add")
+                    add("update")
+                    add("remove")
+                }
             })
             put("goal_id", buildJsonObject {
                 put("type", "string")
@@ -71,8 +73,7 @@ class GoalsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Goals management not yet implemented")
+        return ExternalToolResult.Error("Goals management not yet implemented")
     }
 }
 
@@ -112,8 +113,7 @@ class SchedulesTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Schedules management not yet implemented")
+        return ExternalToolResult.Error("Schedules management not yet implemented")
     }
 }
 
@@ -148,8 +148,7 @@ class SlashCommandsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Slash commands execution not yet implemented")
+        return ExternalToolResult.Error("Slash commands execution not yet implemented")
     }
 }
 
@@ -185,8 +184,7 @@ class SubagentChipsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Subagent chips not yet implemented")
+        return ExternalToolResult.Error("Subagent chips not yet implemented")
     }
 }
 
@@ -218,8 +216,7 @@ class ReflectionTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Reflection not yet implemented")
+        return ExternalToolResult.Error("Reflection not yet implemented")
     }
 }
 
@@ -254,7 +251,6 @@ class SlimAgentsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Slim agents projection not yet implemented")
+        return ExternalToolResult.Error("Slim agents projection not yet implemented")
     }
 }

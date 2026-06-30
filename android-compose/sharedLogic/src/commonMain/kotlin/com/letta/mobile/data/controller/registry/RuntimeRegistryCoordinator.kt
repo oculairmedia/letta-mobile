@@ -67,6 +67,13 @@ class RuntimeRegistryCoordinator(
                     // These can be overridden later if needed
                 )
 
+                // Sync the runtime state (recover approvals and force device status)
+                controller.sync(
+                    runtime = canonical.scope,
+                    recoverApprovals = true,
+                    forceDeviceStatus = true,
+                )
+
                 // Update the record with the canonical runtime and timestamp
                 registry.markStarted(
                     id = record.id,

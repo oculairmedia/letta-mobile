@@ -138,6 +138,7 @@ class AppServerTurnEngine(
                 mode = permissionMode,
                 clientInfo = clientInfo,
                 recoverApprovals = true,
+                externalTools = externalToolsForRuntime(),
                 forceDeviceStatus = true,
             ),
         )
@@ -147,6 +148,23 @@ class AppServerTurnEngine(
         val returnedRuntime = response.runtime ?: error("App Server runtime_start returned no runtime.")
         runtime = returnedRuntime
         return returnedRuntime
+    }
+
+    private fun externalToolsForRuntime(): List<com.letta.mobile.data.transport.appserver.AppServerExternalToolsGroup>? {
+        val tools = externalToolRegistry?.listAdvertisedTools().orEmpty()
+        if (tools.isEmpty()) return null
+        return listOf(
+            com.letta.mobile.data.transport.appserver.AppServerExternalToolsGroup(
+                scopeId = "letta-mobile",
+                tools = tools.map { tool ->
+                    com.letta.mobile.data.transport.appserver.AppServerExternalToolDefinition(
+                        name = tool.name,
+                        description = tool.description,
+                        parameters = tool.inputSchema ?: kotlinx.serialization.json.buildJsonObject {},
+                    )
+                },
+            ),
+        )
     }
 
     private fun AppServerRuntimeScope.matches(command: TurnCommand): Boolean =

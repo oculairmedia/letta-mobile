@@ -154,7 +154,7 @@ data class RemoteNodeHandle(
 class DefaultNodeClient(
     private val scope: CoroutineScope,
     private val controllerFactory: (com.letta.mobile.data.transport.appserver.AppServerClient) -> AppServerController =
-        { client -> com.letta.mobile.data.controller.DefaultAppServerController(client) },
+        { client -> com.letta.mobile.data.controller.DefaultAppServerController(client = client, scope = scope) },
 ) : NodeClient {
     private val sharedHandleMutex = Mutex()
     private val sharedHandlesByEndpoint = mutableMapOf<AppServerEndpoint, RemoteNodeHandle>()

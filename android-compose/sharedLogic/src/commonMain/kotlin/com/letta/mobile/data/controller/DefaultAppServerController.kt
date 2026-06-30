@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * Default implementation of [AppServerController].
@@ -36,9 +38,20 @@ class DefaultAppServerController(
     private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
     private val requestIdFactory: () -> String = ::defaultRequestId,
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    private val scope: CoroutineScope? = null,
 ) : AppServerController {
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
     override val state: StateFlow<AppServerControllerState> = _state.asStateFlow()
+
+    init {
+        scope?.launch {
+            client.isConnected.collect { connected ->
+                if (!connected) {
+                    _state.value = AppServerControllerState.Disconnected("Transport connection dropped")
+                }
+            }
+        }
+    }
 
     /**
      * Cache of started runtimes, keyed by (agentId, conversationId).
