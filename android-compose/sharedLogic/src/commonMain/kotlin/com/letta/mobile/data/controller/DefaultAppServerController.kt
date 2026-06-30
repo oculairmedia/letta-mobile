@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.atomicfu.atomic
 
 /**
  * Default implementation of [AppServerController].
@@ -212,10 +213,10 @@ class DefaultAppServerController(
             version = "0.2.0",
         )
 
-        private val nextRequestId = java.util.concurrent.atomic.AtomicInteger(0)
+        private val nextRequestId = atomic(0)
 
         private fun defaultRequestId(): String {
-            return "controller-req-${nextRequestId.incrementAndGet()}"
+            return "controller-req-${nextRequestId.getAndIncrement()}"
         }
     }
 }

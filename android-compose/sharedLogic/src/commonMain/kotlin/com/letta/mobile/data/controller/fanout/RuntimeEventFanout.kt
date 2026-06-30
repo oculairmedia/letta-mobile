@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.atomicfu.atomic
 
 /**
  * Fanout layer for routing App Server runtime events to multiple UI clients.
@@ -255,7 +256,7 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
-        private val nextSubscriberId = java.util.concurrent.atomic.AtomicInteger(0)
+        private val nextSubscriberId = atomic(0)
 
         private fun AppServerInboundFrame.isRuntimeEventFrame(): Boolean =
             this is AppServerInboundFrame.StreamDelta ||
@@ -266,10 +267,10 @@ class RuntimeEventFanout {
 
         /**
          * Generates a unique subscriber ID.
-         * Thread-safe via AtomicInteger even if called outside the stateMutex.
+         * Thread-safe via atomic even if called outside the stateMutex.
          */
         private fun generateSubscriberId(): String {
-            return "subscriber-${nextSubscriberId.incrementAndGet()}"
+            return "subscriber-${nextSubscriberId.getAndIncrement()}"
         }
     }
 }
