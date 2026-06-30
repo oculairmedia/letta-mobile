@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import io.ktor.client.HttpClient
@@ -89,6 +90,9 @@ class DesktopAppServerControllerGatewayFactory(
         return DesktopHybridAppServerChatGateway(
             controller = controller,
             httpGateway = httpGateway,
+            onClose = {
+                controllerScope.cancel()
+            }
         )
     }
 
