@@ -241,7 +241,7 @@ class AppServerTurnEngine(
         // short enough that a permanently-stuck turn frees the engine before the
         // user gives up. Idle-based (reset per frame), so a long actively-streaming
         // turn never trips. Tunable via the ctor param.
-        const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 90_000L
+        const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
 
         fun defaultRequestId(): String {
             nextRequestId += 1

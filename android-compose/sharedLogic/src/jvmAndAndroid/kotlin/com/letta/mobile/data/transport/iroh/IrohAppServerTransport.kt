@@ -176,14 +176,17 @@ class IrohAppServerTransport(
     }
 
     private suspend fun runStreamChannel() {
+        Telemetry.event("IrohTransport", "stream.channel_start", "alive" to true)
         // Open stream bi-stream (we only read from this, but QUIC requires bi-directional)
         streamBiStream = connection.openBi()
         Telemetry.event("IrohTransport", "stream.opened")
         
         // The stream channel is receive-only in the App Server protocol,
         // but we signal the remote that we're ready by sending a newline
-        streamBiStream.send().writeAll("\n".toByteArray())
-        streamBiStream.send().finish()
+        val s = streamBiStream.send()
+        s.writeAll("\n".toByteArray())
+        s.finish()
+        Telemetry.event("IrohTransport", "stream.listening")
         
         receiveFrames(streamBiStream.recv(), AppServerChannel.Stream, streamFrameFlow)
     }
@@ -193,6 +196,7 @@ class IrohAppServerTransport(
         channel: AppServerChannel,
         sink: MutableSharedFlow<AppServerReceivedFrame>,
     ) {
+        Telemetry.event("IrohTransport", "frame.reader_start", "channel" to channel.name)
         val buffer = mutableListOf<Byte>()
         
         while (true) {

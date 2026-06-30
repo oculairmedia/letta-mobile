@@ -135,6 +135,10 @@ class ServerHealthRepository(
         // a valid transport config as OFFLINE.
         if (!baseUrl.startsWith("http://", ignoreCase = true) &&
             !baseUrl.startsWith("https://", ignoreCase = true)) {
+            // Non-HTTP transport (e.g. iroh://) — no HTTP health endpoint.
+            // Mark ONLINE because the transport itself is valid; the QUIC
+            // connection state is the real health signal, not HTTP.
+            _states.update { it + (config.id to ServerHealthState.ONLINE) }
             return
         }
         val target = "$baseUrl/v1/health/"

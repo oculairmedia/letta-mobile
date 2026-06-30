@@ -107,12 +107,16 @@ class IrohNodeConnection(
                             Telemetry.event("IrohNode", "control.recv", "bytes" to frameJson.length)
 
                             launch {
-                                runCatching {
+                                try {
                                     val response = handleControlFrame(frameJson, streamSend)
                                     if (response != null) {
                                         sendStream.writeAll(response.toByteArray())
                                         sendStream.writeAll("\n".toByteArray())
                                     }
+                                } catch (ce: kotlinx.coroutines.CancellationException) {
+                                    throw ce
+                                } catch (_: Exception) {
+                                    // Per-frame error is isolated — log and continue
                                 }
                             }
                         }
@@ -161,6 +165,8 @@ class IrohNodeConnection(
                 }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             """{"type":"error","message":"Failed to parse frame: ${e.message?.replace("\"", "\\\"")}"}"""
         }

@@ -82,6 +82,7 @@ class IrohNodeEndpoint(
         endpoint = Endpoint.bind(
             EndpointOptions(
                 bindAddr = "0.0.0.0:0",
+                secretKey = kotlin.ByteArray(32) { i -> (i + 1).toByte() },
                 alpns = listOf(alpn),
                 relayMode = relayMode,
             )

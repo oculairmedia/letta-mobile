@@ -61,10 +61,28 @@ class ShimBackendDetector internal constructor(
     }
 
     suspend fun refresh(config: LettaConfig): Boolean = probeMutex.withLock {
+        // Iroh check first — must run before the cache lookup, because a
+        // stale cached false from a pre-fix probe would short-circuit.
+        if (config.mode != LettaConfig.Mode.LOCAL &&
+            config.serverUrl.trimStart().removePrefix("https://").removePrefix("http://").startsWith("iroh://")
+        ) {
+            _states.value = _states.value + (config.id to true)
+            Telemetry.event("Backend", "shim_probe.result",
+                "configId" to config.id, "serverUrl" to config.serverUrl, "isShim" to true)
+            return@withLock true
+        }
+
         _states.value[config.id]?.let { return@withLock it }
         if (config.mode == LettaConfig.Mode.LOCAL) {
             _states.value = _states.value + (config.id to false)
             return@withLock false
+        }
+
+        // Iroh QUIC transport — has no HTTP health endpoint but is a
+        // valid remote backend. Treat as a shim for send strategy selection.
+        if (config.serverUrl.trimStart().removePrefix("https://").removePrefix("http://").startsWith("iroh://")) {
+            _states.value = _states.value + (config.id to true)
+            return@withLock true
         }
 
         val detected = runCatching {
