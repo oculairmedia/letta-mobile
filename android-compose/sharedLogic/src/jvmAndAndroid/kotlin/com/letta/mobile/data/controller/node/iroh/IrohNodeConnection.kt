@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
@@ -160,7 +161,29 @@ class IrohNodeConnection(
                     if (requestId == null) {
                         """{"type":"sync_response","success":false,"error":"request_id is required"}"""
                     } else {
-                        """{"type":"sync_response","request_id":"$requestId","success":false,"error":"sync not yet implemented in Iroh node"}"""
+                        try {
+                            val agentId = obj["agent_id"]?.jsonPrimitive?.content
+                            val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
+                            if (agentId == null || conversationId == null) {
+                                """{"type":"sync_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id required for sync"}"""
+                            } else {
+                                val runtime = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
+                                    agentId = agentId, conversationId = conversationId
+                                )
+                                val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
+                                val forceDeviceStatus = obj["force_device_status"]?.jsonPrimitive?.booleanOrNull ?: false
+                                val response = controller.sync(runtime, recoverApprovals, forceDeviceStatus)
+                                val success = response.success
+                                val error = response.error
+                                if (success) {
+                                    """{"type":"sync_response","request_id":"$requestId","success":true}"""
+                                } else {
+                                    """{"type":"sync_response","request_id":"$requestId","success":false,"error":"${error?.replace("\"", "\\\"") ?: "sync failed"}"}"""
+                                }
+                            }
+                        } catch (e: Exception) {
+                            """{"type":"sync_response","request_id":"$requestId","success":false,"error":"${e.message?.replace("\"", "\\\"") ?: "sync error"}"}"""
+                        }
                     }
                 }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
@@ -179,6 +202,14 @@ class IrohNodeConnection(
         val agentId = obj["agent_id"]?.jsonPrimitive?.content
         val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
         val cwd = obj["cwd"]?.jsonPrimitive?.contentOrNull
+        val mode = obj["mode"]?.jsonPrimitive?.contentOrNull?.let { name ->
+            when (name.lowercase()) {
+                "standard" -> AppServerPermissionMode.Standard
+                "acceptedits" -> AppServerPermissionMode.AcceptEdits
+                "memory" -> AppServerPermissionMode.Memory
+                else -> AppServerPermissionMode.Unrestricted
+            }
+        } ?: AppServerPermissionMode.Unrestricted
 
         return if (requestId == null) {
             """{"type":"runtime_start_response","success":false,"error":"request_id is required"}"""
@@ -190,7 +221,7 @@ class IrohNodeConnection(
                     agentId = AgentId(agentId),
                     conversationId = ConversationId(conversationId),
                     cwd = cwd,
-                    mode = AppServerPermissionMode.Unrestricted,
+                    mode = mode,
                     recoverApprovals = false,
                     forceDeviceStatus = false,
                 )

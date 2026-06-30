@@ -132,6 +132,7 @@ class IrohChannelTransport(
         startNewConversation: Boolean,
     ): Boolean {
         val engine = turnEngine ?: return false
+        if (engine.isBusy) return false
         val runId = "iroh-run-${UUID.randomUUID()}"
         val turnId = "iroh-turn-${UUID.randomUUID()}"
         val sendJob = scope.launch {
@@ -301,7 +302,7 @@ class IrohChannelTransport(
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
-        private const val DEBUG_FORCE_IROH_URL = "iroh://endpointadg4t5xlej5kbf77tkkgsbffiuepldoaj2redps73adlvngg7ikj4mybaafggaab27jqeaiamro74dgx2mbacafmceaadv6taiaqblaraea5puycaeakyeicahl5gaqbacwbcayb27jqeaiavqiqiaox2mbacafmcecqdv6taiaqblaraya5puycaeakyeihahl5gaqbacwbccab27jqeaiavqiqsaox2mbacafmcefadv6taiaqblarbma5puycaeakyeimahl5gaqbacwbcdib27jqeaiavqiq4aox2mbacafmcehqdv6taiaqblarcaa5puycaeakyeirahl5gaqbacwbceqb27jqeaiavqirgaox2mbacafmcekadv6taiaqblarcua5puycaeakyeiwahl5gaqbacwbcfyb27jqeaiavqirqaox2mbacafmcemqdv6taiaqblardia5puycaeakyei3ahl5gaqbacwbchab27jqeaiavqir2aox2mbacafmcepqdv6taiaqblareaa5puycaeakyejlahl5gaqbacwbclab27jqeaiavqis2aox2mbacafmcexqdv6taiaqblargma5puycaeakyejzahl5gaqbacwbcsyb27jqeaiavqiveaox2mbacafmcfladv6taiaqblarnea5puycaeakyemcahl5gaqbacwbiaab27jqeaiavqlaaaox2mbacafmdaaadv6taiaqbqfigjnnpuycaeambkhqahl5gaqbaeqacglqjupkaaf6eqi777s5xawjfkac"
+        private const val DEBUG_FORCE_IROH_URL = "iroh://endpointab43kvror7tfj6kapcyrf2fjrotzah4fhltjlpwx4drzcc5naslgimybaafggaab4kcaeaiamro74dhcqqbacafmceaadyueaiaqblaraea6fbacaeakyeicahriiaqbacwbcayb4kcaeaiavqiqiapcqqbacafmcecqdyueaiaqblaraya6fbacaeakyeihahriiaqbacwbccab4kcaeaiavqiqsapcqqbacafmcefadyueaiaqblarbma6fbacaeakyeimahriiaqbacwbcdib4kcaeaiavqiq4apcqqbacafmcehqdyueaiaqblarcaa6fbacaeakyeirahriiaqbacwbceqb4kcaeaiavqirgapcqqbacafmcekadyueaiaqblarcua6fbacaeakyeiwahriiaqbacwbcfyb4kcaeaiavqirqapcqqbacafmcemqdyueaiaqblardia6fbacaeakyei3ahriiaqbacwbchab4kcaeaiavqir2apcqqbacafmcepqdyueaiaqblareaa6fbacaeakyejlahriiaqbacwbclab4kcaeaiavqis2apcqqbacafmcexqdyueaiaqblargma6fbacaeakyejzahriiaqbacwbcsyb4kcaeaiavqiveapcqqbacafmcfladyueaiaqblarnea6fbacaeakyemcahriiaqbacwbiaab4kcaeaiavqlaaapcqqbacafmdaaadyueaiaqbqfigjnofbacaeambkhqahriiaqbaeqacglqjupkaaf6eqi777s5xawizoad"
         fun isIrohUrl(url: String?): Boolean {
             // Handle bare iroh://, https://iroh:// (corrupted saved config), etc.
             if (url == null) return false

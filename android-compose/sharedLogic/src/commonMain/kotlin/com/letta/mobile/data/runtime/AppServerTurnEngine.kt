@@ -56,6 +56,12 @@ class AppServerTurnEngine(
     private val activeTurn = Mutex()
     private var runtime: AppServerRuntimeScope? = null
 
+    /**
+     * true when a turn is actively running (activeTurn locked).
+     * Check before calling runTurn to avoid "can't send while busy" errors.
+     */
+    val isBusy: Boolean get() = !activeTurn.tryLock().also { if (it) activeTurn.unlock() }
+
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
         if (!activeTurn.tryLock()) {
             throw IllegalStateException("An App Server turn is already active for ${command.runtimeId.value}.")
