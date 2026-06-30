@@ -1249,6 +1249,9 @@ android {
                 // node CLI wrapper (libnodecli.so) linked against nodejs-mobile
                 // libnode.so so local tools can run `node -e` scripts.
                 jniLibs.directories.add(file("libs/embedded-node-cli").absolutePath)
+                // Iroh QUIC transport native lib (libiroh_ffi.so + libjnidispatch.so)
+                // for all variants, not just rootDebug. Built by scripts/build-android-iroh.sh.
+                jniLibs.directories.add(file("src/rootDebug/jniLibs").absolutePath)
             }
         }
         // The `benchmark` buildType (macrobenchmark target) uses the same
