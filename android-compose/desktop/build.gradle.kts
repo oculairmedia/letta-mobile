@@ -25,8 +25,12 @@ plugins {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    // JVM 21: the desktop module transitively consumes sharedLogic's Iroh QUIC
+    // transport binding (computer.iroh:iroh:1.0.0), which requires JVM 21+.
+    // Desktop already needs JDK 25+ at runtime (Jewel UI, class-file v69), so
+    // targeting 21 here is consistent with the runtime contract, not a regression.
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 fun computeDesktopPackageVersion() = providers.provider {
@@ -53,7 +57,7 @@ fun computeDesktopPackageVersion() = providers.provider {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(JvmTarget.JVM_21)
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=org.jetbrains.jewel.foundation.ExperimentalJewelApi",
