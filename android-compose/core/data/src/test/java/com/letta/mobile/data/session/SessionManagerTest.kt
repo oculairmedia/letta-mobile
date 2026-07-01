@@ -124,6 +124,7 @@ class SessionManagerTest {
             FakeScheduleApi(),
             FakeStepApi(),
             FakeToolApi(),
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
         ).create()
 
@@ -159,6 +160,7 @@ class SessionManagerTest {
             FakeScheduleApi(),
             FakeStepApi(),
             FakeToolApi(),
+            appContext = mockk(relaxed = true),
         ).create()
 
         val sharedGraph: SessionRepositoryGraph = graph
@@ -194,6 +196,7 @@ class SessionManagerTest {
             FakeScheduleApi(),
             FakeStepApi(),
             FakeToolApi(),
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
             localRuntimeOptions = localRuntimeOptions(),
         ).create()
@@ -251,6 +254,7 @@ class SessionManagerTest {
             FakeScheduleApi(),
             FakeStepApi(),
             FakeToolApi(),
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
             localRuntimeOptions = localRuntimeOptions(
                 localRuntimeProvider(),
@@ -296,6 +300,7 @@ class SessionManagerTest {
             FakeScheduleApi(),
             FakeStepApi(),
             FakeToolApi(),
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
             localRuntimeOptions = localRuntimeOptions(),
         ).create()
@@ -332,6 +337,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -377,6 +383,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -430,6 +437,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -481,6 +489,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -541,6 +550,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 fakeStepApi,
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -624,6 +634,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -715,6 +726,7 @@ class SessionManagerTest {
                 fakeScheduleApi,
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -804,6 +816,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 fakeToolApi,
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -883,6 +896,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -940,6 +954,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -995,6 +1010,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -1055,6 +1071,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -1100,6 +1117,7 @@ class SessionManagerTest {
                 FakeScheduleApi(),
                 FakeStepApi(),
                 FakeToolApi(),
+                appContext = mockk(relaxed = true),
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )

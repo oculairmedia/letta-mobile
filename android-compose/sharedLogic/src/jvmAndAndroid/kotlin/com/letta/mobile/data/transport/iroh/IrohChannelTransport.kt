@@ -368,7 +368,11 @@ class IrohChannelTransport(
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
-        private const val DEBUG_FORCE_IROH_URL = "iroh://endpointab43kvror7tfj6kapcyrf2fjrotzah4fhltjlpwx4drzcc5naslgimybaafggaabrsbaeaiamro74demqibacafmceaaddecaiaqblaraeayzaqcaeakyeicaggieaqbacwbcaybrsbaeaiavqiqiammqibacafmcecqddecaiaqblarayayzaqcaeakyeihaggieaqbacwbccabrsbaeaiavqiqsammqibacafmcefaddecaiaqblarbmayzaqcaeakyeimaggieaqbacwbcdibrsbaeaiavqiq4ammqibacafmcehqddecaiaqblarcaayzaqcaeakyeiraggieaqbacwbceqbrsbaeaiavqirgammqibacafmcekaddecaiaqblarcuayzaqcaeakyeiwaggieaqbacwbcfybrsbaeaiavqirqammqibacafmcemqddecaiaqblardiayzaqcaeakyei3aggieaqbacwbchabrsbaeaiavqir2ammqibacafmcepqddecaiaqblareaayzaqcaeakyejlaggieaqbacwbclabrsbaeaiavqis2ammqibacafmcexqddecaiaqblargmayzaqcaeakyejzaggieaqbacwbcsybrsbaeaiavqiveammqibacafmcfladdecaiaqblarneayzaqcaeakyemcaggieaqbacwbiaabrsbaeaiavqlaaammqibacafmdaaaddecaiaqbqfigjnizaqcaeambkhqaggieaqbaeqacglqjupkaaf6eqi777s5xawojoid"
+        // Debug override for local Iroh testing. MUST stay blank in committed
+        // code — a non-blank value forces EVERY backend through Iroh regardless
+        // of the active config (breaks REST/local-runtime selection). Set it
+        // only in a throwaway local build when dialing a hand-run wrapper.
+        private const val DEBUG_FORCE_IROH_URL = ""
         fun shouldUseIroh(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || isIrohUrl(url)
 
         fun isIrohUrl(url: String?): Boolean {

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.session
 
+import android.content.Context
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.api.ArchiveApi
 import com.letta.mobile.data.api.ConversationApi
@@ -85,6 +86,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
+            appContext = mockk(relaxed = true),
         )
 
         val graph = factory.create()
@@ -129,6 +131,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository
         )
 
@@ -171,6 +174,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Disabled
         )
@@ -231,6 +235,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
@@ -283,6 +288,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
+            appContext = mockk(relaxed = true),
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
