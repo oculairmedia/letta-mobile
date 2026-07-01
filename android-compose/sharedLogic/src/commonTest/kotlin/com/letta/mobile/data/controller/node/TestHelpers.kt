@@ -25,12 +25,6 @@ import kotlinx.coroutines.flow.flowOf
 class FakeNodeClient(
     private val controller: AppServerController,
 ) : NodeClient {
-    override suspend fun connectTo(identity: NodeIdentity): RemoteNodeHandle {
-        val endpoint = identity.endpoints.firstOrNull()
-            ?: throw IllegalArgumentException("NodeIdentity has no endpoints")
-        return connectTo(endpoint)
-    }
-
     override suspend fun connectTo(endpoint: AppServerEndpoint): RemoteNodeHandle {
         return RemoteNodeHandle(controller)
     }

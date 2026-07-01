@@ -109,11 +109,6 @@ interface AppServerController {
         runtime: AppServerRuntimeScope,
         runId: String? = null,
     ): AppServerInboundFrame.AbortMessageResponse
-
-    /**
-     * Returns runtimes currently hosted by this controller.
-     */
-    suspend fun hostedRuntimes(): List<CanonicalRuntime> = emptyList()
 }
 
 /**

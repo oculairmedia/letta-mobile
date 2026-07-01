@@ -4,7 +4,6 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -40,10 +39,10 @@ class ReconnectCoordinator(
     private val controller: AppServerController,
     private val registry: RuntimeRegistry,
     private val externalToolRegistrar: ExternalToolRegistrar = NoOpExternalToolRegistrar(),
-    private val connectionState: Flow<AppServerControllerState> = controller.state,
+    private val connectionState: StateFlow<AppServerControllerState> = controller.state as StateFlow<AppServerControllerState>,
 ) {
     private val reconnectMutex = Mutex()
-    private var lastObservedState: AppServerControllerState? = (connectionState as? StateFlow<AppServerControllerState>)?.value
+    private var lastReconnectState: AppServerControllerState? = null
 
     /**
      * Executes the reconnect/replay flow.
@@ -120,7 +119,6 @@ class ReconnectCoordinator(
             agentId = record.agentId,
             conversationId = record.conversationId,
             cwd = record.cwd,
-            mode = record.mode,
             recoverApprovals = true,
             forceDeviceStatus = true,
         )
@@ -148,13 +146,23 @@ class ReconnectCoordinator(
      * @return ReconnectResult from the reconnect operation
      */
     suspend fun waitForDisconnectAndReconnect(): ReconnectResult {
-        val state = connectionState.first { state ->
-            lastObservedState = state
+        // Wait for disconnected state
+        val disconnectedState = connectionState.first { state ->
             state is AppServerControllerState.Disconnected ||
                 state is AppServerControllerState.Error
         }
-        lastObservedState = state
 
+        // Only reconnect if this is a new disconnect (not a duplicate)
+        if (disconnectedState == lastReconnectState) {
+            return ReconnectResult(
+                reconnectedCount = 0,
+                errors = emptyList(),
+            )
+        }
+
+        lastReconnectState = disconnectedState
+
+        // Execute reconnect
         return reconnect()
     }
 
@@ -164,7 +172,7 @@ class ReconnectCoordinator(
      * @return true if the controller is disconnected or in error state
      */
     fun isReconnectNeeded(): Boolean {
-        val state = (connectionState as? StateFlow<AppServerControllerState>)?.value ?: lastObservedState
+        val state = connectionState.value
         return state is AppServerControllerState.Disconnected ||
             state is AppServerControllerState.Error
     }

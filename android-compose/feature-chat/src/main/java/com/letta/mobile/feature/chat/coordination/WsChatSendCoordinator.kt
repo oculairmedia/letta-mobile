@@ -17,6 +17,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import java.util.UUID
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -56,92 +57,112 @@ internal class WsChatSendCoordinator(
         override fun isAgentTyping(): Boolean = uiState.value.isAgentTyping
 
         override fun onSendDispatched(conversationId: String?) {
-            uiState.value = uiState.value.copy(
-                conversationState = conversationId
-                    ?.let { ConversationState.Ready(it) }
-                    ?: uiState.value.conversationState,
-                isStreaming = true,
-                isAgentTyping = true,
-                error = null,
-            )
+            uiState.update { current ->
+                current.copy(
+                    conversationState = conversationId
+                        ?.let { ConversationState.Ready(it) }
+                        ?: current.conversationState,
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    error = null,
+                )
+            }
         }
 
         override fun onSendQueued(conversationId: String) {
-            uiState.value = uiState.value.copy(
-                conversationState = ConversationState.Ready(conversationId),
-                isStreaming = true,
-                isAgentTyping = true,
-                error = null,
-            )
+            uiState.update { current ->
+                current.copy(
+                    conversationState = ConversationState.Ready(conversationId),
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    error = null,
+                )
+            }
         }
 
         override fun onSendFailed(message: String) {
-            uiState.value = uiState.value.copy(
-                error = message,
-                isStreaming = false,
-                isAgentTyping = false,
-            )
+            uiState.update { current ->
+                current.copy(
+                    error = message,
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
+            }
         }
 
         override fun onError(message: String?) {
-            uiState.value = uiState.value.copy(error = message)
+            uiState.update { current -> current.copy(error = message) }
         }
 
         override fun onTurnStarted(conversationId: String) {
-            uiState.value = uiState.value.copy(
-                conversationState = ConversationState.Ready(conversationId),
-                isStreaming = true,
-                isAgentTyping = true,
-                error = null,
-            )
+            uiState.update { current ->
+                current.copy(
+                    conversationState = ConversationState.Ready(conversationId),
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    error = null,
+                )
+            }
         }
 
         override fun onMessageDelta(conversationId: String) {
-            uiState.value = uiState.value.copy(
-                conversationState = ConversationState.Ready(conversationId),
-                isStreaming = true,
-                isAgentTyping = true,
-                error = null,
-            )
+            uiState.update { current ->
+                current.copy(
+                    conversationState = ConversationState.Ready(conversationId),
+                    isStreaming = true,
+                    isAgentTyping = true,
+                    error = null,
+                )
+            }
         }
 
         override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) {
-            uiState.value = uiState.value.copy(
-                promptTokens = promptTokens,
-                completionTokens = completionTokens,
-                totalTokens = totalTokens,
-            )
+            uiState.update { current ->
+                current.copy(
+                    promptTokens = promptTokens,
+                    completionTokens = completionTokens,
+                    totalTokens = totalTokens,
+                )
+            }
         }
 
         override fun onTurnFinished(error: String?) {
-            uiState.value = uiState.value.copy(
-                isStreaming = false,
-                isAgentTyping = false,
-                error = error,
-            )
+            uiState.update { current ->
+                current.copy(
+                    isStreaming = false,
+                    isAgentTyping = false,
+                    error = error,
+                )
+            }
         }
 
         override fun onTurnVisuallyComplete() {
-            uiState.value = uiState.value.copy(
-                isStreaming = false,
-                isAgentTyping = false,
-            )
+            uiState.update { current ->
+                current.copy(
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
+            }
         }
 
         override fun onTransientDisconnect(hasActiveSend: Boolean) {
-            uiState.value = uiState.value.copy(
-                error = null,
-                isStreaming = uiState.value.isStreaming || hasActiveSend,
-                isAgentTyping = uiState.value.isAgentTyping || hasActiveSend,
-            )
+            uiState.update { current ->
+                current.copy(
+                    error = null,
+                    isStreaming = current.isStreaming || hasActiveSend,
+                    isAgentTyping = current.isAgentTyping || hasActiveSend,
+                )
+            }
         }
 
         override fun onDisconnectFailure(error: String) {
-            uiState.value = uiState.value.copy(
-                error = error,
-                isStreaming = false,
-                isAgentTyping = false,
-            )
+            uiState.update { current ->
+                current.copy(
+                    error = error,
+                    isStreaming = false,
+                    isAgentTyping = false,
+                )
+            }
         }
     }
 

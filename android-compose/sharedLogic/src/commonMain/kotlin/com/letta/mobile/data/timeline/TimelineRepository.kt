@@ -260,6 +260,13 @@ open class TimelineRepository(
         conversationId: String,
         message: com.letta.mobile.data.model.LettaMessage,
     ) {
+        com.letta.mobile.util.Telemetry.event(
+            "IrohGate", "gate4.repositoryIngest",
+            "agentId" to agentId,
+            "conversationId" to conversationId,
+            "messageId" to message.id,
+            "messageType" to message.messageType,
+        )
         getOrCreate(agentId, conversationId).ingestStreamEvent(message)
     }
 
@@ -289,11 +296,11 @@ open class TimelineRepository(
         getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
-    suspend fun reconcileRecentMessages(
+    override suspend fun reconcileRecentMessages(
         agentId: String?,
         conversationId: String,
         reason: String,
-        forceRefresh: Boolean = false,
+        forceRefresh: Boolean,
     ) {
         getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
     }

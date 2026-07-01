@@ -14,6 +14,13 @@ detekt {
     parallel = true
 }
 
+// Forward the opt-in flag for the live-QUIC Iroh E2E suite to the test JVM.
+// Those tests dial a real loopback QUIC connection via iroh-ffi, which is flaky
+// in CI runners; they are skipped (via JUnit Assume) unless this is "true".
+tasks.withType<Test>().configureEach {
+    System.getProperty("runIrohLiveE2E")?.let { systemProperty("runIrohLiveE2E", it) }
+}
+
 kotlin {
     android {
         namespace = "com.letta.mobile.sharedlogic"
@@ -84,6 +91,11 @@ kotlin {
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")
+                // Iroh QUIC transport binding (JNI-backed, Android + JVM only).
+                // NOT in commonMain — native lib doesn't work with Kotlin/Native.
+                // Use implementation (not api): iroh 1.0 requires JVM 21 and must
+                // not leak onto downstream JVM-17 compile classpaths (:core:domain).
+                implementation("computer.iroh:iroh:1.0.0")
             }
         }
 

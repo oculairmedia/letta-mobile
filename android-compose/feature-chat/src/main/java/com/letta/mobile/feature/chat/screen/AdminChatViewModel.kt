@@ -158,6 +158,8 @@ internal class AdminChatViewModel @Inject constructor(
 ) : ViewModel() {
     companion object {
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
+        private const val IROH_RECENT_RECONCILE_INTERVAL_MS = 1_500L
+        private const val IROH_RECENT_RECONCILE_ATTEMPTS = 40
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
         private const val TAG = "AdminChatViewModel"
     }
@@ -365,7 +367,13 @@ internal class AdminChatViewModel @Inject constructor(
             uiState = _uiState,
             agentId = agentId,
             explicitConversationId = explicitConversationId,
-            isShimBackend = { isShimBackend.value },
+            isShimBackend = {
+                isShimBackend.value || settingsRepository.activeConfig.value?.serverUrl
+                    ?.trimStart()
+                    ?.removePrefix("https://")
+                    ?.removePrefix("http://")
+                    ?.startsWith("iroh://") == true
+            },
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
@@ -845,12 +853,53 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun removeAttachment(index: Int) = composerCoordinator.removeAttachment(index)
 
+    private var irohRecentReconcileJob: Job? = null
+
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
         chatTimelineObserver.start(agentId.value, conversationId)
+        startIrohRecentReconcileLoop(conversationId)
+    }
+
+    private fun startIrohRecentReconcileLoop(conversationId: String) {
+        irohRecentReconcileJob?.cancel()
+        val serverUrl = settingsRepository.activeConfig.value?.serverUrl.orEmpty()
+            .trimStart()
+            .removePrefix("https://")
+            .removePrefix("http://")
+        if (!serverUrl.startsWith("iroh://")) return
+        irohRecentReconcileJob = viewModelScope.launch {
+            repeat(IROH_RECENT_RECONCILE_ATTEMPTS) { attempt ->
+                delay(IROH_RECENT_RECONCILE_INTERVAL_MS)
+                runCatching {
+                    timelineRepository.reconcileRecentMessages(
+                        agentId = agentId.value,
+                        conversationId = conversationId,
+                        reason = "iroh-active-$attempt",
+                        forceRefresh = true,
+                    )
+                }.onSuccess {
+                    chatTimelineObserver.stop()
+                    chatTimelineObserver.start(agentId.value, conversationId)
+                    Telemetry.event(
+                        "TimelineSync", "irohActiveReconcile.ok",
+                        "conversationId" to conversationId,
+                        "attempt" to attempt,
+                    )
+                }.onFailure { error ->
+                    Telemetry.error(
+                        "TimelineSync", "irohActiveReconcile.failed", error,
+                        "conversationId" to conversationId,
+                        "attempt" to attempt,
+                    )
+                }
+            }
+        }
     }
 
     private fun stopTimelineObserver() {
+        irohRecentReconcileJob?.cancel()
+        irohRecentReconcileJob = null
         chatTimelineObserver.stop()
     }
 

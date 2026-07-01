@@ -412,7 +412,7 @@ class ConfigViewModel @Inject constructor(
                             onError?.invoke("Server URL is required")
                             return@launch
                         }
-                        if (raw.startsWith("http://") || raw.startsWith("https://")) raw
+                        if (raw.startsWith("http://") || raw.startsWith("https://") || raw.contains("://")) raw
                         else "https://$raw"
                     }
                 }

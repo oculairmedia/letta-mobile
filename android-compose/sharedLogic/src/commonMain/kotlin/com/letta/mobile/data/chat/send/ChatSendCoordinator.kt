@@ -65,6 +65,7 @@ class ChatSendCoordinator(
 ) {
     @Volatile private var activeWsConversationId: String? = null
     @Volatile private var activeWsOtid: String? = null
+    @Volatile private var activeWsLocalConversationId: String? = null
     // letta-mobile-i8iw: lcp-cv3 contract — stop_reason and usage_statistics
     // are first-wins per turn on the shim. We capture once and drop later
     // duplicates defensively (drop with telemetry rather than overwriting).
@@ -92,7 +93,21 @@ class ChatSendCoordinator(
         attachments: List<MessageContentPart.Image> = emptyList(),
     ): Job = scope.launch {
         val timer = Telemetry.startTimer("AdminChatVM", "send.ws.enqueue")
+        Telemetry.event(
+            "IrohTrace", "coordinator.send.begin",
+            "agentId" to agentId,
+            "textLength" to text.length,
+            "attachments" to attachments.size,
+            "activeConversationId" to activeConversationId(),
+        )
         val config = activeConfig()
+        Telemetry.event(
+            "IrohTrace", "coordinator.config",
+            "hasConfig" to (config != null),
+            "mode" to config?.mode?.name,
+            "serverUrl" to config?.serverUrl,
+            "hasToken" to !config?.accessToken.isNullOrBlank(),
+        )
         if (config == null) {
             ui.onSendFailed("No active backend is configured")
             return@launch
@@ -131,7 +146,9 @@ class ChatSendCoordinator(
             startTimelineObserver(conversationId)
         }
 
+        Telemetry.event("IrohTrace", "coordinator.ensureConnected.begin", "conversationId" to conversationId)
         val connected = ensureConnected(config)
+        Telemetry.event("IrohTrace", "coordinator.ensureConnected.done", "conversationId" to conversationId, "connected" to connected)
         if (!connected) {
             ui.onSendFailed("Admin-shim WebSocket is not connected")
             timer.stop("accepted" to false, "reason" to "not_connected")
@@ -145,7 +162,9 @@ class ChatSendCoordinator(
             otid = otidGenerator(),
             startNewConversation = startNewConversation,
         )
+        Telemetry.event("IrohTrace", "coordinator.dispatch.begin", "conversationId" to conversationId, "otid" to pending.otid)
         val accepted = dispatchPendingSend(pending, appendOptimisticLocal = true)
+        Telemetry.event("IrohTrace", "coordinator.dispatch.done", "conversationId" to conversationId, "otid" to pending.otid, "accepted" to accepted)
         if (!accepted && startNewConversation) {
             ui.onError("WebSocket is busy; wait for the current turn to finish")
             timer.stop("accepted" to false, "reason" to "busy_start_new")
@@ -181,6 +200,13 @@ class ChatSendCoordinator(
         pending: PendingWsSend,
         appendOptimisticLocal: Boolean,
     ): Boolean {
+        Telemetry.event(
+            "IrohTrace", "dispatchPendingSend.bridgeSend.begin",
+            "agentId" to agentId,
+            "conversationId" to pending.conversationId,
+            "otid" to pending.otid,
+            "appendOptimisticLocal" to appendOptimisticLocal,
+        )
         val accepted = wsChatBridge.send(
             agentId = agentId,
             conversationId = pending.conversationId,
@@ -189,9 +215,16 @@ class ChatSendCoordinator(
             attachments = pending.attachments,
             startNewConversation = pending.startNewConversation,
         )
+        Telemetry.event(
+            "IrohTrace", "dispatchPendingSend.bridgeSend.done",
+            "conversationId" to pending.conversationId,
+            "otid" to pending.otid,
+            "accepted" to accepted,
+        )
         if (!accepted) return false
 
         activeWsOtid = pending.otid
+        activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
         activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
         if (appendOptimisticLocal) {
             if (pending.startNewConversation) {
@@ -207,8 +240,39 @@ class ChatSendCoordinator(
             }
             clearComposerAfterSend()
         }
+        schedulePostSendReconcile(pending)
         ui.onSendDispatched(pending.conversationId.takeIf { it.isNotBlank() })
         return true
+    }
+
+    private fun schedulePostSendReconcile(pending: PendingWsSend) {
+        scope.launch {
+            for (delayMs in POST_SEND_RECONCILE_DELAYS_MS) {
+                delay(delayMs)
+                runCatching {
+                    timelineRepository.reconcileRecentMessages(
+                        agentId = agentId,
+                        conversationId = pending.conversationId,
+                        reason = "post-send-$delayMs",
+                        forceRefresh = true,
+                    )
+                }.onSuccess {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.postSendReconcile.ok",
+                        "conversationId" to pending.conversationId,
+                        "otid" to pending.otid,
+                        "delayMs" to delayMs,
+                    )
+                }.onFailure { error ->
+                    Telemetry.error(
+                        "AdminChatVM", "ws.postSendReconcile.failed", error,
+                        "conversationId" to pending.conversationId,
+                        "otid" to pending.otid,
+                        "delayMs" to delayMs,
+                    )
+                }
+            }
+        }
     }
 
     private suspend fun enqueuePendingSend(pending: PendingWsSend): Boolean {
@@ -372,6 +436,12 @@ class ChatSendCoordinator(
             )
             return
         }
+        Telemetry.event(
+            "IrohTrace", "coordinator.event",
+            "type" to (event::class.simpleName ?: ""),
+            "activeConversationId" to activeWsConversationId,
+            "activeTurnId" to activeWsTurnId,
+        )
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
                 activeWsConversationId = event.conversationId
@@ -397,6 +467,13 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.MessageDelta -> {
                 val conversationId = activeWsConversationId ?: activeConversationId()
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohGate", "gate3.coordinatorMessageDelta",
+                    "resolvedConversationId" to conversationId,
+                    "messageId" to event.message.id,
+                    "messageType" to event.message.messageType,
+                    "isReplay" to event.isReplay,
+                )
                 if (conversationId == null) {
                     preConversationMessageDeltas.addLast(event.message)
                     return
@@ -572,7 +649,12 @@ class ChatSendCoordinator(
             }
         }
         activeWsOtid?.let { otid ->
-            timelineRepository.markExternalTransportLocalSent(conversationId, otid)
+            val localConversationId = activeWsLocalConversationId ?: conversationId
+            if (status == "failed") {
+                timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
+            } else {
+                timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
+            }
         }
         val stopReasonError = stopReasonForTurn.equals("error", ignoreCase = true)
         val nextError = when (status) {
@@ -594,6 +676,7 @@ class ChatSendCoordinator(
             "reason" to reason,
         )
         activeWsOtid = null
+        activeWsLocalConversationId = null
         activeWsTurnId = null
         stopReasonForTurn = null
         usageRecordedForTurn = false
@@ -605,8 +688,9 @@ class ChatSendCoordinator(
     private suspend fun failActiveTurnForDisconnect(event: WsTimelineEvent.Disconnected) {
         val conversationId = activeWsConversationId ?: activeConversationId()
         activeWsOtid?.let { otid ->
-            if (conversationId != null) {
-                timelineRepository.markExternalTransportLocalFailed(conversationId, otid)
+            val localConversationId = activeWsLocalConversationId ?: conversationId
+            if (localConversationId != null) {
+                timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
             } else {
                 Telemetry.event(
                     "AdminChatVM", "ws.activeSend.failedWithoutConversation",
@@ -622,6 +706,7 @@ class ChatSendCoordinator(
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null
+        activeWsLocalConversationId = null
         activeWsTurnId = null
         stopReasonForTurn = null
         usageRecordedForTurn = false
@@ -633,7 +718,7 @@ class ChatSendCoordinator(
             ?: activeConversationId()
             ?: defaultShimConversationId(agentId)
         activeWsOtid?.let { otid ->
-            timelineRepository.markExternalTransportLocalSent(agentId, conversationId, otid)
+            timelineRepository.markExternalTransportLocalSent(agentId, activeWsLocalConversationId ?: conversationId, otid)
         }
         timelineRepository.clearExternalTransportActive(agentId, conversationId)
         ui.onTurnVisuallyComplete()
@@ -657,6 +742,7 @@ class ChatSendCoordinator(
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
+        private val POST_SEND_RECONCILE_DELAYS_MS = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

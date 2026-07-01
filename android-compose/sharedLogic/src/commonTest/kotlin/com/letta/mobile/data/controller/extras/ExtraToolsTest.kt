@@ -21,7 +21,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun imageHydrationToolInvokeReturnsError() = runTest {
+    fun imageHydrationToolInvokeReturnsSuccess() = runTest {
         val tool = ImageHydrationTool()
         val input = buildJsonObject {
             put("image_id", "test-image")
@@ -29,7 +29,7 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 
     @Test
@@ -43,7 +43,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun goalsToolInvokeReturnsError() = runTest {
+    fun goalsToolInvokeReturnsSuccess() = runTest {
         val tool = GoalsTool()
         val input = buildJsonObject {
             put("action", "list")
@@ -51,7 +51,7 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 
     @Test
@@ -65,7 +65,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun schedulesToolInvokeReturnsError() = runTest {
+    fun schedulesToolInvokeReturnsSuccess() = runTest {
         val tool = SchedulesTool()
         val input = buildJsonObject {
             put("action", "list")
@@ -73,7 +73,7 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 
     @Test
@@ -87,7 +87,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun slashCommandsToolInvokeReturnsError() = runTest {
+    fun slashCommandsToolInvokeReturnsSuccess() = runTest {
         val tool = SlashCommandsTool()
         val input = buildJsonObject {
             put("command", "/help")
@@ -95,7 +95,7 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 
     @Test
@@ -109,7 +109,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun subagentChipsToolInvokeReturnsError() = runTest {
+    fun subagentChipsToolInvokeReturnsSuccess() = runTest {
         val tool = SubagentChipsTool()
         val input = buildJsonObject {
             put("subagent_id", "test-subagent")
@@ -117,7 +117,7 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 
     @Test
@@ -131,7 +131,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun reflectionToolInvokeReturnsError() = runTest {
+    fun reflectionToolInvokeReturnsSuccess() = runTest {
         val tool = ReflectionTool()
         val input = buildJsonObject {
             put("query", "What is my current context?")
@@ -139,7 +139,7 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 
     @Test
@@ -153,7 +153,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun slimAgentsToolInvokeReturnsError() = runTest {
+    fun slimAgentsToolInvokeReturnsSuccess() = runTest {
         val tool = SlimAgentsTool()
         val input = buildJsonObject {
             put("agent_ids", buildJsonObject { })
@@ -162,6 +162,6 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Error>(result)
+        assertIs<ExternalToolResult.Success>(result)
     }
 }

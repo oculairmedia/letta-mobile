@@ -978,6 +978,41 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `failed turn marks active optimistic local failed`() = runTest {
+        val wsChatBridge = mockBridge(sendAccepted = true)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { null },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("hello").join()
+        val local = timelineRepository.externalLocals.single()
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        advanceUntilIdle()
+
+        assertEquals(
+            FakeTimelineExternalTransportWriter.LocalMarker("agent-1:conv-default-agent-1", local.otid),
+            timelineRepository.failedLocals.single(),
+        )
+        assertTrue(timelineRepository.sentLocals.isEmpty())
+        assertEquals("Turn failed", uiState.value.error)
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+    }
+
+    @Test
     fun `failed turn surfaces buffered error message from preceding error frame`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true))

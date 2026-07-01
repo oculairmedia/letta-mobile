@@ -166,6 +166,14 @@ sealed interface AppServerCommand {
         val result: AppServerExternalToolResult? = null,
         val error: String? = null,
     ) : AppServerCommand
+
+    @Serializable
+    @SerialName("admin_rpc")
+    data class AdminRpc(
+        @SerialName("request_id") val requestId: String,
+        val method: String,
+        val params: JsonObject? = null,
+    ) : AppServerCommand
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -409,6 +417,21 @@ sealed interface AppServerInboundFrame {
             } else {
                 null
             }
+    }
+
+    @Serializable
+    @SerialName("admin_rpc_response")
+    data class AdminRpcResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val result: JsonElement? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = "admin_rpc_response"
+
+        @Transient
+        override val runtime: AppServerRuntimeScope? = null
     }
 
     @Serializable
