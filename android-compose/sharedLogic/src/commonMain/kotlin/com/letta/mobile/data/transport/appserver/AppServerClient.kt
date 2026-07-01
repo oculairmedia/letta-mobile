@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
  */
 interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>
+    val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
     suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse
 
@@ -35,6 +36,7 @@ class DefaultAppServerClient(
     )
 
     override val events: Flow<AppServerReceivedFrame> = transport.mergedFrames()
+    override val isConnected: Flow<Boolean> = transport.isConnected
 
     override suspend fun runtimeStart(
         command: AppServerCommand.RuntimeStart,
