@@ -20,6 +20,23 @@ class IrohNodeEndpoint(
     private val alpn: ByteArray = DEFAULT_ALPN,
     private val scope: CoroutineScope,
     private val relayConfig: IrohRelayConfig = IrohRelayConfig.Default,
+    /**
+     * UDP bind address. Default binds an OS-assigned random port, which makes
+     * the ticket rotate on every restart (direct addrs change). Servers that
+     * want a STABLE ticket should pin a port, e.g. "0.0.0.0:4501".
+     */
+    private val bindAddr: String = "0.0.0.0:0",
+    /**
+     * 32-byte secret key. Determines the NodeID. When null, a key is loaded
+     * from (or generated + persisted to) [secretKeyPath] so the NodeID — and,
+     * with a pinned [bindAddr], the whole ticket — is stable across restarts.
+     */
+    private val secretKey: ByteArray? = null,
+    /**
+     * Where to persist the auto-generated secret key when [secretKey] is null.
+     * Ignored if [secretKey] is provided.
+     */
+    private val secretKeyPath: String? = null,
 ) {
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
@@ -81,12 +98,45 @@ class IrohNodeEndpoint(
         val relayMode = IrohRelayConfigMapper.toRelayMode(relayConfig)
         endpoint = Endpoint.bind(
             EndpointOptions(
-                bindAddr = "0.0.0.0:0",
-                secretKey = kotlin.ByteArray(32) { i -> (i + 1).toByte() },
+                bindAddr = bindAddr,
+                secretKey = resolveSecretKey(),
                 alpns = listOf(alpn),
                 relayMode = relayMode,
             )
         )
+    }
+
+    /**
+     * Key precedence: explicit [secretKey] > persisted key at [secretKeyPath]
+     * (generated once, mode 600) > legacy fixed dev key (backward-compatible
+     * fallback so existing setups keep their NodeID until a path is supplied).
+     */
+    private fun resolveSecretKey(): ByteArray {
+        secretKey?.let {
+            require(it.size == 32) { "iroh secret key must be 32 bytes, got ${it.size}" }
+            return it
+        }
+        val path = secretKeyPath
+        if (path != null) {
+            val file = java.io.File(path)
+            if (file.exists()) {
+                val bytes = file.readBytes()
+                require(bytes.size == 32) { "persisted iroh secret key at $path must be 32 bytes, got ${bytes.size}" }
+                return bytes
+            }
+            val generated = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            file.parentFile?.mkdirs()
+            file.writeBytes(generated)
+            runCatching {
+                java.nio.file.Files.setPosixFilePermissions(
+                    file.toPath(),
+                    java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
+                )
+            }
+            Telemetry.event("IrohNode", "secretKey.generated", "path" to path)
+            return generated
+        }
+        return kotlin.ByteArray(32) { i -> (i + 1).toByte() }
     }
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
