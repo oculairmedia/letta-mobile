@@ -25,8 +25,12 @@ plugins {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    // JVM 21: the desktop module transitively consumes sharedLogic's Iroh QUIC
+    // transport binding (computer.iroh:iroh:1.0.0), which requires JVM 21+.
+    // Desktop already needs JDK 25+ at runtime (Jewel UI, class-file v69), so
+    // targeting 21 here is consistent with the runtime contract, not a regression.
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 fun computeDesktopPackageVersion() = providers.provider {
@@ -53,7 +57,7 @@ fun computeDesktopPackageVersion() = providers.provider {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(JvmTarget.JVM_21)
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=org.jetbrains.jewel.foundation.ExperimentalJewelApi",
@@ -89,11 +93,12 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
-// RUNTIME NOTE: this module compiles to JVM 17 bytecode, but the Jewel UI
-// dependency ships class-file version 69 (Java 25). Running the app (`:desktop:run`
-// or a packaged distribution) therefore requires a JDK 25+ at runtime — an
-// older JRE (e.g. JDK 17/21) fails at startup with UnsupportedClassVersionError
-// loading org.jetbrains.jewel.*. Compilation and unit tests are unaffected.
+// RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
+// transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
+// Jewel UI dependency ships class-file version 69 (Java 25), so running the app
+// (`:desktop:run` or a packaged distribution) requires a JDK 25+ at runtime — an
+// older JRE fails at startup with UnsupportedClassVersionError loading
+// org.jetbrains.jewel.*. Compilation and unit tests run on JDK 21+.
 compose.desktop {
     application {
         mainClass = "com.letta.mobile.desktop.MainKt"

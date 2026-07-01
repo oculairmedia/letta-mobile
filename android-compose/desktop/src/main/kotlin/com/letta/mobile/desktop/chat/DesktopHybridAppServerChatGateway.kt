@@ -28,7 +28,6 @@ class DesktopHybridAppServerChatGateway(
     @Suppress("UNUSED_PARAMETER") // Will be used for send/stream in follow-up
     private val controller: AppServerController,
     private val httpGateway: DesktopLettaHttpChatGateway,
-    private val onClose: () -> Unit = {},
 ) : DesktopChatGateway, AutoCloseable {
 
     // ========================================================================
@@ -97,6 +96,6 @@ class DesktopHybridAppServerChatGateway(
 
     override fun close() {
         httpGateway.close()
-        onClose()
+        // Controller scope is owned externally (by the factory), so we don't close it here
     }
 }

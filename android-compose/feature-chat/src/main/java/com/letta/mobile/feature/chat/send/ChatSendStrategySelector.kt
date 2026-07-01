@@ -26,6 +26,17 @@ internal class ChatSendStrategySelector(
             "via" to strategy.routeName,
             "length" to text.length,
             "attachments" to attachments.size,
+            "conversationId" to context.explicitConversationId,
+            "isShimBackend" to context.isShimBackend,
+            "isLocalRuntime" to context.isLocalRuntime,
+            "isClientModeEnabled" to context.isClientModeEnabled,
+        )
+        Telemetry.event(
+            "IrohTrace", "send.route",
+            "via" to strategy.routeName,
+            "conversationId" to context.explicitConversationId,
+            "isShimBackend" to context.isShimBackend,
+            "isLocalRuntime" to context.isLocalRuntime,
         )
         return strategy.send(text, attachments, context)
     }

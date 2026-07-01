@@ -27,6 +27,7 @@ import com.letta.mobile.cli.commands.RestPutCommand
 import com.letta.mobile.cli.commands.ReplayCommand
 import com.letta.mobile.cli.commands.SendCommand
 import com.letta.mobile.cli.commands.AppServerServeCommand
+import com.letta.mobile.cli.commands.AppServerServeIrohCommand
 import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.SetupApplyCommand
 import com.letta.mobile.cli.commands.SetupCommand
@@ -78,6 +79,7 @@ object Main {
                 ),
                 *buildResourceCommands().toTypedArray(),
                 AppServerServeCommand(),
+                AppServerServeIrohCommand(),
                 AppServerSmokeCommand(),
                 StreamCommand(),
             )

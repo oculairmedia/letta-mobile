@@ -13,6 +13,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val reconciledSends: MutableList<ReconciledSend> = mutableListOf()
     val clearedActiveConversations: MutableList<String> = mutableListOf()
     val scopedClearedActiveConversations: MutableList<ScopedConversation> = mutableListOf()
+    val recentReconciles: MutableList<RecentReconcile> = mutableListOf()
     val repairedCursors: MutableList<CursorRepair> = mutableListOf()
     val scopedRepairedCursors: MutableList<ScopedCursorRepair> = mutableListOf()
 
@@ -99,6 +100,15 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         scopedClearedActiveConversations += ScopedConversation(agentId, conversationId)
     }
 
+    override suspend fun reconcileRecentMessages(
+        agentId: String?,
+        conversationId: String,
+        reason: String,
+        forceRefresh: Boolean,
+    ) {
+        recentReconciles += RecentReconcile(agentId, conversationId, reason, forceRefresh)
+    }
+
     data class ExternalLocal(
         val conversationId: String,
         val content: String,
@@ -137,6 +147,13 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     data class ScopedConversation(
         val agentId: String?,
         val conversationId: String,
+    )
+
+    data class RecentReconcile(
+        val agentId: String?,
+        val conversationId: String,
+        val reason: String,
+        val forceRefresh: Boolean,
     )
 
     private fun scopedConversationId(agentId: String?, conversationId: String): String =

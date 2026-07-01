@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.registry
 
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.runtime.ConversationId
 import kotlin.time.Instant
 
@@ -22,7 +21,6 @@ import kotlin.time.Instant
  * @property agentId The agent ID for this runtime
  * @property conversationId The conversation ID for this runtime
  * @property cwd Optional working directory for the runtime
- * @property mode Optional permission mode used when the runtime was started
  * @property displayName Optional display name (e.g., "Chat with Agent X")
  * @property role Optional role descriptor (e.g., "assistant", "researcher")
  * @property lastStartedAt Timestamp of the last successful runtime_start
@@ -33,7 +31,6 @@ data class RuntimeRecord(
     val agentId: AgentId,
     val conversationId: ConversationId,
     val cwd: String? = null,
-    val mode: AppServerPermissionMode? = null,
     val displayName: String? = null,
     val role: String? = null,
     val lastStartedAt: Instant? = null,

@@ -3,8 +3,6 @@ package com.letta.mobile.data.controller.node
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
-import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransportAdapter
-import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
 
 /**
@@ -105,9 +103,7 @@ data class LocalNode(
             identity: NodeIdentity,
             controller: AppServerController,
             scope: CoroutineScope,
-            httpClient: HttpClient,
         ): LocalNode {
-            KtorAppServerWebSocketTransportAdapter.registerDefault(httpClient)
             val server = DefaultNodeServer(identity, controller)
             val client = DefaultNodeClient(scope)
             return LocalNode(server, client)

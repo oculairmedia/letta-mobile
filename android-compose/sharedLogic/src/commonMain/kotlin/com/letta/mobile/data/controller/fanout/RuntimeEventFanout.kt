@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.atomicfu.atomic
 
 /**
  * Fanout layer for routing App Server runtime events to multiple UI clients.
@@ -89,12 +88,9 @@ class RuntimeEventFanout {
     suspend fun subscribe(
         agentId: AgentId,
         conversationId: ConversationId,
-        subscriberId: String? = null,
+        subscriberId: String = generateSubscriberId(),
     ): Pair<String, Flow<AppServerInboundFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        // Generate subscriber ID INSIDE the lock so concurrent calls cannot
-        // race and produce duplicates (critical fix, Codex review).
-        val sid = subscriberId ?: generateSubscriberId()
 
         // Get or create the shared flow for this runtime
         val flow = runtimeFlows.getOrPut(key) {
@@ -105,9 +101,9 @@ class RuntimeEventFanout {
         }
 
         // Register the subscriber
-        subscribers[sid] = key
+        subscribers[subscriberId] = key
 
-        sid to flow.asSharedFlow()
+        subscriberId to flow.asSharedFlow()
     }
 
     /**
@@ -125,12 +121,9 @@ class RuntimeEventFanout {
         val hasRemainingSubscribers = subscribers.values.any { it == key }
 
         if (!hasRemainingSubscribers) {
-            // No more subscribers for this runtime, clean up the flow.
-            // Keep runtimeTurnLocks alive — an in-flight turn may still hold
-            // the Mutex.lock. Removing the lock from the map while a turn is
-            // active would orphan the Mutex and create a fresh (uncontended)
-            // one on the next acquireTurnLock, breaking per-runtime serialization.
+            // No more subscribers for this runtime, clean up the flow and lock
             runtimeFlows.remove(key)
+            runtimeTurnLocks.remove(key)
         }
 
         true
@@ -149,8 +142,7 @@ class RuntimeEventFanout {
      * @param frame The inbound frame to route
      */
     suspend fun route(frame: AppServerInboundFrame) {
-        if (!frame.isRuntimeEventFrame()) return
-        val runtime = frame.runtime ?: return
+        val runtime = frame.runtime ?: return // Only route events with a runtime scope
 
         val key = RuntimeKey(runtime.agentId, runtime.conversationId)
 
@@ -256,21 +248,14 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
-        private val nextSubscriberId = atomic(0)
-
-        private fun AppServerInboundFrame.isRuntimeEventFrame(): Boolean =
-            this is AppServerInboundFrame.StreamDelta ||
-                this is AppServerInboundFrame.UpdateLoopStatus ||
-                this is AppServerInboundFrame.UpdateDeviceStatus ||
-                this is AppServerInboundFrame.UpdateQueue ||
-                this is AppServerInboundFrame.UpdateSubagentState
+        private var nextSubscriberId = 0
 
         /**
          * Generates a unique subscriber ID.
-         * Thread-safe via atomic even if called outside the stateMutex.
          */
         private fun generateSubscriberId(): String {
-            return "subscriber-${nextSubscriberId.getAndIncrement()}"
+            nextSubscriberId += 1
+            return "subscriber-$nextSubscriberId"
         }
     }
 }

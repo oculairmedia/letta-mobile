@@ -10,7 +10,11 @@ plugins {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        // JVM 21: this module consumes sharedLogic, which brings the Iroh QUIC
+        // transport binding (computer.iroh:iroh:1.0.0, JVM 21+ only) onto the
+        // runtime classpath. Matches the desktop module's target for the same
+        // reason.
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         freeCompilerArgs.addAll(
             "-Xcontext-parameters",
         )
@@ -18,8 +22,8 @@ kotlin {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 application {

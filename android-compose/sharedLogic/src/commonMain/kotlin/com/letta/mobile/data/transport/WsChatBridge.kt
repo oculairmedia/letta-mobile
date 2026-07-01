@@ -266,7 +266,16 @@ sealed interface WsTimelineEvent {
     ) : WsTimelineEvent
 }
 
-private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? = frame.toTimelineEvent(isReplay)
+private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
+    val event = frame.toTimelineEvent(isReplay)
+    com.letta.mobile.util.Telemetry.event(
+        "IrohGate", "gate2.bridgeEvent",
+        "frame" to (frame::class.simpleName ?: ""),
+        "event" to (event?.let { it::class.simpleName } ?: "null"),
+        "isReplay" to isReplay,
+    )
+    return event
+}
 
 private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEvent? = when (this) {
     is ServerFrame.TurnStarted -> WsTimelineEvent.TurnStarted(

@@ -52,7 +52,11 @@ class ShimBackendDetector internal constructor(
         activeConfig,
         states,
     ) { config, states ->
-        config?.let { states[it.id] } ?: false
+        when {
+            config == null -> false
+            config.isIrohBackend() -> true
+            else -> states[config.id] ?: false
+        }
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
     suspend fun refreshActive(): Boolean {
@@ -61,10 +65,26 @@ class ShimBackendDetector internal constructor(
     }
 
     suspend fun refresh(config: LettaConfig): Boolean = probeMutex.withLock {
+        // Iroh check first — must run before the cache lookup, because a
+        // stale cached false from a pre-fix probe would short-circuit.
+        if (config.mode != LettaConfig.Mode.LOCAL && config.isIrohBackend()) {
+            _states.value = _states.value + (config.id to true)
+            Telemetry.event("Backend", "shim_probe.result",
+                "configId" to config.id, "serverUrl" to config.serverUrl, "isShim" to true)
+            return@withLock true
+        }
+
         _states.value[config.id]?.let { return@withLock it }
         if (config.mode == LettaConfig.Mode.LOCAL) {
             _states.value = _states.value + (config.id to false)
             return@withLock false
+        }
+
+        // Iroh QUIC transport — has no HTTP health endpoint but is a
+        // valid remote backend. Treat as a shim for send strategy selection.
+        if (config.isIrohBackend()) {
+            _states.value = _states.value + (config.id to true)
+            return@withLock true
         }
 
         val detected = runCatching {
@@ -101,3 +121,9 @@ private data class ShimHealthPayload(
 private fun ShimHealthPayload.isShimBackend(): Boolean =
     backend.equals("letta-code-local", ignoreCase = true) ||
         version.orEmpty().startsWith("shim-", ignoreCase = true)
+
+private fun LettaConfig.isIrohBackend(): Boolean =
+    serverUrl.trimStart()
+        .removePrefix("https://")
+        .removePrefix("http://")
+        .startsWith("iroh://")

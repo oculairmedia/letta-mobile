@@ -269,6 +269,13 @@ class HeadlessTimelineStore(
 
     override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) = Unit
 
+    override suspend fun reconcileRecentMessages(
+        agentId: String?,
+        conversationId: String,
+        reason: String,
+        forceRefresh: Boolean,
+    ) = Unit
+
     private fun timelineLocked(conversationId: String): Timeline =
         timelines.getOrPut(conversationId) { Timeline(conversationId = conversationId) }
 

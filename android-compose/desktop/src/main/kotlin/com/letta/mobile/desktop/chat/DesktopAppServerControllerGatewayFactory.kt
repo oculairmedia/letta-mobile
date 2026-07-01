@@ -1,23 +1,13 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.controller.DefaultAppServerController
-import com.letta.mobile.data.controller.capability.CapabilityNegotiator
-import com.letta.mobile.data.controller.capability.ExtendedCapabilityAdvertiser
-import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.websocket.WebSockets
-import io.ktor.serialization.kotlinx.json.json
 
 /**
  * Factory for creating a desktop chat gateway backed by the App Server controller.
@@ -68,26 +58,17 @@ class DesktopAppServerControllerGatewayFactory(
         // Create the WebSocket transport
         // The endpoint.address is the full WebSocket URL for WebSocket endpoints
         val transport = KtorAppServerWebSocketTransport(
-            httpClient = createDesktopWsClient(),
+            httpClient = createDesktopLettaHttpClient(),
             baseUrl = endpoint.address,
             scope = controllerScope,
             bearerToken = endpoint.bearerToken,
         )
 
-        // Negotiate capabilities (statically based on extended capabilities config)
-        val negotiator = CapabilityNegotiator(ExtendedCapabilityAdvertiser())
-        val capabilities = kotlinx.coroutines.runBlocking { negotiator.negotiate() }
-        val toolRegistry = ExternalToolRegistry.standard(capabilities)
-
         // Create the App Server client
         val client = DefaultAppServerClient(transport)
 
         // Create the controller
-        val controller = DefaultAppServerController(
-            client = client,
-            externalToolRegistry = toolRegistry,
-            scope = controllerScope,
-        )
+        val controller = DefaultAppServerController(client)
 
         // Create the HTTP gateway for delegation
         // The App Server doesn't yet expose conversation listing, message history,
@@ -102,21 +83,6 @@ class DesktopAppServerControllerGatewayFactory(
         return DesktopHybridAppServerChatGateway(
             controller = controller,
             httpGateway = httpGateway,
-            onClose = {
-                controllerScope.cancel()
-            }
         )
-    }
-
-    private fun createDesktopWsClient(): HttpClient = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(desktopChatJson)
-        }
-        install(HttpTimeout) {
-            connectTimeoutMillis = 15_000
-            requestTimeoutMillis = 60_000
-            socketTimeoutMillis = 60_000
-        }
-        install(WebSockets)
     }
 }
