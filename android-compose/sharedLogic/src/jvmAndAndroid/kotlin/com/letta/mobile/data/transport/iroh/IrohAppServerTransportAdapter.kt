@@ -77,54 +77,68 @@ class IrohAppServerTransportAdapter(
      * - Hex-encoded node ID alone (64 hex chars) — requires relay/discovery.
      * - Full iroh ticket — machine-generated, includes relay + direct addrs.
      */
-    internal fun parseIrohAddress(address: String): EndpointAddr {
-        // Short form: <64-hex>@host:port[,host:port...]
-        val atIndex = address.indexOf('@')
-        if (atIndex > 0) {
-            val idPart = address.take(atIndex)
-            val addrsPart = address.substring(atIndex + 1)
-            require(idPart.matches(Regex("^[0-9a-fA-F]{64}$"))) {
-                "Invalid iroh address: node-id part before '@' must be 64 hex chars, got ${idPart.length}."
-            }
-            val directAddrs = addrsPart.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-            require(directAddrs.isNotEmpty()) {
-                "Invalid iroh address: no direct addresses after '@'. Expected host:port[,host:port...]."
-            }
-            directAddrs.forEach {
-                require(it.contains(':')) { "Invalid direct address '$it': expected host:port." }
-            }
-            return EndpointAddr(hexToEndpointId(idPart), null, directAddrs)
-        }
-
-        // Bare node ID (relay/discovery required — no direct addrs)
-        if (address.matches(Regex("^[0-9a-fA-F]{64}$"))) {
-            return EndpointAddr(hexToEndpointId(address), null, emptyList())
-        }
-
-        // Full iroh ticket (includes direct addresses) — machine format.
-        try {
-            val ticket = EndpointTicket.Companion.fromString(address)
-            return ticket.endpointAddr()
-        } catch (e: Exception) {
-            throw IllegalArgumentException(
-                "Invalid iroh address: '$address'. Expected an iroh ticket, " +
-                    "64 hex chars (node ID), or <node-id-hex>@<host:port>.",
-                e
-            )
-        }
-    }
-
-    private fun hexToEndpointId(hex: String): EndpointId {
-        val bytes = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-        return EndpointId.fromBytes(bytes)
-    }
-
+    // Delegates to the companion so parsing is unit-testable without binding a live Endpoint.
     companion object {
         /**
          * Default ALPN for Letta App Server over Iroh.
          * This should match the ALPN used by the server side.
          */
         val DEFAULT_ALPN = "/letta/appserver/0".toByteArray()
+
+        /**
+         * Parses an iroh address string into an [EndpointAddr].
+         *
+         * Pure function on the companion so it is unit-testable WITHOUT binding a
+         * live Iroh endpoint (parser tests must not touch the network).
+         *
+         * Supported formats (human-friendly SHORT forms first):
+         * - `<node-id-hex>@<host:port>[,<host:port>...]` — 64-hex node ID plus one
+         *   or more direct socket addresses. ~110 chars, hand-shareable, works on
+         *   LAN/loopback with no relay. Recommended dial form.
+         * - Bare 64-hex node ID — requires relay/discovery.
+         * - Full iroh ticket — machine-generated, includes relay + direct addrs.
+         */
+        internal fun parseIrohAddress(address: String): EndpointAddr {
+            // Short form: <64-hex>@host:port[,host:port...]
+            val atIndex = address.indexOf('@')
+            if (atIndex > 0) {
+                val idPart = address.take(atIndex)
+                val addrsPart = address.substring(atIndex + 1)
+                require(idPart.matches(Regex("^[0-9a-fA-F]{64}$"))) {
+                    "Invalid iroh address: node-id part before '@' must be 64 hex chars, got ${idPart.length}."
+                }
+                val directAddrs = addrsPart.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                require(directAddrs.isNotEmpty()) {
+                    "Invalid iroh address: no direct addresses after '@'. Expected host:port[,host:port...]."
+                }
+                directAddrs.forEach {
+                    require(it.contains(':')) { "Invalid direct address '$it': expected host:port." }
+                }
+                return EndpointAddr(hexToEndpointId(idPart), null, directAddrs)
+            }
+
+            // Bare node ID (relay/discovery required — no direct addrs)
+            if (address.matches(Regex("^[0-9a-fA-F]{64}$"))) {
+                return EndpointAddr(hexToEndpointId(address), null, emptyList())
+            }
+
+            // Full iroh ticket (includes direct addresses) — machine format.
+            try {
+                val ticket = EndpointTicket.Companion.fromString(address)
+                return ticket.endpointAddr()
+            } catch (e: Exception) {
+                throw IllegalArgumentException(
+                    "Invalid iroh address: '$address'. Expected an iroh ticket, " +
+                        "64 hex chars (node ID), or <node-id-hex>@<host:port>.",
+                    e
+                )
+            }
+        }
+
+        private fun hexToEndpointId(hex: String): EndpointId {
+            val bytes = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            return EndpointId.fromBytes(bytes)
+        }
 
         /**
          * Registers this adapter for the "iroh" scheme.

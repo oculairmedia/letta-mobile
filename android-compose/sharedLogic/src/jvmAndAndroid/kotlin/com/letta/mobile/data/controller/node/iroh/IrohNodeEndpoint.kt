@@ -108,8 +108,8 @@ class IrohNodeEndpoint(
 
     /**
      * Key precedence: explicit [secretKey] > persisted key at [secretKeyPath]
-     * (generated once, mode 600) > legacy fixed dev key (backward-compatible
-     * fallback so existing setups keep their NodeID until a path is supplied).
+     * (generated once, mode 600) > ephemeral random key (fresh NodeID per run —
+     * safe default; callers wanting a STABLE NodeID must supply key material).
      */
     private fun resolveSecretKey(): ByteArray {
         secretKey?.let {
@@ -120,23 +120,44 @@ class IrohNodeEndpoint(
         if (path != null) {
             val file = java.io.File(path)
             if (file.exists()) {
+                // Enforce the mode-600 contract on pre-existing key files too:
+                // a world/group-readable key must not be silently reused.
+                restrictKeyFilePermissions(file)
                 val bytes = file.readBytes()
                 require(bytes.size == 32) { "persisted iroh secret key at $path must be 32 bytes, got ${bytes.size}" }
                 return bytes
             }
             val generated = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
             file.parentFile?.mkdirs()
+            // Create empty with restrictive perms FIRST, then write — so the key
+            // bytes never exist on disk under a permissive umask, even briefly,
+            // and a crash between create and write leaks nothing.
+            file.createNewFile()
+            restrictKeyFilePermissions(file)
             file.writeBytes(generated)
-            runCatching {
-                java.nio.file.Files.setPosixFilePermissions(
-                    file.toPath(),
-                    java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
-                )
-            }
-            Telemetry.event("IrohNode", "secretKey.generated", "path" to path)
+            // No path in telemetry: key-file locations are sensitive.
+            Telemetry.event("IrohNode", "secretKey.generated")
             return generated
         }
-        return kotlin.ByteArray(32) { i -> (i + 1).toByte() }
+        // No key material configured: use an ephemeral random key rather than a
+        // fixed known dev key (a shared fixed key would make every unconfigured
+        // endpoint impersonatable). NodeID will rotate per run in this mode.
+        return ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+    }
+
+    private fun restrictKeyFilePermissions(file: java.io.File) {
+        val posix = runCatching {
+            java.nio.file.Files.setPosixFilePermissions(
+                file.toPath(),
+                java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
+            )
+        }
+        if (posix.isFailure) {
+            // Non-POSIX filesystems: fall back to java.io.File owner-only flags.
+            file.setReadable(false, false); file.setReadable(true, true)
+            file.setWritable(false, false); file.setWritable(true, true)
+            file.setExecutable(false, false)
+        }
     }
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
