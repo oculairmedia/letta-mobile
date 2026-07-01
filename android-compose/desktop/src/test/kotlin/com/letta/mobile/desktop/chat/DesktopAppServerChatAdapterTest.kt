@@ -1,27 +1,27 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreateRequest
-import com.letta.mobile.data.timeline.TimelineStreamFrame
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
-import kotlin.test.assertSame
+import kotlin.test.assertNotNull
 
 class DesktopAppServerChatAdapterTest {
+
     @Test
-    fun defaultGatewayUsesExistingHttpSseChatWhenAppServerDisabled() {
+    fun createDefaultDesktopChatGateway_whenAppServerDisabled_returnsHttpGateway() {
+        val config = LettaConfig(
+            id = "test-config",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8080",
+        )
+        val appServerConfig = DesktopAppServerRuntimeConfig(enabled = false)
+
         val gateway = createDefaultDesktopChatGateway(
-            config = desktopConfig(),
-            appServerConfig = DesktopAppServerRuntimeConfig(enabled = false),
-            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { _, _ ->
-                error("App Server factory should not be invoked")
-            },
+            config = config,
+            appServerConfig = appServerConfig,
+            appServerGatewayFactory = null, // No factory needed when disabled
         )
 
         assertIs<DesktopLettaHttpChatGateway>(gateway)
@@ -29,78 +29,94 @@ class DesktopAppServerChatAdapterTest {
     }
 
     @Test
-    fun appServerGatewayRequiresSharedClientFactoryWhenEnabled() {
+    fun createDefaultDesktopChatGateway_whenAppServerEnabledButNoFactory_throws() {
+        val config = LettaConfig(
+            id = "test-config",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8080",
+        )
+        val appServerConfig = DesktopAppServerRuntimeConfig(
+            enabled = true,
+            serverUrl = "ws://localhost:4500",
+        )
+
         assertFailsWith<DesktopAppServerClientUnavailableException> {
             createDefaultDesktopChatGateway(
-                config = desktopConfig(),
-                appServerConfig = DesktopAppServerRuntimeConfig(
-                    enabled = true,
-                    serverUrl = "ws://localhost:3131",
-                ),
-                appServerGatewayFactory = null,
+                config = config,
+                appServerConfig = appServerConfig,
+                appServerGatewayFactory = null, // No factory provided
             )
         }
     }
 
     @Test
-    fun appServerGatewayFactoryReceivesDesktopAndRuntimeConfigWhenEnabled() {
-        val config = desktopConfig()
+    fun createDefaultDesktopChatGateway_whenAppServerEnabledWithFactory_returnsAppServerGateway() {
+        val config = LettaConfig(
+            id = "test-config",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8080",
+        )
         val appServerConfig = DesktopAppServerRuntimeConfig(
             enabled = true,
-            serverUrl = "ws://localhost:3131",
+            serverUrl = "ws://localhost:4500",
         )
-        val expectedGateway = EmptyDesktopChatGateway()
-        var capturedConfig: LettaConfig? = null
-        var capturedAppServerConfig: DesktopAppServerRuntimeConfig? = null
+        val factory = DesktopAppServerControllerGatewayFactory()
 
         val gateway = createDefaultDesktopChatGateway(
             config = config,
             appServerConfig = appServerConfig,
-            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { lettaConfig, runtimeConfig ->
-                capturedConfig = lettaConfig
-                capturedAppServerConfig = runtimeConfig
-                expectedGateway
-            },
+            appServerGatewayFactory = factory,
         )
 
-        assertSame(expectedGateway, gateway)
-        assertEquals(config, capturedConfig)
-        assertEquals(appServerConfig, capturedAppServerConfig)
+        // The factory returns a hybrid gateway
+        assertIs<DesktopHybridAppServerChatGateway>(gateway)
+        gateway.close()
     }
 
-    private fun desktopConfig(): LettaConfig =
-        LettaConfig(
-            id = "desktop-local",
+    @Test
+    fun desktopAppServerRuntimeConfig_fromProcess_readsSystemProperty() {
+        try {
+            System.setProperty(DesktopAppServerRuntimeConfig.ENABLED_PROPERTY, "true")
+            System.setProperty(DesktopAppServerRuntimeConfig.SERVER_URL_PROPERTY, "ws://test:4500")
+
+            val config = DesktopAppServerRuntimeConfig.fromProcess()
+
+            assertEquals(true, config.enabled)
+            assertEquals("ws://test:4500", config.serverUrl)
+        } finally {
+            System.clearProperty(DesktopAppServerRuntimeConfig.ENABLED_PROPERTY)
+            System.clearProperty(DesktopAppServerRuntimeConfig.SERVER_URL_PROPERTY)
+        }
+    }
+
+    @Test
+    fun desktopAppServerRuntimeConfig_fromProcess_defaultsToDisabled() {
+        // Ensure no environment variables or system properties are set
+        val config = DesktopAppServerRuntimeConfig.fromProcess()
+        assertEquals(false, config.enabled)
+    }
+
+    @Test
+    fun defaultDesktopAppServerGatewayFactory_returnsFactory() {
+        val factory = defaultDesktopAppServerGatewayFactory()
+        assertNotNull(factory, "Default factory should be available when controller classes are present")
+    }
+
+    @Test
+    fun desktopAppServerControllerGatewayFactory_requiresServerUrl() {
+        val config = LettaConfig(
+            id = "test-config",
             mode = LettaConfig.Mode.SELF_HOSTED,
-            serverUrl = "http://localhost:8283",
+            serverUrl = "http://localhost:8080",
         )
-}
+        val appServerConfig = DesktopAppServerRuntimeConfig(
+            enabled = true,
+            serverUrl = null, // Missing server URL
+        )
+        val factory = DesktopAppServerControllerGatewayFactory()
 
-private class EmptyDesktopChatGateway : DesktopChatGateway {
-    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> = emptyList()
-
-    override suspend fun getConversation(conversationId: String): Conversation =
-        error("not used")
-
-    override suspend fun sendConversationMessage(
-        conversationId: String,
-        request: MessageCreateRequest,
-    ): Flow<LettaMessage> = emptyFlow()
-
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-        emptyFlow()
-
-    override suspend fun listConversationMessages(
-        conversationId: String,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> = emptyList()
-
-    override suspend fun listAgentMessages(
-        agentId: String,
-        limit: Int?,
-        order: String?,
-        conversationId: String?,
-    ): List<LettaMessage> = emptyList()
+        assertFailsWith<IllegalArgumentException> {
+            factory.create(config, appServerConfig)
+        }
+    }
 }

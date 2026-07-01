@@ -59,7 +59,7 @@ class DesktopAppServerClientUnavailableException :
 fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
-    appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = null,
+    appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(),
 ): DesktopChatGateway =
     if (appServerConfig.enabled) {
         appServerGatewayFactory?.create(config, appServerConfig)
@@ -67,3 +67,23 @@ fun createDefaultDesktopChatGateway(
     } else {
         DesktopLettaHttpChatGateway(config)
     }
+
+/**
+ * Creates the default App Server gateway factory for desktop chat.
+ *
+ * Returns a controller-backed factory that wires the App Server transport,
+ * client, and controller stack. The factory is only used when
+ * [DesktopAppServerRuntimeConfig.enabled] is true.
+ *
+ * @return The default factory, or null if controller components are not available
+ */
+fun defaultDesktopAppServerGatewayFactory(): DesktopAppServerChatGatewayFactory? {
+    return try {
+        DesktopAppServerControllerGatewayFactory()
+    } catch (e: NoClassDefFoundError) {
+        // Controller classes not available (stripped build, test scenario, etc.)
+        null
+    } catch (e: ClassNotFoundException) {
+        null
+    }
+}
