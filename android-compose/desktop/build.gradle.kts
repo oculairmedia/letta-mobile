@@ -93,11 +93,12 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
-// RUNTIME NOTE: this module compiles to JVM 17 bytecode, but the Jewel UI
-// dependency ships class-file version 69 (Java 25). Running the app (`:desktop:run`
-// or a packaged distribution) therefore requires a JDK 25+ at runtime — an
-// older JRE (e.g. JDK 17/21) fails at startup with UnsupportedClassVersionError
-// loading org.jetbrains.jewel.*. Compilation and unit tests are unaffected.
+// RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
+// transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
+// Jewel UI dependency ships class-file version 69 (Java 25), so running the app
+// (`:desktop:run` or a packaged distribution) requires a JDK 25+ at runtime — an
+// older JRE fails at startup with UnsupportedClassVersionError loading
+// org.jetbrains.jewel.*. Compilation and unit tests run on JDK 21+.
 compose.desktop {
     application {
         mainClass = "com.letta.mobile.desktop.MainKt"

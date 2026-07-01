@@ -39,7 +39,19 @@ class ReconnectCoordinator(
     private val controller: AppServerController,
     private val registry: RuntimeRegistry,
     private val externalToolRegistrar: ExternalToolRegistrar = NoOpExternalToolRegistrar(),
-    private val connectionState: StateFlow<AppServerControllerState> = controller.state as StateFlow<AppServerControllerState>,
+    // isReconnectNeeded() reads connectionState.value, so a StateFlow is
+    // required. DefaultAppServerController.state is a StateFlow, so the default
+    // works for the production controller. For controllers whose state is a
+    // plain Flow (e.g. test doubles), pass an explicit StateFlow instead of
+    // relying on this default — the guarded cast fails loudly with a clear
+    // message rather than an opaque ClassCastException at a later .value read.
+    private val connectionState: StateFlow<AppServerControllerState> =
+        controller.state as? StateFlow<AppServerControllerState>
+            ?: error(
+                "ReconnectCoordinator requires a StateFlow connectionState; " +
+                    "${controller::class.simpleName}.state is not a StateFlow. " +
+                    "Pass connectionState explicitly.",
+            ),
 ) {
     private val reconnectMutex = Mutex()
     private var lastReconnectState: AppServerControllerState? = null

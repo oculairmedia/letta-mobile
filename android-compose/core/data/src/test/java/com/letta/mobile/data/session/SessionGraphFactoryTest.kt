@@ -1,6 +1,5 @@
 package com.letta.mobile.data.session
 
-import android.content.Context
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.api.ArchiveApi
 import com.letta.mobile.data.api.ConversationApi
@@ -62,6 +61,7 @@ class SessionGraphFactoryTest {
     private val scheduleApi: ScheduleApi = mockk(relaxed = true)
     private val stepApi: StepApi = mockk(relaxed = true)
     private val toolApi: ToolApi = mockk(relaxed = true)
+    private val appContext: android.content.Context = mockk(relaxed = true)
 
     @Test
     fun `create clears daos and produces remote descriptor by default`() {
@@ -86,7 +86,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
-            appContext = mockk(relaxed = true),
+            appContext = appContext,
         )
 
         val graph = factory.create()
@@ -131,7 +131,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
-            appContext = mockk(relaxed = true),
+            appContext = appContext,
             settingsRepository = settingsRepository
         )
 
@@ -174,7 +174,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
-            appContext = mockk(relaxed = true),
+            appContext = appContext,
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Disabled
         )
@@ -235,7 +235,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
-            appContext = mockk(relaxed = true),
+            appContext = appContext,
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
@@ -288,7 +288,7 @@ class SessionGraphFactoryTest {
             scheduleApi = scheduleApi,
             stepApi = stepApi,
             toolApi = toolApi,
-            appContext = mockk(relaxed = true),
+            appContext = appContext,
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
