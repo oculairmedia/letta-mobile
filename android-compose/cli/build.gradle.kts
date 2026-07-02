@@ -59,6 +59,7 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.2")
+    implementation("computer.iroh:iroh:1.0.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
