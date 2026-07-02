@@ -39,6 +39,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import java.time.Instant
 import java.util.UUID
 
@@ -381,6 +382,11 @@ class IrohChannelTransport(
     override fun bye(): Boolean = true
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
+
+    suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        val transport = appServerTransport ?: error("Iroh admin_rpc requested before transport is connected")
+        return transport.adminRpc(method = method, path = path, body = body)
+    }
 
     override suspend fun disconnect() = connectionMutex.withLock {
         closeCurrentConnection("disconnect")
