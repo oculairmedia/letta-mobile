@@ -140,11 +140,12 @@ fun Timeline.mergeServerMessages(
         val pos = timeline.positionForServerMessageDate(msg)
         val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
         if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
+        if (timeline.containsIdentityFor(confirmed)) return@forEach
         val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
         if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
             timeline = timeline.replaceByServerId(confirmed)
             merged++
-        } else if (!timeline.containsIdentityFor(confirmed)) {
+        } else {
             timeline = timeline.insertOrdered(confirmed)
             merged++
         }
@@ -157,7 +158,8 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
 ): Boolean {
     val existingRunId = runId?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
-    return existingRunId?.startsWith("iroh-run-") == true &&
+    return messageType in setOf(TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING) &&
+        existingRunId?.startsWith("iroh-run-") == true &&
         incomingRunId != null &&
         !incomingRunId.startsWith("iroh-run-")
 }

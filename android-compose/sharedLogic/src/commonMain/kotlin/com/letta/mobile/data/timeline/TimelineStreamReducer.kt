@@ -126,7 +126,8 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     val existing = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
         ?.takeIf { it.canMergeStreamFrame(confirmed) }
     if (existing != null) {
-        if (existing.hasAlreadyIngestedStreamFrame(confirmed)) {
+        val syntheticLiveToRealFinal = existing.hasIrohSyntheticRunId() && !confirmed.hasIrohSyntheticRunId()
+        if (!syntheticLiveToRealFinal && existing.hasAlreadyIngestedStreamFrame(confirmed)) {
             hotPathTelemetry(
                 "streamSubscriber.duplicateSeqSkipped",
                 "serverId" to confirmed.serverId,
@@ -139,7 +140,6 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         }
         val oldText = existing.content
         val newText = confirmed.content
-        val syntheticLiveToRealFinal = existing.hasIrohSyntheticRunId() && !confirmed.hasIrohSyntheticRunId()
         val canUseSnapshotMerge = syntheticLiveToRealFinal || (existing.seqId != null && confirmed.seqId != null)
         // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
         // seq id is strictly greater than the text we already hold. A frame with
@@ -148,14 +148,22 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         // are absent we keep the historical append behaviour (treat as forward),
         // except for the Iroh synthetic-live -> real-final replacement path: the
         // reconciled final is a snapshot, not another text delta.
-        val incomingIsForwardDelta = syntheticLiveToRealFinal ||
-            existing.seqId == null || confirmed.seqId == null || confirmed.seqId > existing.seqId
-        val textMerge = mergeStreamText(
-            existing = oldText,
-            incoming = newText,
-            canUseSnapshotMerge = canUseSnapshotMerge,
-            incomingIsForwardDelta = incomingIsForwardDelta,
-        )
+        val incomingIsForwardDelta = !syntheticLiveToRealFinal &&
+            (existing.seqId == null || confirmed.seqId == null || confirmed.seqId > existing.seqId)
+        val textMerge = if (syntheticLiveToRealFinal) {
+            StreamTextMergeResult(
+                text = newText.ifBlank { oldText },
+                branch = StreamTextMergeBranch.SNAPSHOT_CONFLICT,
+                garbleRisk = false,
+            )
+        } else {
+            mergeStreamText(
+                existing = oldText,
+                incoming = newText,
+                canUseSnapshotMerge = canUseSnapshotMerge,
+                incomingIsForwardDelta = incomingIsForwardDelta,
+            )
+        }
         val mergedText = textMerge.text
         val oldCalls = existing.toolCalls
         val newCalls = confirmed.toolCalls

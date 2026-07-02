@@ -473,6 +473,60 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `synthetic live to real final uses incoming snapshot on content conflict`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-302",
+                contentRaw = JsonPrimitive("synthetic partial that should not survive"),
+                runId = "iroh-run-client-synthetic",
+                seqId = null,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-302",
+                contentRaw = JsonPrimitive("final"),
+                runId = "server-run-real",
+                seqId = null,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "final"
+    }
+
+    @Test
+    fun `synthetic duplicate seq still reconciles real run id`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-303",
+                contentRaw = JsonPrimitive("Hello!"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 2,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-303",
+                contentRaw = JsonPrimitive("Hello!"),
+                runId = "server-run-real",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+    }
+
+    @Test
     fun `recent reconcile real run replaces iroh synthetic live row`() {
         val live = reduce(
             frame = AssistantMessage(
