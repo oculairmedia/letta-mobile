@@ -185,14 +185,6 @@ internal fun TimelineEvent.identityKeys(): Set<String> {
     val keys = mutableSetOf("otid:$otid")
     if (this is TimelineEvent.Confirmed) {
         val stableRunId = runId?.takeIf { it.isNotBlank() }
-        if (stableRunId?.startsWith("iroh-run-") == true) {
-            // IrohChannelTransport generates a client-side iroh-run-* before the
-            // App Server's real run_id is known. Recent reconcile later returns
-            // the same server message with the real run id. Keep the legacy
-            // server key for synthetic-run live rows so the reconciled final
-            // message merges instead of rendering as a duplicate row.
-            keys += "server:$serverId:$messageType"
-        }
         keys += if (stableRunId == null) {
             "server:$serverId:$messageType"
         } else {
