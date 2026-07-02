@@ -1,0 +1,193 @@
+package com.letta.mobile.avatar.pipeline
+
+import com.letta.mobile.avatar.catalog.AvatarCatalog
+import com.letta.mobile.avatar.catalog.AvatarCatalogCodec
+import com.letta.mobile.avatar.catalog.JsonFileAvatarCatalogStore
+import com.letta.mobile.avatar.core.AvatarAssetSource
+import com.letta.mobile.avatar.core.AvatarDetectionException
+import com.letta.mobile.avatar.core.AvatarFormat
+import com.letta.mobile.avatar.core.AvatarFormatDetector
+import com.letta.mobile.avatar.core.AvatarImportDecision
+import com.letta.mobile.avatar.core.AvatarImportPolicy
+import com.letta.mobile.avatar.core.AvatarImportVisibility
+import com.letta.mobile.avatar.core.AvatarLicense
+import com.letta.mobile.avatar.core.AvatarManifest
+import com.letta.mobile.avatar.core.AvatarManifestCodec
+import com.letta.mobile.avatar.core.AvatarModel
+import com.letta.mobile.avatar.core.toManifest
+import com.letta.mobile.avatar.core.toModel
+import java.nio.file.Files
+import java.nio.file.Path
+import java.security.MessageDigest
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Everything the importer needs to know about one incoming asset. */
+data class AvatarImportRequest(
+    /** Original file name — drives id derivation and packaged extension. */
+    val sourceFileName: String,
+    val bytes: ByteArray,
+    val id: String? = null,
+    val displayName: String? = null,
+    val license: AvatarLicense = AvatarLicense(),
+    val source: AvatarAssetSource = AvatarAssetSource(),
+    val visibility: AvatarImportVisibility = AvatarImportVisibility.PRIVATE_LOCAL,
+) {
+    override fun equals(other: Any?): Boolean = this === other
+    override fun hashCode(): Int = sourceFileName.hashCode()
+}
+
+sealed interface AvatarImportResult {
+    data class Imported(
+        val model: AvatarModel,
+        val manifest: AvatarManifest,
+        /** May be downgraded from the requested visibility by license policy. */
+        val visibility: AvatarImportVisibility,
+        val assetPath: Path,
+        val manifestPath: Path,
+        val preservedSourcePath: Path,
+        val warnings: List<String>,
+    ) : AvatarImportResult
+
+    data class Rejected(val reason: String) : AvatarImportResult
+}
+
+/**
+ * The import pipeline: detect → license-gate → inspect → hash → write asset +
+ * preserved original + manifest → register in the catalog. Writes land in a
+ * self-contained catalog directory:
+ *
+ * ```
+ * <catalogDir>/
+ *   catalog.json                       entry registry (AvatarCatalogCodec)
+ *   assets/<id>.<ext>                  packaged runtime asset
+ *   manifests/<id>.avatar.manifest.json
+ *   sources/<id>.source.<ext>          untouched original, for audits
+ * ```
+ *
+ * Rejections (license, structural errors, non-glTF bytes) write nothing.
+ */
+class AvatarImporter(
+    private val catalogDir: Path,
+    private val inspector: GltfInspector = BuiltinGltfInspector,
+    private val catalog: AvatarCatalog =
+        AvatarCatalog(JsonFileAvatarCatalogStore(catalogDir.resolve(AvatarCatalogCodec.FILE_NAME))),
+) {
+    suspend fun import(sourcePath: Path): AvatarImportResult =
+        import(
+            AvatarImportRequest(
+                sourceFileName = sourcePath.fileName.toString(),
+                bytes = withContext(Dispatchers.IO) { Files.readAllBytes(sourcePath) },
+                source = AvatarAssetSource(url = sourcePath.toUri().toString(), kind = "local"),
+            ),
+        )
+
+    suspend fun import(request: AvatarImportRequest): AvatarImportResult {
+        val warnings = mutableListOf<String>()
+
+        // 1. Detect format + normalize VRM metadata.
+        val detection = try {
+            AvatarFormatDetector.detect(request.bytes)
+        } catch (e: AvatarDetectionException) {
+            return AvatarImportResult.Rejected(e.message ?: "Not a glTF/VRM asset")
+        }
+
+        // 2. License gate — before any bytes are written.
+        val effectiveVisibility = when (
+            val decision = AvatarImportPolicy.evaluate(request.license, request.visibility)
+        ) {
+            is AvatarImportDecision.Rejected -> return AvatarImportResult.Rejected(decision.reason)
+            is AvatarImportDecision.AllowedLocalOnly -> {
+                warnings += decision.reason
+                AvatarImportVisibility.PRIVATE_LOCAL
+            }
+            AvatarImportDecision.Allowed -> request.visibility
+        }
+
+        // 3. Structural inspection — errors fail the import.
+        val inspection = inspector.inspect(request.bytes, detection)
+        if (inspection.errors.isNotEmpty()) {
+            return AvatarImportResult.Rejected(
+                "Asset failed validation: ${inspection.errors.joinToString("; ")}",
+            )
+        }
+        warnings += inspection.warnings
+
+        // 4. Identity + hash.
+        val sha256 = sha256Hex(request.bytes)
+        val baseName = request.sourceFileName.substringBeforeLast('.')
+            .ifBlank { "avatar" }
+        val id = request.id ?: "${slugify(baseName)}-${sha256.take(8)}"
+        val displayName = request.displayName ?: baseName
+
+        // 5. Write the catalog directory entries.
+        val extension = packagedExtension(request.sourceFileName, detection.format)
+        val assetPath = catalogDir.resolve("assets").resolve("$id.$extension")
+        val manifestPath = catalogDir.resolve("manifests")
+            .resolve("$id.${AvatarManifest.FILE_NAME}")
+        val preservedSourcePath = catalogDir.resolve("sources")
+            .resolve("$id.source.$extension")
+
+        val manifest = detection.toManifest(
+            id = id,
+            displayName = displayName,
+            license = request.license,
+            source = request.source,
+            sha256 = sha256,
+            stats = inspection.stats,
+            extraWarnings = warnings,
+        )
+        val model = manifest.toModel(
+            uri = assetPath.toUri().toString(),
+            manifestUri = manifestPath.toUri().toString(),
+        )
+
+        withContext(Dispatchers.IO) {
+            Files.createDirectories(assetPath.parent)
+            Files.createDirectories(manifestPath.parent)
+            Files.createDirectories(preservedSourcePath.parent)
+            Files.write(assetPath, request.bytes)
+            Files.write(preservedSourcePath, request.bytes)
+            Files.writeString(manifestPath, AvatarManifestCodec.encode(manifest))
+        }
+
+        // 6. Register — refresh first so parallel importers into the same
+        // directory don't clobber each other's entries.
+        catalog.refresh()
+        catalog.upsert(model)
+
+        return AvatarImportResult.Imported(
+            model = model,
+            manifest = manifest,
+            visibility = effectiveVisibility,
+            assetPath = assetPath,
+            manifestPath = manifestPath,
+            preservedSourcePath = preservedSourcePath,
+            warnings = manifest.warnings,
+        )
+    }
+
+    private fun packagedExtension(sourceFileName: String, format: AvatarFormat): String {
+        val original = sourceFileName.substringAfterLast('.', "").lowercase()
+        if (original in setOf("vrm", "glb", "gltf")) return original
+        return when (format) {
+            AvatarFormat.VRM_1, AvatarFormat.VRM_0 -> "vrm"
+            AvatarFormat.GLB -> "glb"
+            AvatarFormat.GLTF -> "gltf"
+        }
+    }
+
+    private fun slugify(value: String): String =
+        value.lowercase()
+            .map { if (it.isLetterOrDigit()) it else '-' }
+            .joinToString("")
+            .split('-')
+            .filter { it.isNotEmpty() }
+            .joinToString("-")
+            .ifBlank { "avatar" }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { byte -> (byte.toInt() and 0xFF).toString(16).padStart(2, '0') }
+}

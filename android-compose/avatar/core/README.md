@@ -29,13 +29,20 @@ in at the platform edge.
 | `AvatarImportPolicy` | License gate: unknown/denied redistribution never enters the shared catalog. |
 | `HeadlessAvatarRuntime` | Renderer-less reference implementation: full state machine, clamped weights, subclass hooks (`loadCapabilities`, `onPlayGesture`, …) for adapters. |
 
-## Planned sibling modules (not yet built)
+## Sibling modules
 
-- `:avatar:asset-pipeline` — JVM/CLI import: glTF-Validator + glTF-Transform
-  reports, license capture, GLB packing, thumbnails; emits `avatar.manifest.json`
-  via `AvatarFormatDetector` + `toManifest`.
+- `:avatar:catalog` — local/offline catalog: `AvatarCatalog` over a pluggable
+  `AvatarCatalogStore` (in-memory + atomic `catalog.json` file store).
+- `:avatar:asset-pipeline` — JVM import pipeline + `avatar-import` CLI:
+  detect → license-gate → inspect → hash → pack → manifest → catalog register.
+  External glTF-Validator / glTF-Transform integration plugs in behind the
+  `GltfInspector` seam.
+
+## Planned (not yet built)
+
 - `:avatar:renderer-filament-android` — Filament/gltfio adapter
   (subclass `HeadlessAvatarRuntime`, forward to `Animator`/morph weights).
 - `:avatar:renderer-web` — WebView/JCEF + three.js + `@pixiv/three-vrm` adapter
   bridging the same commands over JS.
-- `:avatar:catalog` — local/offline catalog over `AvatarModel` + manifests.
+- Pipeline follow-ups: external-buffer GLB packing, thumbnails, external
+  validator integration.
