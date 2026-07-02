@@ -15,6 +15,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartCreateConversationOptions
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
@@ -142,6 +143,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                     requestId = "probe-runtime-${UUID.randomUUID()}",
                     agentId = agentId.takeIf { it.isNotBlank() },
                     conversationId = conversationId,
+                    createConversation = AppServerRuntimeStartCreateConversationOptions(body = null),
                     mode = AppServerPermissionMode.Standard,
                     clientInfo = AppServerRuntimeStartClientInfo(
                         name = "letta-mobile-cli-iroh-probe",
