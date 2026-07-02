@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
+import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointOptions
@@ -171,7 +172,7 @@ class IrohNodeEndpoint(
     }
 
     private fun nodeIdHex(endpointAddr: EndpointAddr): String =
-        endpointAddr.id().toBytes().joinToString("") { "%02x".format(it) }
+        IrohDiagnostics.endpointIdHex(endpointAddr.id())
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         com.letta.mobile.util.Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
@@ -190,10 +191,10 @@ class IrohNodeEndpoint(
                     Telemetry.event("IrohNode", "incoming.accepting")
                     val accepting = incoming.accept()
                     val connection = accepting.connect()
-                    val remoteId = connection.remoteId().toBytes().joinToString("") { "%02x".format(it) }
-                    Telemetry.event("IrohNode", "incoming.connected", "remoteId" to remoteId)
+                    val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
+                    Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
                     if (allowedPeerIds.isNotEmpty() && remoteId !in allowedPeerIds) {
-                        Telemetry.event("IrohNode", "auth.peer_rejected", "remoteId" to remoteId)
+                        Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
                         runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                     } else {
                         launch {
@@ -204,6 +205,7 @@ class IrohNodeEndpoint(
                                 adminRpcRouter = adminRpcRouter,
                                 requiredBearerToken = requiredBearerToken,
                                 allowedPeerIds = allowedPeerIds,
+                                remoteEndpointId = remoteId,
                             ).serve()
                         }
                     }

@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -52,6 +53,7 @@ class IrohNodeConnection(
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
     private val requiredBearerToken: String? = null,
     private val allowedPeerIds: Set<String> = emptySet(),
+    private val remoteEndpointId: String = "",
 ) {
     private val handledClientMessageIds = LinkedHashSet<String>()
     private var authenticated: Boolean = requiredBearerToken.isNullOrBlank()
@@ -59,9 +61,9 @@ class IrohNodeConnection(
     suspend fun serve() = coroutineScope {
         try {
             val controlBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "control.accepted")
+            Telemetry.event("IrohNode", "control.accepted", "remoteEndpointId" to remoteEndpointId)
             val streamBiStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "stream.accepted")
+            Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" to remoteEndpointId)
             val streamSend = streamBiStream.send()
 
             val controlJob = launch {
@@ -76,8 +78,19 @@ class IrohNodeConnection(
             streamJob.cancelAndJoin()
             runCatching { streamSend.finish() }
         } catch (e: Exception) {
-            // Connection error - silently close
+            Telemetry.event(
+                "IrohNode", "connection.error",
+                "remoteEndpointId" to remoteEndpointId,
+                "error" to (e.message ?: e.toString()),
+                "class" to e::class.simpleName,
+            )
         } finally {
+            Telemetry.event(
+                "IrohNode", "connection.closed",
+                "remoteEndpointId" to remoteEndpointId,
+                "closeReason" to IrohDiagnostics.closeReason(connection),
+                *IrohDiagnostics.connectionStatsAttributes(runCatching { connection.stats() }.getOrNull()).toTypedArray(),
+            )
             runCatching { connection.close() }
         }
     }
@@ -94,7 +107,7 @@ class IrohNodeConnection(
                 recvStream = recvStream,
                 maxFrameBytes = MAX_FRAME_BYTES,
             ) { frameJson ->
-                Telemetry.event("IrohNode", "control.recv", "bytes" to frameJson.length)
+                Telemetry.event("IrohNode", "control.recv", "remoteEndpointId" to remoteEndpointId, "bytes" to frameJson.length)
                 try {
                     val response = handleControlFrame(frameJson, streamSend, sendStream)
                     if (response != null) {
@@ -105,6 +118,7 @@ class IrohNodeConnection(
                 } catch (error: Exception) {
                     Telemetry.event(
                         "IrohNode", "control.frame_failed",
+                        "remoteEndpointId" to remoteEndpointId,
                         "error" to (error.message ?: error.toString()),
                         "class" to error::class.simpleName,
                     )
@@ -127,7 +141,7 @@ class IrohNodeConnection(
             val type = obj["type"]?.jsonPrimitive?.content
             val requestId = obj["request_id"]?.jsonPrimitive?.content
 
-            Telemetry.event("IrohNode", "control.frame", "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
+            Telemetry.event("IrohNode", "control.frame", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
                 "runtime_start" -> ifAuthorized(requestId) { handleRuntimeStart(obj, requestId) }
@@ -190,11 +204,12 @@ class IrohNodeConnection(
         val provided = obj["token"]?.jsonPrimitive?.contentOrNull
         authenticated = expected.isNullOrBlank() || provided == expected
         return if (authenticated) {
-            Telemetry.event("IrohNode", "auth.ok")
+            Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId)
             """{"type":"auth_response","request_id":"$requestId","success":true}"""
         } else {
-            Telemetry.event("IrohNode", "auth.failed", "reason" to "invalid_token")
-            """{"type":"auth_response","request_id":"$requestId","success":false,"error":"invalid_token"}"""
+            val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
+            Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)
+            """{"type":"auth_response","request_id":"$requestId","success":false,"error":"$reason"}"""
         }
     }
 
@@ -203,7 +218,7 @@ class IrohNodeConnection(
             block()
         } else {
             val id = requestId ?: ""
-            Telemetry.event("IrohNode", "auth.required", "requestId" to id)
+            Telemetry.event("IrohNode", "auth.required", "remoteEndpointId" to remoteEndpointId, "requestId" to id, "reason" to "missing_token")
             """{"type":"error","request_id":"$id","message":"unauthorized"}"""
         }
 
@@ -347,9 +362,8 @@ class IrohNodeConnection(
     ) {
         Telemetry.event(
             "IrohNode", "stream.write",
-            "bytes" to rawFrame.length,
-            "type" to frameType(rawFrame),
-            "snippet" to rawFrame.take(180),
+            "remoteEndpointId" to remoteEndpointId,
+            *IrohDiagnostics.redactedFrameAttributes(frameType(rawFrame), rawFrame.length).toTypedArray(),
         )
         IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES)
     }
@@ -369,9 +383,8 @@ class IrohNodeConnection(
         }.toString()
         Telemetry.event(
             "IrohNode", "stream.write",
-            "bytes" to frame.length,
-            "type" to frameType(frame),
-            "snippet" to frame.take(180),
+            "remoteEndpointId" to remoteEndpointId,
+            *IrohDiagnostics.redactedFrameAttributes(frameType(frame), frame.length).toTypedArray(),
         )
         IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES)
     }

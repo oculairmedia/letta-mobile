@@ -10,9 +10,12 @@ import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
+import computer.iroh.PathChangeCallback
+import computer.iroh.PathEventCallback
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
@@ -60,6 +63,7 @@ class IrohAppServerTransport(
     private lateinit var connection: Connection
     private lateinit var controlBiStream: BiStream
     private lateinit var streamBiStream: BiStream
+    private var pathWatchJob: Job? = null
     private val connectionReady = CompletableDeferred<Unit>()
     private val streamReady = CompletableDeferred<Unit>()
 
@@ -101,7 +105,10 @@ class IrohAppServerTransport(
     private val closeWatcher = scope.launch {
         runCatching { connectionReady.await() }
         val reason = runCatching { connection.closed() }.getOrNull()
-        Telemetry.event("IrohTransport", "connection.closed", "reason" to (reason ?: "<unknown>"))
+        Telemetry.event(
+            "IrohTransport", "connection.closed",
+            *(IrohDiagnostics.closeAttributes(connection) + ("reason" to IrohDiagnostics.closeReason(reason))).toTypedArray(),
+        )
     }
 
     // c0qm0 keepalive: Iroh exposes no idle-timeout knob, so proactively keep the
@@ -132,6 +139,7 @@ class IrohAppServerTransport(
     suspend fun close() {
         controlCommandQueue.close()
         runCatching { keepAliveJob.cancelAndJoin() }
+        runCatching { pathWatchJob?.cancelAndJoin() }
         runCatching { closeWatcher.cancelAndJoin() }
         controlJob.cancelAndJoin()
         streamJob.cancelAndJoin()
@@ -148,12 +156,19 @@ class IrohAppServerTransport(
             connection = withTimeout(CONNECT_TIMEOUT_MS) {
                 endpoint.connect(remoteAddr, alpn)
             }
-            Telemetry.event("IrohTransport", "connect.ok")
+            Telemetry.event("IrohTransport", "connect.ok", *IrohDiagnostics.connectionAttributes(connection).toTypedArray())
             controlBiStream = connection.openBi()
             Telemetry.event("IrohTransport", "control.opened")
             connectionReady.complete(Unit)
+            pathWatchJob = launch { attachPathWatchers() }
         } catch (t: Throwable) {
-            Telemetry.event("IrohTransport", "connect.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
+            Telemetry.event(
+                "IrohTransport", "connect.failed",
+                "remoteEndpointId" to IrohDiagnostics.endpointIdHex(remoteAddr.id().toBytes()),
+                "closeReason" to "",
+                "error" to (t.message ?: t.toString()),
+                "class" to t::class.simpleName,
+            )
             connectionReady.completeExceptionally(t)
             if (!streamReady.isCompleted) streamReady.completeExceptionally(t)
             return@coroutineScope
@@ -218,6 +233,7 @@ class IrohAppServerTransport(
             Telemetry.event(
                 "IrohTransport", "frame.protocol_error",
                 "channel" to channel.name,
+                *(if (::connection.isInitialized) IrohDiagnostics.closeAttributes(connection) else emptyList()).toTypedArray(),
                 "error" to (error.message ?: error.toString()),
             )
             throw error
@@ -231,6 +247,44 @@ class IrohAppServerTransport(
             throw error
         } finally {
             Telemetry.event("IrohTransport", "frame.reader_stop", "channel" to channel.name)
+        }
+    }
+
+    private fun attachPathWatchers() {
+        val attrs = IrohDiagnostics.connectionAttributes(connection)
+        runCatching {
+            connection.watchPaths(object : PathChangeCallback {
+                override suspend fun onChange(paths: List<computer.iroh.PathSnapshot>) {
+                    val summary = IrohDiagnostics.summarizePaths(paths)
+                    Telemetry.event(
+                        "IrohTransport", "paths.changed",
+                        "remoteEndpointId" to (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: ""),
+                        "selectedPathKind" to summary.selectedKind,
+                        "selectedPathId" to summary.selectedPathId,
+                        "pathCount" to summary.pathCount,
+                        "relayPathCount" to summary.relayPathCount,
+                        "directPathCount" to summary.directPathCount,
+                        "rttMs" to summary.selectedRttMs,
+                        "lostPackets" to summary.lostPackets,
+                        "lostBytes" to summary.lostBytes,
+                    )
+                }
+            })
+        }.onFailure { error ->
+            Telemetry.event("IrohTransport", "paths.watch_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+        }
+        runCatching {
+            connection.watchPathEvents(object : PathEventCallback {
+                override suspend fun onEvent(event: computer.iroh.PathEvent) {
+                    Telemetry.event(
+                        "IrohTransport", "path.event",
+                        "remoteEndpointId" to (attrs.firstOrNull { it.first == "remoteEndpointId" }?.second ?: ""),
+                        *IrohDiagnostics.pathEventAttributes(event).toTypedArray(),
+                    )
+                }
+            })
+        }.onFailure { error ->
+            Telemetry.event("IrohTransport", "path_events.watch_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
         }
     }
 
