@@ -442,6 +442,37 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `reconciled final with real run id replaces iroh synthetic live row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-300",
+                contentRaw = JsonPrimitive("Hello"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 1,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-300",
+                contentRaw = JsonPrimitive("Hello!"),
+                runId = "server-run-real",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-300"
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("letta-msg-300", "assistant_message")
+        )
+    }
+
+    @Test
     fun `reused assistant server id from a different run appends live event`() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",

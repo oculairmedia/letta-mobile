@@ -298,10 +298,12 @@ private fun TimelineEvent.Confirmed.canMergeStreamFrame(
     val existingRunId = runId?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
     if (existingRunId != null && incomingRunId != null) {
-        return existingRunId == incomingRunId
+        return existingRunId == incomingRunId || existingRunId.isIrohSyntheticRunId() || incomingRunId.isIrohSyntheticRunId()
     }
     return true
 }
+
+private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
 
 private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
     incoming: TimelineEvent.Confirmed,
