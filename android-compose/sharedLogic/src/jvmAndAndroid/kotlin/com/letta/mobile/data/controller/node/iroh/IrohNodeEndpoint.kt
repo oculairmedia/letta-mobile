@@ -20,6 +20,23 @@ class IrohNodeEndpoint(
     private val alpn: ByteArray = DEFAULT_ALPN,
     private val scope: CoroutineScope,
     private val relayConfig: IrohRelayConfig = IrohRelayConfig.Default,
+    /**
+     * UDP bind address. Default binds an OS-assigned random port, which makes
+     * the ticket rotate on every restart (direct addrs change). Servers that
+     * want a STABLE ticket should pin a port, e.g. "0.0.0.0:4501".
+     */
+    private val bindAddr: String = "0.0.0.0:0",
+    /**
+     * 32-byte secret key. Determines the NodeID. When null, a key is loaded
+     * from (or generated + persisted to) [secretKeyPath] so the NodeID — and,
+     * with a pinned [bindAddr], the whole ticket — is stable across restarts.
+     */
+    private val secretKey: ByteArray? = null,
+    /**
+     * Where to persist the auto-generated secret key when [secretKey] is null.
+     * Ignored if [secretKey] is provided.
+     */
+    private val secretKeyPath: String? = null,
 ) {
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
@@ -81,12 +98,66 @@ class IrohNodeEndpoint(
         val relayMode = IrohRelayConfigMapper.toRelayMode(relayConfig)
         endpoint = Endpoint.bind(
             EndpointOptions(
-                bindAddr = "0.0.0.0:0",
-                secretKey = kotlin.ByteArray(32) { i -> (i + 1).toByte() },
+                bindAddr = bindAddr,
+                secretKey = resolveSecretKey(),
                 alpns = listOf(alpn),
                 relayMode = relayMode,
             )
         )
+    }
+
+    /**
+     * Key precedence: explicit [secretKey] > persisted key at [secretKeyPath]
+     * (generated once, mode 600) > ephemeral random key (fresh NodeID per run —
+     * safe default; callers wanting a STABLE NodeID must supply key material).
+     */
+    private fun resolveSecretKey(): ByteArray {
+        secretKey?.let {
+            require(it.size == 32) { "iroh secret key must be 32 bytes, got ${it.size}" }
+            return it
+        }
+        val path = secretKeyPath
+        if (path != null) {
+            val file = java.io.File(path)
+            if (file.exists()) {
+                // Enforce the mode-600 contract on pre-existing key files too:
+                // a world/group-readable key must not be silently reused.
+                restrictKeyFilePermissions(file)
+                val bytes = file.readBytes()
+                require(bytes.size == 32) { "persisted iroh secret key at $path must be 32 bytes, got ${bytes.size}" }
+                return bytes
+            }
+            val generated = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            file.parentFile?.mkdirs()
+            // Create empty with restrictive perms FIRST, then write — so the key
+            // bytes never exist on disk under a permissive umask, even briefly,
+            // and a crash between create and write leaks nothing.
+            file.createNewFile()
+            restrictKeyFilePermissions(file)
+            file.writeBytes(generated)
+            // No path in telemetry: key-file locations are sensitive.
+            Telemetry.event("IrohNode", "secretKey.generated")
+            return generated
+        }
+        // No key material configured: use an ephemeral random key rather than a
+        // fixed known dev key (a shared fixed key would make every unconfigured
+        // endpoint impersonatable). NodeID will rotate per run in this mode.
+        return ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+    }
+
+    private fun restrictKeyFilePermissions(file: java.io.File) {
+        val posix = runCatching {
+            java.nio.file.Files.setPosixFilePermissions(
+                file.toPath(),
+                java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
+            )
+        }
+        if (posix.isFailure) {
+            // Non-POSIX filesystems: fall back to java.io.File owner-only flags.
+            file.setReadable(false, false); file.setReadable(true, true)
+            file.setWritable(false, false); file.setWritable(true, true)
+            file.setExecutable(false, false)
+        }
     }
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->

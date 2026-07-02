@@ -52,6 +52,20 @@ internal class AppServerServeIrohCommand : CliktCommand(
         help = "Request timeout in milliseconds",
     ).default("120000")
 
+    private val irohPort by option(
+        "--iroh-port",
+        envvar = "LETTA_IROH_PORT",
+        help = "UDP port to bind the Iroh endpoint on. Pinning a port (plus a persisted " +
+            "secret key) keeps the ticket/dial URL STABLE across restarts. 0 = random.",
+    ).default("0")
+
+    private val irohSecretKeyPath by option(
+        "--iroh-secret-key-file",
+        envvar = "LETTA_IROH_SECRET_KEY_FILE",
+        help = "Path to a 32-byte secret key file. Generated (mode 600) on first run if " +
+            "missing. Keeps the NodeID stable across restarts.",
+    )
+
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         
@@ -59,7 +73,11 @@ internal class AppServerServeIrohCommand : CliktCommand(
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             // Create the Iroh endpoint
-            val irohEndpoint = IrohNodeEndpoint(scope = scope)
+            val irohEndpoint = IrohNodeEndpoint(
+                scope = scope,
+                bindAddr = "0.0.0.0:${irohPort}",
+                secretKeyPath = irohSecretKeyPath,
+            )
             irohEndpoint.create()
             
             // Get the dialable information
@@ -69,6 +87,22 @@ internal class AppServerServeIrohCommand : CliktCommand(
             // Print the dialable information
             println("[iroh-app-server] Node ID: $nodeId")
             println("[iroh-app-server] Ticket: $ticket")
+            // Short human-friendly dial form: iroh://<node-id>@<host:port>[,...]
+            // Only meaningful when the port is pinned; with a random port it
+            // rotates like the ticket does.
+            val port = irohPort.toIntOrNull() ?: 0
+            if (port > 0) {
+                val lanAddrs = try {
+                    java.net.NetworkInterface.getNetworkInterfaces().toList()
+                        .filter { it.isUp && !it.isLoopback }
+                        .flatMap { it.inetAddresses.toList() }
+                        .filterIsInstance<java.net.Inet4Address>()
+                        .map { "${it.hostAddress}:$port" }
+                } catch (_: Exception) { emptyList() }
+                if (lanAddrs.isNotEmpty()) {
+                    println("[iroh-app-server] Short URL: iroh://$nodeId@${lanAddrs.joinToString(",")}")
+                }
+            }
             
             // Create the controller (using a stub implementation for now)
             // In a full implementation, this would connect to a real Letta App Server
