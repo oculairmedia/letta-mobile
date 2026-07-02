@@ -65,7 +65,7 @@ internal object IrohStreamDeltaServerFrameMapper {
             "reasoning_message",
             "hidden_reasoning_message" -> listOf(
                 ServerFrame.ReasoningMessage(
-                    id = meta.messageId(),
+                    id = meta.messageIdFor(messageType),
                     ts = meta.timestamp,
                     agentId = meta.agentId,
                     conversationId = meta.conversationId,
@@ -243,6 +243,12 @@ internal object IrohStreamDeltaServerFrameMapper {
         private val messageId: String?,
     ) {
         fun messageId(): String = messageId ?: frameId
+
+        fun messageIdFor(messageType: String): String = messageId ?: when (messageType) {
+            "reasoning_message",
+            "hidden_reasoning_message" -> "iroh-$messageType-$runId-$turnId"
+            else -> frameId
+        }
 
         companion object {
             fun from(
