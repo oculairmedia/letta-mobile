@@ -31,7 +31,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -162,7 +163,6 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                         if (!inbound.matches(runtime)) return@collect
                         if (firstFrameMs == null) firstFrameMs = nowMs() - turnStartedAt
                         observed.record(inbound)
-                        if (observed.terminalCount > 0) cancel()
                     }
                 }
 
@@ -179,7 +179,11 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                         ),
                     ),
                 )
-                collector.join()
+                while (observed.terminalCount == 0) {
+                    delay(50)
+                }
+                delay(500)
+                collector.cancelAndJoin()
                 true
             }
             timedOut = completed != true
