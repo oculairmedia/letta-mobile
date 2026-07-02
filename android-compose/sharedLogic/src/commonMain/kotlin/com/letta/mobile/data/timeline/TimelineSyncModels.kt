@@ -64,7 +64,12 @@ fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confirmed? {
         is PingMessage, is UnknownMessage, is StopReason, is UsageStatistics,
         is com.letta.mobile.data.model.ErrorMessage -> emptyList()
     }
-    val effectiveOtid = otid ?: "server-$id-${type.name.lowercase()}"
+    val stableRunId = runId?.takeIf { it.isNotBlank() }
+    val effectiveOtid = otid ?: if (stableRunId == null) {
+        "server-$id-${type.name.lowercase()}"
+    } else {
+        "server-$id-${type.name.lowercase()}-$stableRunId"
+    }
     val date = date?.let(::parseTimelineInstantOrNull) ?: timelineNow()
     val toolCallsList = when (this) {
         is ToolCallMessage -> effectiveToolCalls

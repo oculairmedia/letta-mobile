@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -15,12 +16,14 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,11 +37,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
 import java.util.UUID
 
@@ -180,8 +180,25 @@ class IrohChannelTransport(
         val runId = "iroh-run-${UUID.randomUUID()}"
         val turnId = "iroh-turn-${UUID.randomUUID()}"
         val sendJob = scope.launch {
+            var terminalEmitted = false
+            suspend fun emitTurnFrame(frame: ServerFrame) {
+                if (frame is ServerFrame.TurnDone) {
+                    if (terminalEmitted) {
+                        Telemetry.event(
+                            "IrohTrace", "transport.turn_done.duplicate_skipped",
+                            "turnId" to turnId,
+                            "runId" to frame.runId,
+                            "status" to frame.status,
+                        )
+                        return
+                    }
+                    terminalEmitted = true
+                }
+                emitBoth(frame)
+            }
+
             com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
-            emitBoth(
+            emitTurnFrame(
                 ServerFrame.TurnStarted(
                     id = frameId("turn_started"),
                     ts = nowIso(),
@@ -204,10 +221,17 @@ class IrohChannelTransport(
                             contentPartsJson = contentParts?.toString(),
                         ),
                     ),
-                ).collect { draft -> emitDraft(draft, agentId, conversationId, turnId, runId) }
+                ).collect { draft ->
+                    emitDraft(draft, agentId, conversationId, turnId, runId)
+                        .forEach { emitTurnFrame(it) }
+                }
             }.onFailure { error ->
+                if (error is CancellationException) {
+                    com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to runId)
+                    return@onFailure
+                }
                 com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
-                emitBoth(
+                emitTurnFrame(
                     ServerFrame.Error(
                         id = frameId("error"),
                         ts = nowIso(),
@@ -218,7 +242,7 @@ class IrohChannelTransport(
                         runId = runId,
                     ),
                 )
-                emitBoth(
+                emitTurnFrame(
                     ServerFrame.TurnDone(
                         id = frameId("turn_done"),
                         ts = nowIso(),
@@ -233,47 +257,90 @@ class IrohChannelTransport(
         return true
     }
 
-    private suspend fun emitDraft(
+    private fun emitDraft(
         draft: com.letta.mobile.runtime.RuntimeEventDraft,
         agentId: String,
         conversationId: String,
         turnId: String,
         runId: String,
-    ) {
+    ): List<ServerFrame> {
+        val effectiveRunId = draft.runId?.value ?: runId
         com.letta.mobile.util.Telemetry.event(
             "IrohTrace", "transport.emitDraft",
             "payload" to (draft.payload::class.simpleName ?: ""),
-            "runId" to runId,
+            "runId" to effectiveRunId,
         )
-        when (val payload = draft.payload) {
-            is RuntimeEventPayload.RemoteStreamFrame -> emitBoth(
-                ServerFrame.AssistantMessage(
-                    id = payload.messageId ?: payload.frameId,
-                    ts = nowIso(),
+        return when (val payload = draft.payload) {
+            is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
+                payload = payload,
+                context = IrohStreamDeltaServerFrameMapper.Context(
                     agentId = agentId,
                     conversationId = conversationId,
                     turnId = turnId,
-                    runId = runId,
-                    // The UI maps AssistantMessage.content as a BARE string. The mapper sets
-                    // RemoteStreamFrame.body to the raw stream_delta JSON envelope, so extract
-                    // the actual assistant text out of it; otherwise the chat renders a JSON blob.
-                    content = extractAssistantText(payload.body),
+                    runId = effectiveRunId,
+                    timestamp = nowIso(),
                 ),
             )
             // Non-chat App Server frames (update_device_status, update_queue,
             // update_subagent_state, etc.) are side-channel runtime events, not
             // assistant text. Do not fold them into the chat timeline.
-            is RuntimeEventPayload.ExternalTransportFrame -> Unit
+            is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
+            is RuntimeEventPayload.ToolCallObserved -> listOf(
+                ServerFrame.ToolCallMessage(
+                    id = "toolcall-${payload.toolCallId.value}",
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                    toolCall = ToolCallPayload(
+                        toolCallId = payload.toolCallId.value,
+                        name = payload.toolName.value,
+                        arguments = payload.argumentsJson ?: "{}",
+                    ),
+                    seq = null,
+                ),
+            )
+            is RuntimeEventPayload.ToolReturnObserved -> listOf(
+                ServerFrame.ToolReturnMessage(
+                    id = "toolreturn-${payload.toolCallId.value}",
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                    toolCallId = payload.toolCallId.value,
+                    status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
+                    toolReturn = JsonPrimitive(payload.body),
+                ),
+            )
+            is RuntimeEventPayload.ApprovalRequested -> listOf(
+                ServerFrame.ToolCallMessage(
+                    type = "approval_request_message",
+                    id = payload.request.approvalId.value,
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                    toolCall = ToolCallPayload(
+                        toolCallId = payload.request.callId.value,
+                        name = payload.request.toolName.value,
+                        arguments = payload.request.argumentsPreview ?: "{}",
+                    ),
+                    seq = null,
+                ),
+            )
             is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
-                RuntimeRunStatus.Completed -> emitBoth(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "completed"))
+                RuntimeRunStatus.Completed -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "completed"))
                 RuntimeRunStatus.Failed -> {
                     com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""))
-                    emitBoth(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "failed"))
+                    listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "failed"))
                 }
-                RuntimeRunStatus.Cancelled -> emitBoth(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "cancelled"))
-                RuntimeRunStatus.Started, RuntimeRunStatus.Running -> Unit
+                RuntimeRunStatus.Cancelled -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "cancelled"))
+                RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
             }
-            else -> Unit
+            else -> emptyList()
         }
     }
 
@@ -356,30 +423,6 @@ class IrohChannelTransport(
 
     private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
     private fun nowIso(): String = Instant.now().toString()
-
-    /**
-     * Extracts the bare assistant text from a stream_delta body. The App Server
-     * mapper passes the raw stream_delta JSON envelope as the body
-     * (`{"type":"stream_delta",...,"delta":{"content":"..."}}`). The mobile chat
-     * UI renders [ServerFrame.AssistantMessage.content] as a plain string, so the
-     * actual text must be unwrapped here. Falls back to the raw body when it isn't
-     * a recognizable envelope (already-plain text or a different shape).
-     */
-    private fun extractAssistantText(body: String): String {
-        val trimmed = body.trimStart()
-        if (!trimmed.startsWith("{")) return body
-        return runCatching {
-            val obj = lenientJson.parseToJsonElement(body).jsonObject
-            val delta = obj["delta"]?.jsonObject ?: obj
-            delta["content"]?.jsonPrimitive?.contentOrNull
-                ?: delta["text"]?.jsonPrimitive?.contentOrNull
-                ?: delta["message"]?.jsonPrimitive?.contentOrNull
-                ?: obj["content"]?.jsonPrimitive?.contentOrNull
-                ?: body
-        }.getOrDefault(body)
-    }
-
-    private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"

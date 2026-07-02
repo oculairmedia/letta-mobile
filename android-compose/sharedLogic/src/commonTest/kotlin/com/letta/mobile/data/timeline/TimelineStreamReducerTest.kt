@@ -437,8 +437,46 @@ class TimelineStreamReducerTest {
         Telemetry.snapshot().any {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.eventDeduped" &&
-                it.attrs["reason"] == "semanticIdentitySeen"
+            it.attrs["reason"] == "semanticIdentitySeen"
         } shouldBe true
+    }
+
+    @Test
+    fun `reused assistant server id from a different run appends live event`() {
+        val hydrated = TimelineHydrationReducer.reduce(
+            conversationId = "conv-test",
+            serverMessagesChronological = listOf(
+                AssistantMessage(
+                    id = "letta-msg-203",
+                    contentRaw = JsonPrimitive("old answer from a prior app server run"),
+                    runId = "local-run-old",
+                    seqId = 146,
+                )
+            ),
+            timelineBeforeFetch = Timeline("conv-test"),
+            currentTimeline = Timeline("conv-test"),
+            diskRecords = emptyList(),
+        ).timeline
+
+        val output = reduce(
+            prev = hydrated,
+            frame = AssistantMessage(
+                id = "letta-msg-203",
+                contentRaw = JsonPrimitive("hello from iro"),
+                runId = "local-run-new",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 2
+        val live = output.next.events.last() as TimelineEvent.Confirmed
+        live.serverId shouldBe "letta-msg-203"
+        live.runId shouldBe "local-run-new"
+        live.content shouldBe "hello from iro"
+        output.next.liveCursor shouldBe "letta-msg-203"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("letta-msg-203", "assistant_message")
+        )
     }
 
     @Test

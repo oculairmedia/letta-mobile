@@ -27,8 +27,17 @@ class TimelineSyncModelsTest {
         assertNotNull(event)
         assertEquals(TimelineMessageType.ASSISTANT, event.messageType)
         assertEquals("a_text", event.content)
-        assertEquals("server-msg2-assistant", event.otid)
+        assertEquals("server-msg2-assistant-r1", event.otid)
         assertEquals("msg2", event.serverId)
+    }
+
+    @Test
+    fun `test toTimelineEvent preserves legacy server otid when run id is absent`() {
+        val msg = AssistantMessage(id = "msg2", contentRaw = JsonPrimitive("a_text"))
+        val event = msg.toTimelineEvent(2.0)
+
+        assertNotNull(event)
+        assertEquals("server-msg2-assistant", event.otid)
     }
 
     @Test

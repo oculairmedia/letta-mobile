@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -18,10 +19,22 @@ import com.letta.mobile.runtime.TurnInput
 import computer.iroh.BiStream
 import computer.iroh.Connection
 import computer.iroh.SendStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -56,6 +69,7 @@ class IrohNodeConnection(
     private val remoteEndpointId: String = "",
 ) {
     private val handledClientMessageIds = LinkedHashSet<String>()
+    private val streamWriteMutex = Mutex()
     private var authenticated: Boolean = requiredBearerToken.isNullOrBlank()
 
     suspend fun serve() = coroutineScope {
@@ -100,6 +114,8 @@ class IrohNodeConnection(
         streamSend: SendStream,
     ) = coroutineScope {
         val sendStream = biStream.send()
+        val activeTurnJobs = LinkedHashSet<Job>()
+        val activeTurnJobsMutex = Mutex()
 
         try {
             val recvStream = biStream.recv()
@@ -109,7 +125,12 @@ class IrohNodeConnection(
             ) { frameJson ->
                 Telemetry.event("IrohNode", "control.recv", "remoteEndpointId" to remoteEndpointId, "bytes" to frameJson.length)
                 try {
-                    val response = handleControlFrame(frameJson, streamSend, sendStream)
+                    val response = handleControlFrame(
+                        frameJson = frameJson,
+                        streamSend = streamSend,
+                        activeTurnJobs = activeTurnJobs,
+                        activeTurnJobsMutex = activeTurnJobsMutex,
+                    )
                     if (response != null) {
                         IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES)
                     }
@@ -125,14 +146,16 @@ class IrohNodeConnection(
                 }
             }
         } finally {
+            drainTurnJobs(activeTurnJobs, activeTurnJobsMutex)
             runCatching { sendStream.finish() }
         }
     }
 
-    private suspend fun handleControlFrame(
+    private suspend fun CoroutineScope.handleControlFrame(
         frameJson: String,
         streamSend: SendStream,
-        controlSend: SendStream,
+        activeTurnJobs: LinkedHashSet<Job>,
+        activeTurnJobsMutex: Mutex,
     ): String? {
         return try {
             val json = Json { ignoreUnknownKeys = true }
@@ -146,7 +169,12 @@ class IrohNodeConnection(
                 "auth" -> handleAuth(obj, requestId)
                 "runtime_start" -> ifAuthorized(requestId) { handleRuntimeStart(obj, requestId) }
                 "input" -> ifAuthorized(requestId) {
-                    handleInput(frameJson, streamSend)
+                    launchInputJob(
+                        frameJson = frameJson,
+                        streamSend = streamSend,
+                        activeTurnJobs = activeTurnJobs,
+                        activeTurnJobsMutex = activeTurnJobsMutex,
+                    )
                     null
                 }
                 "admin_rpc" -> ifAuthorized(requestId) {
@@ -186,6 +214,7 @@ class IrohNodeConnection(
                         }
                     }
                 }
+                "abort_message" -> ifAuthorized(requestId) { handleAbort(frameJson, requestId) }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -193,6 +222,64 @@ class IrohNodeConnection(
         } catch (e: Exception) {
             """{"type":"error","message":"Failed to parse frame: ${e.message?.replace("\"", "\\\"")}"}"""
         }
+    }
+
+    private suspend fun CoroutineScope.launchInputJob(
+        frameJson: String,
+        streamSend: SendStream,
+        activeTurnJobs: LinkedHashSet<Job>,
+        activeTurnJobsMutex: Mutex,
+    ) {
+        val job = launch(start = CoroutineStart.LAZY) {
+            handleInput(frameJson, streamSend)
+        }
+        activeTurnJobsMutex.withLock { activeTurnJobs += job }
+        job.invokeOnCompletion { cause ->
+            launch {
+                activeTurnJobsMutex.withLock { activeTurnJobs.remove(job) }
+                Telemetry.event(
+                    "IrohNode", "stream.job.done",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "cancelled" to (cause is CancellationException),
+                    "error" to (cause?.message ?: ""),
+                    "class" to (cause?.let { it::class.simpleName } ?: ""),
+                )
+            }
+        }
+        Telemetry.event(
+            "IrohNode", "stream.job.started",
+            "remoteEndpointId" to remoteEndpointId,
+            "activeJobs" to activeTurnJobs.size,
+        )
+        job.start()
+    }
+
+    private suspend fun drainTurnJobs(
+        activeTurnJobs: LinkedHashSet<Job>,
+        activeTurnJobsMutex: Mutex,
+    ) {
+        val jobs = activeTurnJobsMutex.withLock { activeTurnJobs.toList() }
+        if (jobs.isEmpty()) return
+        Telemetry.event(
+            "IrohNode", "stream.jobs.drain",
+            "remoteEndpointId" to remoteEndpointId,
+            "activeJobs" to jobs.size,
+        )
+        val completed = withTimeoutOrNull(STREAM_JOB_DRAIN_TIMEOUT_MS) {
+            jobs.joinAll()
+            true
+        } ?: false
+        if (completed) return
+        Telemetry.event(
+            "IrohNode", "stream.jobs.drain_timeout",
+            "remoteEndpointId" to remoteEndpointId,
+            "activeJobs" to jobs.count { it.isActive },
+            level = Telemetry.Level.WARN,
+        )
+        jobs.forEach { job ->
+            job.cancel(CancellationException("control channel closed before stream job completed"))
+        }
+        jobs.joinAll()
     }
 
     private fun handleAuth(
@@ -259,6 +346,36 @@ class IrohNodeConnection(
         }
     }
 
+    private suspend fun handleAbort(
+        frameJson: String,
+        requestId: String?,
+    ): String {
+        if (requestId == null) {
+            return """{"type":"abort_message_response","success":false,"error":"request_id is required"}"""
+        }
+        return try {
+            val abort = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.AbortMessage
+            val response = controller.abort(abort.runtime, abort.runId)
+            AppServerProtocol.json.encodeToString(AppServerInboundFrame.serializer(), response)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val runtime = runCatching {
+                AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.AbortMessage
+            }.getOrNull()?.runtime
+            AppServerProtocol.json.encodeToString(
+                AppServerInboundFrame.serializer(),
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AbortMessageResponse(
+                    requestId = requestId,
+                    runtime = runtime ?: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope("", ""),
+                    aborted = false,
+                    success = false,
+                    error = e.message ?: e.toString(),
+                ),
+            )
+        }
+    }
+
     private suspend fun handleInput(
         frameJson: String,
         streamSend: SendStream,
@@ -301,19 +418,44 @@ class IrohNodeConnection(
                 contentPartsJson = contentParts?.toString(),
             ),
         )
+        var terminalWritten = false
         runCatching {
             controller.runTurn(command).collect { draft ->
-                writeDraftAsStreamDelta(streamSend, input.runtime, draft.payload)
+                val payload = draft.payload
+                if (terminalWritten && payload.isTerminalLifecycle()) {
+                    Telemetry.event(
+                        "IrohNode", "stream.terminal_duplicate_skipped",
+                        "remoteEndpointId" to remoteEndpointId,
+                        "agentId" to input.runtime.agentId,
+                        "conversationId" to input.runtime.conversationId,
+                    )
+                    return@collect
+                }
+                terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload) || terminalWritten
             }
         }.onFailure { error ->
-            writeStreamDelta(
-                streamSend = streamSend,
-                runtime = input.runtime,
-                delta = buildJsonObject {
-                    put("message_type", "error_message")
-                    put("message", error.message ?: error.toString())
-                },
-            )
+            val wroteTerminal = runCatching {
+                withContext(NonCancellable) {
+                    writeStreamDelta(
+                        streamSend = streamSend,
+                        runtime = input.runtime,
+                        delta = buildJsonObject {
+                            put("message_type", "error_message")
+                            put("message", error.message ?: error.toString())
+                        },
+                    )
+                }
+            }.isSuccess
+            if (!wroteTerminal) {
+                Telemetry.event(
+                    "IrohNode", "stream.closed_before_terminal",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "error" to (error.message ?: error.toString()),
+                    "class" to error::class.simpleName,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+            if (error is CancellationException) throw error
         }
     }
 
@@ -326,13 +468,19 @@ class IrohNodeConnection(
         streamSend: SendStream,
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         payload: RuntimeEventPayload,
-    ) {
-        when (payload) {
+    ): Boolean {
+        return when (payload) {
             // DefaultAppServerController already gives us raw App Server wire
             // frames here (usually stream_delta). Forward them unchanged so we
             // preserve message_type, runtime metadata, and terminal semantics.
-            is RuntimeEventPayload.RemoteStreamFrame -> writeRawFrame(streamSend, payload.body)
-            is RuntimeEventPayload.ExternalTransportFrame -> writeRawFrame(streamSend, payload.body)
+            is RuntimeEventPayload.RemoteStreamFrame -> {
+                writeRawFrame(streamSend, payload.body)
+                rawFrameIsTerminal(payload.body)
+            }
+            is RuntimeEventPayload.ExternalTransportFrame -> {
+                writeRawFrame(streamSend, payload.body)
+                rawFrameIsTerminal(payload.body)
+            }
             is RuntimeEventPayload.RunLifecycleChanged -> if (payload.status == RuntimeRunStatus.Completed) {
                 writeStreamDelta(
                     streamSend = streamSend,
@@ -342,6 +490,7 @@ class IrohNodeConnection(
                         put("stop_reason", payload.reason ?: "end_turn")
                     },
                 )
+                true
             } else if (payload.status == RuntimeRunStatus.Failed) {
                 writeStreamDelta(
                     streamSend = streamSend,
@@ -351,10 +500,28 @@ class IrohNodeConnection(
                         put("message", payload.reason ?: "turn failed")
                     },
                 )
+                true
+            } else if (payload.status == RuntimeRunStatus.Cancelled) {
+                writeStreamDelta(
+                    streamSend = streamSend,
+                    runtime = runtime,
+                    delta = buildJsonObject {
+                        put("message_type", "error_message")
+                        put("message", payload.reason ?: "turn cancelled")
+                        put("status", "cancelled")
+                    },
+                )
+                true
+            } else {
+                false
             }
-            else -> Unit
+            else -> false
         }
     }
+
+    private fun RuntimeEventPayload.isTerminalLifecycle(): Boolean =
+        this is RuntimeEventPayload.RunLifecycleChanged &&
+            (status == RuntimeRunStatus.Completed || status == RuntimeRunStatus.Failed || status == RuntimeRunStatus.Cancelled)
 
     private suspend fun writeRawFrame(
         streamSend: SendStream,
@@ -365,7 +532,9 @@ class IrohNodeConnection(
             "remoteEndpointId" to remoteEndpointId,
             *IrohDiagnostics.redactedFrameAttributes(frameType(rawFrame), rawFrame.length).toTypedArray(),
         )
-        IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES)
+        streamWriteMutex.withLock {
+            IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES)
+        }
     }
 
     private suspend fun writeStreamDelta(
@@ -386,12 +555,25 @@ class IrohNodeConnection(
             "remoteEndpointId" to remoteEndpointId,
             *IrohDiagnostics.redactedFrameAttributes(frameType(frame), frame.length).toTypedArray(),
         )
-        IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES)
+        streamWriteMutex.withLock {
+            IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES)
+        }
     }
 
     private fun frameType(rawFrame: String): String? = runCatching {
         AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull
     }.getOrNull()
+
+    private fun rawFrameIsTerminal(rawFrame: String): Boolean = runCatching {
+        val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
+        val delta = obj["delta"]?.jsonObject ?: obj
+        when (delta["message_type"]?.jsonPrimitive?.contentOrNull) {
+            "stop_reason",
+            "loop_error",
+            "error_message" -> true
+            else -> false
+        }
+    }.getOrDefault(false)
 
     private suspend fun serveStreamReadiness(biStream: BiStream) {
         val recvStream = biStream.recv()
@@ -403,5 +585,6 @@ class IrohNodeConnection(
         const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
         const val MAX_HANDLED_CLIENT_MESSAGE_IDS = 512
         const val HANDLED_CLIENT_MESSAGE_IDS_TRIM_COUNT = 128
+        const val STREAM_JOB_DRAIN_TIMEOUT_MS = 5_000L
     }
 }

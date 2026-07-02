@@ -124,6 +124,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     }
 
     val existing = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
+        ?.takeIf { it.canMergeStreamFrame(confirmed) }
     if (existing != null) {
         if (existing.hasAlreadyIngestedStreamFrame(confirmed)) {
             hotPathTelemetry(
@@ -289,6 +290,17 @@ private fun hotPathTelemetry(
         *attrs,
         level = Telemetry.Level.DEBUG,
     )
+}
+
+private fun TimelineEvent.Confirmed.canMergeStreamFrame(
+    incoming: TimelineEvent.Confirmed,
+): Boolean {
+    val existingRunId = runId?.takeIf { it.isNotBlank() }
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
+    if (existingRunId != null && incomingRunId != null) {
+        return existingRunId == incomingRunId
+    }
+    return true
 }
 
 private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
