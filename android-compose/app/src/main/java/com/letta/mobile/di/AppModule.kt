@@ -121,6 +121,7 @@ abstract class AppModule {
                 http = httpTimelineTransport,
                 iroh = IrohAdminRpcTimelineTransport(
                     channelTransport = channelTransport,
+                    settingsRepository = settingsRepository,
                 ),
             )
             return TimelineRepository(
