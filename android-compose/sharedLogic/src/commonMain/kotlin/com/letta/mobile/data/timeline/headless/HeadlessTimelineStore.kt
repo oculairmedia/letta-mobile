@@ -274,7 +274,7 @@ class HeadlessTimelineStore(
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
-    ) = Unit
+    ): Int = 0
 
     private fun timelineLocked(conversationId: String): Timeline =
         timelines.getOrPut(conversationId) { Timeline(conversationId = conversationId) }

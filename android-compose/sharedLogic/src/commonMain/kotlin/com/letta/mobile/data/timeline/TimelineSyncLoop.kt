@@ -239,8 +239,8 @@ class TimelineSyncLoop(
         }
     }
 
-    suspend fun reconcileRecentMessages(reason: String, forceRefresh: Boolean = false) {
-        recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh)
+    suspend fun reconcileRecentMessages(reason: String, forceRefresh: Boolean = false): Int {
+        return recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh)
     }
 
     suspend fun markExternalTransportLocalSent(otid: String) {

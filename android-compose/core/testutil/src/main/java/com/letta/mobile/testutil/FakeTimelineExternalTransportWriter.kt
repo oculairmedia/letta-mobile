@@ -105,8 +105,9 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
-    ) {
+    ): Int {
         recentReconciles += RecentReconcile(agentId, conversationId, reason, forceRefresh)
+        return 0
     }
 
     data class ExternalLocal(

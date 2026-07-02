@@ -26,8 +26,8 @@ class TimelineRecentMessagesReconciler(
     suspend fun reconcileRecentMessages(
         reason: String,
         forceRefresh: Boolean = false,
-    ) {
-        reconcileRecentMessagesFromServer(
+    ): Int {
+        return reconcileRecentMessagesFromServer(
             telemetryName = "recentReconcile",
             telemetryAttrs = arrayOf("reason" to reason),
             allowWhileStreamActive = forceRefresh,
@@ -38,7 +38,7 @@ class TimelineRecentMessagesReconciler(
         telemetryName: String,
         telemetryAttrs: Array<Pair<String, Any?>>,
         allowWhileStreamActive: Boolean = false,
-    ) {
+    ): Int {
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
         var appended = 0
         try {
@@ -56,7 +56,7 @@ class TimelineRecentMessagesReconciler(
                     "skipped" to true,
                     "skipReason" to "streamSubscriberActive",
                 )
-                return
+                return 0
             }
             val serverMessages = messageApi.listConversationMessages(
                 conversationId = conversationId,
@@ -79,6 +79,7 @@ class TimelineRecentMessagesReconciler(
                 "appended" to appended,
             )
             dumpTimelineState("reconcile.$telemetryName", conversationId, state.value)
+            return appended
         } catch (t: Throwable) {
             timer.stopError(t, *telemetryAttrs)
             throw t

@@ -292,8 +292,8 @@ open class TimelineRepository(
         conversationId: String,
         reason: String,
         forceRefresh: Boolean = false,
-    ) {
-        getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh)
+    ): Int {
+        return getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
     override suspend fun reconcileRecentMessages(
@@ -301,8 +301,8 @@ open class TimelineRepository(
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
-    ) {
-        getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
+    ): Int {
+        return getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
     /**
