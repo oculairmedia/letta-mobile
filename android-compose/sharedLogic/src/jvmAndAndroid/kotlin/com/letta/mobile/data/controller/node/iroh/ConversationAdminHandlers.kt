@@ -65,11 +65,12 @@ object ConversationAdminHandlers {
 
         fun messageList(params: JsonObject?): JsonElement {
             val convId = params?.get("conversation_id")?.jsonPrimitive?.contentOrNull ?: return jsonError("conversation_id required")
-            val query = buildString {
-                params?.get("limit")?.jsonPrimitive?.contentOrNull?.let { append("limit=$it&") }
-                params?.get("after")?.jsonPrimitive?.contentOrNull?.let { append("after=$it&") }
-                params?.get("order")?.jsonPrimitive?.contentOrNull?.let { append("order=$it&") }
-            }.trimEnd('&', '?')
+            val queryParams = buildList {
+                params?.get("limit")?.jsonPrimitive?.contentOrNull?.let { add("limit=$it") }
+                params?.get("after")?.jsonPrimitive?.contentOrNull?.let { add("after=$it") }
+                params?.get("order")?.jsonPrimitive?.contentOrNull?.let { add("order=$it") }
+            }
+            val query = queryParams.joinToString(prefix = "?", separator = "&").takeIf { queryParams.isNotEmpty() }.orEmpty()
             return httpGet("$base/v1/conversations/$convId/messages$query")
         }
 
