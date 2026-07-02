@@ -883,8 +883,17 @@ internal class AdminChatViewModel @Inject constructor(
         if (!serverUrl.startsWith("iroh://")) return
         irohRecentReconcileJob = viewModelScope.launch {
             var consecutiveNoProgress = 0
+            // letta-mobile-b6vxb (codex P1 / CodeRabbit Major): only arm
+            // the stall detector while a turn is actually in flight on
+            // the UI. An idle chat will naturally see appended=0 forever,
+            // and we must not flash a false "Connection stalled" banner
+            // on a chat the user isn't even sending into. Set this the
+            // first time we observe isStreaming=true and require it to
+            // be true to fire recovery.
+            var sawStreaming = false
             repeat(IROH_RECENT_RECONCILE_ATTEMPTS) { attempt ->
                 delay(IROH_RECENT_RECONCILE_INTERVAL_MS)
+                if (_uiState.value.isStreaming) sawStreaming = true
                 val appended = runCatching {
                     timelineRepository.reconcileRecentMessages(
                         agentId = agentId.value,
@@ -914,6 +923,7 @@ internal class AdminChatViewModel @Inject constructor(
                             "conversationId" to conversationId,
                             "attempt" to attempt,
                             "consecutiveNoProgress" to consecutiveNoProgress,
+                            "sawStreaming" to sawStreaming,
                         )
                     }
                 }.onFailure { error ->
@@ -929,11 +939,15 @@ internal class AdminChatViewModel @Inject constructor(
                 // the backend. In that case this loop sees appended=0
                 // forever and the chat is wedged in isStreaming=true
                 // with the activeTurn mutex held. After the stall
-                // threshold of consecutive no-progress attempts,
-                // force-clear the UI streaming state and mark the
-                // active optimistic local as failed so the user can
-                // compose + send again.
-                if (consecutiveNoProgress >= IROH_RECENT_RECONCILE_STALL_THRESHOLD) {
+                // threshold of consecutive no-progress attempts AND
+                // having observed a streaming turn in this loop, force-
+                // clear the UI streaming state and mark the active
+                // optimistic local as failed so the user can compose +
+                // send again. The `sawStreaming` gate is what
+                // prevents an idle chat from flashing a false banner.
+                if (sawStreaming &&
+                    consecutiveNoProgress >= IROH_RECENT_RECONCILE_STALL_THRESHOLD
+                ) {
                     recoverFromIrohStall(conversationId, attempt)
                     return@launch
                 }
@@ -946,8 +960,19 @@ internal class AdminChatViewModel @Inject constructor(
      * live stream dropped the terminal TurnDone frame. Clears the
      * composer / streaming state, marks any pending optimistic locals
      * as failed so the user sees WHY they're back at the composer,
-     * and stops the reconcile loop. The AppServerTurnEngine 5-min
-     * idle watchdog still owns the activeTurn lock release.
+     * clears the timeline's external-transport-active flag (normally
+     * only cleared on the TurnDone path), and stops the reconcile
+     * loop. The AppServerTurnEngine 5-min idle watchdog still owns
+     * the activeTurn lock release.
+     *
+     * Order matters (codex P2 / CodeRabbit Major): mark pending locals
+     * FIRST and clear the timeline flag FIRST while the observer is
+     * still running, so the failed-bubble state and the "active"
+     * flag clear actually render. Then clear the UI streaming state
+     * + stop the observer. The previous implementation fired mark
+     * async and immediately stopped the observer, which could leave
+     * the visible message in SENDING while the composer was already
+     * re-enabled for a fast retry.
      */
     private fun recoverFromIrohStall(conversationId: String, attempt: Int) {
         Telemetry.event(
@@ -955,20 +980,12 @@ internal class AdminChatViewModel @Inject constructor(
             "conversationId" to conversationId,
             "attempt" to attempt,
         )
-        // Clear UI streaming state so the composer + send become
-        // interactive. The activeTurn mutex in AppServerTurnEngine is
-        // still held and will release on the 5-min idle watchdog or on
-        // a fresh user send attempt.
-        chatBannerController.clearStreamingAfterInterrupt()
-        chatBannerController.showError(
-            "Connection stalled; the previous message did not reach a response. " +
-                "Tap Send to retry.",
-        )
-        // Mark any pending optimistic locals as failed so the user
-        // sees the message they sent did not actually reach a
-        // terminal state. Best-effort: if no active local exists
-        // (e.g. the user already cancelled) this is a no-op.
         viewModelScope.launch {
+            // Step 1: synchronously mark any pending optimistic locals
+            // as FAILED so the user sees the message they sent did not
+            // reach a terminal state, and clear the external-transport-
+            // active flag so the persistent stream subscriber stops
+            // treating the external transport as active.
             runCatching {
                 val loop = timelineRepository.getOrCreate(conversationId)
                 val pendingOtids = loop.state.value.events
@@ -983,6 +1000,7 @@ internal class AdminChatViewModel @Inject constructor(
                         otid = otid,
                     )
                 }
+                timelineRepository.clearExternalTransportActive(conversationId)
             }.onFailure { error ->
                 Telemetry.error(
                     "TimelineSync", "irohActiveReconcile.markFailedError",
@@ -991,10 +1009,20 @@ internal class AdminChatViewModel @Inject constructor(
                     "attempt" to attempt,
                 )
             }
+            // Step 2: clear UI streaming state so the composer + send
+            // become interactive. The activeTurn mutex in
+            // AppServerTurnEngine is still held and will release on
+            // the 5-min idle watchdog or on a fresh user send attempt.
+            chatBannerController.clearStreamingAfterInterrupt()
+            chatBannerController.showError(
+                "Connection stalled; the previous message did not reach a response. " +
+                    "Tap Send to retry.",
+            )
+            // Step 3: stop the observer so the user can pull-to-refresh
+            // and the timeline is clean. The reconcile loop is exiting
+            // anyway.
+            chatTimelineObserver.stop()
         }
-        // Stop the observer so the user can pull-to-refresh and the
-        // timeline is clean. The reconcile loop is exiting anyway.
-        chatTimelineObserver.stop()
     }
 
     private fun stopTimelineObserver() {
