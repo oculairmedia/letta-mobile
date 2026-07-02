@@ -58,5 +58,5 @@ interface TimelineExternalTransportWriter {
 
     suspend fun clearExternalTransportActive(agentId: String?, conversationId: String)
 
-    suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean = false)
+    suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean = false): Int
 }
