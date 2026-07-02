@@ -527,6 +527,35 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `reconcile copy without run id does not duplicate live row with real run id`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-166",
+                contentRaw = JsonPrimitive("Hey"),
+                runId = "run-real-app-server",
+                seqId = 3,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "letta-msg-166",
+                    contentRaw = JsonPrimitive("Hey"),
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 0
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Hey"
+        event.runId shouldBe "run-real-app-server"
+    }
+
+    @Test
     fun `recent reconcile real run replaces iroh synthetic live row`() {
         val live = reduce(
             frame = AssistantMessage(
