@@ -15,6 +15,9 @@ interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
+    suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
+        AppServerInboundFrame.AuthResponse(requestId = command.requestId, success = true)
+
     suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse
 
     suspend fun input(command: AppServerCommand.Input)
@@ -37,6 +40,13 @@ class DefaultAppServerClient(
 
     override val events: Flow<AppServerReceivedFrame> = transport.mergedFrames()
     override val isConnected: Flow<Boolean> = transport.isConnected
+
+    override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
+        correlator.request(
+            requestId = command.requestId,
+            response = { it as? AppServerInboundFrame.AuthResponse },
+            send = { transport.sendControl(command) },
+        )
 
     override suspend fun runtimeStart(
         command: AppServerCommand.RuntimeStart,

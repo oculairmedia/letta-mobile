@@ -23,6 +23,7 @@ import kotlinx.serialization.json.jsonPrimitive
 class AppServerRuntimeEventMapper {
     fun map(command: TurnCommand, received: AppServerReceivedFrame): List<RuntimeEventDraft> =
         when (val frame = received.frame) {
+            is AppServerInboundFrame.AuthResponse -> emptyList()
             is AppServerInboundFrame.RuntimeStartResponse -> emptyList()
             is AppServerInboundFrame.SyncResponse -> emptyList()
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)

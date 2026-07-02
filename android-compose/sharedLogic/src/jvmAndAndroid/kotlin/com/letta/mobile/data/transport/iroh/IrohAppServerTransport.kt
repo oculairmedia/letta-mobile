@@ -169,9 +169,7 @@ class IrohAppServerTransport(
                 val json = protocol.encodeCommand(command)
                 val bytes = json.encodeToByteArray()
                 Telemetry.event("IrohTransport", "control.write", "command" to command::class.simpleName, "bytes" to bytes.size)
-                sendStream.writeAll(bytes)
-                // Write newline delimiter so receiver can split frames
-                sendStream.writeAll("\n".toByteArray())
+                IrohFrameCodec.write(sendStream, json)
             }
         }
 
@@ -189,10 +187,10 @@ class IrohAppServerTransport(
         streamBiStream = connection.openBi()
         Telemetry.event("IrohTransport", "stream.opened")
         
-        // The stream channel is receive-only in the App Server protocol,
-        // but we signal the remote that we're ready by sending a newline
+        // The stream channel is receive-only in the App Server protocol.
+        // Open the send half and finish it to signal readiness without sending
+        // any application frame.
         val s = streamBiStream.send()
-        s.writeAll("\n".toByteArray())
         s.finish()
         Telemetry.event("IrohTransport", "stream.listening")
         if (!streamReady.isCompleted) streamReady.complete(Unit)
@@ -206,69 +204,33 @@ class IrohAppServerTransport(
         sink: MutableSharedFlow<AppServerReceivedFrame>,
     ) {
         Telemetry.event("IrohTransport", "frame.reader_start", "channel" to channel.name)
-        val buffer = mutableListOf<Byte>()
-        
-        while (true) {
-            // Safety limit: if a frame line exceeds MAX_LINE_BYTES the stream
-            // is junk or the line delimiter broke. Flush and continue rather than
-            // growing unbounded (causes OOM, observed 86MB allocation).
-            if (buffer.size > MAX_LINE_BYTES) {
-                Telemetry.event("IrohTransport", "frame.line_overflow", "channel" to channel.name, "bytes" to buffer.size)
-                buffer.clear()
+        try {
+            IrohFrameCodec.readAll(
+                recvStream = recvStream,
+                maxFrameBytes = MAX_FRAME_BYTES,
+                chunkBytes = READ_CHUNK_SIZE,
+            ) { json ->
+                val frame = decodeFrame(json, channel)
+                Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
+                sink.emit(frame)
             }
-            // Read chunks from the stream
-            val chunkResult = runCatching {
-                recvStream.read(READ_CHUNK_SIZE.toUInt())
-            }
-            if (chunkResult.isFailure) {
-                val error = chunkResult.exceptionOrNull()
-                Telemetry.event(
-                    "IrohTransport", "frame.reader_error",
-                    "channel" to channel.name,
-                    "error" to (error?.message ?: error.toString()),
-                    "class" to error?.let { it::class.simpleName },
-                    "bufferBytes" to buffer.size,
-                )
-                break
-            }
-            val chunk = chunkResult.getOrThrow()
-            
-            if (chunk.isEmpty()) {
-                Telemetry.event("IrohTransport", "frame.reader_eof", "channel" to channel.name, "bufferBytes" to buffer.size)
-                break
-            }
+        } catch (error: IrohFrameCodec.ProtocolException) {
             Telemetry.event(
-                "IrohTransport", "frame.reader_chunk",
+                "IrohTransport", "frame.protocol_error",
                 "channel" to channel.name,
-                "bytes" to chunk.size,
-                "bufferBytes" to buffer.size,
+                "error" to (error.message ?: error.toString()),
             )
-            
-            // Accumulate bytes and split on newline
-            for (byte in chunk) {
-                if (byte == '\n'.code.toByte()) {
-                    // Process accumulated line as a frame
-                    if (buffer.isNotEmpty()) {
-                        val json = buffer.toByteArray().decodeToString()
-                        buffer.clear()
-                        
-                        val frame = decodeFrame(json, channel)
-                        Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
-                        sink.emit(frame)
-                    }
-                } else {
-                    buffer.add(byte)
-                }
-            }
-        }
-        
-        Telemetry.event("IrohTransport", "frame.reader_stop", "channel" to channel.name, "bufferBytes" to buffer.size)
-        // Process any remaining data
-        if (buffer.isNotEmpty()) {
-            val json = buffer.toByteArray().decodeToString()
-            val frame = decodeFrame(json, channel)
-            Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
-            sink.emit(frame)
+            throw error
+        } catch (error: Throwable) {
+            Telemetry.event(
+                "IrohTransport", "frame.reader_error",
+                "channel" to channel.name,
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
+            )
+            throw error
+        } finally {
+            Telemetry.event("IrohTransport", "frame.reader_stop", "channel" to channel.name)
         }
     }
 
@@ -291,9 +253,7 @@ class IrohAppServerTransport(
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
         const val READ_CHUNK_SIZE = 8192
-        // Max bytes per line before the frame reader clears its buffer as an OOM
-        // safety guard (observed 86MB allocation from unbounded accumulation).
-        const val MAX_LINE_BYTES = 1_048_576 // 1MB
+        const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
         // c0qm0: keep the QUIC connection warm across turns. 15s is well under
         // typical QUIC idle timeouts (~30s) so the path never goes cold between
         // user messages.

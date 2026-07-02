@@ -13,6 +13,25 @@ import kotlinx.serialization.json.put
 
 class AppServerProtocolTest {
     @Test
+    fun encodesAuthCommandAndDecodesAuthResponse() {
+        val encoded = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(AppServerCommand.Auth(requestId = "auth-1", token = "secret")),
+        ).jsonObject
+        assertEquals("auth", encoded["type"]?.jsonPrimitive?.content)
+        assertEquals("auth-1", encoded["request_id"]?.jsonPrimitive?.content)
+        assertEquals("secret", encoded["token"]?.jsonPrimitive?.content)
+
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """{"type":"auth_response","request_id":"auth-1","success":false,"error":"invalid_token"}""",
+            channel = AppServerChannel.Control,
+        )
+        val frame = assertIs<AppServerInboundFrame.AuthResponse>(received.frame)
+        assertEquals("auth-1", frame.requestId)
+        assertEquals(false, frame.success)
+        assertEquals("invalid_token", frame.error)
+    }
+
+    @Test
     fun encodesRuntimeStartWithTypedV2CommandShape() {
         val json = AppServerProtocol.encodeCommand(
             AppServerCommand.RuntimeStart(
@@ -229,6 +248,44 @@ class AppServerProtocolTest {
         assertEquals("future-1", frame.requestId)
         assertEquals(AppServerChannel.Stream, received.channel)
         assertEquals("1", frame.raw["payload"]?.jsonObject?.get("x")?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun decodesAdminRpcSuccessAndFailureResponses() {
+        val success = AppServerProtocol.decodeFrame(
+            rawJson = """
+                {
+                  "type": "admin_rpc_response",
+                  "request_id": "admin-1",
+                  "success": true,
+                  "result": {"ok": true, "value": 42}
+                }
+            """.trimIndent(),
+            channel = AppServerChannel.Control,
+        )
+
+        val successFrame = assertIs<AppServerInboundFrame.AdminRpcResponse>(success.frame)
+        assertEquals("admin-1", successFrame.requestId)
+        assertEquals(true, successFrame.success)
+        assertEquals("true", successFrame.result?.jsonObject?.get("ok")?.jsonPrimitive?.content)
+        assertEquals("42", successFrame.result?.jsonObject?.get("value")?.jsonPrimitive?.content)
+
+        val failure = AppServerProtocol.decodeFrame(
+            rawJson = """
+                {
+                  "type": "admin_rpc_response",
+                  "request_id": "admin-2",
+                  "success": false,
+                  "error": "unknown method"
+                }
+            """.trimIndent(),
+            channel = AppServerChannel.Control,
+        )
+
+        val failureFrame = assertIs<AppServerInboundFrame.AdminRpcResponse>(failure.frame)
+        assertEquals("admin-2", failureFrame.requestId)
+        assertEquals(false, failureFrame.success)
+        assertEquals("unknown method", failureFrame.error)
     }
 
     @Test

@@ -66,6 +66,18 @@ internal class AppServerServeIrohCommand : CliktCommand(
             "missing. Keeps the NodeID stable across restarts.",
     )
 
+    private val authToken by option(
+        "--auth-token",
+        envvar = "LETTA_IROH_AUTH_TOKEN",
+        help = "Optional bearer/invite token clients must present before runtime, input, sync, or admin_rpc.",
+    )
+
+    private val allowedPeerIds by option(
+        "--allowed-peer-ids",
+        envvar = "LETTA_IROH_ALLOWED_PEER_IDS",
+        help = "Optional comma-separated allowlist of remote EndpointIds (64 hex chars).",
+    ).default("")
+
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         
@@ -77,6 +89,8 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 scope = scope,
                 bindAddr = "0.0.0.0:${irohPort}",
                 secretKeyPath = irohSecretKeyPath,
+                requiredBearerToken = authToken?.takeIf { it.isNotBlank() },
+                allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
             )
             irohEndpoint.create()
             

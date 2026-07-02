@@ -27,7 +27,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -57,6 +62,45 @@ class AppServerTurnEngineTest {
         }
 
         assertEquals("runtime-start-1", client.runtimeStartCommands.single().requestId)
+    }
+
+    @Test
+    fun runTurnPreservesMultimodalContentParts() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+        val contentParts = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("type", "text")
+                    put("text", "look")
+                },
+                buildJsonObject {
+                    put("type", "image")
+                    put("source", buildJsonObject {
+                        put("type", "base64")
+                        put("media_type", "image/png")
+                        put("data", "abc123")
+                    })
+                },
+            ),
+        )
+
+        engine.runTurn(
+            command.copy(input = TurnInput.UserMessage("local-image", "look", contentPartsJson = contentParts.toString())),
+        ).test {
+            awaitItem()
+            val input = assertIs<AppServerCommand.Input>(client.sentCommands.single())
+            val payload = assertIs<com.letta.mobile.data.transport.appserver.AppServerInputPayload.CreateMessage>(input.payload)
+            val content = payload.messages.single().content.jsonArray
+            assertEquals("text", content[0].jsonObject["type"]?.jsonPrimitive?.content)
+            assertEquals("look", content[0].jsonObject["text"]?.jsonPrimitive?.content)
+            assertEquals("image", content[1].jsonObject["type"]?.jsonPrimitive?.content)
+            assertEquals("abc123", content[1].jsonObject["source"]?.jsonObject?.get("data")?.jsonPrimitive?.content)
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            awaitItem()
+            awaitComplete()
+        }
     }
 
     @Test
@@ -141,6 +185,9 @@ private class FakeAppServerClient : AppServerClient {
     override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 16)
     val runtimeStartCommands = mutableListOf<AppServerCommand.RuntimeStart>()
     val sentCommands = mutableListOf<AppServerCommand>()
+
+    override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
+        AppServerInboundFrame.AuthResponse(command.requestId, success = true)
 
     override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse {
         runtimeStartCommands += command
