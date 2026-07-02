@@ -148,8 +148,13 @@ class TimelineSyncLoop(
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
     }
 
+    @Volatile
+    var hasHydratedSuccessfully: Boolean = false
+        private set
+
     suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false, fallbackCursorSeq: Long? = null) {
         hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
+        hasHydratedSuccessfully = true
     }
 
     suspend fun send(content: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
