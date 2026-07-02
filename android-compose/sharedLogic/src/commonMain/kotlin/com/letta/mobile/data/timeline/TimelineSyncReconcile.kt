@@ -142,6 +142,21 @@ fun Timeline.mergeServerMessages(
         if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
         if (timeline.containsIdentityFor(confirmed)) return@forEach
         val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
+        if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
+            // The HTTP backend mints its OWN message ids (ui-msg-*) that never
+            // match the App Server ids (letta-msg-*) carried by the live Iroh
+            // frames, and it omits run_id/original otid. No id-based identity
+            // can catch that copy, so a live-delivered reply re-appends on the
+            // next reconcile poll. Dedupe by (messageType + identical trimmed
+            // content) within the recent tail window instead of inserting.
+            Telemetry.event(
+                "TimelineSync", "recentReconcile.contentDeduped",
+                "conversationId" to timeline.conversationId,
+                "serverId" to confirmed.serverId,
+                "messageType" to confirmed.messageType.name,
+            )
+            return@forEach
+        }
         if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
             timeline = timeline.replaceByServerId(confirmed)
             merged++
@@ -171,6 +186,33 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
         existingRunId?.startsWith("iroh-run-") == true &&
         incomingRunId != null &&
         !incomingRunId.startsWith("iroh-run-")
+}
+
+/**
+ * Content-level dedupe for reconcile copies whose ids can never match the live
+ * rows (HTTP backend mints ui-msg-* ids; live Iroh rows carry letta-msg-*).
+ * Scans the recent tail for a row of the same message type with identical
+ * trimmed content. Bounded to the tail window so long histories stay O(1)-ish
+ * per reconcile and legitimately repeated OLD messages are not collapsed.
+ */
+private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
+
+private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confirmed): Boolean {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT &&
+        incoming.messageType != TimelineMessageType.USER &&
+        incoming.messageType != TimelineMessageType.REASONING
+    ) {
+        return false
+    }
+    val incomingContent = incoming.content.trim()
+    if (incomingContent.isEmpty()) return false
+    val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    for (i in events.size - 1 downTo start) {
+        val event = events[i] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != incoming.messageType) continue
+        if (event.content.trim() == incomingContent) return true
+    }
+    return false
 }
 
 /**
