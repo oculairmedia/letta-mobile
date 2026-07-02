@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -49,8 +50,11 @@ class IrohNodeConnection(
      * before connections arrive (e.g. in IrohNodeEndpoint.start).
      */
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
+    private val requiredBearerToken: String? = null,
+    private val allowedPeerIds: Set<String> = emptySet(),
 ) {
     private val handledClientMessageIds = LinkedHashSet<String>()
+    private var authenticated: Boolean = requiredBearerToken.isNullOrBlank()
 
     suspend fun serve() = coroutineScope {
         try {
@@ -86,48 +90,24 @@ class IrohNodeConnection(
 
         try {
             val recvStream = biStream.recv()
-            val buffer = mutableListOf<Byte>()
-
-            while (true) {
-                // Safety limit: prevent unbounded buffer growth if a peer sends
-                // data without newlines (same guard as client-side receiveFrames).
-                if (buffer.size > MAX_LINE_BYTES) {
-                    Telemetry.event("IrohNode", "control.line_overflow", "bytes" to buffer.size)
-                    buffer.clear()
-                }
-
-                val chunk = runCatching {
-                    recvStream.read(8192u)
-                }.getOrNull() ?: break
-
-                if (chunk.isEmpty()) break
-
-                for (byte in chunk) {
-                    if (byte == '\n'.code.toByte()) {
-                        if (buffer.isNotEmpty()) {
-                            val frameJson = buffer.toByteArray().decodeToString()
-                            buffer.clear()
-                            Telemetry.event("IrohNode", "control.recv", "bytes" to frameJson.length)
-
-                            try {
-                                val response = handleControlFrame(frameJson, streamSend, sendStream)
-                                if (response != null) {
-                                    sendStream.writeAll(response.toByteArray())
-                                    sendStream.writeAll("\n".toByteArray())
-                                }
-                            } catch (ce: kotlinx.coroutines.CancellationException) {
-                                throw ce
-                            } catch (error: Exception) {
-                                Telemetry.event(
-                                    "IrohNode", "control.frame_failed",
-                                    "error" to (error.message ?: error.toString()),
-                                    "class" to error::class.simpleName,
-                                )
-                            }
-                        }
-                    } else {
-                        buffer.add(byte)
+            IrohFrameCodec.readAll(
+                recvStream = recvStream,
+                maxFrameBytes = MAX_FRAME_BYTES,
+            ) { frameJson ->
+                Telemetry.event("IrohNode", "control.recv", "bytes" to frameJson.length)
+                try {
+                    val response = handleControlFrame(frameJson, streamSend, sendStream)
+                    if (response != null) {
+                        IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES)
                     }
+                } catch (ce: kotlinx.coroutines.CancellationException) {
+                    throw ce
+                } catch (error: Exception) {
+                    Telemetry.event(
+                        "IrohNode", "control.frame_failed",
+                        "error" to (error.message ?: error.toString()),
+                        "class" to error::class.simpleName,
+                    )
                 }
             }
         } finally {
@@ -149,12 +129,13 @@ class IrohNodeConnection(
 
             Telemetry.event("IrohNode", "control.frame", "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
             when (type) {
-                "runtime_start" -> handleRuntimeStart(obj, requestId)
-                "input" -> {
-                    handleInput(frameJson, streamSend, controlSend)
+                "auth" -> handleAuth(obj, requestId)
+                "runtime_start" -> ifAuthorized(requestId) { handleRuntimeStart(obj, requestId) }
+                "input" -> ifAuthorized(requestId) {
+                    handleInput(frameJson, streamSend)
                     null
                 }
-                "admin_rpc" -> {
+                "admin_rpc" -> ifAuthorized(requestId) {
                     val method = obj["method"]?.jsonPrimitive?.content
                     if (method == null || requestId == null) {
                         """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
@@ -162,7 +143,7 @@ class IrohNodeConnection(
                         adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
                     }
                 }
-                "sync" -> {
+                "sync" -> ifAuthorized(requestId) {
                     if (requestId == null) {
                         """{"type":"sync_response","success":false,"error":"request_id is required"}"""
                     } else {
@@ -199,6 +180,32 @@ class IrohNodeConnection(
             """{"type":"error","message":"Failed to parse frame: ${e.message?.replace("\"", "\\\"")}"}"""
         }
     }
+
+    private fun handleAuth(
+        obj: kotlinx.serialization.json.JsonObject,
+        requestId: String?,
+    ): String {
+        if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
+        val expected = requiredBearerToken
+        val provided = obj["token"]?.jsonPrimitive?.contentOrNull
+        authenticated = expected.isNullOrBlank() || provided == expected
+        return if (authenticated) {
+            Telemetry.event("IrohNode", "auth.ok")
+            """{"type":"auth_response","request_id":"$requestId","success":true}"""
+        } else {
+            Telemetry.event("IrohNode", "auth.failed", "reason" to "invalid_token")
+            """{"type":"auth_response","request_id":"$requestId","success":false,"error":"invalid_token"}"""
+        }
+    }
+
+    private inline fun ifAuthorized(requestId: String?, block: () -> String?): String? =
+        if (authenticated) {
+            block()
+        } else {
+            val id = requestId ?: ""
+            Telemetry.event("IrohNode", "auth.required", "requestId" to id)
+            """{"type":"error","request_id":"$id","message":"unauthorized"}"""
+        }
 
     private suspend fun handleRuntimeStart(
         obj: kotlinx.serialization.json.JsonObject,
@@ -240,14 +247,14 @@ class IrohNodeConnection(
     private suspend fun handleInput(
         frameJson: String,
         streamSend: SendStream,
-        controlSend: SendStream,
     ) {
         val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.Input
         val userMsg = (input.payload as? AppServerInputPayload.CreateMessage)
             ?.messages
             ?.firstOrNull { it.role == "user" }
+        val contentParts = userMsg?.content as? kotlinx.serialization.json.JsonArray
         val text = userMsg?.content
-            ?.let { (it as? JsonPrimitive)?.contentOrNull ?: it.toString() }
+            ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
             ?: ""
         val clientMsgId = userMsg?.clientMessageId
         if (clientMsgId != null && !handledClientMessageIds.add(clientMsgId)) {
@@ -276,16 +283,16 @@ class IrohNodeConnection(
             input = TurnInput.UserMessage(
                 localMessageId = clientMsgId ?: "iroh-${UUID.randomUUID()}",
                 text = text,
+                contentPartsJson = contentParts?.toString(),
             ),
         )
         runCatching {
             controller.runTurn(command).collect { draft ->
-                writeDraftAsStreamDelta(streamSend, controlSend, input.runtime, draft.payload)
+                writeDraftAsStreamDelta(streamSend, input.runtime, draft.payload)
             }
         }.onFailure { error ->
             writeStreamDelta(
                 streamSend = streamSend,
-                mirrorSend = controlSend,
                 runtime = input.runtime,
                 delta = buildJsonObject {
                     put("message_type", "error_message")
@@ -295,9 +302,13 @@ class IrohNodeConnection(
         }
     }
 
+    private fun extractTextFromContentParts(parts: kotlinx.serialization.json.JsonArray?): String? =
+        parts?.firstOrNull { part ->
+            runCatching { part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }.getOrDefault(false)
+        }?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
+
     private suspend fun writeDraftAsStreamDelta(
         streamSend: SendStream,
-        mirrorSend: SendStream,
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         payload: RuntimeEventPayload,
     ) {
@@ -305,12 +316,11 @@ class IrohNodeConnection(
             // DefaultAppServerController already gives us raw App Server wire
             // frames here (usually stream_delta). Forward them unchanged so we
             // preserve message_type, runtime metadata, and terminal semantics.
-            is RuntimeEventPayload.RemoteStreamFrame -> writeRawFrame(streamSend, mirrorSend, payload.body)
-            is RuntimeEventPayload.ExternalTransportFrame -> writeRawFrame(streamSend, mirrorSend, payload.body)
+            is RuntimeEventPayload.RemoteStreamFrame -> writeRawFrame(streamSend, payload.body)
+            is RuntimeEventPayload.ExternalTransportFrame -> writeRawFrame(streamSend, payload.body)
             is RuntimeEventPayload.RunLifecycleChanged -> if (payload.status == RuntimeRunStatus.Completed) {
                 writeStreamDelta(
                     streamSend = streamSend,
-                    mirrorSend = mirrorSend,
                     runtime = runtime,
                     delta = buildJsonObject {
                         put("message_type", "stop_reason")
@@ -320,7 +330,6 @@ class IrohNodeConnection(
             } else if (payload.status == RuntimeRunStatus.Failed) {
                 writeStreamDelta(
                     streamSend = streamSend,
-                    mirrorSend = mirrorSend,
                     runtime = runtime,
                     delta = buildJsonObject {
                         put("message_type", "error_message")
@@ -334,7 +343,6 @@ class IrohNodeConnection(
 
     private suspend fun writeRawFrame(
         streamSend: SendStream,
-        mirrorSend: SendStream,
         rawFrame: String,
     ) {
         Telemetry.event(
@@ -343,18 +351,11 @@ class IrohNodeConnection(
             "type" to frameType(rawFrame),
             "snippet" to rawFrame.take(180),
         )
-        writeFrameLine(streamSend, rawFrame)
-        Telemetry.event(
-            "IrohNode", "control.mirror_write",
-            "bytes" to rawFrame.length,
-            "type" to frameType(rawFrame),
-        )
-        writeFrameLine(mirrorSend, rawFrame)
+        IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES)
     }
 
     private suspend fun writeStreamDelta(
         streamSend: SendStream,
-        mirrorSend: SendStream,
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         delta: kotlinx.serialization.json.JsonObject,
     ) {
@@ -372,21 +373,7 @@ class IrohNodeConnection(
             "type" to frameType(frame),
             "snippet" to frame.take(180),
         )
-        writeFrameLine(streamSend, frame)
-        Telemetry.event(
-            "IrohNode", "control.mirror_write",
-            "bytes" to frame.length,
-            "type" to frameType(frame),
-        )
-        writeFrameLine(mirrorSend, frame)
-    }
-
-    private suspend fun writeFrameLine(
-        sendStream: SendStream,
-        frame: String,
-    ) {
-        sendStream.writeAll(frame.toByteArray())
-        sendStream.writeAll("\n".toByteArray())
+        IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES)
     }
 
     private fun frameType(rawFrame: String): String? = runCatching {
@@ -400,9 +387,7 @@ class IrohNodeConnection(
 
     private companion object {
         var nextEventSeq: Long = 1L
-        // Max bytes per line before the control frame reader clears its buffer
-        // as an unbounded-growth safety guard (same value as client-side guard).
-        const val MAX_LINE_BYTES = 1_048_576 // 1MB
+        const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
         const val MAX_HANDLED_CLIENT_MESSAGE_IDS = 512
         const val HANDLED_CLIENT_MESSAGE_IDS_TRIM_COUNT = 128
     }

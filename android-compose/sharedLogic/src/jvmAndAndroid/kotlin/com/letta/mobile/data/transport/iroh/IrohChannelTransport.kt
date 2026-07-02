@@ -123,8 +123,22 @@ class IrohChannelTransport(
         endpoint = localEndpoint
         appServerTransport = transport
         connectedTicket = ticket
+        val appServerClient = DefaultAppServerClient(transport)
+        if (token.isNotBlank()) {
+            val auth = appServerClient.auth(
+                com.letta.mobile.data.transport.appserver.AppServerCommand.Auth(
+                    requestId = "auth-${UUID.randomUUID()}",
+                    token = token,
+                ),
+            )
+            if (!auth.success) {
+                closeCurrentConnection("auth_failed")
+                _state.value = ChannelTransportState.Disconnected(4401, auth.error ?: "auth_failed", isAuthFailure = true)
+                error(auth.error ?: "Iroh auth failed")
+            }
+        }
         turnEngine = AppServerTurnEngine(
-            client = DefaultAppServerClient(transport),
+            client = appServerClient,
             clientInfo = com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo(
                 name = "letta-mobile-android-iroh",
                 version = clientVersion,
@@ -187,6 +201,7 @@ class IrohChannelTransport(
                         input = TurnInput.UserMessage(
                             localMessageId = otid ?: frameId("local"),
                             text = text,
+                            contentPartsJson = contentParts?.toString(),
                         ),
                     ),
                 ).collect { draft -> emitDraft(draft, agentId, conversationId, turnId, runId) }

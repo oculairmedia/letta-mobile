@@ -29,6 +29,7 @@ object AppServerProtocol {
         val raw = element.jsonObject
         val type = raw["type"]?.jsonPrimitive?.content
         val frame = when (type) {
+            "auth_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(element)
             "runtime_start_response" -> json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(element)
             "sync_response" -> json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(element)
             "abort_message_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AbortMessageResponse>(element)
@@ -39,6 +40,7 @@ object AppServerProtocol {
             "update_subagent_state" -> json.decodeFromJsonElement<AppServerInboundFrame.UpdateSubagentState>(element)
             "external_tool_call_request" -> json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(element)
             "control_request" -> json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(element)
+            "admin_rpc_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(element)
             else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
         }
         return AppServerReceivedFrame(channel = channel, frame = frame, raw = raw)
@@ -119,6 +121,13 @@ data class AppServerExternalToolsGroup(
 @JsonClassDiscriminator("type")
 @Serializable
 sealed interface AppServerCommand {
+    @Serializable
+    @SerialName("auth")
+    data class Auth(
+        @SerialName("request_id") val requestId: String,
+        val token: String,
+    ) : AppServerCommand
+
     @Serializable
     @SerialName("runtime_start")
     data class RuntimeStart(
@@ -263,6 +272,20 @@ sealed interface AppServerInboundFrame {
     val type: String?
     val requestId: String?
     val runtime: AppServerRuntimeScope?
+
+    @Serializable
+    @SerialName("auth_response")
+    data class AuthResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = "auth_response"
+
+        @Transient
+        override val runtime: AppServerRuntimeScope? = null
+    }
 
     @Serializable
     @SerialName("runtime_start_response")

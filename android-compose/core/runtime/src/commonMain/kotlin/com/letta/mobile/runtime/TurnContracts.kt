@@ -76,6 +76,11 @@ sealed interface TurnInput {
          * (letta-mobile-aobcg). Empty = legacy text-only send.
          */
         val imageParts: List<TurnImagePart> = emptyList(),
+        /**
+         * Raw App Server / websocket-compatible multimodal content array. Iroh
+         * uses this to preserve text/image parts byte-for-byte with the WS path.
+         */
+        val contentPartsJson: String? = null,
     ) : TurnInput
 
     @Serializable

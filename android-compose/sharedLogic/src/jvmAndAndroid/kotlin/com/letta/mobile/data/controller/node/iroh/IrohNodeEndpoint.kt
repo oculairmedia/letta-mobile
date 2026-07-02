@@ -7,6 +7,11 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointOptions
 import computer.iroh.EndpointTicket
+import computer.iroh.Preset
+import computer.iroh.EndpointBuilder
+import computer.iroh.AddrChangeCallback
+import computer.iroh.HomeRelayCallback
+import computer.iroh.NetworkChangeCallback
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,16 +32,21 @@ class IrohNodeEndpoint(
      */
     private val bindAddr: String = "0.0.0.0:0",
     /**
-     * 32-byte secret key. Determines the NodeID. When null, a key is loaded
-     * from (or generated + persisted to) [secretKeyPath] so the NodeID — and,
-     * with a pinned [bindAddr], the whole ticket — is stable across restarts.
+     * Backward-compatible explicit key injection. Prefer [secretKeyStore].
      */
     private val secretKey: ByteArray? = null,
     /**
-     * Where to persist the auto-generated secret key when [secretKey] is null.
-     * Ignored if [secretKey] is provided.
+     * Backward-compatible file-backed key path. Prefer [secretKeyStore].
      */
     private val secretKeyPath: String? = null,
+    /**
+     * Identity key source. Use [FileIrohSecretKeyStore] for stable server
+     * identity; default is derived from [secretKey]/[secretKeyPath] or an
+     * ephemeral safe key when neither is configured.
+     */
+    private val secretKeyStore: IrohSecretKeyStore? = null,
+    private val requiredBearerToken: String? = null,
+    private val allowedPeerIds: Set<String> = emptySet(),
 ) {
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
@@ -68,9 +78,7 @@ class IrohNodeEndpoint(
      * Returns the node ID as a hex string (64 hex characters = 32 bytes).
      */
     fun nodeIdHex(): String {
-        val endpointAddr = addr()
-        val nodeIdBytes = endpointAddr.id().toBytes()
-        return nodeIdBytes.joinToString("") { "%02x".format(it) }
+        return nodeIdHex(addr())
     }
 
     /**
@@ -98,67 +106,72 @@ class IrohNodeEndpoint(
         val relayMode = IrohRelayConfigMapper.toRelayMode(relayConfig)
         endpoint = Endpoint.bind(
             EndpointOptions(
+                preset = object : Preset {
+                    override fun apply(builder: EndpointBuilder) {
+                        builder.applyN0()
+                    }
+                },
                 bindAddr = bindAddr,
-                secretKey = resolveSecretKey(),
+                secretKey = resolveSecretKeyStore().loadOrCreate(),
                 alpns = listOf(alpn),
                 relayMode = relayMode,
             )
+        ).also { ep ->
+            ep.online()
+            attachWatchers(ep)
+            emitEndpointStatus(ep, "online")
+        }
+    }
+
+    private fun resolveSecretKeyStore(): IrohSecretKeyStore = secretKeyStore ?: when {
+        secretKey != null -> FixedIrohSecretKeyStore(secretKey)
+        secretKeyPath != null -> FileIrohSecretKeyStore(secretKeyPath)
+        else -> EphemeralIrohSecretKeyStore()
+    }
+
+    private fun attachWatchers(ep: Endpoint) {
+        runCatching {
+            ep.watchAddr(object : AddrChangeCallback {
+                override suspend fun onChange(addr: EndpointAddr) {
+                    Telemetry.event(
+                        "IrohNode", "addr.changed",
+                        "nodeId" to nodeIdHex(addr),
+                        "relay" to (addr.relayUrl() ?: ""),
+                        "directAddresses" to addr.directAddresses().joinToString(","),
+                    )
+                }
+            })
+        }
+        runCatching {
+            ep.watchHomeRelay(object : HomeRelayCallback {
+                override suspend fun onChange(relays: List<String>) {
+                    Telemetry.event("IrohNode", "homeRelay.changed", "relays" to relays.joinToString(","))
+                }
+            })
+        }
+        runCatching {
+            ep.watchNetworkChange(object : NetworkChangeCallback {
+                override suspend fun onChange() {
+                    Telemetry.event("IrohNode", "network.changed")
+                    emitEndpointStatus(ep, "network_changed")
+                }
+            })
+        }
+    }
+
+    private fun emitEndpointStatus(ep: Endpoint, status: String) {
+        val endpointAddr = ep.addr()
+        Telemetry.event(
+            "IrohNode", "endpoint.status",
+            "status" to status,
+            "nodeId" to nodeIdHex(endpointAddr),
+            "relay" to (endpointAddr.relayUrl() ?: ""),
+            "directAddresses" to endpointAddr.directAddresses().joinToString(","),
         )
     }
 
-    /**
-     * Key precedence: explicit [secretKey] > persisted key at [secretKeyPath]
-     * (generated once, mode 600) > ephemeral random key (fresh NodeID per run —
-     * safe default; callers wanting a STABLE NodeID must supply key material).
-     */
-    private fun resolveSecretKey(): ByteArray {
-        secretKey?.let {
-            require(it.size == 32) { "iroh secret key must be 32 bytes, got ${it.size}" }
-            return it
-        }
-        val path = secretKeyPath
-        if (path != null) {
-            val file = java.io.File(path)
-            if (file.exists()) {
-                // Enforce the mode-600 contract on pre-existing key files too:
-                // a world/group-readable key must not be silently reused.
-                restrictKeyFilePermissions(file)
-                val bytes = file.readBytes()
-                require(bytes.size == 32) { "persisted iroh secret key at $path must be 32 bytes, got ${bytes.size}" }
-                return bytes
-            }
-            val generated = ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
-            file.parentFile?.mkdirs()
-            // Create empty with restrictive perms FIRST, then write — so the key
-            // bytes never exist on disk under a permissive umask, even briefly,
-            // and a crash between create and write leaks nothing.
-            file.createNewFile()
-            restrictKeyFilePermissions(file)
-            file.writeBytes(generated)
-            // No path in telemetry: key-file locations are sensitive.
-            Telemetry.event("IrohNode", "secretKey.generated")
-            return generated
-        }
-        // No key material configured: use an ephemeral random key rather than a
-        // fixed known dev key (a shared fixed key would make every unconfigured
-        // endpoint impersonatable). NodeID will rotate per run in this mode.
-        return ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
-    }
-
-    private fun restrictKeyFilePermissions(file: java.io.File) {
-        val posix = runCatching {
-            java.nio.file.Files.setPosixFilePermissions(
-                file.toPath(),
-                java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"),
-            )
-        }
-        if (posix.isFailure) {
-            // Non-POSIX filesystems: fall back to java.io.File owner-only flags.
-            file.setReadable(false, false); file.setReadable(true, true)
-            file.setWritable(false, false); file.setWritable(true, true)
-            file.setExecutable(false, false)
-        }
-    }
+    private fun nodeIdHex(endpointAddr: EndpointAddr): String =
+        endpointAddr.id().toBytes().joinToString("") { "%02x".format(it) }
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         com.letta.mobile.util.Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
@@ -177,15 +190,22 @@ class IrohNodeEndpoint(
                     Telemetry.event("IrohNode", "incoming.accepting")
                     val accepting = incoming.accept()
                     val connection = accepting.connect()
-                    Telemetry.event("IrohNode", "incoming.connected")
-
-                    launch {
-                        IrohNodeConnection(
-                            connection = connection,
-                            controller = controller,
-                            alpn = alpn,
-                            adminRpcRouter = adminRpcRouter,
-                        ).serve()
+                    val remoteId = connection.remoteId().toBytes().joinToString("") { "%02x".format(it) }
+                    Telemetry.event("IrohNode", "incoming.connected", "remoteId" to remoteId)
+                    if (allowedPeerIds.isNotEmpty() && remoteId !in allowedPeerIds) {
+                        Telemetry.event("IrohNode", "auth.peer_rejected", "remoteId" to remoteId)
+                        runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
+                    } else {
+                        launch {
+                            IrohNodeConnection(
+                                connection = connection,
+                                controller = controller,
+                                alpn = alpn,
+                                adminRpcRouter = adminRpcRouter,
+                                requiredBearerToken = requiredBearerToken,
+                                allowedPeerIds = allowedPeerIds,
+                            ).serve()
+                        }
                     }
                 } catch (_: TimeoutCancellationException) {
                     continue

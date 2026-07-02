@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -176,8 +177,11 @@ class AppServerTurnEngine(
                 runtime = scope,
                 payload = AppServerInputPayload.CreateMessage(
                     messages = listOf(
-                        AppServerInputMessage.userText(
-                            text = turnInput.text,
+                        AppServerInputMessage(
+                            role = "user",
+                            content = turnInput.contentPartsJson
+                                ?.let { AppServerProtocol.json.parseToJsonElement(it) }
+                                ?: kotlinx.serialization.json.JsonPrimitive(turnInput.text),
                             clientMessageId = turnInput.localMessageId,
                         ),
                     ),
