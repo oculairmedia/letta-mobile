@@ -78,6 +78,14 @@ internal class AppServerServeIrohCommand : CliktCommand(
         help = "Optional comma-separated allowlist of remote EndpointIds (64 hex chars).",
     ).default("")
 
+    private val adminBaseUrl by option(
+        "--admin-base-url",
+        envvar = "LETTA_IROH_ADMIN_BASE_URL",
+        help = "Base URL of the server-local HTTP API that admin_rpc methods proxy to " +
+            "(conversation/message/agent reads). Server-side localhost only; clients " +
+            "never dial it directly.",
+    ).default("http://127.0.0.1:8291")
+
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         
@@ -121,7 +129,24 @@ internal class AppServerServeIrohCommand : CliktCommand(
             // Create the controller (using a stub implementation for now)
             // In a full implementation, this would connect to a real Letta App Server
             val controller = createController(appServerUrl, requestTimeout.toLong(), scope)
-            
+
+            // Register admin_rpc handlers so clients on an iroh:// backend can
+            // read conversations/messages/agents WITHOUT any direct HTTP route
+            // to this host (Iroh purity: letta-mobile-qfa81). The handlers
+            // proxy to the server-local HTTP API; only this process dials it.
+            val rpcBase = adminBaseUrl.trimEnd('/')
+            com.letta.mobile.data.controller.node.iroh.HealthAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.AgentAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.ConversationAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.RunAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.ArchiveAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.IdentityAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.ModelAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.ScheduleAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.ToolAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.McpAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            println("[iroh-app-server] admin_rpc handlers registered (proxy base: $rpcBase)")
+
             // Start accepting connections
             irohEndpoint.start(controller)
             println("[iroh-app-server] Listening on Iroh... (Ctrl+C to stop)")
