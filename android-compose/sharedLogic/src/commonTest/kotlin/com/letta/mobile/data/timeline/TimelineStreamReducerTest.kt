@@ -968,7 +968,7 @@ class TimelineStreamReducerTest {
             ).toTimelineEvent(position = withFull.nextLocalPosition())!!),
         )
 
-        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed")
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed").timeline
 
         cleaned.events shouldHaveSize 1
         val event = cleaned.events.single() as TimelineEvent.Confirmed
@@ -995,7 +995,7 @@ class TimelineStreamReducerTest {
             ).toTimelineEvent(position = withFull.nextLocalPosition())!!,
         )
 
-        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-disconnect", "turn-disconnect", "disconnect")
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-disconnect", "turn-disconnect", "disconnect").timeline
 
         cleaned.events shouldHaveSize 1
         (cleaned.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
@@ -1012,9 +1012,62 @@ class TimelineStreamReducerTest {
             ),
         ).next
 
-        val cleaned = withFragment.cleanupAbandonedAssistantFragments("iroh-run-terminal", "turn-terminal", "turn_done_failed")
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("iroh-run-terminal", "turn-terminal", "turn_done_failed").timeline
 
         cleaned.events shouldHaveSize 0
+    }
+
+
+    @Test
+    fun `terminal cleanup with synthetic run id removes observed real run fragment`() {
+        val withFragment = reduce(
+            frame = AssistantMessage(
+                id = "assistant-real-run-fragment",
+                contentRaw = JsonPrimitive("I"),
+                runId = "run-app",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments(
+            runId = "iroh-run-terminal",
+            turnId = "turn-terminal",
+            reason = "turn_done_failed",
+            candidateRunIds = setOf("run-app"),
+        ).timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `abandoned fragment suppression prevents recent reconcile reinsert`() {
+        val withFragment = reduce(
+            frame = AssistantMessage(
+                id = "assistant-orphan-reconcile",
+                contentRaw = JsonPrimitive("I"),
+                runId = "run-reconcile",
+                seqId = 1,
+            ),
+        ).next
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments(
+            runId = "run-reconcile",
+            turnId = "turn-reconcile",
+            reason = "turn_done_failed",
+        ).timeline
+
+        val (mergedTimeline, changed) = cleaned.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "assistant-orphan-reconcile",
+                    contentRaw = JsonPrimitive("I"),
+                    runId = "run-reconcile",
+                    seqId = 1,
+                )
+            )
+        )
+
+        changed shouldBe 0
+        mergedTimeline.events shouldHaveSize 0
     }
 
     @Test
@@ -1034,7 +1087,7 @@ class TimelineStreamReducerTest {
                 runId = "run-terminal",
             ).toTimelineEvent(position = earlier.nextLocalPosition())!!,
         )
-        val cleaned = withToolCall.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed")
+        val cleaned = withToolCall.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed").timeline
 
         cleaned.events shouldHaveSize 2
         (cleaned.events.first() as TimelineEvent.Confirmed).serverId shouldBe "assistant-ok"

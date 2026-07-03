@@ -141,6 +141,15 @@ fun Timeline.mergeServerMessages(
         val pos = timeline.positionForServerMessageDate(msg)
         val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
         if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
+        if (timeline.shouldSuppressAbandonedAssistantFragment(confirmed)) {
+            Telemetry.event(
+                "TimelineSync", "recentReconcile.abandonedAssistantSuppressed",
+                "conversationId" to timeline.conversationId,
+                "serverId" to confirmed.serverId,
+                "runId" to (confirmed.runId ?: ""),
+            )
+            return@forEach
+        }
         if (timeline.containsIdentityFor(confirmed)) return@forEach
         val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
         if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {

@@ -269,7 +269,7 @@ class HeadlessTimelineStore(
 
     override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) = Unit
 
-    override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String): Int = 0
+    override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int = 0
 
     override suspend fun reconcileRecentMessages(
         agentId: String?,

@@ -241,18 +241,28 @@ class TimelineSyncLoop(
         return ack.await()
     }
 
-    suspend fun cleanupAbandonedAssistantFragments(runId: String?, turnId: String?, reason: String): Int {
+    suspend fun cleanupAbandonedAssistantFragments(
+        runId: String?,
+        turnId: String?,
+        reason: String,
+        candidateRunIds: Set<String> = emptySet(),
+    ): Int {
         val ack = CompletableDeferred<Int>()
-        eventQueue.send(TimelineGatewayEvent.CleanupAbandonedAssistantFragments(runId, turnId, reason, ack))
+        eventQueue.send(TimelineGatewayEvent.CleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds, ack))
         return ack.await()
     }
 
     private suspend fun applyCleanupAbandonedAssistantFragments(event: TimelineGatewayEvent.CleanupAbandonedAssistantFragments) {
         var removed = 0
         writeMutex.withLock {
-            val before = _state.value.events.size
-            _state.value = _state.value.cleanupAbandonedAssistantFragments(event.runId, event.turnId, event.reason)
-            removed = before - _state.value.events.size
+            val result = _state.value.cleanupAbandonedAssistantFragments(
+                runId = event.runId,
+                turnId = event.turnId,
+                reason = event.reason,
+                candidateRunIds = event.candidateRunIds,
+            )
+            removed = result.suppressions.size
+            _state.value = result.timeline
         }
         if (removed > 0 && !event.runId.isNullOrBlank()) {
             _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))

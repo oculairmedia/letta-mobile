@@ -20,7 +20,7 @@ sealed interface TimelineGatewayEvent {
     data class RetrySend(val otid: String, val ack: CompletableDeferred<Unit>) : TimelineGatewayEvent
     data class MarkSent(val otid: String, val ack: CompletableDeferred<Unit>) : TimelineGatewayEvent
     data class MarkFailed(val otid: String, val ack: CompletableDeferred<Unit>) : TimelineGatewayEvent
-    data class CleanupAbandonedAssistantFragments(val runId: String?, val turnId: String?, val reason: String, val ack: CompletableDeferred<Int>) : TimelineGatewayEvent
+    data class CleanupAbandonedAssistantFragments(val runId: String?, val turnId: String?, val reason: String, val candidateRunIds: Set<String>, val ack: CompletableDeferred<Int>) : TimelineGatewayEvent
 }
 
 @Immutable

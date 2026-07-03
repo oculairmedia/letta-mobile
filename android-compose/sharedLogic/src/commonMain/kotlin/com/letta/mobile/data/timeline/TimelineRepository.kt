@@ -366,10 +366,11 @@ open class TimelineRepository(
         runId: String?,
         turnId: String?,
         reason: String,
+        candidateRunIds: Set<String>,
     ): Int {
         val key = TimelineCacheKey(agentId, conversationId)
         val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) } ?: return 0
-        return loop.cleanupAbandonedAssistantFragments(runId, turnId, reason)
+        return loop.cleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds)
     }
 
     /**
