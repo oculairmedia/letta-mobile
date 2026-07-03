@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -15,12 +16,14 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,13 +35,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import java.time.Instant
 import java.util.UUID
 
@@ -55,6 +54,8 @@ class IrohChannelTransport(
     // Test/override hook: when non-blank, used instead of the compiled DEBUG_FORCE_IROH_URL.
     // Lets the on-host harness dial a live in-process node without rebuilding the constant.
     private val forcedIrohUrl: String = "",
+    private val activeConfigProvider: () -> IrohConnectConfig? = { null },
+    private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
 ) : IChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
@@ -78,33 +79,39 @@ class IrohChannelTransport(
         _frameEvents.emit(TransportFrameEvent(frame = frame))
     }
 
-    private val connectionMutex = Mutex()
-    private var endpoint: Endpoint? = null
-    private var appServerTransport: IrohAppServerTransport? = null
-    private var turnEngine: AppServerTurnEngine? = null
-    private var connectedTicket: String? = null
     private var activeSendJob: kotlinx.coroutines.Job? = null
+    private var explicitConfig: IrohConnectConfig? = null
+    private val supervisor = IrohConnectionSupervisor(
+        scope = scope,
+        configProvider = { explicitConfig ?: activeConfigProvider() },
+        dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
+        onStateChanged = { supervisorState -> _state.value = supervisorState.toChannelTransportState() },
+    )
 
-    override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = connectionMutex.withLock {
-        val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
-            ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
-            ?: baseShimUrl.trimStart().removePrefix("https://").removePrefix("http://")
-        val ticket = effectiveUrl.removePrefix(IROH_URL_PREFIX).takeIf { it != effectiveUrl && it.isNotBlank() }
-            ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
+    override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
+        explicitConfig = IrohConnectConfig(
+            baseShimUrl = baseShimUrl,
+            token = token,
+            deviceId = deviceId,
+            clientVersion = clientVersion,
+        )
         com.letta.mobile.util.Telemetry.event(
             "IrohTrace", "transport.connect.begin",
             "baseShimUrl" to baseShimUrl,
             "forced" to DEBUG_FORCE_IROH_URL.isNotBlank(),
-            "ticketLength" to ticket.length,
-            "connectedTicketMatches" to (connectedTicket == ticket),
-            "hasEngine" to (turnEngine != null),
             "state" to state.value::class.simpleName,
         )
-        if (connectedTicket == ticket && turnEngine != null && state.value is ChannelTransportState.Connected) {
-            com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.connect.reuse", "sessionId" to ticket.hashCode().toString())
-            return@withLock
-        }
-        closeCurrentConnection("reconnect")
+        supervisor.refreshConfig()
+        val handle = supervisor.ready()
+        com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
+    }
+
+    private suspend fun dial(config: IrohConnectConfig): IrohConnectionHandle {
+        val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
+            ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
+            ?: config.baseShimUrl.trimStart().removePrefix("https://").removePrefix("http://")
+        val ticket = effectiveUrl.removePrefix(IROH_URL_PREFIX).takeIf { it != effectiveUrl && it.isNotBlank() }
+            ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
         _state.value = ChannelTransportState.Connecting()
         onConnect()
         val localEndpoint = runCatching {
@@ -113,50 +120,50 @@ class IrohChannelTransport(
             )
         }.onFailure { t ->
             com.letta.mobile.util.Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
-            _state.value = ChannelTransportState.Disconnected(0, "bind_failed: ${t.message}")
-            return@withLock
         }.getOrThrow()
-        val transport = IrohAppServerTransportAdapter(localEndpoint).createTransport(
-            endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
-            scope = scope,
-        ) as IrohAppServerTransport
-        endpoint = localEndpoint
-        appServerTransport = transport
-        connectedTicket = ticket
-        val appServerClient = DefaultAppServerClient(transport)
-        if (token.isNotBlank()) {
-            val auth = appServerClient.auth(
-                com.letta.mobile.data.transport.appserver.AppServerCommand.Auth(
-                    requestId = "auth-${UUID.randomUUID()}",
-                    token = token,
+        var transport: IrohAppServerTransport? = null
+        return runCatching {
+            transport = IrohAppServerTransportAdapter(
+                endpoint = localEndpoint,
+                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason) },
+            ).createTransport(
+                endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
+                scope = scope,
+            ) as IrohAppServerTransport
+            val appServerClient = DefaultAppServerClient(transport!!)
+            if (config.token.isNotBlank()) {
+                val auth = appServerClient.auth(
+                    com.letta.mobile.data.transport.appserver.AppServerCommand.Auth(
+                        requestId = "auth-${UUID.randomUUID()}",
+                        token = config.token,
+                    ),
+                )
+                if (!auth.success) {
+                    throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
+                }
+            }
+            val engine = AppServerTurnEngine(
+                client = appServerClient,
+                clientInfo = com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo(
+                    name = "letta-mobile-android-iroh",
+                    version = config.clientVersion,
                 ),
             )
-            if (!auth.success) {
-                closeCurrentConnection("auth_failed")
-                _state.value = ChannelTransportState.Disconnected(4401, auth.error ?: "auth_failed", isAuthFailure = true)
-                error(auth.error ?: "Iroh auth failed")
-            }
+            transport!!.awaitConnectionReady()
+            IrohConnectionHandle(
+                config = config,
+                ticket = ticket,
+                sessionId = ticket.hashCode().toString(),
+                transport = transport,
+                turnEngine = engine,
+                close = { reason ->
+                    closeIrohResources(reason, transport, localEndpoint)
+                },
+            )
+        }.getOrElse { error ->
+            closeIrohResources("dial_failed", transport, localEndpoint)
+            throw error
         }
-        turnEngine = AppServerTurnEngine(
-            client = appServerClient,
-            clientInfo = com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo(
-                name = "letta-mobile-android-iroh",
-                version = clientVersion,
-            ),
-        )
-        // Await actual QUIC connection before marking Connected. If the
-        // handshake fails, the state stays Disconnected and the caller
-        // can retry rather than getting a false "Connected" signal.
-        runCatching {
-            transport.awaitConnectionReady()
-        }.onFailure { t ->
-            com.letta.mobile.util.Telemetry.event("IrohTransport", "connect.failed", "error" to (t.message ?: t.toString()))
-            closeCurrentConnection("connect_failed")
-            _state.value = ChannelTransportState.Disconnected(0, "connect_failed: ${t.message}")
-            return@withLock
-        }
-        _state.value = ChannelTransportState.Connected(serverId = "iroh-app-server", sessionId = connectedTicket.hashCode().toString(), deviceId = deviceId, a2uiEnabled = false, a2uiCatalog = null, canonicalLiveTransport = "iroh")
-        com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to connectedTicket.hashCode().toString())
     }
 
     override fun send(
@@ -172,16 +179,79 @@ class IrohChannelTransport(
             "agentId" to agentId,
             "conversationId" to conversationId,
             "textLength" to text.length,
-            "hasEngine" to (turnEngine != null),
-            "engineBusy" to (turnEngine?.isBusy ?: false),
+            "state" to state.value::class.simpleName,
         )
-        val engine = turnEngine ?: return false
-        if (engine.isBusy) return false
         val runId = "iroh-run-${UUID.randomUUID()}"
         val turnId = "iroh-turn-${UUID.randomUUID()}"
         val sendJob = scope.launch {
+            var terminalEmitted = false
+            suspend fun emitTurnFrame(frame: ServerFrame) {
+                if (frame is ServerFrame.TurnDone) {
+                    if (terminalEmitted) {
+                        Telemetry.event(
+                            "IrohTrace", "transport.turn_done.duplicate_skipped",
+                            "turnId" to turnId,
+                            "runId" to frame.runId,
+                            "status" to frame.status,
+                        )
+                        return
+                    }
+                    terminalEmitted = true
+                }
+                emitBoth(frame)
+            }
+
             com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
-            emitBoth(
+            val handle = runCatching { supervisor.ready() }.getOrElse { error ->
+                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.ready_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+                emitTurnFrame(
+                    ServerFrame.Error(
+                        id = frameId("error"),
+                        ts = nowIso(),
+                        code = "iroh_connection_not_ready",
+                        message = error.message ?: error.toString(),
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = runId,
+                    ),
+                )
+                emitTurnFrame(
+                    ServerFrame.TurnDone(
+                        id = frameId("turn_done"),
+                        ts = nowIso(),
+                        turnId = turnId,
+                        runId = runId,
+                        status = "failed",
+                    ),
+                )
+                return@launch
+            }
+            val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
+            if (engine.isBusy) {
+                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.busy", "turnId" to turnId, "runId" to runId)
+                emitTurnFrame(
+                    ServerFrame.Error(
+                        id = frameId("error"),
+                        ts = nowIso(),
+                        code = "iroh_turn_engine_busy",
+                        message = "Iroh App Server turn engine is already busy.",
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = runId,
+                    ),
+                )
+                emitTurnFrame(
+                    ServerFrame.TurnDone(
+                        id = frameId("turn_done"),
+                        ts = nowIso(),
+                        turnId = turnId,
+                        runId = runId,
+                        status = "failed",
+                    ),
+                )
+                return@launch
+            }
+            emitTurnFrame(
                 ServerFrame.TurnStarted(
                     id = frameId("turn_started"),
                     ts = nowIso(),
@@ -195,7 +265,7 @@ class IrohChannelTransport(
                 engine.runTurn(
                     TurnCommand(
                         backendId = BackendId("iroh-app-server"),
-                        runtimeId = RuntimeId("iroh:${connectedTicket.hashCode()}"),
+                        runtimeId = RuntimeId("iroh:${handle.sessionId}"),
                         agentId = AgentId(agentId),
                         conversationId = ConversationId(conversationId),
                         input = TurnInput.UserMessage(
@@ -204,10 +274,17 @@ class IrohChannelTransport(
                             contentPartsJson = contentParts?.toString(),
                         ),
                     ),
-                ).collect { draft -> emitDraft(draft, agentId, conversationId, turnId, runId) }
+                ).collect { draft ->
+                    emitDraft(draft, agentId, conversationId, turnId, runId)
+                        .forEach { emitTurnFrame(it) }
+                }
             }.onFailure { error ->
+                if (error is CancellationException) {
+                    com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to runId)
+                    return@onFailure
+                }
                 com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
-                emitBoth(
+                emitTurnFrame(
                     ServerFrame.Error(
                         id = frameId("error"),
                         ts = nowIso(),
@@ -218,7 +295,7 @@ class IrohChannelTransport(
                         runId = runId,
                     ),
                 )
-                emitBoth(
+                emitTurnFrame(
                     ServerFrame.TurnDone(
                         id = frameId("turn_done"),
                         ts = nowIso(),
@@ -233,47 +310,90 @@ class IrohChannelTransport(
         return true
     }
 
-    private suspend fun emitDraft(
+    private fun emitDraft(
         draft: com.letta.mobile.runtime.RuntimeEventDraft,
         agentId: String,
         conversationId: String,
         turnId: String,
         runId: String,
-    ) {
+    ): List<ServerFrame> {
+        val effectiveRunId = draft.runId?.value ?: runId
         com.letta.mobile.util.Telemetry.event(
             "IrohTrace", "transport.emitDraft",
             "payload" to (draft.payload::class.simpleName ?: ""),
-            "runId" to runId,
+            "runId" to effectiveRunId,
         )
-        when (val payload = draft.payload) {
-            is RuntimeEventPayload.RemoteStreamFrame -> emitBoth(
-                ServerFrame.AssistantMessage(
-                    id = payload.messageId ?: payload.frameId,
-                    ts = nowIso(),
+        return when (val payload = draft.payload) {
+            is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
+                payload = payload,
+                context = IrohStreamDeltaServerFrameMapper.Context(
                     agentId = agentId,
                     conversationId = conversationId,
                     turnId = turnId,
-                    runId = runId,
-                    // The UI maps AssistantMessage.content as a BARE string. The mapper sets
-                    // RemoteStreamFrame.body to the raw stream_delta JSON envelope, so extract
-                    // the actual assistant text out of it; otherwise the chat renders a JSON blob.
-                    content = extractAssistantText(payload.body),
+                    runId = effectiveRunId,
+                    timestamp = nowIso(),
                 ),
             )
             // Non-chat App Server frames (update_device_status, update_queue,
             // update_subagent_state, etc.) are side-channel runtime events, not
             // assistant text. Do not fold them into the chat timeline.
-            is RuntimeEventPayload.ExternalTransportFrame -> Unit
+            is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
+            is RuntimeEventPayload.ToolCallObserved -> listOf(
+                ServerFrame.ToolCallMessage(
+                    id = "toolcall-${payload.toolCallId.value}",
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                    toolCall = ToolCallPayload(
+                        toolCallId = payload.toolCallId.value,
+                        name = payload.toolName.value,
+                        arguments = payload.argumentsJson ?: "{}",
+                    ),
+                    seq = null,
+                ),
+            )
+            is RuntimeEventPayload.ToolReturnObserved -> listOf(
+                ServerFrame.ToolReturnMessage(
+                    id = "toolreturn-${payload.toolCallId.value}",
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                    toolCallId = payload.toolCallId.value,
+                    status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
+                    toolReturn = JsonPrimitive(payload.body),
+                ),
+            )
+            is RuntimeEventPayload.ApprovalRequested -> listOf(
+                ServerFrame.ToolCallMessage(
+                    type = "approval_request_message",
+                    id = payload.request.approvalId.value,
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                    toolCall = ToolCallPayload(
+                        toolCallId = payload.request.callId.value,
+                        name = payload.request.toolName.value,
+                        arguments = payload.request.argumentsPreview ?: "{}",
+                    ),
+                    seq = null,
+                ),
+            )
             is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
-                RuntimeRunStatus.Completed -> emitBoth(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "completed"))
+                RuntimeRunStatus.Completed -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "completed"))
                 RuntimeRunStatus.Failed -> {
                     com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""))
-                    emitBoth(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "failed"))
+                    listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "failed"))
                 }
-                RuntimeRunStatus.Cancelled -> emitBoth(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "cancelled"))
-                RuntimeRunStatus.Started, RuntimeRunStatus.Running -> Unit
+                RuntimeRunStatus.Cancelled -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "cancelled"))
+                RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
             }
-            else -> Unit
+            else -> emptyList()
         }
     }
 
@@ -315,28 +435,64 @@ class IrohChannelTransport(
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
-    override suspend fun disconnect() = connectionMutex.withLock {
-        closeCurrentConnection("disconnect")
+    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        val first = supervisor.ready().transport ?: error("Iroh admin_rpc requested without transport")
+        return runCatching {
+            first.adminRpc(method = method, path = path, body = body)
+        }.getOrElse { firstError ->
+            if (!firstError.isConnectionLostClass()) throw firstError
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "admin_rpc.retry_after_failure",
+                "method" to method,
+                "path" to path,
+                "error" to (firstError.message ?: firstError.toString()),
+                "class" to firstError::class.simpleName,
+            )
+            supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}")
+            val retry = supervisor.ready().transport ?: error("Iroh admin_rpc retry requested without transport")
+            retry.adminRpc(method = method, path = path, body = body)
+        }
+    }
+
+    override suspend fun disconnect() {
+        supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
 
-    private suspend fun closeCurrentConnection(reason: String) {
+    private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
         com.letta.mobile.util.Telemetry.event(
             "IrohTrace", "transport.closeCurrent",
             "reason" to reason,
-            "hasTransport" to (appServerTransport != null),
+            "hasTransport" to (transport != null),
             "hasEndpoint" to (endpoint != null),
-            "hasEngine" to (turnEngine != null),
         )
         runCatching { activeSendJob?.cancel() }
         activeSendJob = null
-        runCatching { appServerTransport?.close() }
-        appServerTransport = null
+        runCatching { transport?.close() }
         runCatching { endpoint?.shutdown() }
         runCatching { endpoint?.close() }
-        endpoint = null
-        turnEngine = null
-        connectedTicket = null
+    }
+
+    private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
+        IrohConnectionState.Disconnected -> ChannelTransportState.Idle
+        IrohConnectionState.Dialing,
+        IrohConnectionState.Handshaking -> ChannelTransportState.Connecting()
+        is IrohConnectionState.Ready -> ChannelTransportState.Connected(
+            serverId = "iroh-app-server",
+            sessionId = handle.sessionId,
+            deviceId = handle.config.deviceId,
+            a2uiEnabled = false,
+            a2uiCatalog = null,
+            canonicalLiveTransport = "iroh",
+        )
+        is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason, willReconnect = true)
+        is IrohConnectionState.AuthFailed -> ChannelTransportState.Disconnected(4001, reason, isAuthFailure = true, willReconnect = false)
+        IrohConnectionState.Closed -> ChannelTransportState.Disconnected(1000, "closed")
+    }
+
+    private fun Throwable.isConnectionLostClass(): Boolean {
+        val text = listOfNotNull(message, this::class.simpleName).joinToString(" ").lowercase()
+        return listOf("closed", "timeout", "timed out", "reset", "broken pipe", "connection", "stream").any { it in text }
     }
 
     override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse =
@@ -356,30 +512,6 @@ class IrohChannelTransport(
 
     private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
     private fun nowIso(): String = Instant.now().toString()
-
-    /**
-     * Extracts the bare assistant text from a stream_delta body. The App Server
-     * mapper passes the raw stream_delta JSON envelope as the body
-     * (`{"type":"stream_delta",...,"delta":{"content":"..."}}`). The mobile chat
-     * UI renders [ServerFrame.AssistantMessage.content] as a plain string, so the
-     * actual text must be unwrapped here. Falls back to the raw body when it isn't
-     * a recognizable envelope (already-plain text or a different shape).
-     */
-    private fun extractAssistantText(body: String): String {
-        val trimmed = body.trimStart()
-        if (!trimmed.startsWith("{")) return body
-        return runCatching {
-            val obj = lenientJson.parseToJsonElement(body).jsonObject
-            val delta = obj["delta"]?.jsonObject ?: obj
-            delta["content"]?.jsonPrimitive?.contentOrNull
-                ?: delta["text"]?.jsonPrimitive?.contentOrNull
-                ?: delta["message"]?.jsonPrimitive?.contentOrNull
-                ?: obj["content"]?.jsonPrimitive?.contentOrNull
-                ?: body
-        }.getOrDefault(body)
-    }
-
-    private val lenientJson = Json { ignoreUnknownKeys = true; isLenient = true }
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"

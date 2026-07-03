@@ -211,6 +211,9 @@ private class FakeAppServerClient : AppServerClient {
     override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
         error("abort is not used by these tests")
 
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+        throw UnsupportedOperationException()
+
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) {
         sentCommands += command
     }

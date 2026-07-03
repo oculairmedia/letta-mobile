@@ -143,6 +143,9 @@ private class FakeReceiveClient : AppServerClient {
     override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
         error("abort unused")
 
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+        error("adminRpc unused")
+
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
     fun emit(frame: AppServerInboundFrame.StreamDelta) {

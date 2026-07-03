@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.TimeoutCancellationException
@@ -187,26 +188,55 @@ class IrohNodeEndpoint(
                 try {
                     val incoming = withTimeout(ACCEPT_TIMEOUT_MS) {
                         ep.acceptNext()
-                    } ?: break
+                    }
+                    if (incoming == null) {
+                        // A null accept is NOT a terminal signal by itself: breaking
+                        // here left the endpoint bound-but-deaf (UDP port alive,
+                        // no accepts) until the wrapper was restarted. Only stop
+                        // when the scope is cancelled (shutdown()); otherwise log
+                        // and keep accepting.
+                        Telemetry.event(
+                            "IrohNode", "incoming.accept.null",
+                            level = Telemetry.Level.WARN,
+                        )
+                        if (!isActive) break
+                        delay(ACCEPT_NULL_RETRY_MS)
+                        continue
+                    }
                     Telemetry.event("IrohNode", "incoming.accepting")
-                    val accepting = incoming.accept()
-                    val connection = accepting.connect()
-                    val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
-                    Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
-                    if (allowedPeerIds.isNotEmpty() && remoteId !in allowedPeerIds) {
-                        Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
-                        runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
-                    } else {
-                        launch {
-                            IrohNodeConnection(
-                                connection = connection,
-                                controller = controller,
-                                alpn = alpn,
-                                adminRpcRouter = adminRpcRouter,
-                                requiredBearerToken = requiredBearerToken,
-                                allowedPeerIds = allowedPeerIds,
-                                remoteEndpointId = remoteId,
-                            ).serve()
+                    // Handshake + serve run in a CHILD coroutine so a stalled
+                    // client handshake (peer died mid-connect) can never block
+                    // the accept loop for other clients — the exact wedge that
+                    // made every subsequent dial time out.
+                    launch {
+                        try {
+                            val accepting = incoming.accept()
+                            val connection = withTimeout(HANDSHAKE_TIMEOUT_MS) { accepting.connect() }
+                            val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
+                            Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
+                            if (allowedPeerIds.isNotEmpty() && remoteId !in allowedPeerIds) {
+                                Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
+                                runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
+                            } else {
+                                IrohNodeConnection(
+                                    connection = connection,
+                                    controller = controller,
+                                    alpn = alpn,
+                                    adminRpcRouter = adminRpcRouter,
+                                    requiredBearerToken = requiredBearerToken,
+                                    allowedPeerIds = allowedPeerIds,
+                                    remoteEndpointId = remoteId,
+                                ).serve()
+                            }
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Telemetry.event(
+                                "IrohNode", "incoming.handshake.failed",
+                                "error" to (e.message ?: e.toString()),
+                                "class" to e::class.simpleName,
+                                level = Telemetry.Level.WARN,
+                            )
                         }
                     }
                 } catch (_: TimeoutCancellationException) {
@@ -214,6 +244,7 @@ class IrohNodeEndpoint(
                 } catch (e: Exception) {
                     if (!isActive) break
                     Telemetry.event("IrohNode", "incoming.accept.failed", "error" to (e.message ?: e.toString()), "class" to e::class.simpleName)
+                    delay(ACCEPT_FAILURE_RETRY_MS)
                 }
             }
         }
@@ -233,5 +264,8 @@ class IrohNodeEndpoint(
     companion object {
         val DEFAULT_ALPN = "/letta/appserver/0".toByteArray()
         private const val ACCEPT_TIMEOUT_MS = 120_000L
+        private const val HANDSHAKE_TIMEOUT_MS = 15_000L
+        private const val ACCEPT_NULL_RETRY_MS = 1_000L
+        private const val ACCEPT_FAILURE_RETRY_MS = 500L
     }
 }

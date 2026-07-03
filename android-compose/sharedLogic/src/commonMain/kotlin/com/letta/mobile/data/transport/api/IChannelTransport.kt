@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.api
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
@@ -45,6 +46,9 @@ interface IChannelTransport {
      * Replay + live-tail a Run's frame log starting after [cursor].
      */
     fun subscribe(runId: String, cursor: Long = 0L): Boolean
+
+    suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
+        error("admin_rpc is not supported by this transport")
 
     suspend fun sendCronList(
         agentId: String? = null,

@@ -39,6 +39,7 @@ open class AllConversationsRepository(
     private val repositoryScope: CoroutineScope,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
+    private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
 ) : IAllConversationsRepository, BackendScopedCache {
     /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
     @Inject
@@ -224,10 +225,21 @@ open class AllConversationsRepository(
     }
 
     private suspend fun fetchPage(after: String?): List<Conversation> {
-        return conversationApi.listConversations(
-            limit = PAGE_SIZE,
-            after = after,
-        )
+        val irohSource = irohConversationListSource
+        return if (irohSource?.shouldUseIroh() == true) {
+            irohSource.listConversations(
+                agentId = null,
+                limit = PAGE_SIZE,
+                after = after,
+                order = "desc",
+                orderBy = "last_message_at",
+            )
+        } else {
+            conversationApi.listConversations(
+                limit = PAGE_SIZE,
+                after = after,
+            )
+        }
     }
 
     private suspend fun applyLoadedPage(newConversations: List<Conversation>) {

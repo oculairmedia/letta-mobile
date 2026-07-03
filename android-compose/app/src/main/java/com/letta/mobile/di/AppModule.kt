@@ -68,6 +68,8 @@ import com.letta.mobile.data.session.SessionScopedToolRepository
 import com.letta.mobile.data.session.SessionScopedVibesyncEventStreamRepository
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.timeline.ConversationCursorStore
+import com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport
+import com.letta.mobile.data.timeline.IrohRoutingTimelineTransport
 import com.letta.mobile.data.timeline.MessageApiTimelineTransport
 import com.letta.mobile.data.timeline.PendingLocalStore
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -110,13 +112,24 @@ abstract class AppModule {
             pendingLocalStore: PendingLocalStore,
             conversationCursorStore: ConversationCursorStore,
             localTimelineTransport: com.letta.mobile.runtime.local.LettaCodeLocalTimelineTransport,
+            channelTransport: IChannelTransport,
+            settingsRepository: ISettingsRepository,
         ): TimelineRepository {
+            val httpTimelineTransport = MessageApiTimelineTransport(messageApi)
+            val remoteTimelineTransport = IrohRoutingTimelineTransport(
+                settingsRepository = settingsRepository,
+                http = httpTimelineTransport,
+                iroh = IrohAdminRpcTimelineTransport(
+                    channelTransport = channelTransport,
+                    settingsRepository = settingsRepository,
+                ),
+            )
             return TimelineRepository(
                 // local-conv-* hydrates from the on-device letta.js transcript
-                // (letta-mobile-czomn); everything else uses the remote API.
+                // (letta-mobile-czomn); everything else uses the active remote route.
                 timelineTransport = com.letta.mobile.runtime.local.LocalRoutingTimelineTransport(
                     local = localTimelineTransport,
-                    remote = MessageApiTimelineTransport(messageApi),
+                    remote = remoteTimelineTransport,
                 ),
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,

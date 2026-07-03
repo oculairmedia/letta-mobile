@@ -28,6 +28,7 @@ import com.letta.mobile.cli.commands.ReplayCommand
 import com.letta.mobile.cli.commands.SendCommand
 import com.letta.mobile.cli.commands.AppServerServeCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohCommand
+import com.letta.mobile.cli.commands.AppServerIrohProbeCommand
 import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.SetupApplyCommand
 import com.letta.mobile.cli.commands.SetupCommand
@@ -80,6 +81,7 @@ object Main {
                 *buildResourceCommands().toTypedArray(),
                 AppServerServeCommand(),
                 AppServerServeIrohCommand(),
+                AppServerIrohProbeCommand(),
                 AppServerSmokeCommand(),
                 StreamCommand(),
             )
@@ -118,6 +120,7 @@ object Main {
           runs/jobs/steps Inspect and mutate execution resources.
           projects       Manage Vibesync projects and beads remotes.
           app-server-serve  Launch host letta app-server with optional WS auth.
+          app-server-iroh-probe  Run a headless two-turn Iroh transport probe.
           app-server-smoke  Send one turn through a running Letta App Server.
           stream         Direct Letta REST/SSE path for low-level comparison.
 

@@ -437,8 +437,247 @@ class TimelineStreamReducerTest {
         Telemetry.snapshot().any {
             it.tag == "TimelineSync" &&
                 it.name == "streamSubscriber.eventDeduped" &&
-                it.attrs["reason"] == "semanticIdentitySeen"
+            it.attrs["reason"] == "semanticIdentitySeen"
         } shouldBe true
+    }
+
+    @Test
+    fun `reconciled final with real run id replaces iroh synthetic live row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-300",
+                contentRaw = JsonPrimitive("Hello"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 1,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-300",
+                contentRaw = JsonPrimitive("Hello!"),
+                runId = "server-run-real",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-300"
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("letta-msg-300", "assistant_message")
+        )
+    }
+
+    @Test
+    fun `synthetic live to real final uses incoming snapshot on content conflict`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-302",
+                contentRaw = JsonPrimitive("synthetic partial that should not survive"),
+                runId = "iroh-run-client-synthetic",
+                seqId = null,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-302",
+                contentRaw = JsonPrimitive("final"),
+                runId = "server-run-real",
+                seqId = null,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "final"
+    }
+
+    @Test
+    fun `synthetic duplicate seq still reconciles real run id`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-303",
+                contentRaw = JsonPrimitive("Hello!"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 2,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-303",
+                contentRaw = JsonPrimitive("Hello!"),
+                runId = "server-run-real",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+    }
+
+    @Test
+    fun `reconcile copy without run id does not duplicate live row with real run id`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-166",
+                contentRaw = JsonPrimitive("Hey"),
+                runId = "run-real-app-server",
+                seqId = 3,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "letta-msg-166",
+                    contentRaw = JsonPrimitive("Hey"),
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 0
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Hey"
+        event.runId shouldBe "run-real-app-server"
+    }
+
+    @Test
+    fun `reconcile copy with backend-minted id does not duplicate identical live row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-166",
+                contentRaw = JsonPrimitive("Hey"),
+                runId = "run-real-app-server",
+                seqId = 3,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "ui-msg-55781",
+                    contentRaw = JsonPrimitive("Hey"),
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 0
+        mergedTimeline.events shouldHaveSize 1
+        (mergedTimeline.events.single() as TimelineEvent.Confirmed).serverId shouldBe "letta-msg-166"
+    }
+
+    @Test
+    fun `recent reconcile final assistant replaces live prefix row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-624",
+                contentRaw = JsonPrimitive("Let"),
+                runId = "local-run-15",
+                seqId = 1,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "letta-msg-640",
+                    contentRaw = JsonPrimitive("Let's find out — no duplicate here."),
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-640"
+        event.content shouldBe "Let's find out — no duplicate here."
+        event.position shouldBe (live.events.single() as TimelineEvent.Confirmed).position
+    }
+
+    @Test
+    fun `recent reconcile real run replaces iroh synthetic live row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-301",
+                contentRaw = JsonPrimitive("Hello"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 1,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "letta-msg-301",
+                    contentRaw = JsonPrimitive("Hello!"),
+                    runId = "server-run-real",
+                    seqId = 2,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-301"
+        event.runId shouldBe "server-run-real"
+        event.content shouldBe "Hello!"
+    }
+
+    @Test
+    fun `reused assistant server id from a different run appends live event`() {
+        val hydrated = TimelineHydrationReducer.reduce(
+            conversationId = "conv-test",
+            serverMessagesChronological = listOf(
+                AssistantMessage(
+                    id = "letta-msg-203",
+                    contentRaw = JsonPrimitive("old answer from a prior app server run"),
+                    runId = "local-run-old",
+                    seqId = 146,
+                )
+            ),
+            timelineBeforeFetch = Timeline("conv-test"),
+            currentTimeline = Timeline("conv-test"),
+            diskRecords = emptyList(),
+        ).timeline
+
+        val output = reduce(
+            prev = hydrated,
+            frame = AssistantMessage(
+                id = "letta-msg-203",
+                contentRaw = JsonPrimitive("hello from iro"),
+                runId = "local-run-new",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 2
+        val live = output.next.events.last() as TimelineEvent.Confirmed
+        live.serverId shouldBe "letta-msg-203"
+        live.runId shouldBe "local-run-new"
+        live.content shouldBe "hello from iro"
+        output.next.liveCursor shouldBe "letta-msg-203"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("letta-msg-203", "assistant_message")
+        )
     }
 
     @Test
@@ -653,6 +892,61 @@ class TimelineStreamReducerTest {
         event2.content shouldBe "Yes — confirmed working at both layers:"
         // The first token 'Y' must be preserved — the full content starts with "Yes"
         event2.content.startsWith("Yes") shouldBe true
+    }
+
+    @Test
+    fun `assistant one character prefix replay is dropped after reconciled final without run id`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-final",
+                contentRaw = JsonPrimitive("Nah, that was just the bit. Real answer: agents stay off the relay."),
+                runId = null,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix",
+                contentRaw = JsonPrimitive("N"),
+                runId = "local-run-39",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-final"
+        event.content shouldBe "Nah, that was just the bit. Real answer: agents stay off the relay."
+        output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
+    fun `assistant prefix replay from local run is dropped after iroh final`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Yeah — still seeing it. Smells like a dedup issue."),
+                runId = "iroh-run-123",
+                seqId = 12,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix",
+                contentRaw = JsonPrimitive("Yeah"),
+                runId = "local-run-12",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "Yeah — still seeing it. Smells like a dedup issue."
+        output.emittedEvents shouldBe emptyList()
     }
 
     @Test

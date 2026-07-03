@@ -184,7 +184,12 @@ object TimelineHydrationReducer {
 internal fun TimelineEvent.identityKeys(): Set<String> {
     val keys = mutableSetOf("otid:$otid")
     if (this is TimelineEvent.Confirmed) {
-        keys += "server:$serverId:$messageType"
+        val stableRunId = runId?.takeIf { it.isNotBlank() }
+        keys += if (stableRunId == null) {
+            "server:$serverId:$messageType"
+        } else {
+            "server:$serverId:$messageType:run:$stableRunId"
+        }
         semanticIdentityKeyOrNull()?.let { keys += it }
     }
     return keys
