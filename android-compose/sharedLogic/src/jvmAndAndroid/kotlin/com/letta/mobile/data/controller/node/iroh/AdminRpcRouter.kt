@@ -5,10 +5,8 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.jsonObject
 
 /**
  * Routes incoming admin RPC calls to registered handler functions.
@@ -46,16 +44,33 @@ class AdminRpcRouter(
         val handler = handlers[method]
         if (handler == null) {
             Telemetry.event("AdminRpc", "method.not_found", "method" to method)
-            return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"Unknown method: $method"}"""
+            return encodeFailure(requestId, "Unknown method: $method")
         }
         return try {
             val result = handler(params)
-            val resultJson = json.encodeToString(kotlinx.serialization.serializer(), result)
-            """{"type":"admin_rpc_response","request_id":"$requestId","success":true,"result":$resultJson}"""
+            json.encodeToString(
+                kotlinx.serialization.serializer(),
+                buildJsonObject {
+                    put("type", "admin_rpc_response")
+                    put("request_id", requestId)
+                    put("success", true)
+                    put("result", result)
+                },
+            )
         } catch (e: Exception) {
             Telemetry.event("AdminRpc", "handler.error", "method" to method, "error" to (e.message ?: ""))
-            val msg = e.message?.replace("\"", "\\\"") ?: "Internal error"
-            """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"$msg"}"""
+            encodeFailure(requestId, e.message ?: "Internal error")
         }
     }
+
+    private fun encodeFailure(requestId: String, message: String): String =
+        json.encodeToString(
+            kotlinx.serialization.serializer(),
+            buildJsonObject {
+                put("type", "admin_rpc_response")
+                put("request_id", requestId)
+                put("success", false)
+                put("error", message)
+            },
+        )
 }
