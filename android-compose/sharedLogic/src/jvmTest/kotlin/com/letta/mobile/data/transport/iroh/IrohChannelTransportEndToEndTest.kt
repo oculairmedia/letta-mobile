@@ -5,7 +5,10 @@ import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.appserver.AppServerChannel
+import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
@@ -25,13 +28,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.Assume.assumeTrue
 
@@ -259,6 +265,55 @@ class IrohChannelTransportEndToEndTest {
         }
     }
 
+
+    @Test
+    fun busyTurnEngineEmitsTerminalFailureForAcceptedSend() = runBlocking {
+        val engine = AppServerTurnEngine(client = BusyAppServerClient())
+        val transport = IrohChannelTransport(
+            scope = clientScope,
+            activeConfigProvider = { IrohConnectConfig("iroh://ticket", "", "device", "test") },
+            testDialer = { config ->
+                IrohConnectionHandle(
+                    config = config,
+                    ticket = "ticket",
+                    sessionId = "session",
+                    turnEngine = engine,
+                    close = {},
+                )
+            },
+        )
+        val frames = mutableListOf<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+        try {
+            val first = clientScope.async {
+                engine.runTurn(
+                    TurnCommand(
+                        backendId = BackendId("iroh-app-server"),
+                        runtimeId = RuntimeId("iroh:session"),
+                        agentId = AgentId("agent"),
+                        conversationId = ConversationId("conversation"),
+                        input = TurnInput.UserMessage(localMessageId = "local-1", text = "first"),
+                    ),
+                ).collect { }
+            }
+            withTimeout(2_000) {
+                while (!engine.isBusy) delay(10)
+            }
+
+            assertTrue(transport.send("agent", "conversation", "second", "otid-2", null, false))
+            withTimeout(2_000) {
+                while (frames.none { it is ServerFrame.TurnDone && it.status == "failed" }) delay(10)
+            }
+
+            assertTrue(frames.any { it is ServerFrame.Error && it.code == "iroh_turn_engine_busy" })
+            assertEquals(1, frames.count { it is ServerFrame.TurnDone && it.status == "failed" })
+            first.cancel()
+        } finally {
+            collector.cancel()
+            transport.disconnect()
+        }
+    }
+
     @Test
     fun nonTerminatingTurnDoesNotPermanentlyJamTheEngine() = runBlocking {
         // A controller that NEVER emits a terminal stop_reason — reproduces the
@@ -448,4 +503,33 @@ class IrohChannelTransportEndToEndTest {
     private companion object {
         const val ASSISTANT_REPLY = "harness-assistant-reply-OK"
     }
+}
+
+private class BusyAppServerClient : com.letta.mobile.data.transport.appserver.AppServerClient {
+    override val events: MutableSharedFlow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 16)
+
+    override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
+        AppServerInboundFrame.RuntimeStartResponse(
+            requestId = command.requestId,
+            success = true,
+            runtime = AppServerRuntimeScope(
+                agentId = requireNotNull(command.agentId),
+                conversationId = requireNotNull(command.conversationId),
+            ),
+        )
+
+    override suspend fun input(command: AppServerCommand.Input) {
+        kotlinx.coroutines.awaitCancellation()
+    }
+
+    override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
+        throw UnsupportedOperationException()
+
+    override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
+        throw UnsupportedOperationException()
+
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+        throw UnsupportedOperationException()
+
+    override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 }

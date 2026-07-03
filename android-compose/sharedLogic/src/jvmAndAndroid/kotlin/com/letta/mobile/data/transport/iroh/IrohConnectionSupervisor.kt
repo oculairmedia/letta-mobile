@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -43,8 +44,11 @@ sealed interface IrohConnectionState {
     data object Handshaking : IrohConnectionState
     data class Ready(val handle: IrohConnectionHandle) : IrohConnectionState
     data class Degraded(val reason: String) : IrohConnectionState
+    data class AuthFailed(val reason: String) : IrohConnectionState
     data object Closed : IrohConnectionState
 }
+
+class IrohAuthFailure(message: String, cause: Throwable? = null) : IllegalStateException(message, cause)
 
 class IrohConnectionSupervisor(
     private val scope: CoroutineScope,
@@ -60,9 +64,12 @@ class IrohConnectionSupervisor(
     private var dialJob: Job? = null
     private var dialResult: CompletableDeferred<IrohConnectionHandle>? = null
     private var redialJob: Job? = null
+    private var redialReadyAtMs: Long? = null
     private var currentHandle: IrohConnectionHandle? = null
     private var currentConfig: IrohConnectConfig? = null
+    private var dialConfig: IrohConnectConfig? = null
     private var closed = false
+    private var authFailed = false
     private var failureCount = 0
 
     suspend fun ready(timeoutMs: Long = 30_000): IrohConnectionHandle {
@@ -82,40 +89,66 @@ class IrohConnectionSupervisor(
     }
 
     suspend fun refreshConfig() {
-        val desired = configProvider()
         val staleHandle = mutex.withLock {
-            val active = currentConfig
-            if (desired != null && active != null && active != desired) currentHandle else null
+            val desired = configProvider()
+            val active = currentConfig ?: dialConfig
+            if (desired != null && active != null && active != desired) {
+                authFailed = false
+                val existing = currentHandle
+                currentHandle = null
+                currentConfig = null
+                cancelDialLocked("config_changed")
+                transitionTo(IrohConnectionState.Degraded("config_changed"), "config_changed")
+                existing
+            } else {
+                null
+            }
         }
-        if (staleHandle != null) {
-            staleHandle.close("config_changed")
-            onConnectionLost("config_changed")
-        }
+        staleHandle?.close("config_changed")
     }
 
-    fun onConnectionLost(reason: String) {
-        scope.launch {
-            val shouldRedial = mutex.withLock {
-                if (closed) return@withLock false
-                currentHandle = null
-                dialResult = null
-                dialJob = null
-                transitionTo(IrohConnectionState.Degraded(reason), reason)
-                true
-            }
-            if (shouldRedial) scheduleRedial(reason)
+    suspend fun onConnectionLost(reason: String) {
+        val staleHandle = mutex.withLock {
+            if (closed || authFailed) return@withLock null
+            val existing = currentHandle
+            currentHandle = null
+            currentConfig = null
+            cancelDialLocked(reason)
+            transitionTo(IrohConnectionState.Degraded(reason), reason)
+            scheduleRedialLocked(reason)
+            existing
         }
+        staleHandle?.close(reason)
+    }
+
+    fun onConnectionLostAsync(reason: String) {
+        scope.launch { onConnectionLost(reason) }
+    }
+
+    suspend fun disconnect(reason: String = "disconnect") {
+        val handle = mutex.withLock {
+            authFailed = false
+            redialJob?.cancel()
+            redialJob = null
+            redialReadyAtMs = null
+            cancelDialLocked(reason)
+            val existing = currentHandle
+            currentHandle = null
+            currentConfig = null
+            transitionTo(IrohConnectionState.Disconnected, reason)
+            existing
+        }
+        handle?.close(reason)
     }
 
     suspend fun close(reason: String = "closed") {
         val handle = mutex.withLock {
             closed = true
+            authFailed = false
             redialJob?.cancel()
             redialJob = null
-            dialJob?.cancel()
-            dialJob = null
-            dialResult?.cancel()
-            dialResult = null
+            redialReadyAtMs = null
+            cancelDialLocked(reason)
             val existing = currentHandle
             currentHandle = null
             currentConfig = null
@@ -127,6 +160,7 @@ class IrohConnectionSupervisor(
 
     private suspend fun ensureDialing(): CompletableDeferred<IrohConnectionHandle> = mutex.withLock {
         check(!closed) { "Iroh connection supervisor is closed" }
+        check(!authFailed) { authFailureMessage() }
         val desired = configProvider() ?: error("Iroh connection requested with no active iroh:// config")
         val ready = currentHandle
         if (ready != null && currentConfig == desired && state.value is IrohConnectionState.Ready) {
@@ -135,17 +169,32 @@ class IrohConnectionSupervisor(
         if (ready != null && currentConfig != desired) {
             scope.launch { ready.close("config_changed") }
             currentHandle = null
+            currentConfig = null
             transitionTo(IrohConnectionState.Degraded("config_changed"), "config_changed")
         }
-        dialResult?.takeIf { dialJob?.isActive == true }?.let { return@withLock it }
+        if (dialJob?.isActive == true && dialConfig != desired) {
+            cancelDialLocked("config_changed")
+            transitionTo(IrohConnectionState.Degraded("config_changed"), "config_changed")
+        }
+        dialResult?.takeIf { dialJob?.isActive == true && dialConfig == desired }?.let { return@withLock it }
+        redialReadyAtMs?.let { readyAt ->
+            val delayMs = readyAt - System.currentTimeMillis()
+            if (delayMs > 0) {
+                val waiting = dialResult ?: CompletableDeferred<IrohConnectionHandle>().also { dialResult = it }
+                if (redialJob?.isActive != true) scheduleRedialLocked("await_backoff")
+                return@withLock waiting
+            }
+        }
         startDialLocked(desired)
     }
 
     private fun startDialLocked(config: IrohConnectConfig): CompletableDeferred<IrohConnectionHandle> {
         redialJob?.cancel()
         redialJob = null
+        redialReadyAtMs = null
         currentConfig = config
-        val result = CompletableDeferred<IrohConnectionHandle>()
+        dialConfig = config
+        val result = dialResult?.takeIf { !it.isCompleted } ?: CompletableDeferred()
         dialResult = result
         dialJob = scope.launch {
             transitionTo(IrohConnectionState.Dialing, "dial")
@@ -155,43 +204,77 @@ class IrohConnectionSupervisor(
             }
             dialAttempt.onSuccess { handle ->
                 mutex.withLock {
+                    if (closed || authFailed || dialConfig != config || currentConfig != config) {
+                        if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial result ignored"))
+                        scope.launch { handle.close("stale_dial") }
+                        return@withLock
+                    }
                     currentHandle = handle
                     currentConfig = config
                     failureCount = 0
                     dialResult = null
                     dialJob = null
+                    dialConfig = null
                     transitionTo(IrohConnectionState.Ready(handle), "ready")
                     if (!result.isCompleted) result.complete(handle)
                 }
             }.onFailure { error ->
                 mutex.withLock {
+                    if (dialConfig != config) {
+                        if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial failure ignored"))
+                        return@withLock
+                    }
                     currentHandle = null
                     dialResult = null
                     dialJob = null
-                    failureCount += 1
-                    transitionTo(IrohConnectionState.Degraded(error.message ?: error.toString()), "dial_failed")
+                    dialConfig = null
+                    if (error is IrohAuthFailure) {
+                        authFailed = true
+                        redialJob?.cancel()
+                        redialJob = null
+                        redialReadyAtMs = null
+                        transitionTo(IrohConnectionState.AuthFailed(error.message ?: "Iroh auth failed"), "auth_failed")
+                    } else {
+                        failureCount += 1
+                        transitionTo(IrohConnectionState.Degraded(error.message ?: error.toString()), "dial_failed")
+                        if (!closed) scheduleRedialLocked(error.message ?: error.toString())
+                    }
                     if (!result.isCompleted) result.completeExceptionally(error)
                 }
-                scheduleRedial(error.message ?: error.toString())
             }
         }
         return result
     }
 
-    private fun scheduleRedial(reason: String) {
-        if (redialJob?.isActive == true) return
+    private fun scheduleRedialLocked(reason: String) {
+        if (redialJob?.isActive == true || closed || authFailed) return
+        val attempt = failureCount + 1
+        val delayMs = backoffPolicy.delayMs(attempt, randomJitterMs)
+        redialReadyAtMs = System.currentTimeMillis() + delayMs
         redialJob = scope.launch {
-            val attempt = failureCount + 1
-            val delayMs = backoffPolicy.delayMs(attempt, randomJitterMs)
             Telemetry.event("IrohSupervisor", "redial.scheduled", "reason" to reason, "delayMs" to delayMs.toString(), "attempt" to attempt.toString())
             delay(delayMs)
             val config = configProvider() ?: return@launch
             mutex.withLock {
-                if (!closed && currentHandle == null && dialJob?.isActive != true) {
+                redialReadyAtMs = null
+                if (!closed && !authFailed && currentHandle == null && dialJob?.isActive != true) {
                     startDialLocked(config)
                 }
             }
         }
+    }
+
+    private fun cancelDialLocked(reason: String) {
+        dialJob?.cancel(CancellationException(reason))
+        dialJob = null
+        dialConfig = null
+        dialResult?.cancel(CancellationException(reason))
+        dialResult = null
+    }
+
+    private fun authFailureMessage(): String = when (val value = state.value) {
+        is IrohConnectionState.AuthFailed -> value.reason
+        else -> "Iroh auth failed"
     }
 
     private fun transitionTo(next: IrohConnectionState, reason: String) {
@@ -226,5 +309,6 @@ private val IrohConnectionState.name: String
         IrohConnectionState.Handshaking -> "Handshaking"
         is IrohConnectionState.Ready -> "Ready"
         is IrohConnectionState.Degraded -> "Degraded"
+        is IrohConnectionState.AuthFailed -> "AuthFailed"
         IrohConnectionState.Closed -> "Closed"
     }

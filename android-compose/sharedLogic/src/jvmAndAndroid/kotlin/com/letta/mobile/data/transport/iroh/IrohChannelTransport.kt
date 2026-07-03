@@ -56,6 +56,7 @@ class IrohChannelTransport(
     // Lets the on-host harness dial a live in-process node without rebuilding the constant.
     private val forcedIrohUrl: String = "",
     private val activeConfigProvider: () -> IrohConnectConfig? = { null },
+    private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
 ) : IChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
@@ -84,7 +85,7 @@ class IrohChannelTransport(
     private val supervisor = IrohConnectionSupervisor(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
-        dialer = { config -> dial(config) },
+        dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
     )
 
     init {
@@ -132,7 +133,7 @@ class IrohChannelTransport(
         return runCatching {
             transport = IrohAppServerTransportAdapter(
                 endpoint = localEndpoint,
-                onConnectionLost = { reason -> supervisor.onConnectionLost(reason) },
+                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason) },
             ).createTransport(
                 endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
                 scope = scope,
@@ -146,7 +147,7 @@ class IrohChannelTransport(
                     ),
                 )
                 if (!auth.success) {
-                    error(auth.error ?: "Iroh auth failed")
+                    throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
                 }
             }
             val engine = AppServerTurnEngine(
@@ -234,7 +235,30 @@ class IrohChannelTransport(
                 return@launch
             }
             val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
-            if (engine.isBusy) return@launch
+            if (engine.isBusy) {
+                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.busy", "turnId" to turnId, "runId" to runId)
+                emitTurnFrame(
+                    ServerFrame.Error(
+                        id = frameId("error"),
+                        ts = nowIso(),
+                        code = "iroh_turn_engine_busy",
+                        message = "Iroh App Server turn engine is already busy.",
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = runId,
+                    ),
+                )
+                emitTurnFrame(
+                    ServerFrame.TurnDone(
+                        id = frameId("turn_done"),
+                        ts = nowIso(),
+                        turnId = turnId,
+                        runId = runId,
+                        status = "failed",
+                    ),
+                )
+                return@launch
+            }
             emitTurnFrame(
                 ServerFrame.TurnStarted(
                     id = frameId("turn_started"),
@@ -439,7 +463,7 @@ class IrohChannelTransport(
     }
 
     override suspend fun disconnect() {
-        supervisor.close("disconnect")
+        supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
 
@@ -469,7 +493,8 @@ class IrohChannelTransport(
             a2uiCatalog = null,
             canonicalLiveTransport = "iroh",
         )
-        is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason)
+        is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason, willReconnect = true)
+        is IrohConnectionState.AuthFailed -> ChannelTransportState.Disconnected(4001, reason, isAuthFailure = true, willReconnect = false)
         IrohConnectionState.Closed -> ChannelTransportState.Disconnected(1000, "closed")
     }
 

@@ -3,7 +3,6 @@ package com.letta.mobile.data.transport.iroh
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -13,6 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -60,6 +60,141 @@ class IrohConnectionSupervisorTest {
         val ready = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
         assertTrue(ready.handle.sessionId != first.sessionId)
         assertEquals(2, dials)
+    }
+
+
+    @Test
+    fun connectionLostInvalidatesReadyHandleBeforeRetry() = runTest {
+        var dials = 0
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            fakeHandle(it, "dial-$dials")
+        }
+
+        val first = supervisor.ready()
+        supervisor.onConnectionLost("admin_rpc_failed")
+        val retry = async { supervisor.ready() }
+        runCurrent()
+
+        assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+        assertTrue(!retry.isCompleted)
+        advanceTimeBy(500)
+        advanceUntilIdle()
+        val second = retry.await()
+
+        assertNotSame(first, second)
+        assertEquals("dial-2", second.sessionId)
+        assertEquals(2, dials)
+    }
+
+    @Test
+    fun authFailureBecomesTerminalAndDoesNotRedial() = runTest {
+        var dials = 0
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            throw IrohAuthFailure("bad token")
+        }
+
+        val error = assertFailsWith<IllegalStateException> {
+            supervisor.ready(timeoutMs = 100)
+        }
+        runCurrent()
+        advanceTimeBy(5_000)
+        advanceUntilIdle()
+
+        assertTrue(error.message.orEmpty().contains("bad token"))
+        assertIs<IrohConnectionState.AuthFailed>(supervisor.state.value)
+        assertEquals(1, dials)
+    }
+
+    @Test
+    fun readyRespectsScheduledBackoffAfterFailure() = runTest {
+        var dials = 0
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            if (dials == 1) throw IllegalStateException("temporary outage")
+            fakeHandle(it, "dial-$dials")
+        }
+
+        assertFailsWith<IllegalStateException> {
+            supervisor.ready(timeoutMs = 1)
+        }
+        assertEquals(1, dials)
+
+        val retry = async { supervisor.ready(timeoutMs = 2_000) }
+        runCurrent()
+        advanceTimeBy(499)
+        runCurrent()
+        assertEquals(1, dials)
+        assertTrue(!retry.isCompleted)
+
+        advanceTimeBy(1)
+        advanceUntilIdle()
+        assertEquals("dial-2", retry.await().sessionId)
+        assertEquals(2, dials)
+    }
+
+    @Test
+    fun disconnectAllowsLaterReconnect() = runTest {
+        var dials = 0
+        val closed = mutableListOf<String>()
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            fakeHandle(it, "dial-$dials") { reason -> closed += reason }
+        }
+
+        val first = supervisor.ready()
+        supervisor.disconnect("user_disconnect")
+        advanceUntilIdle()
+        assertIs<IrohConnectionState.Disconnected>(supervisor.state.value)
+
+        val second = supervisor.ready()
+
+        assertNotSame(first, second)
+        assertEquals("dial-2", second.sessionId)
+        assertEquals(listOf("user_disconnect"), closed)
+    }
+
+    @Test
+    fun connectionLostClosesStaleHandleBeforeRedial() = runTest {
+        val closed = mutableListOf<String>()
+        val supervisor = supervisor(config = { configA }) {
+            fakeHandle(it, it.baseShimUrl) { reason -> closed += reason }
+        }
+
+        supervisor.ready()
+        supervisor.onConnectionLost("reader_stopped")
+        runCurrent()
+
+        assertEquals(listOf("reader_stopped"), closed)
+        assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+    }
+
+    @Test
+    fun configChangeCancelsInFlightDialAndStartsNewConfig() = runTest {
+        var config = configA
+        val firstDialGate = CompletableDeferred<Unit>()
+        val seenConfigs = mutableListOf<IrohConnectConfig>()
+        val supervisor = supervisor(config = { config }) {
+            seenConfigs += it
+            if (it == configA) firstDialGate.await()
+            fakeHandle(it, it.baseShimUrl)
+        }
+
+        val first = async { supervisor.ready() }
+        runCurrent()
+        config = configB
+        supervisor.refreshConfig()
+        val second = async { supervisor.ready() }
+        runCurrent()
+        firstDialGate.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("iroh://ticket-b", first.await().sessionId)
+        assertEquals("iroh://ticket-b", second.await().sessionId)
+        assertEquals(listOf(configA, configB), seenConfigs)
+        val ready = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals(configB, ready.handle.config)
     }
 
     @Test
