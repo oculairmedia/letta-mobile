@@ -18,6 +18,7 @@ import com.letta.mobile.avatar.core.toManifest
 import com.letta.mobile.avatar.core.toModel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -113,7 +114,16 @@ class AvatarImporter(
         }
         warnings += inspection.warnings
 
-        // 4. Identity + hash.
+        // 4. Identity + hash. Explicit ids become path segments below, so
+        // anything that isn't a plain safe file name (separators, "..", a
+        // leading dot) is rejected rather than allowed to escape catalogDir.
+        request.id?.let { explicit ->
+            if (!SAFE_ID_REGEX.matches(explicit)) {
+                return AvatarImportResult.Rejected(
+                    "Invalid id '$explicit': ids must match ${SAFE_ID_REGEX.pattern}",
+                )
+            }
+        }
         val sha256 = sha256Hex(request.bytes)
         val baseName = request.sourceFileName.substringBeforeLast('.')
             .ifBlank { "avatar" }
@@ -143,17 +153,18 @@ class AvatarImporter(
         )
 
         withContext(Dispatchers.IO) {
-            Files.createDirectories(assetPath.parent)
-            Files.createDirectories(manifestPath.parent)
-            Files.createDirectories(preservedSourcePath.parent)
-            Files.write(assetPath, request.bytes)
-            Files.write(preservedSourcePath, request.bytes)
-            Files.writeString(manifestPath, AvatarManifestCodec.encode(manifest))
+            // Atomic writes: on re-import of an existing id, the previous
+            // asset/manifest stay intact until each replacement is complete —
+            // a crash mid-import never leaves a catalog entry pointing at a
+            // truncated file.
+            writeAtomically(assetPath, request.bytes)
+            writeAtomically(preservedSourcePath, request.bytes)
+            writeAtomically(manifestPath, AvatarManifestCodec.encode(manifest).encodeToByteArray())
         }
 
-        // 6. Register — refresh first so parallel importers into the same
-        // directory don't clobber each other's entries.
-        catalog.refresh()
+        // 6. Register. AvatarCatalog.upsert merges against the persisted
+        // catalog.json inside its lock, so a fresh importer never clobbers
+        // existing entries.
         catalog.upsert(model)
 
         return AvatarImportResult.Imported(
@@ -186,8 +197,29 @@ class AvatarImporter(
             .joinToString("-")
             .ifBlank { "avatar" }
 
+    private fun writeAtomically(target: Path, bytes: ByteArray) {
+        Files.createDirectories(target.parent)
+        val temp = target.resolveSibling("${target.fileName}.tmp")
+        Files.write(temp, bytes)
+        try {
+            Files.move(
+                temp,
+                target,
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE,
+            )
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+
     private fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256")
             .digest(bytes)
             .joinToString("") { byte -> (byte.toInt() and 0xFF).toString(16).padStart(2, '0') }
+
+    private companion object {
+        /** Plain safe file-name segment: no separators, no leading dot. */
+        val SAFE_ID_REGEX = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$")
+    }
 }

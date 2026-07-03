@@ -66,4 +66,43 @@ class AvatarCatalogTest {
         catalog.upsert(model("a"))
         assertEquals("a", catalog.get("a")?.id)
     }
+
+    @Test
+    fun upsertWithoutPriorRefreshMergesAgainstPersistedEntries() = runTest {
+        // A freshly-constructed catalog over an existing store must not
+        // clobber persisted entries when mutated before refresh().
+        val store = InMemoryAvatarCatalogStore(listOf(model("existing", "Existing")))
+        val catalog = AvatarCatalog(store)
+
+        catalog.upsert(model("new", "New"))
+
+        assertEquals(listOf("existing", "new"), store.load().map { it.id }.sorted())
+        assertEquals(listOf("existing", "new"), catalog.entries.value.map { it.id }.sorted())
+    }
+
+    @Test
+    fun removeWithoutPriorRefreshOperatesOnPersistedEntries() = runTest {
+        val store = InMemoryAvatarCatalogStore(listOf(model("existing")))
+        val catalog = AvatarCatalog(store)
+
+        assertTrue(catalog.remove("existing"))
+        assertTrue(store.load().isEmpty())
+    }
+
+    @Test
+    fun interleavedWritersAgainstOneStoreKeepEachOthersEntries() = runTest {
+        // Two catalog instances over the same store (e.g. two importer runs
+        // into one directory): each upsert merges with the persisted list.
+        val store = InMemoryAvatarCatalogStore()
+        val first = AvatarCatalog(store)
+        val second = AvatarCatalog(store)
+
+        first.upsert(model("from-first"))
+        second.upsert(model("from-second"))
+
+        assertEquals(
+            listOf("from-first", "from-second"),
+            store.load().map { it.id }.sorted(),
+        )
+    }
 }

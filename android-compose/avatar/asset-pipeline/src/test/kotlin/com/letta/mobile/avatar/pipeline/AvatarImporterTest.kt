@@ -179,6 +179,102 @@ class AvatarImporterTest {
         assertEquals(1, entries.size)
     }
 
+    @Test
+    fun freshImporterInstancesMergeIntoTheSameCatalog() = runTest {
+        // Two importers over the same directory: the second must not clobber
+        // the first's entry (upsert merges against persisted catalog.json).
+        AvatarImporter(catalogDir).import(
+            AvatarImportRequest(
+                sourceFileName = "one.glb",
+                bytes = glb("""{"asset":{"version":"2.0"}}"""),
+                id = "one",
+                license = AvatarLicense(allowRedistribution = true),
+            ),
+        )
+        AvatarImporter(catalogDir).import(
+            AvatarImportRequest(
+                sourceFileName = "two.glb",
+                bytes = glb("""{"asset":{"version":"2.0"}}"""),
+                id = "two",
+                license = AvatarLicense(allowRedistribution = true),
+            ),
+        )
+
+        val entries = AvatarCatalogCodec.decode(
+            Files.readString(catalogDir.resolve(AvatarCatalogCodec.FILE_NAME)),
+        )
+        assertEquals(listOf("one", "two"), entries.map { it.id }.sorted())
+    }
+
+    @Test
+    fun unsafeExplicitIdsAreRejected() = runTest {
+        val importer = AvatarImporter(catalogDir)
+        for (badId in listOf("../escape", "/tmp/avatar", "a/b", "a\\b", ".hidden", "..")) {
+            val result = importer.import(
+                AvatarImportRequest(
+                    sourceFileName = "x.glb",
+                    bytes = glb("""{"asset":{"version":"2.0"}}"""),
+                    id = badId,
+                    license = AvatarLicense(allowRedistribution = true),
+                ),
+            )
+            assertIs<AvatarImportResult.Rejected>(result, "id '$badId' should be rejected")
+        }
+        assertTrue(Files.notExists(catalogDir.resolve("assets")))
+    }
+
+    @Test
+    fun externalImageResourcesAreRejectedUntilPackingExists() = runTest {
+        val result = AvatarImporter(catalogDir).import(
+            AvatarImportRequest(
+                sourceFileName = "textured.gltf",
+                bytes = """
+                    {"asset":{"version":"2.0"},
+                     "buffers":[{"uri":"data:application/octet-stream;base64,AA==","byteLength":1}],
+                     "images":[{"uri":"textures/skin.png"}]}
+                """.trimIndent().encodeToByteArray(),
+                license = AvatarLicense(allowRedistribution = true),
+            ),
+        )
+
+        val rejected = assertIs<AvatarImportResult.Rejected>(result)
+        assertTrue("skin.png" in rejected.reason)
+    }
+
+    @Test
+    fun malformedAssetVersionTypeRejectsInsteadOfCrashing() = runTest {
+        // asset.version as an object: safe extraction must reject, not throw.
+        val result = AvatarImporter(catalogDir).import(
+            AvatarImportRequest(
+                sourceFileName = "weird.glb",
+                bytes = glb("""{"asset":{"version":{"major":2}}}"""),
+                license = AvatarLicense(allowRedistribution = true),
+            ),
+        )
+        assertIs<AvatarImportResult.Rejected>(result)
+    }
+
+    @Test
+    fun atomicWritesLeaveNoTempFilesBehind() = runTest {
+        val imported = assertIs<AvatarImportResult.Imported>(
+            AvatarImporter(catalogDir).import(
+                AvatarImportRequest(
+                    sourceFileName = "x.glb",
+                    bytes = glb("""{"asset":{"version":"2.0"}}"""),
+                    id = "clean",
+                    license = AvatarLicense(allowRedistribution = true),
+                ),
+            ),
+        )
+
+        for (dir in listOf(imported.assetPath.parent, imported.manifestPath.parent, imported.preservedSourcePath.parent)) {
+            val leftovers = Files.list(dir).use { paths ->
+                paths.filter { it.fileName.toString().endsWith(".tmp") }.count()
+            }
+            assertEquals(0L, leftovers, "no temp files expected in $dir")
+        }
+    }
+
     private fun glb(json: String): ByteArray {
         val jsonBytes = json.encodeToByteArray()
         val total = 12 + 8 + jsonBytes.size

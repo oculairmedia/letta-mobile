@@ -34,8 +34,15 @@ class InMemoryAvatarCatalogStore(
  * Entries are [AvatarModel]s — asset locations plus license/provenance — with
  * the full normalized metadata living in each entry's manifest file.
  *
- * All mutations persist through the [store] before the public [entries] flow
- * updates, so observers never see state that would be lost on restart.
+ * Mutation semantics:
+ * - Every mutation RELOADS from the [store] and merges against the persisted
+ *   contents inside the catalog lock, so an `upsert` on a freshly-constructed
+ *   catalog never clobbers an existing `catalog.json`, and interleaved writers
+ *   against the same store lose at most their own in-flight entry rather than
+ *   each other's. (True multi-process transactionality would need store-level
+ *   locking; a catalog directory still assumes cooperating writers.)
+ * - Persistence happens BEFORE the public [entries] flow updates, so observers
+ *   never see state that would be lost on restart.
  */
 class AvatarCatalog(
     private val store: AvatarCatalogStore,
@@ -53,11 +60,12 @@ class AvatarCatalog(
         }
     }
 
-    /** Insert [model], replacing any existing entry with the same id. */
+    /** Insert [model], replacing any persisted entry with the same id. */
     suspend fun upsert(model: AvatarModel) {
         require(model.id.isNotBlank()) { "Catalog entries need a non-blank id" }
         mutex.withLock {
-            val next = (_entries.value.filterNot { it.id == model.id } + model)
+            val persisted = store.load()
+            val next = (persisted.filterNot { it.id == model.id } + model)
                 .sortedForCatalog()
             store.save(next)
             _entries.value = next
@@ -67,14 +75,21 @@ class AvatarCatalog(
     /** Remove the entry with [id]; returns whether anything was removed. */
     suspend fun remove(id: String): Boolean =
         mutex.withLock {
-            val current = _entries.value
-            val next = current.filterNot { it.id == id }
-            if (next.size == current.size) return@withLock false
+            val persisted = store.load()
+            val next = persisted.filterNot { it.id == id }
+            if (next.size == persisted.size) {
+                _entries.value = persisted.sortedForCatalog()
+                return@withLock false
+            }
             store.save(next)
-            _entries.value = next
+            _entries.value = next.sortedForCatalog()
             true
         }
 
+    /**
+     * Look up an entry in the last-observed snapshot ([entries]); call
+     * [refresh] first if another writer may have changed the store.
+     */
     fun get(id: String): AvatarModel? = _entries.value.firstOrNull { it.id == id }
 
     private fun List<AvatarModel>.sortedForCatalog(): List<AvatarModel> =
