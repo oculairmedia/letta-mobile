@@ -45,6 +45,8 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     var lastSearchRequest: MessageSearchRequest? = null
     var lastCreateBatchRequest: CreateBatchMessagesRequest? = null
     var lastResetAgentId: String? = null
+    var lastConversationMessagesLimit: Int? = null
+    var lastConversationMessagesOrder: String? = null
 
     override suspend fun fetchRecentMessages(
         conversationId: ConversationId,
@@ -86,7 +88,10 @@ class FakeMessageApi : MessageApi(mockk(relaxed = true)) {
     ): List<LettaMessage> {
         calls.add("listConversationMessages:$conversationId")
         if (shouldFail) throw ApiException(500, "Server error")
-        return messages
+        lastConversationMessagesLimit = limit
+        lastConversationMessagesOrder = order
+        val ordered = if (order == "desc") messages.reversed() else messages.toList()
+        return limit?.let { ordered.take(it) } ?: ordered
     }
 
     override suspend fun retrieveBatch(batchId: String): Job {
