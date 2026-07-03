@@ -217,6 +217,7 @@ private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Conf
     return null
 }
 
+
 private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     incoming: TimelineEvent.Confirmed,
 ): Boolean {
