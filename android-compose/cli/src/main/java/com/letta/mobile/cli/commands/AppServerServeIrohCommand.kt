@@ -135,18 +135,9 @@ internal class AppServerServeIrohCommand : CliktCommand(
             // to this host (Iroh purity: letta-mobile-qfa81). The handlers
             // proxy to the server-local HTTP API; only this process dials it.
             val rpcBase = adminBaseUrl.trimEnd('/')
-            com.letta.mobile.data.controller.node.iroh.HealthAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.AgentAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.ConversationAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.GoalAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.RunAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.ArchiveAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.IdentityAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.ModelAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.ScheduleAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.ToolAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            com.letta.mobile.data.controller.node.iroh.McpAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
-            println("[iroh-app-server] admin_rpc handlers registered (proxy base: $rpcBase)")
+            val adminRpcRouter = com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry.buildRouter(rpcBase)
+            irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
+            println("[iroh-app-server] admin_rpc handlers registered (proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount})")
 
             // Start accepting connections
             irohEndpoint.start(controller)
