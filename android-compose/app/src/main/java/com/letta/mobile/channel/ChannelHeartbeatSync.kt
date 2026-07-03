@@ -6,6 +6,7 @@ import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -66,24 +67,19 @@ class ChannelHeartbeatSync @Inject constructor(
             return
         }
 
-        val messages = try {
-            messageRepository.fetchLatestConversationInspectorMessages(
-                conversationId = conversation.id,
-                limit = LATEST_MESSAGE_WINDOW,
-            )
+        val scan = try {
+            scanForLatestNotifiable(conversation.id, previousProcessedAt)
         } catch (_: Exception) {
             return
         }
 
-        // Newest-first window, so the first notifiable hit is the latest one.
-        val latestNotifiable = messages.firstOrNull { it.isNotifiable() }
         if (previousProcessedAt == null) {
             syncStateStore.setProcessedLastActivityAt(conversationId, lastActivityAt)
-            latestNotifiable?.id?.let { syncStateStore.setLastNotifiedMessageId(conversationId, it) }
+            scan.latestNotifiable?.id?.let { syncStateStore.setLastNotifiedMessageId(conversationId, it) }
             return
         }
 
-        if (latestNotifiable != null) {
+        scan.latestNotifiable?.let { latestNotifiable ->
             notificationDeliveryCoordinator.submit(
                 NotificationDeliveryCandidate(
                     conversationId = conversationId,
@@ -100,8 +96,58 @@ class ChannelHeartbeatSync @Inject constructor(
             )
         }
 
-        syncStateStore.setProcessedLastActivityAt(conversationId, lastActivityAt)
+        // Only advance the baseline once the scan has actually settled the
+        // unprocessed gap; a capped scan that found nothing may still have a
+        // notifiable buried under deeper chatter, and jumping the baseline
+        // over it would skip that message permanently (the next heartbeat
+        // retries instead).
+        if (scan.latestNotifiable != null || scan.coveredGap) {
+            syncStateStore.setProcessedLastActivityAt(conversationId, lastActivityAt)
+        }
     }
+
+    /**
+     * Newest-first scan for the latest notifiable message. Starts with a
+     * small window and, when a full window comes back all chatter
+     * (reasoning/tool-call/tool-return noise), widens it until a notifiable
+     * turns up, the scan reaches messages at-or-before [previousProcessedAt],
+     * the conversation start is reached, or [MAX_SCAN_PAGES] bounds the cost.
+     */
+    private suspend fun scanForLatestNotifiable(
+        conversationId: ConversationId,
+        previousProcessedAt: String?,
+    ): NotifiableScan {
+        for (page in 1..MAX_SCAN_PAGES) {
+            val windowSize = LATEST_MESSAGE_WINDOW * page
+            val messages = messageRepository.fetchLatestConversationInspectorMessages(
+                conversationId = conversationId,
+                limit = windowSize,
+            )
+
+            // Newest-first window, so the first notifiable hit is the latest one.
+            val latestNotifiable = messages.firstOrNull { it.isNotifiable() }
+            if (latestNotifiable != null) {
+                return NotifiableScan(latestNotifiable, coveredGap = true)
+            }
+            // A short window means the conversation start was reached.
+            if (messages.size < windowSize) {
+                return NotifiableScan(latestNotifiable = null, coveredGap = true)
+            }
+            // Timestamps are ISO-8601 UTC, so string comparison orders them.
+            val reachedBaseline = previousProcessedAt != null &&
+                messages.any { message -> message.date?.let { it <= previousProcessedAt } == true }
+            if (reachedBaseline) {
+                return NotifiableScan(latestNotifiable = null, coveredGap = true)
+            }
+        }
+        return NotifiableScan(latestNotifiable = null, coveredGap = false)
+    }
+
+    private data class NotifiableScan(
+        val latestNotifiable: ConversationInspectorMessage?,
+        /** Whether the scan settled the whole gap since the processed baseline. */
+        val coveredGap: Boolean,
+    )
 
     private fun ConversationInspectorMessage.isNotifiable(): Boolean {
         if (summary.isBlank()) {
@@ -120,6 +166,14 @@ class ChannelHeartbeatSync @Inject constructor(
          * sync across 100 conversations (letta-mobile-e9vca).
          */
         private const val LATEST_MESSAGE_WINDOW = 25
+
+        /**
+         * Bound on how far a scan widens when full windows keep coming back
+         * all chatter: window sizes escalate to LATEST_MESSAGE_WINDOW *
+         * MAX_SCAN_PAGES before the scan gives up for this heartbeat (and
+         * leaves the baseline in place so the next one retries).
+         */
+        private const val MAX_SCAN_PAGES = 3
 
         private val NOTIFIABLE_MESSAGE_TYPES = setOf(
             "assistant_message",

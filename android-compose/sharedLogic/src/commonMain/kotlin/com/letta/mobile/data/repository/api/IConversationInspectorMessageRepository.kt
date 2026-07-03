@@ -14,8 +14,15 @@ interface IConversationInspectorMessageRepository {
      * conversation's first 200 messages and pulls up to 200 records per
      * conversation per sync (letta-mobile-e9vca). Remote implementations
      * override this with an `order=desc` query so only [limit] records cross
-     * the wire; the default derives the window from the full fetch so
-     * existing implementations and test doubles stay correct.
+     * the wire.
+     *
+     * The default derives the window from [fetchConversationInspectorMessages],
+     * so it is only correct when that fetch returns the complete conversation
+     * (e.g. in-memory test doubles). Implementations whose base fetch
+     * truncates — like the production repository, whose base fetch caps at
+     * the oldest 200 messages — MUST override this, or it returns the tail of
+     * the truncated oldest page rather than the conversation's newest
+     * messages. Both existing implementations override.
      */
     suspend fun fetchLatestConversationInspectorMessages(
         conversationId: ConversationId,

@@ -169,8 +169,76 @@ class ChannelHeartbeatSyncTest {
 
         assertTrue(result is ListenableWorker.Result.Success)
         assertEquals(listOf("assistant-new"), fixture.publisher.published.map { it.messageId })
-        assertTrue(fixture.messageRepository.latestFetchLimits.isNotEmpty())
-        assertTrue(fixture.messageRepository.latestFetchLimits.all { it in 1..25 })
+        // The newest message is notifiable, so each sync settles with a
+        // single page far below the old 200-message fetch (letta-mobile-e9vca).
+        assertEquals(2, fixture.messageRepository.latestFetchLimits.size)
+        assertTrue(fixture.messageRepository.latestFetchLimits.all { it < 200 })
+    }
+
+    @Test
+    fun `notifiable buried under a full window of chatter is still notified`() = runTest {
+        val fixture = createFixture()
+        fixture.sync.run()
+        fixture.messageRepository.latestFetchLimits.clear()
+        fixture.conversations.clear()
+        fixture.conversations += listOf(
+            Conversation(
+                id = ConversationId("conv-1"),
+                agentId = AgentId("agent-1"),
+                summary = "Main thread",
+                lastMessageAt = "2026-04-10T10:05:00Z",
+            )
+        )
+        // The newest notifiable message sits below a full first window of
+        // reasoning/tool chatter: the scan must page deeper instead of
+        // silently advancing the baseline past it.
+        fixture.messagesByConversation["conv-1"] = buildList {
+            add(ConversationInspectorMessage(id = "assistant-buried", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Buried ping"))
+            repeat(30) { index ->
+                add(ConversationInspectorMessage(id = "reasoning-$index", messageType = "reasoning_message", date = null, runId = null, stepId = null, otid = null, summary = "thinking $index"))
+            }
+        }
+
+        val result = fixture.sync.run()
+
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertEquals(listOf("assistant-buried"), fixture.publisher.published.map { it.messageId })
+        assertEquals("assistant-buried", fixture.stateStore.getLastNotifiedMessageId("conv-1"))
+        assertEquals("2026-04-10T10:05:00Z", fixture.stateStore.getProcessedLastActivityAt("conv-1"))
+        // The scan widened past the first full window to reach the message.
+        val limits = fixture.messageRepository.latestFetchLimits
+        assertTrue(limits.size >= 2)
+        assertTrue(limits.zipWithNext().all { (first, second) -> first < second })
+    }
+
+    @Test
+    fun `capped scan keeps the baseline so a deeply buried notifiable is not skipped permanently`() = runTest {
+        val fixture = createFixture()
+        fixture.sync.run()
+        fixture.conversations.clear()
+        fixture.conversations += listOf(
+            Conversation(
+                id = ConversationId("conv-1"),
+                agentId = AgentId("agent-1"),
+                summary = "Main thread",
+                lastMessageAt = "2026-04-10T10:05:00Z",
+            )
+        )
+        // More chatter than the widest scan window: this heartbeat cannot see
+        // the notifiable, so it must leave the baseline where it was instead
+        // of jumping over the message.
+        fixture.messagesByConversation["conv-1"] = buildList {
+            add(ConversationInspectorMessage(id = "assistant-deep", messageType = "assistant_message", date = null, runId = null, stepId = null, otid = null, summary = "Deep ping"))
+            repeat(80) { index ->
+                add(ConversationInspectorMessage(id = "tool-$index", messageType = "tool_call_message", date = null, runId = null, stepId = null, otid = null, summary = "tool $index"))
+            }
+        }
+
+        val result = fixture.sync.run()
+
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertTrue(fixture.publisher.published.isEmpty())
+        assertEquals("2026-04-10T10:00:00Z", fixture.stateStore.getProcessedLastActivityAt("conv-1"))
     }
 
     private fun createFixture(): Fixture {
