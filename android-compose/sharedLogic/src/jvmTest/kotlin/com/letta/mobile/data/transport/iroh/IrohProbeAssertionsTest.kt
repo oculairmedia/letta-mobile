@@ -26,6 +26,7 @@ class IrohProbeAssertionsTest {
         assertEquals(2, metrics.assistantDeltaCount)
         assertEquals(listOf("assistant-1"), metrics.assistantMessageIds)
         assertEquals(1, metrics.reasoningRowEstimate)
+        assertEquals(listOf(5), metrics.assistantFinalTextLengths)
     }
 
     @Test
@@ -93,6 +94,7 @@ class IrohProbeAssertionsTest {
         val summary = IrohProbeAssertions.summarize(listOf(metrics))
 
         assertFalse(summary.ok)
+        assertEquals(listOf(1), metrics.assistantFinalTextLengths)
         assertTrue("orphan_fragment:turn1" in summary.violations)
     }
 

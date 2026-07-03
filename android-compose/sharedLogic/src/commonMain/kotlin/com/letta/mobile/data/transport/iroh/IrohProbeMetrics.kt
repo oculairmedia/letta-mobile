@@ -16,7 +16,7 @@ data class IrohProbeTurnMetrics(
     val errorFrames: List<String> = emptyList(),
     val dialSucceeded: Boolean = dialMs != null,
     val timedOut: Boolean = false,
-    val assistantFinalTexts: List<String> = emptyList(),
+    val assistantFinalTextLengths: List<Int> = emptyList(),
     val scenarioViolations: List<String> = emptyList(),
     val notes: List<String> = emptyList(),
     val skipped: Boolean = false,
@@ -38,7 +38,7 @@ object IrohProbeAssertions {
         timedOut: Boolean = false,
     ): IrohProbeTurnMetrics {
         val assistantIds = linkedSetOf<String>()
-        val assistantFinalTexts = mutableMapOf<String, String>()
+        val assistantFinalTextLengths = mutableMapOf<String, Int>()
         val reasoningIds = linkedSetOf<String>()
         val errors = mutableListOf<String>()
         var assistantDeltaCount = 0
@@ -49,7 +49,7 @@ object IrohProbeAssertions {
                 is ServerFrame.AssistantMessage -> {
                     assistantDeltaCount += 1
                     assistantIds += frame.id
-                    assistantFinalTexts[frame.id] = frame.content
+                    assistantFinalTextLengths[frame.id] = frame.content.length
                 }
                 is ServerFrame.ReasoningMessage -> reasoningIds += frame.id
                 is ServerFrame.TurnDone -> turnDoneCount += 1
@@ -72,7 +72,7 @@ object IrohProbeAssertions {
             errorFrames = errors,
             dialSucceeded = dialMs != null,
             timedOut = timedOut,
-            assistantFinalTexts = assistantFinalTexts.values.toList(),
+            assistantFinalTextLengths = assistantFinalTextLengths.values.toList(),
         )
     }
 
@@ -104,8 +104,8 @@ object IrohProbeAssertions {
                 if (turn.skipped) return@forEach
                 val prefix = "turn${turn.turn}"
                 addAll(turn.scenarioViolations)
-                turn.assistantFinalTexts
-                    .filter { it.length in 1..2 }
+                turn.assistantFinalTextLengths
+                    .filter { it in 1..2 }
                     .forEach { add("orphan_fragment:$prefix") }
                 if (!turn.dialSucceeded) add("$prefix:dial_failed")
                 if (turn.turn == 2 && !turn.dialSucceeded) add("accept_wedge:turn2_dial_failed")

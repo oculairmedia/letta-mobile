@@ -41,11 +41,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 internal class AppServerIrohProbeCommand : CliktCommand(
@@ -486,7 +487,7 @@ private class ProbeSetupMetrics(private val turn: Int) {
 
 private class ProbeAccumulator(private val turn: Int) {
     private val assistantIds = linkedSetOf<String>()
-    private val assistantFinalTexts = linkedMapOf<String, String>()
+    private val assistantFinalTextLengths = linkedMapOf<String, Int>()
     private val reasoningIds = linkedSetOf<String>()
     val errors = mutableListOf<String>()
     val scenarioViolations = mutableListOf<String>()
@@ -519,7 +520,7 @@ private class ProbeAccumulator(private val turn: Int) {
             errorFrames = errors,
             dialSucceeded = dialMs != null,
             timedOut = timedOut,
-            assistantFinalTexts = assistantFinalTexts.values.toList(),
+            assistantFinalTextLengths = assistantFinalTextLengths.values.toList(),
             scenarioViolations = scenarioViolations,
         )
 
@@ -529,8 +530,8 @@ private class ProbeAccumulator(private val turn: Int) {
                 val id = delta.string("id") ?: fallbackId
                 assistantDeltaCount += 1
                 assistantIds += id
-                val text = delta.string("text") ?: delta.string("content") ?: delta.string("message")
-                if (text != null) assistantFinalTexts[id] = text
+                val text = delta.textContent("text") ?: delta.textContent("content") ?: delta.textContent("message")
+                if (text != null) assistantFinalTextLengths[id] = text.length
             }
             "reasoning_message", "hidden_reasoning_message" -> {
                 reasoningIds += delta.string("id") ?: fallbackId
@@ -544,4 +545,16 @@ private class ProbeAccumulator(private val turn: Int) {
     }
 }
 
-private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+internal fun JsonObject.probeTextContent(key: String): String? = this[key]?.extractProbeTextContent()
+
+private fun JsonObject.textContent(key: String): String? = probeTextContent(key)
+
+private fun JsonElement.extractProbeTextContent(): String = when (this) {
+    is JsonPrimitive -> contentOrNull.orEmpty()
+    is JsonArray -> map { it.extractProbeTextContent() }.joinToString("")
+    is JsonObject -> listOf("text", "content", "value")
+        .firstNotNullOfOrNull { field -> this[field]?.extractProbeTextContent() }
+        .orEmpty()
+}

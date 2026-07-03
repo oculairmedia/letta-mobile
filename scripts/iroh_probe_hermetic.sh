@@ -25,15 +25,25 @@ print(s.getsockname()[1])
 s.close()
 PORTPY
 )}"
-SECRET_KEY_FILE="$(mktemp -u "${TMPDIR:-/tmp}/letta-iroh-probe-key.XXXXXX")"
+SECRET_KEY_FILE="$(mktemp "${TMPDIR:-/tmp}/letta-iroh-probe-key.XXXXXX")"
 SERVE_LOG="$(mktemp "${TMPDIR:-/tmp}/letta-iroh-serve.XXXXXX.log")"
 PROBE_LOG="$(mktemp "${TMPDIR:-/tmp}/letta-iroh-probe.XXXXXX.log")"
 SERVE_PID=""
 
+kill_process_tree() {
+  local pid="$1"
+  local child
+  while read -r child; do
+    [[ -z "${child}" ]] && continue
+    kill_process_tree "${child}"
+  done < <(pgrep -P "${pid}" 2>/dev/null || true)
+  kill "${pid}" 2>/dev/null || true
+}
+
 cleanup() {
   local status=$?
   if [[ -n "${SERVE_PID}" ]] && kill -0 "${SERVE_PID}" 2>/dev/null; then
-    kill "${SERVE_PID}" 2>/dev/null || true
+    kill_process_tree "${SERVE_PID}"
     wait "${SERVE_PID}" 2>/dev/null || true
   fi
   rm -f "${SECRET_KEY_FILE}"
@@ -46,13 +56,7 @@ trap cleanup EXIT INT TERM
 cd "${COMPOSE_DIR}"
 
 quote_cli_args() {
-  local quoted=""
-  local arg
-  for arg in "$@"; do
-    printf -v arg '%q' "${arg}"
-    quoted+=" ${arg}"
-  done
-  printf '%s' "${quoted# }"
+  python3 -c 'import sys; print(" ".join("\\"" + arg.translate(str.maketrans({\"\\\\\": \"\\\\\\\\\", \"\\\"\": \"\\\\\\\"\", \"$\": \"\\\\$\", \"`\": \"\\\\`\"})) + "\\"" for arg in sys.argv[1:]))' "$@"
 }
 
 SERVE_ARGS="$(quote_cli_args \
