@@ -119,22 +119,28 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     override fun setExpression(expression: AvatarExpression, weight: Float) {
         if (readyCapabilities()?.supportsExpressions != true) return
-        expressions[expression.key] = sanitizeWeight(weight)
+        val clamped = sanitizeWeight(weight)
+        expressions[expression.key] = clamped
+        onExpressionChanged(expression, clamped)
     }
 
     override fun setViseme(viseme: AvatarViseme, weight: Float) {
         if (readyCapabilities()?.supportsVisemes != true) return
-        visemes[viseme.key] = sanitizeWeight(weight)
+        val clamped = sanitizeWeight(weight)
+        visemes[viseme.key] = clamped
+        onVisemeChanged(viseme, clamped)
     }
 
     override fun setMouthOpen(value: Float) {
         if (readyCapabilities()?.supportsVisemes != true) return
         mouthOpen = sanitizeWeight(value)
+        onMouthOpenChanged(mouthOpen)
     }
 
     override fun setLookTarget(target: AvatarLookTarget?) {
         if (readyCapabilities()?.supportsLookAt != true) return
         lookTarget = target
+        onLookTargetChanged(target)
     }
 
     override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) {
@@ -152,6 +158,7 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     override fun setAccessoryEnabled(accessoryId: String, enabled: Boolean) {
         if (readyCapabilities()?.supportsAccessories != true) return
         if (enabled) disabledAccessories.remove(accessoryId) else disabledAccessories.add(accessoryId)
+        onAccessoryToggled(accessoryId, enabled)
     }
 
     override fun update(deltaSeconds: Float) {
@@ -179,6 +186,25 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     /** Hook for subclasses: an animation was requested while Ready. */
     protected open fun onPlayAnimation(animationId: String, loop: Boolean) {}
+
+    // Setter hooks fire AFTER the capability gate and clamping, so adapters
+    // forward exactly the values the base class recorded — never commands the
+    // model reported unsupported.
+
+    /** Hook for subclasses: an expression weight changed (already clamped). */
+    protected open fun onExpressionChanged(expression: AvatarExpression, weight: Float) {}
+
+    /** Hook for subclasses: a viseme weight changed (already clamped). */
+    protected open fun onVisemeChanged(viseme: AvatarViseme, weight: Float) {}
+
+    /** Hook for subclasses: the mouth-open level changed (already clamped). */
+    protected open fun onMouthOpenChanged(value: Float) {}
+
+    /** Hook for subclasses: the look target changed. */
+    protected open fun onLookTargetChanged(target: AvatarLookTarget?) {}
+
+    /** Hook for subclasses: an accessory was toggled. */
+    protected open fun onAccessoryToggled(accessoryId: String, enabled: Boolean) {}
 
     /** The Ready-state capabilities, or null when commands must be dropped. */
     private fun readyCapabilities(): AvatarCapabilities? {
