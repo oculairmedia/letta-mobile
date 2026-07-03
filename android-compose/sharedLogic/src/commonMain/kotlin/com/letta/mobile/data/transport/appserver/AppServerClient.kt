@@ -26,6 +26,8 @@ interface AppServerClient {
 
     suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse
 
+    suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse
+
     suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse)
 }
 
@@ -82,6 +84,13 @@ class DefaultAppServerClient(
             send = { transport.sendControl(command) },
         )
     }
+
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+        correlator.request(
+            requestId = command.requestId,
+            response = { it as? AppServerInboundFrame.AdminRpcResponse },
+            send = { transport.sendControl(command) },
+        )
 
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) {
         transport.sendControl(command)

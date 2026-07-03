@@ -39,6 +39,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import java.time.Instant
 import java.util.UUID
 
@@ -84,6 +85,10 @@ class IrohChannelTransport(
     private var turnEngine: AppServerTurnEngine? = null
     private var connectedTicket: String? = null
     private var activeSendJob: kotlinx.coroutines.Job? = null
+    private var lastBaseShimUrl: String? = null
+    private var lastToken: String = ""
+    private var lastDeviceId: String = ""
+    private var lastClientVersion: String = ""
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = connectionMutex.withLock {
         val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
@@ -91,6 +96,10 @@ class IrohChannelTransport(
             ?: baseShimUrl.trimStart().removePrefix("https://").removePrefix("http://")
         val ticket = effectiveUrl.removePrefix(IROH_URL_PREFIX).takeIf { it != effectiveUrl && it.isNotBlank() }
             ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
+        lastBaseShimUrl = baseShimUrl
+        lastToken = token
+        lastDeviceId = deviceId
+        lastClientVersion = clientVersion
         com.letta.mobile.util.Telemetry.event(
             "IrohTrace", "transport.connect.begin",
             "baseShimUrl" to baseShimUrl,
@@ -381,6 +390,44 @@ class IrohChannelTransport(
     override fun bye(): Boolean = true
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
+
+    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        val first = appServerTransport ?: reconnectForAdminRpc(method, path)
+        return runCatching {
+            first.adminRpc(method = method, path = path, body = body)
+        }.getOrElse { firstError ->
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "admin_rpc.retry_after_failure",
+                "method" to method,
+                "path" to path,
+                "error" to (firstError.message ?: firstError.toString()),
+                "class" to firstError::class.simpleName,
+            )
+            closeCurrentConnection("admin_rpc_failed")
+            val retry = reconnectForAdminRpc(method, path)
+            retry.adminRpc(method = method, path = path, body = body)
+        }
+    }
+
+    private suspend fun reconnectForAdminRpc(
+        method: String,
+        path: String,
+    ): IrohAppServerTransport {
+        val baseUrl = lastBaseShimUrl ?: error("Iroh admin_rpc requested before transport is connected")
+        com.letta.mobile.util.Telemetry.event(
+            "IrohTransport", "admin_rpc.reconnect",
+            "method" to method,
+            "path" to path,
+            "state" to state.value::class.simpleName,
+        )
+        connect(
+            baseShimUrl = baseUrl,
+            token = lastToken,
+            deviceId = lastDeviceId,
+            clientVersion = lastClientVersion,
+        )
+        return appServerTransport ?: error("Iroh admin_rpc reconnect did not create transport")
+    }
 
     override suspend fun disconnect() = connectionMutex.withLock {
         closeCurrentConnection("disconnect")

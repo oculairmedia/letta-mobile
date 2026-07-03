@@ -250,6 +250,31 @@ class AppServerProtocolTest {
         assertEquals("1", frame.raw["payload"]?.jsonObject?.get("x")?.jsonPrimitive?.content)
     }
 
+
+    @Test
+    fun encodesAdminRpcCommandWithProxyParams() {
+        val encoded = AppServerProtocol.encodeCommand(
+            AppServerCommand.AdminRpc(
+                requestId = "admin-1",
+                method = "message.list",
+                params = kotlinx.serialization.json.buildJsonObject {
+                    put("conversation_id", kotlinx.serialization.json.JsonPrimitive("conv-1"))
+                    put("limit", kotlinx.serialization.json.JsonPrimitive("100"))
+                    put("order", kotlinx.serialization.json.JsonPrimitive("asc"))
+                },
+            ),
+        )
+
+        val raw = AppServerProtocol.json.parseToJsonElement(encoded).jsonObject
+        assertEquals("admin_rpc", raw["type"]?.jsonPrimitive?.content)
+        assertEquals("admin-1", raw["request_id"]?.jsonPrimitive?.content)
+        assertEquals("message.list", raw["method"]?.jsonPrimitive?.content)
+        val params = raw["params"]?.jsonObject
+        assertEquals("conv-1", params?.get("conversation_id")?.jsonPrimitive?.content)
+        assertEquals("100", params?.get("limit")?.jsonPrimitive?.content)
+        assertEquals("asc", params?.get("order")?.jsonPrimitive?.content)
+    }
+
     @Test
     fun decodesAdminRpcSuccessAndFailureResponses() {
         val success = AppServerProtocol.decodeFrame(

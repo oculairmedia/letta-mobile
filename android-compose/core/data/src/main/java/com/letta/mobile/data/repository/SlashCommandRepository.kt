@@ -4,7 +4,12 @@ import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.model.GoalStatusResponse
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.SlashCommandsResponse
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
+import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.util.Telemetry
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -15,6 +20,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.http.encodeURLPathPart
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -25,7 +31,10 @@ import javax.inject.Singleton
 @Singleton
 class SlashCommandRepository @Inject constructor(
     private val apiClient: LettaApiClient,
+    private val settingsRepository: ISettingsRepository,
+    private val channelTransport: IChannelTransport,
 ) : ISlashCommandRepository {
+    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     override suspend fun listGlobal(): Result<List<SlashCommand>> = fetch("/v1/slash-commands")
 
     override suspend fun listForAgent(agentId: String): Result<List<SlashCommand>> =
@@ -54,6 +63,20 @@ class SlashCommandRepository @Inject constructor(
     }.onFailure { if (it is CancellationException) throw it }
 
     override suspend fun getGoalStatus(agentId: String): Result<GoalStatusResponse> = runCatching {
+        if (shouldUseIroh()) {
+            ensureConnectedForAdminRpc()
+            val response = channelTransport.adminRpc(
+                method = "goal.get",
+                path = "/v1/agents/$agentId/goal",
+                body = JsonObject(mapOf("agent_id" to JsonPrimitive(agentId))).toString(),
+            )
+            if (!response.success) {
+                throw IllegalStateException(response.error ?: "Iroh admin_rpc goal.get failed")
+            }
+            val result = response.result ?: throw IllegalStateException("Iroh admin_rpc goal.get returned no result")
+            return@runCatching json.decodeFromJsonElement(GoalStatusResponse.serializer(), result)
+        }
+
         val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/v1/agents/$agentId/goal")
         if (response.status.value !in 200..299) {
@@ -63,6 +86,25 @@ class SlashCommandRepository @Inject constructor(
     }.onFailure { if (it is CancellationException) throw it }
 
     override suspend fun executeGoalCommand(agentId: String, command: String): Result<String> = runCatching {
+        if (shouldUseIroh()) {
+            ensureConnectedForAdminRpc()
+            val response = channelTransport.adminRpc(
+                method = "goal.command",
+                path = "/v1/agents/$agentId/goal/command",
+                body = JsonObject(
+                    mapOf(
+                        "agent_id" to JsonPrimitive(agentId),
+                        "command" to JsonPrimitive(command),
+                    ),
+                ).toString(),
+            )
+            if (!response.success) {
+                throw IllegalStateException(response.error ?: "Iroh admin_rpc goal.command failed")
+            }
+            val body = response.result?.jsonObject
+            return@runCatching (body?.get("message") as? JsonPrimitive)?.contentOrNull ?: "Goal command executed."
+        }
+
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/v1/agents/$agentId/goal/command") {
             contentType(ContentType.Application.Json)
@@ -72,9 +114,36 @@ class SlashCommandRepository @Inject constructor(
         if (response.status.value !in 200..299) {
             throw IllegalStateException(bodyText)
         }
-        val body = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(bodyText).jsonObject }.getOrNull()
+        val body = runCatching { json.parseToJsonElement(bodyText).jsonObject }.getOrNull()
         (body?.get("message") as? JsonPrimitive)?.contentOrNull ?: "Goal command executed."
     }.onFailure { if (it is CancellationException) throw it }
+
+    private fun shouldUseIroh(): Boolean =
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+
+    private suspend fun ensureConnectedForAdminRpc() {
+        if (channelTransport.state.value is ChannelTransportState.Connected) return
+        val config = settingsRepository.activeConfig.value
+            ?: error("Iroh goal admin_rpc requested with no active backend config")
+        val serverUrl = config.serverUrl
+        if (!IrohChannelTransport.shouldUseIroh(serverUrl)) {
+            error("Iroh goal admin_rpc requested while backend is not iroh://")
+        }
+        Telemetry.event(
+            "IrohTransport", "goal.ensureConnected",
+            "serverUrl" to serverUrl,
+            "state" to channelTransport.state.value::class.simpleName,
+        )
+        channelTransport.connect(
+            baseShimUrl = serverUrl,
+            token = config.accessToken.orEmpty(),
+            deviceId = "android-letta-mobile",
+            clientVersion = "android-iroh-goal-admin-rpc",
+        )
+        if (channelTransport.state.value !is ChannelTransportState.Connected) {
+            error("Iroh goal admin_rpc could not connect transport")
+        }
+    }
 
     private suspend fun fetch(path: String): Result<List<SlashCommand>> = runCatching {
         val (client, baseUrl) = apiClient.session()

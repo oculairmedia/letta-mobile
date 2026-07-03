@@ -74,6 +74,8 @@ class SessionScopedChannelTransport internal constructor(
     override fun cancel(conversationId: String): Boolean = current.cancel(conversationId)
     override fun bye(): Boolean = current.bye()
     override fun subscribe(runId: String, cursor: Long): Boolean = current.subscribe(runId, cursor)
+    override suspend fun adminRpc(method: String, path: String, body: String?): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse =
+        sessionManager.withCurrentSession { it.channelTransport.adminRpc(method, path, body) }
     override suspend fun disconnect() = sessionManager.withCurrentSession { it.channelTransport.disconnect() }
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = current.sendA2uiAction(action)
 

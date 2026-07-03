@@ -215,6 +215,12 @@ class SessionGraphFactory internal constructor(
             settingsRepository = settingsRepository,
             transport = channelTransport,
         )
+        val irohConversationListSource = settingsRepository?.let {
+            com.letta.mobile.data.repository.IrohAdminRpcConversationListSource(
+                channelTransport = channelTransport,
+                settingsRepository = it,
+            )
+        }
         return SessionGraph(
             id = graphId,
             backendDescriptor = localRuntimeBackend?.descriptor ?: remoteLettaDescriptor(activeConfig),
@@ -227,6 +233,7 @@ class SessionGraphFactory internal constructor(
                 repositoryScope = scope,
                 localConversationSource = localConversationSource,
                 settingsRepository = settingsRepository,
+                irohConversationListSource = irohConversationListSource,
             ),
             channelTransport = channelTransport,
             conversationRepository = ConversationRepository(
@@ -236,6 +243,7 @@ class SessionGraphFactory internal constructor(
                 repositoryScope = scope,
                 localConversationSource = localConversationSource,
                 settingsRepository = settingsRepository,
+                irohConversationListSource = irohConversationListSource,
             ),
             cronRepository = CronRepository(
                 transport = channelTransport,
