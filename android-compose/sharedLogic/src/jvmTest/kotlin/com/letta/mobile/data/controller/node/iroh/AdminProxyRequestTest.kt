@@ -142,6 +142,33 @@ class AdminProxyRequestTest {
         assertTrue(response.getValue("error").jsonPrimitive.content.contains("404"))
     }
 
+    @Test
+    fun non2xxUpstreamResponseWithMultilineBodyDispatchesValidJsonFailure() = runTest {
+        val upstreamBody = """
+            {
+              "error": "first line",
+              "detail": "quoted \"value\"
+and newline"
+            }
+        """.trimIndent()
+        val recording = installRecordingTransport(AdminProxyTransportResponse(500, upstreamBody))
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, "http://admin.local")
+
+        val responseText = router.dispatch(
+            requestId = "req-500",
+            method = "conversation.get",
+            params = buildJsonObject { put("conversation_id", "broken") },
+        )
+        val response = Json.parseToJsonElement(responseText).jsonObject
+
+        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
+        val error = response.getValue("error").jsonPrimitive.content
+        assertTrue(error.contains("HTTP 500"))
+        assertTrue(error.contains("quoted \\\"value\\\""))
+        assertTrue(error.contains("and newline"))
+    }
+
     private fun installRecordingTransport(
         response: AdminProxyTransportResponse = AdminProxyTransportResponse(200, """{"ok":true}"""),
     ): RecordingTransport {
