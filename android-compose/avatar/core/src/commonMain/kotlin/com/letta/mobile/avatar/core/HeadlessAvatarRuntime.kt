@@ -43,6 +43,13 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     private val disabledAccessories = mutableSetOf<String>()
 
     /**
+     * Bumped by every load/unload/dispose. A load whose [loadCapabilities]
+     * resumes after a newer operation started must not publish its (stale)
+     * result over the newer state.
+     */
+    private var operationGeneration = 0
+
+    /**
      * Capabilities to report when [load] succeeds. The headless runtime can
      * honor every command it's given (it just records them), so it claims
      * everything; renderer subclasses should report what they verified.
@@ -67,23 +74,42 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
             onUnload()
         }
         resetCommandState()
+        operationGeneration += 1
+        val generation = operationGeneration
         _state.value = AvatarRuntimeState.Loading(model)
         try {
             val capabilities = loadCapabilities(model)
+            if (generation != operationGeneration) {
+                // A newer load/unload/dispose superseded this one while it was
+                // suspended — tear down whatever this stale load allocated and
+                // leave the newer operation's state untouched.
+                onUnload()
+                throw CancellationException("Load of ${model.id} was superseded")
+            }
             _state.value = AvatarRuntimeState.Ready(model, capabilities)
         } catch (cancelled: CancellationException) {
             // A cancelled load is not a failure — don't flash an error state
             // at observers during normal navigation/avatar-switch teardown.
-            _state.value = AvatarRuntimeState.Idle
+            // Still give the adapter its teardown hook for partial resources.
+            if (generation == operationGeneration) {
+                runCatching { onUnload() }
+                _state.value = AvatarRuntimeState.Idle
+            }
             throw cancelled
         } catch (t: Throwable) {
-            _state.value = AvatarRuntimeState.Failed(model, t.message ?: "Load failed")
+            if (generation == operationGeneration) {
+                // Partial renderer resources from the failed load must not
+                // stay live behind a Failed state.
+                runCatching { onUnload() }
+                _state.value = AvatarRuntimeState.Failed(model, t.message ?: "Load failed")
+            }
             throw t
         }
     }
 
     final override suspend fun unload() {
         if (isDisposed) return
+        operationGeneration += 1
         resetCommandState()
         if (_state.value !is AvatarRuntimeState.Idle) {
             onUnload()
@@ -93,17 +119,17 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     override fun setExpression(expression: AvatarExpression, weight: Float) {
         if (readyCapabilities()?.supportsExpressions != true) return
-        expressions[expression.key] = weight.coerceIn(0f, 1f)
+        expressions[expression.key] = sanitizeWeight(weight)
     }
 
     override fun setViseme(viseme: AvatarViseme, weight: Float) {
         if (readyCapabilities()?.supportsVisemes != true) return
-        visemes[viseme.key] = weight.coerceIn(0f, 1f)
+        visemes[viseme.key] = sanitizeWeight(weight)
     }
 
     override fun setMouthOpen(value: Float) {
         if (readyCapabilities()?.supportsVisemes != true) return
-        mouthOpen = value.coerceIn(0f, 1f)
+        mouthOpen = sanitizeWeight(value)
     }
 
     override fun setLookTarget(target: AvatarLookTarget?) {
@@ -134,6 +160,7 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     override fun dispose() {
         if (isDisposed) return
+        operationGeneration += 1
         // Same teardown hook contract as unload(): adapters relying on
         // onUnload() for renderer cleanup must not leak on direct dispose().
         if (_state.value !is AvatarRuntimeState.Idle) {
@@ -166,4 +193,8 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         mouthOpen = 0f
         lookTarget = null
     }
+
+    /** Contract promises 0..1 levels; NaN survives coerceIn, so drop it to 0. */
+    private fun sanitizeWeight(weight: Float): Float =
+        if (weight.isNaN()) 0f else weight.coerceIn(0f, 1f)
 }

@@ -6,7 +6,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 
 class HeadlessAvatarRuntimeTest {
     private val model = AvatarModel(
@@ -196,6 +199,88 @@ class HeadlessAvatarRuntimeTest {
         assertFailsWith<kotlinx.coroutines.CancellationException> { runtime.load(model) }
 
         // Cancellation is not a failure — no error state flashed at observers.
+        assertEquals(AvatarRuntimeState.Idle, runtime.state.value)
+    }
+
+    @Test
+    fun nonFiniteWeightsAreDroppedToZero() = runTest {
+        val runtime = HeadlessAvatarRuntime()
+        runtime.load(model)
+
+        runtime.setExpression(AvatarExpression.Happy, Float.NaN)
+        runtime.setViseme(AvatarViseme.A, Float.NaN)
+        runtime.setMouthOpen(Float.NaN)
+        runtime.setMouthOpen(Float.POSITIVE_INFINITY)
+
+        assertEquals(0f, runtime.expressionWeights["happy"])
+        assertEquals(0f, runtime.visemeWeights["aa"])
+        assertEquals(1f, runtime.mouthOpen) // +Inf clamps to 1, NaN drops to 0
+    }
+
+    @Test
+    fun failedLoadTearsDownPartialRendererResources() = runTest {
+        var unloads = 0
+        val runtime = object : HeadlessAvatarRuntime() {
+            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
+                error("exploded after allocating scene resources")
+
+            override fun onUnload() {
+                unloads += 1
+            }
+        }
+
+        assertFailsWith<IllegalStateException> { runtime.load(model) }
+
+        assertIs<AvatarRuntimeState.Failed>(runtime.state.value)
+        assertEquals(1, unloads) // partial resources were released
+    }
+
+    @Test
+    fun staleLoadDoesNotOverwriteNewerState() = runTest {
+        // First load suspends until released; second load completes first.
+        val firstGate = CompletableDeferred<Unit>()
+        var loadCount = 0
+        val runtime = object : HeadlessAvatarRuntime() {
+            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
+                loadCount += 1
+                if (loadCount == 1) firstGate.await()
+                return AvatarCapabilities(supportsHumanoid = true)
+            }
+        }
+
+        val staleLoad = launch {
+            runCatching { runtime.load(model) }
+        }
+        yield() // first load reaches the gate
+
+        runtime.load(model.copy(id = "newer")) // supersedes while first suspended
+        firstGate.complete(Unit) // stale load resumes
+        staleLoad.join()
+
+        // The newer model owns the state; the stale result was discarded.
+        assertEquals(
+            "newer",
+            assertIs<AvatarRuntimeState.Ready>(runtime.state.value).model.id,
+        )
+    }
+
+    @Test
+    fun unloadDuringInFlightLoadWinsOverLateResult() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val runtime = object : HeadlessAvatarRuntime() {
+            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
+                gate.await()
+                return AvatarCapabilities()
+            }
+        }
+
+        val load = launch { runCatching { runtime.load(model) } }
+        yield()
+
+        runtime.unload()
+        gate.complete(Unit)
+        load.join()
+
         assertEquals(AvatarRuntimeState.Idle, runtime.state.value)
     }
 }

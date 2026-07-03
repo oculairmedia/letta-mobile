@@ -90,6 +90,13 @@ object GlbContainer {
             }
             offset = dataStart + chunkLength
         }
+        if (offset != declaredLength) {
+            // Trailing bytes too short to be a chunk header — a truncated or
+            // corrupt container, not a parseable one.
+            throw GlbFormatException(
+                "Malformed GLB: ${declaredLength - offset} trailing bytes after the last chunk",
+            )
+        }
 
         return Glb(
             version = version.toInt(),

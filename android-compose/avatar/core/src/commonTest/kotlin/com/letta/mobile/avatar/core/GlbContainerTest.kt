@@ -87,6 +87,22 @@ class GlbContainerTest {
     }
 
     @Test
+    fun rejectsIncompleteTrailingChunkBytes() {
+        // Declare 4 extra bytes after the last chunk — too short for a chunk
+        // header; a well-formed GLB accounts for every byte.
+        val valid = buildGlb("""{"asset":{"version":"2.0"}}""", bin = null)
+        val padded = valid.copyOf(valid.size + 4)
+        // Patch the declared total length to include the garbage tail.
+        val total = padded.size
+        padded[8] = (total and 0xFF).toByte()
+        padded[9] = ((total ushr 8) and 0xFF).toByte()
+        padded[10] = ((total ushr 16) and 0xFF).toByte()
+        padded[11] = ((total ushr 24) and 0xFF).toByte()
+
+        assertFailsWith<GlbFormatException> { GlbContainer.parse(padded) }
+    }
+
+    @Test
     fun rejectsChunkLengthAboveIntRange() {
         // Full-u32 chunkLength (would be negative as a signed Int).
         val bytes = buildGlb("""{"asset":{"version":"2.0"}}""", bin = null)
