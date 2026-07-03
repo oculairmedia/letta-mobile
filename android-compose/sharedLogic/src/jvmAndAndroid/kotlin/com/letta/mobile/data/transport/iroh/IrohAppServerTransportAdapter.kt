@@ -41,6 +41,7 @@ import kotlinx.coroutines.CoroutineScope
 class IrohAppServerTransportAdapter(
     private val endpoint: Endpoint,
     private val alpn: ByteArray = DEFAULT_ALPN,
+    private val onConnectionLost: (String) -> Unit = {},
 ) : AppServerTransportAdapter {
     override val scheme: String = "iroh"
 
@@ -64,6 +65,7 @@ class IrohAppServerTransportAdapter(
             alpn = alpn,
             scope = scope,
             protocol = protocol,
+            onConnectionLost = onConnectionLost,
         )
     }
 
