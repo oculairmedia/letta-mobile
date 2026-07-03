@@ -4,6 +4,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
