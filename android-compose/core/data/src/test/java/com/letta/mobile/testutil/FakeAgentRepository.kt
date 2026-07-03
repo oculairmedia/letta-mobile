@@ -3,6 +3,7 @@ package com.letta.mobile.testutil
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -42,6 +43,11 @@ class FakeAgentRepository(
 
     override suspend fun refreshAgents() {
         calls += "refreshAgents"
+    }
+
+    override suspend fun listAgentSummaries(): List<AgentSummary> {
+        calls += "listAgentSummaries"
+        return agentsState.value.map { AgentSummary(id = it.id, name = it.name, description = it.description) }
     }
 
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {

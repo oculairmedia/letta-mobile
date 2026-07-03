@@ -205,6 +205,16 @@ open class MessageRepository @Inject constructor(
             .map { it.toInspectorMessage() }
     }
 
+    override suspend fun fetchLatestConversationInspectorMessages(
+        conversationId: ConversationId,
+        limit: Int,
+    ): List<ConversationInspectorMessage> {
+        // order=desc so the newest messages come back first; an asc fetch can
+        // never see past a conversation's first page (letta-mobile-e9vca).
+        return messageApi.listConversationMessages(conversationId, limit = limit, order = "desc")
+            .map { it.toInspectorMessage() }
+    }
+
     private fun LettaMessage.toInspectorMessage(): ConversationInspectorMessage {
         val baseDetails = buildList {
             date?.let { add("Date" to it) }

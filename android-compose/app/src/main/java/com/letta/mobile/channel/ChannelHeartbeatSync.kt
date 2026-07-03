@@ -38,8 +38,15 @@ class ChannelHeartbeatSync @Inject constructor(
             return ListenableWorker.Result.retry()
         }
 
-        runCatching { agentRepository.refreshAgents() }
-        val agentNames = agentRepository.agents.value.associate { it.id.value to it.name }
+        // Wire diet (letta-mobile-hxxlz): the heartbeat only needs id→name to
+        // label notifications, so pull the slim `{id, name, description}`
+        // projection instead of refreshAgents()'s full agents payload
+        // (~9.6MB every 15 minutes). Full-object consumers keep their own
+        // fat refresh paths; on slim failure fall back to whatever full
+        // agents are already cached.
+        val agentNames = runCatching { agentRepository.listAgentSummaries() }
+            .map { summaries -> summaries.associate { it.id.value to it.name } }
+            .getOrElse { agentRepository.agents.value.associate { it.id.value to it.name } }
 
         conversations.forEach { conversation ->
             processConversation(conversation, agentNames[conversation.agentId.value].orEmpty())
@@ -60,12 +67,16 @@ class ChannelHeartbeatSync @Inject constructor(
         }
 
         val messages = try {
-            messageRepository.fetchConversationInspectorMessages(conversation.id)
+            messageRepository.fetchLatestConversationInspectorMessages(
+                conversationId = conversation.id,
+                limit = LATEST_MESSAGE_WINDOW,
+            )
         } catch (_: Exception) {
             return
         }
 
-        val latestNotifiable = messages.lastOrNull { it.isNotifiable() }
+        // Newest-first window, so the first notifiable hit is the latest one.
+        val latestNotifiable = messages.firstOrNull { it.isNotifiable() }
         if (previousProcessedAt == null) {
             syncStateStore.setProcessedLastActivityAt(conversationId, lastActivityAt)
             latestNotifiable?.id?.let { syncStateStore.setLastNotifiedMessageId(conversationId, it) }
@@ -101,6 +112,15 @@ class ChannelHeartbeatSync @Inject constructor(
     }
 
     companion object {
+        /**
+         * Newest-first page size for the notifiable-message scan. The
+         * heartbeat only needs the most recent notifiable message; the old
+         * oldest-first 200-message fetch could never see past a
+         * conversation's first 200 messages and pulled up to 20k records per
+         * sync across 100 conversations (letta-mobile-e9vca).
+         */
+        private const val LATEST_MESSAGE_WINDOW = 25
+
         private val NOTIFIABLE_MESSAGE_TYPES = setOf(
             "assistant_message",
             "system_message",
