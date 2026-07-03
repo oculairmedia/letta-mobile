@@ -214,4 +214,25 @@ class MessageRepositoryTest {
         assertTrue(result.first().detailLines.contains("Sender ID" to "sender-1"))
         assertEquals("Assistant message", result[1].summary)
     }
+
+    @Test
+    fun `fetchLatestConversationInspectorMessages queries newest-first with the requested window`() = runTest {
+        fakeApi.messages.addAll(
+            listOf(
+                AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("old")),
+                AssistantMessage(id = "assistant-2", contentRaw = JsonPrimitive("new")),
+            )
+        )
+
+        val result = repository.fetchLatestConversationInspectorMessages(
+            com.letta.mobile.data.model.ConversationId("conv-1"),
+            limit = 25,
+        )
+
+        // order=desc so the newest message comes back first and only the
+        // requested window crosses the wire (letta-mobile-e9vca).
+        assertEquals(listOf("assistant-2", "assistant-1"), result.map { it.id })
+        assertEquals(25, fakeApi.lastConversationMessagesLimit)
+        assertEquals("desc", fakeApi.lastConversationMessagesOrder)
+    }
 }
