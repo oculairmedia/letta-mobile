@@ -76,6 +76,7 @@ class ChatSendCoordinator(
     // are first-wins per turn on the shim. We capture once and drop later
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile private var activeWsTurnId: String? = null
+    @Volatile private var activeWsRunId: String? = null
     @Volatile private var stopReasonForTurn: String? = null
     @Volatile private var usageRecordedForTurn: Boolean = false
     // lcp-axv: failed turns emit `error` THEN `turn_done(status="failed")`
@@ -456,6 +457,7 @@ class ChatSendCoordinator(
             is WsTimelineEvent.TurnStarted -> {
                 activeWsConversationId = event.conversationId
                 activeWsTurnId = event.turnId
+                activeWsRunId = event.runId
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
@@ -688,6 +690,9 @@ class ChatSendCoordinator(
         recordEvent: WsTimelineEvent.TurnDone?,
     ) {
         val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+        if (status == "failed" || status == "cancelled") {
+            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, runId, turnId, "turn_done_$status")
+        }
         if (recordEvent != null) {
             recordRuntimeEvent(recordEvent, conversationId)
         }
@@ -737,6 +742,7 @@ class ChatSendCoordinator(
         activeWsOtid = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
+        activeWsRunId = null
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
@@ -761,12 +767,14 @@ class ChatSendCoordinator(
         preConversationMessageDeltas.clear()
         clearPendingSends("disconnect")
         if (conversationId != null) {
+            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, activeWsRunId, activeWsTurnId, "disconnect")
             timelineRepository.clearExternalTransportActive(conversationId)
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
+        activeWsRunId = null
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null

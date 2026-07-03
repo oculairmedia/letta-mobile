@@ -381,6 +381,41 @@ data class Timeline(
         return false
     }
 
+    fun cleanupAbandonedAssistantFragments(runId: String?, turnId: String?, reason: String): Timeline {
+        val targetRunId = runId?.takeIf { it.isNotBlank() } ?: return this
+        val assistantByRun = events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT && it.runId == targetRunId }
+        if (assistantByRun.size < 2) return this
+        val longest = assistantByRun.maxByOrNull { it.content.trim().length } ?: return this
+        val longestText = longest.content.trim()
+        if (longestText.length < ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS) return this
+        val removeServerIds = assistantByRun
+            .asSequence()
+            .filter { it.serverId != longest.serverId }
+            .filter { candidate ->
+                val text = candidate.content.trim()
+                text.length < ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS || longestText.startsWith(text)
+            }
+            .map { it.serverId }
+            .toSet()
+        if (removeServerIds.isEmpty()) return this
+        Telemetry.event(
+            "TimelineSync", "orphanAssistantFragments.cleaned",
+            "conversationId" to conversationId,
+            "runId" to targetRunId,
+            "turnId" to (turnId ?: ""),
+            "reason" to reason,
+            "count" to removeServerIds.size,
+        )
+        return copy(
+            events = events.filterNot { event ->
+                event is TimelineEvent.Confirmed && event.serverId in removeServerIds
+            }.toPersistentList(),
+            stablePrefixVersion = stablePrefixVersion + 1,
+        )
+    }
+
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */
     fun markSent(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.SENT) }
 
@@ -393,6 +428,8 @@ data class Timeline(
         return copy(events = events.replacingAt(idx, transform(local)), stablePrefixVersion = stablePrefixVersion + 1)
     }
 }
+
+private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
 
 internal fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
     var fingerprint = 1125899906842597L

@@ -360,6 +360,18 @@ open class TimelineRepository(
         loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.clearExternalTransportActive()
     }
 
+    override suspend fun cleanupAbandonedAssistantFragments(
+        agentId: String?,
+        conversationId: String,
+        runId: String?,
+        turnId: String?,
+        reason: String,
+    ): Int {
+        val key = TimelineCacheKey(agentId, conversationId)
+        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) } ?: return 0
+        return loop.cleanupAbandonedAssistantFragments(runId, turnId, reason)
+    }
+
     /**
      * Reconcile a send that went through the admin-shim mobile WebSocket.
      * The shim guarantees `turn_done` is emitted after disk stamping, so callers
