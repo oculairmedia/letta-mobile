@@ -56,6 +56,7 @@ class IrohConnectionSupervisor(
     private val dialer: suspend (IrohConnectConfig) -> IrohConnectionHandle,
     private val backoffPolicy: BackoffPolicy = BackoffPolicy(),
     private val randomJitterMs: (Long) -> Long = { bound -> if (bound <= 0) 0L else Random.nextLong(bound + 1) },
+    private val onStateChanged: (IrohConnectionState) -> Unit = {},
 ) {
     private val mutex = Mutex()
     private val _state = MutableStateFlow<IrohConnectionState>(IrohConnectionState.Disconnected)
@@ -281,6 +282,7 @@ class IrohConnectionSupervisor(
         val previous = _state.value
         if (previous::class == next::class && previous == next) return
         _state.value = next
+        onStateChanged(next)
         Telemetry.event(
             "IrohSupervisor", "state",
             "from" to previous.name,

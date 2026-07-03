@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -86,15 +85,8 @@ class IrohChannelTransport(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
+        onStateChanged = { supervisorState -> _state.value = supervisorState.toChannelTransportState() },
     )
-
-    init {
-        scope.launch {
-            supervisor.state.collectLatest { supervisorState ->
-                _state.value = supervisorState.toChannelTransportState()
-            }
-        }
-    }
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
         explicitConfig = IrohConnectConfig(
