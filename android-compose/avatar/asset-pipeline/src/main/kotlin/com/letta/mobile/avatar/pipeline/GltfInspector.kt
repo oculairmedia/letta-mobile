@@ -53,10 +53,14 @@ object BuiltinGltfInspector : GltfInspector {
     private fun inspectOrThrow(bytes: ByteArray): GltfInspectionReport {
         val errors = mutableListOf<String>()
 
+        val hasBinaryChunk: Boolean
         val gltfJsonText = if (GlbContainer.looksLikeGlb(bytes)) {
-            GlbContainer.parseOrNull(bytes)?.json
+            val glb = GlbContainer.parseOrNull(bytes)
                 ?: return GltfInspectionReport(errors = listOf("Unreadable GLB container"))
+            hasBinaryChunk = glb.binary != null
+            glb.json
         } else {
+            hasBinaryChunk = false
             bytes.decodeToString()
         }
         val root = runCatching { json.parseToJsonElement(gltfJsonText) as? JsonObject }
@@ -79,6 +83,18 @@ object BuiltinGltfInspector : GltfInspector {
         if (externalResources.isNotEmpty()) {
             errors += "External resources are not packed into the catalog yet " +
                 "(re-export as a self-contained GLB): " + externalResources.joinToString()
+        }
+
+        // A uri-less buffer is only self-contained when a GLB BIN chunk backs
+        // it (glTF allows exactly one such buffer). Anything else has no
+        // payload at all — meshes would read from nothing after import.
+        val uriLessBuffers = (root["buffers"] as? JsonArray).orEmpty()
+            .count { (it as? JsonObject)?.get("uri").primitiveContent() == null }
+        val backedBuffers = if (hasBinaryChunk) 1 else 0
+        if (uriLessBuffers > backedBuffers) {
+            errors += "Buffer(s) without uri have no payload " +
+                if (hasBinaryChunk) "(only one buffer may use the GLB BIN chunk)"
+                else "(no GLB BIN chunk to back them)"
         }
 
         return GltfInspectionReport(

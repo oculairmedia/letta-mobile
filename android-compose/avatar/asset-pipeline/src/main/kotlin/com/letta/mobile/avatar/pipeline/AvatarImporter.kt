@@ -147,9 +147,13 @@ class AvatarImporter(
             stats = inspection.stats,
             extraWarnings = warnings,
         )
+        // Catalog entries carry CATALOG-RELATIVE uris ("assets/<id>.glb") so a
+        // catalog directory stays self-contained when moved, synced, or used
+        // as a shared catalog on another machine. Consumers resolve them with
+        // [resolveCatalogUri] against whatever directory they loaded from.
         val model = manifest.toModel(
-            uri = assetPath.toUri().toString(),
-            manifestUri = manifestPath.toUri().toString(),
+            uri = catalogRelative(assetPath),
+            manifestUri = catalogRelative(manifestPath),
         )
 
         withContext(Dispatchers.IO) {
@@ -213,6 +217,11 @@ class AvatarImporter(
         }
     }
 
+    /** Forward-slash catalog-relative path, portable across OS + machines. */
+    private fun catalogRelative(target: Path): String =
+        catalogDir.toAbsolutePath().relativize(target.toAbsolutePath())
+            .joinToString("/") { it.toString() }
+
     private fun sha256Hex(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256")
             .digest(bytes)
@@ -222,4 +231,16 @@ class AvatarImporter(
         /** Plain safe file-name segment: no separators, no leading dot. */
         val SAFE_ID_REGEX = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$")
     }
+}
+
+/**
+ * Resolve a catalog-relative [AvatarModel.uri]/[AvatarModel.manifestUri]
+ * against the directory the catalog was loaded from. Rejects uris that would
+ * escape [catalogDir].
+ */
+fun resolveCatalogUri(catalogDir: Path, uri: String): Path {
+    val base = catalogDir.toAbsolutePath().normalize()
+    val resolved = base.resolve(uri).normalize()
+    require(resolved.startsWith(base)) { "Catalog uri escapes the catalog directory: $uri" }
+    return resolved
 }

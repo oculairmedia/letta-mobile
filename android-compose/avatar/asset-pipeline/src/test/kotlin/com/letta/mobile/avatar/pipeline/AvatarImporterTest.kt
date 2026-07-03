@@ -51,11 +51,54 @@ class AvatarImporterTest {
         val manifestOnDisk = AvatarManifestCodec.decode(Files.readString(imported.manifestPath))
         assertEquals(imported.manifest, manifestOnDisk)
 
-        // Catalog registry contains the entry.
+        // Catalog registry contains the entry with CATALOG-RELATIVE uris that
+        // resolve back to the written files (portable catalog directories).
         val entries = AvatarCatalogCodec.decode(
             Files.readString(catalogDir.resolve(AvatarCatalogCodec.FILE_NAME)),
         )
         assertEquals(listOf(imported.model), entries)
+        assertEquals("assets/${imported.model.id}.glb", imported.model.uri)
+        assertEquals(
+            imported.assetPath.toAbsolutePath().normalize(),
+            resolveCatalogUri(catalogDir, imported.model.uri),
+        )
+    }
+
+    @Test
+    fun resolveCatalogUriRejectsEscapes() {
+        kotlin.test.assertFailsWith<IllegalArgumentException> {
+            resolveCatalogUri(catalogDir, "../outside.vrm")
+        }
+    }
+
+    @Test
+    fun uriLessBufferWithoutBinChunkIsRejected() = runTest {
+        val result = AvatarImporter(catalogDir).import(
+            AvatarImportRequest(
+                sourceFileName = "no-payload.gltf",
+                bytes = """{"asset":{"version":"2.0"},"buffers":[{"byteLength":16}]}"""
+                    .encodeToByteArray(),
+                license = AvatarLicense(allowRedistribution = true),
+            ),
+        )
+
+        val rejected = assertIs<AvatarImportResult.Rejected>(result)
+        assertTrue("no payload" in rejected.reason || "payload" in rejected.reason)
+    }
+
+    @Test
+    fun uriLessBufferBackedByBinChunkIsAccepted() = runTest {
+        val result = AvatarImporter(catalogDir).import(
+            AvatarImportRequest(
+                sourceFileName = "packed.glb",
+                bytes = glb(
+                    """{"asset":{"version":"2.0"},"buffers":[{"byteLength":4}]}""",
+                    bin = byteArrayOf(1, 2, 3, 4),
+                ),
+                license = AvatarLicense(allowRedistribution = true),
+            ),
+        )
+        assertIs<AvatarImportResult.Imported>(result)
     }
 
     @Test
@@ -275,9 +318,9 @@ class AvatarImporterTest {
         }
     }
 
-    private fun glb(json: String): ByteArray {
+    private fun glb(json: String, bin: ByteArray? = null): ByteArray {
         val jsonBytes = json.encodeToByteArray()
-        val total = 12 + 8 + jsonBytes.size
+        val total = 12 + 8 + jsonBytes.size + (bin?.let { 8 + it.size } ?: 0)
         val out = ByteArray(total)
         var offset = 0
         fun writeU32(value: Int) {
@@ -293,6 +336,12 @@ class AvatarImporterTest {
         writeU32(jsonBytes.size)
         writeU32(GlbContainer.CHUNK_JSON)
         jsonBytes.copyInto(out, offset)
+        offset += jsonBytes.size
+        if (bin != null) {
+            writeU32(bin.size)
+            writeU32(GlbContainer.CHUNK_BIN)
+            bin.copyInto(out, offset)
+        }
         return out
     }
 
