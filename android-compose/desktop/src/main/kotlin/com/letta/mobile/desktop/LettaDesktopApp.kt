@@ -112,6 +112,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.avatar.core.AvatarActivity
 import com.letta.mobile.desktop.avatar.DesktopAvatarCompanion
+import com.letta.mobile.desktop.avatar.DesktopAvatarLibraryWindow
+import com.letta.mobile.desktop.avatar.defaultAvatarCatalogDir
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentSphere
@@ -384,29 +386,35 @@ fun LettaDesktopApp(
     DisposableEffect(avatarCompanion) {
         onDispose { avatarCompanion.stop() }
     }
-    val avatarPickerLauncher = rememberFilePickerLauncher(
-        type = FileKitType.File(extensions = listOf("vrm", "glb")),
-        mode = FileKitMode.Single,
-        dialogSettings = FileKitDialogSettings(title = "Choose avatar model (.vrm)"),
-    ) { file ->
-        if (file != null) {
-            val path = file.file.absolutePath
-            secureSettingsStore.putString(AVATAR_COMPANION_VRM_PATH_KEY, path)
-            avatarCompanion.start(java.nio.file.Path.of(path))
-        }
-    }
+    var showAvatarLibrary by remember { mutableStateOf(false) }
+    var activeAvatarModelId by remember { mutableStateOf<String?>(null) }
     fun toggleAvatarCompanion() {
         when (avatarCompanionState) {
             is DesktopAvatarCompanion.State.Starting,
             is DesktopAvatarCompanion.State.Running,
-            -> avatarCompanion.stop()
-            else -> {
-                val saved = secureSettingsStore.getString(AVATAR_COMPANION_VRM_PATH_KEY)
-                    ?.let(java.nio.file.Path::of)
-                    ?.takeIf { java.nio.file.Files.isRegularFile(it) }
-                if (saved != null) avatarCompanion.start(saved) else avatarPickerLauncher.launch()
+            -> {
+                avatarCompanion.stop()
+                activeAvatarModelId = null
             }
+            // Library-first: pick from imported avatars (with their license
+            // on display) instead of a blind file dialog; imports run the
+            // full pipeline from inside the library window.
+            else -> showAvatarLibrary = true
         }
+    }
+    if (showAvatarLibrary) {
+        DesktopAvatarLibraryWindow(
+            catalogDir = remember { defaultAvatarCatalogDir() },
+            activeModelId = activeAvatarModelId,
+            onUseAvatar = { model, assetPath ->
+                showAvatarLibrary = false
+                secureSettingsStore.putString(AVATAR_COMPANION_VRM_PATH_KEY, assetPath.toString())
+                activeAvatarModelId = model.id
+                avatarCompanion.stop()
+                avatarCompanion.start(assetPath)
+            },
+            onClose = { showAvatarLibrary = false },
+        )
     }
 
     LaunchedEffect(chatController) {

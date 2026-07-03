@@ -69,6 +69,8 @@ dependencies {
     implementation(project(":sharedLogic"))
     // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
     implementation(project(":avatar:renderer-web"))
+    // Avatar library: import pipeline + local catalog (license capture/display).
+    implementation(project(":avatar:asset-pipeline"))
 
     implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
     implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
