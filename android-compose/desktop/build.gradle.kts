@@ -67,6 +67,8 @@ kotlin {
 
 dependencies {
     implementation(project(":sharedLogic"))
+    // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
+    implementation(project(":avatar:renderer-web"))
 
     implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
     implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
