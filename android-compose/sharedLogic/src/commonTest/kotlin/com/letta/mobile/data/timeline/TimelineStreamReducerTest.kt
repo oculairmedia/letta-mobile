@@ -865,6 +865,34 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `assistant prefix replay from local run is dropped after iroh final`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Yeah — still seeing it. Smells like a dedup issue."),
+                runId = "iroh-run-123",
+                seqId = 12,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix",
+                contentRaw = JsonPrimitive("Yeah"),
+                runId = "local-run-12",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "Yeah — still seeing it. Smells like a dedup issue."
+        output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
     fun `semantic duplicate detection stays bounded on long histories`() {
         val longHistory = Timeline(
             conversationId = "conv-test",

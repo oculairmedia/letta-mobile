@@ -319,6 +319,14 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
 
 private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
 
+private fun String?.isCompatibleAssistantPrefixRunId(other: String): Boolean {
+    val thisRunId = this?.takeIf { it.isNotBlank() } ?: return false
+    if (thisRunId == other) return true
+    val thisIsIrohFamily = thisRunId.isIrohSyntheticRunId() || thisRunId.startsWith("local-run-")
+    val otherIsIrohFamily = other.isIrohSyntheticRunId() || other.startsWith("local-run-")
+    return thisIsIrohFamily && otherIsIrohFamily
+}
+
 private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
     incoming: TimelineEvent.Confirmed,
 ): TimelineEvent.Confirmed? {
@@ -331,7 +339,7 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
         .firstOrNull { existing ->
             if (existing.messageType != TimelineMessageType.ASSISTANT) return@firstOrNull false
             if (existing.serverId == incoming.serverId) return@firstOrNull false
-            if (existing.runId != incomingRunId) return@firstOrNull false
+            if (!existing.runId.isCompatibleAssistantPrefixRunId(incomingRunId)) return@firstOrNull false
 
             val existingText = existing.content.trim()
             val isReplayPrefix = existingText.isNotBlank() &&
