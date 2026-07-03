@@ -16,14 +16,12 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
@@ -150,21 +148,29 @@ class IrohAppServerTransport(
     }
 
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        connectionReady.await()
         val requestId = "admin-${UUID.randomUUID()}"
         val params = adminRpcParams(path = path, body = body)
-        val response = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
-            coroutineScope {
-                val awaited = async {
-                    controlFrames.first { received ->
-                        val frame = received.frame
-                        frame is AppServerInboundFrame.AdminRpcResponse && frame.requestId == requestId
-                    }.frame as AppServerInboundFrame.AdminRpcResponse
-                }
-                sendControl(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-                awaited.await()
+        return withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
+            val biStream = connection.openBi()
+            val sendStream = biStream.send()
+            Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" to method, "path" to path, "requestId" to requestId)
+            try {
+                val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
+                IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES)
+                sendStream.finish()
+                val rawResponse = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
+                    ?: error("admin_rpc stream closed before response for method=$method path=$path")
+                val response = decodeFrame(rawResponse, AppServerChannel.Control).frame
+                val adminResponse = response as? AppServerInboundFrame.AdminRpcResponse
+                    ?: error("admin_rpc expected admin_rpc_response but received ${response.type}")
+                Telemetry.event("IrohTransport", "admin_rpc.stream.complete", "method" to method, "path" to path, "requestId" to requestId, "success" to adminResponse.success.toString())
+                adminResponse
+            } catch (error: Throwable) {
+                Telemetry.event("IrohTransport", "admin_rpc.stream.failed", "method" to method, "path" to path, "requestId" to requestId, "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+                throw error
             }
         } ?: error("admin_rpc timed out for method=$method path=$path")
-        return response
     }
 
     suspend fun close() {

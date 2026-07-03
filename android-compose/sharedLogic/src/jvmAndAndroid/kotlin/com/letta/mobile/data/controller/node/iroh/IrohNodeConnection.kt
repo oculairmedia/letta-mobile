@@ -88,7 +88,12 @@ class IrohNodeConnection(
                 serveStreamReadiness(streamBiStream)
             }
 
+            val adminRpcAcceptJob = launch {
+                acceptAdminRpcStreams()
+            }
+
             controlJob.join()
+            adminRpcAcceptJob.cancelAndJoin()
             streamJob.cancelAndJoin()
             runCatching { streamSend.finish() }
         } catch (e: Exception) {
@@ -106,6 +111,65 @@ class IrohNodeConnection(
                 *IrohDiagnostics.connectionStatsAttributes(runCatching { connection.stats() }.getOrNull()).toTypedArray(),
             )
             runCatching { connection.close() }
+        }
+    }
+
+    private suspend fun acceptAdminRpcStreams() = coroutineScope {
+        while (true) {
+            val biStream = connection.acceptBi()
+            Telemetry.event("IrohNode", "admin_rpc.stream.accepted", "remoteEndpointId" to remoteEndpointId)
+            launch { serveAdminRpcStream(biStream) }
+        }
+    }
+
+    private suspend fun serveAdminRpcStream(biStream: BiStream) {
+        val sendStream = biStream.send()
+        try {
+            val frameJson = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
+            val response = if (frameJson == null) {
+                """{"type":"admin_rpc_response","request_id":"","success":false,"error":"admin_rpc request stream closed before request"}"""
+            } else {
+                handleAdminRpcStreamFrame(frameJson)
+            }
+            IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (error: Exception) {
+            Telemetry.event(
+                "IrohNode", "admin_rpc.stream.failed",
+                "remoteEndpointId" to remoteEndpointId,
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
+            )
+            IrohFrameCodec.write(sendStream, """{"type":"admin_rpc_response","request_id":"","success":false,"error":"${error.message?.replace("\"", "\\\"") ?: "admin_rpc stream failed"}"}""", MAX_FRAME_BYTES)
+        } finally {
+            runCatching { sendStream.finish() }
+        }
+    }
+
+    private suspend fun handleAdminRpcStreamFrame(frameJson: String): String {
+        return try {
+            val json = Json { ignoreUnknownKeys = true }
+            val obj = json.parseToJsonElement(frameJson).jsonObject
+            val type = obj["type"]?.jsonPrimitive?.content
+            val requestId = obj["request_id"]?.jsonPrimitive?.content
+            val method = obj["method"]?.jsonPrimitive?.content
+            Telemetry.event("IrohNode", "admin_rpc.stream.recv", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "method" to method)
+            if (type != "admin_rpc") {
+                """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"Expected admin_rpc frame"}"""
+            } else if (!authenticated) {
+                val id = requestId ?: ""
+                Telemetry.event("IrohNode", "auth.required", "remoteEndpointId" to remoteEndpointId, "requestId" to id, "reason" to "missing_token")
+                """{"type":"admin_rpc_response","request_id":"$id","success":false,"error":"unauthorized"}"""
+            } else if (method == null || requestId == null) {
+                """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"method and request_id are required"}"""
+            } else {
+                adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
+            }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (error: Exception) {
+            """{"type":"admin_rpc_response","request_id":"","success":false,"error":"Failed to parse admin_rpc frame: ${error.message?.replace("\"", "\\\"")}"}"""
         }
     }
 
