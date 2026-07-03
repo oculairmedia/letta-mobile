@@ -138,6 +138,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             com.letta.mobile.data.controller.node.iroh.HealthAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
             com.letta.mobile.data.controller.node.iroh.AgentAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
             com.letta.mobile.data.controller.node.iroh.ConversationAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
+            com.letta.mobile.data.controller.node.iroh.GoalAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
             com.letta.mobile.data.controller.node.iroh.RunAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
             com.letta.mobile.data.controller.node.iroh.ArchiveAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
             com.letta.mobile.data.controller.node.iroh.IdentityAdminHandlers.register(irohEndpoint.adminRpcRouter, rpcBase)
