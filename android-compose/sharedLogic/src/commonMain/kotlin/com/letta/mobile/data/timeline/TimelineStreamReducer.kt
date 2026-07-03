@@ -339,7 +339,8 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
         .firstOrNull { existing ->
             if (existing.messageType != TimelineMessageType.ASSISTANT) return@firstOrNull false
             if (existing.serverId == incoming.serverId) return@firstOrNull false
-            if (!existing.runId.isCompatibleAssistantPrefixRunId(incomingRunId)) return@firstOrNull false
+            val existingRunId = existing.runId?.takeIf { it.isNotBlank() }
+            if (existingRunId != null && !existingRunId.isCompatibleAssistantPrefixRunId(incomingRunId)) return@firstOrNull false
 
             val existingText = existing.content.trim()
             val isReplayPrefix = existingText.isNotBlank() &&
@@ -352,7 +353,7 @@ private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
             // though it may be a prefix of an earlier same-run assistant. The
             // post-install replay bug, however, replays multi-character prefixes
             // like "Got" with seqId=1; those should still be dropped.
-            if (incoming.seqId == 1 && incomingText.length <= 1) return@firstOrNull false
+            if (existingRunId != null && incoming.seqId == 1 && incomingText.length <= 1) return@firstOrNull false
             true
         }
 }
