@@ -114,8 +114,11 @@ class WebAvatarRuntime(
     override fun onUnload() {
         // An unload (or a replacement load / dispose) invalidates any load
         // still awaiting its ack — a late avatarLoaded for that request must
-        // not resurrect the model the caller just navigated away from.
+        // not resurrect the model the caller just navigated away from. The
+        // same applies to in-flight thumbnail captures: the renderer is being
+        // told to drop the avatar and may never answer them.
         cancelPendingLoad("Unloaded while the load was in flight")
+        cancelPendingThumbnails("Avatar unloaded during thumbnail capture")
         sendCommand(AvatarRendererCommand.Unload)
     }
 
@@ -202,11 +205,15 @@ class WebAvatarRuntime(
     override fun dispose() {
         super.dispose()
         cancelPendingLoad("Runtime disposed")
+        cancelPendingThumbnails("Runtime disposed")
+        transport.close()
+    }
+
+    private fun cancelPendingThumbnails(reason: String) {
         pendingThumbnails.values.forEach {
-            it.completeExceptionally(AvatarWireException("Runtime disposed"))
+            it.completeExceptionally(AvatarWireException(reason))
         }
         pendingThumbnails.clear()
-        transport.close()
     }
 
     private fun handleRendererMessage(message: String) {

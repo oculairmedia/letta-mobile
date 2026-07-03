@@ -73,6 +73,10 @@ export function createAvatarRenderer(canvas, emit) {
 
   function unloadCurrent() {
     activeLoadRequestId = null; // discard any in-flight load's late result
+    // Match the host's command-state reset (HeadlessAvatarRuntime): framing
+    // and gaze return to defaults for the next avatar.
+    cameraFraming = 'fullBody';
+    lookTargetActive = false;
     if (!current) return;
     scene.remove(current.root);
     VRMUtils.deepDispose(current.root);
@@ -88,21 +92,28 @@ export function createAvatarRenderer(canvas, emit) {
     fullBody: { bandBottom: -0.02, bandTop: 1.02, eyeline: 0.55 },
   };
   let cameraFraming = 'fullBody';
+  let lookTargetActive = false;
 
   function frameCamera(root) {
     const preset = FRAMINGS[cameraFraming] ?? FRAMINGS.fullBody;
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const bandHeight = size.y * (preset.bandTop - preset.bandBottom);
     const focusY = box.min.y + size.y * preset.eyeline;
+    // The eyeline is not the band's center, so size the camera distance from
+    // the LARGER half-extent — otherwise the far edge of the band crops
+    // (e.g. the waist in bust framing).
+    const bandTopY = box.min.y + size.y * preset.bandTop;
+    const bandBottomY = box.min.y + size.y * preset.bandBottom;
+    const halfExtent = Math.max(bandTopY - focusY, focusY - bandBottomY);
     const distance = Math.max(
-      bandHeight / (2 * Math.tan((camera.fov * Math.PI) / 360)),
+      halfExtent / Math.tan((camera.fov * Math.PI) / 360),
       size.z * 1.5,
     ) * 1.1;
     camera.position.set(center.x, focusY, center.z + distance);
     camera.lookAt(center.x, focusY, center.z);
-    lookAtTarget.position.copy(camera.position);
+    // Reframing must not stomp an active host-driven gaze target.
+    if (!lookTargetActive) lookAtTarget.position.copy(camera.position);
   }
 
   function setCameraFraming(framing) {
@@ -212,6 +223,7 @@ export function createAvatarRenderer(canvas, emit) {
   }
 
   function setLookTarget({ space, x, y, z }) {
+    lookTargetActive = true;
     // (Re)attach the target object — cleared by clearLookTarget below.
     if (current?.vrm?.lookAt) current.vrm.lookAt.target = lookAtTarget;
     if (space === 'screen') {
@@ -275,6 +287,7 @@ export function createAvatarRenderer(canvas, emit) {
       case 'clearLookTarget':
         // Detach entirely: the VRM returns to its idle gaze rather than
         // staying locked onto a target parked at the camera.
+        lookTargetActive = false;
         if (current?.vrm?.lookAt) current.vrm.lookAt.target = null;
         break;
       case 'playGesture': playClip(command.id, { loop: false, fadeSeconds: command.fadeSeconds }); break;

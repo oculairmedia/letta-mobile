@@ -287,6 +287,23 @@ class WebAvatarRuntimeTest {
     }
 
     @Test
+    fun unloadCancelsInFlightThumbnailCaptures() = runTest {
+        val (runtime, transport) = readyRuntime()
+
+        var failure: Throwable? = null
+        val job = launch {
+            runCatching { runtime.captureThumbnail() }.onFailure { failure = it }
+        }
+        runCurrent() // capture command sent, awaiting the renderer's answer
+
+        runtime.unload() // renderer told to drop the avatar — no answer coming
+        runCurrent()
+        job.join()
+
+        assertIs<AvatarWireException>(failure)
+    }
+
+    @Test
     fun captureThumbnailRequiresALoadedAvatar() = runTest {
         val transport = FakeTransport()
         val runtime = WebAvatarRuntime(transport)
