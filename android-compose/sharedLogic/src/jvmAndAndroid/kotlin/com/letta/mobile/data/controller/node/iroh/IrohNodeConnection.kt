@@ -30,8 +30,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
@@ -114,18 +117,25 @@ class IrohNodeConnection(
         }
     }
 
-    private suspend fun acceptAdminRpcStreams() = coroutineScope {
+    private suspend fun acceptAdminRpcStreams() = supervisorScope {
+        val adminRpcStreamPermits = Semaphore(MAX_CONCURRENT_ADMIN_RPC_STREAMS)
         while (true) {
             val biStream = connection.acceptBi()
             Telemetry.event("IrohNode", "admin_rpc.stream.accepted", "remoteEndpointId" to remoteEndpointId)
-            launch { serveAdminRpcStream(biStream) }
+            launch {
+                adminRpcStreamPermits.withPermit {
+                    serveAdminRpcStream(biStream)
+                }
+            }
         }
     }
 
     private suspend fun serveAdminRpcStream(biStream: BiStream) {
         val sendStream = biStream.send()
         try {
-            val frameJson = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
+            val frameJson = withTimeoutOrNull(ADMIN_RPC_REQUEST_TIMEOUT_MS) {
+                IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
+            }
             val response = if (frameJson == null) {
                 """{"type":"admin_rpc_response","request_id":"","success":false,"error":"admin_rpc request stream closed before request"}"""
             } else {
@@ -141,7 +151,16 @@ class IrohNodeConnection(
                 "error" to (error.message ?: error.toString()),
                 "class" to error::class.simpleName,
             )
-            IrohFrameCodec.write(sendStream, """{"type":"admin_rpc_response","request_id":"","success":false,"error":"${error.message?.replace("\"", "\\\"") ?: "admin_rpc stream failed"}"}""", MAX_FRAME_BYTES)
+            runCatching {
+                IrohFrameCodec.write(sendStream, """{"type":"admin_rpc_response","request_id":"","success":false,"error":"${error.message?.replace("\"", "\\\"") ?: "admin_rpc stream failed"}"}""", MAX_FRAME_BYTES)
+            }.onFailure { writeError ->
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.stream.error_response_failed",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "error" to (writeError.message ?: writeError.toString()),
+                    "class" to writeError::class.simpleName,
+                )
+            }
         } finally {
             runCatching { sendStream.finish() }
         }
@@ -650,5 +669,7 @@ class IrohNodeConnection(
         const val MAX_HANDLED_CLIENT_MESSAGE_IDS = 512
         const val HANDLED_CLIENT_MESSAGE_IDS_TRIM_COUNT = 128
         const val STREAM_JOB_DRAIN_TIMEOUT_MS = 5_000L
+        const val ADMIN_RPC_REQUEST_TIMEOUT_MS = 15_000L
+        const val MAX_CONCURRENT_ADMIN_RPC_STREAMS = 16
     }
 }
