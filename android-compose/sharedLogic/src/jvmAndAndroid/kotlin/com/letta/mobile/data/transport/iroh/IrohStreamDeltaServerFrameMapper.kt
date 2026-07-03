@@ -244,10 +244,10 @@ internal object IrohStreamDeltaServerFrameMapper {
     ) {
         fun messageId(): String = messageId ?: frameId
 
-        fun messageIdFor(messageType: String): String = messageId ?: when (messageType) {
+        fun messageIdFor(messageType: String): String = when (messageType) {
             "reasoning_message",
             "hidden_reasoning_message" -> "iroh-$messageType-$runId-$turnId"
-            else -> frameId
+            else -> messageId ?: frameId
         }
 
         companion object {
