@@ -80,10 +80,64 @@ class IrohProbeAssertionsTest {
         assertTrue("turn1:turn_done_count_0" in summary.violations)
     }
 
-    private fun assistant(id: String) = ServerFrame.AssistantMessage(
+    @Test
+    fun `short final assistant fragment is reported as orphan fragment`() {
+        val metrics = IrohProbeAssertions.metricsForFrames(
+            turn = 1,
+            frames = listOf(
+                assistant(id = "assistant-1", content = "a"),
+                done(),
+            ),
+        )
+
+        val summary = IrohProbeAssertions.summarize(listOf(metrics))
+
+        assertFalse(summary.ok)
+        assertTrue("orphan_fragment:turn1" in summary.violations)
+    }
+
+    @Test
+    fun `idle send failures use named violation`() {
+        val violation = IrohProbeAssertions.classifyIdleSendFailure("send failed")
+
+        assertEquals("idle_send_failed:send failed", violation)
+    }
+
+    @Test
+    fun `admin rpc unknown method is reported as method missing`() {
+        val violation = IrohProbeAssertions.classifyAdminRpc(
+            method = "message.list",
+            success = false,
+            resultIsArray = false,
+            error = "Unknown method: message.list",
+        )
+
+        assertEquals("admin_rpc_method_missing:message.list", violation)
+    }
+
+    @Test
+    fun `admin rpc non array result is reported as method missing`() {
+        val violation = IrohProbeAssertions.classifyAdminRpc(
+            method = "conversation.list",
+            success = true,
+            resultIsArray = false,
+            error = null,
+        )
+
+        assertEquals("admin_rpc_method_missing:conversation.list", violation)
+    }
+
+    @Test
+    fun `fresh conversation missing error is reported as bootstrap failure`() {
+        val violation = IrohProbeAssertions.classifyConversationBootstrap("Conversation not found")
+
+        assertEquals("conversation_bootstrap_failed", violation)
+    }
+
+    private fun assistant(id: String, content: String = "delta") = ServerFrame.AssistantMessage(
         id = id,
         ts = "2026-01-01T00:00:00Z",
-        content = "delta",
+        content = content,
     )
 
     private fun reasoning(id: String) = ServerFrame.ReasoningMessage(

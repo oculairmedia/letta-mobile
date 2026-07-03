@@ -16,6 +16,9 @@ data class IrohProbeTurnMetrics(
     val errorFrames: List<String> = emptyList(),
     val dialSucceeded: Boolean = dialMs != null,
     val timedOut: Boolean = false,
+    val assistantFinalTexts: List<String> = emptyList(),
+    val scenarioViolations: List<String> = emptyList(),
+    val notes: List<String> = emptyList(),
 )
 
 @Serializable
@@ -34,6 +37,7 @@ object IrohProbeAssertions {
         timedOut: Boolean = false,
     ): IrohProbeTurnMetrics {
         val assistantIds = linkedSetOf<String>()
+        val assistantFinalTexts = mutableMapOf<String, String>()
         val reasoningIds = linkedSetOf<String>()
         val errors = mutableListOf<String>()
         var assistantDeltaCount = 0
@@ -44,6 +48,7 @@ object IrohProbeAssertions {
                 is ServerFrame.AssistantMessage -> {
                     assistantDeltaCount += 1
                     assistantIds += frame.id
+                    assistantFinalTexts[frame.id] = frame.content
                 }
                 is ServerFrame.ReasoningMessage -> reasoningIds += frame.id
                 is ServerFrame.TurnDone -> turnDoneCount += 1
@@ -66,13 +71,40 @@ object IrohProbeAssertions {
             errorFrames = errors,
             dialSucceeded = dialMs != null,
             timedOut = timedOut,
+            assistantFinalTexts = assistantFinalTexts.values.toList(),
         )
     }
+
+    fun classifyAdminRpc(
+        method: String,
+        success: Boolean,
+        resultIsArray: Boolean,
+        error: String?,
+    ): String? = when {
+        !success -> "admin_rpc_method_missing:$method"
+        error?.contains("Unknown method", ignoreCase = true) == true -> "admin_rpc_method_missing:$method"
+        !resultIsArray -> "admin_rpc_method_missing:$method"
+        else -> null
+    }
+
+    fun classifyIdleSendFailure(error: String?): String =
+        "idle_send_failed" + error?.takeIf { it.isNotBlank() }?.let { ":$it" }.orEmpty()
+
+    fun classifyConversationBootstrap(error: String?): String =
+        if (error?.contains("Conversation not found", ignoreCase = true) == true) {
+            "conversation_bootstrap_failed"
+        } else {
+            "probe_error" + error?.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()
+        }
 
     fun summarize(turns: List<IrohProbeTurnMetrics>): IrohProbeSummary {
         val violations = buildList {
             turns.forEach { turn ->
                 val prefix = "turn${turn.turn}"
+                addAll(turn.scenarioViolations)
+                turn.assistantFinalTexts
+                    .filter { it.length in 1..2 }
+                    .forEach { add("orphan_fragment:$prefix") }
                 if (!turn.dialSucceeded) add("$prefix:dial_failed")
                 if (turn.turn == 2 && !turn.dialSucceeded) add("accept_wedge:turn2_dial_failed")
                 if (turn.timedOut) add("$prefix:timeout_missing_terminal")
