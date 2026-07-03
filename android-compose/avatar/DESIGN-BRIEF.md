@@ -29,6 +29,7 @@ Renderer capabilities (commands that exist NOW):
 Behavior layer (the "director") already drives, automatically from agent state:
 
 - IDLE: natural blinking on a randomized schedule
+- LISTENING (user talking/composing): attentive, still
 - THINKING (agent reasoning/tools): relaxed inward expression
 - SPEAKING (reply streaming): procedural mouth chatter (TTS amplitude later)
 - ERROR: brief sad flash, then settles
@@ -55,7 +56,7 @@ Redesign the modal into a proper surface: card grid with live/rendered thumbnail
 
 ### (D) State matrix + motion spec
 
-One board: rows = IDLE/LISTENING/THINKING/SPEAKING/ERROR/LOADING/FAILED/CAPABILITY-DEGRADED, columns = each surface (header bust, dock panel, pet window, library thumbnail). Specify expression + gesture + camera framing + any UI chrome per cell, with timings (hold/decay durations) — the director consumes exact seconds.
+One board: rows = the director activities IDLE/LISTENING/THINKING/SPEAKING/ERROR, plus the runtime lifecycle states LOADING/FAILED, plus CAPABILITY-DEGRADED `[NEW-BEHAVIOR]` (a UI condition for models lacking expressions/look-at — not a director state; the design defines what it means per surface). Columns = each surface (header bust, dock panel, pet window, library thumbnail). Specify expression + gesture + camera framing + any UI chrome per cell, with timings (hold/decay durations) — the director consumes exact seconds.
 
 ## Constraints
 
