@@ -140,12 +140,95 @@ fun Timeline.mergeServerMessages(
         val pos = timeline.positionForServerMessageDate(msg)
         val confirmed = msg.toTimelineEvent(position = pos) ?: return@forEach
         if (confirmed.messageType == TimelineMessageType.TOOL_RETURN) return@forEach
-        if (!timeline.containsIdentityFor(confirmed)) {
+        if (timeline.containsIdentityFor(confirmed)) return@forEach
+        val existingByServerId = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
+        if (existingByServerId == null && timeline.recentTailContainsEquivalent(confirmed)) {
+            // The HTTP backend mints its OWN message ids (ui-msg-*) that never
+            // match the App Server ids (letta-msg-*) carried by the live Iroh
+            // frames, and it omits run_id/original otid. No id-based identity
+            // can catch that copy, so a live-delivered reply re-appends on the
+            // next reconcile poll. Dedupe by (messageType + identical trimmed
+            // content) within the recent tail window instead of inserting.
+            Telemetry.event(
+                "TimelineSync", "recentReconcile.contentDeduped",
+                "conversationId" to timeline.conversationId,
+                "serverId" to confirmed.serverId,
+                "messageType" to confirmed.messageType.name,
+            )
+            return@forEach
+        }
+        if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
+            timeline = timeline.replaceByServerId(confirmed)
+            merged++
+        } else if (existingByServerId != null && existingByServerId.sharesRunIdentityWith(confirmed)) {
+            // Same server id + message type, and at least one side lacks a
+            // run id (REST /messages replies often omit run_id while the live
+            // Iroh/WS row carries the real one). #780 run-scoped identity keys
+            // no longer overlap in that case, so without this guard the
+            // reconciled copy re-inserts and the reply renders twice. Only a
+            // REAL run-id mismatch on both sides (recycled server id across
+            // runs) may append.
+            return@forEach
+        } else {
             timeline = timeline.insertOrdered(confirmed)
             merged++
         }
     }
     return timeline to merged
+}
+
+private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
+    incoming: TimelineEvent.Confirmed,
+): Boolean {
+    val existingRunId = runId?.takeIf { it.isNotBlank() }
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
+    return messageType in setOf(TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING) &&
+        existingRunId?.startsWith("iroh-run-") == true &&
+        incomingRunId != null &&
+        !incomingRunId.startsWith("iroh-run-")
+}
+
+/**
+ * Content-level dedupe for reconcile copies whose ids can never match the live
+ * rows (HTTP backend mints ui-msg-* ids; live Iroh rows carry letta-msg-*).
+ * Scans the recent tail for a row of the same message type with identical
+ * trimmed content. Bounded to the tail window so long histories stay O(1)-ish
+ * per reconcile and legitimately repeated OLD messages are not collapsed.
+ */
+private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
+
+private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confirmed): Boolean {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT &&
+        incoming.messageType != TimelineMessageType.USER &&
+        incoming.messageType != TimelineMessageType.REASONING
+    ) {
+        return false
+    }
+    val incomingContent = incoming.content.trim()
+    if (incomingContent.isEmpty()) return false
+    val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    for (i in events.size - 1 downTo start) {
+        val event = events[i] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != incoming.messageType) continue
+        if (event.content.trim() == incomingContent) return true
+    }
+    return false
+}
+
+/**
+ * True when an existing row with the same server id should absorb the incoming
+ * reconciled copy instead of appending a duplicate. Matching real run ids, or
+ * either side missing a run id (REST reconcile responses often omit run_id),
+ * count as the same logical message. Only two DIFFERENT real run ids — the
+ * recycled-server-id-across-runs case from #780 — are treated as distinct.
+ */
+private fun TimelineEvent.Confirmed.sharesRunIdentityWith(
+    incoming: TimelineEvent.Confirmed,
+): Boolean {
+    val existingRunId = runId?.takeIf { it.isNotBlank() }
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
+    if (existingRunId == null || incomingRunId == null) return true
+    return existingRunId == incomingRunId
 }
 
 fun Timeline.positionForServerMessageDate(message: LettaMessage): Double {

@@ -126,7 +126,8 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     val existing = timeline.findByServerId(confirmed.serverId, confirmed.messageType)
         ?.takeIf { it.canMergeStreamFrame(confirmed) }
     if (existing != null) {
-        if (existing.hasAlreadyIngestedStreamFrame(confirmed)) {
+        val syntheticLiveToRealFinal = existing.hasIrohSyntheticRunId() && !confirmed.hasIrohSyntheticRunId()
+        if (!syntheticLiveToRealFinal && existing.hasAlreadyIngestedStreamFrame(confirmed)) {
             hotPathTelemetry(
                 "streamSubscriber.duplicateSeqSkipped",
                 "serverId" to confirmed.serverId,
@@ -139,20 +140,30 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         }
         val oldText = existing.content
         val newText = confirmed.content
-        val canUseSnapshotMerge = existing.seqId != null && confirmed.seqId != null
+        val canUseSnapshotMerge = syntheticLiveToRealFinal || (existing.seqId != null && confirmed.seqId != null)
         // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
         // seq id is strictly greater than the text we already hold. A frame with
         // a lower-or-equal seq id is a replayed / out-of-order re-delivery and
         // must never append or drop a prefix of the complete text. When seq ids
-        // are absent we keep the historical append behaviour (treat as forward).
-        val incomingIsForwardDelta = existing.seqId == null || confirmed.seqId == null ||
-            confirmed.seqId > existing.seqId
-        val textMerge = mergeStreamText(
-            existing = oldText,
-            incoming = newText,
-            canUseSnapshotMerge = canUseSnapshotMerge,
-            incomingIsForwardDelta = incomingIsForwardDelta,
-        )
+        // are absent we keep the historical append behaviour (treat as forward),
+        // except for the Iroh synthetic-live -> real-final replacement path: the
+        // reconciled final is a snapshot, not another text delta.
+        val incomingIsForwardDelta = !syntheticLiveToRealFinal &&
+            (existing.seqId == null || confirmed.seqId == null || confirmed.seqId > existing.seqId)
+        val textMerge = if (syntheticLiveToRealFinal) {
+            StreamTextMergeResult(
+                text = newText.ifBlank { oldText },
+                branch = StreamTextMergeBranch.SNAPSHOT_CONFLICT,
+                garbleRisk = false,
+            )
+        } else {
+            mergeStreamText(
+                existing = oldText,
+                incoming = newText,
+                canUseSnapshotMerge = canUseSnapshotMerge,
+                incomingIsForwardDelta = incomingIsForwardDelta,
+            )
+        }
         val mergedText = textMerge.text
         val oldCalls = existing.toolCalls
         val newCalls = confirmed.toolCalls
@@ -298,10 +309,15 @@ private fun TimelineEvent.Confirmed.canMergeStreamFrame(
     val existingRunId = runId?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
     if (existingRunId != null && incomingRunId != null) {
-        return existingRunId == incomingRunId
+        return existingRunId == incomingRunId || (existingRunId.isIrohSyntheticRunId() && !incomingRunId.isIrohSyntheticRunId())
     }
     return true
 }
+
+private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
+    runId?.takeIf { it.isNotBlank() }?.isIrohSyntheticRunId() == true
+
+private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
 
 private fun Timeline.findSameRunAssistantPrefixOrBlankTarget(
     incoming: TimelineEvent.Confirmed,

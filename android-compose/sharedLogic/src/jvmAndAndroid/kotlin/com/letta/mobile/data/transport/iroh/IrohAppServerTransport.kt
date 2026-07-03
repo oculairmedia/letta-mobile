@@ -103,11 +103,12 @@ class IrohAppServerTransport(
     // connection drops mid-conversation, this names the cause (idle, server
     // close, error) so the multi-turn churn can be diagnosed precisely.
     private val closeWatcher = scope.launch {
-        runCatching { connectionReady.await() }
-        val reason = runCatching { connection.closed() }.getOrNull()
+        if (runCatching { connectionReady.await() }.isFailure || !::connection.isInitialized) return@launch
+        val activeConnection = connection
+        val reason = runCatching { activeConnection.closed() }.getOrNull()
         Telemetry.event(
             "IrohTransport", "connection.closed",
-            *(IrohDiagnostics.closeAttributes(connection) + ("reason" to IrohDiagnostics.closeReason(reason))).toTypedArray(),
+            *(IrohDiagnostics.closeAttributes(activeConnection) + ("reason" to IrohDiagnostics.closeReason(reason))).toTypedArray(),
         )
     }
 
@@ -117,10 +118,11 @@ class IrohAppServerTransport(
     // drop that orphaned later turns' response streams. The server ignores these
     // (it never reads datagrams); they exist only to keep the path alive.
     private val keepAliveJob = scope.launch {
-        runCatching { connectionReady.await() }
+        if (runCatching { connectionReady.await() }.isFailure || !::connection.isInitialized) return@launch
+        val activeConnection = connection
         while (true) {
             kotlinx.coroutines.delay(KEEPALIVE_INTERVAL_MS)
-            val ok = runCatching { connection.sendDatagram(KEEPALIVE_PAYLOAD) }.isSuccess
+            val ok = runCatching { activeConnection.sendDatagram(KEEPALIVE_PAYLOAD) }.isSuccess
             if (!ok) {
                 Telemetry.event("IrohTransport", "keepalive.stopped")
                 break
