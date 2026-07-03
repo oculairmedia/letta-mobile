@@ -35,7 +35,7 @@ object GlbContainer {
 
     /** True if [bytes] start with the GLB magic (cheap format sniff). */
     fun looksLikeGlb(bytes: ByteArray): Boolean =
-        bytes.size >= 4 && readU32(bytes, 0) == MAGIC
+        bytes.size >= 4 && readU32(bytes, 0) == MAGIC.toLong()
 
     fun parseOrNull(bytes: ByteArray): Glb? =
         try {
@@ -48,11 +48,11 @@ object GlbContainer {
         if (bytes.size < HEADER_LENGTH) {
             throw GlbFormatException("Too short for a GLB header (${bytes.size} bytes)")
         }
-        if (readU32(bytes, 0) != MAGIC) {
+        if (readU32(bytes, 0) != MAGIC.toLong()) {
             throw GlbFormatException("Not a GLB container (bad magic)")
         }
         val version = readU32(bytes, 4)
-        if (version != 2) {
+        if (version != 2L) {
             throw GlbFormatException("Unsupported GLB version $version (expected 2)")
         }
         val declaredLength = readU32(bytes, 8)
@@ -62,22 +62,29 @@ object GlbContainer {
             )
         }
 
-        var offset = HEADER_LENGTH
+        // All length/offset math is done in Long: the u32 fields cover the
+        // full 0..2^32-1 range, and a crafted chunkLength near 2^31 would
+        // overflow Int arithmetic, slip past the truncation guard, and crash
+        // with an unchecked bounds exception instead of GlbFormatException.
+        var offset = HEADER_LENGTH.toLong()
         var json: String? = null
         var binary: ByteArray? = null
         while (offset + CHUNK_HEADER_LENGTH <= declaredLength) {
-            val chunkLength = readU32(bytes, offset)
-            val chunkType = readU32(bytes, offset + 4)
+            val chunkLength = readU32(bytes, offset.toInt())
+            val chunkType = readU32(bytes, offset.toInt() + 4)
             val dataStart = offset + CHUNK_HEADER_LENGTH
-            if (chunkLength < 0 || dataStart + chunkLength > declaredLength) {
+            if (dataStart + chunkLength > declaredLength) {
                 throw GlbFormatException("Truncated GLB chunk at offset $offset")
             }
+            // Safe: dataStart + chunkLength <= declaredLength <= bytes.size <= Int.MAX.
+            val start = dataStart.toInt()
+            val end = (dataStart + chunkLength).toInt()
             when (chunkType) {
-                CHUNK_JSON -> if (json == null) {
-                    json = bytes.decodeToString(dataStart, dataStart + chunkLength)
+                CHUNK_JSON.toLong() -> if (json == null) {
+                    json = bytes.decodeToString(start, end)
                 }
-                CHUNK_BIN -> if (binary == null) {
-                    binary = bytes.copyOfRange(dataStart, dataStart + chunkLength)
+                CHUNK_BIN.toLong() -> if (binary == null) {
+                    binary = bytes.copyOfRange(start, end)
                 }
                 // Unknown chunk types are skipped per spec.
             }
@@ -85,15 +92,16 @@ object GlbContainer {
         }
 
         return Glb(
-            version = version,
+            version = version.toInt(),
             json = json ?: throw GlbFormatException("GLB has no JSON chunk"),
             binary = binary,
         )
     }
 
-    private fun readU32(bytes: ByteArray, offset: Int): Int =
-        (bytes[offset].toInt() and 0xFF) or
-            ((bytes[offset + 1].toInt() and 0xFF) shl 8) or
-            ((bytes[offset + 2].toInt() and 0xFF) shl 16) or
-            ((bytes[offset + 3].toInt() and 0xFF) shl 24)
+    /** Little-endian u32 as an unsigned value in a Long (never negative). */
+    private fun readU32(bytes: ByteArray, offset: Int): Long =
+        (bytes[offset].toLong() and 0xFF) or
+            ((bytes[offset + 1].toLong() and 0xFF) shl 8) or
+            ((bytes[offset + 2].toLong() and 0xFF) shl 16) or
+            ((bytes[offset + 3].toLong() and 0xFF) shl 24)
 }

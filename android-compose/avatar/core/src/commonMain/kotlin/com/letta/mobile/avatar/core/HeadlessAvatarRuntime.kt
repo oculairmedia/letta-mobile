@@ -1,5 +1,6 @@
 package com.letta.mobile.avatar.core
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -59,11 +60,22 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     final override suspend fun load(model: AvatarModel) {
         check(!isDisposed) { "AvatarRuntime is disposed" }
+        // Replacing a live avatar: give the adapter its teardown hook before
+        // the new load starts, so renderer resources for the previous model
+        // never outlive the state transition.
+        if (_state.value !is AvatarRuntimeState.Idle) {
+            onUnload()
+        }
         resetCommandState()
         _state.value = AvatarRuntimeState.Loading(model)
         try {
             val capabilities = loadCapabilities(model)
             _state.value = AvatarRuntimeState.Ready(model, capabilities)
+        } catch (cancelled: CancellationException) {
+            // A cancelled load is not a failure — don't flash an error state
+            // at observers during normal navigation/avatar-switch teardown.
+            _state.value = AvatarRuntimeState.Idle
+            throw cancelled
         } catch (t: Throwable) {
             _state.value = AvatarRuntimeState.Failed(model, t.message ?: "Load failed")
             throw t
@@ -73,42 +85,46 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     final override suspend fun unload() {
         if (isDisposed) return
         resetCommandState()
-        onUnload()
+        if (_state.value !is AvatarRuntimeState.Idle) {
+            onUnload()
+        }
         _state.value = AvatarRuntimeState.Idle
     }
 
     override fun setExpression(expression: AvatarExpression, weight: Float) {
-        if (!isReady()) return
+        if (readyCapabilities()?.supportsExpressions != true) return
         expressions[expression.key] = weight.coerceIn(0f, 1f)
     }
 
     override fun setViseme(viseme: AvatarViseme, weight: Float) {
-        if (!isReady()) return
+        if (readyCapabilities()?.supportsVisemes != true) return
         visemes[viseme.key] = weight.coerceIn(0f, 1f)
     }
 
     override fun setMouthOpen(value: Float) {
-        if (!isReady()) return
+        if (readyCapabilities()?.supportsVisemes != true) return
         mouthOpen = value.coerceIn(0f, 1f)
     }
 
     override fun setLookTarget(target: AvatarLookTarget?) {
-        if (!isReady()) return
+        if (readyCapabilities()?.supportsLookAt != true) return
         lookTarget = target
     }
 
     override fun playGesture(gesture: AvatarGesture, fadeSeconds: Float) {
-        if (!isReady()) return
+        // Gestures may be procedural, so they have no capability flag —
+        // Ready-gated only.
+        if (readyCapabilities() == null) return
         onPlayGesture(gesture, fadeSeconds)
     }
 
     override fun playAnimation(animationId: String, loop: Boolean) {
-        if (!isReady()) return
+        if (readyCapabilities()?.supportsEmbeddedAnimations != true) return
         onPlayAnimation(animationId, loop)
     }
 
     override fun setAccessoryEnabled(accessoryId: String, enabled: Boolean) {
-        if (!isReady()) return
+        if (readyCapabilities()?.supportsAccessories != true) return
         if (enabled) disabledAccessories.remove(accessoryId) else disabledAccessories.add(accessoryId)
     }
 
@@ -118,6 +134,11 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
 
     override fun dispose() {
         if (isDisposed) return
+        // Same teardown hook contract as unload(): adapters relying on
+        // onUnload() for renderer cleanup must not leak on direct dispose().
+        if (_state.value !is AvatarRuntimeState.Idle) {
+            onUnload()
+        }
         isDisposed = true
         resetCommandState()
         _state.value = AvatarRuntimeState.Idle
@@ -132,8 +153,11 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     /** Hook for subclasses: an animation was requested while Ready. */
     protected open fun onPlayAnimation(animationId: String, loop: Boolean) {}
 
-    private fun isReady(): Boolean =
-        !isDisposed && _state.value is AvatarRuntimeState.Ready
+    /** The Ready-state capabilities, or null when commands must be dropped. */
+    private fun readyCapabilities(): AvatarCapabilities? {
+        if (isDisposed) return null
+        return (_state.value as? AvatarRuntimeState.Ready)?.capabilities
+    }
 
     private fun resetCommandState() {
         expressions.clear()

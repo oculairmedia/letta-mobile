@@ -77,6 +77,8 @@ class AvatarFormatDetectorTest {
                     {"presetName": "joy", "name": "Joy"},
                     {"presetName": "sorrow", "name": "Sorrow"},
                     {"presetName": "a", "name": "A"},
+                    {"presetName": "blink_l", "name": "Blink_L"},
+                    {"presetName": "lookup", "name": "LookUp"},
                     {"presetName": "unknown", "name": "CatEars"}
                   ]},
                   "secondaryAnimation": {"boneGroups": [{"bones": [3]}]}
@@ -89,8 +91,12 @@ class AvatarFormatDetectorTest {
 
         assertEquals(AvatarFormat.VRM_0, detection.format)
         assertEquals(listOf("hips", "head"), detection.humanoidBones)
-        // joy -> happy, sorrow -> sad; unknown preset falls back to its name.
-        assertEquals(listOf("happy", "sad", "CatEars"), detection.expressions)
+        // joy -> happy, sorrow -> sad, blink_l -> blinkLeft, lookup -> lookUp;
+        // unknown preset falls back to its author-facing name.
+        assertEquals(
+            listOf("happy", "sad", "blinkLeft", "lookUp", "CatEars"),
+            detection.expressions,
+        )
         // a -> aa (VRM 1.0 viseme key space).
         assertEquals(listOf("aa"), detection.visemes)
         assertTrue(detection.capabilities.supportsSpringBones)
@@ -118,6 +124,36 @@ class AvatarFormatDetectorTest {
             AvatarFormatDetector.detect(byteArrayOf(0, 1, 2, 3))
         }
         assertEquals(null, AvatarFormatDetector.detectOrNull(byteArrayOf(0, 1, 2, 3)))
+    }
+
+    @Test
+    fun jsonWithoutGltfAssetVersionIsRejected() {
+        // Arbitrary JSON — not a glTF document — must not produce a manifest.
+        assertFailsWith<AvatarDetectionException> {
+            AvatarFormatDetector.detect("""{"foo": 1}""".encodeToByteArray())
+        }
+        // Same for a GLB whose JSON chunk isn't glTF.
+        assertFailsWith<AvatarDetectionException> {
+            AvatarFormatDetector.detect(buildGlb("{}", bin = null))
+        }
+        // And for unsupported glTF major versions.
+        assertFailsWith<AvatarDetectionException> {
+            AvatarFormatDetector.detect(buildGlb("""{"asset":{"version":"1.0"}}""", bin = null))
+        }
+    }
+
+    @Test
+    fun duplicateAnimationNamesGetUniqueIds() {
+        val json = """
+            {
+              "asset": {"version": "2.0"},
+              "animations": [{"name": "Idle"}, {"name": "Idle"}, {"name": "Wave"}]
+            }
+        """.trimIndent()
+
+        val detection = AvatarFormatDetector.detect(buildGlb(json, bin = null))
+
+        assertEquals(listOf("Idle", "Idle-1", "Wave"), detection.animations.map { it.id })
     }
 
     @Test

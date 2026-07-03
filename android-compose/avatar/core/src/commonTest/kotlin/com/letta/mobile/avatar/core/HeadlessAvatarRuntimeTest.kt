@@ -122,4 +122,80 @@ class HeadlessAvatarRuntimeTest {
         runtime.setExpression(AvatarExpression.Happy)
         runtime.update(0.016f)
     }
+
+    /** Counts onUnload calls so adapter-teardown contracts are assertable. */
+    private class UnloadCountingRuntime : HeadlessAvatarRuntime() {
+        var unloadCount = 0
+            private set
+
+        override fun onUnload() {
+            unloadCount += 1
+        }
+    }
+
+    @Test
+    fun replacingALoadedAvatarFiresTheUnloadHook() = runTest {
+        val runtime = UnloadCountingRuntime()
+
+        runtime.load(model)
+        assertEquals(0, runtime.unloadCount) // first load replaces nothing
+
+        runtime.load(model.copy(id = "avatar-2"))
+        assertEquals(1, runtime.unloadCount) // previous avatar torn down
+    }
+
+    @Test
+    fun unloadAndDisposeFireTheUnloadHookOnlyWhileLive() = runTest {
+        val runtime = UnloadCountingRuntime()
+
+        runtime.unload() // idle — nothing to tear down
+        assertEquals(0, runtime.unloadCount)
+
+        runtime.load(model)
+        runtime.unload()
+        assertEquals(1, runtime.unloadCount)
+
+        runtime.load(model)
+        runtime.dispose() // dispose without prior unload must not leak
+        assertEquals(2, runtime.unloadCount)
+    }
+
+    @Test
+    fun commandsForUnsupportedCapabilitiesAreDropped() = runTest {
+        val runtime = object : HeadlessAvatarRuntime() {
+            var animationPlays = 0
+            override suspend fun loadCapabilities(model: AvatarModel) = AvatarCapabilities()
+            override fun onPlayAnimation(animationId: String, loop: Boolean) {
+                animationPlays += 1
+            }
+        }
+        runtime.load(model)
+
+        runtime.setExpression(AvatarExpression.Happy)
+        runtime.setViseme(AvatarViseme.A, 1f)
+        runtime.setMouthOpen(1f)
+        runtime.setLookTarget(AvatarLookTarget.World(0f, 0f, 0f))
+        runtime.playAnimation("Idle")
+        runtime.setAccessoryEnabled("glasses", enabled = false)
+
+        assertTrue(runtime.expressionWeights.isEmpty())
+        assertTrue(runtime.visemeWeights.isEmpty())
+        assertEquals(0f, runtime.mouthOpen)
+        assertNull(runtime.lookTarget)
+        assertEquals(0, runtime.animationPlays)
+        assertTrue(runtime.disabledAccessoryIds.isEmpty())
+    }
+
+    @Test
+    fun cancelledLoadReturnsToIdleInsteadOfFailed() = runTest {
+        val runtime = object : HeadlessAvatarRuntime() {
+            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
+                throw kotlinx.coroutines.CancellationException("scope torn down")
+        }
+
+        assertFailsWith<kotlinx.coroutines.CancellationException> { runtime.load(model) }
+
+        // Cancellation is not a failure — no error state flashed at observers.
+        assertEquals(AvatarRuntimeState.Idle, runtime.state.value)
+    }
 }

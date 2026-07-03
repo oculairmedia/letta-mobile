@@ -3,8 +3,8 @@ package com.letta.mobile.avatar.core
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /** Result of sniffing an asset's bytes: format + normalized metadata. */
 data class AvatarDetection(
@@ -41,8 +41,9 @@ object AvatarFormatDetector {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * VRM 0.x blend-shape preset → normalized key. Lip-sync presets map to
-     * [AvatarViseme] keys, emotion presets to [AvatarExpression] keys.
+     * VRM 0.x predefined blend-shape preset → normalized key (the VRM 1.0
+     * preset name space). Lip-sync presets map to [AvatarViseme] keys, all
+     * other presets — emotions, blinks, eye-control — to expression keys.
      * (VRM 1.0 already uses the normalized names.)
      */
     private val vrm0PresetToNormalized = mapOf(
@@ -57,6 +58,13 @@ object AvatarFormatDetector {
         "u" to "ou",
         "e" to "ee",
         "o" to "oh",
+        "blink" to "blink",
+        "blink_l" to "blinkLeft",
+        "blink_r" to "blinkRight",
+        "lookup" to "lookUp",
+        "lookdown" to "lookDown",
+        "lookleft" to "lookLeft",
+        "lookright" to "lookRight",
     )
 
     private val visemeKeys = AvatarViseme.presets.map { it.key }.toSet()
@@ -85,6 +93,17 @@ object AvatarFormatDetector {
             json.parseToJsonElement(gltfJsonText).jsonObject
         } catch (e: Exception) {
             throw AvatarDetectionException("Asset JSON chunk is not valid JSON", e)
+        }
+
+        // glTF 2.0 makes asset.version mandatory — without it this is just
+        // some JSON object, and accepting it would let non-glTF bytes produce
+        // manifests and catalog entries.
+        val assetVersion = (root.obj("asset")?.get("version") as? JsonPrimitive)?.content
+            ?: throw AvatarDetectionException("Missing required glTF asset.version")
+        if (!assetVersion.startsWith("2.")) {
+            throw AvatarDetectionException(
+                "Unsupported glTF asset.version $assetVersion (need 2.x)",
+            )
         }
 
         val extensions = root.stringArray("extensionsUsed").toSet()
@@ -169,7 +188,7 @@ object AvatarFormatDetector {
         // humanoid.humanBones is an ARRAY of { bone: "hips", node: n }.
         val bones = vrm.obj("humanoid")?.get("humanBones")?.let { element ->
             (element as? JsonArray)?.mapNotNull { entry ->
-                (entry as? JsonObject)?.get("bone")?.jsonPrimitive?.content
+                (entry as? JsonObject)?.get("bone").primitiveContent()
             }
         }.orEmpty()
 
@@ -178,11 +197,11 @@ object AvatarFormatDetector {
         val groups = vrm.obj("blendShapeMaster")?.get("blendShapeGroups") as? JsonArray
         val morphKeys = groups.orEmpty().mapNotNull { entry ->
             val group = entry as? JsonObject ?: return@mapNotNull null
-            val preset = group["presetName"]?.jsonPrimitive?.content?.lowercase()
+            val preset = group["presetName"].primitiveContent()?.lowercase()
             when {
                 preset != null && preset in vrm0PresetToNormalized ->
                     vrm0PresetToNormalized[preset]
-                else -> group["name"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                else -> group["name"].primitiveContent()?.takeIf { it.isNotBlank() }
             }
         }.distinct()
         return bones to morphKeys
@@ -196,12 +215,20 @@ object AvatarFormatDetector {
 
     private fun detectAnimations(root: JsonObject): List<AvatarAnimationInfo> {
         val animations = root["animations"] as? JsonArray ?: return emptyList()
+        // glTF animation names are optional labels with no uniqueness
+        // guarantee, but manifests address animations by id — dedupe with an
+        // index suffix so every embedded animation stays reachable.
+        val seenIds = mutableSetOf<String>()
         return animations.mapIndexed { index, entry ->
-            val name = (entry as? JsonObject)?.get("name")?.jsonPrimitive?.content
-            AvatarAnimationInfo(
-                id = name?.takeIf { it.isNotBlank() } ?: "anim-$index",
-                name = name,
-            )
+            val name = (entry as? JsonObject)?.get("name").primitiveContent()
+            val base = name?.takeIf { it.isNotBlank() } ?: "anim-$index"
+            var id = base
+            var suffix = index
+            while (!seenIds.add(id)) {
+                id = "$base-$suffix"
+                suffix += 1
+            }
+            AvatarAnimationInfo(id = id, name = name)
         }
     }
 
@@ -212,7 +239,10 @@ object AvatarFormatDetector {
 
     private fun JsonObject.obj(key: String): JsonObject? = this[key] as? JsonObject
 
+    /** Non-throwing primitive extraction — malformed nodes yield null. */
+    private fun kotlinx.serialization.json.JsonElement?.primitiveContent(): String? =
+        (this as? JsonPrimitive)?.content
+
     private fun JsonObject.stringArray(key: String): List<String> =
-        (this[key] as? JsonArray)?.mapNotNull { runCatching { it.jsonPrimitive.content }.getOrNull() }
-            .orEmpty()
+        (this[key] as? JsonArray)?.mapNotNull { it.primitiveContent() }.orEmpty()
 }

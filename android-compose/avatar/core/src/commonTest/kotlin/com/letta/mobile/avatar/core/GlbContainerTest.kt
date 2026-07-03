@@ -70,6 +70,33 @@ class GlbContainerTest {
         val bytes = buildRawGlb(listOf(GlbContainer.CHUNK_BIN to byteArrayOf(1)))
         assertFailsWith<GlbFormatException> { GlbContainer.parse(bytes) }
     }
+
+    @Test
+    fun rejectsChunkLengthThatWouldOverflowIntArithmetic() {
+        // A crafted chunkLength just under 2^31: with Int math,
+        // dataStart + chunkLength wraps negative and slips past the
+        // truncation guard into an unchecked bounds exception.
+        val bytes = buildGlb("""{"asset":{"version":"2.0"}}""", bin = null)
+        val overflowLength = 2_147_483_600
+        bytes[12] = (overflowLength and 0xFF).toByte()
+        bytes[13] = ((overflowLength ushr 8) and 0xFF).toByte()
+        bytes[14] = ((overflowLength ushr 16) and 0xFF).toByte()
+        bytes[15] = ((overflowLength ushr 24) and 0xFF).toByte()
+
+        assertFailsWith<GlbFormatException> { GlbContainer.parse(bytes) }
+    }
+
+    @Test
+    fun rejectsChunkLengthAboveIntRange() {
+        // Full-u32 chunkLength (would be negative as a signed Int).
+        val bytes = buildGlb("""{"asset":{"version":"2.0"}}""", bin = null)
+        bytes[12] = 0xFF.toByte()
+        bytes[13] = 0xFF.toByte()
+        bytes[14] = 0xFF.toByte()
+        bytes[15] = 0xFF.toByte()
+
+        assertFailsWith<GlbFormatException> { GlbContainer.parse(bytes) }
+    }
 }
 
 /** Assemble a spec-shaped GLB from a JSON payload and optional BIN chunk. */
