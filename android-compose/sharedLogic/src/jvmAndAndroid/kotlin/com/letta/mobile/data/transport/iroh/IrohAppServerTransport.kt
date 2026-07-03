@@ -12,6 +12,7 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.PathChangeCallback
 import computer.iroh.PathEventCallback
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -155,9 +156,22 @@ class IrohAppServerTransport(
         connectionReady.await()
         val requestId = "admin-${UUID.randomUUID()}"
         val params = adminRpcParams(path = path, body = body)
-        return runCatching {
+        return try {
             adminRpcOverStream(requestId, method, path, params)
-        }.getOrElse { streamError ->
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (streamError: Throwable) {
+            if (!method.isLegacyFallbackSafeAdminRpcMethod()) {
+                Telemetry.event(
+                    "IrohTransport", "admin_rpc.stream.fallback_skipped",
+                    "method" to method,
+                    "path" to path,
+                    "requestId" to requestId,
+                    "error" to (streamError.message ?: streamError.toString()),
+                    "class" to streamError::class.simpleName,
+                )
+                throw streamError
+            }
             Telemetry.event(
                 "IrohTransport", "admin_rpc.stream.fallback_control",
                 "method" to method,
@@ -383,6 +397,25 @@ class IrohAppServerTransport(
         val pending = legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(response.requestId) }
         pending?.complete(response)
         return pending != null
+    }
+
+    private fun String.isLegacyFallbackSafeAdminRpcMethod(): Boolean = when (this) {
+        "health.check",
+        "conversation.list",
+        "message.list",
+        "message.get",
+        "goal.get",
+        "agent.list",
+        "agent.get",
+        "archive.list",
+        "identity.list",
+        "model.list",
+        "schedule.list",
+        "tool.list",
+        "mcp.list",
+        "run.list",
+        "run.get" -> true
+        else -> false
     }
 
     private fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {
