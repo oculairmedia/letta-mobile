@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -160,7 +161,22 @@ fun Timeline.mergeServerMessages(
         if (existingByServerId?.canReplaceIrohSyntheticLiveRow(confirmed) == true) {
             timeline = timeline.replaceByServerId(confirmed)
             merged++
-        } else if (existingByServerId != null && existingByServerId.sharesRunIdentityWith(confirmed)) {
+        } else if (existingByServerId == null) {
+            val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)
+            if (prefixIndex != null) {
+                timeline = timeline.replaceEventAt(prefixIndex, confirmed.copy(position = timeline.events[prefixIndex].position))
+                Telemetry.event(
+                    "TimelineSync", "recentReconcile.assistantPrefixReplaced",
+                    "conversationId" to timeline.conversationId,
+                    "serverId" to confirmed.serverId,
+                    "incomingLen" to confirmed.content.length,
+                )
+                merged++
+            } else {
+                timeline = timeline.insertOrdered(confirmed)
+                merged++
+            }
+        } else if (existingByServerId.sharesRunIdentityWith(confirmed)) {
             // Same server id + message type, and at least one side lacks a
             // run id (REST /messages replies often omit run_id while the live
             // Iroh/WS row carries the real one). #780 run-scoped identity keys
@@ -175,6 +191,30 @@ fun Timeline.mergeServerMessages(
         }
     }
     return timeline to merged
+}
+
+private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed): Timeline {
+    val updated = events.toMutableList()
+    updated[index] = event
+    return copy(events = updated.toPersistentList(), stablePrefixVersion = stablePrefixVersion + 1)
+}
+
+private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Confirmed): Int? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingText = incoming.content.trim()
+    if (incomingText.length < 2) return null
+    val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    for (index in events.size - 1 downTo start) {
+        val event = events[index] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != TimelineMessageType.ASSISTANT) continue
+        if (event.serverId == incoming.serverId) continue
+        val existingText = event.content.trim()
+        if (existingText.isBlank()) continue
+        if (incomingText.length > existingText.length && incomingText.startsWith(existingText)) {
+            return index
+        }
+    }
+    return null
 }
 
 private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(

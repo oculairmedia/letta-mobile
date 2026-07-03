@@ -583,6 +583,36 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `recent reconcile final assistant replaces live prefix row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-624",
+                contentRaw = JsonPrimitive("Let"),
+                runId = "local-run-15",
+                seqId = 1,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "letta-msg-640",
+                    contentRaw = JsonPrimitive("Let's find out — no duplicate here."),
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-640"
+        event.content shouldBe "Let's find out — no duplicate here."
+        event.position shouldBe (live.events.single() as TimelineEvent.Confirmed).position
+    }
+
+    @Test
     fun `recent reconcile real run replaces iroh synthetic live row`() {
         val live = reduce(
             frame = AssistantMessage(
