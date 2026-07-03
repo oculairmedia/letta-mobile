@@ -28,6 +28,12 @@ class AdminRpcRouter(
 ) {
     private val handlers = mutableMapOf<String, suspend (JsonObject?) -> JsonElement>()
 
+    val methodCount: Int
+        get() = handlers.size
+
+    val registeredMethods: Set<String>
+        get() = handlers.keys.toSet()
+
     /**
      * Registers a handler for the given method name.
      * Method names should use dot-notation: "agent.list", "conversation.get", etc.
@@ -35,6 +41,19 @@ class AdminRpcRouter(
     fun register(method: String, handler: suspend (JsonObject?) -> JsonElement) {
         handlers[method] = handler
         Telemetry.event("AdminRpc", "handler.registered", "method" to method)
+    }
+
+    fun requireNonEmpty(minMethods: Int = 1): AdminRpcRouter {
+        require(handlers.size >= minMethods) {
+            "Admin RPC router has ${handlers.size} registered methods; expected at least $minMethods"
+        }
+        return this
+    }
+
+    fun copyHandlersFrom(other: AdminRpcRouter): AdminRpcRouter {
+        handlers.clear()
+        handlers.putAll(other.handlers)
+        return requireNonEmpty(other.methodCount)
     }
 
     /**
