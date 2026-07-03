@@ -29,6 +29,7 @@ class MessageRepositoryBoundaryTest {
                 "cancelMessage",
                 "createBatch",
                 "fetchConversationInspectorMessages",
+                "fetchLatestConversationInspectorMessages",
                 "fetchMessages",
                 "fetchOlderMessages",
                 "getMessagesPaged",

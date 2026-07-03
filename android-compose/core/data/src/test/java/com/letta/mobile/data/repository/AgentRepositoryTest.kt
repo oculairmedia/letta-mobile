@@ -6,7 +6,10 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
+import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeAgentApi
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -14,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -329,6 +333,86 @@ class AgentRepositoryTest {
         assertEquals("Remote", agent.name)
         assertEquals(listOf("createAgent:Remote", "listAgents"), fakeApi.calls)
         assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
+    }
+
+    @Test
+    fun `reconnect refreshes cache with one bulk list instead of per-agent GETs`() = runTest {
+        val transport = FakeChannelTransport()
+        repeat(3) { index ->
+            fakeApi.agents.add(TestData.agent(id = "a$index", name = "Agent $index"))
+        }
+        val repo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
+        repo.refreshAgents()
+        runCurrent()
+        val listCallsBefore = fakeApi.calls.count { it == "listAgents" }
+
+        transport.state.value = ChannelTransportState.Disconnected(1006, "network drop")
+        runCurrent()
+        transport.state.value = ChannelTransportState.Connected(
+            serverId = "srv",
+            sessionId = "sess-2",
+            deviceId = "dev",
+        )
+        runCurrent()
+
+        // letta-mobile-vcmin: one paged list call, never a GET per cached agent.
+        assertTrue(fakeApi.calls.none { it.startsWith("getAgent:") })
+        assertEquals(listCallsBefore + 1, fakeApi.calls.count { it == "listAgents" })
+        assertEquals(3, repo.agents.value.size)
+    }
+
+    @Test
+    fun `agent_updated for ephemeral letta-code subagent skips per-agent GET`() = runTest {
+        val transport = FakeChannelTransport()
+        val repo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(
+            ServerFrame.AgentUpdated(
+                id = "evt-1",
+                ts = "2026-07-03T00:00:00Z",
+                agentId = "agent-local-worker-1",
+            )
+        )
+        runCurrent()
+
+        assertTrue(fakeApi.calls.none { it.startsWith("getAgent:") })
+        assertTrue(repo.agents.value.isEmpty())
+    }
+
+    @Test
+    fun `agent_updated for persistent agent still refreshes it individually`() = runTest {
+        fakeApi.agents.add(TestData.agent(id = "agent-1", name = "Persistent"))
+        val transport = FakeChannelTransport()
+        val repo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            repositoryScope = backgroundScope,
+            transport = transport,
+        )
+        runCurrent()
+
+        transport.events.emit(
+            ServerFrame.AgentUpdated(
+                id = "evt-1",
+                ts = "2026-07-03T00:00:00Z",
+                agentId = "agent-1",
+            )
+        )
+        runCurrent()
+
+        assertTrue(fakeApi.calls.any { it.startsWith("getAgent:") })
+        assertEquals(listOf("Persistent"), repo.agents.value.map { it.name })
     }
 
     @Test

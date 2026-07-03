@@ -287,6 +287,12 @@ open class AgentRepository(
                     .onFailure { e -> Log.w("AgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", e) }
                 return@collect
             }
+            // Ephemeral letta-code subagents (`agent-local-*`, transient
+            // "Letta Code" workers) churn in bursts while a run fans out;
+            // don't issue a per-agent GET for each one — they are not part of
+            // the human agent list and the next bulk refresh reconciles them
+            // (letta-mobile-vcmin).
+            if (isEphemeralSubagentId(agentId)) return@collect
             refreshAgent(agentId)
                 .onFailure { e -> Log.w("AgentRepository", "agent_updated refresh failed for ${frame.agentId}: ${e.message}") }
         }
@@ -297,14 +303,20 @@ open class AgentRepository(
         channelTransport.state.collect { state ->
             val nowConnected = state is ChannelTransportState.Connected
             if (wasConnected == false && nowConnected) {
-                _agents.value.map { it.id }.forEach { agentId ->
-                    refreshAgent(agentId)
-                        .onFailure { e -> Log.w("AgentRepository", "reconnect agent refresh failed for ${agentId.value}: ${e.message}") }
-                }
+                // One paged list call instead of a GET /v1/agents/{id} per
+                // cached agent: with ~100 cached agents (mostly ephemeral
+                // `agent-local-*` subagents) the per-agent loop serialized
+                // ~5s of sequential requests on every reconnect
+                // (letta-mobile-vcmin).
+                runCatching { refreshAgents() }
+                    .onFailure { e -> Log.w("AgentRepository", "reconnect agent refresh failed: ${e.message}") }
             }
             wasConnected = nowConnected
         }
     }
+
+    private fun isEphemeralSubagentId(id: AgentId): Boolean =
+        id.value.startsWith(EPHEMERAL_SUBAGENT_ID_PREFIX)
 
     override open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
         val localSource = localAgentSource
@@ -483,5 +495,13 @@ open class AgentRepository(
     private companion object {
         const val CACHE_REFRESH_PAGE_SIZE = 50
         const val FALLBACK_FULL_FETCH_LIMIT = 5_000
+
+        /**
+         * Id prefix letta-code mints for ephemeral subagent workers (the
+         * transient "Letta Code" agents that fan out during a run). Distinct
+         * from the on-device `local-agent-*` prefix used by
+         * [createLocalAgent].
+         */
+        const val EPHEMERAL_SUBAGENT_ID_PREFIX = "agent-local-"
     }
 }
