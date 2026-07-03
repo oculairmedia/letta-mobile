@@ -8,7 +8,14 @@ import kotlin.test.assertTrue
 
 class AvatarWireProtocolTest {
     private val allCommands: List<AvatarRendererCommand> = listOf(
-        AvatarRendererCommand.LoadAvatar(url = "file:///a.vrm", format = "vrm1", requestId = "load-1"),
+        AvatarRendererCommand.LoadAvatar(
+            url = "file:///a.vrm",
+            format = "vrm1",
+            requestId = "load-1",
+            accessories = listOf(
+                AvatarRendererCommand.WireAccessory("glasses", listOf("Glasses_L", "Glasses_R")),
+            ),
+        ),
         AvatarRendererCommand.Unload,
         AvatarRendererCommand.SetExpression(key = "happy", weight = 0.8f),
         AvatarRendererCommand.SetViseme(key = "aa", weight = 1f),

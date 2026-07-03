@@ -47,6 +47,13 @@ class WebAvatarRuntime(
     private val transport: AvatarRendererTransport,
     private val loadTimeoutMillis: Long = 30_000,
     private val onRendererError: (String) -> Unit = {},
+    /**
+     * Accessory id -> node-name bindings for a model, typically read from its
+     * manifest ([com.letta.mobile.avatar.core.AvatarManifest.accessories]).
+     * Sent with the load command so the renderer can honor logical accessory
+     * ids that don't match raw glTF node names.
+     */
+    private val accessoriesForModel: (AvatarModel) -> List<AvatarRendererCommand.WireAccessory> = { emptyList() },
 ) : HeadlessAvatarRuntime() {
     private val rendererReady = CompletableDeferred<Int>()
     private var pendingLoad: PendingLoad? = null
@@ -63,9 +70,7 @@ class WebAvatarRuntime(
 
     override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
         // A replacement load supersedes any still-pending one.
-        pendingLoad?.result?.completeExceptionally(
-            AvatarWireException("Superseded by a newer load"),
-        )
+        cancelPendingLoad("Superseded by a newer load")
 
         return try {
             withTimeout(loadTimeoutMillis) {
@@ -84,6 +89,7 @@ class WebAvatarRuntime(
                         url = model.uri,
                         format = model.format.wireName,
                         requestId = pending.requestId,
+                        accessories = accessoriesForModel(model),
                     ),
                 )
                 try {
@@ -103,7 +109,16 @@ class WebAvatarRuntime(
     }
 
     override fun onUnload() {
+        // An unload (or a replacement load / dispose) invalidates any load
+        // still awaiting its ack — a late avatarLoaded for that request must
+        // not resurrect the model the caller just navigated away from.
+        cancelPendingLoad("Unloaded while the load was in flight")
         sendCommand(AvatarRendererCommand.Unload)
+    }
+
+    private fun cancelPendingLoad(reason: String) {
+        pendingLoad?.result?.completeExceptionally(AvatarWireException(reason))
+        pendingLoad = null
     }
 
     override fun onExpressionChanged(expression: AvatarExpression, weight: Float) {
@@ -144,8 +159,7 @@ class WebAvatarRuntime(
 
     override fun dispose() {
         super.dispose()
-        pendingLoad?.result?.completeExceptionally(AvatarWireException("Runtime disposed"))
-        pendingLoad = null
+        cancelPendingLoad("Runtime disposed")
         transport.close()
     }
 

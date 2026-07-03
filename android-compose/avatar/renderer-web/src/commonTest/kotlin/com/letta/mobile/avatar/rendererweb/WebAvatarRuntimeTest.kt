@@ -186,6 +186,49 @@ class WebAvatarRuntimeTest {
     }
 
     @Test
+    fun unloadDuringInFlightLoadCancelsItAndLateAckIsIgnored() = runTest {
+        val transport = FakeTransport()
+        val runtime = WebAvatarRuntime(transport)
+        transport.emit(AvatarRendererEvent.Ready(AvatarWireProtocol.VERSION))
+
+        var failure: Throwable? = null
+        val job = launch { runCatching { runtime.load(model) }.onFailure { failure = it } }
+        runCurrent() // load command sent, awaiting ack
+
+        runtime.unload()
+        runCurrent()
+        job.join()
+
+        assertIs<AvatarWireException>(failure)
+        assertEquals(AvatarRuntimeState.Idle, runtime.state.value)
+
+        // A late ack for the cancelled request must not resurrect the model.
+        transport.emit(
+            AvatarRendererEvent.AvatarLoaded(transport.lastLoadRequestId(), fullCapabilities),
+        )
+        runCurrent()
+        assertEquals(AvatarRuntimeState.Idle, runtime.state.value)
+    }
+
+    @Test
+    fun manifestAccessoryBindingsRideTheLoadCommand() = runTest {
+        val binding = AvatarRendererCommand.WireAccessory("glasses", listOf("Glasses_L"))
+        val transport = FakeTransport()
+        val runtime = WebAvatarRuntime(transport, accessoriesForModel = { listOf(binding) })
+        transport.emit(AvatarRendererEvent.Ready(AvatarWireProtocol.VERSION))
+
+        val job = launch { runCatching { runtime.load(model) } }
+        runCurrent()
+
+        val load = assertIs<AvatarRendererCommand.LoadAvatar>(transport.sent.single())
+        assertEquals(listOf(binding), load.accessories)
+
+        transport.emit(AvatarRendererEvent.AvatarLoaded(load.requestId, fullCapabilities))
+        runCurrent()
+        job.join()
+    }
+
+    @Test
     fun malformedRendererEventsAreSurfacedNotThrown() = runTest {
         val errors = mutableListOf<String>()
         val transport = FakeTransport()

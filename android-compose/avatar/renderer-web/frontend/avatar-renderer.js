@@ -42,7 +42,10 @@ export function createAvatarRenderer(canvas, emit) {
   const lookAtTarget = new THREE.Object3D();
   scene.add(lookAtTarget);
 
-  let current = null; // { root, vrm|null, mixer|null, clipsById }
+  let current = null; // { root, vrm|null, mixer|null, clipsById, accessoryBindings }
+  // Only the newest load may mutate the scene; older in-flight loadAsync
+  // resolutions are discarded (the host ignores their acks by requestId too).
+  let activeLoadRequestId = null;
 
   function resize() {
     const width = canvas.clientWidth || canvas.width;
@@ -69,6 +72,7 @@ export function createAvatarRenderer(canvas, emit) {
   }
 
   function unloadCurrent() {
+    activeLoadRequestId = null; // discard any in-flight load's late result
     if (!current) return;
     scene.remove(current.root);
     VRMUtils.deepDispose(current.root);
@@ -86,18 +90,29 @@ export function createAvatarRenderer(canvas, emit) {
     lookAtTarget.position.copy(camera.position);
   }
 
-  async function loadAvatar({ url, format, requestId }) {
+  async function loadAvatar({ url, format, requestId, accessories }) {
+    activeLoadRequestId = requestId;
     try {
       const gltf = await loader.loadAsync(url);
+      if (activeLoadRequestId !== requestId) {
+        // Superseded by a newer load or an unload while fetching/parsing —
+        // never touch the live scene; just release what we loaded.
+        VRMUtils.deepDispose(gltf.userData.vrm ? gltf.userData.vrm.scene : gltf.scene);
+        return;
+      }
       unloadCurrent();
 
       const vrm = gltf.userData.vrm ?? null;
       const root = vrm ? vrm.scene : gltf.scene;
       if (vrm) {
+        // Legacy VRM 0.x assets face +Z; normalize to the VRM 1.0 convention
+        // (no-op for VRM 1.0 models).
+        VRMUtils.rotateVRM0(vrm);
         // Perf prep per three-vrm guidance; harmless on small scenes.
         VRMUtils.removeUnnecessaryVertices(root);
         VRMUtils.combineSkeletons(root);
-        if (vrm.lookAt) vrm.lookAt.target = lookAtTarget;
+        // Note: lookAt.target stays unset — idle gaze until the host sends
+        // an explicit setLookTarget.
       }
       scene.add(root);
       frameCamera(root);
@@ -108,16 +123,21 @@ export function createAvatarRenderer(canvas, emit) {
         mixer = new THREE.AnimationMixer(root);
         const seen = new Set();
         gltf.animations.forEach((clip, index) => {
-          // Mirror AvatarFormatDetector's id scheme: name, deduped, else anim-<i>.
-          let id = clip.name && clip.name.length > 0 ? clip.name : `anim-${index}`;
+          // Mirror AvatarFormatDetector's id scheme exactly: non-blank name,
+          // deduped from the same base, else anim-<index>.
+          const base = clip.name && clip.name.length > 0 ? clip.name : `anim-${index}`;
+          let id = base;
           let suffix = index;
-          while (seen.has(id)) { id = `${clip.name}-${suffix}`; suffix += 1; }
+          while (seen.has(id)) { id = `${base}-${suffix}`; suffix += 1; }
           seen.add(id);
           clipsById.set(id, clip);
         });
       }
 
-      current = { root, vrm, mixer, clipsById };
+      const accessoryBindings = new Map(
+        (accessories ?? []).map((a) => [a.id, a.nodeNames ?? []]),
+      );
+      current = { root, vrm, mixer, clipsById, accessoryBindings };
 
       const expressions = vrm?.expressionManager
         ? Object.keys(vrm.expressionManager.expressionMap)
@@ -145,6 +165,8 @@ export function createAvatarRenderer(canvas, emit) {
   }
 
   function setLookTarget({ space, x, y, z }) {
+    // (Re)attach the target object — cleared by clearLookTarget below.
+    if (current?.vrm?.lookAt) current.vrm.lookAt.target = lookAtTarget;
     if (space === 'screen') {
       // Normalized (0,0)=top-left → NDC, unprojected onto a plane 2m out.
       const ndc = new THREE.Vector3(x * 2 - 1, -(y * 2 - 1), 0.5);
@@ -172,8 +194,13 @@ export function createAvatarRenderer(canvas, emit) {
   }
 
   function setAccessoryEnabled(id, enabled) {
-    current?.root?.traverse((node) => {
-      if (node.name === id) node.visible = enabled;
+    if (!current) return;
+    // Manifest binding (logical id -> node names) wins; fall back to nodes
+    // literally named after the id.
+    const bound = current.accessoryBindings.get(id);
+    const targets = bound && bound.length > 0 ? new Set(bound) : new Set([id]);
+    current.root.traverse((node) => {
+      if (targets.has(node.name)) node.visible = enabled;
     });
   }
 
@@ -198,7 +225,11 @@ export function createAvatarRenderer(canvas, emit) {
         break;
       case 'setMouthOpen': setExpressionValue('aa', command.value); break;
       case 'setLookTarget': setLookTarget(command); break;
-      case 'clearLookTarget': lookAtTarget.position.copy(camera.position); break;
+      case 'clearLookTarget':
+        // Detach entirely: the VRM returns to its idle gaze rather than
+        // staying locked onto a target parked at the camera.
+        if (current?.vrm?.lookAt) current.vrm.lookAt.target = null;
+        break;
       case 'playGesture': playClip(command.id, { loop: false, fadeSeconds: command.fadeSeconds }); break;
       case 'playAnimation': playClip(command.id, { loop: command.loop, fadeSeconds: 0 }); break;
       case 'setAccessoryEnabled': setAccessoryEnabled(command.id, command.enabled); break;

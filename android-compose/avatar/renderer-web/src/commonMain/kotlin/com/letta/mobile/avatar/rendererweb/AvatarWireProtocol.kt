@@ -73,7 +73,20 @@ sealed interface AvatarRendererCommand {
         val format: String,
         /** Correlates the eventual Loaded/LoadFailed event. */
         val requestId: String,
+        /**
+         * Accessory bindings from the manifest: logical accessory id → the
+         * glTF node names it toggles. Without a binding the renderer falls
+         * back to toggling nodes whose name equals the id.
+         */
+        val accessories: List<WireAccessory> = emptyList(),
     ) : AvatarRendererCommand
+
+    /** Manifest accessory binding carried on [LoadAvatar]. */
+    @Serializable
+    data class WireAccessory(
+        val id: String,
+        val nodeNames: List<String> = emptyList(),
+    )
 
     @Serializable
     @SerialName("unload")
