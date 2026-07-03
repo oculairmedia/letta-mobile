@@ -192,11 +192,13 @@ class IrohAppServerTransport(
     ): AppServerInboundFrame.AdminRpcResponse = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
         val biStream = connection.openBi()
         val sendStream = biStream.send()
+        var sendFinished = false
         Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" to method, "path" to path, "requestId" to requestId)
         try {
             val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
             IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES)
             sendStream.finish()
+            sendFinished = true
             val rawResponse = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
                 ?: error("admin_rpc stream closed before response for method=$method path=$path")
             val response = decodeFrame(rawResponse, AppServerChannel.Control).frame
@@ -207,6 +209,10 @@ class IrohAppServerTransport(
         } catch (error: Throwable) {
             Telemetry.event("IrohTransport", "admin_rpc.stream.failed", "method" to method, "path" to path, "requestId" to requestId, "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
             throw error
+        } finally {
+            if (!sendFinished) {
+                runCatching { sendStream.finish() }
+            }
         }
     } ?: error("admin_rpc timed out for method=$method path=$path")
 

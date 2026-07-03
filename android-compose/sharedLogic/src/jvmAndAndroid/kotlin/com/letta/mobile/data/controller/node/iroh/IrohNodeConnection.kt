@@ -49,6 +49,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -73,7 +74,7 @@ class IrohNodeConnection(
 ) {
     private val handledClientMessageIds = LinkedHashSet<String>()
     private val streamWriteMutex = Mutex()
-    private var authenticated: Boolean = requiredBearerToken.isNullOrBlank()
+    private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
 
     suspend fun serve() = coroutineScope {
         try {
@@ -176,7 +177,7 @@ class IrohNodeConnection(
             Telemetry.event("IrohNode", "admin_rpc.stream.recv", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "method" to method)
             if (type != "admin_rpc") {
                 """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"Expected admin_rpc frame"}"""
-            } else if (!authenticated) {
+            } else if (!authenticated.get()) {
                 val id = requestId ?: ""
                 Telemetry.event("IrohNode", "auth.required", "remoteEndpointId" to remoteEndpointId, "requestId" to id, "reason" to "missing_token")
                 """{"type":"admin_rpc_response","request_id":"$id","success":false,"error":"unauthorized"}"""
@@ -372,8 +373,9 @@ class IrohNodeConnection(
         if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
         val expected = requiredBearerToken
         val provided = obj["token"]?.jsonPrimitive?.contentOrNull
-        authenticated = expected.isNullOrBlank() || provided == expected
-        return if (authenticated) {
+        val isAuthenticated = expected.isNullOrBlank() || provided == expected
+        authenticated.set(isAuthenticated)
+        return if (isAuthenticated) {
             Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId)
             """{"type":"auth_response","request_id":"$requestId","success":true}"""
         } else {
@@ -384,7 +386,7 @@ class IrohNodeConnection(
     }
 
     private inline fun ifAuthorized(requestId: String?, block: () -> String?): String? =
-        if (authenticated) {
+        if (authenticated.get()) {
             block()
         } else {
             val id = requestId ?: ""
