@@ -95,7 +95,7 @@
   </div>
 
 <script type="module">
-import { createAvatarRenderer } from './avatar-renderer.js';
+import { createAvatarRenderer, PROTOCOL_VERSION } from './avatar-renderer.js';
 
 const logEl = document.getElementById('log');
 function log(cls, text) {
@@ -107,16 +107,46 @@ function log(cls, text) {
 }
 
 // --- Transport wiring -------------------------------------------------------
-// Embedded (JCEF/WebView): the host injects window.lettaAvatarHost.onEvent and
-// calls window.lettaAvatar.handleCommand. Harness mode: commands come from the
-// panel below; events land in the log.
+// Three host modes, all speaking the same protocol:
+//  - Embedded (JCEF/WebView): host injects window.lettaAvatarHost.onEvent and
+//    calls window.lettaAvatar.handleCommand.
+//  - Loopback host (?ws=1): AvatarWebHost bridges commands/events over a
+//    local WebSocket at /bridge. Events emitted before the socket opens
+//    (the boot-time `ready`) are buffered and flushed on connect.
+//  - Harness: commands come from the panel below; events land in the log.
+const eventSinks = [(json) => log('evt', '⇠ ' + json)];
 function emitToHost(eventJson) {
-  log('evt', '⇠ ' + eventJson);
+  eventSinks.forEach((sink) => sink(eventJson));
   window.lettaAvatarHost?.onEvent?.(eventJson);
 }
 
 const rendererApi = createAvatarRenderer(document.getElementById('avatar-canvas'), emitToHost);
 window.lettaAvatar = rendererApi; // host-facing bridge entry point
+
+if (new URLSearchParams(location.search).has('ws')) {
+  const pending = [];
+  let socket = null;
+  eventSinks.push((json) => {
+    // `ready` is (re)announced on every connect below, so the boot-time one
+    // isn't buffered — a host that attaches after a reconnect still gets it.
+    try { if (JSON.parse(json).type === 'ready') return; } catch { /* buffer as-is */ }
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(json);
+    else pending.push(json);
+  });
+  function connect() {
+    socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/bridge');
+    socket.onopen = () => {
+      socket.send(JSON.stringify({ type: 'ready', protocolVersion: PROTOCOL_VERSION }));
+      while (pending.length) socket.send(pending.shift());
+    };
+    socket.onmessage = (e) => {
+      log('cmd', '⇢ ' + e.data);
+      rendererApi.handleCommand(e.data);
+    };
+    socket.onclose = () => setTimeout(connect, 1000); // host restart tolerance
+  }
+  connect();
+}
 
 function send(command) {
   const json = JSON.stringify(command);
