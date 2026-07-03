@@ -1,103 +1,137 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.Telemetry
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.jsonPrimitive
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
-/**
- * HTTP proxy response wrapping both the HTTP status code and body.
- * Callers can check [status] to distinguish 2xx success from 4xx/5xx errors,
- * then parse [body] for the actual payload.
- */
-@Serializable
-data class ProxyResponse(
-    val status: Int,
+class AdminProxyHttpException(
+    val statusCode: Int,
+    val bodyText: String,
+) : RuntimeException("HTTP $statusCode: $bodyText")
+
+data class AdminProxyResponse(
+    val statusCode: Int,
     val body: JsonElement,
-    val ok: Boolean = status in 200..299,
 )
 
-/**
- * Shared HTTP proxy client for admin RPC handlers.
- *
- * Reduces boilerplate across 11 handler files by centralizing:
- * - Connection creation and cleanup
- * - Timeout configuration
- * - Error handling and telemetry
- * - Request body writing
- *
- * Usage:
- * ```
- * val proxy = HttpProxyClient("http://localhost:8291")
- * val agents = proxy.get("/v1/agents")
- * val created = proxy.post("/v1/agents", params.toString())
- * ```
- */
-class HttpProxyClient(private val adminBaseUrl: String) {
-    private val base = adminBaseUrl.trimEnd('/')
-    private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+data class AdminProxyTransportResponse(
+    val statusCode: Int,
+    val bodyText: String,
+)
 
-    fun get(path: String): ProxyResponse = request("GET", path)
-    fun post(path: String, body: String = "{}"): ProxyResponse = request("POST", path, body)
-    fun patch(path: String, body: String): ProxyResponse = request("PATCH", path, body)
-    fun delete(path: String): ProxyResponse = request("DELETE", path)
+fun interface AdminProxyTransport {
+    fun execute(method: String, url: String, body: String?): AdminProxyTransportResponse
+}
 
-    fun param(params: JsonObject?, key: String): String? =
-        params?.get(key)?.jsonPrimitive?.contentOrNull
+class AdminProxyRequest private constructor(
+    private val segments: List<String>,
+    private val queryParams: List<Pair<String, String>>,
+) {
+    fun url(baseUrl: String): String {
+        val path = segments.joinToString(separator = "/", prefix = "/") { encode(it) }
+        val query = queryParams.joinToString(separator = "&") { (key, value) ->
+            "${encode(key)}=${encode(value)}"
+        }
+        return baseUrl.trimEnd('/') + path + query.takeIf { it.isNotEmpty() }?.let { "?$it" }.orEmpty()
+    }
 
-    fun requireParam(params: JsonObject?, key: String): String? =
-        param(params, key)
+    class Builder {
+        private val segments = mutableListOf<String>()
+        private val queryParams = mutableListOf<Pair<String, String>>()
 
-    fun error(message: String): ProxyResponse =
-        ProxyResponse(status = 500, body = buildJsonObject { put("_error", message) }, ok = false)
+        fun segment(value: String) = apply { segments += value }
+        fun segments(vararg values: String) = apply { segments += values }
+        fun query(key: String, value: String?) = apply {
+            if (value != null) queryParams += key to value
+        }
+        fun build(): AdminProxyRequest = AdminProxyRequest(segments.toList(), queryParams.toList())
+    }
 
-    fun error(status: Int, message: String): ProxyResponse =
-        ProxyResponse(status = status, body = buildJsonObject { put("_error", message) }, ok = false)
+    companion object {
+        fun path(vararg segments: String): AdminProxyRequest = Builder().segments(*segments).build()
 
-    fun agentPath(agentId: String, resource: String = ""): String =
-        "$base/v1/agents/$agentId${if (resource.isNotEmpty()) "/$resource" else ""}"
+        private fun encode(value: String): String =
+            URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+    }
+}
 
-    fun convPath(convId: String, resource: String = ""): String =
-        "$base/v1/conversations/$convId${if (resource.isNotEmpty()) "/$resource" else ""}"
+class AdminProxyClient(
+    private val adminBaseUrl: String,
+    private val transport: AdminProxyTransport = defaultTransportFactory(),
+    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
+) {
+    private val baseUrl = adminBaseUrl.trimEnd('/')
 
-    private fun request(method: String, path: String, body: String? = null): ProxyResponse {
-        val url = if (path.startsWith("http")) path else "$base$path"
+    companion object {
+        internal var defaultTransportFactory: () -> AdminProxyTransport = { HttpUrlConnectionAdminProxyTransport() }
+    }
+
+    fun get(request: AdminProxyRequest): JsonElement = execute("GET", request)
+    fun post(request: AdminProxyRequest, body: String = "{}"): JsonElement = execute("POST", request, body)
+    fun patch(request: AdminProxyRequest, body: String): JsonElement = execute("PATCH", request, body)
+    fun delete(request: AdminProxyRequest): JsonElement = execute("DELETE", request)
+
+    fun execute(method: String, request: AdminProxyRequest, body: String? = null): JsonElement =
+        response(method, request, body).body
+
+    fun response(method: String, request: AdminProxyRequest, body: String? = null): AdminProxyResponse {
+        val url = request.url(baseUrl)
         val startMs = System.currentTimeMillis()
-        var conn: HttpURLConnection? = null
         return try {
-            conn = URL(url).openConnection() as HttpURLConnection
-            conn.requestMethod = method
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 15_000
-            conn.setRequestProperty("Content-Type", "application/json")
-            conn.setRequestProperty("Accept", "application/json")
-            if (body != null) {
-                conn.doOutput = true
-                OutputStreamWriter(conn.outputStream).use { it.write(body) }
+            val response = transport.execute(method, url, body)
+            Telemetry.event(
+                "AdminRpc",
+                "proxy.$method",
+                "url" to url,
+                "code" to response.statusCode,
+                "ms" to (System.currentTimeMillis() - startMs),
+            )
+            if (response.statusCode !in 200..299) {
+                throw AdminProxyHttpException(response.statusCode, response.bodyText)
             }
-            val code = conn.responseCode
-            val text = if (code in 200..299) {
-                conn.inputStream.bufferedReader().readText()
-            } else {
-                conn.errorStream?.bufferedReader()?.readText() ?: "{\"error\":\"HTTP $code\"}"
-            }
-            Telemetry.event("AdminRpc", "proxy.$method",
-                "path" to path, "code" to code, "ms" to (System.currentTimeMillis() - startMs))
-            ProxyResponse(status = code, body = json.parseToJsonElement(text))
+            AdminProxyResponse(response.statusCode, json.parseToJsonElement(response.bodyText))
+        } catch (e: AdminProxyHttpException) {
+            throw e
         } catch (e: Exception) {
-            Telemetry.event("AdminRpc", "proxy.failed",
-                "path" to path, "error" to (e.message ?: ""))
-            error(e.message ?: e.toString())
-        } finally {
-            conn?.disconnect()
+            Telemetry.event("AdminRpc", "proxy.failed", "url" to url, "error" to (e.message ?: ""))
+            throw e
         }
     }
 }
+
+class HttpUrlConnectionAdminProxyTransport(
+    private val connectTimeoutMs: Int = 15_000,
+    private val readTimeoutMs: Int = 15_000,
+) : AdminProxyTransport {
+    override fun execute(method: String, url: String, body: String?): AdminProxyTransportResponse {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        return try {
+            connection.requestMethod = method
+            connection.connectTimeout = connectTimeoutMs
+            connection.readTimeout = readTimeoutMs
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("Accept", "application/json")
+            if (body != null) {
+                connection.doOutput = true
+                OutputStreamWriter(connection.outputStream).use { it.write(body) }
+            }
+
+            val statusCode = connection.responseCode
+            val bodyText = if (statusCode in 200..299) {
+                connection.inputStream.bufferedReader().readText()
+            } else {
+                connection.errorStream?.bufferedReader()?.readText() ?: "{\"error\":\"HTTP $statusCode\"}"
+            }
+            AdminProxyTransportResponse(statusCode, bodyText)
+        } finally {
+            connection.disconnect()
+        }
+    }
+}
+
+fun adminProxyRequest(vararg segments: String): AdminProxyRequest.Builder =
+    AdminProxyRequest.Builder().segments(*segments)
