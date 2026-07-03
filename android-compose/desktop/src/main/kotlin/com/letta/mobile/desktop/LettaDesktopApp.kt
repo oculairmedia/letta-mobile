@@ -52,6 +52,7 @@ import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SmartToy
@@ -109,6 +110,10 @@ import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.letta.mobile.desktop.components.DesktopChipTab
+import com.letta.mobile.avatar.core.AvatarActivity
+import com.letta.mobile.desktop.avatar.DesktopAvatarCompanion
+import com.letta.mobile.desktop.avatar.DesktopAvatarLibraryWindow
+import com.letta.mobile.desktop.avatar.defaultAvatarCatalogDir
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentSphere
@@ -372,6 +377,46 @@ fun LettaDesktopApp(
         }
     }
 
+    // ------------------------------------------------------------------
+    // Avatar companion (pet mode v1): loopback-hosted three-vrm renderer in
+    // the default browser, driven by the agent's presence via AvatarDirector.
+    // ------------------------------------------------------------------
+    val avatarCompanion = remember(chatScope) { DesktopAvatarCompanion(chatScope) }
+    val avatarCompanionState by avatarCompanion.state.collectAsState()
+    DisposableEffect(avatarCompanion) {
+        onDispose { avatarCompanion.stop() }
+    }
+    var showAvatarLibrary by remember { mutableStateOf(false) }
+    var activeAvatarModelId by remember { mutableStateOf<String?>(null) }
+    fun toggleAvatarCompanion() {
+        when (avatarCompanionState) {
+            is DesktopAvatarCompanion.State.Starting,
+            is DesktopAvatarCompanion.State.Running,
+            -> {
+                avatarCompanion.stop()
+                activeAvatarModelId = null
+            }
+            // Library-first: pick from imported avatars (with their license
+            // on display) instead of a blind file dialog; imports run the
+            // full pipeline from inside the library window.
+            else -> showAvatarLibrary = true
+        }
+    }
+    if (showAvatarLibrary) {
+        DesktopAvatarLibraryWindow(
+            catalogDir = remember { defaultAvatarCatalogDir() },
+            activeModelId = activeAvatarModelId,
+            onUseAvatar = { model, assetPath ->
+                showAvatarLibrary = false
+                secureSettingsStore.putString(AVATAR_COMPANION_VRM_PATH_KEY, assetPath.toString())
+                activeAvatarModelId = model.id
+                avatarCompanion.stop()
+                avatarCompanion.start(assetPath)
+            },
+            onClose = { showAvatarLibrary = false },
+        )
+    }
+
     LaunchedEffect(chatController) {
         chatController.start()
     }
@@ -543,6 +588,24 @@ fun LettaDesktopApp(
     val replyPresence by chatController.replyPresence.collectAsState()
     val isStreamingReplySelected = replyPresence.isStreaming
 
+    // Agent presence -> avatar companion behavior.
+    LaunchedEffect(isStreamingReplySelected, thinkingConversationId, avatarCompanionState) {
+        if (avatarCompanionState is DesktopAvatarCompanion.State.Running ||
+            avatarCompanionState is DesktopAvatarCompanion.State.Starting
+        ) {
+            avatarCompanion.setActivity(
+                when {
+                    isStreamingReplySelected -> AvatarActivity.SPEAKING
+                    thinkingConversationId != null -> AvatarActivity.THINKING
+                    else -> AvatarActivity.IDLE
+                },
+            )
+        }
+    }
+    LaunchedEffect(chatState.errorMessage) {
+        if (chatState.errorMessage != null) avatarCompanion.flashError()
+    }
+
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
     suspend fun reloadSkills() {
@@ -594,6 +657,9 @@ fun LettaDesktopApp(
                     },
                     onNewSession = { showNewAgentDialog = true },
                     onSearch = { showCommandPalette = true },
+                    onAvatarCompanion = ::toggleAvatarCompanion,
+                    avatarCompanionActive = avatarCompanionState is DesktopAvatarCompanion.State.Running ||
+                        avatarCompanionState is DesktopAvatarCompanion.State.Starting,
                 )
                 RailDivider()
                 // Agent sidebar: agent header + nav + conversations.
@@ -1050,6 +1116,8 @@ private fun DesktopAgentRail(
     onAgentSelected: (String) -> Unit,
     onNewSession: () -> Unit,
     onSearch: () -> Unit,
+    onAvatarCompanion: () -> Unit = {},
+    avatarCompanionActive: Boolean = false,
 ) {
     // Collapse agents that share a display name — e.g. the many ephemeral
     // "Letta Code" agents spawned per task — into a single stacked orb with a
@@ -1165,9 +1233,21 @@ private fun DesktopAgentRail(
             }
         }
 
+        RailActionIcon(
+            icon = Icons.Outlined.Face,
+            description = if (avatarCompanionActive) "Stop avatar companion" else "Avatar companion",
+            onClick = onAvatarCompanion,
+            tint = if (avatarCompanionActive) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
         RailActionIcon(Icons.Outlined.Search, "Search", onSearch)
     }
 }
+
+private const val AVATAR_COMPANION_VRM_PATH_KEY = "avatar.companion.vrm_path"
 
 /** A rail entry: one or more agents that share a display name, stacked together. */
 private data class AgentRailGroup(
@@ -1180,6 +1260,7 @@ private fun RailActionIcon(
     icon: ImageVector,
     description: String,
     onClick: () -> Unit,
+    tint: Color = Color.Unspecified,
 ) {
     DesktopTooltip(text = description) {
         Box(
@@ -1192,7 +1273,8 @@ private fun RailActionIcon(
             Icon(
                 imageVector = icon,
                 contentDescription = description,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = tint.takeIf { it != Color.Unspecified }
+                    ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }

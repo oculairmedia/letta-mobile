@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Letta Avatar Renderer — Dev Harness</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; display: flex; height: 100vh; overflow: hidden;
+    background: #101014; color: #e8e8ec;
+    font: 13px/1.5 system-ui, sans-serif;
+  }
+  #stage { flex: 1; position: relative; background:
+    radial-gradient(ellipse at 50% 40%, #23232e 0%, #101014 70%); }
+  #stage canvas { width: 100%; height: 100%; display: block; }
+  #panel {
+    width: 320px; padding: 14px; overflow-y: auto;
+    border-left: 1px solid #2a2a34; background: #16161c;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  h1 { font-size: 13px; margin: 0; letter-spacing: .04em; text-transform: uppercase; color: #9a9aa6; }
+  fieldset { border: 1px solid #2a2a34; border-radius: 8px; padding: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  legend { color: #9a9aa6; font-size: 11px; padding: 0 4px; }
+  button, input[type=text] {
+    background: #23232e; color: #e8e8ec; border: 1px solid #34343f;
+    border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer;
+  }
+  button:hover { background: #2d2d3a; }
+  input[type=range] { width: 100%; }
+  label { display: flex; align-items: center; gap: 8px; width: 100%; }
+  #log {
+    flex: 1; min-height: 120px; background: #0c0c10; border: 1px solid #2a2a34;
+    border-radius: 8px; padding: 8px; overflow-y: auto;
+    font: 11px/1.6 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all;
+  }
+  .evt { color: #7fd4a3; } .cmd { color: #8ab8ff; } .err { color: #ff8a8a; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js",
+    "@pixiv/three-vrm": "./vendor/three-vrm.module.min.js"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="stage"><canvas id="avatar-canvas"></canvas></div>
+  <div id="panel">
+    <h1>Avatar dev harness</h1>
+
+    <fieldset>
+      <legend>Load</legend>
+      <input type="file" id="file" accept=".vrm,.glb,.gltf">
+      <button id="unload">Unload</button>
+    </fieldset>
+
+    <fieldset id="expressions">
+      <legend>Expressions</legend>
+      <button data-exp="neutral">neutral</button>
+      <button data-exp="happy">happy</button>
+      <button data-exp="angry">angry</button>
+      <button data-exp="sad">sad</button>
+      <button data-exp="surprised">surprised</button>
+      <button data-exp="relaxed">relaxed</button>
+      <button data-exp="blink">blink</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Visemes</legend>
+      <button data-vis="aa">aa</button>
+      <button data-vis="ih">ih</button>
+      <button data-vis="ou">ou</button>
+      <button data-vis="ee">ee</button>
+      <button data-vis="oh">oh</button>
+      <button data-vis="closed">closed</button>
+      <label>mouth <input type="range" id="mouth" min="0" max="1" step="0.01" value="0"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Look-at</legend>
+      <label><input type="checkbox" id="follow"> follow pointer</label>
+      <button id="clearlook">clear target</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Animation</legend>
+      <input type="text" id="animid" placeholder="animation id" size="12">
+      <button id="play">play</button>
+      <button id="playloop">loop</button>
+    </fieldset>
+
+    <div id="log"></div>
+  </div>
+
+<script type="module">
+import { createAvatarRenderer, PROTOCOL_VERSION } from './avatar-renderer.js';
+
+const logEl = document.getElementById('log');
+function log(cls, text) {
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = text;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// --- Transport wiring -------------------------------------------------------
+// Three host modes, all speaking the same protocol:
+//  - Embedded (JCEF/WebView): host injects window.lettaAvatarHost.onEvent and
+//    calls window.lettaAvatar.handleCommand.
+//  - Loopback host (?ws=1): AvatarWebHost bridges commands/events over a
+//    local WebSocket at /bridge. Events emitted before the socket opens
+//    (the boot-time `ready`) are buffered and flushed on connect.
+//  - Harness: commands come from the panel below; events land in the log.
+const eventSinks = [(json) => log('evt', '⇠ ' + json)];
+function emitToHost(eventJson) {
+  eventSinks.forEach((sink) => sink(eventJson));
+  window.lettaAvatarHost?.onEvent?.(eventJson);
+}
+
+const rendererApi = createAvatarRenderer(document.getElementById('avatar-canvas'), emitToHost);
+window.lettaAvatar = rendererApi; // host-facing bridge entry point
+
+if (new URLSearchParams(location.search).has('ws')) {
+  const pending = [];
+  let socket = null;
+  eventSinks.push((json) => {
+    // `ready` is (re)announced on every connect below, so the boot-time one
+    // isn't buffered — a host that attaches after a reconnect still gets it.
+    try { if (JSON.parse(json).type === 'ready') return; } catch { /* buffer as-is */ }
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(json);
+    else pending.push(json);
+  });
+  function connect() {
+    socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/bridge');
+    socket.onopen = () => {
+      socket.send(JSON.stringify({ type: 'ready', protocolVersion: PROTOCOL_VERSION }));
+      while (pending.length) socket.send(pending.shift());
+    };
+    socket.onmessage = (e) => {
+      log('cmd', '⇢ ' + e.data);
+      rendererApi.handleCommand(e.data);
+    };
+    socket.onclose = () => setTimeout(connect, 1000); // host restart tolerance
+  }
+  connect();
+}
+
+function send(command) {
+  const json = JSON.stringify(command);
+  log('cmd', '⇢ ' + json);
+  rendererApi.handleCommand(json);
+}
+
+// --- Harness controls -------------------------------------------------------
+let loadCounter = 0;
+document.getElementById('file').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  const format = file.name.toLowerCase().endsWith('.vrm') ? 'vrm1'
+    : file.name.toLowerCase().endsWith('.gltf') ? 'gltf' : 'glb';
+  send({ type: 'loadAvatar', url, format, requestId: 'harness-' + (++loadCounter) });
+});
+document.getElementById('unload').onclick = () => send({ type: 'unload' });
+
+document.querySelectorAll('[data-exp]').forEach((btn) => {
+  let active = false;
+  btn.onclick = () => {
+    active = !active;
+    btn.style.background = active ? '#3b5bd9' : '';
+    send({ type: 'setExpression', key: btn.dataset.exp, weight: active ? 1 : 0 });
+  };
+});
+document.querySelectorAll('[data-vis]').forEach((btn) => {
+  btn.onclick = () => send({ type: 'setViseme', key: btn.dataset.vis, weight: 1 });
+});
+document.getElementById('mouth').oninput = (e) =>
+  send({ type: 'setMouthOpen', value: Number(e.target.value) });
+
+const stage = document.getElementById('stage');
+stage.addEventListener('pointermove', (e) => {
+  if (!document.getElementById('follow').checked) return;
+  const rect = stage.getBoundingClientRect();
+  send({
+    type: 'setLookTarget', space: 'screen',
+    x: (e.clientX - rect.left) / rect.width,
+    y: (e.clientY - rect.top) / rect.height,
+  });
+});
+document.getElementById('clearlook').onclick = () => send({ type: 'clearLookTarget' });
+
+document.getElementById('play').onclick = () =>
+  send({ type: 'playAnimation', id: document.getElementById('animid').value, loop: false });
+document.getElementById('playloop').onclick = () =>
+  send({ type: 'playAnimation', id: document.getElementById('animid').value, loop: true });
+</script>
+</body>
+</html>
