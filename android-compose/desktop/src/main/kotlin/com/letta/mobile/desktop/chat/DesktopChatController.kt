@@ -312,6 +312,17 @@ class DesktopChatController(
             _state.update { it.copy(errorMessage = "Select an agent before starting a new chat.") }
             return
         }
+        createConversationForAgent(agentId)
+    }
+
+    /**
+     * Create and select a conversation for an EXPLICIT agent — used when the
+     * rail selects an agent that has no conversations yet (e.g. bulk-imported
+     * fleets), where selection can't go through an existing conversation.
+     */
+    fun createConversationForAgent(agentId: String) {
+        if (closed) return
+        if (agentId.isBlank()) return
         scope.launch {
             try {
                 // Drop the previous untouched chat first so the reload below

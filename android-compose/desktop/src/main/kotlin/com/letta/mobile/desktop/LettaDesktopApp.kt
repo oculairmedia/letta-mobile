@@ -475,12 +475,31 @@ fun LettaDesktopApp(
     // the rail, and the sidebar lists the whole stack's conversations together.
     // Ordered most-recent-first so each stack's "first" member (the click/open
     // fallback) is the one with the most recent conversation, not just first-seen.
-    val railAgents = remember(chatState.conversations) {
-        chatState.conversations
+    // Full roster from the agent repository, so agents WITHOUT recent (or any)
+    // conversations still appear — conversations only cover the newest
+    // DEFAULT_CONVERSATION_LIMIT entries, which hid bulk-imported agent fleets.
+    val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
+    val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
+    LaunchedEffect(sessionGraph, chatState.connectionState) {
+        runCatching {
+            sessionGraph.agentRepository.refreshAgentsIfStale(
+                maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS,
+            )
+        }
+    }
+    val railAgents = remember(chatState.conversations, rosterAgents) {
+        val fromConversations = chatState.conversations
             .sortedByDescending { conversationRecency(it.updatedAtLabel) }
             .filter { !it.agentId.isNullOrBlank() }
             .distinctBy { it.agentId }
             .map { it.agentId!! to it.agentName }
+        val seenIds = fromConversations.mapTo(mutableSetOf()) { it.first }
+        // Roster-only agents follow the conversation-active ones, alphabetically.
+        val fromRoster = rosterAgents
+            .filter { it.id.value !in seenIds }
+            .map { it.id.value to it.name.ifBlank { it.id.value } }
+            .sortedBy { it.second.lowercase() }
+        fromConversations + fromRoster
     }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
@@ -650,9 +669,14 @@ fun LettaDesktopApp(
                     thinkingAgentId = thinkingAgentId,
                     onAgentSelected = { agentId ->
                         editAgentId = null
-                        chatState.conversations
-                            .firstOrNull { it.agentId == agentId }
-                            ?.let { chatController.selectConversation(it.id) }
+                        val existing = chatState.conversations.firstOrNull { it.agentId == agentId }
+                        if (existing != null) {
+                            chatController.selectConversation(existing.id)
+                        } else {
+                            // Roster-only agent (e.g. bulk-imported): open its
+                            // first conversation. Never-sent chats auto-clean.
+                            chatController.createConversationForAgent(agentId)
+                        }
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onNewSession = { showNewAgentDialog = true },
