@@ -67,6 +67,12 @@ interface AvatarRuntime {
 
     fun setAccessoryEnabled(accessoryId: String, enabled: Boolean)
 
+    /**
+     * Ask the renderer to frame the avatar for the hosting surface. Default
+     * no-op so renderer-less implementations stay source-compatible.
+     */
+    fun setCameraFraming(framing: AvatarCameraFraming) {}
+
     /** Advance renderer-side time (spring bones, blends, procedural idle). */
     fun update(deltaSeconds: Float)
 

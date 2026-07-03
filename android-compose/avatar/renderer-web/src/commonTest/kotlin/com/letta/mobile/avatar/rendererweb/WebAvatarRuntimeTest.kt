@@ -11,6 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -226,6 +227,72 @@ class WebAvatarRuntimeTest {
         transport.emit(AvatarRendererEvent.AvatarLoaded(load.requestId, fullCapabilities))
         runCurrent()
         job.join()
+    }
+
+    @Test
+    fun cameraFramingForwardsWireNames() = runTest {
+        val (runtime, transport) = readyRuntime()
+
+        runtime.setCameraFraming(com.letta.mobile.avatar.core.AvatarCameraFraming.HEADSHOT)
+        runtime.setCameraFraming(com.letta.mobile.avatar.core.AvatarCameraFraming.BUST)
+        runtime.setCameraFraming(com.letta.mobile.avatar.core.AvatarCameraFraming.FULL_BODY)
+
+        assertEquals(
+            listOf("headshot", "bust", "fullBody"),
+            transport.sent.filterIsInstance<AvatarRendererCommand.SetCameraFraming>().map { it.framing },
+        )
+    }
+
+    @Test
+    fun captureThumbnailRoundTripsOverTheWire() = runTest {
+        val (runtime, transport) = readyRuntime()
+
+        val capture = async { runtime.captureThumbnail(width = 128, height = 128) }
+        runCurrent()
+
+        val command = transport.sent.filterIsInstance<AvatarRendererCommand.CaptureThumbnail>().single()
+        assertEquals(128, command.width)
+        transport.emit(
+            AvatarRendererEvent.ThumbnailCaptured(command.requestId, "data:image/png;base64,QUJD"),
+        )
+        runCurrent()
+
+        assertEquals("data:image/png;base64,QUJD", capture.await())
+    }
+
+    @Test
+    fun captureThumbnailFailureAndTimeoutSurfaceAsWireExceptions() = runTest {
+        val (runtime, transport) = readyRuntime()
+
+        // Renderer-reported failure.
+        var failure: Throwable? = null
+        val job = launch {
+            runCatching { runtime.captureThumbnail() }.onFailure { failure = it }
+        }
+        runCurrent()
+        val command = transport.sent.filterIsInstance<AvatarRendererCommand.CaptureThumbnail>().single()
+        transport.emit(AvatarRendererEvent.ThumbnailFailed(command.requestId, "no avatar"))
+        job.join()
+        assertIs<AvatarWireException>(failure)
+
+        // Timeout.
+        var timeoutFailure: Throwable? = null
+        val timeoutJob = launch {
+            runCatching { runtime.captureThumbnail(timeoutMillis = 2_000) }
+                .onFailure { timeoutFailure = it }
+        }
+        advanceTimeBy(2_001)
+        timeoutJob.join()
+        assertIs<AvatarWireException>(timeoutFailure)
+    }
+
+    @Test
+    fun captureThumbnailRequiresALoadedAvatar() = runTest {
+        val transport = FakeTransport()
+        val runtime = WebAvatarRuntime(transport)
+        transport.emit(AvatarRendererEvent.Ready(AvatarWireProtocol.VERSION))
+
+        assertFailsWith<IllegalStateException> { runtime.captureThumbnail() }
     }
 
     @Test

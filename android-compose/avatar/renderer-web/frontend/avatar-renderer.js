@@ -79,15 +79,62 @@ export function createAvatarRenderer(canvas, emit) {
     current = null;
   }
 
+  // Framing presets: which vertical band of the model the camera covers.
+  // Proportions are relative to the bounding box, so tall/chibi models both
+  // frame sensibly.
+  const FRAMINGS = {
+    headshot: { bandBottom: 0.72, bandTop: 1.02, eyeline: 0.88 },
+    bust: { bandBottom: 0.45, bandTop: 1.02, eyeline: 0.85 },
+    fullBody: { bandBottom: -0.02, bandTop: 1.02, eyeline: 0.55 },
+  };
+  let cameraFraming = 'fullBody';
+
   function frameCamera(root) {
+    const preset = FRAMINGS[cameraFraming] ?? FRAMINGS.fullBody;
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const headY = box.min.y + size.y * 0.85;
-    const distance = Math.max(size.y / (2 * Math.tan((camera.fov * Math.PI) / 360)), size.z * 2) * 1.2;
-    camera.position.set(center.x, headY - size.y * 0.12, center.z + distance);
-    camera.lookAt(center.x, headY - size.y * 0.12, center.z);
+    const bandHeight = size.y * (preset.bandTop - preset.bandBottom);
+    const focusY = box.min.y + size.y * preset.eyeline;
+    const distance = Math.max(
+      bandHeight / (2 * Math.tan((camera.fov * Math.PI) / 360)),
+      size.z * 1.5,
+    ) * 1.1;
+    camera.position.set(center.x, focusY, center.z + distance);
+    camera.lookAt(center.x, focusY, center.z);
     lookAtTarget.position.copy(camera.position);
+  }
+
+  function setCameraFraming(framing) {
+    cameraFraming = FRAMINGS[framing] ? framing : 'fullBody';
+    if (current) frameCamera(current.root);
+  }
+
+  function captureThumbnail({ requestId, width, height }) {
+    try {
+      if (!current) throw new Error('No avatar loaded');
+      // Render a fresh frame, then cover-fit the live canvas into the
+      // requested size via a 2D canvas.
+      renderer.render(scene, camera);
+      const source = renderer.domElement;
+      const target = document.createElement('canvas');
+      target.width = width;
+      target.height = height;
+      const context = target.getContext('2d');
+      const scale = Math.max(width / source.width, height / source.height);
+      const drawWidth = source.width * scale;
+      const drawHeight = source.height * scale;
+      context.drawImage(
+        source,
+        (width - drawWidth) / 2,
+        (height - drawHeight) / 2,
+        drawWidth,
+        drawHeight,
+      );
+      sendEvent({ type: 'thumbnailCaptured', requestId, dataUrl: target.toDataURL('image/png') });
+    } catch (error) {
+      sendEvent({ type: 'thumbnailFailed', requestId, message: String(error?.message ?? error) });
+    }
   }
 
   async function loadAvatar({ url, format, requestId, accessories }) {
@@ -233,6 +280,8 @@ export function createAvatarRenderer(canvas, emit) {
       case 'playGesture': playClip(command.id, { loop: false, fadeSeconds: command.fadeSeconds }); break;
       case 'playAnimation': playClip(command.id, { loop: command.loop, fadeSeconds: 0 }); break;
       case 'setAccessoryEnabled': setAccessoryEnabled(command.id, command.enabled); break;
+      case 'setCameraFraming': setCameraFraming(command.framing); break;
+      case 'captureThumbnail': captureThumbnail(command); break;
       default:
         sendEvent({ type: 'rendererError', message: `Unknown command type: ${command.type}` });
     }

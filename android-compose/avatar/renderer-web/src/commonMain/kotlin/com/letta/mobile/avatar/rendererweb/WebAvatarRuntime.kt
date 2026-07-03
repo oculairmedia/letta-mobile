@@ -1,5 +1,6 @@
 package com.letta.mobile.avatar.rendererweb
 
+import com.letta.mobile.avatar.core.AvatarCameraFraming
 import com.letta.mobile.avatar.core.AvatarCapabilities
 import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarFormat
@@ -58,6 +59,8 @@ class WebAvatarRuntime(
     private val rendererReady = CompletableDeferred<Int>()
     private var pendingLoad: PendingLoad? = null
     private var loadCounter = 0
+    private var thumbnailCounter = 0
+    private val pendingThumbnails = mutableMapOf<String, CompletableDeferred<String>>()
 
     private class PendingLoad(
         val requestId: String,
@@ -157,9 +160,52 @@ class WebAvatarRuntime(
         sendCommand(AvatarRendererCommand.SetAccessoryEnabled(accessoryId, enabled))
     }
 
+    override fun onCameraFramingChanged(framing: AvatarCameraFraming) {
+        sendCommand(
+            AvatarRendererCommand.SetCameraFraming(
+                when (framing) {
+                    AvatarCameraFraming.HEADSHOT -> "headshot"
+                    AvatarCameraFraming.BUST -> "bust"
+                    AvatarCameraFraming.FULL_BODY -> "fullBody"
+                },
+            ),
+        )
+    }
+
+    /**
+     * Rasterize the currently loaded avatar into a PNG data-url
+     * (`data:image/png;base64,...`), cover-fit to roughly [width]x[height].
+     * Requires a Ready runtime; bounded by [timeoutMillis].
+     */
+    suspend fun captureThumbnail(
+        width: Int = 512,
+        height: Int = 512,
+        timeoutMillis: Long = 10_000,
+    ): String {
+        check(state.value is com.letta.mobile.avatar.core.AvatarRuntimeState.Ready) {
+            "captureThumbnail requires a loaded avatar"
+        }
+        thumbnailCounter += 1
+        val requestId = "thumb-$thumbnailCounter"
+        val pending = CompletableDeferred<String>()
+        pendingThumbnails[requestId] = pending
+        sendCommand(AvatarRendererCommand.CaptureThumbnail(requestId, width, height))
+        return try {
+            withTimeout(timeoutMillis) { pending.await() }
+        } catch (e: TimeoutCancellationException) {
+            throw AvatarWireException("Renderer did not answer the thumbnail capture in time", e)
+        } finally {
+            pendingThumbnails.remove(requestId)
+        }
+    }
+
     override fun dispose() {
         super.dispose()
         cancelPendingLoad("Runtime disposed")
+        pendingThumbnails.values.forEach {
+            it.completeExceptionally(AvatarWireException("Runtime disposed"))
+        }
+        pendingThumbnails.clear()
         transport.close()
     }
 
@@ -190,6 +236,11 @@ class WebAvatarRuntime(
                     ?.result?.completeExceptionally(AvatarWireException(event.message))
             }
             is AvatarRendererEvent.RendererError -> onRendererError(event.message)
+            is AvatarRendererEvent.ThumbnailCaptured ->
+                pendingThumbnails.remove(event.requestId)?.complete(event.dataUrl)
+            is AvatarRendererEvent.ThumbnailFailed ->
+                pendingThumbnails.remove(event.requestId)
+                    ?.completeExceptionally(AvatarWireException(event.message))
         }
     }
 
