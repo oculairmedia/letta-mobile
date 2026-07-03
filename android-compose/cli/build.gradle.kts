@@ -69,8 +69,14 @@ fun splitCliArgs(input: String): List<String> {
     val out = mutableListOf<String>()
     val cur = StringBuilder()
     var inQuote = false
+    var escaped = false
     input.forEach { c ->
         when {
+            escaped -> {
+                cur.append(c)
+                escaped = false
+            }
+            inQuote && c == '\\' -> escaped = true
             c == '"' -> inQuote = !inQuote
             c == ' ' && !inQuote -> {
                 if (cur.isNotEmpty()) {
@@ -80,6 +86,9 @@ fun splitCliArgs(input: String): List<String> {
             }
             else -> cur.append(c)
         }
+    }
+    if (escaped) {
+        cur.append('\\')
     }
     if (inQuote) {
         throw IllegalArgumentException("Unbalanced quotes in cliArgs")
