@@ -620,6 +620,10 @@ class ChatSendCoordinator(
                         "code" to event.code,
                         "attempt" to event.reconnectAttempt,
                     )
+                    val conversationId = activeWsConversationId ?: activeConversationId()
+                    if (conversationId != null && activeWsOtid != null) {
+                        cleanupAbandonedAssistantFragmentsSafely(conversationId, activeWsRunId, activeWsTurnId, "transient_disconnect")
+                    }
                     ui.onTransientDisconnect(hasActiveSend = activeWsOtid != null)
                     return
                 }
@@ -680,6 +684,25 @@ class ChatSendCoordinator(
         else -> message.date.orEmpty() + ":" + message.seqId.toString()
     }
 
+    private suspend fun cleanupAbandonedAssistantFragmentsSafely(
+        conversationId: String,
+        runId: String?,
+        turnId: String?,
+        reason: String,
+    ) {
+        runCatching {
+            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, runId, turnId, reason)
+        }.onFailure { error ->
+            Telemetry.error(
+                "AdminChatVM", "cleanupAbandonedAssistantFragments.failed", error,
+                "conversationId" to conversationId,
+                "runId" to (runId ?: ""),
+                "turnId" to (turnId ?: ""),
+                "reason" to reason,
+            )
+        }
+    }
+
     private suspend fun finishActiveTurn(
         status: String,
         runId: String,
@@ -691,7 +714,7 @@ class ChatSendCoordinator(
     ) {
         val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
         if (status == "failed" || status == "cancelled") {
-            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, runId, turnId, "turn_done_$status")
+            cleanupAbandonedAssistantFragmentsSafely(conversationId, runId, turnId, "turn_done_$status")
         }
         if (recordEvent != null) {
             recordRuntimeEvent(recordEvent, conversationId)
@@ -767,7 +790,7 @@ class ChatSendCoordinator(
         preConversationMessageDeltas.clear()
         clearPendingSends("disconnect")
         if (conversationId != null) {
-            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, activeWsRunId, activeWsTurnId, "disconnect")
+            cleanupAbandonedAssistantFragmentsSafely(conversationId, activeWsRunId, activeWsTurnId, "disconnect")
             timelineRepository.clearExternalTransportActive(conversationId)
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })

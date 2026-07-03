@@ -382,20 +382,30 @@ data class Timeline(
     }
 
     fun cleanupAbandonedAssistantFragments(runId: String?, turnId: String?, reason: String): Timeline {
-        val targetRunId = runId?.takeIf { it.isNotBlank() } ?: return this
-        val assistantByRun = events
+        val targetRunId = runId?.takeIf { it.isNotBlank() }
+        val tailAssistantEvents = events
+            .asReversed()
+            .takeWhile { event ->
+                event is TimelineEvent.Confirmed && event.messageType == TimelineMessageType.ASSISTANT
+            }
             .filterIsInstance<TimelineEvent.Confirmed>()
-            .filter { it.messageType == TimelineMessageType.ASSISTANT && it.runId == targetRunId }
-        if (assistantByRun.size < 2) return this
-        val longest = assistantByRun.maxByOrNull { it.content.trim().length } ?: return this
-        val longestText = longest.content.trim()
-        if (longestText.length < ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS) return this
-        val removeServerIds = assistantByRun
+            .filter { it.runId.matchesCleanupRun(targetRunId) }
+            .asReversed()
+        if (tailAssistantEvents.isEmpty()) return this
+
+        val longest = tailAssistantEvents.maxByOrNull { it.content.trim().length }
+        val longestText = longest?.content?.trim().orEmpty()
+        val removeServerIds = tailAssistantEvents
             .asSequence()
-            .filter { it.serverId != longest.serverId }
             .filter { candidate ->
                 val text = candidate.content.trim()
-                text.length < ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS || longestText.startsWith(text)
+                if (text.isBlank()) return@filter false
+                val isShortTerminalFragment = text.length < ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS
+                val isTailPrefix = longest != null &&
+                    candidate.serverId != longest.serverId &&
+                    longestText.length >= ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS &&
+                    longestText.startsWith(text)
+                isShortTerminalFragment || isTailPrefix
             }
             .map { it.serverId }
             .toSet()
@@ -403,7 +413,7 @@ data class Timeline(
         Telemetry.event(
             "TimelineSync", "orphanAssistantFragments.cleaned",
             "conversationId" to conversationId,
-            "runId" to targetRunId,
+            "runId" to (targetRunId ?: ""),
             "turnId" to (turnId ?: ""),
             "reason" to reason,
             "count" to removeServerIds.size,
@@ -430,6 +440,16 @@ data class Timeline(
 }
 
 private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
+
+private fun String?.matchesCleanupRun(targetRunId: String?): Boolean {
+    val eventRunId = this?.takeIf { it.isNotBlank() }
+    val target = targetRunId?.takeIf { it.isNotBlank() }
+    if (target == null || eventRunId == null) return true
+    if (eventRunId == target) return true
+    val eventIsIrohFamily = eventRunId.startsWith("iroh-run-") || eventRunId.startsWith("local-run-")
+    val targetIsIrohFamily = target.startsWith("iroh-run-") || target.startsWith("local-run-")
+    return eventIsIrohFamily && targetIsIrohFamily
+}
 
 internal fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
     var fingerprint = 1125899906842597L

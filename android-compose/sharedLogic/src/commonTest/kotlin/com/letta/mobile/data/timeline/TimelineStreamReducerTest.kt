@@ -1002,6 +1002,45 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `terminal failed turn cleanup removes sole one character assistant fragment`() {
+        val withFragment = reduce(
+            frame = AssistantMessage(
+                id = "assistant-orphan-i",
+                contentRaw = JsonPrimitive("I"),
+                runId = "local-run-terminal",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("iroh-run-terminal", "turn-terminal", "turn_done_failed")
+
+        cleaned.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `terminal cleanup only removes tail assistant fragments`() {
+        val earlier = reduce(
+            frame = AssistantMessage(
+                id = "assistant-ok",
+                contentRaw = JsonPrimitive("OK"),
+                runId = "run-terminal",
+                seqId = 1,
+            ),
+        ).next
+        val withToolCall = earlier.append(
+            ToolCallMessage(
+                id = "tool-call",
+                toolCall = ToolCall(toolCallId = "call-1", name = "noop", arguments = "{}"),
+                runId = "run-terminal",
+            ).toTimelineEvent(position = earlier.nextLocalPosition())!!,
+        )
+        val cleaned = withToolCall.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed")
+
+        cleaned.events shouldHaveSize 2
+        (cleaned.events.first() as TimelineEvent.Confirmed).serverId shouldBe "assistant-ok"
+    }
+
+    @Test
     fun `successful post tool one character continuation is preserved before terminal cleanup`() {
         val seeded = reduce(
             frame = AssistantMessage(
