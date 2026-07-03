@@ -163,15 +163,30 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var session: ProbeSession? = null
         val turns = mutableListOf<IrohProbeTurnMetrics>()
+        val turnStartedAt = nowMs()
         try {
-            session = establishSession(
-                normalizedAddress = normalizedAddress,
-                conversationId = conversationId,
-                scope = scope,
-                turn = 1,
-                runAdminRpcScenario = "admin-rpc" in scenarioSet,
-            )
-            turns += sendProbeInput(turn = 1, session = session)
+            val setup = withTimeoutOrNull(timeoutMs) {
+                establishSession(
+                    normalizedAddress = normalizedAddress,
+                    conversationId = conversationId,
+                    scope = scope,
+                    turn = 1,
+                    runAdminRpcScenario = "admin-rpc" in scenarioSet,
+                    turnStartedAt = turnStartedAt,
+                )
+            }
+            if (setup == null) {
+                val violation = IrohProbeAssertions.classifyIdleSendFailure("setup timeout after ${timeoutMs}ms")
+                turns += IrohProbeTurnMetrics(
+                    turn = 1,
+                    errorFrames = listOf(violation),
+                    scenarioViolations = listOf(violation),
+                    timedOut = true,
+                )
+                return turns
+            }
+            session = setup
+            turns += sendProbeInput(turn = 1, session = session, turnStartedAt = turnStartedAt)
             delay(idleMs)
             turns += sendProbeInput(turn = 2, session = session, sendFailureViolation = true)
         } catch (error: Throwable) {
@@ -204,6 +219,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var session: ProbeSession? = null
         val turnStartedAt = nowMs()
+        val setupMetrics = ProbeSetupMetrics(turn)
         return try {
             val metrics = withTimeoutOrNull(timeoutMs) {
                 session = establishSession(
@@ -213,13 +229,13 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                     turn = turn,
                     runAdminRpcScenario = runAdminRpcScenario,
                     turnStartedAt = turnStartedAt,
+                    setupMetrics = setupMetrics,
                 )
                 sendProbeInput(turn = turn, session = session, turnStartedAt = turnStartedAt)
             }
-            metrics ?: IrohProbeTurnMetrics(turn = turn, timedOut = true)
+            metrics ?: setupMetrics.toFailureMetrics("timeout after ${timeoutMs}ms", timedOut = true)
         } catch (error: Throwable) {
-            val violation = IrohProbeAssertions.classifyConversationBootstrap(error.message ?: error.toString())
-            IrohProbeTurnMetrics(turn = turn, errorFrames = listOf(violation), scenarioViolations = listOf(violation))
+            setupMetrics.toFailureMetrics(error.message ?: error.toString())
         } finally {
             runCatching { session?.transport?.close() }
             runCatching { session?.endpoint?.close() }
@@ -234,6 +250,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         turn: Int,
         runAdminRpcScenario: Boolean,
         turnStartedAt: Long = nowMs(),
+        setupMetrics: ProbeSetupMetrics = ProbeSetupMetrics(turn),
     ): ProbeSession {
         val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.Companion.defaultMode()))
         val transport = IrohAppServerTransportAdapter(endpoint).createTransport(
@@ -242,13 +259,17 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         ) as IrohAppServerTransport
         transport.awaitConnectionReady()
         val dialMs = nowMs() - turnStartedAt
+        setupMetrics.markDialSucceeded(dialMs)
         val client = DefaultAppServerClient(transport, requestTimeoutMs = timeoutMs)
 
         token?.takeIf { it.isNotBlank() }?.let { bearer ->
+            setupMetrics.beginStage("auth")
             val auth = client.auth(AppServerCommand.Auth(requestId = "probe-auth-${UUID.randomUUID()}", token = bearer))
             if (!auth.success) error(auth.error ?: "Iroh auth failed")
+            setupMetrics.markStageSucceeded("auth")
         }
 
+        setupMetrics.beginStage("runtime_start")
         val runtimeStart = AppServerCommand.RuntimeStart(
             requestId = "probe-runtime-${UUID.randomUUID()}",
             agentId = agentId.takeIf { it.isNotBlank() },
@@ -264,11 +285,18 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         )
         val runtimeResponse = client.runtimeStart(runtimeStart)
         if (!runtimeResponse.success) error(runtimeResponse.error ?: "App Server runtime_start failed")
+        setupMetrics.markStageSucceeded("runtime_start")
         val runtime = runtimeResponse.runtime ?: AppServerRuntimeScope(
             agentId = runtimeStart.agentId.orEmpty(),
             conversationId = conversationId,
         )
-        val scenarioViolations = if (runAdminRpcScenario) runAdminRpcChecks(client, conversationId) else emptyList()
+        val scenarioViolations = if (runAdminRpcScenario) {
+            setupMetrics.beginStage("admin_rpc")
+            runAdminRpcChecks(client, conversationId)
+        } else {
+            emptyList()
+        }
+        setupMetrics.markStageSucceeded("admin_rpc")
         return ProbeSession(endpoint, transport, client, runtime, dialMs, scenarioViolations, scope)
     }
 
@@ -382,6 +410,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
             assistantMessageIds = listOf("restart-send-skipped"),
             turnDoneCount = 1,
             notes = listOf(note),
+            skipped = true,
         )
 
     private fun AppServerInboundFrame.matches(runtime: AppServerRuntimeScope): Boolean {
@@ -416,6 +445,43 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         val scenarioViolations: List<String>,
         val scope: CoroutineScope,
     )
+}
+
+
+private class ProbeSetupMetrics(private val turn: Int) {
+    private var dialMs: Long? = null
+    private var currentStage: String = "dial"
+    private val completedStages = mutableListOf<String>()
+
+    fun markDialSucceeded(value: Long) {
+        dialMs = value
+        completedStages += "dial"
+    }
+
+    fun beginStage(stage: String) {
+        currentStage = stage
+    }
+
+    fun markStageSucceeded(stage: String) {
+        completedStages += stage
+    }
+
+    fun toFailureMetrics(message: String, timedOut: Boolean = false): IrohProbeTurnMetrics {
+        val violation = IrohProbeAssertions.classifyConversationBootstrap(message)
+        val error = listOfNotNull(
+            completedStages.takeIf { it.isNotEmpty() }?.joinToString(prefix = "completed_stages:", separator = ","),
+            "failed_stage:$currentStage",
+            violation,
+        )
+        return IrohProbeTurnMetrics(
+            turn = turn,
+            dialMs = dialMs,
+            errorFrames = error,
+            scenarioViolations = listOf(violation),
+            dialSucceeded = dialMs != null,
+            timedOut = timedOut,
+        )
+    }
 }
 
 private class ProbeAccumulator(private val turn: Int) {

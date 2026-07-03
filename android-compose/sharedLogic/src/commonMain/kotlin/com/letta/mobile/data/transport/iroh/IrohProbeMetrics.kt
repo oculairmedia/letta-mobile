@@ -19,6 +19,7 @@ data class IrohProbeTurnMetrics(
     val assistantFinalTexts: List<String> = emptyList(),
     val scenarioViolations: List<String> = emptyList(),
     val notes: List<String> = emptyList(),
+    val skipped: Boolean = false,
 )
 
 @Serializable
@@ -100,6 +101,7 @@ object IrohProbeAssertions {
     fun summarize(turns: List<IrohProbeTurnMetrics>): IrohProbeSummary {
         val violations = buildList {
             turns.forEach { turn ->
+                if (turn.skipped) return@forEach
                 val prefix = "turn${turn.turn}"
                 addAll(turn.scenarioViolations)
                 turn.assistantFinalTexts

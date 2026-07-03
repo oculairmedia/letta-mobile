@@ -96,6 +96,23 @@ class IrohProbeAssertionsTest {
         assertTrue("orphan_fragment:turn1" in summary.violations)
     }
 
+
+    @Test
+    fun `skipped restart turn is ignored by probe assertions`() {
+        val skipped = IrohProbeTurnMetrics(
+            turn = 2,
+            notes = listOf("restart-send skipped: --wrapper-restart-cmd not provided"),
+            skipped = true,
+        )
+
+        val summary = IrohProbeAssertions.summarize(listOf(skipped))
+
+        assertTrue(summary.ok)
+        assertEquals(emptyList(), summary.violations)
+        assertTrue(summary.turns.single().skipped)
+        assertEquals(listOf("restart-send skipped: --wrapper-restart-cmd not provided"), summary.turns.single().notes)
+    }
+
     @Test
     fun `idle send failures use named violation`() {
         val violation = IrohProbeAssertions.classifyIdleSendFailure("send failed")
