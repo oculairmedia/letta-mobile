@@ -4,6 +4,7 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import kotlin.concurrent.Volatile
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -148,8 +149,13 @@ class TimelineSyncLoop(
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
     }
 
+    @Volatile
+    var hasHydratedSuccessfully: Boolean = false
+        private set
+
     suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false, fallbackCursorSeq: Long? = null) {
         hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
+        hasHydratedSuccessfully = true
     }
 
     suspend fun send(content: String, attachments: List<MessageContentPart.Image> = emptyList()): String {

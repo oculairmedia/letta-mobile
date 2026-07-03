@@ -583,6 +583,36 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `recent reconcile final assistant replaces live prefix row`() {
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-624",
+                contentRaw = JsonPrimitive("Let"),
+                runId = "local-run-15",
+                seqId = 1,
+            ),
+        ).next
+
+        val (mergedTimeline, changed) = live.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "letta-msg-640",
+                    contentRaw = JsonPrimitive("Let's find out — no duplicate here."),
+                    runId = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-640"
+        event.content shouldBe "Let's find out — no duplicate here."
+        event.position shouldBe (live.events.single() as TimelineEvent.Confirmed).position
+    }
+
+    @Test
     fun `recent reconcile real run replaces iroh synthetic live row`() {
         val live = reduce(
             frame = AssistantMessage(
@@ -862,6 +892,34 @@ class TimelineStreamReducerTest {
         event2.content shouldBe "Yes — confirmed working at both layers:"
         // The first token 'Y' must be preserved — the full content starts with "Yes"
         event2.content.startsWith("Yes") shouldBe true
+    }
+
+    @Test
+    fun `assistant prefix replay from local run is dropped after iroh final`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Yeah — still seeing it. Smells like a dedup issue."),
+                runId = "iroh-run-123",
+                seqId = 12,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix",
+                contentRaw = JsonPrimitive("Yeah"),
+                runId = "local-run-12",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "Yeah — still seeing it. Smells like a dedup issue."
+        output.emittedEvents shouldBe emptyList()
     }
 
     @Test

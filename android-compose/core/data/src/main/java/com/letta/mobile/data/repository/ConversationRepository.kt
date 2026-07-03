@@ -37,6 +37,7 @@ open class ConversationRepository(
     private val repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
+    private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
 ) : IConversationRepository, BackendScopedCache {
     private val _conversationsByAgent = MutableStateFlow<Map<AgentId, List<Conversation>>>(emptyMap())
     private val refreshMutex = Mutex()
@@ -82,7 +83,12 @@ open class ConversationRepository(
     }
 
     private suspend fun refreshConversationsLocked(agentId: AgentId) {
-        val conversations = conversationApi.listConversations(agentId = agentId)
+        val irohSource = irohConversationListSource
+        val conversations = if (irohSource?.shouldUseIroh() == true) {
+            irohSource.listConversations(agentId = agentId)
+        } else {
+            conversationApi.listConversations(agentId = agentId)
+        }
         val refreshedAt = System.currentTimeMillis()
         writeAgentConversations(agentId, conversations, refreshedAt)
     }

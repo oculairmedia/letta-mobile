@@ -30,10 +30,19 @@ object ConversationAdminHandlers {
     private class ConvApi(private val base: String) {
         fun list(params: JsonObject?): JsonElement {
             val agentId = params?.get("agent_id")?.jsonPrimitive?.contentOrNull
+            val queryParams = buildList {
+                params?.get("limit")?.jsonPrimitive?.contentOrNull?.let { add("limit=$it") }
+                params?.get("after")?.jsonPrimitive?.contentOrNull?.let { add("after=$it") }
+                params?.get("archive_status")?.jsonPrimitive?.contentOrNull?.let { add("archive_status=$it") }
+                params?.get("summary_search")?.jsonPrimitive?.contentOrNull?.let { add("summary_search=$it") }
+                params?.get("order")?.jsonPrimitive?.contentOrNull?.let { add("order=$it") }
+                params?.get("order_by")?.jsonPrimitive?.contentOrNull?.let { add("order_by=$it") }
+            }
+            val query = queryParams.joinToString(prefix = "?", separator = "&").takeIf { queryParams.isNotEmpty() }.orEmpty()
             return if (agentId != null) {
-                httpGet("$base/v1/agents/$agentId/conversations")
+                httpGet("$base/v1/agents/$agentId/conversations$query")
             } else {
-                httpGet("$base/v1/conversations")
+                httpGet("$base/v1/conversations$query")
             }
         }
 
@@ -65,11 +74,12 @@ object ConversationAdminHandlers {
 
         fun messageList(params: JsonObject?): JsonElement {
             val convId = params?.get("conversation_id")?.jsonPrimitive?.contentOrNull ?: return jsonError("conversation_id required")
-            val query = buildString {
-                params?.get("limit")?.jsonPrimitive?.contentOrNull?.let { append("limit=$it&") }
-                params?.get("after")?.jsonPrimitive?.contentOrNull?.let { append("after=$it&") }
-                params?.get("order")?.jsonPrimitive?.contentOrNull?.let { append("order=$it&") }
-            }.trimEnd('&', '?')
+            val queryParams = buildList {
+                params?.get("limit")?.jsonPrimitive?.contentOrNull?.let { add("limit=$it") }
+                params?.get("after")?.jsonPrimitive?.contentOrNull?.let { add("after=$it") }
+                params?.get("order")?.jsonPrimitive?.contentOrNull?.let { add("order=$it") }
+            }
+            val query = queryParams.joinToString(prefix = "?", separator = "&").takeIf { queryParams.isNotEmpty() }.orEmpty()
             return httpGet("$base/v1/conversations/$convId/messages$query")
         }
 

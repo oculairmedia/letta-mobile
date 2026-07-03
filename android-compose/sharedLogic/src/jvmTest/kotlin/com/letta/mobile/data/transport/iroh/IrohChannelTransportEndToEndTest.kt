@@ -272,6 +272,7 @@ class IrohChannelTransportEndToEndTest {
                 override suspend fun input(command: com.letta.mobile.data.transport.appserver.AppServerCommand.Input) { /* never replies */ }
                 override suspend fun sync(command: com.letta.mobile.data.transport.appserver.AppServerCommand.Sync) = throw UnsupportedOperationException()
                 override suspend fun abort(command: com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage) = throw UnsupportedOperationException()
+                override suspend fun adminRpc(command: com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse = throw UnsupportedOperationException()
                 override suspend fun sendExternalToolResponse(command: com.letta.mobile.data.transport.appserver.AppServerCommand.ExternalToolCallResponse) {}
             },
             turnIdleTimeoutMs = 300L, // fast for the test

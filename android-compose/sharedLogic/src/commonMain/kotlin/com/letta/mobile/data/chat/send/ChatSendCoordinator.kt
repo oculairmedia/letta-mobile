@@ -1,9 +1,15 @@
 package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.SystemMessage
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
@@ -81,6 +87,9 @@ class ChatSendCoordinator(
     private val pendingSendLock = SynchronizedObject()
     private val pendingSends = ArrayDeque<PendingWsSend>()
     @Volatile private var pendingConversationBootstrapLocal: PendingWsSend? = null
+    private val seenBridgeEventLock = SynchronizedObject()
+    private val seenBridgeEventKeys = ArrayDeque<String>()
+    private val seenBridgeEventKeySet = mutableSetOf<String>()
 
     init {
         scope.launch {
@@ -442,6 +451,7 @@ class ChatSendCoordinator(
             "activeConversationId" to activeWsConversationId,
             "activeTurnId" to activeWsTurnId,
         )
+        if (dropDuplicateBridgeEvent(event)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
                 activeWsConversationId = event.conversationId
@@ -619,6 +629,55 @@ class ChatSendCoordinator(
         }
     }
 
+    private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
+        val key = bridgeEventKey(event) ?: return false
+        val isDuplicate = synchronized(seenBridgeEventLock) {
+            if (key in seenBridgeEventKeySet) {
+                true
+            } else {
+                seenBridgeEventKeySet.add(key)
+                seenBridgeEventKeys.addLast(key)
+                while (seenBridgeEventKeys.size > MAX_SEEN_BRIDGE_EVENTS) {
+                    seenBridgeEventKeySet.remove(seenBridgeEventKeys.removeFirst())
+                }
+                false
+            }
+        }
+        if (isDuplicate) {
+            Telemetry.event(
+                "AdminChatVM", "ws.event.exactDuplicateDropped",
+                "eventType" to (event::class.simpleName ?: ""),
+                "keyHash" to key.hashCode().toString(),
+            )
+        }
+        return isDuplicate
+    }
+
+    private fun bridgeEventKey(event: WsTimelineEvent): String? = when (event) {
+        is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}"
+        is WsTimelineEvent.MessageDelta -> {
+            val conversationId = activeWsConversationId ?: activeConversationId().orEmpty()
+            val message = event.message
+            "message|$conversationId|${message.id}|${message.messageType}|${message.runId.orEmpty()}|${messageContentForDedupe(message)}"
+        }
+        is WsTimelineEvent.StopReason -> "stop|${event.turnId}|${event.runId}|${event.stopReason}"
+        is WsTimelineEvent.UsageStatistics -> "usage|${event.turnId}|${event.runId}|${event.promptTokens}|${event.completionTokens}|${event.totalTokens}"
+        is WsTimelineEvent.TurnDone -> "done|${event.turnId}|${event.runId}|${event.status}|${event.lossy}|${event.dropCount}"
+        is WsTimelineEvent.Error -> "error|${event.conversationId.orEmpty()}|${event.turnId.orEmpty()}|${event.runId.orEmpty()}|${event.code}|${event.message}"
+        is WsTimelineEvent.UserActionOutcome -> "action|${event.frameId}|${event.actionId.orEmpty()}|${event.outcome}|${event.reason.orEmpty()}"
+        else -> null
+    }
+
+    private fun messageContentForDedupe(message: LettaMessage): String = when (message) {
+        is AssistantMessage -> message.content
+        is UserMessage -> message.content
+        is SystemMessage -> message.content
+        is ReasoningMessage -> message.reasoning
+        is ToolCallMessage -> message.effectiveToolCalls.joinToString(separator = "|") { it.effectiveId + ":" + (it.name ?: "") }
+        is ToolReturnMessage -> message.toolCallId.orEmpty() + ":" + message.toolReturn.funcResponse.orEmpty()
+        else -> message.date.orEmpty() + ":" + message.seqId.toString()
+    }
+
     private suspend fun finishActiveTurn(
         status: String,
         runId: String,
@@ -741,6 +800,7 @@ class ChatSendCoordinator(
     private companion object {
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
+        private const val MAX_SEEN_BRIDGE_EVENTS = 512
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
         private val POST_SEND_RECONCILE_DELAYS_MS = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =

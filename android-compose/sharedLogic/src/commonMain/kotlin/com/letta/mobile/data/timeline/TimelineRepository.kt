@@ -103,13 +103,28 @@ open class TimelineRepository(
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
-        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.let {
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.let { cached ->
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
                 "agentId" to agentId.orEmpty(),
                 "conversationId" to conversationId,
+                "hydrated" to cached.hasHydratedSuccessfully,
             )
-            return it
+            if (!cached.hasHydratedSuccessfully) {
+                runCatching {
+                    withContext(timelineIoDispatcher) {
+                        cached.hydrate()
+                    }
+                }.onFailure { t ->
+                    Telemetry.error(
+                        "TimelineRepo", "hydrate.retryFailed", t,
+                        "agentId" to agentId.orEmpty(),
+                        "conversationId" to conversationId,
+                    )
+                    runCatching { cached.emitHydrateFailed(t.message ?: "unknown") }
+                }
+            }
+            return cached
         }
         val loop = getOrCreateLoopWithoutHydrate(key)
         // Hydrate OUTSIDE the mutex so parallel callers don't block each other.

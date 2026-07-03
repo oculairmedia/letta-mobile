@@ -357,6 +357,9 @@ private class FakeAppServerClient(
         )
     }
 
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+        throw UnsupportedOperationException()
+
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) {
         sentCommands += command
     }

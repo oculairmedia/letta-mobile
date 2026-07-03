@@ -16,15 +16,21 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import java.util.UUID
 import kotlinx.serialization.json.put
 import com.letta.mobile.util.Telemetry
 
@@ -136,6 +142,24 @@ class IrohAppServerTransport(
     override suspend fun sendControl(command: AppServerCommand) {
         Telemetry.event("IrohTransport", "control.enqueue", "command" to command::class.simpleName)
         controlCommandQueue.send(command)
+    }
+
+    suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        val requestId = "admin-${UUID.randomUUID()}"
+        val params = adminRpcParams(path = path, body = body)
+        val response = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
+            coroutineScope {
+                val awaited = async {
+                    controlFrames.first { received ->
+                        val frame = received.frame
+                        frame is AppServerInboundFrame.AdminRpcResponse && frame.requestId == requestId
+                    }.frame as AppServerInboundFrame.AdminRpcResponse
+                }
+                sendControl(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
+                awaited.await()
+            }
+        } ?: error("admin_rpc timed out for method=$method path=$path")
+        return response
     }
 
     suspend fun close() {
@@ -290,6 +314,35 @@ class IrohAppServerTransport(
         }
     }
 
+    private fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {
+        parseAdminRpcPath(path).forEach { (key, value) -> put(key, value) }
+        if (body != null) {
+            runCatching { AppServerProtocol.json.parseToJsonElement(body).jsonObject }
+                .getOrNull()
+                ?.forEach { (key, value) -> put(key, value) }
+        }
+    }
+
+    private fun parseAdminRpcPath(path: String): Map<String, String> {
+        val withoutPrefix = path.substringBefore('?').trim('/').split('/').filter { it.isNotBlank() }
+        val values = mutableMapOf<String, String>()
+        if (withoutPrefix.size >= 3 && withoutPrefix[0] == "v1" && withoutPrefix[1] == "conversations") {
+            values["conversation_id"] = withoutPrefix[2]
+            if (withoutPrefix.size >= 5 && withoutPrefix[3] == "messages") {
+                values["message_id"] = withoutPrefix[4]
+            }
+        }
+        path.substringAfter('?', missingDelimiterValue = "")
+            .split('&')
+            .filter { it.isNotBlank() }
+            .forEach { part ->
+                val key = part.substringBefore('=')
+                val value = part.substringAfter('=', missingDelimiterValue = "")
+                if (key.isNotBlank()) values[key] = value
+            }
+        return values
+    }
+
     private fun decodeFrame(rawText: String, channel: AppServerChannel): AppServerReceivedFrame =
         runCatching {
             protocol.decodeFrame(rawText, channel)
@@ -315,6 +368,7 @@ class IrohAppServerTransport(
         // user messages.
         const val KEEPALIVE_INTERVAL_MS = 15_000L
         const val CONNECT_TIMEOUT_MS = 120_000L
+        const val ADMIN_RPC_TIMEOUT_MS = 15_000L
         val KEEPALIVE_PAYLOAD = byteArrayOf(0)
     }
 }
