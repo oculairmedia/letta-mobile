@@ -13,6 +13,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val reconciledSends: MutableList<ReconciledSend> = mutableListOf()
     val clearedActiveConversations: MutableList<String> = mutableListOf()
     val scopedClearedActiveConversations: MutableList<ScopedConversation> = mutableListOf()
+    val abandonedFragmentCleanups: MutableList<AbandonedFragmentCleanup> = mutableListOf()
     val recentReconciles: MutableList<RecentReconcile> = mutableListOf()
     val repairedCursors: MutableList<CursorRepair> = mutableListOf()
     val scopedRepairedCursors: MutableList<ScopedCursorRepair> = mutableListOf()
@@ -100,6 +101,17 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         scopedClearedActiveConversations += ScopedConversation(agentId, conversationId)
     }
 
+    override suspend fun cleanupAbandonedAssistantFragments(
+        agentId: String?,
+        conversationId: String,
+        runId: String?,
+        turnId: String?,
+        reason: String,
+    ): Int {
+        abandonedFragmentCleanups += AbandonedFragmentCleanup(agentId, conversationId, runId, turnId, reason)
+        return 0
+    }
+
     override suspend fun reconcileRecentMessages(
         agentId: String?,
         conversationId: String,
@@ -148,6 +160,14 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     data class ScopedConversation(
         val agentId: String?,
         val conversationId: String,
+    )
+
+    data class AbandonedFragmentCleanup(
+        val agentId: String?,
+        val conversationId: String,
+        val runId: String?,
+        val turnId: String?,
+        val reason: String,
     )
 
     data class RecentReconcile(
