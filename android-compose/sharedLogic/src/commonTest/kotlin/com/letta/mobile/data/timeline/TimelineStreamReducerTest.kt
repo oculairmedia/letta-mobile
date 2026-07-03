@@ -895,6 +895,33 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `assistant one character prefix replay is dropped after reconciled final without run id`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-final",
+                contentRaw = JsonPrimitive("Nah, that was just the bit. Real answer: agents stay off the relay."),
+                runId = null,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-prefix",
+                contentRaw = JsonPrimitive("N"),
+                runId = "local-run-39",
+                seqId = 1,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-final"
+        event.content shouldBe "Nah, that was just the bit. Real answer: agents stay off the relay."
+        output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
     fun `assistant prefix replay from local run is dropped after iroh final`() {
         val seeded = reduce(
             frame = AssistantMessage(
