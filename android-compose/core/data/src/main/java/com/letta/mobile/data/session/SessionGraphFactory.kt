@@ -53,6 +53,7 @@ import com.letta.mobile.data.transport.ChannelTransport
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.runtime.BackendCapabilities
@@ -190,6 +191,16 @@ class SessionGraphFactory internal constructor(
                 IrohChannelTransport(
                     scope = scope,
                     onConnect = { com.letta.mobile.runtime.iroh.IrohAndroidInit.install(appContext) },
+                    activeConfigProvider = {
+                        settingsRepository?.activeConfig?.value?.let { config ->
+                            IrohConnectConfig(
+                                baseShimUrl = config.serverUrl,
+                                token = config.accessToken.orEmpty(),
+                                deviceId = "android-letta-mobile",
+                                clientVersion = "android-iroh-active-config",
+                            )
+                        }
+                    },
                 )
             }
             localRuntimeBackend != null -> {

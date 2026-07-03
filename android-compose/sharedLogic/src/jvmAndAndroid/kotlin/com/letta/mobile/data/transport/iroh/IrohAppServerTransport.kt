@@ -60,6 +60,7 @@ class IrohAppServerTransport(
     private val alpn: ByteArray,
     scope: CoroutineScope,
     private val protocol: AppServerProtocol = AppServerProtocol,
+    private val onConnectionLost: (String) -> Unit = {},
 ) : AppServerTransport {
     private val controlCommandQueue = Channel<AppServerCommand>(Channel.BUFFERED)
     private val controlFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
@@ -112,10 +113,12 @@ class IrohAppServerTransport(
         if (runCatching { connectionReady.await() }.isFailure || !::connection.isInitialized) return@launch
         val activeConnection = connection
         val reason = runCatching { activeConnection.closed() }.getOrNull()
+        val closeReason = IrohDiagnostics.closeReason(reason)
         Telemetry.event(
             "IrohTransport", "connection.closed",
-            *(IrohDiagnostics.closeAttributes(activeConnection) + ("reason" to IrohDiagnostics.closeReason(reason))).toTypedArray(),
+            *(IrohDiagnostics.closeAttributes(activeConnection) + ("reason" to closeReason)).toTypedArray(),
         )
+        onConnectionLost("connection_closed: $closeReason")
     }
 
     // c0qm0 keepalive: Iroh exposes no idle-timeout knob, so proactively keep the
@@ -188,6 +191,7 @@ class IrohAppServerTransport(
             connectionReady.complete(Unit)
             pathWatchJob = launch { attachPathWatchers() }
         } catch (t: Throwable) {
+            onConnectionLost("connect_failed: ${t.message ?: t.toString()}")
             Telemetry.event(
                 "IrohTransport", "connect.failed",
                 "remoteEndpointId" to IrohDiagnostics.endpointIdHex(remoteAddr.id().toBytes()),
@@ -273,6 +277,7 @@ class IrohAppServerTransport(
             throw error
         } finally {
             Telemetry.event("IrohTransport", "frame.reader_stop", "channel" to channel.name)
+            onConnectionLost("reader_stopped:${channel.name}")
         }
     }
 

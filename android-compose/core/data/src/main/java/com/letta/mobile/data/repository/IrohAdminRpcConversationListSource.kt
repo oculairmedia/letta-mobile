@@ -3,7 +3,6 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
@@ -29,7 +28,6 @@ class IrohAdminRpcConversationListSource(
         order: String? = null,
         orderBy: String? = null,
     ): List<Conversation> {
-        ensureConnectedForAdminRpc()
         val params = buildJsonObject {
             agentId?.value?.let { put("agent_id", it) }
             limit?.let { put("limit", it.toString()) }
@@ -49,26 +47,5 @@ class IrohAdminRpcConversationListSource(
         }
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
-    }
-
-    private suspend fun ensureConnectedForAdminRpc() {
-        if (channelTransport.state.value is ChannelTransportState.Connected) return
-        val config = settingsRepository.activeConfig.value
-            ?: error("Iroh conversation.list requested with no active backend config")
-        val serverUrl = config.serverUrl
-        if (!IrohChannelTransport.shouldUseIroh(serverUrl)) {
-            error("Iroh conversation.list requested while backend is not iroh://")
-        }
-        Telemetry.event(
-            "IrohTransport", "conversation_list.ensureConnected",
-            "serverUrl" to serverUrl,
-            "state" to channelTransport.state.value::class.simpleName,
-        )
-        channelTransport.connect(
-            baseShimUrl = serverUrl,
-            token = config.accessToken.orEmpty(),
-            deviceId = "android-letta-mobile",
-            clientVersion = "android-iroh-conversation-list",
-        )
     }
 }
