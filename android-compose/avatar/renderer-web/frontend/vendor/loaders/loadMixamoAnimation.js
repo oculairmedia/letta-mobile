@@ -96,12 +96,30 @@ export function loadMixamoAnimation(url, vrm) {
     const parentRestWorldRotation = new THREE.Quaternion();
     const _quatA = new THREE.Quaternion();
 
-    // Rescale hips translation by the VRM/Mixamo hips-height ratio so the clip
-    // fits this model's proportions rather than the Mixamo skeleton's.
-    const mixamoHips = asset.getObjectByName('mixamorigHips');
+    // Mixamo namespaces bones as `<prefix>Hips` etc. The prefix is usually
+    // "mixamorig", but re-processed/re-uploaded characters get numbered
+    // namespaces ("mixamorig1:", "mixamorig11:", ... — FBXLoader strips the
+    // ":" separator). Detect the real prefix from the hips bone and remap the
+    // rig map onto it. (Deviation from the upstream example, which hardcodes
+    // "mixamorigHips" and rejects numbered rigs.)
+    let mixamoHips = null;
+    let rigPrefix = null;
+    asset.traverse((node) => {
+      if (rigPrefix === null && /^mixamorig\d*Hips$/.test(node.name)) {
+        mixamoHips = node;
+        rigPrefix = node.name.slice(0, node.name.length - 'Hips'.length);
+      }
+    });
     if (!mixamoHips) {
-      throw new Error('FBX is not a Mixamo humanoid rig (no mixamorigHips)');
+      throw new Error('FBX is not a Mixamo humanoid rig (no mixamorig*Hips bone)');
     }
+    const rigMap = rigPrefix === 'mixamorig'
+      ? mixamoVRMRigMap
+      : Object.fromEntries(
+          Object.entries(mixamoVRMRigMap).map(
+            ([name, bone]) => [rigPrefix + name.slice('mixamorig'.length), bone],
+          ),
+        );
     const motionHipsHeight = mixamoHips.position.y;
     const vrmHipsHeight = vrm.humanoid.normalizedRestPose.hips.position[1];
     const hipsPositionScale = vrmHipsHeight / motionHipsHeight;
@@ -109,7 +127,7 @@ export function loadMixamoAnimation(url, vrm) {
     clip.tracks.forEach((track) => {
       const trackSplitted = track.name.split('.');
       const mixamoRigName = trackSplitted[0];
-      const vrmBoneName = mixamoVRMRigMap[mixamoRigName];
+      const vrmBoneName = rigMap[mixamoRigName];
       const vrmNodeName = vrm.humanoid?.getNormalizedBoneNode(vrmBoneName)?.name;
       const mixamoRigNode = asset.getObjectByName(mixamoRigName);
 
