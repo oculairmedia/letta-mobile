@@ -79,11 +79,27 @@ class DesktopFileSecureSettingsStore(
         saveProperties(Properties())
     }
 
+    // A run of reads (e.g. the agent rail resolving one avatar-style key per
+    // agent for a bulk-imported fleet) previously re-read and re-parsed the
+    // whole properties file per call. Cache the parsed file, invalidated by
+    // last-modified time and cleared on our own writes.
+    private var cachedProperties: Properties? = null
+    private var cachedModifiedTime: java.nio.file.attribute.FileTime? = null
+
     private fun loadProperties(): Properties {
-        val properties = Properties()
-        if (Files.exists(path)) {
-            Files.newInputStream(path).use<InputStream, Unit>(properties::load)
+        if (!Files.exists(path)) {
+            cachedProperties = null
+            cachedModifiedTime = null
+            return Properties()
         }
+        val modified = Files.getLastModifiedTime(path)
+        cachedProperties?.let { snapshot ->
+            if (modified == cachedModifiedTime) return snapshot
+        }
+        val properties = Properties()
+        Files.newInputStream(path).use<InputStream, Unit>(properties::load)
+        cachedProperties = properties
+        cachedModifiedTime = modified
         return properties
     }
 
@@ -92,6 +108,9 @@ class DesktopFileSecureSettingsStore(
         Files.newOutputStream(path).use<OutputStream, Unit> { output ->
             properties.store(output, "Letta Desktop settings")
         }
+        // Force a re-read next time — mtime granularity can miss rapid writes.
+        cachedProperties = null
+        cachedModifiedTime = null
     }
 
     companion object {
