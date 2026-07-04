@@ -51,6 +51,15 @@ open class AgentRepository(
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
     private val transport: IChannelTransport? = null,
+    // letta-mobile-71orq: Iroh admin_rpc agent reads. When the active backend
+    // is iroh://, getAgent MUST route over the control channel — the raw HTTP
+    // AgentApi hard-fails at the purity choke-point.
+    private val irohAgentSource: IrohAdminRpcAgentSource? =
+        if (transport != null && settingsRepository != null) {
+            IrohAdminRpcAgentSource(transport, settingsRepository)
+        } else {
+            null
+        },
 ) : IAgentRepository, BackendScopedCache {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
     override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
@@ -260,13 +269,25 @@ open class AgentRepository(
             }
             return@flow
         }
-        val fresh = agentApi.getAgent(id)
+        val fresh = fetchAgentRemote(id)
         emit(fresh)
         updateAgentInCache(fresh)
     }
 
+    /**
+     * Fetch a single agent from the active backend. Routes over the Iroh admin
+     * RPC control channel when the backend is iroh:// (letta-mobile-71orq),
+     * falling back to the raw HTTP AgentApi otherwise.
+     */
+    private suspend fun fetchAgentRemote(id: AgentId): Agent =
+        if (irohAgentSource?.shouldUseIroh() == true) {
+            irohAgentSource.getAgent(id)
+        } else {
+            agentApi.getAgent(id)
+        }
+
     private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatching {
-        val fresh = agentApi.getAgent(agentId)
+        val fresh = fetchAgentRemote(agentId)
         updateAgentInCache(fresh)
         // Persist the transport-driven refresh to the Room cache so a pushed
         // agent_updated change survives an app restart (CodeRabbit #517).
@@ -330,7 +351,7 @@ open class AgentRepository(
 
     fun getAgentPolling(id: AgentId): Flow<Agent> = flow {
         while (true) {
-            val agent = agentApi.getAgent(id)
+            val agent = fetchAgentRemote(id)
             emit(agent)
             updateAgentInCache(agent)
             delay(3000)
@@ -465,13 +486,13 @@ open class AgentRepository(
         agentId: AgentId,
         operation: suspend () -> Unit
     ) {
-        val agent = agentApi.getAgent(agentId)
+        val agent = fetchAgentRemote(agentId)
         val checkpoint = com.letta.mobile.data.model.AgentConfigCheckpoint.from(agent)
         
         try {
             operation()
         } finally {
-            val updatedAgent = agentApi.getAgent(agentId)
+            val updatedAgent = fetchAgentRemote(agentId)
             if (!checkpoint.matches(updatedAgent)) {
                 Log.w("AgentRepository", "Agent config drift detected after operation, restoring checkpoint")
                 Telemetry.event(
