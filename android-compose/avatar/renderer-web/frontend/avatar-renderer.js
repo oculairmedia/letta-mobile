@@ -2,9 +2,14 @@
 //
 // Speaks AvatarWireProtocol v1 (see AvatarWireProtocol.kt): the host sends
 // command JSON via handleCommand(), the renderer emits event JSON through the
-// `emit` callback. Behavior (blinking, idle sway, emotion policy) lives in the
-// Kotlin director — this file just applies state to the three-vrm scene, so
-// any future native renderer can replay the same command stream.
+// `emit` callback. High-level behavior (blink cadence, gaze targeting, emotion
+// policy) lives in the Kotlin director — this file just applies state to the
+// three-vrm scene, so any future native renderer can replay the same command
+// stream. The two exceptions are inert baseline mechanics that every renderer
+// must reproduce identically for a VRM to look alive at all: a procedural
+// arms-down rest pose (VRM humanoids bind in a T-pose that nothing else undoes)
+// and a subtle deterministic breathing sway. Both are additive, humanoid-only,
+// and suspended whenever an embedded animation clip is driving the skeleton.
 //
 // Renderer stack (vendored, pinned): three r180 + @pixiv/three-vrm 3.4.5 —
 // the reference VRM runtime (MToon, spring bones, expressions, look-at).
@@ -16,6 +21,39 @@ import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 export const PROTOCOL_VERSION = 2;
 
 const VISEME_KEYS = ['aa', 'ih', 'ou', 'ee', 'oh'];
+
+// --- Baseline body mechanics (rest pose + breathing) ------------------------
+// VRM humanoids bind in a T-pose and the face-level channels never touch the
+// body, so without this the arms stay stuck out sideways. We apply a fixed
+// arms-down rest offset per humanoid bone, then add a small sinusoidal
+// breathing sway on top each frame. Everything is expressed in the three-vrm
+// NORMALIZED humanoid space (getNormalizedBoneNode), where three-vrm has
+// already reconciled VRM0/VRM1 axis differences for us — so we must NOT
+// re-apply the rotateVRM0 compensation here.
+//
+// Sign convention (verified live against the sample VRM in normalized space):
+// a NEGATIVE Z rotation on leftUpperArm swings it DOWN to the model's side; the
+// right side is the mirror (positive Z). ~1.2 rad drops the arms to a natural
+// rest angle without punching through the hips/skirt.
+const ARM_DOWN_Z = 1.2; // upper-arm drop from T-pose (~69°)
+const ELBOW_BEND_Z = 0.22; // slight lower-arm bend (~13°)
+const SHOULDER_DROP_Z = 0.08; // tiny natural shoulder relax (~4.5°)
+// Per-bone rest offsets, keyed by three-vrm humanoid bone name. Left/right are
+// mirrored on Z. Applied as the base local rotation; breathing adds onto it.
+const REST_POSE = {
+  leftShoulder: { x: 0, y: 0, z: SHOULDER_DROP_Z },
+  rightShoulder: { x: 0, y: 0, z: -SHOULDER_DROP_Z },
+  leftUpperArm: { x: 0, y: 0, z: -ARM_DOWN_Z },
+  rightUpperArm: { x: 0, y: 0, z: ARM_DOWN_Z },
+  leftLowerArm: { x: 0, y: 0, z: -ELBOW_BEND_Z },
+  rightLowerArm: { x: 0, y: 0, z: ELBOW_BEND_Z },
+};
+// Breathing: chest/spine lift on X plus faint shoulder + head follow. Driven by
+// accumulated delta time (no Math.random) so every renderer breathes in step.
+const BREATH_PERIOD = 4.0; // seconds per breath
+const BREATH_CHEST_X = 0.02; // primary spine/chest rise (~1.1°)
+const BREATH_SHOULDER_Z = 0.01; // faint shoulder swell
+const BREATH_HEAD_X = 0.006; // barely-there head bob
 
 export function createAvatarRenderer(canvas, emit) {
   const renderer = new THREE.WebGLRenderer({
@@ -42,7 +80,9 @@ export function createAvatarRenderer(canvas, emit) {
   const lookAtTarget = new THREE.Object3D();
   scene.add(lookAtTarget);
 
-  let current = null; // { root, vrm|null, mixer|null, clipsById, accessoryBindings }
+  let breathPhase = 0; // accumulated seconds — deterministic breathing input
+
+  let current = null; // { root, vrm|null, mixer|null, clipsById, accessoryBindings, restBones, activeClips }
   // Only the newest load may mutate the scene; older in-flight loadAsync
   // resolutions are discarded (the host ignores their acks by requestId too).
   let activeLoadRequestId = null;
@@ -60,12 +100,69 @@ export function createAvatarRenderer(canvas, emit) {
   renderer.setAnimationLoop(() => {
     const delta = clock.getDelta();
     if (current) {
+      // Rest pose + breathing own the humanoid skeleton ONLY while no embedded
+      // clip is driving it — a clip must win outright, so we skip our overrides
+      // the moment one is playing and let it restore naturally when it stops.
+      if (current.restBones && !clipDriving()) {
+        breathPhase += delta;
+        applyRestAndBreathing(current.restBones, breathPhase);
+      }
       if (current.mixer) current.mixer.update(delta);
       // vrm.update drives expressions, look-at, spring bones, constraints.
       if (current.vrm) current.vrm.update(delta);
     }
     renderer.render(scene, camera);
   });
+
+  // A clip is driving the skeleton if any registered mixer action is still
+  // running. When true the rest-pose/breathing overrides stand down so the clip
+  // wins; finished (non-loop) actions are pruned so we resume afterward.
+  function clipDriving() {
+    const actions = current?.activeClips;
+    if (!actions || actions.size === 0) return false;
+    let driving = false;
+    for (const action of actions) {
+      if (action.isRunning() && action.getEffectiveWeight() > 0) driving = true;
+      else if (!action.isRunning()) actions.delete(action);
+    }
+    return driving;
+  }
+
+  // Collect the normalized humanoid bone nodes we pose, keyed by bone name.
+  // Missing bones (partial rigs) are simply skipped.
+  function collectRestBones(vrm) {
+    if (!vrm?.humanoid) return null;
+    const bones = {};
+    for (const name of Object.keys(REST_POSE)) {
+      const node = vrm.humanoid.getNormalizedBoneNode(name);
+      if (node) bones[name] = node;
+    }
+    // Breathing targets — optional, posed additively over any rest offset.
+    for (const name of ['spine', 'chest', 'upperChest', 'head']) {
+      const node = vrm.humanoid.getNormalizedBoneNode(name);
+      if (node) bones[name] = node;
+    }
+    return Object.keys(bones).length > 0 ? bones : null;
+  }
+
+  // Write the rest offset plus this frame's breathing onto each bone's local
+  // rotation. Deterministic: breathing is a pure function of accumulated time.
+  function applyRestAndBreathing(bones, phase) {
+    const s = Math.sin((phase / BREATH_PERIOD) * Math.PI * 2);
+    for (const [name, rest] of Object.entries(REST_POSE)) {
+      const node = bones[name];
+      if (!node) continue;
+      let bz = 0;
+      if (name === 'leftShoulder' || name === 'rightShoulder') {
+        bz = (name === 'leftShoulder' ? 1 : -1) * BREATH_SHOULDER_Z * s;
+      }
+      node.rotation.set(rest.x, rest.y, rest.z + bz);
+    }
+    // Spine/chest lift is the dominant breathing motion; head gives a hint.
+    const chest = bones.upperChest ?? bones.chest ?? bones.spine;
+    if (chest) chest.rotation.x = BREATH_CHEST_X * s;
+    if (bones.head) bones.head.rotation.x = BREATH_HEAD_X * s;
+  }
 
   function sendEvent(event) {
     emit(JSON.stringify(event));
@@ -215,7 +312,12 @@ export function createAvatarRenderer(canvas, emit) {
       const accessoryBindings = new Map(
         (accessories ?? []).map((a) => [a.id, a.nodeNames ?? []]),
       );
-      current = { root, vrm, mixer, clipsById, accessoryBindings };
+      // Humanoid rest-pose bones (null for non-humanoid GLB → body untouched).
+      // activeClips tracks running mixer actions so the per-frame loop knows to
+      // stand the rest pose down while a clip drives the skeleton.
+      const restBones = collectRestBones(vrm);
+      breathPhase = 0;
+      current = { root, vrm, mixer, clipsById, accessoryBindings, restBones, activeClips: new Set() };
 
       const expressions = vrm?.expressionManager
         ? Object.keys(vrm.expressionManager.expressionMap)
@@ -263,6 +365,9 @@ export function createAvatarRenderer(canvas, emit) {
     action.clampWhenFinished = !loop;
     if (fadeSeconds > 0) action.fadeIn(fadeSeconds);
     action.play();
+    // Register so the frame loop suspends rest pose/breathing while this runs;
+    // clipDriving() drops it again once it finishes (non-loop) or is stopped.
+    current.activeClips.add(action);
   }
 
   function setAccessoryEnabled(id, enabled) {
