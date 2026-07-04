@@ -949,6 +949,100 @@ class TimelineStreamReducerTest {
         output.emittedEvents shouldBe emptyList()
     }
 
+
+
+    @Test
+    fun `failed turn with sole short assistant fragment removes tail row`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-fragment",
+                contentRaw = JsonPrimitive("No"),
+                runId = "run-failed",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = seeded.cleanupAbandonedAssistantFragments(
+            runId = "run-failed",
+            turnId = "turn-failed",
+            reason = "turn_done_failed",
+        ).timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+
+    @Test
+    fun `cleanup uses observed real run id when terminal frame carries synthetic run id`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-fragment",
+                contentRaw = JsonPrimitive("Ok"),
+                runId = "run-real-observed",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = seeded.cleanupAbandonedAssistantFragments(
+            runId = "iroh-run-terminal",
+            turnId = "turn-terminal",
+            reason = "turn_done_failed",
+            candidateRunIds = setOf("run-real-observed"),
+        ).timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `tail-only cleanup preserves earlier legitimate short assistant before tool event`() {
+        val shortAssistant = reduce(
+            frame = AssistantMessage(
+                id = "assistant-ok",
+                contentRaw = JsonPrimitive("OK"),
+                runId = "run-legit",
+                seqId = 1,
+            ),
+        ).next
+        val withTool = reduce(
+            prev = shortAssistant,
+            frame = ToolCallMessage(
+                id = "tool-call",
+                runId = "run-legit",
+                toolCall = ToolCall(toolCallId = "call-1", name = "lookup", arguments = "{}"),
+            ),
+        ).next
+
+        val cleaned = withTool.cleanupAbandonedAssistantFragments(
+            runId = "run-legit",
+            turnId = "turn-legit",
+            reason = "turn_done_failed",
+        ).timeline
+
+        cleaned.events shouldHaveSize 2
+        (cleaned.events.first() as TimelineEvent.Confirmed).content shouldBe "OK"
+    }
+
+    @Test
+    fun `terminal disconnect without cleanup target preserves legitimate short tail reply`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-ok",
+                contentRaw = JsonPrimitive("OK"),
+                runId = "run-legit",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = seeded.cleanupAbandonedAssistantFragments(
+            runId = null,
+            turnId = null,
+            reason = "disconnect",
+        ).timeline
+
+        cleaned.events shouldHaveSize 1
+        (cleaned.events.single() as TimelineEvent.Confirmed).content shouldBe "OK"
+    }
+
     @Test
     fun `terminal failed turn cleanup removes one character assistant fragment`() {
         val withFull = reduce(
