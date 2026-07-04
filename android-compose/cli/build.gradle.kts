@@ -62,6 +62,7 @@ dependencies {
     implementation("computer.iroh:iroh:1.0.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 
