@@ -15,9 +15,11 @@ import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,6 +96,21 @@ fun main(args: Array<String>) {
             height = 560.dp,
             position = WindowPosition(Alignment.BottomEnd),
         )
+
+        // Real Letta chat, wired to the user's actual backend (PRD §5 B1). Lives
+        // at the application scope so BOTH the pet window and the focusable reply
+        // popup share one session. Started once; closed on app exit.
+        val appScope = rememberCoroutineScope()
+        val chatSession = remember { PetChatSession(scope = appScope, log = { println("[pet] $it") }) }
+        val chatState by chatSession.state.collectAsState()
+        LaunchedEffect(chatSession) { chatSession.start() }
+        DisposableEffect(chatSession) { onDispose { chatSession.close() } }
+
+        // Reply-popup toggle + the pet window's live on-screen origin (so the
+        // popup can anchor just below/beside it, clamped to screen).
+        var chatOpen by remember { mutableStateOf(false) }
+        var petOrigin by remember { mutableStateOf(0 to 0) }
+
         Window(
             onCloseRequest = ::exitApplication,
             state = state,
@@ -105,7 +122,25 @@ fun main(args: Array<String>) {
             alwaysOnTop = true,
         ) {
             LaunchedEffect(Unit) { PetWindowStyles.applyBaseStyles(window) }
-            PetSpikeContent(vrmPath = vrmPath, window = window, onClose = ::exitApplication)
+            PetSpikeContent(
+                vrmPath = vrmPath,
+                window = window,
+                onClose = ::exitApplication,
+                chatState = chatState,
+                chatOpen = chatOpen,
+                onToggleChat = { chatOpen = !chatOpen },
+                onPetOriginChanged = { x, y -> petOrigin = x to y },
+            )
+        }
+
+        if (chatOpen) {
+            PetReplyWindow(
+                chat = chatState,
+                anchorX = petOrigin.first,
+                anchorY = petOrigin.second,
+                onSend = { text -> chatSession.send(text) },
+                onClose = { chatOpen = false },
+            )
         }
     }
 }
@@ -190,6 +225,10 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
     vrmPath: Path,
     window: androidx.compose.ui.awt.ComposeWindow,
     onClose: () -> Unit,
+    chatState: PetChatUiState,
+    chatOpen: Boolean,
+    onToggleChat: () -> Unit,
+    onPetOriginChanged: (x: Int, y: Int) -> Unit,
 ) {
     val log: (String) -> Unit = remember { { println("[pet] $it") } }
     var status by remember { mutableStateOf("starting…") }
@@ -197,6 +236,8 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
     var clickThrough by remember { mutableStateOf(false) }
     var hovered by remember { mutableStateOf(false) }
     var importedAnimIds by remember { mutableStateOf(emptyList<String>()) }
+    // Bubble text shown right now; held ~4s after the stream ends (§6 SPEAKING).
+    var bubbleText by remember { mutableStateOf("") }
 
     var cef by remember { mutableStateOf<PetCefHost?>(null) }
     val runtimeRef = remember { AtomicReference<WebAvatarRuntime?>(null) }
@@ -255,6 +296,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
             // 30fps behavior tick + viewport mirroring (window may be moved).
             val timeSource = TimeSource.Monotonic
             var lastMark = timeSource.markNow()
+            var lastOrigin = Int.MIN_VALUE to Int.MIN_VALUE
             while (isActive) {
                 delay(33L)
                 val delta = lastMark.elapsedNow().inWholeMicroseconds / 1_000_000f
@@ -262,6 +304,13 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
                 director.tick(delta)
                 val v = viewport.get()
                 startedCef.updateViewport(v.widthDip, v.heightDip, v.scale, v.x, v.y)
+                // Report the window's live on-screen origin (it can be dragged)
+                // so the reply popup can re-anchor to it. Only on change.
+                val origin = runCatching { window.locationOnScreen }.getOrNull()
+                if (origin != null && (origin.x to origin.y) != lastOrigin) {
+                    lastOrigin = origin.x to origin.y
+                    onPetOriginChanged(origin.x, origin.y)
+                }
             }
         } catch (t: Throwable) {
             if (t is kotlinx.coroutines.CancellationException) throw t
@@ -288,6 +337,42 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
         }
     }
 
+    // Live chat drives the director: THINKING while the agent works, SPEAKING
+    // while the reply streams, a green SUCCESS flash + IDLE when it settles, and
+    // a sad flash on error (PRD §5 B1 presence wiring). This OVERRIDES the manual
+    // hover chips whenever a turn is in flight; when chat is idle the manual
+    // selection (tracked in [activity]) is restored so the demo chips still work.
+    var prevPhase by remember { mutableStateOf(PetChatPhase.CONNECTING) }
+    LaunchedEffect(chatState.phase) {
+        val director = directorRef.get()
+        when (chatState.phase) {
+            PetChatPhase.THINKING -> director?.setActivity(AvatarActivity.THINKING)
+            PetChatPhase.REPLYING -> director?.setActivity(AvatarActivity.SPEAKING)
+            PetChatPhase.ERROR -> {
+                director?.setActivity(AvatarActivity.ERROR)
+                director?.flashEmotion(AvatarExpression.Sad)
+            }
+            PetChatPhase.IDLE, PetChatPhase.CONNECTING -> {
+                // Green flash on a completed reply, then hand presence back to
+                // whatever the manual chips last selected.
+                if (prevPhase == PetChatPhase.REPLYING) director?.notifyTaskSucceeded()
+                director?.setActivity(activity)
+            }
+        }
+        prevPhase = chatState.phase
+    }
+
+    // Speech bubble: mirror the streamed reply while REPLYING, then hold the
+    // final text ~4s after the stream ends before clearing (§6 SPEAKING auto-hide).
+    LaunchedEffect(chatState.bubbleText, chatState.phase) {
+        if (chatState.bubbleText.isNotBlank()) {
+            bubbleText = chatState.bubbleText
+        } else if (bubbleText.isNotBlank() && chatState.phase != PetChatPhase.REPLYING) {
+            delay(4_000)
+            bubbleText = ""
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -308,23 +393,37 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
             }
         }
 
-        // Status chip (boot progress / director state) — PRD B1's chip slot.
+        // Speech bubble: streams the assistant reply inside the pet window
+        // (PRD §5 B1, §6 SPEAKING). Non-interactive v1; auto-hidden by the
+        // effect above ~4s after the stream ends. Sits below the hover row.
+        PetSpeechBubble(
+            text = bubbleText,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 40.dp, start = 12.dp, end = 12.dp),
+        )
+
+        // Status chip (boot progress / chat progress / director state) — PRD B1's
+        // chip slot. Once the avatar has booted, prefer the one-line chat
+        // progress ("thinking…"/"replying…"/agent name) — Codex-pets pattern.
         val chipText = when {
             status.isNotEmpty() -> status
             clickThrough -> "click-through (auto-off 10s)"
-            else -> activity.name.lowercase()
+            else -> chatState.errorMessage ?: chatState.statusLine
         }
         Chip(
             text = chipText,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp),
         )
 
-        // Hover micro-row: cycle presence states, click-through, close.
+        // Hover micro-row: chat, cycle presence states, click-through, close.
         if (hovered && !clickThrough) {
             Row(
                 modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                // New "chat" chip: toggles the focusable reply popup (PRD §5 B1).
+                Chip(text = "chat", highlighted = chatOpen) { onToggleChat() }
                 for (target in listOf(
                     AvatarActivity.IDLE,
                     AvatarActivity.THINKING,
