@@ -31,10 +31,12 @@ data class IrohConnectionHandle(
     val sessionId: String,
     val transport: IrohAppServerTransport? = null,
     val turnEngine: AppServerTurnEngine? = null,
+    val adminRpcCall: (suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse)? = null,
     val close: suspend (String) -> Unit,
 ) {
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
-        transport?.adminRpc(method = method, path = path, body = body)
+        adminRpcCall?.invoke(method, path, body)
+            ?: transport?.adminRpc(method = method, path = path, body = body)
             ?: error("Iroh admin_rpc requested without an active transport")
 }
 

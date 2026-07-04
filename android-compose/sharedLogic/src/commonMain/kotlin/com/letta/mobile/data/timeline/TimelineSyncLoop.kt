@@ -194,6 +194,7 @@ class TimelineSyncLoop(
                     is TimelineGatewayEvent.RetrySend -> stateTransitionHandler.applyRetrySend(event)
                     is TimelineGatewayEvent.MarkSent -> stateTransitionHandler.applyMarkSent(event)
                     is TimelineGatewayEvent.MarkFailed -> stateTransitionHandler.applyMarkFailed(event)
+                    is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> applyCleanupAbandonedAssistantFragments(event)
                 }
             } catch (cancelled: CancellationException) {
                 completeGatewayEventExceptionally(event, cancelled)
@@ -216,6 +217,7 @@ class TimelineSyncLoop(
             is TimelineGatewayEvent.RetrySend -> event.ack.completeExceptionally(t)
             is TimelineGatewayEvent.MarkSent -> event.ack.completeExceptionally(t)
             is TimelineGatewayEvent.MarkFailed -> event.ack.completeExceptionally(t)
+            is TimelineGatewayEvent.CleanupAbandonedAssistantFragments -> event.ack.completeExceptionally(t)
         }
     }
 
@@ -237,6 +239,35 @@ class TimelineSyncLoop(
         val ack = CompletableDeferred<ReconcileAfterSendResult>()
         eventQueue.send(TimelineGatewayEvent.ReconcileAfterSendSnapshot(otid = otid, serverMessages = serverMessages, ack = ack))
         return ack.await()
+    }
+
+    suspend fun cleanupAbandonedAssistantFragments(
+        runId: String?,
+        turnId: String?,
+        reason: String,
+        candidateRunIds: Set<String> = emptySet(),
+    ): Int {
+        val ack = CompletableDeferred<Int>()
+        eventQueue.send(TimelineGatewayEvent.CleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds, ack))
+        return ack.await()
+    }
+
+    private suspend fun applyCleanupAbandonedAssistantFragments(event: TimelineGatewayEvent.CleanupAbandonedAssistantFragments) {
+        var removed = 0
+        writeMutex.withLock {
+            val result = _state.value.cleanupAbandonedAssistantFragments(
+                runId = event.runId,
+                turnId = event.turnId,
+                reason = event.reason,
+                candidateRunIds = event.candidateRunIds,
+            )
+            removed = result.suppressions.size
+            _state.value = result.timeline
+        }
+        if (removed > 0 && !event.runId.isNullOrBlank()) {
+            _events.emit(TimelineSyncEvent.OrphanAssistantFragmentsCleaned(event.runId, event.turnId, removed, event.reason))
+        }
+        event.ack.complete(removed)
     }
 
     suspend fun reconcileForExternalRun(runId: String) {

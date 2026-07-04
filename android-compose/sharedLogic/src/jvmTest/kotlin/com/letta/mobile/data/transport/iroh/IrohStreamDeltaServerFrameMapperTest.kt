@@ -159,6 +159,47 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
+    fun usesStableReasoningIdEvenWhenDeltaChunksCarryUniqueIds() {
+        val first = assertIs<ServerFrame.ReasoningMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 1,
+                  "idempotency_key": "evt-reasoning-1",
+                  "delta": {
+                    "id": "reasoning-word-1",
+                    "message_type": "reasoning_message",
+                    "reasoning": "Still",
+                    "run_id": "run-app"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+        val second = assertIs<ServerFrame.ReasoningMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 2,
+                  "idempotency_key": "evt-reasoning-2",
+                  "delta": {
+                    "id": "reasoning-word-2",
+                    "message_type": "reasoning_message",
+                    "reasoning": " responsive",
+                    "run_id": "run-app"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+
+        assertEquals("iroh-reasoning_message-run-app-turn-fallback", first.id)
+        assertEquals(first.id, second.id)
+    }
+
+    @Test
     fun mapsStopReasonToStopReasonAndSingleTerminalCandidate() {
         val frames = map(
             """
