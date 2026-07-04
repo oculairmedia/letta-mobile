@@ -104,4 +104,9 @@ class LocalRoutingTimelineTransport(
         } else {
             remote.listAgentMessages(agentId, limit, order, conversationId)
         }
+
+    override suspend fun getToolReturn(
+        conversationId: String,
+        messageId: String,
+    ): LettaMessage? = transportFor(conversationId).getToolReturn(conversationId, messageId)
 }

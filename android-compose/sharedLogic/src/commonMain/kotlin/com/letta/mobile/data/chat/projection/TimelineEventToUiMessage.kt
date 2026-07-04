@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.model.UiToolResultTruncation
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -269,6 +270,9 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             ?: if (index == 0) ev.toolReturnContent else null
                         val isError = callId?.let { ev.toolReturnIsErrorByCallId[it] }
                             ?: ev.toolReturnIsError
+                        // letta-mobile-fe51r: surface the pointer-diet marker
+                        // so the card can lazily fetch the full body on expand.
+                        val truncation = callId?.let { ev.toolReturnTruncationByCallId[it] }
                         UiToolCall(
                             name = tc.name ?: "tool",
                             arguments = tc.arguments ?: "",
@@ -283,6 +287,9 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             },
                             toolCallId = callId,
                             approvalDecision = chip,
+                            resultTruncation = truncation?.let {
+                                UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
+                            },
                         )
                     }
                 } else null

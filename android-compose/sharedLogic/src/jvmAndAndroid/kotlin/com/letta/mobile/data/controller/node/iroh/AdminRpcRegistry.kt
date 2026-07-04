@@ -5,6 +5,7 @@ object AdminRpcRegistry {
         "conversation.list",
         "message.list",
         "message.get",
+        "tool_return.get",
         "goal.get",
         "goal.command",
         "agent.list",

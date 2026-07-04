@@ -43,20 +43,22 @@ fun applyReturnsAndResponsesFromSnapshot(
             toolCall.effectiveId.takeIf { it.isNotBlank() }?.let { it in returnedToolCallIds } == true
         }
         if (matchingReturn == null && !byResponse && !byReturn) return@map ev
-        val returnContentByCallId = ev.toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
-            toolReturn.toolReturn.funcResponse?.let { callId to it }
-        }.toMap()
+        // letta-mobile-fe51r: shared fold keeps projected previews from
+        // clobbering full bodies and tracks truncation markers per call id.
+        val fold = foldToolReturnBodies(ev.toolReturnContentByCallId, ev.toolReturnTruncationByCallId, matchingReturns)
         val returnIsErrorByCallId = ev.toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
             callId to (toolReturn.isErr == true || toolReturn.status == "error")
         }
+        val firstCallId = matchingReturns.firstOrNull()?.first
         ev.copy(
             approvalDecided = byResponse || byReturn || ev.approvalDecided,
-            toolReturnContent = matchingReturn?.toolReturn?.funcResponse
+            toolReturnContent = firstCallId?.let { fold.contentByCallId[it] }
                 ?: ev.toolReturnContent,
             toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" }
                 ?: ev.toolReturnIsError,
-            toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+            toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
+            toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
         )
     }
     if (newEvents !== state.value.events) {

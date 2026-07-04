@@ -51,6 +51,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.letta.mobile.feature.chat.render.LocalStreamingRevealHapticPulse
+import com.letta.mobile.feature.chat.render.LocalTruncatedToolResultResolver
+import com.letta.mobile.feature.chat.render.TruncatedToolResultResolver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -488,9 +490,18 @@ internal fun ChatScreen(
                     else -> "ready"
                 }
 
+                // letta-mobile-fe51r (P2b pointer diet): lets tool cards
+                // lazily fetch the full body of a server-projected result
+                // when the user expands them.
+                val truncatedToolResultResolver = remember(viewModel) {
+                    TruncatedToolResultResolver { messageId ->
+                        viewModel.onTruncatedToolResultExpanded(messageId)
+                    }
+                }
                 CompositionLocalProvider(
                     LocalSubagentTodoSheetOpener provides openSubagentTarget,
                     LocalStreamingRevealHapticPulse provides streamingRevealPulse,
+                    LocalTruncatedToolResultResolver provides truncatedToolResultResolver,
                 ) {
                     Crossfade(
                         targetState = contentPhase,

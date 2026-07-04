@@ -410,6 +410,7 @@ class IrohAppServerTransport(
         "conversation.list",
         "message.list",
         "message.get",
+        "tool_return.get",
         "goal.get",
         "agent.list",
         "agent.get",

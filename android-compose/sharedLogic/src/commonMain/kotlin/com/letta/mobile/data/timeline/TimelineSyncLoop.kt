@@ -270,6 +270,35 @@ class TimelineSyncLoop(
         event.ack.complete(removed)
     }
 
+    /**
+     * letta-mobile-fe51r (P2b pointer diet): fetch the full body of a
+     * tool-return message that `message.list` projected to a preview, then
+     * fold it into the owning TOOL_CALL event (clearing the truncation
+     * marker). Returns true when a full body was fetched and applied.
+     */
+    suspend fun resolveTruncatedToolReturn(messageId: String): Boolean {
+        val message = runCatching { messageApi.getToolReturn(conversationId, messageId) }
+            .onFailure { t ->
+                Telemetry.error(
+                    "TimelineSync", "toolReturn.resolveFailed", t,
+                    "conversationId" to conversationId,
+                    "messageId" to messageId,
+                )
+            }
+            .getOrNull() as? com.letta.mobile.data.model.ToolReturnMessage ?: return false
+        if (message.toolReturnTruncated == true) return false
+        writeMutex.withLock {
+            applyReturnsAndResponsesFromSnapshot(listOf(message), _state)
+        }
+        Telemetry.event(
+            "TimelineSync", "toolReturn.resolved",
+            "conversationId" to conversationId,
+            "messageId" to messageId,
+            "bodyLen" to (message.toolReturn.funcResponse?.length ?: 0),
+        )
+        return true
+    }
+
     suspend fun reconcileForExternalRun(runId: String) {
         reconcileForExternalRun(runId) { name, attrs, allowWhileActive ->
             recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)
