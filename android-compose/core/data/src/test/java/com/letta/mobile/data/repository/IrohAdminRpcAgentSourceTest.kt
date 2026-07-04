@@ -54,6 +54,21 @@ class IrohAdminRpcAgentSourceTest {
     }
 
     @Test
+    fun `getAgent coerces explicit null metadata to default`() = runTest {
+        // The server serializes optional fields as explicit null; the decoder
+        // must coerce "metadata": null to the empty-map default rather than
+        // failing (letta-mobile-71orq — surfaced on-device after the choke-point
+        // fix let agent.get results reach the decoder).
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("""{"id":"agent-1","name":"Lester","metadata":null}""") }
+        }
+        val agent = source(transport).getAgent(AgentId("agent-1"))
+
+        assertEquals("agent-1", agent.id.value)
+        assertTrue(agent.metadata.isEmpty())
+    }
+
+    @Test
     fun `listAgents routes to agent_list and decodes`() = runTest {
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ -> ok("""[{"id":"agent-1","name":"Lester"},{"id":"agent-2","name":"BMO"}]""") }

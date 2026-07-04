@@ -28,7 +28,16 @@ import kotlinx.serialization.json.put
 class IrohAdminRpcAgentSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
+    // Match the raw AgentApi Json config: the server may serialize optional
+    // fields as explicit null (e.g. "metadata": null). explicitNulls=false +
+    // coerceInputValues=true coerce those to the property defaults instead of
+    // failing to decode (letta-mobile-71orq).
+    private val json: Json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+        coerceInputValues = true
+    },
 ) {
     fun shouldUseIroh(): Boolean =
         IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
