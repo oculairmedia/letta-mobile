@@ -64,7 +64,14 @@ class IrohAdminRpcAgentSource(
         val merged = mutableListOf<Agent>()
         val seenIds = HashSet<String>()
         var offset = 0
-        while (true) {
+        // Hard cap on iterations so a server that ignores `offset` (returning the
+        // same page) or otherwise never shortens can't loop forever
+        // (CodeRabbit/Codex review on #818). The seenIds dedup already breaks on
+        // a stalled offset (fresh.isEmpty), but the cap is a belt-and-braces
+        // bound: MAX_PAGES * page size covers far more agents than realistic.
+        var iterations = 0
+        while (iterations < MAX_AGENT_LIST_PAGES) {
+            iterations++
             val params = buildJsonObject {
                 put("limit", AGENT_LIST_PAGE_SIZE.toString())
                 put("offset", offset.toString())
@@ -79,6 +86,8 @@ class IrohAdminRpcAgentSource(
             val page = json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
             if (page.isEmpty()) break
             val fresh = page.filter { seenIds.add(it.id.value) }
+            // Server ignored offset / returned an already-seen page: stop rather
+            // than spin. Returns what we have so far (still better than page 1).
             if (fresh.isEmpty()) break
             merged += fresh
             if (page.size < AGENT_LIST_PAGE_SIZE) break
@@ -88,6 +97,12 @@ class IrohAdminRpcAgentSource(
     }
 
     private companion object {
-        const val AGENT_LIST_PAGE_SIZE = 100
+        // Kept modest so a single page stays comfortably under the ~1MB
+        // unchunked Iroh frame cap even for agents with sizeable metadata
+        // (Codex review on #818 — the same cap that broke message.list before).
+        const val AGENT_LIST_PAGE_SIZE = 50
+        // Belt-and-braces bound: 50 pages * 50 = 2500 agents, far above realistic
+        // fleets; prevents an unbounded loop if the server misbehaves on offset.
+        const val MAX_AGENT_LIST_PAGES = 50
     }
 }

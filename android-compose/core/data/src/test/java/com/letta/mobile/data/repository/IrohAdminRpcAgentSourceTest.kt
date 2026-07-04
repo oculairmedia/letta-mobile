@@ -87,8 +87,8 @@ class IrohAdminRpcAgentSourceTest {
         // The server returns only a default page when unlimited, so agents beyond
         // it never resolve a name (letta-mobile-71orq). Verify the source pages
         // via offset and stops on a short page.
-        val fullPage = (1..100).joinToString(",", "[", "]") { """{"id":"agent-$it","name":"A$it"}""" }
-        val secondPage = """[{"id":"agent-101","name":"Lester"}]"""
+        val fullPage = (1..50).joinToString(",", "[", "]") { """{"id":"agent-$it","name":"A$it"}""" }
+        val secondPage = """[{"id":"agent-51","name":"Lester"}]"""
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, path, _ ->
                 if (path.contains("offset=0")) ok(fullPage) else ok(secondPage)
@@ -97,8 +97,8 @@ class IrohAdminRpcAgentSourceTest {
 
         val agents = source(transport).listAgents()
 
-        assertEquals(101, agents.size)
-        assertTrue("second page agent must be included", agents.any { it.id.value == "agent-101" })
+        assertEquals(51, agents.size)
+        assertTrue("second page agent must be included", agents.any { it.id.value == "agent-51" })
         assertEquals(2, transport.adminRpcCalls.size)
     }
 }
