@@ -64,12 +64,12 @@ export function createAvatarRenderer(canvas, emit) {
     alpha: true, // transparent clear — pet-mode windows composite over the desktop
     antialias: true,
   });
-  // Supersample 2x on top of the device ratio: under CEF off-screen rendering
-  // the context's MSAA is not reliably available, so edges alias at 1:1. The
-  // oversized framebuffer downscales to the canvas CSS size at composite time
-  // (SSAA). Pet-window canvases are small (~380x560), so the cost is modest.
-  const SUPERSAMPLE = 2;
-  renderer.setPixelRatio((window.devicePixelRatio || 1) * SUPERSAMPLE);
+  // Antialiasing: under CEF off-screen rendering MSAA is unreliable, so pet
+  // mode supersamples HOST-SIDE — the embedder reports an inflated device
+  // scale (PetWindowSpike), which flows into devicePixelRatio here and is
+  // downscaled when the BGRA frame is composited. Keeping the GL pipeline at
+  // the plain device ratio preserves the alpha path exactly as verified.
+  renderer.setPixelRatio(window.devicePixelRatio || 1);
   renderer.setClearColor(0x000000, 0);
 
   const scene = new THREE.Scene();

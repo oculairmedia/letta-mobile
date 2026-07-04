@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.window.WindowDraggableArea
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -71,16 +72,32 @@ fun PetReplyWindow(
     chat: PetChatUiState,
     anchorX: Int,
     anchorY: Int,
+    anchorHeight: Int,
     onSend: (String) -> Boolean,
     onClose: () -> Unit,
 ) {
-    // Sit just below the pet window's top-left, clamped so the card stays on
-    // screen. The pet window is 380 wide; nudge in a touch so the ~360 card
-    // reads as attached rather than overhanging.
+    // Default position: BELOW the pet (under her feet). When the pet is parked
+    // at the bottom edge there is no room below, so fall back to beside her,
+    // bottom-aligned (left first, then right), always clamped on-screen. The
+    // header is a drag handle, so the user can reposition freely after open;
+    // the initial position only applies when the popup (re)opens.
     val popupWidth = 360
     val popupHeight = 128
-    val x = (anchorX + 10).coerceAtLeast(0)
-    val y = (anchorY + 12).coerceAtLeast(0)
+    val gap = 8
+    val screen = remember {
+        java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+    }
+    val below = anchorY + anchorHeight + gap
+    val x: Int
+    val y: Int
+    if (below + popupHeight <= screen.y + screen.height) {
+        x = anchorX.coerceIn(0, (screen.width - popupWidth).coerceAtLeast(0))
+        y = below
+    } else {
+        val left = anchorX - popupWidth - gap
+        x = if (left >= 0) left else (anchorX + 380 + gap).coerceAtMost(screen.width - popupWidth)
+        y = (anchorY + anchorHeight - popupHeight).coerceAtLeast(0)
+    }
 
     val windowState = rememberWindowState(
         width = popupWidth.dp,
@@ -103,7 +120,7 @@ fun PetReplyWindow(
 }
 
 @Composable
-private fun PetReplyCard(
+private fun androidx.compose.ui.window.WindowScope.PetReplyCard(
     chat: PetChatUiState,
     onSend: (String) -> Boolean,
     onClose: () -> Unit,
@@ -140,30 +157,33 @@ private fun PetReplyCard(
             .padding(14.dp),
     ) {
         Column(Modifier.fillMaxSize()) {
-            // Header: presence dot + agent name + close.
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(8.dp)
-                        .background(phaseDotColor(chat.phase), CircleShape),
-                )
-                Spacer(Modifier.width(8.dp))
-                BasicText(
-                    text = chat.agent?.displayName ?: "Pet",
-                    style = TextStyle(color = Color(0xFFE8E8EC), fontSize = 13.sp),
-                    modifier = Modifier.weight(1f),
-                )
-                BasicText(
-                    text = chat.statusLine,
-                    style = TextStyle(color = Color(0xFF8A8A93), fontSize = 11.sp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Box(
-                    Modifier
-                        .clickable(onClick = onClose)
-                        .padding(horizontal = 4.dp),
-                ) {
-                    BasicText(text = "✕", style = TextStyle(color = Color(0xFF8A8A93), fontSize = 13.sp))
+            // Header: presence dot + agent name + close. Also the drag handle —
+            // the card is repositionable by grabbing anywhere along this row.
+            WindowDraggableArea(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .background(phaseDotColor(chat.phase), CircleShape),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    BasicText(
+                        text = chat.agent?.displayName ?: "Pet",
+                        style = TextStyle(color = Color(0xFFE8E8EC), fontSize = 13.sp),
+                        modifier = Modifier.weight(1f),
+                    )
+                    BasicText(
+                        text = chat.statusLine,
+                        style = TextStyle(color = Color(0xFF8A8A93), fontSize = 11.sp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Box(
+                        Modifier
+                            .clickable(onClick = onClose)
+                            .padding(horizontal = 4.dp),
+                    ) {
+                        BasicText(text = "✕", style = TextStyle(color = Color(0xFF8A8A93), fontSize = 13.sp))
+                    }
                 }
             }
 

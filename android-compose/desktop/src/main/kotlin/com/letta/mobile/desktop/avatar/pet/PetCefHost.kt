@@ -35,6 +35,7 @@ class PetCefHost private constructor(
     val frame: State<ImageBitmap?> = frameState
 
     @Volatile private var firstFrameLogged = false
+    @Volatile private var alphaProbeLogged = false
 
     private var browser: ComposeOsrBrowser? = null
 
@@ -69,6 +70,13 @@ class PetCefHost private constructor(
         val bytes = ByteArray(width * height * 4)
         buffer.rewind()
         buffer.get(bytes)
+        // One-time transparency probe: the page corner must be alpha 0. If it
+        // reads 255 the transparency loss is CEF/page-side; if 0 it is the
+        // Compose window compositing — splits the search space from the log.
+        if (!alphaProbeLogged && width > 64) {
+            alphaProbeLogged = true
+            onLog("frame alpha probe ${width}x$height corner=${bytes[3].toInt() and 0xFF} (0=transparent)")
+        }
         val info = ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.PREMUL)
         try {
             frameState.value = Image.makeRaster(info, bytes, width * 4).toComposeImageBitmap()

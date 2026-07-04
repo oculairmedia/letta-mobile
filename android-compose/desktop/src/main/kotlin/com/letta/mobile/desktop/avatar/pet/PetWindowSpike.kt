@@ -82,6 +82,16 @@ import kotlinx.coroutines.withContext
  * `~/.letta-mobile/jcef-bundle`.
  */
 fun main(args: Array<String>) {
+    // Per-pixel transparency must survive GPU/display events: on the
+    // accelerated (Direct3D) path a driver overlay toast or display change
+    // forces a swapchain recreate that can come back WITHOUT composition
+    // alpha — the window turns opaque black (observed live with an NVIDIA
+    // overlay notification). The pet only composites a CPU bitmap (the CEF
+    // frame) into a small window, so software presentation is both robust
+    // (layered-window path, unaffected by GPU resets) and cheap.
+    if (System.getProperty("skiko.renderApi") == null) {
+        System.setProperty("skiko.renderApi", "SOFTWARE_FAST")
+    }
     val vrmPath = args.firstOrNull()?.let(Path::of) ?: resolveDefaultAvatar()
     if (vrmPath == null) {
         System.err.println(
@@ -106,10 +116,10 @@ fun main(args: Array<String>) {
         LaunchedEffect(chatSession) { chatSession.start() }
         DisposableEffect(chatSession) { onDispose { chatSession.close() } }
 
-        // Reply-popup toggle + the pet window's live on-screen origin (so the
-        // popup can anchor just below/beside it, clamped to screen).
+        // Reply-popup toggle + the pet window's live on-screen bounds (so the
+        // popup can anchor below it, clamped to screen).
         var chatOpen by remember { mutableStateOf(false) }
-        var petOrigin by remember { mutableStateOf(0 to 0) }
+        var petBounds by remember { mutableStateOf(Triple(0, 0, 560)) }
 
         Window(
             onCloseRequest = ::exitApplication,
@@ -129,15 +139,16 @@ fun main(args: Array<String>) {
                 chatState = chatState,
                 chatOpen = chatOpen,
                 onToggleChat = { chatOpen = !chatOpen },
-                onPetOriginChanged = { x, y -> petOrigin = x to y },
+                onPetOriginChanged = { x, y, h -> petBounds = Triple(x, y, h) },
             )
         }
 
         if (chatOpen) {
             PetReplyWindow(
                 chat = chatState,
-                anchorX = petOrigin.first,
-                anchorY = petOrigin.second,
+                anchorX = petBounds.first,
+                anchorY = petBounds.second,
+                anchorHeight = petBounds.third,
                 onSend = { text -> chatSession.send(text) },
                 onClose = { chatOpen = false },
             )
@@ -228,7 +239,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
     chatState: PetChatUiState,
     chatOpen: Boolean,
     onToggleChat: () -> Unit,
-    onPetOriginChanged: (x: Int, y: Int) -> Unit,
+    onPetOriginChanged: (x: Int, y: Int, height: Int) -> Unit,
 ) {
     val log: (String) -> Unit = remember { { println("[pet] $it") } }
     var status by remember { mutableStateOf("starting…") }
@@ -309,7 +320,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
                 val origin = runCatching { window.locationOnScreen }.getOrNull()
                 if (origin != null && (origin.x to origin.y) != lastOrigin) {
                     lastOrigin = origin.x to origin.y
-                    onPetOriginChanged(origin.x, origin.y)
+                    onPetOriginChanged(origin.x, origin.y, window.height)
                 }
             }
         } catch (t: Throwable) {
@@ -388,6 +399,9 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.FillBounds,
+                        // The frame arrives PET_RENDER_SUPERSAMPLE larger than the
+                        // window; a high-quality downscale is the AA.
+                        filterQuality = androidx.compose.ui.graphics.FilterQuality.High,
                     )
                 }
             }
@@ -465,6 +479,14 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
     }
 }
 
+// Host-side supersampling factor: reported to CEF as extra device scale, so
+// the whole page (canvas included) rasterizes oversized and the Compose draw
+// downscales it with FilterQuality.High — that downscale IS the antialiasing.
+// MSAA inside CEF's off-screen GL context is unreliable, and inflating the
+// WebGL pixel ratio page-side changed the canvas compositing path; scaling at
+// the CEF layer keeps the exact BGRA alpha path that is known to composite.
+private const val PET_RENDER_SUPERSAMPLE = 2.0
+
 private fun Modifier.onPetSizeChanged(
     density: Float,
     window: androidx.compose.ui.awt.ComposeWindow,
@@ -475,7 +497,7 @@ private fun Modifier.onPetSizeChanged(
         Viewport(
             widthDip = (size.width / density).toInt(),
             heightDip = (size.height / density).toInt(),
-            scale = density.toDouble(),
+            scale = density.toDouble() * PET_RENDER_SUPERSAMPLE,
             x = location?.x ?: 0,
             y = location?.y ?: 0,
         ),
