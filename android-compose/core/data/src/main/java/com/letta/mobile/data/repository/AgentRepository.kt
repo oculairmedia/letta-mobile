@@ -114,6 +114,14 @@ open class AgentRepository(
         if (isLocalRuntimeActive()) {
             return super.listAgentSummaries()
         }
+        // letta-mobile-71orq: no slim admin_rpc handler exists; the raw HTTP
+        // listAgentsSlim hard-fails at the purity choke-point in iroh:// mode.
+        // Project summaries from the full agent.list result instead.
+        if (irohAgentSource?.shouldUseIroh() == true) {
+            return irohAgentSource.listAgents()
+                .distinctBy { it.id }
+                .map { AgentSummary(id = it.id, name = it.name, description = it.description) }
+        }
         // Page through the slim projection so pickers see every agent, not
         // just the first page. Each item is tiny ({id, name, description}),
         // so this stays far below the full-agents wire cost even across pages.
@@ -196,6 +204,16 @@ open class AgentRepository(
     private suspend fun fetchAgentsForCache(
         onProgress: suspend (List<Agent>) -> Unit = {},
     ): List<Agent> {
+        // letta-mobile-71orq: in iroh:// mode the raw HTTP AgentApi hard-fails
+        // at the purity choke-point, so the agents cache would stay empty and
+        // conversation rows fall back to agentId.take(8). Route the list over
+        // the agent.list admin_rpc handler instead. The handler returns the
+        // full list, so no client-side pagination is needed here.
+        if (irohAgentSource?.shouldUseIroh() == true) {
+            val agents = irohAgentSource.listAgents().distinctBy { it.id }
+            if (agents.isNotEmpty()) onProgress(agents)
+            return agents
+        }
         val merged = mutableListOf<Agent>()
         var offset = AgentPagingSource.INITIAL_OFFSET
         while (true) {
