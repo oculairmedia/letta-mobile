@@ -186,6 +186,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
     var activity by remember { mutableStateOf(AvatarActivity.IDLE) }
     var clickThrough by remember { mutableStateOf(false) }
     var hovered by remember { mutableStateOf(false) }
+    var importedAnimIds by remember { mutableStateOf(emptyList<String>()) }
 
     var cef by remember { mutableStateOf<PetCefHost?>(null) }
     val runtimeRef = remember { AtomicReference<WebAvatarRuntime?>(null) }
@@ -220,6 +221,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
             // stem lowercased. Registered via the loopback host so the renderer
             // can fetch them.
             val animations = scanDropInAnimations(host, log)
+            importedAnimIds = animations.map { it.id }
 
             status = "loading avatar…"
             runtime.load(
@@ -337,6 +339,12 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
                 }
                 Chip(text = "party") {
                     runtimeRef.get()?.playGesture(AvatarGesture("celebrate"), fadeSeconds = 0.3f)
+                }
+                // One chip per drop-in animation (~/.letta-mobile/avatars/animations).
+                for (animId in importedAnimIds) {
+                    Chip(text = animId) {
+                        runtimeRef.get()?.playGesture(AvatarGesture(animId), fadeSeconds = 0.3f)
+                    }
                 }
                 Chip(text = "ghost") {
                     PetWindowStyles.setClickThrough(window, true)
