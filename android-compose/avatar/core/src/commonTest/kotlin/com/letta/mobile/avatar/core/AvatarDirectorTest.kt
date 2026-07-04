@@ -103,6 +103,9 @@ class AvatarDirectorTest {
         val director = AvatarDirector(runtime, Random(1), fixedBlinkConfig())
 
         director.setActivity(AvatarActivity.THINKING)
+        // THINKING relaxed 0.6wt attacks over 0.4s (§6): ramps from 0, so tick
+        // to let the base expression rise before asserting.
+        director.tick(0.4f)
         val relaxed = runtime.expressionWeights["relaxed"]
         assertNotNull(relaxed)
         assertTrue(relaxed > 0f)
@@ -122,7 +125,8 @@ class AvatarDirectorTest {
 
         director.setActivity(AvatarActivity.ERROR)
 
-        assertEquals(1f, runtime.expressionWeights["sad"])
+        // ERROR sad 0.8wt (§6 state matrix).
+        assertEquals(0.8f, runtime.expressionWeights["sad"])
     }
 
     @Test
