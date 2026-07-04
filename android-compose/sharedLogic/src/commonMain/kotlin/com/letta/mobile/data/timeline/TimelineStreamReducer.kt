@@ -72,15 +72,27 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                     ev.toolCalls.any { it.effectiveId.takeIf { id -> id.isNotBlank() } == tcid }
             } as? TimelineEvent.Confirmed
             if (match != null) {
-                val body = message.toolReturn.funcResponse ?: ""
                 val isError = message.isErr == true || message.status == "error"
-                val contentByCallId = match.toolReturnContentByCallId + (tcid to body)
+                // letta-mobile-fe51r: shared fold keeps projected previews
+                // from clobbering full bodies and tracks truncation markers.
+                val fold = foldToolReturnBodies(
+                    match.toolReturnContentByCallId,
+                    match.toolReturnTruncationByCallId,
+                    listOf(tcid to message),
+                )
+                // Preserve legacy behavior for returns without a func_response
+                // (fold skips them): still mark the call complete with "".
+                val contentByCallId =
+                    if (tcid in fold.contentByCallId) fold.contentByCallId
+                    else fold.contentByCallId + (tcid to "")
+                val body = contentByCallId.getValue(tcid)
                 val updated = match.copy(
                     approvalDecided = true,
                     toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
                     toolReturnIsError = isError,
                     toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
                     toolReturnIsErrorByCallId = (match.toolReturnIsErrorByCallId + (tcid to isError)).toTimelinePersistentMap(),
+                    toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
                     attachments = (match.attachments + message.attachments).distinct().toTimelinePersistentList(),
                 )
                 timeline = timeline.replaceByServerId(updated)
@@ -182,6 +194,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
                 toolReturnContentByCallId = (existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId).toTimelinePersistentMap(),
                 toolReturnIsErrorByCallId = (existing.toolReturnIsErrorByCallId + confirmed.toolReturnIsErrorByCallId).toTimelinePersistentMap(),
+                toolReturnTruncationByCallId = (existing.toolReturnTruncationByCallId + confirmed.toolReturnTruncationByCallId).toTimelinePersistentMap(),
                 approvalRequestId = confirmed.approvalRequestId ?: existing.approvalRequestId,
                 attachments = (existing.attachments + confirmed.attachments).distinct().toTimelinePersistentList(),
                 source = existing.source,
@@ -373,9 +386,9 @@ private fun applyPendingToolReturns(
     }
     if (matchingReturns.isEmpty()) return ev
     val firstReturn = matchingReturns.first().second
-    val returnContentByCallId = ev.toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
-        toolReturn.toolReturn.funcResponse?.let { callId to it }
-    }.toMap()
+    // letta-mobile-fe51r: shared fold keeps projected previews from
+    // clobbering full bodies and tracks truncation markers per call id.
+    val fold = foldToolReturnBodies(ev.toolReturnContentByCallId, ev.toolReturnTruncationByCallId, matchingReturns)
     val returnIsErrorByCallId = ev.toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
         callId to (toolReturn.isErr == true || toolReturn.status == "error")
     }
@@ -384,12 +397,14 @@ private fun applyPendingToolReturns(
         "serverId" to ev.serverId,
         "count" to matchingReturns.size,
     )
+    val firstCallId = matchingReturns.first().first
     return ev.copy(
         approvalDecided = true,
-        toolReturnContent = firstReturn.toolReturn.funcResponse ?: ev.toolReturnContent,
+        toolReturnContent = fold.contentByCallId[firstCallId] ?: ev.toolReturnContent,
         toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
-        toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+        toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
         toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
+        toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
         attachments = (ev.attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
     )
 }

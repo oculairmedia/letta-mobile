@@ -164,18 +164,20 @@ object TimelineHydrationReducer {
             callId to toolReturn
         }
         val matchingReturn = matchingReturns.firstOrNull()?.second
-        val returnContentByCallId = toolReturnContentByCallId + matchingReturns.mapNotNull { (callId, toolReturn) ->
-            toolReturn.toolReturn.funcResponse?.let { callId to it }
-        }.toMap()
+        // letta-mobile-fe51r: shared fold keeps projected previews from
+        // clobbering full bodies and tracks truncation markers per call id.
+        val fold = foldToolReturnBodies(toolReturnContentByCallId, toolReturnTruncationByCallId, matchingReturns)
         val returnIsErrorByCallId = toolReturnIsErrorByCallId + matchingReturns.associate { (callId, toolReturn) ->
             callId to (toolReturn.isErr == true || toolReturn.status == "error")
         }
+        val firstCallId = matchingReturns.firstOrNull()?.first
         return copy(
             approvalDecided = byResponse || byReturn || approvalDecided,
-            toolReturnContent = matchingReturn?.toolReturn?.funcResponse ?: toolReturnContent,
+            toolReturnContent = firstCallId?.let { fold.contentByCallId[it] } ?: toolReturnContent,
             toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" } ?: toolReturnIsError,
-            toolReturnContentByCallId = returnContentByCallId.toTimelinePersistentMap(),
+            toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
             toolReturnIsErrorByCallId = returnIsErrorByCallId.toTimelinePersistentMap(),
+            toolReturnTruncationByCallId = fold.truncationByCallId.toTimelinePersistentMap(),
             attachments = (attachments + matchingReturns.flatMap { (_, toolReturn) -> toolReturn.attachments }).distinct().toTimelinePersistentList(),
         )
     }

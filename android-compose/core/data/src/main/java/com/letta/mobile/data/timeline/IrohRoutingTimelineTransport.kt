@@ -35,4 +35,9 @@ class IrohRoutingTimelineTransport(
         order: String?,
         conversationId: String?,
     ): List<LettaMessage> = selected().listAgentMessages(agentId, limit, order, conversationId)
+
+    override suspend fun getToolReturn(
+        conversationId: String,
+        messageId: String,
+    ): LettaMessage? = selected().getToolReturn(conversationId, messageId)
 }

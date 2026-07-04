@@ -552,6 +552,39 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
 
+    // letta-mobile-fe51r (P2b pointer diet): tool-return message ids we've
+    // already asked the transport to resolve, so repeated expand/collapse of
+    // the same card doesn't refetch a body that is in flight or already
+    // resolved. Entries are removed on failure so a later expand can retry.
+    private val requestedTruncatedToolReturnIds = mutableSetOf<String>()
+
+    /**
+     * Called when the user expands a tool card whose result is a
+     * server-projected preview (iroh pointer diet). Fetches the full body via
+     * `tool_return.get` and folds it into the timeline; the card recomposes
+     * with the full output once the fetch lands.
+     */
+    fun onTruncatedToolResultExpanded(messageId: String) {
+        val convId = chatConversationCoordinator.activeConversationId ?: conversationId?.value ?: return
+        synchronized(requestedTruncatedToolReturnIds) {
+            if (!requestedTruncatedToolReturnIds.add(messageId)) return
+        }
+        viewModelScope.launch {
+            val resolved = runCatching {
+                timelineRepository.resolveTruncatedToolReturn(agentId.value, convId, messageId)
+            }.onFailure { t ->
+                Telemetry.error(
+                    "AdminChat", "truncatedToolReturn.resolveFailed", t,
+                    "conversationId" to convId,
+                    "messageId" to messageId,
+                )
+            }.getOrDefault(false)
+            if (!resolved) {
+                synchronized(requestedTruncatedToolReturnIds) { requestedTruncatedToolReturnIds.remove(messageId) }
+            }
+        }
+    }
+
     private fun collapseCompletedRunsIfStreamingFinished(
         previous: ChatUiState,
         next: ChatUiState,

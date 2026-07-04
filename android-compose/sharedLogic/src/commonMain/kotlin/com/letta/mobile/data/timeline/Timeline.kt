@@ -114,6 +114,10 @@ sealed class TimelineEvent {
         val toolReturnIsError: Boolean = false,
         val toolReturnContentByCallId: PersistentMap<String, String> = persistentMapOf(),
         val toolReturnIsErrorByCallId: PersistentMap<String, Boolean> = persistentMapOf(),
+        // letta-mobile-fe51r: call ids whose attached body is a server-side
+        // projected preview (iroh pointer diet). Entry removed once the full
+        // body is folded in (live stream frame or tool_return.get fetch).
+        val toolReturnTruncationByCallId: PersistentMap<String, ToolReturnTruncation> = persistentMapOf(),
         override val source: MessageSource = MessageSource.LETTA_SERVER,
         val seqId: Int? = null,
     ) : TimelineEvent()

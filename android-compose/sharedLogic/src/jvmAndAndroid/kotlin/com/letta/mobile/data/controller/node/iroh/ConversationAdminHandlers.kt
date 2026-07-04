@@ -2,9 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
 
 object ConversationAdminHandlers {
@@ -18,6 +16,7 @@ object ConversationAdminHandlers {
         router.register("conversation.restore") { api.restore(it) }
         router.register("message.list") { api.messageList(it) }
         router.register("message.get") { api.messageGet(it) }
+        router.register("tool_return.get") { api.toolReturnGet(it) }
     }
 
     private class ConvApi(private val proxy: AdminProxyClient) {
@@ -65,13 +64,18 @@ object ConversationAdminHandlers {
 
         fun messageList(params: JsonObject?): JsonElement {
             val convId = param(params, "conversation_id") ?: return jsonError("conversation_id required")
-            return proxy.get(
+            val response = proxy.get(
                 adminProxyRequest("v1", "conversations", convId, "messages")
                     .query("limit", param(params, "limit"))
                     .query("after", param(params, "after"))
                     .query("order", param(params, "order"))
                     .build(),
             )
+            // letta-mobile-fe51r (P2b pointer diet): list responses ship
+            // previews for heavy tool-return bodies and never inline
+            // attachment payloads. Full bodies come via tool_return.get /
+            // message.get on demand.
+            return MessageListWireProjection.projectMessageList(response, convId)
         }
 
         fun messageGet(params: JsonObject?): JsonElement {
@@ -79,8 +83,28 @@ object ConversationAdminHandlers {
             val msgId = param(params, "message_id") ?: return jsonError("message_id required")
             return proxy.get(adminProxyRequest("v1", "conversations", convId, "messages", msgId).build())
         }
+
+        /**
+         * letta-mobile-fe51r: on-demand full-body fetch for a projected
+         * tool-return message. Returns the complete, unprojected message.
+         */
+        fun toolReturnGet(params: JsonObject?): JsonElement {
+            val convId = param(params, "conversation_id") ?: return jsonError("conversation_id required")
+            val msgId = param(params, "message_id") ?: return jsonError("message_id required")
+            return proxy.get(adminProxyRequest("v1", "conversations", convId, "messages", msgId).build())
+        }
     }
 
     private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
+
+    /**
+     * letta-mobile-8vplf: handler-level parameter errors previously returned a
+     * `{_error: ...}` object that the router wrapped in a `success: true`
+     * envelope, so clients decoded an error as a successful result. Throwing
+     * here routes the failure through [AdminRpcRouter.dispatch]'s catch path,
+     * which encodes a proper `success: false` + `error` envelope. Other
+     * handler files still carry private `{_error}` helpers — tracked by bead
+     * letta-mobile-8vplf.
+     */
+    private fun jsonError(message: String): Nothing = throw IllegalArgumentException(message)
 }

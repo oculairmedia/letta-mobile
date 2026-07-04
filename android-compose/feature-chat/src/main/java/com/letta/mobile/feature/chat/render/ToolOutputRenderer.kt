@@ -90,6 +90,21 @@ internal data class ToolCardBodyRenderEligibility(
 
 internal val LocalToolCardBodyParentVisible = compositionLocalOf { true }
 
+/**
+ * letta-mobile-fe51r (P2b pointer diet): callback the chat screen provides so
+ * tool cards can lazily fetch the full body of a server-projected (truncated)
+ * tool result when the user expands the card. [messageId] is the tool-return
+ * message id from [com.letta.mobile.data.model.UiToolCall.resultTruncation];
+ * the fetch resolves through the timeline, so the card re-renders with the
+ * full output once it lands.
+ */
+fun interface TruncatedToolResultResolver {
+    fun requestFullToolResult(messageId: String)
+}
+
+internal val LocalTruncatedToolResultResolver =
+    compositionLocalOf<TruncatedToolResultResolver?> { null }
+
 internal val LocalToolCardBodyRenderEligibility = compositionLocalOf {
     toolCardBodyRenderEligibility(expanded = false, parentVisible = true)
 }
