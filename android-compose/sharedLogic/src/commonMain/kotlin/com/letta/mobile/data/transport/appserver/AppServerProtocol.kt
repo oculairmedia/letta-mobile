@@ -126,6 +126,12 @@ sealed interface AppServerCommand {
     data class Auth(
         @SerialName("request_id") val requestId: String,
         val token: String,
+        /**
+         * Transport capabilities this client supports (e.g. `frame_part` chunked
+         * frame reassembly). Absent/null means baseline framing only — servers
+         * must never emit capability-gated encodings to such peers.
+         */
+        val capabilities: List<String>? = null,
     ) : AppServerCommand
 
     @Serializable
@@ -279,6 +285,11 @@ sealed interface AppServerInboundFrame {
         @SerialName("request_id") override val requestId: String,
         val success: Boolean,
         val error: String? = null,
+        /**
+         * Transport capabilities the server supports (e.g. `frame_part`).
+         * Absent/null means baseline framing only.
+         */
+        val capabilities: List<String>? = null,
     ) : AppServerInboundFrame {
         @Transient
         override val type: String = "auth_response"

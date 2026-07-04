@@ -29,6 +29,32 @@ class AppServerProtocolTest {
         assertEquals("auth-1", frame.requestId)
         assertEquals(false, frame.success)
         assertEquals("invalid_token", frame.error)
+        assertNull(frame.capabilities)
+    }
+
+    @Test
+    fun authCapabilitiesRoundTripAndStayAbsentByDefault() {
+        val withCaps = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(
+                AppServerCommand.Auth(requestId = "auth-2", token = "", capabilities = listOf("frame_part")),
+            ),
+        ).jsonObject
+        assertEquals(
+            listOf("frame_part"),
+            withCaps["capabilities"]?.jsonArray?.map { it.jsonPrimitive.content },
+        )
+
+        val withoutCaps = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(AppServerCommand.Auth(requestId = "auth-3", token = "t")),
+        ).jsonObject
+        assertNull(withoutCaps["capabilities"], "old servers must not see a capabilities key by default")
+
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """{"type":"auth_response","request_id":"auth-2","success":true,"capabilities":["frame_part"]}""",
+            channel = AppServerChannel.Control,
+        )
+        val frame = assertIs<AppServerInboundFrame.AuthResponse>(received.frame)
+        assertEquals(listOf("frame_part"), frame.capabilities)
     }
 
     @Test

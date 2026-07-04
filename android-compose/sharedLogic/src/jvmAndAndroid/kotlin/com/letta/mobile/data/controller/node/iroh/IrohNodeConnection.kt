@@ -73,6 +73,17 @@ class IrohNodeConnection(
     private val streamWriteMutex = Mutex()
     private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
 
+    /**
+     * Transport capabilities advertised by the peer in its auth frame.
+     * Empty until the peer authenticates with a `capabilities` array; frames
+     * that need capability-gated encodings (frame_part chunking) must check
+     * this before writing so old peers reject cleanly instead of corrupting.
+     */
+    private val peerCapabilities = java.util.concurrent.atomic.AtomicReference<Set<String>>(emptySet())
+
+    private fun peerSupportsFrameParts(): Boolean =
+        IrohFrameCodec.FRAME_PART_CAPABILITY in peerCapabilities.get()
+
     suspend fun serve() = coroutineScope {
         try {
             val controlBiStream = connection.acceptBi()
@@ -123,6 +134,7 @@ class IrohNodeConnection(
             maxActiveHandlers = MAX_CONCURRENT_ADMIN_RPC_STREAMS,
             firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
             maxFrameBytes = MAX_FRAME_BYTES,
+            peerSupportsFrameParts = { peerSupportsFrameParts() },
         )
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
@@ -150,7 +162,7 @@ class IrohNodeConnection(
                         activeTurnJobsMutex = activeTurnJobsMutex,
                     )
                     if (response != null) {
-                        IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES)
+                        IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
                     }
                 } catch (ce: kotlinx.coroutines.CancellationException) {
                     throw ce
@@ -310,8 +322,17 @@ class IrohNodeConnection(
         val isAuthenticated = expected.isNullOrBlank() || provided == expected
         authenticated.set(isAuthenticated)
         return if (isAuthenticated) {
-            Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId)
-            """{"type":"auth_response","request_id":"$requestId","success":true}"""
+            val advertised = (obj["capabilities"] as? kotlinx.serialization.json.JsonArray)
+                ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                ?.toSet()
+                .orEmpty()
+            peerCapabilities.set(advertised)
+            Telemetry.event(
+                "IrohNode", "auth.ok",
+                "remoteEndpointId" to remoteEndpointId,
+                "peerCapabilities" to advertised.sorted().joinToString(","),
+            )
+            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}"]}"""
         } else {
             val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
             Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)
@@ -552,7 +573,7 @@ class IrohNodeConnection(
             *IrohDiagnostics.redactedFrameAttributes(frameType(rawFrame), rawFrame.length).toTypedArray(),
         )
         streamWriteMutex.withLock {
-            IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES)
+            IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
     }
 
@@ -575,7 +596,7 @@ class IrohNodeConnection(
             *IrohDiagnostics.redactedFrameAttributes(frameType(frame), frame.length).toTypedArray(),
         )
         streamWriteMutex.withLock {
-            IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES)
+            IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
     }
 

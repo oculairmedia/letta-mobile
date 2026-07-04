@@ -131,17 +131,26 @@ class IrohChannelTransport(
                 scope = scope,
             ) as IrohAppServerTransport
             val appServerClient = DefaultAppServerClient(transport!!)
-            if (config.token.isNotBlank()) {
-                val auth = appServerClient.auth(
-                    com.letta.mobile.data.transport.appserver.AppServerCommand.Auth(
-                        requestId = "auth-${UUID.randomUUID()}",
-                        token = config.token,
-                    ),
-                )
-                if (!auth.success) {
-                    throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
-                }
+            // The auth exchange doubles as the Iroh transport handshake: it
+            // advertises client capabilities (frame_part chunked-frame
+            // reassembly) so the server may split >1MiB frames instead of
+            // failing them. Send it even with a blank token — servers without
+            // a required token still ack and record capabilities.
+            val auth = appServerClient.auth(
+                com.letta.mobile.data.transport.appserver.AppServerCommand.Auth(
+                    requestId = "auth-${UUID.randomUUID()}",
+                    token = config.token,
+                    capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
+                ),
+            )
+            if (!auth.success && config.token.isNotBlank()) {
+                throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
             }
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "auth.negotiated",
+                "success" to auth.success,
+                "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
+            )
             val engine = AppServerTurnEngine(
                 client = appServerClient,
                 clientInfo = com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo(
