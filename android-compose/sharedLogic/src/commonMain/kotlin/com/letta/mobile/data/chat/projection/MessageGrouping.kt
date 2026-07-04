@@ -264,6 +264,63 @@ fun groupMessagesForRender(
  * so a duplicate degrades into a distinct-but-stable slot instead of a hard
  * crash. In a correct snapshot no item is rewritten, so this is a no-op.
  */
+/**
+ * letta-mobile-x1xnl: collapse render items that render the SAME underlying
+ * assistant message id twice.
+ *
+ * The incremental builder concatenates a freshly-built tail with a cached
+ * committed-history list. During the Single<->RunBlock transition a message can
+ * end up as a standalone [ChatRenderItem.Single] (key `msg-<id>`) in one half
+ * and inside a [ChatRenderItem.RunBlock] (key `run-<runId>`) in the other. The
+ * keys DIFFER, so [deduplicateRenderKeys] never sees a collision and BOTH items
+ * render — the on-screen stranded duplicate (the message list count stays
+ * correct; only the render expands one message into two visible items).
+ *
+ * A RunBlock is the promoted/canonical form, so when a message id is owned by a
+ * RunBlock we drop any standalone Single for that same id. We also drop a later
+ * Single that repeats an id an earlier Single already rendered. Order is
+ * preserved and RunBlocks are never dropped.
+ */
+fun deduplicateRenderItemsByMessageId(items: List<ChatRenderItem>): List<ChatRenderItem> {
+    if (items.size < 2) return items
+    val runBlockMessageIds = HashSet<String>()
+    val runBlockRunIds = HashSet<String>()
+    for (item in items) {
+        if (item is ChatRenderItem.RunBlock) {
+            item.messages.forEach { runBlockMessageIds.add(it.first.id) }
+            // letta-mobile-x1xnl: also index the RunBlock's runId. On-device the
+            // streaming reply renders as a RunBlock (key run-<runId>) in one
+            // rebuild and the SAME turn's reconciled final renders as a
+            // standalone Single with a DIFFERENT server message id (key
+            // msg-<newId>) in another. They share no message id, so the id-only
+            // dedup missed them and BOTH rendered (the stranded fragment). Drop a
+            // Single that belongs to a run already owned by a RunBlock.
+            item.runId.takeIf { it.isNotBlank() }?.let { runBlockRunIds.add(it) }
+        }
+    }
+    val seenSingleIds = HashSet<String>()
+    var droppedAny = false
+    val out = ArrayList<ChatRenderItem>(items.size)
+    for (item in items) {
+        when (item) {
+            is ChatRenderItem.Single -> {
+                val id = item.message.id
+                val runId = item.message.runId?.takeIf { it.isNotBlank() }
+                if (id in runBlockMessageIds ||
+                    (runId != null && runId in runBlockRunIds) ||
+                    !seenSingleIds.add(id)
+                ) {
+                    droppedAny = true
+                    continue
+                }
+                out.add(item)
+            }
+            is ChatRenderItem.RunBlock -> out.add(item)
+        }
+    }
+    return if (droppedAny) out else items
+}
+
 fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
     if (items.size < 2) return items
     val seen = HashSet<String>(items.size)

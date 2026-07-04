@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.deduplicateRenderItemsByMessageId
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.assertEquals
@@ -518,6 +519,63 @@ class ChatRenderModelBuilderTest {
         // (user repeating themselves across turns). Only adjacent twins
         // indicate the optimistic-Local-orphan race.
         assertEquals(listOf("client-1", "server-mid", "server-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId drops a Single whose id is owned by a RunBlock`() {
+        // letta-mobile-x1xnl: incremental tail/committed join can emit the same
+        // assistant message as a Single (key msg-<id>) AND inside a RunBlock
+        // (key run-<runId>). Different keys => key dedup misses => stranded
+        // duplicate on screen. Collapse by underlying message id.
+        val a1 = assistant("a1", runId = "r1")
+        val a2 = assistant("a2", runId = "r1")
+        val staleSingle = ChatRenderItem.Single(message = a1, groupPosition = GroupPosition.None)
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "r1",
+            messages = listOf(a1 to GroupPosition.First, a2 to GroupPosition.Last),
+        )
+
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, staleSingle))
+
+        assertEquals(1, out.size)
+        assertTrue(out.single() is ChatRenderItem.RunBlock)
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId drops a repeated Single id but keeps distinct ids`() {
+        val a1 = assistant("a1", runId = null)
+        val a2 = assistant("a2", runId = null)
+        val first = ChatRenderItem.Single(message = a1, groupPosition = GroupPosition.None)
+        val dup = ChatRenderItem.Single(message = a1, groupPosition = GroupPosition.None, keyOverride = "k2")
+        val other = ChatRenderItem.Single(message = a2, groupPosition = GroupPosition.None)
+
+        val out = deduplicateRenderItemsByMessageId(listOf(first, dup, other))
+
+        assertEquals(2, out.size)
+        assertEquals(listOf("a1", "a2"), out.map { (it as ChatRenderItem.Single).message.id })
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId drops a Single sharing a runId with a RunBlock`() {
+        // letta-mobile-x1xnl (on-device root cause): the streaming reply renders
+        // as a RunBlock (key run-<runId>) in one rebuild, then the SAME turn's
+        // reconciled final renders as a standalone Single with a DIFFERENT server
+        // message id (key msg-<newId>) in a later Full rebuild. They share no
+        // message id but DO share the runId, so both used to render (the stranded
+        // fragment). Collapse the Single into the RunBlock by runId.
+        val streamed = assistant("a1", runId = "local-run-107")
+        val streamed2 = assistant("a2", runId = "local-run-107")
+        val reconciledFinal = assistant("a1-final", runId = "local-run-107")
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "local-run-107",
+            messages = listOf(streamed to GroupPosition.First, streamed2 to GroupPosition.Last),
+        )
+        val strandedSingle = ChatRenderItem.Single(message = reconciledFinal, groupPosition = GroupPosition.None)
+
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, strandedSingle))
+
+        assertEquals(1, out.size)
+        assertTrue(out.single() is ChatRenderItem.RunBlock)
     }
 
     private fun user(
