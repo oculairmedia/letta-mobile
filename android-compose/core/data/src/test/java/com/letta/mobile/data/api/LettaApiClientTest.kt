@@ -73,6 +73,68 @@ class LettaApiClientTest {
     }
 
     @Test
+    fun `session hard-fails with typed iroh error when active config is iroh and http configs exist`() = runTest {
+        val cacheDir = Files.createTempDirectory("letta-api-client-iroh-test").toFile()
+        val context = mockk<Context> {
+            every { this@mockk.cacheDir } returns cacheDir
+        }
+        // A stale HTTP admin config is present in the list — the choke point
+        // MUST NOT silently fall back to it while iroh:// is the active backend.
+        val staleHttp = config(
+            id = "stale-http",
+            serverUrl = "https://stale.example/",
+            token = "stale-token",
+        )
+        val irohConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://EndpointTicketAbc123",
+        )
+        val settings = FakeSettingsRepository(initialActiveConfig = irohConfig).apply {
+            configsState.value = listOf(staleHttp, irohConfig)
+        }
+        val apiClient = LettaApiClient(context, settings)
+
+        try {
+            apiClient.session()
+            fail("Expected IrohAdminApiUnavailableException")
+        } catch (e: IrohAdminApiUnavailableException) {
+            assertEquals(true, e.message.orEmpty().contains("iroh://EndpointTicketAbc123"))
+        } finally {
+            apiClient.invalidateClient()
+            cacheDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `session hard-fails for corrupted https-prefixed iroh url instead of treating it as http`() = runTest {
+        val cacheDir = Files.createTempDirectory("letta-api-client-iroh-corrupt-test").toFile()
+        val context = mockk<Context> {
+            every { this@mockk.cacheDir } returns cacheDir
+        }
+        // `https://iroh://<ticket>` is a known corrupted-config shape: it
+        // startsWith "https://" but is still an Iroh endpoint. The iroh guard
+        // must win over the http-admin check.
+        val corruptedIroh = LettaConfig(
+            id = "iroh-corrupt",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "https://iroh://EndpointTicketXyz",
+        )
+        val settings = FakeSettingsRepository(initialActiveConfig = corruptedIroh)
+        val apiClient = LettaApiClient(context, settings)
+
+        try {
+            apiClient.session()
+            fail("Expected IrohAdminApiUnavailableException")
+        } catch (e: IrohAdminApiUnavailableException) {
+            assertFalse(e.message.orEmpty().isBlank())
+        } finally {
+            apiClient.invalidateClient()
+            cacheDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `session returns coherent client and base url after backend switch`() = runTest {
         val cacheDir = Files.createTempDirectory("letta-api-client-test").toFile()
         val context = mockk<Context> {

@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -112,6 +113,31 @@ class FakeChannelTransport(
         sendCalls += SendCall(agentId, conversationId, text, otid, contentParts, startNewConversation)
         return sendResult
     }
+
+    val adminRpcCalls = mutableListOf<AdminRpcCall>()
+
+    /**
+     * Hook for admin_rpc routing tests. Receives (method, path, body) and
+     * returns the response frame. Defaults to erroring so a test that forgets
+     * to wire it fails loudly instead of silently swallowing the call.
+     */
+    var adminRpcHandler: (suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse)? = null
+
+    override suspend fun adminRpc(
+        method: String,
+        path: String,
+        body: String?,
+    ): AppServerInboundFrame.AdminRpcResponse {
+        adminRpcCalls += AdminRpcCall(method, path, body)
+        return adminRpcHandler?.invoke(method, path, body)
+            ?: error("No fake adminRpc handler set for method=$method path=$path")
+    }
+
+    data class AdminRpcCall(
+        val method: String,
+        val path: String,
+        val body: String?,
+    )
 
     override fun cancel(conversationId: String): Boolean = cancelResult
 
