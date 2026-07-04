@@ -444,6 +444,13 @@ class IrohAppServerTransport(
      * channel — failure stays isolated to the request, never the transport.
      */
     private fun String.isLegacyFallbackSafeAdminRpcMethod(): Boolean = when (this) {
+        // #822 review: agent.get / agent.list are deliberately NOT here. They
+        // return full Agent objects (system text, blocks, tools, metadata) that
+        // can exceed the unchunked control-frame budget; falling those back onto
+        // the shared control stream could take down unrelated traffic. Only small
+        // fixed-size reads belong on the legacy fallback. Agent-read retry-on-
+        // reconnect is handled by READ_ONLY_ADMIN_RPC_METHODS in
+        // IrohChannelTransport instead (stream-per-request, chunk-capable).
         "health.check",
         "goal.get" -> true
         else -> false
