@@ -134,10 +134,17 @@ private fun resolveDefaultAvatar(): Path? {
 
 /**
  * Scan the drop-in animation folder (`~/.letta-mobile/avatars/animations`) for
- * user-provided `.vrma`/`.fbx` files and register each with the loopback [host]
- * so the renderer can fetch it. The folder is created if missing. Each id is the
- * filename stem lowercased. Ill-formed or duplicate-id files are skipped with a
- * log line rather than aborting the pet boot.
+ * user-provided `.vrma`/`.fbx`/`.glb` files and register each with the loopback
+ * [host] so the renderer can fetch it. The folder is created if missing. Each id
+ * is the filename stem lowercased. Ill-formed or duplicate-id files are skipped
+ * with a log line rather than aborting the pet boot.
+ *
+ * `.glb` here is always treated as an *animation* (a Mixamo-compatible clip, e.g.
+ * the Ready Player Me library), even though avatar *models* are also `.glb`:
+ * this directory is scanned exclusively for animations, so the extension alone
+ * is unambiguous in this context. (Models live in the catalog `assets/` dir, not
+ * here.) License note: the RPM library is proprietary (RPM OÜ) and may NOT be
+ * redistributed/bundled — the user drops the files here himself.
  */
 private fun scanDropInAnimations(host: AvatarWebHost, log: (String) -> Unit): List<AvatarAnimationSource> {
     val dir = defaultAvatarCatalogDir().resolve("animations")
@@ -153,6 +160,9 @@ private fun scanDropInAnimations(host: AvatarWebHost, log: (String) -> Unit): Li
                 val format = when {
                     name.endsWith(".vrma", ignoreCase = true) -> AvatarAnimationFormat.VRMA
                     name.endsWith(".fbx", ignoreCase = true) -> AvatarAnimationFormat.FBX
+                    // .glb in the animation dir is always an animation clip (see
+                    // the doc comment) — models are .glb too but live elsewhere.
+                    name.endsWith(".glb", ignoreCase = true) -> AvatarAnimationFormat.GLB
                     else -> return@forEach
                 }
                 val id = name.substringBeforeLast('.').lowercase()
@@ -166,7 +176,7 @@ private fun scanDropInAnimations(host: AvatarWebHost, log: (String) -> Unit): Li
     }.onFailure { log("failed to scan animation dir $dir: ${it.message}") }
 
     if (sources.isEmpty()) {
-        log("animations: none — drop .vrma/.fbx into $dir")
+        log("animations: none — drop .vrma/.fbx/.glb into $dir")
     } else {
         log("animations: ${sources.joinToString(", ") { it.id }}")
     }

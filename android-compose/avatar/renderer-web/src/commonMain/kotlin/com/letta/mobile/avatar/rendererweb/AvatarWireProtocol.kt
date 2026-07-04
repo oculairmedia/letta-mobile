@@ -105,7 +105,9 @@ sealed interface AvatarRendererCommand {
     /**
      * One user-provided animation source carried on [LoadAvatar]. [id] is the
      * clip id it registers under (and the id [PlayAnimation] plays); [url] is
-     * renderer-resolvable; [format] is `"vrma"` or `"fbx"` (Mixamo).
+     * renderer-resolvable; [format] is `"vrma"`, `"fbx"` (Mixamo), or `"glb"` (a
+     * Mixamo-compatible, prefix-less GLB clip, e.g. Ready Player Me). Additive
+     * value — no protocol version bump; the renderer switches on the string.
      */
     @Serializable
     data class WireAnimationSource(

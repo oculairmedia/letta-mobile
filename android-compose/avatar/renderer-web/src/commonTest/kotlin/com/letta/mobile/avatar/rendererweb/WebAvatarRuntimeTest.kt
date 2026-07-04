@@ -246,6 +246,11 @@ class WebAvatarRuntimeTest {
                 uri = "file:///dance.fbx",
                 format = com.letta.mobile.avatar.core.AvatarAnimationFormat.FBX,
             ),
+            com.letta.mobile.avatar.core.AvatarAnimationSource(
+                id = "idle",
+                uri = "file:///idle.glb",
+                format = com.letta.mobile.avatar.core.AvatarAnimationFormat.GLB,
+            ),
         )
         val job = launch { runCatching { runtime.load(model, sources) } }
         runCurrent()
@@ -255,6 +260,7 @@ class WebAvatarRuntimeTest {
             listOf(
                 AvatarRendererCommand.WireAnimationSource("wave", "file:///wave.vrma", "vrma"),
                 AvatarRendererCommand.WireAnimationSource("dance", "file:///dance.fbx", "fbx"),
+                AvatarRendererCommand.WireAnimationSource("idle", "file:///idle.glb", "glb"),
             ),
             load.animations,
         )

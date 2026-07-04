@@ -19,6 +19,7 @@ import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { loadVrmaAnimation } from './vendor/loaders/loadVrmaAnimation.js';
 import { loadMixamoAnimation } from './vendor/loaders/loadMixamoAnimation.js';
+import { loadGlbAnimation } from './vendor/loaders/loadGlbAnimation.js';
 
 export const PROTOCOL_VERSION = 2;
 
@@ -425,13 +426,15 @@ export function createAvatarRenderer(canvas, emit) {
   }
 
   // Fetch + parse + retarget one user-provided animation source onto the
-  // loaded VRM, returning its THREE.AnimationClip. `format` is "vrma" or "fbx".
-  // Throws on any failure; the caller treats each source as best-effort so one
-  // bad file never fails the avatar load.
+  // loaded VRM, returning its THREE.AnimationClip. `format` is "vrma", "fbx", or
+  // "glb" (a Mixamo-compatible skeleton with prefix-less bones, e.g. the Ready
+  // Player Me animation library). Throws on any failure; the caller treats each
+  // source as best-effort so one bad file never fails the avatar load.
   async function loadImportedAnimation(source, vrm) {
     const format = String(source.format ?? '').toLowerCase();
     if (format === 'vrma') return loadVrmaAnimation(source.url, vrm);
     if (format === 'fbx') return loadMixamoAnimation(source.url, vrm);
+    if (format === 'glb') return loadGlbAnimation(source.url, vrm);
     throw new Error(`Unsupported animation format: ${source.format}`);
   }
 

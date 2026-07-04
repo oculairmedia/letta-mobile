@@ -18,6 +18,7 @@ class AvatarWireProtocolTest {
             animations = listOf(
                 AvatarRendererCommand.WireAnimationSource("wave", "file:///wave.vrma", "vrma"),
                 AvatarRendererCommand.WireAnimationSource("dance", "file:///dance.fbx", "fbx"),
+                AvatarRendererCommand.WireAnimationSource("idle", "file:///idle.glb", "glb"),
             ),
         ),
         AvatarRendererCommand.Unload,

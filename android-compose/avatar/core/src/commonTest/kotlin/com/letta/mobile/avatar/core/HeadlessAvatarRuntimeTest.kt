@@ -37,6 +37,7 @@ class HeadlessAvatarRuntimeTest {
         val animations = listOf(
             AvatarAnimationSource("wave", "file:///wave.vrma", AvatarAnimationFormat.VRMA),
             AvatarAnimationSource("dance", "file:///dance.fbx", AvatarAnimationFormat.FBX),
+            AvatarAnimationSource("idle", "file:///idle.glb", AvatarAnimationFormat.GLB),
         )
 
         runtime.load(model, animations)
