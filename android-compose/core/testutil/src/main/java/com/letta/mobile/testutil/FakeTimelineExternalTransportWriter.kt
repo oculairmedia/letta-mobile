@@ -13,7 +13,9 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val reconciledSends: MutableList<ReconciledSend> = mutableListOf()
     val clearedActiveConversations: MutableList<String> = mutableListOf()
     val scopedClearedActiveConversations: MutableList<ScopedConversation> = mutableListOf()
+    val abandonedFragmentCleanups: MutableList<AbandonedFragmentCleanup> = mutableListOf()
     val recentReconciles: MutableList<RecentReconcile> = mutableListOf()
+    var cleanupFailure: Throwable? = null
     val repairedCursors: MutableList<CursorRepair> = mutableListOf()
     val scopedRepairedCursors: MutableList<ScopedCursorRepair> = mutableListOf()
 
@@ -100,13 +102,26 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         scopedClearedActiveConversations += ScopedConversation(agentId, conversationId)
     }
 
+    override suspend fun cleanupAbandonedAssistantFragments(
+        agentId: String?,
+        conversationId: String,
+        runId: String?,
+        turnId: String?,
+        reason: String,
+        candidateRunIds: Set<String>,
+    ): Int {
+        cleanupFailure?.let { throw it }
+        abandonedFragmentCleanups += AbandonedFragmentCleanup(agentId, conversationId, runId, turnId, reason, candidateRunIds)
+        return 0
+    }
+
     override suspend fun reconcileRecentMessages(
         agentId: String?,
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
     ): Int {
-        recentReconciles += RecentReconcile(agentId, conversationId, reason, forceRefresh)
+        recentReconciles += RecentReconcile(agentId, conversationId, reason, emptySet(), forceRefresh)
         return 0
     }
 
@@ -150,10 +165,20 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         val conversationId: String,
     )
 
+    data class AbandonedFragmentCleanup(
+        val agentId: String?,
+        val conversationId: String,
+        val runId: String?,
+        val turnId: String?,
+        val reason: String,
+        val candidateRunIds: Set<String> = emptySet(),
+    )
+
     data class RecentReconcile(
         val agentId: String?,
         val conversationId: String,
         val reason: String,
+        val candidateRunIds: Set<String> = emptySet(),
         val forceRefresh: Boolean,
     )
 
