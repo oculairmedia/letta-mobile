@@ -143,7 +143,8 @@ export function retargetMixamoClip(asset, clip, vrm) {
   const _quatA = new THREE.Quaternion();
 
   const motionHipsHeight = hipsNode.position.y;
-  const vrmHipsHeight = vrm.humanoid.normalizedRestPose.hips.position[1];
+  const restHips = vrm.humanoid.normalizedRestPose.hips.position;
+  const vrmHipsHeight = restHips[1];
   const hipsPositionScale = vrmHipsHeight / motionHipsHeight;
 
   clip.tracks.forEach((track) => {
@@ -183,6 +184,34 @@ export function retargetMixamoClip(asset, clip, vrm) {
         const value = track.values.map(
           (v, i) => (vrm.meta?.metaVersion === '0' && i % 3 !== 1 ? -v : v) * hipsPositionScale,
         );
+        // Root-motion stripping (hips only). Mixamo clips downloaded WITHOUT the
+        // "in place" option translate the hips across the floor (walks, dances),
+        // which carries the avatar out of a stationary pet window. For the hips
+        // position track we pin the horizontal (X/Z) channels while keeping Y
+        // fully intact — crouches, jumps, sits and the natural walk bob all live
+        // in Y and must survive. Two steps:
+        //   1. strip the per-frame X/Z delta relative to the first keyframe, so
+        //      the body no longer travels;
+        //   2. recenter that now-constant X/Z onto the VRM rest hips X/Z, so a
+        //      clip whose first frame is already offset (some Mixamo takes start
+        //      the hips far from origin) still plays centered in frame.
+        // Net effect: X/Z are held at the rest hips position for the whole clip
+        // while Y animates freely. Applied only to the hips bone; no other
+        // Mixamo bone carries a position track.
+        if (vrmBoneName === 'hips' && value.length >= 3) {
+          const restX = restHips[0];
+          const restZ = restHips[2];
+          for (let i = 0; i < value.length; i += 3) {
+            // Step 1 (strip drift) collapses every frame's X/Z onto the first
+            // frame's X/Z: value[i] − (value[i] − value[0]) = value[0]. Step 2
+            // (recenter) then shifts that constant to the rest hips X/Z. The two
+            // compose to a single assignment — every frame's X/Z becomes the rest
+            // value — so we write it directly rather than reconstructing the
+            // intermediate. Y (value[i+1]) is left untouched.
+            value[i] = restX;
+            value[i + 2] = restZ;
+          }
+        }
         tracks.push(new THREE.VectorKeyframeTrack(`${vrmNodeName}.${propertyName}`, track.times, value));
       }
     }
