@@ -16,6 +16,10 @@ val textyVersion = "1.0.0-alpha"
 // (HeatMapCalendar). Uses kotlinx-datetime types, matching our shared
 // schedule projection (Phase 7).
 val calendarVersion = "2.10.1"
+// Pet-window surface host (avatar PRD P4): embedded Chromium for the
+// off-screen renderer + Win32 window styles (no-activate / click-through).
+val jcefMavenVersion = "146.0.10"
+val jnaVersion = "5.17.0"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -83,6 +87,8 @@ dependencies {
     implementation("com.arjunjadeja:texty:$textyVersion")
     implementation("com.kizitonwose.calendar:compose-multiplatform:$calendarVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
+    implementation("me.friwi:jcefmaven:$jcefMavenVersion")
+    implementation("net.java.dev.jna:jna-platform:$jnaVersion")
     implementation("io.ktor:ktor-client-cio:$ktorVersion")
     implementation("io.ktor:ktor-client-websockets:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
@@ -95,6 +101,22 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+}
+
+// P4 spike entry point (see avatar/DESIGN-BRIEF.md + docs/design/avatar-system-prd.md):
+// frameless transparent pet window hosting the web avatar renderer off-screen.
+tasks.register<JavaExec>("runPetSpike") {
+    group = "application"
+    description = "Runs the frameless pet-window spike (-PpetVrm=path\\to\\model.vrm to override the avatar)."
+    mainClass.set("com.letta.mobile.desktop.avatar.pet.PetWindowSpikeKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+    jvmArgs(
+        // jcefmaven OSR-mode requirements.
+        "--add-exports=java.base/java.lang=ALL-UNNAMED",
+        "--add-exports=java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-exports=java.desktop/sun.java2d=ALL-UNNAMED",
+    )
+    providers.gradleProperty("petVrm").orNull?.let { args(it) }
 }
 
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
