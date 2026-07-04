@@ -21,6 +21,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartCreateConv
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
+import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.data.transport.iroh.IrohProbeAssertions
 import com.letta.mobile.data.transport.iroh.IrohProbeSummary
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
@@ -891,9 +892,28 @@ internal class AppServerIrohProbeCommand : CliktCommand(
 
         token?.takeIf { it.isNotBlank() }?.let { bearer ->
             setupMetrics.beginStage("auth")
-            val auth = client.auth(AppServerCommand.Auth(requestId = "probe-auth-${UUID.randomUUID()}", token = bearer))
+            val auth = client.auth(
+                AppServerCommand.Auth(
+                    requestId = "probe-auth-${UUID.randomUUID()}",
+                    token = bearer,
+                    capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
+                ),
+            )
             if (!auth.success) error(auth.error ?: "Iroh auth failed")
             setupMetrics.markStageSucceeded("auth")
+        } ?: run {
+            // Even without a bearer token, send the auth handshake so the server
+            // learns this probe can reassemble frame_part chunked frames
+            // (needed for hydrate-heavy >1MiB message.list responses).
+            runCatching {
+                client.auth(
+                    AppServerCommand.Auth(
+                        requestId = "probe-auth-${UUID.randomUUID()}",
+                        token = "",
+                        capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
+                    ),
+                )
+            }
         }
 
         setupMetrics.beginStage("runtime_start")
