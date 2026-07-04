@@ -283,25 +283,29 @@ fun groupMessagesForRender(
  */
 fun deduplicateRenderItemsByMessageId(items: List<ChatRenderItem>): List<ChatRenderItem> {
     if (items.size < 2) return items
+    // Message ids owned by ANY RunBlock — a message can never legitimately render
+    // twice, so this collapse is always safe regardless of position.
     val runBlockMessageIds = HashSet<String>()
-    val runBlockRunIds = HashSet<String>()
     for (item in items) {
         if (item is ChatRenderItem.RunBlock) {
             item.messages.forEach { runBlockMessageIds.add(it.first.id) }
-            // letta-mobile-x1xnl: also index the RunBlock's runId. On-device the
-            // streaming reply renders as a RunBlock (key run-<runId>) in one
-            // rebuild and the SAME turn's reconciled final renders as a
-            // standalone Single with a DIFFERENT server message id (key
-            // msg-<newId>) in another. They share no message id, so the id-only
-            // dedup missed them and BOTH rendered (the stranded fragment). Drop a
-            // Single that belongs to a run already owned by a RunBlock.
-            item.runId.takeIf { it.isNotBlank() }?.let { runBlockRunIds.add(it) }
         }
     }
-    val seenSingleIds = HashSet<String>()
+    // #824 review (P1): the runId collapse must be ADJACENCY-scoped, not global.
+    // The streaming reply renders as a RunBlock (key run-<runId>) and the SAME
+    // turn's reconciled final renders as a standalone assistant Single with a
+    // DIFFERENT server id (key msg-<newId>) IMMEDIATELY next to it — that is the
+    // stranded duplicate. But a conversation can legitimately have another
+    // assistant Single from the SAME run elsewhere in history (a run split by
+    // user turns); dropping that by runId globally would delete real messages.
+    // So only drop an assistant Single that is directly adjacent (prev or next)
+    // to a RunBlock carrying the same runId.
+    fun runBlockRunIdAt(idx: Int): String? =
+        (items.getOrNull(idx) as? ChatRenderItem.RunBlock)?.runId?.takeIf { it.isNotBlank() }
+
     var droppedAny = false
     val out = ArrayList<ChatRenderItem>(items.size)
-    for (item in items) {
+    for ((idx, item) in items.withIndex()) {
         when (item) {
             is ChatRenderItem.Single -> {
                 val id = item.message.id
@@ -311,10 +315,9 @@ fun deduplicateRenderItemsByMessageId(items: List<ChatRenderItem>): List<ChatRen
                 // but are distinct bubbles — never collapse them by runId.
                 val runId = item.message.runId
                     ?.takeIf { it.isNotBlank() && item.message.role == "assistant" }
-                if (id in runBlockMessageIds ||
-                    (runId != null && runId in runBlockRunIds) ||
-                    !seenSingleIds.add(id)
-                ) {
+                val adjacentSameRunBlock = runId != null &&
+                    (runId == runBlockRunIdAt(idx - 1) || runId == runBlockRunIdAt(idx + 1))
+                if (id in runBlockMessageIds || adjacentSameRunBlock) {
                     droppedAny = true
                     continue
                 }

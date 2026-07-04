@@ -58,7 +58,12 @@ fun buildChatRenderModel(
 
     val reversed = dedupeGroupedMessagesForLazyKeys(groupedMessages).asReversed()
 
-    val renderItems = groupMessagesForRender(reversed)
+    // letta-mobile-x1xnl: collapse the streaming-RunBlock vs reconciled-final-
+    // Single duplicate (same run, adjacent, different server ids) here in the
+    // single common chokepoint so EVERY caller — incremental cache, desktop's
+    // buildDesktopChatRenderItems, and any other direct render path — is covered
+    // (#824 review P2).
+    val renderItems = deduplicateRenderItemsByMessageId(groupMessagesForRender(reversed))
 
     return ChatRenderModel(
         visibleMessages = visibleMessages,
@@ -156,7 +161,9 @@ class IncrementalChatRenderItemsCache {
         mode: ChatDisplayMode,
         tailStartIndex: Int,
     ): List<ChatRenderItem> {
-        val full = deduplicateRenderItemsByMessageId(buildChatRenderModel(messages, mode).renderItems)
+        // buildChatRenderModel already applies deduplicateRenderItemsByMessageId
+        // internally (single chokepoint), so no extra wrap needed here.
+        val full = buildChatRenderModel(messages, mode).renderItems
         committedRenderItems = if (tailStartIndex > 0) {
             buildChatRenderModel(
                 messages = messages.subList(0, tailStartIndex),
