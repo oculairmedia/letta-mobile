@@ -54,14 +54,40 @@ class IrohAdminRpcAgentSource(
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
+    /**
+     * List ALL agents by paging through `agent.list`. The server returns only a
+     * default first page (~50) when no limit is given, so agents beyond it never
+     * resolved a name in the conversation list and fell back to `agentId.take(8)`
+     * (letta-mobile-71orq).
+     */
     suspend fun listAgents(): List<Agent> {
-        val response = channelTransport.adminRpc(
-            method = "agent.list",
-            path = "/v1/agents",
-            body = null,
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.list failed")
-        val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
+        val merged = mutableListOf<Agent>()
+        val seenIds = HashSet<String>()
+        var offset = 0
+        while (true) {
+            val params = buildJsonObject {
+                put("limit", AGENT_LIST_PAGE_SIZE.toString())
+                put("offset", offset.toString())
+            }
+            val response = channelTransport.adminRpc(
+                method = "agent.list",
+                path = "/v1/agents?limit=$AGENT_LIST_PAGE_SIZE&offset=$offset",
+                body = params.toString(),
+            )
+            if (!response.success) error(response.error ?: "Iroh admin_rpc agent.list failed")
+            val result = response.result ?: break
+            val page = json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
+            if (page.isEmpty()) break
+            val fresh = page.filter { seenIds.add(it.id.value) }
+            if (fresh.isEmpty()) break
+            merged += fresh
+            if (page.size < AGENT_LIST_PAGE_SIZE) break
+            offset += page.size
+        }
+        return merged
+    }
+
+    private companion object {
+        const val AGENT_LIST_PAGE_SIZE = 100
     }
 }

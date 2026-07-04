@@ -69,7 +69,7 @@ class IrohAdminRpcAgentSourceTest {
     }
 
     @Test
-    fun `listAgents routes to agent_list and decodes`() = runTest {
+    fun `listAgents routes to agent_list with pagination params and decodes`() = runTest {
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ -> ok("""[{"id":"agent-1","name":"Lester"},{"id":"agent-2","name":"BMO"}]""") }
         }
@@ -77,8 +77,28 @@ class IrohAdminRpcAgentSourceTest {
 
         val call = transport.adminRpcCalls.single()
         assertEquals("agent.list", call.method)
-        assertEquals("/v1/agents", call.path)
+        assertTrue("path should carry pagination", call.path.contains("limit=") && call.path.contains("offset="))
         assertEquals(2, agents.size)
         assertEquals("agent-2", agents[1].id.value)
+    }
+
+    @Test
+    fun `listAgents pages through all agents until a short page`() = runTest {
+        // The server returns only a default page when unlimited, so agents beyond
+        // it never resolve a name (letta-mobile-71orq). Verify the source pages
+        // via offset and stops on a short page.
+        val fullPage = (1..100).joinToString(",", "[", "]") { """{"id":"agent-$it","name":"A$it"}""" }
+        val secondPage = """[{"id":"agent-101","name":"Lester"}]"""
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, path, _ ->
+                if (path.contains("offset=0")) ok(fullPage) else ok(secondPage)
+            }
+        }
+
+        val agents = source(transport).listAgents()
+
+        assertEquals(101, agents.size)
+        assertTrue("second page agent must be included", agents.any { it.id.value == "agent-101" })
+        assertEquals(2, transport.adminRpcCalls.size)
     }
 }
