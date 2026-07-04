@@ -130,6 +130,26 @@ class AvatarDirectorStateMachineTest {
         assertEquals(AvatarState.ERROR, d.state)
     }
 
+    @Test
+    fun legacyActivityAfterErrorClearsLatchWithoutIdle() = runTest {
+        // Pre-P2 setActivity contract: any subsequent activity replaces ERROR.
+        // A caller that recovers with SPEAKING (never sending IDLE) must not be
+        // stuck red (Codex: clear latched errors on any new activity).
+        val (_, d) = director()
+        d.setActivity(AvatarActivity.ERROR)
+        assertEquals(AvatarState.ERROR, d.state)
+        d.setActivity(AvatarActivity.SPEAKING)
+        assertEquals(AvatarState.SPEAKING, d.state)
+
+        // THINKING and LISTENING recover the same way.
+        d.setActivity(AvatarActivity.ERROR)
+        d.setActivity(AvatarActivity.THINKING)
+        assertEquals(AvatarState.THINKING, d.state)
+        d.setActivity(AvatarActivity.ERROR)
+        d.setActivity(AvatarActivity.LISTENING)
+        assertEquals(AvatarState.LISTENING, d.state)
+    }
+
     // ---- SUCCESS self-expiry -------------------------------------------------
 
     @Test
@@ -144,6 +164,26 @@ class AvatarDirectorStateMachineTest {
         assertEquals(AvatarState.SUCCESS, d.state)
         repeat(2) { d.tick(0.1f) } // cross 2.0s
         assertEquals(AvatarState.IDLE, d.state)
+    }
+
+    @Test
+    fun successReplaysHappyFlashOnNewCompletionWithinWindow() = runTest {
+        val (runtime, d) = director()
+        d.notifyTaskSucceeded()
+        assertEquals(0.7f, runtime.expressionWeights["happy"])
+
+        // Drive into the decay tail (past the 1.5s hold) while still inside the
+        // 2.0s SUCCESS window, so the happy flash has fallen well below its 0.7
+        // peak but the director hasn't self-expired yet.
+        repeat(18) { d.tick(0.1f) } // 1.8s: still SUCCESS, flash decaying
+        assertEquals(AvatarState.SUCCESS, d.state)
+        assertTrue((runtime.expressionWeights["happy"] ?: 0f) < 0.5f, "flash should be decaying")
+
+        // A genuinely new completion re-flashes the happy cue even though the
+        // director never left SUCCESS (Codex: replay success when already active).
+        d.notifyTaskSucceeded()
+        assertEquals(AvatarState.SUCCESS, d.state)
+        assertEquals(0.7f, runtime.expressionWeights["happy"]!!, 0.001f)
     }
 
     @Test
@@ -260,6 +300,25 @@ class AvatarDirectorStateMachineTest {
         d.removeStateListener(listener)
         d.setActivity(AvatarActivity.SPEAKING)
         assertEquals(1, count)
+    }
+
+    @Test
+    fun listenerMutatingListenersDuringCallbackDoesNotThrow() = runTest {
+        val (_, d) = director()
+        var secondCalled = false
+        // Two listeners; the first removes the second during its callback. With
+        // an index-based loop over the live list this threw IndexOutOfBounds
+        // (Codex: notify listeners from a stable snapshot).
+        val second = AvatarStateListener { _, _ -> secondCalled = true }
+        d.addStateListener { _, _ -> d.removeStateListener(second) }
+        d.addStateListener(second)
+
+        d.setActivity(AvatarActivity.THINKING) // must not throw
+
+        assertEquals(AvatarState.THINKING, d.state)
+        // The snapshot was taken before the mutation, so the second listener
+        // still saw this transition; its removal takes effect next time.
+        assertTrue(secondCalled)
     }
 
     @Test

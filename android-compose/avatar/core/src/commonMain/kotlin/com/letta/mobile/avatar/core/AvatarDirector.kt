@@ -215,16 +215,18 @@ class AvatarDirector(
     /**
      * Legacy 5-value input, unchanged. Maps onto the arbitrated state machine:
      * THINKING/SPEAKING/LISTENING set the legacy activity; ERROR latches an
-     * error cue; IDLE clears them. Explicit signals ([setDragged],
+     * error cue; any other activity clears it. Explicit signals ([setDragged],
      * [setAwaitingApproval], …) still take priority per §4 P2 when active.
+     *
+     * Clearing on every non-ERROR activity (not just IDLE) preserves the
+     * pre-P2 `setActivity` contract, where any subsequent activity replaced
+     * ERROR — so a caller that recovers by sending SPEAKING/THINKING/LISTENING
+     * without first sending IDLE is not stuck red. (The [notifyError] latch is
+     * for the explicit signal, which has no legacy-activity backing.)
      */
     fun setActivity(next: AvatarActivity) {
         legacyActivity = next
-        when (next) {
-            AvatarActivity.ERROR -> errorLatched = true
-            AvatarActivity.IDLE -> errorLatched = false
-            else -> Unit
-        }
+        errorLatched = next == AvatarActivity.ERROR
         // LISTENING can arrive via this legacy input too; keep typing-derived
         // LISTENING independent so setUserTyping(false) doesn't cancel it.
         arbitrate()
@@ -260,9 +262,16 @@ class AvatarDirector(
 
     /** A task completed → momentary [AvatarState.SUCCESS] that self-expires after [Config.successTotalSeconds] (§6). */
     fun notifyTaskSucceeded() {
+        val wasSuccess = state == AvatarState.SUCCESS
         successRemaining = config.successTotalSeconds
         errorLatched = false // success supersedes a stale error cue
         arbitrate()
+        // If we were already SUCCESS, arbitrate()'s same-state guard skipped the
+        // enter side effects — but this is a genuinely new completion event, so
+        // replay the happy flash/presence pulse. Without this, back-to-back task
+        // completions inside the 2s window are invisible (the earlier flash has
+        // already decayed) even though the timer was extended.
+        if (wasSuccess && state == AvatarState.SUCCESS) onEnter(AvatarState.SUCCESS)
     }
 
     /** Latch [AvatarState.ERROR] (sad flash → settle, §6). Cleared by [notifyTaskSucceeded] or `setActivity(IDLE)`. */
@@ -363,8 +372,11 @@ class AvatarDirector(
         state = next
         onEnter(next)
         // Exit-before-enter ordering is part of the observable contract.
-        for (i in listeners.indices) {
-            listeners[i].onStateTransition(previous, next)
+        // Iterate a snapshot so a listener that (un)registers a listener during
+        // its callback doesn't corrupt this loop's indices or throw
+        // IndexOutOfBoundsException; the mutation takes effect next transition.
+        for (listener in listeners.toList()) {
+            listener.onStateTransition(previous, next)
         }
     }
 
