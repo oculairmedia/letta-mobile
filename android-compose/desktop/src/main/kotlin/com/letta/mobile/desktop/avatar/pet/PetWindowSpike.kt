@@ -1,4 +1,7 @@
-@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+@file:OptIn(
+    androidx.compose.ui.ExperimentalComposeUiApi::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
 
 package com.letta.mobile.desktop.avatar.pet
 
@@ -431,10 +434,15 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
         )
 
         // Hover micro-row: chat, cycle presence states, click-through, close.
+        // FlowRow: with imported animation chips the set no longer fits one
+        // line in a 380dp window — wrap instead of clipping.
         if (hovered && !clickThrough) {
-            Row(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp),
+            androidx.compose.foundation.layout.FlowRow(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp, start = 8.dp, end = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 // New "chat" chip: toggles the focusable reply popup (PRD §5 B1).
                 Chip(text = "chat", highlighted = chatOpen) { onToggleChat() }
