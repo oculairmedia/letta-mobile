@@ -25,6 +25,7 @@ sealed class TimelineSyncEvent {
     data class StreamError(val type: String, val message: String) : TimelineSyncEvent()
     /** A LettaMessage was ingested via the resume-stream subscriber (letta-mobile-mge5). */
     data class StreamEventIngested(val serverId: String, val messageType: String?) : TimelineSyncEvent()
+    data class OrphanAssistantFragmentsCleaned(val runId: String, val turnId: String?, val count: Int, val reason: String) : TimelineSyncEvent()
     /** Stream subscriber successfully opened a stream; resets backoff. */
     object StreamSubscriberOpened : TimelineSyncEvent()
     /** Stream subscriber closed cleanly (run finished). */

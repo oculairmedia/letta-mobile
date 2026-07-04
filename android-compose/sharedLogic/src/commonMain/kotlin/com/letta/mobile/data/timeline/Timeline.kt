@@ -9,6 +9,7 @@ import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentSet
 
 fun String.stripEnvelopeReminders(): String {
     return this.replace(Regex("<system-reminder>[\\s\\S]*?</system-reminder>\\s*"), "")
@@ -163,6 +164,8 @@ data class Timeline(
     val liveCursor: String? = null,
     /** Cursor for backfill pagination (oldest known message id). */
     val backfillCursor: String? = null,
+    /** Recent abandoned assistant fragments removed locally; suppresses delayed reconcile reinserts. */
+    val abandonedAssistantFragmentSuppressions: kotlinx.collections.immutable.PersistentSet<AbandonedAssistantFragmentSuppression> = kotlinx.collections.immutable.persistentSetOf(),
     /** Monotonic fingerprint for all non-tail events so UI projections can trust unchanged history. */
     val stablePrefixVersion: Long = events.stablePrefixFingerprint(),
 ) {
@@ -381,6 +384,74 @@ data class Timeline(
         return false
     }
 
+    fun cleanupAbandonedAssistantFragments(
+        runId: String?,
+        turnId: String?,
+        reason: String,
+        candidateRunIds: Set<String> = emptySet(),
+    ): AbandonedAssistantFragmentCleanupResult {
+        val targetRunIds = buildSet {
+            runId?.takeIf { it.isNotBlank() }?.let(::add)
+            candidateRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
+        }
+        if (targetRunIds.isEmpty()) return AbandonedAssistantFragmentCleanupResult(this, emptySet())
+        val tailAssistantEvents = events
+            .asReversed()
+            .takeWhile { event ->
+                event is TimelineEvent.Confirmed && event.messageType == TimelineMessageType.ASSISTANT
+            }
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.runId.matchesCleanupRun(targetRunIds) }
+            .asReversed()
+        if (tailAssistantEvents.isEmpty()) return AbandonedAssistantFragmentCleanupResult(this, emptySet())
+
+        val longest = tailAssistantEvents.maxByOrNull { it.content.trim().length }
+        val longestText = longest?.content?.trim().orEmpty()
+        val removedEvents = tailAssistantEvents
+            .asSequence()
+            .filter { candidate ->
+                val text = candidate.content.trim()
+                if (text.isBlank()) return@filter false
+                val isShortTerminalFragment = text.length < ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS
+                val isTailPrefix = longest != null &&
+                    candidate.serverId != longest.serverId &&
+                    longestText.length >= ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS &&
+                    longestText.startsWith(text)
+                isShortTerminalFragment || isTailPrefix
+            }
+            .toList()
+        if (removedEvents.isEmpty()) return AbandonedAssistantFragmentCleanupResult(this, emptySet())
+        val removeServerIds = removedEvents.map { it.serverId }.toSet()
+        val suppressions = removedEvents.map { it.toAbandonedAssistantFragmentSuppression() }.toSet()
+        Telemetry.event(
+            "TimelineSync", "orphanAssistantFragments.cleaned",
+            "conversationId" to conversationId,
+            "runId" to targetRunIds.joinToString(","),
+            "turnId" to (turnId ?: ""),
+            "reason" to reason,
+            "count" to removeServerIds.size,
+        )
+        return AbandonedAssistantFragmentCleanupResult(
+            timeline = copy(
+                events = events.filterNot { event ->
+                    event is TimelineEvent.Confirmed && event.serverId in removeServerIds
+                }.toPersistentList(),
+                abandonedAssistantFragmentSuppressions = buildList<AbandonedAssistantFragmentSuppression> {
+                    addAll(abandonedAssistantFragmentSuppressions)
+                    addAll(suppressions)
+                }.takeLast(MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS).toPersistentSet(),
+                stablePrefixVersion = stablePrefixVersion + 1,
+            ),
+            suppressions = suppressions,
+        )
+    }
+
+    fun shouldSuppressAbandonedAssistantFragment(event: TimelineEvent.Confirmed): Boolean {
+        if (event.messageType != TimelineMessageType.ASSISTANT) return false
+        if (abandonedAssistantFragmentSuppressions.isEmpty()) return false
+        return event.toAbandonedAssistantFragmentSuppression() in abandonedAssistantFragmentSuppressions
+    }
+
     /** Mark a Local event as [DeliveryState.SENT]. No-op for Confirmed events. */
     fun markSent(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.SENT) }
 
@@ -393,6 +464,37 @@ data class Timeline(
         return copy(events = events.replacingAt(idx, transform(local)), stablePrefixVersion = stablePrefixVersion + 1)
     }
 }
+
+data class AbandonedAssistantFragmentCleanupResult(
+    val timeline: Timeline,
+    val suppressions: Set<AbandonedAssistantFragmentSuppression>,
+)
+
+data class AbandonedAssistantFragmentSuppression(
+    val serverId: String?,
+    val runId: String?,
+    val contentFingerprint: String,
+)
+
+private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
+private const val MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS = 32
+private const val ABANDONED_FRAGMENT_CONTENT_FINGERPRINT_CHARS = 256
+
+private fun String?.matchesCleanupRun(targetRunIds: Set<String>): Boolean {
+    val eventRunId = this?.takeIf { it.isNotBlank() } ?: return false
+    return targetRunIds.any { target ->
+        eventRunId == target || (eventRunId.isSyntheticIrohRunFamily() && target.isSyntheticIrohRunFamily())
+    }
+}
+
+private fun String.isSyntheticIrohRunFamily(): Boolean = startsWith("iroh-run-") || startsWith("local-run-")
+
+private fun TimelineEvent.Confirmed.toAbandonedAssistantFragmentSuppression(): AbandonedAssistantFragmentSuppression =
+    AbandonedAssistantFragmentSuppression(
+        serverId = serverId.takeIf { it.isNotBlank() },
+        runId = runId?.takeIf { it.isNotBlank() },
+        contentFingerprint = content.trim().take(ABANDONED_FRAGMENT_CONTENT_FINGERPRINT_CHARS),
+    )
 
 internal fun List<TimelineEvent>.stablePrefixFingerprint(): Long {
     var fingerprint = 1125899906842597L

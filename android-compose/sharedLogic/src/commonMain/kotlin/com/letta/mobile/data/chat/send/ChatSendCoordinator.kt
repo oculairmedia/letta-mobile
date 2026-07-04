@@ -19,6 +19,7 @@ import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -76,6 +77,8 @@ class ChatSendCoordinator(
     // are first-wins per turn on the shim. We capture once and drop later
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile private var activeWsTurnId: String? = null
+    @Volatile private var activeWsRunId: String? = null
+    private val activeAssistantMessageRunIds = linkedSetOf<String>()
     @Volatile private var stopReasonForTurn: String? = null
     @Volatile private var usageRecordedForTurn: Boolean = false
     // lcp-axv: failed turns emit `error` THEN `turn_done(status="failed")`
@@ -456,6 +459,8 @@ class ChatSendCoordinator(
             is WsTimelineEvent.TurnStarted -> {
                 activeWsConversationId = event.conversationId
                 activeWsTurnId = event.turnId
+                activeWsRunId = event.runId
+                activeAssistantMessageRunIds.clear()
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
@@ -489,6 +494,7 @@ class ChatSendCoordinator(
                     return
                 }
                 recordRuntimeEvent(event, conversationId)
+                rememberActiveAssistantMessageRunId(event.message)
                 timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
                 if (!event.isReplay) {
                     ui.onMessageDelta(conversationId)
@@ -678,6 +684,37 @@ class ChatSendCoordinator(
         else -> message.date.orEmpty() + ":" + message.seqId.toString()
     }
 
+    private fun rememberActiveAssistantMessageRunId(message: LettaMessage) {
+        if (message !is AssistantMessage) return
+        val messageRunId = message.runId?.takeIf { it.isNotBlank() } ?: return
+        activeAssistantMessageRunIds += messageRunId
+        while (activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
+            activeAssistantMessageRunIds.remove(activeAssistantMessageRunIds.first())
+        }
+    }
+
+    private suspend fun cleanupAbandonedAssistantFragmentsSafely(
+        conversationId: String,
+        runId: String?,
+        turnId: String?,
+        reason: String,
+        candidateRunIds: Set<String> = emptySet(),
+    ) {
+        try {
+            timelineRepository.cleanupAbandonedAssistantFragments(agentId, conversationId, runId, turnId, reason, candidateRunIds)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error(
+                "AdminChatVM", "cleanupAbandonedAssistantFragments.failed", error,
+                "conversationId" to conversationId,
+                "runId" to (runId ?: ""),
+                "turnId" to (turnId ?: ""),
+                "reason" to reason,
+            )
+        }
+    }
+
     private suspend fun finishActiveTurn(
         status: String,
         runId: String,
@@ -688,6 +725,15 @@ class ChatSendCoordinator(
         recordEvent: WsTimelineEvent.TurnDone?,
     ) {
         val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+        if (status == "failed" || status == "cancelled") {
+            cleanupAbandonedAssistantFragmentsSafely(
+                conversationId = conversationId,
+                runId = runId,
+                turnId = turnId,
+                reason = "turn_done_$status",
+                candidateRunIds = activeCleanupCandidateRunIds(runId),
+            )
+        }
         if (recordEvent != null) {
             recordRuntimeEvent(recordEvent, conversationId)
         }
@@ -737,6 +783,8 @@ class ChatSendCoordinator(
         activeWsOtid = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
+        activeWsRunId = null
+        activeAssistantMessageRunIds.clear()
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
@@ -761,15 +809,34 @@ class ChatSendCoordinator(
         preConversationMessageDeltas.clear()
         clearPendingSends("disconnect")
         if (conversationId != null) {
+            val cleanupRunId = activeWsRunId
+            val cleanupTurnId = activeWsTurnId
+            if (activeWsOtid != null || cleanupRunId != null || cleanupTurnId != null) {
+                cleanupAbandonedAssistantFragmentsSafely(
+                    conversationId = conversationId,
+                    runId = cleanupRunId,
+                    turnId = cleanupTurnId,
+                    reason = "disconnect",
+                    candidateRunIds = activeCleanupCandidateRunIds(cleanupRunId),
+                )
+            }
             timelineRepository.clearExternalTransportActive(conversationId)
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
+        activeWsRunId = null
+        activeAssistantMessageRunIds.clear()
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
+    }
+
+    private fun activeCleanupCandidateRunIds(primaryRunId: String?): Set<String> = buildSet {
+        primaryRunId?.takeIf { it.isNotBlank() }?.let(::add)
+        activeWsRunId?.takeIf { it.isNotBlank() }?.let(::add)
+        activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
     }
 
     private suspend fun markTurnVisuallyComplete(reason: String) {
@@ -793,6 +860,7 @@ class ChatSendCoordinator(
         while (true) {
             val message = preConversationMessageDeltas.removeFirstOrNull() ?: return
             recordRuntimeEvent(WsTimelineEvent.MessageDelta(message), conversationId)
+            rememberActiveAssistantMessageRunId(message)
             timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message)
         }
     }
@@ -801,6 +869,7 @@ class ChatSendCoordinator(
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val MAX_SEEN_BRIDGE_EVENTS = 512
+        private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
         private val POST_SEND_RECONCILE_DELAYS_MS = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =

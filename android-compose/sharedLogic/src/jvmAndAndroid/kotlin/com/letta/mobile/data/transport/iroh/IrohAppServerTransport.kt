@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -71,6 +72,7 @@ class IrohAppServerTransport(
     private lateinit var controlBiStream: BiStream
     private lateinit var streamBiStream: BiStream
     private var pathWatchJob: Job? = null
+    private val readerExitReported = AtomicBoolean(false)
     private val connectionReady = CompletableDeferred<Unit>()
     private val streamReady = CompletableDeferred<Unit>()
 
@@ -276,9 +278,18 @@ class IrohAppServerTransport(
             )
             throw error
         } finally {
-            Telemetry.event("IrohTransport", "frame.reader_stop", "channel" to channel.name)
-            onConnectionLost("reader_stopped:${channel.name}")
+            reportReaderExit(channel, "reader_stopped:${channel.name}")
         }
+    }
+
+    private fun reportReaderExit(channel: AppServerChannel, reason: String) {
+        if (!readerExitReported.compareAndSet(false, true)) return
+        Telemetry.event(
+            "IrohSupervisor", "reader.exit",
+            "channel" to channel.name,
+            "reason" to reason,
+        )
+        onConnectionLost(reason)
     }
 
     private fun attachPathWatchers() {

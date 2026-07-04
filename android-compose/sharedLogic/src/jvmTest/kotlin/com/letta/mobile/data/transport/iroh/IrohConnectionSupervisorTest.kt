@@ -156,18 +156,28 @@ class IrohConnectionSupervisorTest {
     }
 
     @Test
-    fun connectionLostClosesStaleHandleBeforeRedial() = runTest {
+    fun readerExitClosesStaleHandleOnceDegradesAndRedials() = runTest {
+        var dials = 0
         val closed = mutableListOf<String>()
         val supervisor = supervisor(config = { configA }) {
-            fakeHandle(it, it.baseShimUrl) { reason -> closed += reason }
+            dials += 1
+            fakeHandle(it, "dial-$dials") { reason -> closed += reason }
         }
 
         supervisor.ready()
-        supervisor.onConnectionLost("reader_stopped")
+        supervisor.onConnectionLost("reader_stopped:Stream")
+        supervisor.onConnectionLost("reader_stopped:Control")
         runCurrent()
 
-        assertEquals(listOf("reader_stopped"), closed)
+        assertEquals(listOf("reader_stopped:Stream"), closed)
         assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+
+        advanceTimeBy(500)
+        advanceUntilIdle()
+
+        val ready = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals("dial-2", ready.handle.sessionId)
+        assertEquals(2, dials)
     }
 
     @Test
