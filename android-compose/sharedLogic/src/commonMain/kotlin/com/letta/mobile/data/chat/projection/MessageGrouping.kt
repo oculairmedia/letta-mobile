@@ -305,7 +305,12 @@ fun deduplicateRenderItemsByMessageId(items: List<ChatRenderItem>): List<ChatRen
         when (item) {
             is ChatRenderItem.Single -> {
                 val id = item.message.id
-                val runId = item.message.runId?.takeIf { it.isNotBlank() }
+                // #824 review (P2): only ASSISTANT Singles belong to a run's
+                // RunBlock. Other renderables (e.g. ERROR frames mapped to role
+                // "system" by TimelineEventToUiMessage) can carry the same runId
+                // but are distinct bubbles — never collapse them by runId.
+                val runId = item.message.runId
+                    ?.takeIf { it.isNotBlank() && item.message.role == "assistant" }
                 if (id in runBlockMessageIds ||
                     (runId != null && runId in runBlockRunIds) ||
                     !seenSingleIds.add(id)

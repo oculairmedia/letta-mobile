@@ -105,7 +105,15 @@ class IncrementalChatRenderItemsCache {
             // already holds one. Two identical keys crash the LazyColumn
             // ("Key was already used"). Re-run the global key de-dupe across
             // the joined list so the boundary can never produce a collision.
-            val next = deduplicateRenderKeys(tailRenderItems + committedRenderItems)
+            // letta-mobile-x1xnl: collapse a turn that appears as a RunBlock in
+            // one half and a standalone Single (a reconciled final with a
+            // DIFFERENT server id but the SAME runId) in the other, before the
+            // key-level dedup — otherwise the two DIFFERENT keys both render as a
+            // stranded duplicate. Then run the key dedup for remaining same-key
+            // collisions.
+            val next = deduplicateRenderKeys(
+                deduplicateRenderItemsByMessageId(tailRenderItems + committedRenderItems),
+            )
             cachedMode = mode
             previousMessages = messages
             previousTailStartIndex = tailStartIndex
@@ -148,7 +156,7 @@ class IncrementalChatRenderItemsCache {
         mode: ChatDisplayMode,
         tailStartIndex: Int,
     ): List<ChatRenderItem> {
-        val full = buildChatRenderModel(messages, mode).renderItems
+        val full = deduplicateRenderItemsByMessageId(buildChatRenderModel(messages, mode).renderItems)
         committedRenderItems = if (tailStartIndex > 0) {
             buildChatRenderModel(
                 messages = messages.subList(0, tailStartIndex),

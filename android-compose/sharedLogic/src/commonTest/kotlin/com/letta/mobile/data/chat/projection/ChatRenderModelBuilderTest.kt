@@ -578,6 +578,28 @@ class ChatRenderModelBuilderTest {
         assertTrue(out.single() is ChatRenderItem.RunBlock)
     }
 
+    @Test
+    fun `deduplicateRenderItemsByMessageId keeps a non-assistant Single sharing a RunBlock runId`() {
+        // #824 review (P2): an ERROR/status bubble (role != assistant) can carry
+        // the same runId as an assistant RunBlock but is a distinct bubble — it
+        // must NOT be collapsed by runId.
+        val a1 = assistant("a1", runId = "r9")
+        val a2 = assistant("a2", runId = "r9")
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "r9",
+            messages = listOf(a1 to GroupPosition.First, a2 to GroupPosition.Last),
+        )
+        val errorBubble = ChatRenderItem.Single(
+            message = UiMessage(id = "err-1", role = "system", content = "Error", timestamp = "2026-04-19T12:00:00Z", runId = "r9"),
+            groupPosition = GroupPosition.None,
+        )
+
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, errorBubble))
+
+        assertEquals(2, out.size)
+        assertTrue(out.any { it is ChatRenderItem.Single && (it as ChatRenderItem.Single).message.id == "err-1" })
+    }
+
     private fun user(
         id: String,
         content: String = "u-$id",
