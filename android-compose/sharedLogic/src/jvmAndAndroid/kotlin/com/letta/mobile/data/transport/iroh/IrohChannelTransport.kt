@@ -440,7 +440,9 @@ class IrohChannelTransport(
         return runCatching {
             first.adminRpc(method = method, path = path, body = body)
         }.getOrElse { firstError ->
+            if (firstError is CancellationException) throw firstError
             if (!firstError.isConnectionLostClass()) throw firstError
+            if (!method.isReadOnlyAdminRpcMethod()) throw firstError
             com.letta.mobile.util.Telemetry.event(
                 "IrohTransport", "admin_rpc.retry_after_failure",
                 "method" to method,
@@ -453,6 +455,8 @@ class IrohChannelTransport(
             retry.adminRpc(method = method, path = path, body = body)
         }
     }
+
+    private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
         supervisor.disconnect("disconnect")
@@ -521,6 +525,14 @@ class IrohChannelTransport(
         // only in a throwaway local build when dialing a hand-run wrapper.
         private const val DEBUG_FORCE_IROH_URL = ""
         fun shouldUseIroh(url: String?): Boolean = DEBUG_FORCE_IROH_URL.isNotBlank() || isIrohUrl(url)
+
+        internal val READ_ONLY_ADMIN_RPC_METHODS = setOf(
+            "message.list",
+            "message.get",
+            "conversation.list",
+            "goal.get",
+            "health.check",
+        )
 
         fun isIrohUrl(url: String?): Boolean {
             // Handle bare iroh://, https://iroh:// (corrupted saved config), etc.
