@@ -112,7 +112,12 @@ export function createAvatarRenderer(canvas, emit) {
         breathPhase += delta;
         applyRestAndBreathing(current.restBones, breathPhase);
       }
-      if (current.mixer) current.mixer.update(delta);
+      if (current.mixer) {
+        current.mixer.update(delta);
+        // After a finished action's rest crossfade settles, prune all actions
+        // so procedural rest+breathing resumes. Gated on mixer time, not delta.
+        pruneAfterRestFade();
+      }
       // vrm.update drives expressions, look-at, spring bones, constraints.
       if (current.vrm) current.vrm.update(delta);
     }
@@ -127,8 +132,11 @@ export function createAvatarRenderer(canvas, emit) {
     if (!actions || actions.size === 0) return false;
     let driving = false;
     for (const action of actions) {
-      if (action.isRunning() && action.getEffectiveWeight() > 0) driving = true;
-      else if (!action.isRunning()) actions.delete(action);
+      // A running action counts as driving even at weight 0 (e.g. the first
+      // frame of a fade-in) so the procedural pose never flashes for a frame
+      // during the return-to-rest crossfade. Non-running actions are pruned.
+      if (action.isRunning()) driving = true;
+      else actions.delete(action);
     }
     return driving;
   }
@@ -324,6 +332,129 @@ export function createAvatarRenderer(canvas, emit) {
     return clips;
   }
 
+  // --- Internal all-bones rest clip -----------------------------------------
+  // Imported clips (Mixamo FBX / GLB / VRMA) drive the FULL skeleton: hips
+  // position AND rotation, legs, feet, fingers — not just the handful of bones
+  // the procedural rest pose touches (arms/shoulders/spine/head). When a
+  // non-loop action finishes, clipDriving() goes false and the frame loop
+  // resumes rest+breathing, but only on that small set; every other bone keeps
+  // the mixer's last-written transform and the avatar freezes in the clip's end
+  // pose. To fix that we synthesize an internal AnimationClip that keys EVERY
+  // available humanoid bone to its rest local rotation (identity in normalized
+  // space, except the arms/shoulders/elbows which reuse the REST_POSE offsets),
+  // plus a hips position track so the hips come home. Every finishing action
+  // crossfades into this rest action; once the fade completes we stop all
+  // actions so clipDriving() returns false and the procedural rest+breathing —
+  // whose baseline pose equals this clip's pose — takes over seamlessly.
+  //
+  // The full canonical VRM humanoid bone name list (three-vrm normalized bone
+  // names). We iterate it and skip any bone the rig lacks, so partial rigs
+  // degrade gracefully. Kept internal: never added to clipsById / animationIds.
+  const HUMAN_BONE_NAMES = [
+    'hips', 'spine', 'chest', 'upperChest', 'neck', 'head',
+    'leftEye', 'rightEye', 'jaw',
+    'leftUpperLeg', 'leftLowerLeg', 'leftFoot', 'leftToes',
+    'rightUpperLeg', 'rightLowerLeg', 'rightFoot', 'rightToes',
+    'leftShoulder', 'leftUpperArm', 'leftLowerArm', 'leftHand',
+    'rightShoulder', 'rightUpperArm', 'rightLowerArm', 'rightHand',
+    'leftThumbMetacarpal', 'leftThumbProximal', 'leftThumbDistal',
+    'leftIndexProximal', 'leftIndexIntermediate', 'leftIndexDistal',
+    'leftMiddleProximal', 'leftMiddleIntermediate', 'leftMiddleDistal',
+    'leftRingProximal', 'leftRingIntermediate', 'leftRingDistal',
+    'leftLittleProximal', 'leftLittleIntermediate', 'leftLittleDistal',
+    'rightThumbMetacarpal', 'rightThumbProximal', 'rightThumbDistal',
+    'rightIndexProximal', 'rightIndexIntermediate', 'rightIndexDistal',
+    'rightMiddleProximal', 'rightMiddleIntermediate', 'rightMiddleDistal',
+    'rightRingProximal', 'rightRingIntermediate', 'rightRingDistal',
+    'rightLittleProximal', 'rightLittleIntermediate', 'rightLittleDistal',
+  ];
+  const REST_CLIP_DURATION = 0.5; // arbitrary; two identical keys, we crossfade
+
+  // Build the internal rest clip for `vrm`: a two-key quaternion track per
+  // available humanoid bone at its rest rotation (REST_POSE offset via
+  // restEuler, else identity — the SAME quaternion path buildStandardGesture
+  // clips use), plus a two-key hips position track at the normalized rest hips
+  // position. Two identical keys keep the clip valid and hold a constant pose
+  // for the whole crossfade. Returns null on a non-humanoid rig.
+  function buildRestClip(vrm) {
+    if (!vrm?.humanoid) return null;
+    const tracks = [];
+    const times = new Float32Array([0, REST_CLIP_DURATION]);
+    for (const boneName of HUMAN_BONE_NAMES) {
+      const node = vrm.humanoid.getNormalizedBoneNode(boneName);
+      if (!node) continue;
+      const [rx, ry, rz] = restEuler(boneName);
+      _euler.set(rx, ry, rz, 'XYZ');
+      _quat.setFromEuler(_euler);
+      const q = [_quat.x, _quat.y, _quat.z, _quat.w];
+      // Same quaternion at both keys.
+      const values = new Float32Array([...q, ...q]);
+      tracks.push(new THREE.QuaternionKeyframeTrack(`${node.name}.quaternion`, times, values));
+    }
+    // Hips position: bring the root translation home to the normalized rest
+    // hips position (clips animate hips.position, so a rotation-only rest clip
+    // would leave the body offset). normalizedRestPose.hips.position is [x,y,z].
+    const hipsNode = vrm.humanoid.getNormalizedBoneNode('hips');
+    const restHips = vrm.humanoid.normalizedRestPose?.hips?.position;
+    if (hipsNode && restHips) {
+      const p = [restHips[0], restHips[1], restHips[2]];
+      const values = new Float32Array([...p, ...p]);
+      tracks.push(new THREE.VectorKeyframeTrack(`${hipsNode.name}.position`, times, values));
+    }
+    return tracks.length > 0 ? new THREE.AnimationClip('__rest__', REST_CLIP_DURATION, tracks) : null;
+  }
+
+  // Crossfade timing for return-to-rest. The fade blends the finishing action
+  // (held at its end pose via clampWhenFinished) into the rest action; after it
+  // completes plus a small margin we prune ALL actions so procedural
+  // rest+breathing resumes with no visible pop (its baseline == the rest clip).
+  const REST_FADE = 0.35; // seconds
+  const REST_PRUNE_MARGIN = 0.08; // extra time before pruning, in seconds
+
+  // Handle a mixer 'finished' event: a non-loop action reached its end. Blend
+  // the internal rest action in and the finished action out, then schedule a
+  // prune of all actions once the blend settles. Deterministic — the prune is
+  // gated on mixer time (accumulated in restPruneAt), not a wall-clock timer.
+  function onActionFinished(event) {
+    if (!current || !current.mixer) return;
+    const finishedAction = event.action;
+    // Only imported/one-shot clips reach here (loops never fire 'finished');
+    // ignore the rest action finishing (it loops-once too but we prune it).
+    if (finishedAction === current.restAction) return;
+    if (!current.restClip) {
+      // Non-humanoid rig: no rest clip to fade to. Just drop the action so
+      // clipDriving() clears; nothing procedural drives a non-humanoid body.
+      current.activeClips.delete(finishedAction);
+      return;
+    }
+    const restAction = current.mixer.clipAction(current.restClip);
+    current.restAction = restAction;
+    restAction.reset();
+    restAction.setLoop(THREE.LoopOnce, 1);
+    restAction.clampWhenFinished = true;
+    restAction.enabled = true;
+    restAction.setEffectiveWeight(1);
+    restAction.fadeIn(REST_FADE);
+    restAction.play();
+    finishedAction.fadeOut(REST_FADE);
+    // Track the rest action so clipDriving() keeps the procedural pose down
+    // during the blend, and schedule the prune in mixer time.
+    current.activeClips.add(restAction);
+    current.restPruneAt = current.mixer.time + REST_FADE + REST_PRUNE_MARGIN;
+  }
+
+  // Once the rest crossfade has settled (mixer time passed restPruneAt), stop
+  // and prune every action — including the rest action — so clipDriving()
+  // returns false and the frame loop hands back to procedural rest+breathing.
+  function pruneAfterRestFade() {
+    if (!current || current.restPruneAt == null || !current.mixer) return;
+    if (current.mixer.time < current.restPruneAt) return;
+    current.restPruneAt = null;
+    current.mixer.stopAllAction();
+    current.activeClips.clear();
+    current.restAction = null;
+  }
+
   function sendEvent(event) {
     emit(JSON.stringify(event));
   }
@@ -336,6 +467,14 @@ export function createAvatarRenderer(canvas, emit) {
     lookTargetActive = false;
     lastLookTarget = null;
     if (!current) return;
+    // Drop the mixer 'finished' listener (and stop actions) so an interrupted
+    // loop or a re-load never leaks listeners onto a disposed mixer.
+    if (current.mixer) {
+      if (current.finishedListener) {
+        current.mixer.removeEventListener('finished', current.finishedListener);
+      }
+      current.mixer.stopAllAction();
+    }
     scene.remove(current.root);
     VRMUtils.deepDispose(current.root);
     current = null;
@@ -525,6 +664,15 @@ export function createAvatarRenderer(canvas, emit) {
       // One mixer drives both standard and embedded clips; needed whenever any
       // clip exists (rooted at the model so normalized-bone track names bind).
       const mixer = clipsById.size > 0 ? new THREE.AnimationMixer(root) : null;
+      // Internal all-bones rest clip + 'finished' handler: when any non-loop
+      // action ends, crossfade the full skeleton back to rest instead of
+      // freezing at the clip's end pose. Kept out of clipsById/animationIds.
+      const restClip = mixer ? buildRestClip(vrm) : null;
+      let finishedListener = null;
+      if (mixer) {
+        finishedListener = (event) => onActionFinished(event);
+        mixer.addEventListener('finished', finishedListener);
+      }
 
       const accessoryBindings = new Map(
         (accessories ?? []).map((a) => [a.id, a.nodeNames ?? []]),
@@ -534,7 +682,13 @@ export function createAvatarRenderer(canvas, emit) {
       // stand the rest pose down while a clip drives the skeleton.
       const restBones = collectRestBones(vrm);
       breathPhase = 0;
-      current = { root, vrm, mixer, clipsById, accessoryBindings, restBones, activeClips: new Set() };
+      current = {
+        root, vrm, mixer, clipsById, accessoryBindings, restBones,
+        activeClips: new Set(),
+        // Return-to-rest machinery (see buildRestClip / onActionFinished).
+        restClip, finishedListener,
+        restAction: null, restPruneAt: null,
+      };
 
       const expressions = vrm?.expressionManager
         ? Object.keys(vrm.expressionManager.expressionMap)
@@ -585,10 +739,21 @@ export function createAvatarRenderer(canvas, emit) {
       return;
     }
     const action = current.mixer.clipAction(clip);
+    // Interrupting a clip mid-play (or mid return-to-rest crossfade): cancel any
+    // scheduled rest prune and crossfade every other running action — including
+    // the internal rest action — out to the new one so there is no pop and the
+    // pruner can't stop the freshly started clip.
+    current.restPruneAt = null;
+    const fade = fadeSeconds > 0 ? fadeSeconds : REST_FADE;
+    for (const other of current.activeClips) {
+      if (other !== action && other.isRunning()) other.fadeOut(fade);
+    }
+    if (current.restAction && current.restAction !== action) current.restAction = null;
     action.reset();
     action.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
     action.clampWhenFinished = !loop;
     if (fadeSeconds > 0) action.fadeIn(fadeSeconds);
+    else action.setEffectiveWeight(1);
     action.play();
     // Register so the frame loop suspends rest pose/breathing while this runs;
     // clipDriving() drops it again once it finishes (non-loop) or is stopped.
