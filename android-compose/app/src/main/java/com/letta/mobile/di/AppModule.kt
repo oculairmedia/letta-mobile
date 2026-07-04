@@ -119,6 +119,19 @@ abstract class AppModule {
             settingsRepository = settingsRepository,
         )
 
+        // letta-mobile-71orq: older-message pagination (scroll up for history)
+        // must route over message.list admin_rpc in iroh:// mode; the raw HTTP
+        // MessageApi.fetchRecentMessages hard-fails at the purity choke-point.
+        @Provides
+        @Singleton
+        fun provideIrohAdminRpcTimelineTransport(
+            transport: IChannelTransport,
+            settingsRepository: ISettingsRepository,
+        ): IrohAdminRpcTimelineTransport = IrohAdminRpcTimelineTransport(
+            channelTransport = transport,
+            settingsRepository = settingsRepository,
+        )
+
         @Provides
         @Singleton
         fun provideTimelineRepository(
