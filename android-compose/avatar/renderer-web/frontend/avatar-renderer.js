@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 const VISEME_KEYS = ['aa', 'ih', 'ou', 'ee', 'oh'];
 
@@ -73,21 +73,99 @@ export function createAvatarRenderer(canvas, emit) {
 
   function unloadCurrent() {
     activeLoadRequestId = null; // discard any in-flight load's late result
+    // Match the host's command-state reset (HeadlessAvatarRuntime): framing
+    // and gaze return to defaults for the next avatar.
+    cameraFraming = 'fullBody';
+    lookTargetActive = false;
+    lastLookTarget = null;
     if (!current) return;
     scene.remove(current.root);
     VRMUtils.deepDispose(current.root);
     current = null;
   }
 
+  // Framing presets: which vertical band of the model the camera covers.
+  // Proportions are relative to the bounding box, so tall/chibi models both
+  // frame sensibly.
+  const FRAMINGS = {
+    headshot: { bandBottom: 0.72, bandTop: 1.02, eyeline: 0.88 },
+    bust: { bandBottom: 0.45, bandTop: 1.02, eyeline: 0.85 },
+    fullBody: { bandBottom: -0.02, bandTop: 1.02, eyeline: 0.55 },
+  };
+  let cameraFraming = 'fullBody';
+  let lookTargetActive = false;
+  let lastLookTarget = null; // { space, x, y, z } — reprojected on reframe
+
+  // Recompute the world-space look target from the last host command using the
+  // CURRENT camera. Screen-space targets must be re-unprojected after any
+  // reframe, or a stationary pointer maps to a stale world point.
+  function applyLookTarget() {
+    if (!lastLookTarget) return;
+    const { space, x, y, z } = lastLookTarget;
+    if (space === 'screen') {
+      const ndc = new THREE.Vector3(x * 2 - 1, -(y * 2 - 1), 0.5);
+      ndc.unproject(camera);
+      const direction = ndc.sub(camera.position).normalize();
+      lookAtTarget.position.copy(camera.position).addScaledVector(direction, 2);
+    } else {
+      lookAtTarget.position.set(x, y, z);
+    }
+  }
+
   function frameCamera(root) {
+    const preset = FRAMINGS[cameraFraming] ?? FRAMINGS.fullBody;
     const box = new THREE.Box3().setFromObject(root);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const headY = box.min.y + size.y * 0.85;
-    const distance = Math.max(size.y / (2 * Math.tan((camera.fov * Math.PI) / 360)), size.z * 2) * 1.2;
-    camera.position.set(center.x, headY - size.y * 0.12, center.z + distance);
-    camera.lookAt(center.x, headY - size.y * 0.12, center.z);
-    lookAtTarget.position.copy(camera.position);
+    const focusY = box.min.y + size.y * preset.eyeline;
+    // The eyeline is not the band's center, so size the camera distance from
+    // the LARGER half-extent — otherwise the far edge of the band crops
+    // (e.g. the waist in bust framing).
+    const bandTopY = box.min.y + size.y * preset.bandTop;
+    const bandBottomY = box.min.y + size.y * preset.bandBottom;
+    const halfExtent = Math.max(bandTopY - focusY, focusY - bandBottomY);
+    const distance = Math.max(
+      halfExtent / Math.tan((camera.fov * Math.PI) / 360),
+      size.z * 1.5,
+    ) * 1.1;
+    camera.position.set(center.x, focusY, center.z + distance);
+    camera.lookAt(center.x, focusY, center.z);
+    // Reframing must not stomp an active host-driven gaze target — reproject
+    // it through the new camera; only fall back to camera-facing idle gaze.
+    if (lookTargetActive) applyLookTarget();
+    else lookAtTarget.position.copy(camera.position);
+  }
+
+  function setCameraFraming(framing) {
+    cameraFraming = FRAMINGS[framing] ? framing : 'fullBody';
+    if (current) frameCamera(current.root);
+  }
+
+  function captureThumbnail({ requestId, width, height }) {
+    try {
+      if (!current) throw new Error('No avatar loaded');
+      // Render a fresh frame, then cover-fit the live canvas into the
+      // requested size via a 2D canvas.
+      renderer.render(scene, camera);
+      const source = renderer.domElement;
+      const target = document.createElement('canvas');
+      target.width = width;
+      target.height = height;
+      const context = target.getContext('2d');
+      const scale = Math.max(width / source.width, height / source.height);
+      const drawWidth = source.width * scale;
+      const drawHeight = source.height * scale;
+      context.drawImage(
+        source,
+        (width - drawWidth) / 2,
+        (height - drawHeight) / 2,
+        drawWidth,
+        drawHeight,
+      );
+      sendEvent({ type: 'thumbnailCaptured', requestId, dataUrl: target.toDataURL('image/png') });
+    } catch (error) {
+      sendEvent({ type: 'thumbnailFailed', requestId, message: String(error?.message ?? error) });
+    }
   }
 
   async function loadAvatar({ url, format, requestId, accessories }) {
@@ -164,18 +242,12 @@ export function createAvatarRenderer(canvas, emit) {
     current?.vrm?.expressionManager?.setValue(key, weight);
   }
 
-  function setLookTarget({ space, x, y, z }) {
+  function setLookTarget(target) {
+    lookTargetActive = true;
+    lastLookTarget = target;
     // (Re)attach the target object — cleared by clearLookTarget below.
     if (current?.vrm?.lookAt) current.vrm.lookAt.target = lookAtTarget;
-    if (space === 'screen') {
-      // Normalized (0,0)=top-left → NDC, unprojected onto a plane 2m out.
-      const ndc = new THREE.Vector3(x * 2 - 1, -(y * 2 - 1), 0.5);
-      ndc.unproject(camera);
-      const direction = ndc.sub(camera.position).normalize();
-      lookAtTarget.position.copy(camera.position).addScaledVector(direction, 2);
-    } else {
-      lookAtTarget.position.set(x, y, z);
-    }
+    applyLookTarget();
   }
 
   function playClip(id, { loop, fadeSeconds }) {
@@ -228,11 +300,15 @@ export function createAvatarRenderer(canvas, emit) {
       case 'clearLookTarget':
         // Detach entirely: the VRM returns to its idle gaze rather than
         // staying locked onto a target parked at the camera.
+        lookTargetActive = false;
+        lastLookTarget = null;
         if (current?.vrm?.lookAt) current.vrm.lookAt.target = null;
         break;
       case 'playGesture': playClip(command.id, { loop: false, fadeSeconds: command.fadeSeconds }); break;
       case 'playAnimation': playClip(command.id, { loop: command.loop, fadeSeconds: 0 }); break;
       case 'setAccessoryEnabled': setAccessoryEnabled(command.id, command.enabled); break;
+      case 'setCameraFraming': setCameraFraming(command.framing); break;
+      case 'captureThumbnail': captureThumbnail(command); break;
       default:
         sendEvent({ type: 'rendererError', message: `Unknown command type: ${command.type}` });
     }

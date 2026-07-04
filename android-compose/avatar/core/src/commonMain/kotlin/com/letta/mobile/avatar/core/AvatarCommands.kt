@@ -74,3 +74,20 @@ sealed interface AvatarLookTarget {
  * the only contract.
  */
 data class AvatarGesture(val id: String)
+
+/**
+ * How the renderer frames the avatar. Surfaces pick a framing for their
+ * size/shape (a chat-header chip wants [HEADSHOT], a side dock [BUST], a pet
+ * window [FULL_BODY]); renderers map it onto their camera however fits the
+ * model's proportions.
+ */
+enum class AvatarCameraFraming {
+    /** Head and shoulders, tightly framed. */
+    HEADSHOT,
+
+    /** Waist-up. */
+    BUST,
+
+    /** The whole model. */
+    FULL_BODY,
+}

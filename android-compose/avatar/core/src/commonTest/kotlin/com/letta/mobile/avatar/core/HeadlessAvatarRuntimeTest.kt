@@ -203,6 +203,21 @@ class HeadlessAvatarRuntimeTest {
     }
 
     @Test
+    fun cameraFramingIsRecordedGatedAndResetOnUnload() = runTest {
+        val runtime = HeadlessAvatarRuntime()
+
+        runtime.setCameraFraming(AvatarCameraFraming.BUST) // not loaded -> dropped
+        assertEquals(AvatarCameraFraming.FULL_BODY, runtime.cameraFraming)
+
+        runtime.load(model)
+        runtime.setCameraFraming(AvatarCameraFraming.HEADSHOT)
+        assertEquals(AvatarCameraFraming.HEADSHOT, runtime.cameraFraming)
+
+        runtime.unload()
+        assertEquals(AvatarCameraFraming.FULL_BODY, runtime.cameraFraming)
+    }
+
+    @Test
     fun nonFiniteWeightsAreDroppedToZero() = runTest {
         val runtime = HeadlessAvatarRuntime()
         runtime.load(model)
