@@ -52,14 +52,20 @@ object ConversationAdminHandlers {
             return proxy.delete(adminProxyRequest("v1", "conversations", id).build())
         }
 
+        // Letta has no /conversations/{id}/archive|/unarchive sub-resource; archive
+        // state is a field on the conversation, toggled via PATCH /v1/conversations/{id}
+        // with {"archived": bool} (same route + response the HTTP client uses in
+        // ConversationApi.updateConversation). That PATCH returns the updated
+        // Conversation, which IrohAdminRpcConversationListSource decodes. Hitting a
+        // phantom /archive sub-route would 404 and break iroh-mode archive/restore.
         fun archive(params: JsonObject?): JsonElement {
             val id = param(params, "conversation_id") ?: return jsonError("conversation_id required")
-            return proxy.patch(adminProxyRequest("v1", "conversations", id, "archive").build(), params.toString())
+            return proxy.patch(adminProxyRequest("v1", "conversations", id).build(), """{"archived":true}""")
         }
 
         fun restore(params: JsonObject?): JsonElement {
             val id = param(params, "conversation_id") ?: return jsonError("conversation_id required")
-            return proxy.patch(adminProxyRequest("v1", "conversations", id, "unarchive").build(), params.toString())
+            return proxy.patch(adminProxyRequest("v1", "conversations", id).build(), """{"archived":false}""")
         }
 
         fun messageList(params: JsonObject?): JsonElement {

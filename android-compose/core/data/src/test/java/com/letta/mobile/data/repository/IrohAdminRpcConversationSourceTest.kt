@@ -82,14 +82,14 @@ class IrohAdminRpcConversationSourceTest {
         }
         source(archived).setConversationArchived(ConversationId("c"), archived = true)
         assertEquals("conversation.archive", archived.adminRpcCalls.single().method)
-        assertEquals("/v1/conversations/c/archive", archived.adminRpcCalls.single().path)
+        assertEquals("/v1/conversations/c", archived.adminRpcCalls.single().path)
 
         val restored = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ -> ok("""{"id":"c","agent_id":"a","archived":false}""") }
         }
         source(restored).setConversationArchived(ConversationId("c"), archived = false)
         assertEquals("conversation.restore", restored.adminRpcCalls.single().method)
-        assertEquals("/v1/conversations/c/unarchive", restored.adminRpcCalls.single().path)
+        assertEquals("/v1/conversations/c", restored.adminRpcCalls.single().path)
     }
 
     @Test

@@ -113,6 +113,15 @@ open class LettaApiClient @Inject constructor(
         // guard here closes ~30 per-Api call sites at once. Admin reads with an
         // Iroh path route over admin_rpc before ever reaching this client;
         // anything still landing here has no Iroh path and must fail visibly.
+        //
+        // Keys on isIrohUrl(activeConfig) — NOT shouldUseIroh() — deliberately:
+        // shouldUseIroh() also returns true for the debug-only DEBUG_FORCE_IROH_URL
+        // override, but that flag is committed blank and only ever set in throwaway
+        // local builds. This guard reflects the *actual* active backend; purity is
+        // therefore not enforced under a debug-force build (unrouted *Api calls
+        // still hit HTTP). Real Iroh backends (a genuine iroh:// active URL) are
+        // fully covered. The hermetic probe must use a real iroh:// ticket, never
+        // the force flag, to exercise this path.
         if (IrohChannelTransport.isIrohUrl(activeConfig.serverUrl)) {
             throw IrohAdminApiUnavailableException(activeConfig.serverUrl)
         }
