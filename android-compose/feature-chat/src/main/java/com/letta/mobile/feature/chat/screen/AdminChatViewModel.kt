@@ -261,6 +261,17 @@ internal class AdminChatViewModel @Inject constructor(
     @Composable
     private fun present(): ChatUiState {
         val state by _uiState.collectAsState()
+        // letta-mobile-x1xnl: if this VM once owned the visible surface but has
+        // been superseded by a newer AdminChatViewModel for the same
+        // conversation (nav/dual-composition overlap), suppress its message list
+        // so the ghost's stale rows can't render as a stranded duplicate. A VM
+        // that never resumed (token 0) is untouched.
+        if (surfaceOwnerToken != 0L && !currentConversationTracker.isCurrentOwner(surfaceOwnerToken)) {
+            return state.copy(
+                messages = kotlinx.collections.immutable.persistentListOf(),
+                messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
+            )
+        }
         return state
     }
 
@@ -931,12 +942,21 @@ internal class AdminChatViewModel @Inject constructor(
 
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
+    // letta-mobile-x1xnl: owner token claimed when this VM becomes the visible
+    // chat surface. If another AdminChatViewModel later claims the surface (a
+    // navigation/dual-composition overlap), this token is superseded and this
+    // (ghost) VM stops emitting UI, so its stale message list can't render as a
+    // stranded duplicate.
+    @Volatile
+    private var surfaceOwnerToken: Long = 0L
+
     fun onScreenResumed() {
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenResumedAtMs < 200) return
         lastScreenResumedAtMs = now
         val currentId = conversationId?.value
         if (currentId != null) {
+            surfaceOwnerToken = currentConversationTracker.claimOwner()
             currentConversationTracker.setCurrent(currentId)
             val conn = _sessionState.value.connectionState
             if (conn == ChatConnectionState.Offline || conn == ChatConnectionState.StreamDisconnected) {
