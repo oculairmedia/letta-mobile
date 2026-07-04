@@ -169,6 +169,63 @@ class AdminRpcStreamServerTest {
         assertFalse(acceptJob.isCancelled)
     }
 
+    @Test
+    fun oversizedResponseIsChunkedWhenPeerAdvertisedFramePart() = runTest {
+        val bigResult = "x".repeat(1_500)
+        val router = AdminRpcRouter().apply { register("big.get") { JsonPrimitive(bigResult) } }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            firstFrameTimeoutMs = 1_000,
+            maxFrameBytes = 256,
+            peerSupportsFrameParts = { true },
+        )
+        val stream = FakeBiStream()
+
+        val job = launchTracked(server, stream)
+        stream.sendFrame(adminRpc("rpc-big", "big.get"))
+        stream.closeRecv()
+
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("admin_rpc_response", response["type"]?.jsonPrimitive?.content)
+        assertEquals("rpc-big", response["request_id"]?.jsonPrimitive?.content)
+        assertTrue(response["success"]?.jsonPrimitive?.boolean == true)
+        assertEquals(bigResult, response["result"]?.jsonPrimitive?.content)
+        assertTrue(stream.send.writes.size > 1, "response should span multiple frame_part writes")
+        stream.send.writes.forEach { assertTrue(it.size <= 256 + 13, "each part stays within maxFrameBytes + headers") }
+    }
+
+    @Test
+    fun oversizedResponseWithoutFramePartCapabilityReturnsTypedErrorEnvelope() = runTest {
+        val bigResult = "x".repeat(1_500)
+        val router = AdminRpcRouter().apply { register("big.get") { JsonPrimitive(bigResult) } }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            firstFrameTimeoutMs = 1_000,
+            maxFrameBytes = 256,
+            // peerSupportsFrameParts defaults to false (capability-off peer)
+        )
+        val stream = FakeBiStream()
+
+        val job = launchTracked(server, stream)
+        stream.sendFrame(adminRpc("rpc-big", "big.get"))
+        stream.closeRecv()
+
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("admin_rpc_response", response["type"]?.jsonPrimitive?.content)
+        assertEquals("rpc-big", response["request_id"]?.jsonPrimitive?.content)
+        assertTrue(response["success"]?.jsonPrimitive?.boolean == false)
+        val error = response["error"]?.jsonPrimitive?.content.orEmpty()
+        assertTrue("frame_part" in error, "error should name the missing capability: $error")
+        assertTrue("too large" in error, "error should name the size rejection: $error")
+        assertEquals(1, stream.send.writes.size, "capability-off peer must receive a single plain frame")
+    }
+
     private fun TestScope.launchTracked(server: AdminRpcStreamServer, stream: AdminRpcBiStream): Job =
         with(server) { launchHandler(stream) }
 

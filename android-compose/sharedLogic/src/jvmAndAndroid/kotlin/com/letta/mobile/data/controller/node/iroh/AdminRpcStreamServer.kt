@@ -65,6 +65,14 @@ internal class AdminRpcStreamServer(
     private val maxActiveHandlers: Int = DEFAULT_MAX_ACTIVE_HANDLERS,
     private val firstFrameTimeoutMs: Long = DEFAULT_FIRST_FRAME_TIMEOUT_MS,
     private val maxFrameBytes: Int = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
+    /**
+     * Whether the connected peer advertised the `frame_part` capability in its
+     * auth handshake. Responses larger than [maxFrameBytes] are chunked into
+     * frame_part continuations only when this returns true; otherwise they are
+     * replaced by a typed error envelope so old peers fail cleanly instead of
+     * receiving framing they cannot decode.
+     */
+    private val peerSupportsFrameParts: () -> Boolean = { false },
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val permits = Semaphore(maxActiveHandlers)
@@ -115,7 +123,7 @@ internal class AdminRpcStreamServer(
             } else {
                 handleFrame(frameJson)
             }
-            runCatching { sendStream.writeAll(IrohFrameCodec.encodeFrame(response, maxFrameBytes)) }
+            runCatching { writeResponse(sendStream, response) }
                 .onFailure { writeError ->
                     Telemetry.event(
                         "IrohNode", "admin_rpc.stream.error_response_failed",
@@ -144,6 +152,44 @@ internal class AdminRpcStreamServer(
         } finally {
             runCatching { sendStream.finish() }
         }
+    }
+
+    /**
+     * Writes [response] as a single frame when it fits, as frame_part
+     * continuations when the peer negotiated the capability, or — for
+     * oversized responses to capability-off peers — as a small typed error
+     * envelope (never partial/corrupt framing the peer cannot decode).
+     */
+    private suspend fun writeResponse(sendStream: AdminRpcSendStream, response: String) {
+        val payload = response.encodeToByteArray()
+        val buffers = when {
+            payload.size <= maxFrameBytes -> listOf(IrohFrameCodec.encodeFrame(payload, maxFrameBytes))
+            peerSupportsFrameParts() -> IrohFrameCodec.encodeFrameParts(payload, maxFrameBytes)
+            else -> {
+                val requestId = runCatching {
+                    json.parseToJsonElement(response).jsonObject["request_id"]?.jsonPrimitive?.contentOrNull
+                }.getOrNull().orEmpty()
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.stream.response_too_large",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "requestId" to requestId,
+                    "bytes" to payload.size,
+                    "maxFrameBytes" to maxFrameBytes,
+                    level = Telemetry.Level.WARN,
+                )
+                listOf(
+                    IrohFrameCodec.encodeFrame(
+                        errorEnvelope(
+                            requestId,
+                            "admin_rpc response too large: ${payload.size} bytes > max $maxFrameBytes " +
+                                "and peer did not advertise the ${IrohFrameCodec.FRAME_PART_CAPABILITY} capability",
+                        ),
+                        maxFrameBytes,
+                    ),
+                )
+            }
+        }
+        buffers.forEach { sendStream.writeAll(it) }
     }
 
     private suspend fun readOneFrame(recv: AdminRpcRecvStream): String? {
