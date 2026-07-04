@@ -74,6 +74,12 @@ object ConversationAdminHandlers {
                 adminProxyRequest("v1", "conversations", convId, "messages")
                     .query("limit", param(params, "limit"))
                     .query("after", param(params, "after"))
+                    // letta-mobile-71orq: backward pagination (scroll up for
+                    // history) cursors on `before`; the raw HTTP path
+                    // (MessageApi.fetchRecentMessages) hits the same endpoint
+                    // with a `before` query param, so pass it through so
+                    // iroh:// older-message loads mirror HTTP.
+                    .query("before", param(params, "before"))
                     .query("order", param(params, "order"))
                     .build(),
             )
