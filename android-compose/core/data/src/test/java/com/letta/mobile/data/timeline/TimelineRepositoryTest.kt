@@ -149,6 +149,44 @@ class TimelineRepositoryTest {
     }
 
     @Test
+    fun `duplicate external transport frame is dropped at the ingestion boundary`() = runBlocking {
+        // letta-mobile-x1xnl: the Iroh gate fanout can deliver the same stream
+        // frame more than once. The ingestion-boundary idempotency guard keys on
+        // (conversationId, serverId) so a redelivery is dropped while distinct
+        // increments (new ids) pass through.
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+
+        val frame = com.letta.mobile.data.model.AssistantMessage(
+            id = "letta-msg-5785",
+            contentRaw = JsonPrimitive("Hey."),
+            runId = "run-1",
+            otid = "otid-1",
+        )
+        // Same frame delivered twice (the observed double-fanout).
+        repository.ingestExternalTransportMessage("agent-a", "conv-dup", frame)
+        repository.ingestExternalTransportMessage("agent-a", "conv-dup", frame)
+
+        val distinct = com.letta.mobile.data.model.AssistantMessage(
+            id = "letta-msg-5786",
+            contentRaw = JsonPrimitive(" Still here."),
+            runId = "run-1",
+            otid = "otid-1",
+        )
+        // A genuine forward increment (new id) must still be ingested.
+        repository.ingestExternalTransportMessage("agent-a", "conv-dup", distinct)
+
+        val timeline = withTimeout(2_000) {
+            var t = repository.getOrCreate("agent-a", "conv-dup").state.value
+            while (t.events.isEmpty()) { delay(10); t = repository.getOrCreate("agent-a", "conv-dup").state.value }
+            t
+        }
+        assertEquals("duplicate frame must not create a second assistant row", 1, timeline.events.size)
+
+        repository.clearAll()
+    }
+
+    @Test
     fun `unscoped loop promoted to first scoped agent is not reused by different agent`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)

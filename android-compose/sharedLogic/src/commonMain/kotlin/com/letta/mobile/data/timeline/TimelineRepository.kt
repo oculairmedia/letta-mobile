@@ -47,6 +47,41 @@ open class TimelineRepository(
     private val loops = LinkedHashMap<TimelineCacheKey, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
 
+    // letta-mobile-x1xnl: ingestion-boundary idempotency guard for external
+    // (Iroh) transport frames. The Iroh gate fanout can deliver the SAME stream
+    // frame more than once (observed on-device: every incoming letta-msg-* id
+    // logged twice across multiple threads, and a duplicate mid-stream
+    // accumulator row spawning for one otid). Each stream frame carries a unique
+    // server message id, so (conversationId, serverId) is a stable per-frame
+    // identity: a genuine forward increment has a NEW id, a redelivery repeats
+    // the SAME id. Dropping repeats here — before loop resolution — removes the
+    // double-ingest and the loop-aliasing race that spawns the duplicate row,
+    // without affecting distinct increments. Bounded so it can't grow unbounded.
+    private val seenExternalFrameKeys = LinkedHashSet<String>()
+    private val seenExternalFrameKeysMutex = Mutex()
+
+    private suspend fun isDuplicateExternalFrame(conversationId: String, message: com.letta.mobile.data.model.LettaMessage): Boolean {
+        val serverId = message.id
+        if (serverId.isBlank()) return false
+        val key = "$conversationId::$serverId"
+        return seenExternalFrameKeysMutex.withLock {
+            if (!seenExternalFrameKeys.add(key)) {
+                true
+            } else {
+                if (seenExternalFrameKeys.size > MAX_SEEN_EXTERNAL_FRAME_KEYS) {
+                    val iterator = seenExternalFrameKeys.iterator()
+                    var toEvict = seenExternalFrameKeys.size - MAX_SEEN_EXTERNAL_FRAME_KEYS
+                    while (toEvict > 0 && iterator.hasNext()) {
+                        iterator.next()
+                        iterator.remove()
+                        toEvict--
+                    }
+                }
+                false
+            }
+        }
+    }
+
     /** Mutex-guarded LRU get: touches the entry so eviction stays correct. */
     private fun getLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
         val loop = loops.remove(key) ?: return null
@@ -267,6 +302,15 @@ open class TimelineRepository(
         conversationId: String,
         message: com.letta.mobile.data.model.LettaMessage,
     ) {
+        if (isDuplicateExternalFrame(conversationId, message)) {
+            Telemetry.event(
+                "TimelineRepo", "externalFrame.duplicateDropped",
+                "conversationId" to conversationId,
+                "serverId" to message.id,
+                "messageType" to message.messageType,
+            )
+            return
+        }
         getOrCreate(conversationId).ingestStreamEvent(message)
     }
 
@@ -282,6 +326,16 @@ open class TimelineRepository(
             "messageId" to message.id,
             "messageType" to message.messageType,
         )
+        if (isDuplicateExternalFrame(conversationId, message)) {
+            Telemetry.event(
+                "TimelineRepo", "externalFrame.duplicateDropped",
+                "agentId" to agentId.orEmpty(),
+                "conversationId" to conversationId,
+                "serverId" to message.id,
+                "messageType" to message.messageType,
+            )
+            return
+        }
         getOrCreate(agentId, conversationId).ingestStreamEvent(message)
     }
 
@@ -495,6 +549,11 @@ open class TimelineRepository(
     private companion object {
         const val DEFAULT_MAX_CACHED_LOOPS = 32
         const val CURSOR_REPAIR_HYDRATE_LIMIT = 100
+        // Bounded ring of recently-seen external frame ids for the ingestion
+        // idempotency guard (letta-mobile-x1xnl). Large enough to cover a full
+        // streamed turn's worth of per-chunk ids many times over, small enough
+        // to stay negligible in memory.
+        const val MAX_SEEN_EXTERNAL_FRAME_KEYS = 4096
     }
 
     private data class TimelineCacheKey(
