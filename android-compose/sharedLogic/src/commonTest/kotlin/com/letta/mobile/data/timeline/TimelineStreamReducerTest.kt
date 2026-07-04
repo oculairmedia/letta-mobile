@@ -294,6 +294,45 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `same otid never creates a second assistant row via the append path`() {
+        // Defensive one-row-per-otid invariant: if an assistant increment reaches
+        // the append path while a row for its otid already exists (a fanout/timing
+        // race that bypassed the earlier otid merge), it must merge into the
+        // existing row rather than append a stranded duplicate. Simulate by
+        // seeding a row whose serverId will NOT match the incoming frame and whose
+        // otid index is present, then feeding a fuller same-otid frame with a new
+        // serverId.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-5785",
+                contentRaw = JsonPrimitive("Hey, welcome back."),
+                runId = "run-1",
+                otid = "otid-dup",
+                seqId = 10,
+            )
+        ).next
+
+        // A racing increment for the SAME otid but a brand-new serverId and no
+        // detectable prefix relationship — the exact shape that produced the
+        // stranded ", welcome back..." row on-device.
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-5815",
+                contentRaw = JsonPrimitive("Hey, welcome back. Connection seems solid."),
+                runId = "run-1",
+                otid = "otid-dup",
+                seqId = 11,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-5785"
+        event.content shouldBe "Hey, welcome back. Connection seems solid."
+    }
+
+    @Test
     fun `distinct otids in the same run stay separate assistant rows`() {
         // Guard against over-merging: a tool-mediated run can legitimately have
         // multiple assistant messages. They carry DISTINCT otids, so the

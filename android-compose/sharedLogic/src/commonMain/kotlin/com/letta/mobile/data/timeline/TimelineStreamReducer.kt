@@ -325,6 +325,52 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
+    // letta-mobile-x1xnl: one-row-per-otid invariant. The App Server streams
+    // assistant deltas with a NEW backend letta-msg-* id per chunk but a STABLE
+    // otid. If — through a fanout/timing race — an increment reaches the append
+    // path while a row for this otid already exists (the earlier findByOtid
+    // merge above having been bypassed on a prior racing frame), appending would
+    // create a SECOND assistant row for the same message that the user sees as a
+    // stranded duplicate. Never let that happen: if a confirmed assistant row
+    // already carries this otid, merge into it (keyed by its stable serverId)
+    // instead of appending a new row. Distinct assistant messages carry distinct
+    // otids, so tool-mediated multi-assistant runs stay separate.
+    val otidRow = confirmed.otid
+        .takeIf { it.isNotBlank() && confirmed.messageType == TimelineMessageType.ASSISTANT }
+        ?.let { otid ->
+            timeline.events.firstOrNull { ev ->
+                ev is TimelineEvent.Confirmed &&
+                    ev.messageType == TimelineMessageType.ASSISTANT &&
+                    ev.otid == otid
+            } as? TimelineEvent.Confirmed
+        }
+    if (otidRow != null) {
+        val merge = mergeStreamText(
+            existing = otidRow.content,
+            incoming = confirmed.content,
+            canUseSnapshotMerge = otidRow.seqId != null && confirmed.seqId != null,
+            incomingIsForwardDelta = otidRow.seqId == null || confirmed.seqId == null ||
+                confirmed.seqId > otidRow.seqId,
+        )
+        val merged = otidRow.copy(
+            content = merge.text,
+            seqId = latestSeqId(otidRow.seqId, confirmed.seqId),
+        )
+        timeline = timeline.replaceByServerId(merged)
+        timeline = timeline.copy(liveCursor = otidRow.serverId)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(otidRow.serverId, message.messageType)
+        hotPathTelemetry(
+            "streamSubscriber.otidAppendMerged",
+            "otid" to confirmed.otid,
+            "serverId" to otidRow.serverId,
+            "incomingServerId" to confirmed.serverId,
+            "mergedLen" to merge.text.length,
+            "mergeBranch" to merge.branch.name,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
     timeline = timeline.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
     timeline = timeline.copy(liveCursor = confirmed.serverId)
     pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)
