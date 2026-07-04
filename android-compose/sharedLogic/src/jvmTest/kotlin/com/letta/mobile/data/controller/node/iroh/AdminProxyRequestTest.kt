@@ -106,6 +106,44 @@ class AdminProxyRequestTest {
     }
 
     @Test
+    fun archivePatchesBaseConversationResourceWithArchivedTrue() = runTest {
+        val recording = installRecordingTransport()
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, "http://admin.local")
+
+        router.dispatch(
+            requestId = "req-1",
+            method = "conversation.archive",
+            params = buildJsonObject { put("conversation_id", "conv-1") },
+        )
+
+        val call = recording.calls.single()
+        assertEquals("PATCH", call.method)
+        // Letta has no /archive sub-resource; archive is a field toggled via
+        // PATCH /v1/conversations/{id}. A phantom /archive path would 404.
+        assertEquals("http://admin.local/v1/conversations/conv-1", call.url)
+        assertEquals("""{"archived":true}""", call.body)
+    }
+
+    @Test
+    fun restorePatchesBaseConversationResourceWithArchivedFalse() = runTest {
+        val recording = installRecordingTransport()
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, "http://admin.local")
+
+        router.dispatch(
+            requestId = "req-1",
+            method = "conversation.restore",
+            params = buildJsonObject { put("conversation_id", "conv-1") },
+        )
+
+        val call = recording.calls.single()
+        assertEquals("PATCH", call.method)
+        assertEquals("http://admin.local/v1/conversations/conv-1", call.url)
+        assertEquals("""{"archived":false}""", call.body)
+    }
+
+    @Test
     fun queryParamValuesArePercentEncoded() {
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()

@@ -90,13 +90,17 @@ class IrohAdminRpcConversationListSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.delete failed")
     }
 
-    /** Archive (true) or restore/unarchive (false) a conversation. */
+    /**
+     * Archive (true) or restore/unarchive (false) a conversation. The archive
+     * state is a field on the conversation, so both map to the same resource
+     * (`/v1/conversations/{id}`); the method name selects the value the server
+     * handler PATCHes. The handler returns the updated [Conversation].
+     */
     suspend fun setConversationArchived(id: ConversationId, archived: Boolean): Conversation {
         val method = if (archived) "conversation.archive" else "conversation.restore"
-        val suffix = if (archived) "archive" else "unarchive"
         val response = channelTransport.adminRpc(
             method = method,
-            path = "/v1/conversations/${id.value}/$suffix",
+            path = "/v1/conversations/${id.value}",
             body = null,
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc $method failed")
