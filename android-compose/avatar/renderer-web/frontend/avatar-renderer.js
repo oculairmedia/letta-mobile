@@ -13,7 +13,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 const VISEME_KEYS = ['aa', 'ih', 'ou', 'ee', 'oh'];
 
@@ -77,6 +77,7 @@ export function createAvatarRenderer(canvas, emit) {
     // and gaze return to defaults for the next avatar.
     cameraFraming = 'fullBody';
     lookTargetActive = false;
+    lastLookTarget = null;
     if (!current) return;
     scene.remove(current.root);
     VRMUtils.deepDispose(current.root);
@@ -93,6 +94,23 @@ export function createAvatarRenderer(canvas, emit) {
   };
   let cameraFraming = 'fullBody';
   let lookTargetActive = false;
+  let lastLookTarget = null; // { space, x, y, z } — reprojected on reframe
+
+  // Recompute the world-space look target from the last host command using the
+  // CURRENT camera. Screen-space targets must be re-unprojected after any
+  // reframe, or a stationary pointer maps to a stale world point.
+  function applyLookTarget() {
+    if (!lastLookTarget) return;
+    const { space, x, y, z } = lastLookTarget;
+    if (space === 'screen') {
+      const ndc = new THREE.Vector3(x * 2 - 1, -(y * 2 - 1), 0.5);
+      ndc.unproject(camera);
+      const direction = ndc.sub(camera.position).normalize();
+      lookAtTarget.position.copy(camera.position).addScaledVector(direction, 2);
+    } else {
+      lookAtTarget.position.set(x, y, z);
+    }
+  }
 
   function frameCamera(root) {
     const preset = FRAMINGS[cameraFraming] ?? FRAMINGS.fullBody;
@@ -112,8 +130,10 @@ export function createAvatarRenderer(canvas, emit) {
     ) * 1.1;
     camera.position.set(center.x, focusY, center.z + distance);
     camera.lookAt(center.x, focusY, center.z);
-    // Reframing must not stomp an active host-driven gaze target.
-    if (!lookTargetActive) lookAtTarget.position.copy(camera.position);
+    // Reframing must not stomp an active host-driven gaze target — reproject
+    // it through the new camera; only fall back to camera-facing idle gaze.
+    if (lookTargetActive) applyLookTarget();
+    else lookAtTarget.position.copy(camera.position);
   }
 
   function setCameraFraming(framing) {
@@ -222,19 +242,12 @@ export function createAvatarRenderer(canvas, emit) {
     current?.vrm?.expressionManager?.setValue(key, weight);
   }
 
-  function setLookTarget({ space, x, y, z }) {
+  function setLookTarget(target) {
     lookTargetActive = true;
+    lastLookTarget = target;
     // (Re)attach the target object — cleared by clearLookTarget below.
     if (current?.vrm?.lookAt) current.vrm.lookAt.target = lookAtTarget;
-    if (space === 'screen') {
-      // Normalized (0,0)=top-left → NDC, unprojected onto a plane 2m out.
-      const ndc = new THREE.Vector3(x * 2 - 1, -(y * 2 - 1), 0.5);
-      ndc.unproject(camera);
-      const direction = ndc.sub(camera.position).normalize();
-      lookAtTarget.position.copy(camera.position).addScaledVector(direction, 2);
-    } else {
-      lookAtTarget.position.set(x, y, z);
-    }
+    applyLookTarget();
   }
 
   function playClip(id, { loop, fadeSeconds }) {
@@ -288,6 +301,7 @@ export function createAvatarRenderer(canvas, emit) {
         // Detach entirely: the VRM returns to its idle gaze rather than
         // staying locked onto a target parked at the camera.
         lookTargetActive = false;
+        lastLookTarget = null;
         if (current?.vrm?.lookAt) current.vrm.lookAt.target = null;
         break;
       case 'playGesture': playClip(command.id, { loop: false, fadeSeconds: command.fadeSeconds }); break;

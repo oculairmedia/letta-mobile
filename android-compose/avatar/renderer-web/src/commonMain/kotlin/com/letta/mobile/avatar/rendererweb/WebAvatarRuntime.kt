@@ -226,9 +226,12 @@ class WebAvatarRuntime(
         when (event) {
             is AvatarRendererEvent.Ready -> {
                 if (!rendererReady.complete(event.protocolVersion)) {
-                    // Renderer rebooted (e.g. page reload) — the current
-                    // avatar is gone on the far side; surface it for the host
-                    // to decide on a reload.
+                    // Renderer rebooted (e.g. page reload): the page that
+                    // received our in-flight commands is gone and can't answer
+                    // them, so fail pending load/thumbnail waiters now instead
+                    // of leaving callers to time out.
+                    cancelPendingLoad("Renderer rebooted before the load was acknowledged")
+                    cancelPendingThumbnails("Renderer rebooted before the thumbnail was captured")
                     onRendererError(
                         "Renderer re-announced (protocol ${event.protocolVersion}) — a reload may be required",
                     )

@@ -23,7 +23,7 @@ import kotlinx.serialization.json.Json
  * future native renderer (filament-vrm) must satisfy.
  */
 object AvatarWireProtocol {
-    const val VERSION = 1
+    const val VERSION = 2
 
     val json: Json = Json {
         ignoreUnknownKeys = true

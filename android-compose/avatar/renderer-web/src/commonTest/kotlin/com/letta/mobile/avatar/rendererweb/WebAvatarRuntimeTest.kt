@@ -287,6 +287,25 @@ class WebAvatarRuntimeTest {
     }
 
     @Test
+    fun rendererRebootCancelsPendingLoadAndThumbnails() = runTest {
+        val (runtime, transport) = readyRuntime()
+
+        var thumbFailure: Throwable? = null
+        val thumbJob = launch {
+            runCatching { runtime.captureThumbnail() }.onFailure { thumbFailure = it }
+        }
+        runCurrent()
+
+        // The page reloads and re-announces ready — it can't answer the
+        // in-flight capture, so the caller must be failed now, not on timeout.
+        transport.emit(AvatarRendererEvent.Ready(AvatarWireProtocol.VERSION))
+        runCurrent()
+        thumbJob.join()
+
+        assertIs<AvatarWireException>(thumbFailure)
+    }
+
+    @Test
     fun unloadCancelsInFlightThumbnailCaptures() = runTest {
         val (runtime, transport) = readyRuntime()
 
