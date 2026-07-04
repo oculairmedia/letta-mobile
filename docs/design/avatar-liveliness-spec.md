@@ -1,25 +1,28 @@
-# Spec — Avatar Passive Liveliness Pack (Mate-Engine behavior study, clean-room)
+# Spec — Avatar Passive Liveliness Pack (Mate-Engine + VPet behavior study, clean-room)
 
 **Status:** Draft for review · **Date:** 2026-07-04
 **Companion to:** `docs/design/avatar-system-prd.md` (the primitives contract; read §4 P2/P6, §6 state matrix, §8 [NEW-*] vocab first)
 **Scope:** Passive / ambient "liveliness" only — the behaviors that make an idle avatar read as *alive* rather than a frozen model. No new agent-intent tooling, no expression/emotion policy already covered by the director.
+**Genre span studied:** two poles of the desktop-companion genre — **Mate-Engine** (§2) as the *ambient companion* end ("not too distracting," background presence) and **VPet** (§2b) as the *tamagotchi-grade* end (needs simulation, deliberately attention-seeking). Our design sits at the ambient pole but harvests specific mechanics from both.
 
 ---
 
 ## 1. Provenance + license note (READ THIS FIRST)
 
-This spec is a **clean-room functional design**. Its behavior inventory (§2) is drawn from studying **Mate-Engine** (`https://github.com/shinyflvre/Mate-Engine`) and the broader Desktop Mate / Bongo Cat / Codex-pet genre — via public README, wiki manual, DeepWiki, release notes, Steam listings and reviews — to understand *what* ambient behaviors these apps have and *why users like them*.
+This spec is a **clean-room functional design**. Its behavior inventories (§2 Mate-Engine, §2b VPet) are drawn from studying two reference apps and the broader Desktop Mate / Bongo Cat / Tamagotchi-pet genre — via public README, wiki manual, DeepWiki, release notes, Steam listings and reviews — to understand *what* ambient behaviors these apps have and *why users like them*.
 
 **Mate-Engine is AGPL-v3 (dual-licensed AGPL + a proprietary "MateProv2" license), Unity/C#.** Its default avatar is separately "All Rights Reserved."
 
+**VPet (`https://github.com/LorisYounger/VPet`) is Apache-2.0, C#/WPF (.NET).** Its animation *assets* (from the VUP-Simulator team) are separately licensed — attribution required, non-commercial without permission — but the source code itself is permissive Apache-2.0. (Apache-2.0 is *not* copyleft, unlike Mate-Engine's AGPL, so the code-contamination risk is lower — but that changes nothing about our discipline below: we still take behavior only.)
+
 **Hard constraint for every implementer of this spec:**
 
-- **Do NOT copy, translate, transliterate, or closely paraphrase Mate-Engine source code**, component names, class structures, or asset files. AGPL is copyleft; porting their code would virally license our tree.
+- **Do NOT copy, translate, transliterate, or closely paraphrase either project's source code**, component names, class structures, or asset files. This holds regardless of license: AGPL is copyleft (porting Mate-Engine code would virally license our tree); Apache-2.0 is permissive but still requires attribution and — more importantly — a *ported design is not a clean-room design*. We take behavior only, from both.
 - We take **behavior-level inspiration only**: the feature exists, roughly how it feels, roughly what cadence users tolerate. All parameters in §4 are **our own proposals**, chosen to fit our architecture and perf budget — not lifted values.
-- Reading their source to understand a behavior is fine; producing code that derives from it is not. Treat this document as the *only* permitted bridge between their work and ours: everything downstream must trace to this clean-room description, not to their repo.
-- Component/behavior names in this spec (`weight-shift`, `pickup-float`, `window-perch`, …) are **ours**, already seeded in PRD §8 [NEW-BEHAVIOR]. Any resemblance to Mate-Engine identifiers is coincidental and must stay that way.
+- Reading their source to understand a behavior is fine; producing code that derives from it is not. Treat this document as the *only* permitted bridge between their work and ours: everything downstream must trace to this clean-room description, not to their repos.
+- Component/behavior names in this spec (`weight-shift`, `pickup-float`, `window-perch`, …) are **ours**, already seeded in PRD §8 [NEW-BEHAVIOR]. Any resemblance to Mate-Engine or VPet identifiers is coincidental and must stay that way.
 
-Where a Mate-Engine number is cited below (e.g. "≈200 MB RAM bar", "10 idle animations", "hold ≥1 s to sit"), it is quoted as a **market data point for calibration**, not a value to reproduce in code.
+Where a reference number is cited below (e.g. "≈200 MB RAM bar", "10 idle animations", "hold ≥1 s to sit", VPet's "32 types × 4 states × 3 variants"), it is quoted as a **market data point for calibration**, not a value to reproduce in code.
 
 ---
 
@@ -52,6 +55,36 @@ Every *passive / ambient* liveliness behavior observed, described functionally. 
 
 ---
 
+## 2b. VPet behavior inventory (the tamagotchi-grade pole)
+
+**VPet-Simulator** (`https://github.com/LorisYounger/VPet`, Apache-2.0, C#/WPF) is the genre's *other* pole. Where Mate-Engine is an ambient companion that self-consciously stays out of the way ("not too distracting" is its top review praise), VPet is a **needs-driven virtual pet** with a full care loop — mood, hunger, thirst, health, stamina, money, EXP, level, affinity — and is **deliberately attention-seeking**: reviewers describe a "clingy anime girl" who "dances around your screen," is charming precisely *because* she distracts, and (a Valorant player's review) "can very easily cost you a victory." Same genre, opposite thesis. It is enormously popular — ~51k Steam reviews, ~98 % positive — so its choices are well market-tested even where we won't follow them.
+
+Studied via README/Tutorial, the VPet Simulator Wiki (Status / Animations / Messaging), Steam store + reviews, and the plugin/ModMaker docs. Behaviors described functionally, in our own words; all numbers are calibration data points, not values to reproduce.
+
+| Behavior | Trigger | Feel (what it looks like) | Cadence / duration | Anti-annoyance guard (theirs, inferred) |
+|---|---|---|---|---|
+| **Idle auto-actions** | Pet stationary + app "online"/idle | Wanders left/right, "spaces out"/dazes, squats/crouches, sleeps; a large pool of short idle clips | Occasional, idle-gated — "only when the game is idle" | Explicitly idle-only: any interaction preempts them, so they never fight the user |
+| **Wall / ceiling climb** | Auto (idle) or triggered | Pet walks up a screen edge and can hang from the top of the screen / ceiling | Occasional | Novelty accent, not constant; still idle-gated |
+| **Head / body touch** | Click (or repeated click/rub) on head vs. body region | Region-specific happy reaction; converts **Stamina→Mood** (each touch ≈ −2 stamina / +1 mood in their economy) | Per-click, short | Region-gated (head vs body differ); the *cost* (stamina) is a soft self-limit — over-patting drains the pet, discouraging spam |
+| **Pinch / drag / lift / throw** | Grab the body and move it; release with velocity | Pet is picked up and can be flung; lands/settles; physics-y | Duration of drag; settle on release | Physical, user-initiated — no cadence issue; a "throw" is a play interaction, not an accident |
+| **State-driven animation variants** | Mood/health status crosses thresholds | The **same** action plays in a different *state variant*: **Happy / Normal / Poor-Condition / Ill** (their "32 types × 4 states × 3 variants" grid). A low-health pet does its idle/talk/eat animations *sickly*; a high-mood pet does them *brightly* | Continuous; state is the ambient backdrop that colors every clip | The state doesn't add *new* motion spam — it re-skins existing motion, so "the pet feels different today" without extra on-screen noise |
+| **Sickness presence** | Health drops low | Pet visibly ill — droops, can't work/study; a persistent "poor condition" read | Persistent until cared for | Communicates need through *pose/variant*, not a nagging popup |
+| **Messaging / speech** | User opens a chat box, picks one of ~52 preset questions | Pet answers with a random preset reply in a **speech bubble**; grants mood/affinity/EXP | Per-message, user-initiated | Pull, not push — the pet speaks when *asked*; ambient chatter is bounded to short bubbles, not walls of text |
+| **Work / study / activities** | User assigns an activity | Pet performs a long looping activity animation, earns money/EXP | Long, user-scheduled | User owns the schedule; the pet doesn't self-start disruptive activities |
+| **Multiple pets** | User adds more | Several pets coexist on the desktop | Persistent | Opt-in; each is an independent instance |
+| **Themes / mods / workshop** | Steam Workshop + ModMaker + code plugins | Swap the whole character, add animations, items, dialogue, themes, and code-plugin features (clocks, TTS, LLM chat) | — | Near-total customization *without touching core*: content is data (animation folders + config), features are plugins |
+| **Performance envelope** | Global | Stated bar: **200 MB RAM min / 500 MB rec**; well-optimized builds report **<1 % CPU / ~500 MB** at rest, though early versions were review-flagged as "very poorly optimised" | — | Same perf-credibility bar as the rest of the genre; optimization was a *fixed bug*, confirming perf is a product requirement |
+
+**Architecture note (relevant to our P7 mod-space):** VPet cleanly separates **content-as-data** (a pet = a folder of animation image-sequences + config describing which clip maps to which action/state/variant, plus dialogue tables and item definitions — all authorable in the **ModMaker** with no code) from **features-as-code** (**plugins** implementing a plugin interface, hooking menu items / timers / speech / custom windows — e.g. a Pomodoro clock, EdgeTTS voice, or an LLM-chat plugin). The huge, healthy Workshop is downstream of that split: because *behaviors and characters are data*, non-programmers author most of the ecosystem, and only genuinely new *capabilities* need a plugin. This is the strongest external evidence for a **behaviors-as-data** posture in our own P7.
+
+**Genre sentiment (VPet reviews, for calibration):**
+- **Loved:** the care loop and affinity ("she grows on you"), the sheer animation variety, wall/ceiling climb as a delight moment, deep moddability, and — despite the distraction — the emotional pull of a pet that visibly *reacts to how you treat it*.
+- **Tolerated/complained-about:** it *is* distracting (acknowledged, even by fans); early perf was rough before optimization. Notably, the distraction is a *feature* to its audience — the exact opposite of Mate-Engine's "not too distracting" selling point.
+
+**Design lesson distilled (VPet):** state should **color existing motion, not add new motion** — the 4-state variant grid makes the pet feel responsive to its condition *without* spamming the screen. Interaction cost (stamina drain per pat) is an elegant self-limiter. And a **data-first content model** is what actually produces a modding ecosystem. The cautionary lesson is the mirror image of Mate-Engine's praise: a needs-simulation that demands care and self-starts activities buys engagement at the price of distraction — a trade we decline (§3, §4d).
+
+---
+
 ## 3. Gap analysis — what we already have vs. the genre
 
 Grounded in the current tree (worktree `letta-mobile-avatar-core`, branch state at the P4 spike + built-in gesture set):
@@ -79,6 +112,31 @@ Grounded in the current tree (worktree `letta-mobile-avatar-core`, branch state 
 - **Determinism:** all randomness flows from the director's injected seeded `Random`; all timing from `tick(delta)` deltas. This is already the contract (see `AvatarDirector` header) and every new behavior must preserve it so tests can drive it with a fixed seed + fixed steps.
 - **Capability-gated:** every behavior branches on `AvatarCapabilities`, never on model type. Non-humanoid GLB mascots get the `mascot-motion-set` fallback, never humanoid-bone poses.
 - **P6 guardrails are enforced in core**, not by etiquette: attention max 1×/task, quiet-hours suppression, opt-in cursor-follow/click-through, zero focus steal.
+
+---
+
+## 3b. VPet synthesis — reinforce / adopt / skip
+
+Cross-referencing §2b against what the doc already recommends. Three buckets.
+
+### (1) VPet **reinforces** recommendations already in this spec
+- **Drag/pickup + throw physics** → reinforces **pickup-float** (§4c). VPet's grab-and-fling with a settle confirms the "lift a light plush" feel is the genre-standard drag reaction; our spring-bone-free-swing + settle-bounce is the same intent, calibrated softer.
+- **Wall/ceiling climb + edge perching** → reinforces **window-perch / taskbar-sit** (§4c). Both poles converge on *edge-attachment as a delight moment*. VPet's climb is flashier; we keep the calmer Mate-Engine "perch," but VPet is independent evidence the mechanic lands.
+- **Idle-only auto-actions (wander/daze/crouch)** → reinforces **idle variety** (§4b) and the **idle-gating discipline** (§4b P6 guard). VPet's "only when idle, any interaction preempts" is exactly our "never fire while a higher-priority state is active."
+- **Perf bar** → reinforces §6 / PRD §7. VPet's 200 MB-min / 500 MB-rec bar and its early-optimization review-flagging independently re-confirm the ≈200 MB budget as a *product* requirement, not a nicety.
+- **Data-first modding** → reinforces our P7 [NEW-PROTOCOL] mod-space intent (PRD §8) — see (2) for the upgrade it argues for.
+
+### (2) VPet behaviors **new** and worth adopting into our vocabulary
+- **[NEW-BEHAVIOR state-variant] — state colors motion, not adds it.** VPet's biggest transferable idea: the *same* idle/gesture clip plays in a **mood/health-tinted variant** rather than the pet gaining extra distinct motions. Mapped to **our 12-state director**: our director already owns the state; this says the *renderer's baseline mechanics + clip playback should accept a director-supplied "affect tint"* (e.g. a global posture/energy bias + expression floor) so THINKING/ERROR/SLEEPING/etc. re-skin ambient motion (slumped + dimmer under ERROR, brighter + livelier under a "good" state) **without new clips**. This is a low-cost, high-legibility win and stays inside our mechanism/policy split — the tint is a director parameter, the curve is renderer math. Folded into the implementation slices (§5 PR 2/PR 3 gain an `affectTint` input; see §5).
+- **[NEW-PROTOCOL behaviors-as-data] — mod-space is data, not just code.** VPet proves an ecosystem forms when *characters and behavior mappings are authorable data* (animation folder + config table: action→clip, state→variant) and only new *capabilities* are code plugins. Our P7 should adopt the same split explicitly: a **behavior/clip manifest** (which clip id plays for which action/state, cadence hints, capability flags) as declarative data the director reads, distinct from **code-level plugins** for genuinely new mechanics. This strengthens — and gives concrete shape to — the P7 mod-space already gestured at in the PRD. (Design intent only; no P7 build in this pack.)
+- **[NEW-BEHAVIOR interaction-cost self-limit]** — a soft idea to carry into the deferred touch work (§4d): VPet's per-pat stamina drain is an elegant *organic* anti-spam guard (over-patting has a diminishing/negative return) versus a hard rate-limit. When `touch.regions` lands, a gentle "the pet tires of repeated pats" damping is a nicer feel than a hard cooldown. Noted, not yet specced.
+- **Speech bubbles / messaging** — VPet's ask-and-answer speech bubble maps onto an affordance **we already shipped**: the **pet CHAT slice** (reply popup + streaming bubble) landed in our stack. VPet validates the *pull, not push* discipline (the pet speaks when asked; ambient chatter stays short-bubble). No new liveliness work implied — but the liveliness director should treat an active chat reply as a higher-priority state that suspends idle variety (same rule as any SPEAKING state; already covered by §4b's "never fire while a higher-priority state is active").
+
+### (3) VPet behaviors we **deliberately skip**
+- **Needs/stats simulation (hunger / thirst / health / stamina / money / decay-over-time)** — *skipped.* This is the core of VPet's tamagotchi thesis and squarely against ours: our avatar is a **presence layer for a real agent**, not a pet to be fed. The agent's **actual state — thinking, running tools, streaming, erroring, idle — is our "simulation."** We get emotional legibility from *real* signal, not a synthetic care loop; inventing hunger would be noise competing with genuine agent state. (We *do* keep the *presentation* trick — state-variant tinting, (2) — just driven by agent state, not fake needs.)
+- **Care-loop obligations & self-started activities (work/study, "the pet gets sick if neglected")** — *skipped.* Guilt-driven engagement and a pet that self-starts long disruptive activities are the opposite of "ambient, non-distracting, zero focus-steal" (P6). Our avatar must never demand maintenance or grab attention to satisfy a need.
+- **Deliberately-distracting dance/attention-seeking** — *skipped* (already a PRD non-goal; §2b just re-confirms it's a real fork in the genre). VPet's "cost you a victory" charm is explicitly not our target; we sit at the ambient pole.
+- **Preset canned-dialogue Q&A tables** — *skipped as a liveliness feature.* Our chat is a *real agent*, not 52 preset answers; the shipped pet CHAT slice already supersedes this with live streaming replies.
 
 ---
 
@@ -164,7 +222,7 @@ These require the desktop pet host (`PetWindowSpike.kt` and successors), not jus
 
 | Deferred behavior | Why deferred | When it lands |
 |---|---|---|
-| **Touch / head-pat / poke reactions** | Needs [NEW-PROTOCOL] `touch.regions`: per-model region map + a `touch(region)` event out of the renderer (PRD P1/§8). Not yet built. | Ties to `touch.regions`. When it lands: head-pat → happy 0.5 wt 1.5 s (PRD row); body → poke-response. Trigger should require a **deliberate gesture** (circular/back-and-forth over the head region), not a single click, to avoid incidental firing — a genre lesson worth copying at the *policy* level. Determinism: the *event* is user input; the *reaction* is a seeded-free fixed response. P6: reactions are user-initiated so no attention budget, but must respect SLEEPING (a sleeping pet stirs, doesn't fully perform). |
+| **Touch / head-pat / poke reactions** | Needs [NEW-PROTOCOL] `touch.regions`: per-model region map + a `touch(region)` event out of the renderer (PRD P1/§8). Not yet built. | Ties to `touch.regions`. When it lands: head-pat → happy 0.5 wt 1.5 s (PRD row); body → poke-response. Trigger should require a **deliberate gesture** (circular/back-and-forth over the head region), not a single click, to avoid incidental firing — a genre lesson worth copying at the *policy* level. **Interaction-cost self-limit [NEW-BEHAVIOR, from VPet §3b(2)]:** instead of a hard cooldown, damp repeated pats organically (the pet gradually "tires" of being patted and the reaction softens), which feels warmer than a rate-gate. Determinism: the *event* is user input; the *reaction* is a seeded-free fixed response; the damping is a pure function of recent-touch accumulation. P6: reactions are user-initiated so no attention budget, but must respect SLEEPING (a sleeping pet stirs, doesn't fully perform). |
 | **Dance / audio reactivity** | Explicit PRD non-goal this phase ("dance-to-music" in §2 non-goals). Also raises perf + audio-capture + per-app-whitelist complexity, and the whole-body motion is the *opposite* of "ambient/background." | Future. If ever built: gate on an explicit user toggle + volume threshold + app whitelist (genre pattern), idle-only, seeded clip shuffle via the director. |
 
 ---
@@ -179,14 +237,16 @@ The current `AvatarActivity` enum has 5 states; the PRD director is 12. This pac
 - Tests: state-transition + priority (DRAGGED/SLEEPING override) in `AvatarDirectorTest`.
 - No renderer change. Pure policy.
 
-**PR 1 — Renderer baseline mechanics: body-lean + idle-gaze offsets (mechanism-only).**
+**PR 1 — Renderer baseline mechanics: body-lean + idle-gaze offsets + affect-tint (mechanism-only).**
 - `avatar-renderer.js`: add `setBodyLean(x,y)` and `setIdleGaze(x,y)` commands; apply as additive offsets in `applyRestAndBreathing`, suspended while `clipDriving()`; amplitude-clamped; **no RNG, no timers**. Add a director-set `breathRateMultiplier` for the sleep slowdown.
+- **Affect-tint hook [NEW-BEHAVIOR state-variant] (from VPet §3b(2)):** add a `setAffectTint(energy, posture)` command — a small pair of director-supplied biases (energy ∈ [0..1] scales breathing/idle amplitude + blink liveliness; posture ∈ [-1..1] adds a slump/uplift to the rest-pose lean). Applied as a clamped modulation of the *existing* baseline curves, **not a new clip** — so agent state (ERROR = slumped/dim, healthy-idle = brighter) re-skins ambient motion for free. Pure mechanism, amplitude-clamped, RNG-free.
 - `avatar/renderer-web/.../AvatarWireProtocol.kt` + `WebAvatarRuntime.kt` + `AvatarRuntime.kt`: add the pass-through methods.
-- Renderer test: offsets apply/clamp/suspend correctly (headless or the existing web runtime test).
+- Renderer test: offsets apply/clamp/suspend correctly; affect-tint modulates amplitude within clamp and never introduces new motion (headless or the existing web runtime test).
 
-**PR 2 — Director-driven micro weight-shift + idle head-drift (§4a policy).**
+**PR 2 — Director-driven micro weight-shift + idle head-drift + affect-tint mapping (§4a policy).**
 - `AvatarDirector.kt`: seeded cadence picks lean + drift targets while IDLE; ease off on state exit; feed via the PR 1 commands. Config values (6–10 s / 4–7 s, amplitudes) in `Config`.
-- Tests: seeded `Random` + fixed steps reproduces the target sequence; nothing fires outside IDLE; head-drift yields to a host look target.
+- **Affect-tint policy (VPet §3b(2)):** map each of the 12 director states to an `(energy, posture)` tint and feed it via PR 1's `setAffectTint` (e.g. ERROR → low energy / slump; SLEEPING → lowest; a good/idle backdrop → neutral-bright). Deterministic function of state, no RNG. This is the "state colors motion, not adds it" win, driven by **real agent state** rather than fake needs.
+- Tests: seeded `Random` + fixed steps reproduces the target sequence; nothing fires outside IDLE; head-drift yields to a host look target; each state maps to its expected tint and the tint changes on state transition.
 - Delivers the PRD §6 IDLE "weight-shift ~8s" contract.
 
 **PR 3 — Idle variety scheduler (§4b).**
@@ -217,9 +277,9 @@ The current `AvatarActivity` enum has 5 states; the PRD director is 12. This pac
 - No renderer change (screen-space path exists). Director just relays.
 - Tests: off-by-default; suppressed under SLEEPING; idle drift resumes when off.
 
-**Deferred (separate future initiatives, not in this pack):** touch.regions + head-pat/poke (§4d), dance/audio (§4d). File nothing now beyond a tracking issue.
+**Deferred (separate future initiatives, not in this pack):** touch.regions + head-pat/poke incl. the interaction-cost self-limit (§4d), dance/audio (§4d), and the **behaviors-as-data mod manifest** for P7 (§3b(2) [NEW-PROTOCOL behaviors-as-data] — VPet's data-first content model is the template; design intent only, no build here). File nothing now beyond tracking issues.
 
-**Ordering rationale:** PR 0 unblocks everything (states). PRs 1–3 are pure in-renderer+director "always-alive" wins with no OS work — they make *every* surface (bust/dock/pet) livelier and are the cheapest, safest first slices. PRs 4–7 add OS-integrated pet delight in rising integration cost, ending on the highest-value/highest-effort **window-perch**. Every PR keeps the renderer RNG-free and the director seeded, so the whole pack stays deterministic and testable.
+**Ordering rationale:** PR 0 unblocks everything (states). PRs 1–3 are pure in-renderer+director "always-alive" wins with no OS work — they make *every* surface (bust/dock/pet) livelier and are the cheapest, safest first slices; PRs 1–2 also carry the **affect-tint** (state-colors-motion) win folded in from VPet, so agent state re-skins ambient motion at near-zero extra cost. PRs 4–7 add OS-integrated pet delight in rising integration cost, ending on the highest-value/highest-effort **window-perch**. Every PR keeps the renderer RNG-free and the director seeded, so the whole pack stays deterministic and testable.
 
 ---
 
@@ -234,4 +294,5 @@ The current `AvatarActivity` enum has 5 states; the PRD director is 12. This pac
 - [ ] Attention behaviors (none here except future touch) obey the 1×/task budget; ambient behaviors are low-amplitude and pause under occlusion.
 - [ ] Pet window: zero focus steal, no clicks captured while unhovered, no process injection (window-rect enumeration only).
 - [ ] Amplitudes clamped in the renderer so a bad director value can't produce a violent sway.
+- [ ] Affect-tint (§3b(2)/PR 1–2) only *modulates* existing baseline curves — it adds no new clip/motion, is clamped, and is a pure function of director state (driven by real agent state, never a synthetic need).
 - [ ] Perf: everything pauses when the render loop pauses (occlusion/off-display); idle variety amplitudes stay small; targets the ≈200 MB / capped-FPS budget (PRD §7).
