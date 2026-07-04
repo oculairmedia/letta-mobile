@@ -29,6 +29,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -395,6 +396,7 @@ class WsChatSendCoordinatorTest {
         assertEquals(true, uiState.value.isAgentTyping)
         assertEquals(emptyList<FakeTimelineExternalTransportWriter.LocalMarker>(), timelineRepository.failedLocals)
         assertEquals(emptyList<String>(), timelineRepository.clearedActiveConversations)
+        assertEquals(emptyList<FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup>(), timelineRepository.abandonedFragmentCleanups)
 
         coordinator.handleEvent(WsTimelineEvent.SubscribeDone(runId = "run-1", lastSeq = 42L, status = "failed"))
         advanceUntilIdle()
@@ -439,6 +441,96 @@ class WsChatSendCoordinatorTest {
         assertEquals(true, uiState.value.isAgentTyping)
         assertEquals(emptyList<FakeTimelineExternalTransportWriter.LocalMarker>(), timelineRepository.failedLocals)
         assertEquals(emptyList<String>(), timelineRepository.clearedActiveConversations)
+        assertEquals(emptyList<FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup>(), timelineRepository.abandonedFragmentCleanups)
+    }
+
+    @Test
+    fun `terminal disconnect with no active turn does not cleanup abandoned fragments`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.handleEvent(WsTimelineEvent.Disconnected(code = 1008, reason = "auth closed", isAuthFailure = true))
+        advanceUntilIdle()
+
+        assertEquals(emptyList<FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup>(), timelineRepository.abandonedFragmentCleanups)
+        assertEquals(listOf(FakeTimelineExternalTransportWriter.ScopedConversation("agent-1", "conv-1")), timelineRepository.scopedClearedActiveConversations)
+        assertEquals("auth closed", uiState.value.error)
+    }
+
+    @Test
+    fun `cleanup cancellation propagates from failed turn`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter().apply {
+            cleanupFailure = CancellationException("cancel cleanup")
+        }
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true)),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", "agent-1", "conv-1", "run-1"))
+
+        var cancellationPropagated = false
+        try {
+            coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        } catch (_: CancellationException) {
+            cancellationPropagated = true
+        }
+
+        assertTrue(cancellationPropagated)
+    }
+
+    @Test
+    fun `synthetic terminal run cleanup includes observed real assistant run id`() = runTest {
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = MutableStateFlow(ChatUiState(agentName = "Agent", isStreaming = true, isAgentTyping = true)),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("one").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", "agent-1", "conv-1", "iroh-run-1"))
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "msg-1", contentRaw = JsonPrimitive("I"), runId = "run-app")))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "iroh-run-1", status = "failed"))
+        advanceUntilIdle()
+
+        val cleanup = timelineRepository.abandonedFragmentCleanups.single()
+        assertEquals("iroh-run-1", cleanup.runId)
+        assertEquals(setOf("iroh-run-1", "run-app"), cleanup.candidateRunIds)
     }
 
     @Test

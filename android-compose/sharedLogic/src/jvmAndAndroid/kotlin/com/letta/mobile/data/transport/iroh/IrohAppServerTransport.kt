@@ -12,21 +12,23 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.PathChangeCallback
 import computer.iroh.PathEventCallback
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -71,6 +73,9 @@ class IrohAppServerTransport(
     private lateinit var controlBiStream: BiStream
     private lateinit var streamBiStream: BiStream
     private var pathWatchJob: Job? = null
+    private val readerExitReported = AtomicBoolean(false)
+    private val legacyAdminRpcResponsesMutex = Mutex()
+    private val legacyAdminRpcResponses = mutableMapOf<String, CompletableDeferred<AppServerInboundFrame.AdminRpcResponse>>()
     private val connectionReady = CompletableDeferred<Unit>()
     private val streamReady = CompletableDeferred<Unit>()
 
@@ -148,21 +153,83 @@ class IrohAppServerTransport(
     }
 
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        connectionReady.await()
         val requestId = "admin-${UUID.randomUUID()}"
         val params = adminRpcParams(path = path, body = body)
-        val response = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
-            coroutineScope {
-                val awaited = async {
-                    controlFrames.first { received ->
-                        val frame = received.frame
-                        frame is AppServerInboundFrame.AdminRpcResponse && frame.requestId == requestId
-                    }.frame as AppServerInboundFrame.AdminRpcResponse
-                }
-                sendControl(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-                awaited.await()
+        return try {
+            adminRpcOverStream(requestId, method, path, params)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (streamError: Throwable) {
+            if (!method.isLegacyFallbackSafeAdminRpcMethod()) {
+                Telemetry.event(
+                    "IrohTransport", "admin_rpc.stream.fallback_skipped",
+                    "method" to method,
+                    "path" to path,
+                    "requestId" to requestId,
+                    "error" to (streamError.message ?: streamError.toString()),
+                    "class" to streamError::class.simpleName,
+                )
+                throw streamError
             }
-        } ?: error("admin_rpc timed out for method=$method path=$path")
-        return response
+            Telemetry.event(
+                "IrohTransport", "admin_rpc.stream.fallback_control",
+                "method" to method,
+                "path" to path,
+                "requestId" to requestId,
+                "error" to (streamError.message ?: streamError.toString()),
+                "class" to streamError::class.simpleName,
+            )
+            adminRpcOverControl(requestId, method, params)
+        }
+    }
+
+    private suspend fun adminRpcOverStream(
+        requestId: String,
+        method: String,
+        path: String,
+        params: JsonObject,
+    ): AppServerInboundFrame.AdminRpcResponse = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
+        val biStream = connection.openBi()
+        val sendStream = biStream.send()
+        var sendFinished = false
+        Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" to method, "path" to path, "requestId" to requestId)
+        try {
+            val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
+            IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES)
+            sendStream.finish()
+            sendFinished = true
+            val rawResponse = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
+                ?: error("admin_rpc stream closed before response for method=$method path=$path")
+            val response = decodeFrame(rawResponse, AppServerChannel.Control).frame
+            val adminResponse = response as? AppServerInboundFrame.AdminRpcResponse
+                ?: error("admin_rpc expected admin_rpc_response but received ${response.type}")
+            Telemetry.event("IrohTransport", "admin_rpc.stream.complete", "method" to method, "path" to path, "requestId" to requestId, "success" to adminResponse.success.toString())
+            adminResponse
+        } catch (error: Throwable) {
+            Telemetry.event("IrohTransport", "admin_rpc.stream.failed", "method" to method, "path" to path, "requestId" to requestId, "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+            throw error
+        } finally {
+            if (!sendFinished) {
+                runCatching { sendStream.finish() }
+            }
+        }
+    } ?: error("admin_rpc timed out for method=$method path=$path")
+
+    private suspend fun adminRpcOverControl(
+        requestId: String,
+        method: String,
+        params: JsonObject,
+    ): AppServerInboundFrame.AdminRpcResponse {
+        val pending = CompletableDeferred<AppServerInboundFrame.AdminRpcResponse>()
+        legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses[requestId] = pending }
+        return try {
+            sendControl(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
+            withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) { pending.await() }
+                ?: error("legacy admin_rpc timed out for method=$method")
+        } finally {
+            legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(requestId) }
+        }
     }
 
     suspend fun close() {
@@ -257,6 +324,9 @@ class IrohAppServerTransport(
             ) { json ->
                 val frame = decodeFrame(json, channel)
                 Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
+                if (channel == AppServerChannel.Control && completeLegacyAdminRpcIfPending(frame)) {
+                    return@readAll
+                }
                 sink.emit(frame)
             }
         } catch (error: IrohFrameCodec.ProtocolException) {
@@ -276,9 +346,18 @@ class IrohAppServerTransport(
             )
             throw error
         } finally {
-            Telemetry.event("IrohTransport", "frame.reader_stop", "channel" to channel.name)
-            onConnectionLost("reader_stopped:${channel.name}")
+            reportReaderExit(channel, "reader_stopped:${channel.name}")
         }
+    }
+
+    private fun reportReaderExit(channel: AppServerChannel, reason: String) {
+        if (!readerExitReported.compareAndSet(false, true)) return
+        Telemetry.event(
+            "IrohSupervisor", "reader.exit",
+            "channel" to channel.name,
+            "reason" to reason,
+        )
+        onConnectionLost(reason)
     }
 
     private fun attachPathWatchers() {
@@ -317,6 +396,32 @@ class IrohAppServerTransport(
         }.onFailure { error ->
             Telemetry.event("IrohTransport", "path_events.watch_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
         }
+    }
+
+    private suspend fun completeLegacyAdminRpcIfPending(frame: AppServerReceivedFrame): Boolean {
+        val response = frame.frame as? AppServerInboundFrame.AdminRpcResponse ?: return false
+        val pending = legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(response.requestId) }
+        pending?.complete(response)
+        return pending != null
+    }
+
+    private fun String.isLegacyFallbackSafeAdminRpcMethod(): Boolean = when (this) {
+        "health.check",
+        "conversation.list",
+        "message.list",
+        "message.get",
+        "goal.get",
+        "agent.list",
+        "agent.get",
+        "archive.list",
+        "identity.list",
+        "model.list",
+        "schedule.list",
+        "tool.list",
+        "mcp.list",
+        "run.list",
+        "run.get" -> true
+        else -> false
     }
 
     private fun adminRpcParams(path: String, body: String?): JsonObject = buildJsonObject {

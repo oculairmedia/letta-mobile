@@ -950,6 +950,187 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `terminal failed turn cleanup removes one character assistant fragment`() {
+        val withFull = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("I can help clean up the lifecycle."),
+                runId = "run-terminal",
+                seqId = 12,
+            ),
+        ).next
+        val withFragment = withFull.append(
+            (AssistantMessage(
+                id = "assistant-orphan-i",
+                contentRaw = JsonPrimitive("I"),
+                runId = "run-terminal",
+                seqId = 13,
+            ).toTimelineEvent(position = withFull.nextLocalPosition())!!),
+        )
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed").timeline
+
+        cleaned.events shouldHaveSize 1
+        val event = cleaned.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-full"
+        event.content shouldBe "I can help clean up the lifecycle."
+    }
+
+    @Test
+    fun `terminal disconnect cleanup removes strict prefix assistant fragment`() {
+        val withFull = reduce(
+            frame = AssistantMessage(
+                id = "assistant-full",
+                contentRaw = JsonPrimitive("Nah, that was the full response."),
+                runId = "run-disconnect",
+                seqId = 20,
+            ),
+        ).next
+        val withFragment = withFull.append(
+            AssistantMessage(
+                id = "assistant-orphan-n",
+                contentRaw = JsonPrimitive("N"),
+                runId = "run-disconnect",
+                seqId = 21,
+            ).toTimelineEvent(position = withFull.nextLocalPosition())!!,
+        )
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("run-disconnect", "turn-disconnect", "disconnect").timeline
+
+        cleaned.events shouldHaveSize 1
+        (cleaned.events.single() as TimelineEvent.Confirmed).serverId shouldBe "assistant-full"
+    }
+
+    @Test
+    fun `terminal failed turn cleanup removes sole one character assistant fragment`() {
+        val withFragment = reduce(
+            frame = AssistantMessage(
+                id = "assistant-orphan-i",
+                contentRaw = JsonPrimitive("I"),
+                runId = "local-run-terminal",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments("iroh-run-terminal", "turn-terminal", "turn_done_failed").timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+
+    @Test
+    fun `terminal cleanup with synthetic run id removes observed real run fragment`() {
+        val withFragment = reduce(
+            frame = AssistantMessage(
+                id = "assistant-real-run-fragment",
+                contentRaw = JsonPrimitive("I"),
+                runId = "run-app",
+                seqId = 1,
+            ),
+        ).next
+
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments(
+            runId = "iroh-run-terminal",
+            turnId = "turn-terminal",
+            reason = "turn_done_failed",
+            candidateRunIds = setOf("run-app"),
+        ).timeline
+
+        cleaned.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `abandoned fragment suppression prevents recent reconcile reinsert`() {
+        val withFragment = reduce(
+            frame = AssistantMessage(
+                id = "assistant-orphan-reconcile",
+                contentRaw = JsonPrimitive("I"),
+                runId = "run-reconcile",
+                seqId = 1,
+            ),
+        ).next
+        val cleaned = withFragment.cleanupAbandonedAssistantFragments(
+            runId = "run-reconcile",
+            turnId = "turn-reconcile",
+            reason = "turn_done_failed",
+        ).timeline
+
+        val (mergedTimeline, changed) = cleaned.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    id = "assistant-orphan-reconcile",
+                    contentRaw = JsonPrimitive("I"),
+                    runId = "run-reconcile",
+                    seqId = 1,
+                )
+            )
+        )
+
+        changed shouldBe 0
+        mergedTimeline.events shouldHaveSize 0
+    }
+
+    @Test
+    fun `terminal cleanup only removes tail assistant fragments`() {
+        val earlier = reduce(
+            frame = AssistantMessage(
+                id = "assistant-ok",
+                contentRaw = JsonPrimitive("OK"),
+                runId = "run-terminal",
+                seqId = 1,
+            ),
+        ).next
+        val withToolCall = earlier.append(
+            ToolCallMessage(
+                id = "tool-call",
+                toolCall = ToolCall(toolCallId = "call-1", name = "noop", arguments = "{}"),
+                runId = "run-terminal",
+            ).toTimelineEvent(position = earlier.nextLocalPosition())!!,
+        )
+        val cleaned = withToolCall.cleanupAbandonedAssistantFragments("run-terminal", "turn-terminal", "turn_done_failed").timeline
+
+        cleaned.events shouldHaveSize 2
+        (cleaned.events.first() as TimelineEvent.Confirmed).serverId shouldBe "assistant-ok"
+    }
+
+    @Test
+    fun `successful post tool one character continuation is preserved before terminal cleanup`() {
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "assistant-before-tool",
+                contentRaw = JsonPrimitive("Yes — earlier answer before tool."),
+                runId = "run-success",
+                seqId = 1,
+            ),
+        ).next
+        val withContinuation = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "assistant-post-tool",
+                contentRaw = JsonPrimitive("Y"),
+                runId = "run-success",
+                seqId = 1,
+                otid = "post-tool",
+            ),
+        ).next
+        val completed = reduce(
+            prev = withContinuation,
+            frame = AssistantMessage(
+                id = "assistant-post-tool",
+                contentRaw = JsonPrimitive("es, that worked."),
+                runId = "run-success",
+                seqId = 2,
+                otid = "post-tool",
+            ),
+        ).next
+
+        completed.events shouldHaveSize 2
+        val event = completed.events.last() as TimelineEvent.Confirmed
+        event.serverId shouldBe "assistant-post-tool"
+        event.content shouldBe "Yes, that worked."
+    }
+
+    @Test
     fun `semantic duplicate detection stays bounded on long histories`() {
         val longHistory = Timeline(
             conversationId = "conv-test",
