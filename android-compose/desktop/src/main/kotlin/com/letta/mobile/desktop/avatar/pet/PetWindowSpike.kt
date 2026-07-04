@@ -41,6 +41,10 @@ import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarFormat
 import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarModel
+import com.letta.mobile.avatar.catalog.AvatarCatalog
+import com.letta.mobile.avatar.catalog.AvatarCatalogCodec
+import com.letta.mobile.avatar.catalog.JsonFileAvatarCatalogStore
+import com.letta.mobile.avatar.pipeline.resolveCatalogUri
 import com.letta.mobile.avatar.rendererweb.AvatarWebHost
 import com.letta.mobile.avatar.rendererweb.WebAvatarRuntime
 import com.letta.mobile.desktop.avatar.defaultAvatarCatalogDir
@@ -52,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 /**
@@ -67,12 +72,20 @@ import kotlinx.coroutines.withContext
  *  - drag-anywhere window moving while the avatar stays live.
  *
  * Run: `./gradlew :desktop:runPetSpike [-PpetVrm=path\to\model.vrm]`
- * Defaults to the imported catalog sample. First run downloads the CEF
- * bundle (~200MB) to `~/.letta-mobile/jcef-bundle`.
+ * Without an override it uses the first entry in the imported avatar catalog
+ * (`~/.letta-mobile/avatars`); import a `.vrm` via the desktop Avatar library
+ * first, or pass `-PpetVrm`. First run downloads the CEF bundle (~200MB) to
+ * `~/.letta-mobile/jcef-bundle`.
  */
 fun main(args: Array<String>) {
-    val vrmPath = args.firstOrNull()?.let(Path::of)
-        ?: defaultAvatarCatalogDir().resolve("assets").resolve("sample-three-vrm.vrm")
+    val vrmPath = args.firstOrNull()?.let(Path::of) ?: resolveDefaultAvatar()
+    if (vrmPath == null) {
+        System.err.println(
+            "[pet] No avatar found. Import a .vrm/.glb into the desktop Avatar library " +
+                "(~/.letta-mobile/avatars) or pass -PpetVrm=path\\to\\model.vrm.",
+        )
+        return
+    }
     application {
         val state = rememberWindowState(
             width = 380.dp,
@@ -93,6 +106,28 @@ fun main(args: Array<String>) {
             PetSpikeContent(vrmPath = vrmPath, window = window, onClose = ::exitApplication)
         }
     }
+}
+
+/**
+ * Resolve the avatar to show when no `-PpetVrm` override is supplied: the first
+ * entry of the imported catalog, resolved to its on-disk asset. Returns null
+ * when the catalog is empty or its asset can't be resolved — the imports write
+ * `<slug>-<hash>.<ext>` under `assets/`, so there's no fixed filename to guess.
+ */
+private fun resolveDefaultAvatar(): Path? {
+    val catalogDir = defaultAvatarCatalogDir()
+    val catalog = AvatarCatalog(
+        JsonFileAvatarCatalogStore(catalogDir.resolve(AvatarCatalogCodec.FILE_NAME)),
+    )
+    val model = runBlocking {
+        runCatching {
+            catalog.refresh()
+            catalog.entries.value.firstOrNull()
+        }.getOrNull()
+    } ?: return null
+    return runCatching { resolveCatalogUri(catalogDir, model.uri) }
+        .getOrNull()
+        ?.takeIf(Files::isRegularFile)
 }
 
 private data class Viewport(val widthDip: Int, val heightDip: Int, val scale: Double, val x: Int, val y: Int)

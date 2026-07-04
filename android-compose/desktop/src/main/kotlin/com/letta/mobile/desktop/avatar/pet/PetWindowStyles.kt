@@ -49,8 +49,19 @@ object PetWindowStyles {
         val user32 = User32.INSTANCE
         val current = user32.GetWindowLong(hwnd, WinUser.GWL_EXSTYLE)
         val next = transform(current)
-        if (next != current) {
-            user32.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, next)
-        }
+        if (next == current) return
+        user32.SetWindowLong(hwnd, WinUser.GWL_EXSTYLE, next)
+        // SetWindowLong alone leaves Windows' cached non-client/frame, taskbar,
+        // and hit-test state stale until a SetWindowPos with SWP_FRAMECHANGED —
+        // without it the tool-window/no-activate and click-through flips can be
+        // ignored on an already-visible window (the exact behavior this spike
+        // validates). No move/resize/z-order/activation change, just a reframe.
+        user32.SetWindowPos(
+            hwnd,
+            null,
+            0, 0, 0, 0,
+            WinUser.SWP_FRAMECHANGED or WinUser.SWP_NOMOVE or WinUser.SWP_NOSIZE or
+                WinUser.SWP_NOZORDER or WinUser.SWP_NOACTIVATE or WinUser.SWP_NOOWNERZORDER,
+        )
     }
 }
