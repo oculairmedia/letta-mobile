@@ -1,0 +1,167 @@
+# Iroh probe gate (letta-mobile-q5iiv, iroh epic phase P1).
+#
+# Runs the hermetic iroh probe — a stub app-server + admin API served over a
+# real Iroh endpoint, exercised by `app-server-iroh-probe --scenario all` —
+# plus a red-path acceptance self-check that proves the gate goes red when a
+# known regression is injected (terminal suppression, untyped frames, dead
+# address).
+#
+# The workflow itself runs on every PR; the `changes` job applies the path
+# filter so `iroh-probe-gate` can be a REQUIRED status check without
+# deadlocking PRs that do not touch the iroh transport surface (a
+# workflow-level `paths:` filter would leave the required check pending
+# forever on such PRs).
+name: Iroh Probe
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: iroh-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      probe: ${{ steps.filter.outputs.probe }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect probe-relevant changes
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" != "pull_request" ]]; then
+            echo "probe=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" || true)"
+          printf 'changed files:\n%s\n' "$changed"
+          pattern='^(\.github/workflows/iroh-probe\.yml|scripts/iroh_probe|android-compose/cli/|android-compose/sharedLogic/.*/iroh/|android-compose/sharedLogic/.*/appserver/|android-compose/sharedLogic/.*/transport/|android-compose/core/runtime/|android-compose/core/data/.*/timeline/)'
+          if grep -qE "$pattern" <<<"$changed"; then
+            echo "probe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "probe=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  probe-unit:
+    needs: changes
+    if: needs.changes.outputs.probe == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Probe assertion + CLI unit tests
+        run: |
+          ./gradlew :sharedLogic:jvmTest --tests 'com.letta.mobile.data.transport.iroh.IrohProbeAssertionsTest'
+          ./gradlew :cli:testDebugUnitTest
+
+  probe-hermetic:
+    needs: [changes, probe-unit]
+    if: needs.changes.outputs.probe == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Hermetic probe (all scenarios)
+        run: scripts/iroh_probe_hermetic.sh --scenario all --idle-ms 2000 --timeout-ms 90000
+
+  probe-red-path:
+    # Acceptance self-check: the gate MUST go red when a known regression is
+    # injected. Each mode expects the probe to exit nonzero; the wrapper exits
+    # 0 only when the injected regression is detected.
+    needs: [changes, probe-unit]
+    if: needs.changes.outputs.probe == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        self-check: [suppress-terminal, untyped-frames, wrong-address]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Injected-regression self-check (${{ matrix.self-check }})
+        env:
+          LETTA_PROBE_SELF_CHECK: ${{ matrix.self-check }}
+        run: scripts/iroh_probe_hermetic.sh --scenario idle-send --idle-ms 1000 --timeout-ms 20000
+
+  iroh-probe-gate:
+    # Single stable required-check context (mirrors build-apk-pass in
+    # android.yml). Green when the path filter skipped the heavy jobs; red when
+    # any of them failed or was cancelled.
+    needs: [changes, probe-unit, probe-hermetic, probe-red-path]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          results=(
+            "${{ needs.changes.result }}"
+            "${{ needs.probe-unit.result }}"
+            "${{ needs.probe-hermetic.result }}"
+            "${{ needs.probe-red-path.result }}"
+          )
+          echo "job results: ${results[*]}"
+          for result in "${results[@]}"; do
+            if [[ "$result" == "failure" || "$result" == "cancelled" ]]; then
+              echo "iroh-probe-gate: FAILED ($result)"
+              exit 1
+            fi
+          done
+          echo "iroh-probe-gate: OK"

@@ -62,6 +62,7 @@ dependencies {
     implementation("computer.iroh:iroh:1.0.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 
@@ -113,6 +114,10 @@ tasks.register<JavaExec>("run") {
 
     args(splitCliArgs(providers.gradleProperty("cliArgs").orElse("").get()))
     standardInput = System.`in`
+    // This forked JVM (not the daemon/client, which GRADLE_OPTS /
+    // gradle.properties cover) is what actually loads libiroh_ffi; keep it
+    // green if a future JDK flips native-access warnings to errors.
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
 
     outputs.upToDateWhen { false }
 }
