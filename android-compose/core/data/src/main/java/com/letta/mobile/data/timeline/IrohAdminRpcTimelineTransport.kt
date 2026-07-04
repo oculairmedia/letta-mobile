@@ -64,6 +64,26 @@ class IrohAdminRpcTimelineTransport(
         throw TimelineTransportHttpException(0, "HTTP agent message reads are gated while backend is iroh://")
     }
 
+    /**
+     * letta-mobile-fe51r: on-demand full-body fetch for a tool-return message
+     * that `message.list` projected down to a preview (pointer diet).
+     */
+    override suspend fun getToolReturn(
+        conversationId: String,
+        messageId: String,
+    ): LettaMessage? {
+        val response = channelTransport.adminRpc(
+            method = "tool_return.get",
+            path = "/v1/conversations/$conversationId/messages/$messageId",
+            body = null,
+        )
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc tool_return.get failed")
+        }
+        val result = response.result ?: return null
+        return json.decodeFromJsonElement(LettaMessage.serializer(), result)
+    }
+
     private fun httpGated(path: String) {
         if (gatedTelemetryPaths.add(path)) {
             Telemetry.event("TimelineSync", "irohMode.httpGated", "path" to path)

@@ -285,6 +285,17 @@ open class TimelineRepository(
         getOrCreate(agentId, conversationId).ingestStreamEvent(message)
     }
 
+    /**
+     * letta-mobile-fe51r (P2b pointer diet): resolve a projected tool-return
+     * preview to its full body via the transport's on-demand fetch. Called
+     * when the user expands a truncated tool card.
+     */
+    suspend fun resolveTruncatedToolReturn(
+        agentId: String?,
+        conversationId: String,
+        messageId: String,
+    ): Boolean = getOrCreate(agentId, conversationId).resolveTruncatedToolReturn(messageId)
+
     suspend fun postHandlerCollapse(conversationId: String) {
         val key = TimelineCacheKey(null, conversationId)
         val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }

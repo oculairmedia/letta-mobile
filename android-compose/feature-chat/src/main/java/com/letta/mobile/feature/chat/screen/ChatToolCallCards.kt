@@ -81,6 +81,7 @@ import com.letta.mobile.ui.chat.render.ToolDisplayInfo
 import com.letta.mobile.ui.chat.render.ToolDisplayRegistry
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyRenderEligibility
+import com.letta.mobile.feature.chat.render.LocalTruncatedToolResultResolver
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
 import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
@@ -543,6 +544,7 @@ internal fun ToolCallCard(
     val reducedMotion = rememberReducedMotionEnabled()
     var expanded by remember { mutableStateOf(false) }
     val showDetails = keepExpanded || expanded
+    RequestFullToolResultOnExpand(toolCall = toolCall, expanded = showDetails)
     val parentVisible = LocalToolCardBodyParentVisible.current
     val canRenderFullOutput = showDetails && parentVisible
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
@@ -1314,6 +1316,7 @@ internal fun CompactToolCallRow(
     val view = LocalView.current
     val reducedMotion = rememberReducedMotionEnabled()
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
+    RequestFullToolResultOnExpand(toolCall = toolCall, expanded = expanded)
     val parentVisible = LocalToolCardBodyParentVisible.current
     val canRenderFullOutput = expanded && parentVisible
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
@@ -1836,6 +1839,24 @@ private class RecentStringSet(
     fun clear() {
         synchronized(lock) {
             values.clear()
+        }
+    }
+}
+
+/**
+ * letta-mobile-fe51r (P2b pointer diet): when a tool card whose result is a
+ * server-projected preview is expanded, ask the screen-provided resolver to
+ * fetch the full body. The fetch resolves through the timeline (the card
+ * recomposes with the full result and a cleared [UiToolCall.resultTruncation]
+ * once it lands), so this fires at most once per messageId per expansion.
+ */
+@Composable
+private fun RequestFullToolResultOnExpand(toolCall: UiToolCall, expanded: Boolean) {
+    val truncation = toolCall.resultTruncation ?: return
+    val resolver = LocalTruncatedToolResultResolver.current ?: return
+    LaunchedEffect(expanded, truncation.messageId, resolver) {
+        if (expanded) {
+            resolver.requestFullToolResult(truncation.messageId)
         }
     }
 }

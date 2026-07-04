@@ -82,6 +82,24 @@ data class UiToolCall(
      */
     val approvalDecision: UiToolApprovalDecision? = null,
     val subagentDispatch: UiSubagentDispatch? = null,
+    /**
+     * letta-mobile-fe51r (P2b pointer diet): non-null when [result] is a
+     * server-projected preview of a larger tool-return body. Carries the
+     * tool-return message id needed to lazily fetch the full output when the
+     * user expands the card.
+     */
+    val resultTruncation: UiToolResultTruncation? = null,
+)
+
+/**
+ * Marker that a tool-call's result is a truncated preview; the full body can
+ * be fetched on demand via `tool_return.get` using [messageId].
+ * letta-mobile-fe51r.
+ */
+@Immutable
+data class UiToolResultTruncation(
+    val messageId: String,
+    val byteLen: Long,
 )
 
 @Immutable

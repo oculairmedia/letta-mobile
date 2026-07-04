@@ -80,6 +80,14 @@ class IrohAppServerTransport(
     private val streamReady = CompletableDeferred<Unit>()
 
     /**
+     * Whether the server advertised the `frame_part` capability in its
+     * auth_response (sniffed off the control channel). Until then all
+     * client-to-server frames stay plain, so pre-negotiation writes to old
+     * servers can never emit framing the peer cannot decode.
+     */
+    private val serverSupportsFrameParts = AtomicBoolean(false)
+
+    /**
      * Awaits the initial QUIC connection completion (success or failure).
      * The transport is not fully usable until this completes successfully.
      * Throws the connection error if the handshake failed.
@@ -196,7 +204,7 @@ class IrohAppServerTransport(
         Telemetry.event("IrohTransport", "admin_rpc.stream.open", "method" to method, "path" to path, "requestId" to requestId)
         try {
             val request = protocol.encodeCommand(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-            IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES)
+            IrohFrameCodec.write(sendStream, request, MAX_FRAME_BYTES, allowFrameParts = serverSupportsFrameParts.get())
             sendStream.finish()
             sendFinished = true
             val rawResponse = IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
@@ -281,7 +289,7 @@ class IrohAppServerTransport(
                 val json = protocol.encodeCommand(command)
                 val bytes = json.encodeToByteArray()
                 Telemetry.event("IrohTransport", "control.write", "command" to command::class.simpleName, "bytes" to bytes.size)
-                IrohFrameCodec.write(sendStream, json)
+                IrohFrameCodec.write(sendStream, json, allowFrameParts = serverSupportsFrameParts.get())
             }
         }
 
@@ -324,6 +332,7 @@ class IrohAppServerTransport(
             ) { json ->
                 val frame = decodeFrame(json, channel)
                 Telemetry.event("IrohTransport", "frame.recv", "channel" to channel.name, "type" to frame.frame.type)
+                recordServerCapabilities(frame)
                 if (channel == AppServerChannel.Control && completeLegacyAdminRpcIfPending(frame)) {
                     return@readAll
                 }
@@ -398,6 +407,22 @@ class IrohAppServerTransport(
         }
     }
 
+    /**
+     * letta-mobile-5purh follow-up: record the server's advertised transport
+     * capabilities from its auth_response so subsequent client writes may use
+     * frame_part chunking for >1MiB frames (e.g. user messages carrying
+     * base64 image attachments). Only a successful auth_response counts.
+     */
+    private fun recordServerCapabilities(frame: AppServerReceivedFrame) {
+        val auth = frame.frame as? AppServerInboundFrame.AuthResponse ?: return
+        if (!auth.success) return
+        val supported = IrohFrameCodec.FRAME_PART_CAPABILITY in auth.capabilities.orEmpty()
+        val changed = serverSupportsFrameParts.getAndSet(supported) != supported
+        if (changed) {
+            Telemetry.event("IrohTransport", "capabilities.negotiated", "framePart" to supported)
+        }
+    }
+
     private suspend fun completeLegacyAdminRpcIfPending(frame: AppServerReceivedFrame): Boolean {
         val response = frame.frame as? AppServerInboundFrame.AdminRpcResponse ?: return false
         val pending = legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(response.requestId) }
@@ -410,6 +435,7 @@ class IrohAppServerTransport(
         "conversation.list",
         "message.list",
         "message.get",
+        "tool_return.get",
         "goal.get",
         "agent.list",
         "agent.get",

@@ -73,6 +73,12 @@ internal class AdminRpcStreamServer(
      * receiving framing they cannot decode.
      */
     private val peerSupportsFrameParts: () -> Boolean = { false },
+    /**
+     * Logical-frame cap for chunked requests/responses once the peer has
+     * authenticated and advertised `frame_part`. Unauthenticated or
+     * capability-off peers are always bounded by [maxFrameBytes].
+     */
+    private val maxReassembledBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val permits = Semaphore(maxActiveHandlers)
@@ -164,36 +170,52 @@ internal class AdminRpcStreamServer(
         val payload = response.encodeToByteArray()
         val buffers = when {
             payload.size <= maxFrameBytes -> listOf(IrohFrameCodec.encodeFrame(payload, maxFrameBytes))
-            peerSupportsFrameParts() -> IrohFrameCodec.encodeFrameParts(payload, maxFrameBytes)
-            else -> {
-                val requestId = runCatching {
-                    json.parseToJsonElement(response).jsonObject["request_id"]?.jsonPrimitive?.contentOrNull
-                }.getOrNull().orEmpty()
-                Telemetry.event(
-                    "IrohNode", "admin_rpc.stream.response_too_large",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "requestId" to requestId,
-                    "bytes" to payload.size,
-                    "maxFrameBytes" to maxFrameBytes,
-                    level = Telemetry.Level.WARN,
-                )
-                listOf(
-                    IrohFrameCodec.encodeFrame(
-                        errorEnvelope(
-                            requestId,
-                            "admin_rpc response too large: ${payload.size} bytes > max $maxFrameBytes " +
-                                "and peer did not advertise the ${IrohFrameCodec.FRAME_PART_CAPABILITY} capability",
-                        ),
-                        maxFrameBytes,
-                    ),
+            peerSupportsFrameParts() -> try {
+                IrohFrameCodec.encodeFrameParts(payload, maxFrameBytes, maxReassembledBytes)
+            } catch (tooLarge: IrohFrameCodec.FrameTooLargeException) {
+                // Response exceeds even the chunked logical-frame cap. Fall
+                // back to the same typed envelope the capability-off path
+                // sends, so the client fails fast instead of timing out on a
+                // silently finished stream.
+                tooLargeEnvelopeBuffers(
+                    response = response,
+                    bytes = payload.size,
+                    detail = tooLarge.message ?: "admin_rpc response exceeds the chunked logical frame cap",
                 )
             }
+            else -> tooLargeEnvelopeBuffers(
+                response = response,
+                bytes = payload.size,
+                detail = "admin_rpc response too large: ${payload.size} bytes > max $maxFrameBytes " +
+                    "and peer did not advertise the ${IrohFrameCodec.FRAME_PART_CAPABILITY} capability",
+            )
         }
         buffers.forEach { sendStream.writeAll(it) }
     }
 
+    private fun tooLargeEnvelopeBuffers(response: String, bytes: Int, detail: String): List<ByteArray> {
+        val requestId = runCatching {
+            json.parseToJsonElement(response).jsonObject["request_id"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull().orEmpty()
+        Telemetry.event(
+            "IrohNode", "admin_rpc.stream.response_too_large",
+            "remoteEndpointId" to remoteEndpointId,
+            "requestId" to requestId,
+            "bytes" to bytes,
+            "maxFrameBytes" to maxFrameBytes,
+            level = Telemetry.Level.WARN,
+        )
+        return listOf(IrohFrameCodec.encodeFrame(errorEnvelope(requestId, detail), maxFrameBytes))
+    }
+
     private suspend fun readOneFrame(recv: AdminRpcRecvStream): String? {
-        val decoder = IrohFrameCodec.Decoder(maxFrameBytes)
+        // Chunked (frame_part) requests may only widen reassembly memory
+        // beyond a single frame once the peer has authenticated AND advertised
+        // the capability — otherwise a peer holding just the ticket could pin
+        // maxReassembled bytes per stream before presenting any token.
+        val decoder = IrohFrameCodec.Decoder(maxFrameBytes, maxReassembledBytesProvider = {
+            if (authenticated.get() && peerSupportsFrameParts()) maxReassembledBytes else maxFrameBytes
+        })
         while (true) {
             val chunk = recv.read(READ_CHUNK_SIZE.toUInt())
             if (chunk.isEmpty()) {

@@ -538,6 +538,7 @@ class IrohChannelTransport(
         internal val READ_ONLY_ADMIN_RPC_METHODS = setOf(
             "message.list",
             "message.get",
+            "tool_return.get",
             "conversation.list",
             "goal.get",
             "health.check",

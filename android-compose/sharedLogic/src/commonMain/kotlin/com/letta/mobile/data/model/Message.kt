@@ -296,6 +296,15 @@ data class ToolReturnMessage(
     val stdout: List<String>? = null,
     val stderr: List<String>? = null,
     @SerialName("tool_returns") val toolReturns: List<ToolReturn>? = null,
+    // letta-mobile-fe51r (P2b pointer diet): iroh admin_rpc `message.list`
+    // projects tool-return bodies larger than ~4KiB down to a ~2KiB preview
+    // so heavy pages fit the 1MiB frame budget. When that happened the server
+    // stamps these fields; the full body is fetched on demand via the
+    // `tool_return.get` admin_rpc method. Both are absent/null for full
+    // (unprojected) messages and for plain HTTP responses.
+    @SerialName("tool_return_truncated") val toolReturnTruncated: Boolean? = null,
+    @SerialName("tool_return_byte_len") val toolReturnByteLen: Long? = null,
+    @SerialName("tool_return_pointer") val toolReturnPointer: JsonElement? = null,
     override val date: String? = null,
     val name: String? = null,
     @SerialName("run_id") override val runId: String? = null,
