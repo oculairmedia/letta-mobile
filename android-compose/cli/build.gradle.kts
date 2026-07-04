@@ -114,6 +114,10 @@ tasks.register<JavaExec>("run") {
 
     args(splitCliArgs(providers.gradleProperty("cliArgs").orElse("").get()))
     standardInput = System.`in`
+    // This forked JVM (not the daemon/client, which GRADLE_OPTS /
+    // gradle.properties cover) is what actually loads libiroh_ffi; keep it
+    // green if a future JDK flips native-access warnings to errors.
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
 
     outputs.upToDateWhen { false }
 }

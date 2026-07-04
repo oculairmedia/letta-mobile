@@ -192,6 +192,27 @@ class IrohProbeAssertionsTest {
     }
 
     @Test
+    fun `cross turn event seq reset on same connection is reported`() {
+        assertEquals(
+            "event_seq_reset_across_turns:9->1",
+            IrohProbeAssertions.classifyCrossTurnEventSeq(listOf(7L, 8L, 9L), listOf(1L, 2L, 3L)),
+        )
+        assertEquals(
+            "event_seq_reset_across_turns:9->9",
+            IrohProbeAssertions.classifyCrossTurnEventSeq(listOf(9L), listOf(9L)),
+        )
+    }
+
+    @Test
+    fun `cross turn event seq continuity passes`() {
+        assertEquals(null, IrohProbeAssertions.classifyCrossTurnEventSeq(listOf(7L, 8L, 9L), listOf(10L, 11L)))
+        // Either side empty: nothing to compare (e.g. a turn that produced no frames
+        // is already reported by the per-turn send-profile rules).
+        assertEquals(null, IrohProbeAssertions.classifyCrossTurnEventSeq(emptyList(), listOf(1L)))
+        assertEquals(null, IrohProbeAssertions.classifyCrossTurnEventSeq(listOf(9L), emptyList()))
+    }
+
+    @Test
     fun `untyped stream frames are reported`() {
         val metrics = sendTurn().copy(untypedFrameCount = 2)
 

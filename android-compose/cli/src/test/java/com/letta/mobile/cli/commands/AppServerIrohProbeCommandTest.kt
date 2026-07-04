@@ -98,6 +98,8 @@ class AppServerIrohProbeCommandTest {
 
         val metrics = accumulator.toMetrics(dialMs = 1, firstFrameMs = 1, timedOut = false)
 
+        assertEquals(5, accumulator.recordedFrameCount)
+        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), accumulator.observedEventSeqs)
         assertEquals(listOf(1L, 2L, 3L, 4L, 5L), metrics.eventSeqs)
         assertEquals(0, metrics.untypedFrameCount)
         assertEquals(1, metrics.turnDoneCount)

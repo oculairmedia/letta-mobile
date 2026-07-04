@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
+import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.probe.ProbeStubAdminServer
 import com.letta.mobile.cli.probe.ProbeStubBehavior
 import com.letta.mobile.cli.probe.ProbeStubController
@@ -67,6 +68,14 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
         help = "Delay between stream deltas in milliseconds.",
     ).int().default(200)
 
+    private val maxLifetimeMs by option(
+        "--max-lifetime-ms",
+        envvar = "LETTA_PROBE_STUB_MAX_LIFETIME_MS",
+        help = "Self-terminate after this long, so a stub leaked by a hard-killed " +
+            "wrapper (SIGKILL/OOM: gradle's JavaExec child survives the client " +
+            "process tree) cannot hold the UDP port forever. 0 = run until killed.",
+    ).long().default(15 * 60 * 1000L)
+
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         try {
@@ -81,6 +90,11 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
             if (behavior.untypedFrames) {
                 println("[iroh-stub-server] REGRESSION INJECTED: untyped-frames")
             }
+
+            // The wrapper script kills this JVM directly by PID: with the Gradle
+            // daemon in play, this process is a child of the daemon — NOT of the
+            // backgrounded `./gradlew` client whose process tree the script walks.
+            println("[iroh-stub-server] PID: ${ProcessHandle.current().pid()}")
 
             val adminServer = ProbeStubAdminServer(store, adminPort)
             println("[iroh-stub-server] Admin base: ${adminServer.baseUrl}")
@@ -118,9 +132,12 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
                 },
             )
 
-            while (true) {
+            val deadline = if (maxLifetimeMs > 0) System.currentTimeMillis() + maxLifetimeMs else Long.MAX_VALUE
+            while (System.currentTimeMillis() < deadline) {
                 delay(1000)
             }
+            println("[iroh-stub-server] max lifetime ${maxLifetimeMs}ms reached; shutting down")
+            exitProcess(0)
         } catch (e: Exception) {
             System.err.println("[iroh-stub-server] Error: ${e.message}")
             e.printStackTrace()

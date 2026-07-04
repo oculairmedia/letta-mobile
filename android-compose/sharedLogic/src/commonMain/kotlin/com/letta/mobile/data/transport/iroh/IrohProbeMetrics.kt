@@ -152,6 +152,19 @@ object IrohProbeAssertions {
         eventSeqs.zipWithNext().all { (a, b) -> b > a }
 
     /**
+     * Cross-turn event_seq continuity on the SAME connection: a server that
+     * resets event_seq to 0 at each turn boundary stays green under the
+     * per-turn [isEventSeqMonotonic] check (each turn's list is individually
+     * increasing), so consecutive same-connection turns must also be compared.
+     * Returns null when either side is empty or continuity holds.
+     */
+    fun classifyCrossTurnEventSeq(previousTurnSeqs: List<Long>, nextTurnSeqs: List<Long>): String? {
+        val last = previousTurnSeqs.lastOrNull() ?: return null
+        val first = nextTurnSeqs.firstOrNull() ?: return null
+        return if (first > last) null else "event_seq_reset_across_turns:$last->$first"
+    }
+
+    /**
      * no-http invariant (qfa81 headline): zero TCP connections from the probe process
      * to the admin HTTP port while running in iroh:// mode.
      */

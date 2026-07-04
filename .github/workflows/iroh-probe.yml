@@ -49,7 +49,7 @@ jobs:
           git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
           changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" || true)"
           printf 'changed files:\n%s\n' "$changed"
-          pattern='^(\.github/workflows/iroh-probe\.yml|scripts/iroh_probe|android-compose/cli/|android-compose/sharedLogic/.*/iroh/|android-compose/sharedLogic/.*/appserver/|android-compose/core/data/.*/timeline/)'
+          pattern='^(\.github/workflows/iroh-probe\.yml|scripts/iroh_probe|android-compose/cli/|android-compose/sharedLogic/.*/iroh/|android-compose/sharedLogic/.*/appserver/|android-compose/sharedLogic/.*/transport/|android-compose/core/runtime/|android-compose/core/data/.*/timeline/)'
           if grep -qE "$pattern" <<<"$changed"; then
             echo "probe=true" >> "$GITHUB_OUTPUT"
           else

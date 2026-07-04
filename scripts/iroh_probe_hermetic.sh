@@ -13,7 +13,9 @@ set -euo pipefail
 #     # default probe args: --scenario all --idle-ms 2000 --timeout-ms 90000
 #
 # Acceptance self-check (red path — the gate must FAIL when a known regression
-# is injected; the wrapper exits 0 only if the probe exits NONZERO):
+# is injected; the wrapper exits 0 only if the probe exits NONZERO *and* its
+# output carries the mode-specific violation token, so an unrelated
+# environmental failure cannot masquerade as a detected regression):
 #   LETTA_PROBE_SELF_CHECK=suppress-terminal scripts/iroh_probe_hermetic.sh
 #     # stub drops terminal stop_reason frames -> probe must report
 #     # timeout_missing_terminal and exit nonzero
@@ -25,7 +27,9 @@ set -euo pipefail
 #
 # Environment:
 #   LETTA_IROH_AUTH_TOKEN   Bearer token shared by stub/probe (random default)
-#   LETTA_PROBE_IROH_PORT   UDP port for the stub Iroh endpoint (random default)
+#   LETTA_PROBE_IROH_PORT   UDP port for the stub Iroh endpoint (default 0 =
+#                           kernel-assigned; the real address is read from the
+#                           printed ticket, so there is no reserve-then-bind race)
 #   LETTA_PROBE_SELF_CHECK  suppress-terminal | untyped-frames | wrong-address
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -35,14 +39,10 @@ export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}"
 
 AUTH_TOKEN="${LETTA_IROH_AUTH_TOKEN:-probe-token-$(date +%s)-$RANDOM}"
 SELF_CHECK="${LETTA_PROBE_SELF_CHECK:-}"
-PORT="${LETTA_PROBE_IROH_PORT:-$(python3 - <<'PORTPY'
-import socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.bind(('127.0.0.1', 0))
-print(s.getsockname()[1])
-s.close()
-PORTPY
-)}"
+# Default to port 0 (kernel-assigned): the stub prints the ticket with the real
+# address, so pre-reserving a "free" port would only reintroduce a TOCTOU race
+# between the reservation and the stub's actual bind.
+PORT="${LETTA_PROBE_IROH_PORT:-0}"
 # The key store generates a fresh key only when the file does NOT exist, so
 # hand it a path inside a throwaway directory instead of a pre-created file.
 SECRET_KEY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/letta-iroh-probe-key.XXXXXX")"
@@ -50,6 +50,7 @@ SECRET_KEY_FILE="${SECRET_KEY_DIR}/iroh.key"
 SERVE_LOG="$(mktemp "${TMPDIR:-/tmp}/letta-iroh-serve.XXXXXX.log")"
 PROBE_LOG="$(mktemp "${TMPDIR:-/tmp}/letta-iroh-probe.XXXXXX.log")"
 SERVE_PID=""
+STUB_PID=""
 
 kill_process_tree() {
   local pid="$1"
@@ -63,6 +64,11 @@ kill_process_tree() {
 
 cleanup() {
   local status=$?
+  # Kill the stub JVM directly first: under the Gradle daemon it is a child of
+  # the DAEMON, not of the backgrounded gradlew client tree walked below.
+  if [[ -n "${STUB_PID}" ]] && kill -0 "${STUB_PID}" 2>/dev/null; then
+    kill "${STUB_PID}" 2>/dev/null || true
+  fi
   if [[ -n "${SERVE_PID}" ]] && kill -0 "${SERVE_PID}" 2>/dev/null; then
     kill_process_tree "${SERVE_PID}"
     wait "${SERVE_PID}" 2>/dev/null || true
@@ -130,14 +136,17 @@ if 'admin_rpc handlers registered' not in text or 'Listening on Iroh' not in tex
     sys.exit(0)
 ticket = re.findall(r'Ticket: (\S+)', text)
 admin = re.findall(r'Admin base: (\S+)', text)
+pid = re.findall(r'\[iroh-stub-server\] PID: (\d+)', text)
 if ticket and admin:
     print(ticket[-1])
     print(admin[-1])
+    print(pid[-1] if pid else '')
 ADDRPY
 )"
   if [[ -n "${READY}" ]]; then
     ADDRESS="$(sed -n 1p <<<"${READY}")"
     ADMIN_BASE="$(sed -n 2p <<<"${READY}")"
+    STUB_PID="$(sed -n 3p <<<"${READY}")"
     break
   fi
   sleep 1
@@ -186,6 +195,39 @@ if [[ -n "${SELF_CHECK}" ]]; then
     echo "[iroh-probe-hermetic] SELF-CHECK FAILED: probe passed despite injected regression '${SELF_CHECK}'" >&2
     exit 1
   fi
+  # A nonzero exit alone does not prove detection — a probe that dies for an
+  # unrelated environmental reason (dial wedge, overloaded runner) also exits
+  # nonzero. Require the mode-specific violation token in the probe output
+  # (printHumanSummary's violations= line / the --json summary), and for
+  # suppress-terminal additionally rule out failure shapes that indicate the
+  # connection never worked at all.
+  require_violation() {
+    if ! grep -q "$1" "${PROBE_LOG}"; then
+      echo "[iroh-probe-hermetic] SELF-CHECK FAILED: probe exited ${PROBE_STATUS} but expected violation '$1' is absent from ${PROBE_LOG} (mode '${SELF_CHECK}')" >&2
+      exit 1
+    fi
+  }
+  forbid_violation() {
+    if grep -q "$1" "${PROBE_LOG}"; then
+      echo "[iroh-probe-hermetic] SELF-CHECK FAILED: probe output contains '$1' — an environmental failure, not proof the injected '${SELF_CHECK}' regression was detected" >&2
+      exit 1
+    fi
+  }
+  case "${SELF_CHECK}" in
+    suppress-terminal)
+      # Expected: deltas streamed fine but the terminal never arrived. A dial
+      # or stream wedge also times out, so demand the stream actually worked.
+      require_violation "timeout_missing_terminal"
+      forbid_violation "dial_failed"
+      forbid_violation "no_assistant_delta"
+      ;;
+    untyped-frames)
+      require_violation "untyped_frames_"
+      ;;
+    wrong-address)
+      require_violation "dial_failed"
+      ;;
+  esac
   echo "[iroh-probe-hermetic] self-check ok: injected regression '${SELF_CHECK}' was detected (probe exit ${PROBE_STATUS})" >&2
   exit 0
 fi

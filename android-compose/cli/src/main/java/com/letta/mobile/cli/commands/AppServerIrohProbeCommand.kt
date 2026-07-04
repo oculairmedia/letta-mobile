@@ -31,7 +31,9 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.util.Collections
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
@@ -287,9 +289,22 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                 return turns
             }
             session = setup
-            turns += sendProbeInput(turn = 1, session = session, turnStartedAt = turnStartedAt)
+            val firstTurn = sendProbeInput(turn = 1, session = session, turnStartedAt = turnStartedAt)
+            turns += firstTurn
             delay(idleMs)
-            turns += sendProbeInput(turn = 2, session = session, sendFailureViolation = true)
+            val secondTurn = sendProbeInput(turn = 2, session = session, sendFailureViolation = true)
+            // Both turns share ONE connection, so event_seq must keep rising
+            // across the turn boundary — a per-turn reset (each turn restarting
+            // at 0) is individually monotonic and only visible here.
+            val crossTurn = IrohProbeAssertions.classifyCrossTurnEventSeq(
+                previousTurnSeqs = firstTurn.eventSeqs,
+                nextTurnSeqs = secondTurn.eventSeqs,
+            )
+            turns += if (crossTurn == null) {
+                secondTurn
+            } else {
+                secondTurn.copy(scenarioViolations = secondTurn.scenarioViolations + crossTurn)
+            }
         } catch (error: Throwable) {
             val message = error.message ?: error.toString()
             val violation = if (message.contains("Conversation not found", ignoreCase = true)) {
@@ -355,15 +370,25 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         var session: ProbeSession? = null
         val adminPort = adminPort()
-        val samples = mutableListOf<Int>()
-        var scanUnsupported = false
+        val samples: MutableList<Int> = Collections.synchronizedList(mutableListOf())
+        val scanUnsupported = AtomicBoolean(false)
         fun sample() {
             when (val count = NoHttpSocketScan.connectionsToPort(adminPort)) {
-                null -> scanUnsupported = true
+                null -> scanUnsupported.set(true)
                 else -> samples += count
             }
         }
         val turnStartedAt = nowMs()
+        // Point-in-time boundary samples alone would miss a transient HTTP
+        // fallback that opens, completes, and closes between them (e.g. an
+        // HttpURLConnection with Connection: close), so also sample on a
+        // continuous ~100ms ticker for the scenario's whole duration.
+        val sampler = scope.launch {
+            while (true) {
+                sample()
+                delay(100)
+            }
+        }
         return try {
             sample()
             val metrics = withTimeoutOrNull(timeoutMs) {
@@ -390,13 +415,17 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                 timedOut = true,
                 scenarioViolations = listOf("no_http_setup_timeout"),
             )
-            val violations = listOfNotNull(IrohProbeAssertions.classifyNoHttp(samples))
-            val notes = if (scanUnsupported) listOf("no_http_scan_unsupported_platform") else emptyList()
+            sampler.cancelAndJoin()
+            val snapshot = samples.toList()
+            val violations = listOfNotNull(IrohProbeAssertions.classifyNoHttp(snapshot))
+            val notes = if (scanUnsupported.get()) listOf("no_http_scan_unsupported_platform") else emptyList()
             metrics.copy(
                 scenarioViolations = metrics.scenarioViolations + violations,
-                notes = metrics.notes + notes + "no_http_socket_samples=${samples.joinToString(",")}",
+                notes = metrics.notes + notes +
+                    "no_http_socket_samples=${snapshot.size} max=${snapshot.maxOrNull() ?: -1}",
             )
         } finally {
+            runCatching { sampler.cancel() }
             runCatching { session?.transport?.close() }
             runCatching { session?.endpoint?.close() }
             scope.cancel()
@@ -436,10 +465,10 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                         scenario = "duplicate-send",
                         clientMessageId = duplicateClientMessageId,
                     )
-                    val replayTerminals = observeTerminals(established) {
+                    val replay = observeTerminals(established, quiesceMs = graceMs) {
                         sendInputFrame(established, duplicateClientMessageId)
-                        delay(graceMs)
                     }
+                    val replayTerminals = replay.terminalCount
                     listOf(
                         first,
                         IrohProbeTurnMetrics(
@@ -448,6 +477,8 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                             profile = IrohProbeAssertions.PROFILE_REPORT,
                             dialMs = established.dialMs,
                             turnDoneCount = replayTerminals,
+                            eventSeqs = replay.observedEventSeqs,
+                            untypedFrameCount = replay.untypedFrameCount,
                             scenarioViolations = listOfNotNull(
                                 IrohProbeAssertions.classifyDuplicateSend(1 + replayTerminals, "same-connection"),
                             ),
@@ -492,10 +523,10 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                         runAdminRpcScenario = false,
                     )
                     session = established
-                    val redialTerminals = observeTerminals(established) {
+                    val redialReplay = observeTerminals(established, quiesceMs = graceMs) {
                         sendInputFrame(established, duplicateClientMessageId)
-                        delay(graceMs)
                     }
+                    val redialTerminals = redialReplay.terminalCount
                     val violation = IrohProbeAssertions.classifyDuplicateSend(1 + redialTerminals, "after-redial")
                     val enforced = strictRedialDedupe
                     IrohProbeTurnMetrics(
@@ -504,6 +535,8 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                         profile = IrohProbeAssertions.PROFILE_REPORT,
                         dialMs = established.dialMs,
                         turnDoneCount = redialTerminals,
+                        eventSeqs = redialReplay.observedEventSeqs,
+                        untypedFrameCount = redialReplay.untypedFrameCount,
                         scenarioViolations = if (enforced) listOfNotNull(violation) else emptyList(),
                         notes = buildList {
                             add("duplicate_send_redial_replay_terminals=$redialTerminals")
@@ -535,8 +568,18 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         return turns
     }
 
-    /** Counts terminal frames observed on [session] while [block] executes. */
-    private suspend fun observeTerminals(session: ProbeSession, block: suspend () -> Unit): Int {
+    /**
+     * Observes frames on [session] while [block] executes and then until the
+     * stream stays quiet for [quiesceMs] (condition-based, not a fixed sleep,
+     * so a slow replayed turn cannot escape the window; callers bound the
+     * total wait with withTimeoutOrNull). Returns the full accumulator so the
+     * replay frames are also checked for typing and event_seq shape.
+     */
+    private suspend fun observeTerminals(
+        session: ProbeSession,
+        quiesceMs: Long = 3_000,
+        block: suspend () -> Unit,
+    ): ProbeAccumulator {
         val accumulator = ProbeAccumulator(turn = 0)
         val collector = session.scope.launch {
             session.client.events.collect { received ->
@@ -547,10 +590,17 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         }
         try {
             block()
+            var drained = accumulator.recordedFrameCount
+            while (true) {
+                delay(quiesceMs)
+                val current = accumulator.recordedFrameCount
+                if (current == drained) break
+                drained = current
+            }
         } finally {
             collector.cancelAndJoin()
         }
-        return accumulator.terminalCount
+        return accumulator
     }
 
     private suspend fun sendInputFrame(session: ProbeSession, clientMessageId: String) {
@@ -926,7 +976,17 @@ internal class AppServerIrohProbeCommand : CliktCommand(
             while (observed.terminalCount == 0) {
                 delay(50)
             }
-            delay(500)
+            // Quiescence drain instead of a fixed post-terminal window: keep
+            // collecting until no new frame arrives for 500ms, so late
+            // duplicates / frames-after-terminal cannot slip past the cutoff.
+            // Bounded by the enclosing withTimeoutOrNull.
+            var drainedFrames = observed.recordedFrameCount
+            while (true) {
+                delay(500)
+                val current = observed.recordedFrameCount
+                if (current == drainedFrames) break
+                drainedFrames = current
+            }
             collector.cancelAndJoin()
             true
         }
@@ -1108,20 +1168,37 @@ internal class ProbeAccumulator(private val turn: Int) {
     val scenarioViolations = mutableListOf<String>()
     var assistantDeltaCount = 0
         private set
+
+    // The counters below are polled from a different coroutine than the
+    // collector that calls [record] (condition loops / quiescence drains), so
+    // they must be @Volatile for cross-thread visibility.
+    @Volatile
     var terminalCount = 0
+        private set
+
+    /** Total frames recorded, for "no new frame for N ms" quiescence drains. */
+    @Volatile
+    var recordedFrameCount = 0
         private set
     var untypedFrameCount = 0
         private set
     var framesAfterTerminal = 0
         private set
+
+    /** Snapshot of event_seq values in arrival order (safe after the collector is joined). */
+    val observedEventSeqs: List<Long>
+        get() = eventSeqs.toList()
     var terminalStatus: String? = null
         private set
     var terminalRunId: String? = null
         private set
+
+    @Volatile
     var activeRunId: String? = null
         private set
 
     fun record(frame: AppServerInboundFrame) {
+        recordedFrameCount += 1
         when (frame) {
             is AppServerInboundFrame.StreamDelta -> {
                 eventSeqs += frame.eventSeq
