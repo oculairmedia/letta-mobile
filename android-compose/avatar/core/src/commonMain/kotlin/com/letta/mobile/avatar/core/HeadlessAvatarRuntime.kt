@@ -41,6 +41,14 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     var isDisposed: Boolean = false
         private set
 
+    /**
+     * Animation sources requested by the most recent [load] (VRMA/Mixamo FBX).
+     * Recorded here so headless callers and tests can assert the load carried
+     * them; renderer subclasses forward them to the actual renderer.
+     */
+    var loadedAnimations: List<AvatarAnimationSource> = emptyList()
+        private set
+
     private val expressions = mutableMapOf<String, Float>()
     private val visemes = mutableMapOf<String, Float>()
     private val disabledAccessories = mutableSetOf<String>()
@@ -57,7 +65,10 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
      * honor every command it's given (it just records them), so it claims
      * everything; renderer subclasses should report what they verified.
      */
-    protected open suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
+    protected open suspend fun loadCapabilities(
+        model: AvatarModel,
+        animations: List<AvatarAnimationSource>,
+    ): AvatarCapabilities =
         AvatarCapabilities(
             supportsHumanoid = model.format.isHumanoidProfile,
             supportsExpressions = true,
@@ -68,7 +79,7 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
             supportsAccessories = true,
         )
 
-    final override suspend fun load(model: AvatarModel) {
+    final override suspend fun load(model: AvatarModel, animations: List<AvatarAnimationSource>) {
         check(!isDisposed) { "AvatarRuntime is disposed" }
         // Replacing a live avatar: give the adapter its teardown hook before
         // the new load starts, so renderer resources for the previous model
@@ -77,11 +88,12 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
             onUnload()
         }
         resetCommandState()
+        loadedAnimations = animations
         operationGeneration += 1
         val generation = operationGeneration
         _state.value = AvatarRuntimeState.Loading(model)
         try {
-            val capabilities = loadCapabilities(model)
+            val capabilities = loadCapabilities(model, animations)
             if (generation != operationGeneration) {
                 // A newer load/unload/dispose superseded this one while it was
                 // suspended — tear down whatever this stale load allocated and
@@ -232,6 +244,7 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         mouthOpen = 0f
         lookTarget = null
         cameraFraming = AvatarCameraFraming.FULL_BODY
+        loadedAnimations = emptyList()
     }
 
     /** Contract promises 0..1 levels; NaN survives coerceIn, so drop it to 0. */

@@ -15,6 +15,10 @@ class AvatarWireProtocolTest {
             accessories = listOf(
                 AvatarRendererCommand.WireAccessory("glasses", listOf("Glasses_L", "Glasses_R")),
             ),
+            animations = listOf(
+                AvatarRendererCommand.WireAnimationSource("wave", "file:///wave.vrma", "vrma"),
+                AvatarRendererCommand.WireAnimationSource("dance", "file:///dance.fbx", "fbx"),
+            ),
         ),
         AvatarRendererCommand.Unload,
         AvatarRendererCommand.SetExpression(key = "happy", weight = 0.8f),
@@ -63,6 +67,35 @@ class AvatarWireProtocolTest {
         )
         assertTrue("\"type\":\"setExpression\"" in encoded, encoded)
         assertTrue("\"key\":\"happy\"" in encoded, encoded)
+    }
+
+    @Test
+    fun loadAvatarDecodesWithoutAnimationsFieldForBackwardCompat() {
+        // A pre-animations LoadAvatar (protocol still v2) carries no `animations`
+        // key; the additive optional field must default to empty, not fail.
+        val decoded = AvatarWireProtocol.decodeCommand(
+            """{"type":"loadAvatar","url":"file:///a.vrm","format":"vrm1","requestId":"load-1"}""",
+        )
+        val load = decoded as AvatarRendererCommand.LoadAvatar
+        assertTrue(load.animations.isEmpty())
+        assertTrue(load.accessories.isEmpty())
+    }
+
+    @Test
+    fun loadAvatarAnimationsSerializeWithIdUrlFormat() {
+        val encoded = AvatarWireProtocol.encodeCommand(
+            AvatarRendererCommand.LoadAvatar(
+                url = "file:///a.vrm",
+                format = "vrm1",
+                requestId = "load-1",
+                animations = listOf(
+                    AvatarRendererCommand.WireAnimationSource("wave", "file:///wave.vrma", "vrma"),
+                ),
+            ),
+        )
+        assertTrue("\"animations\"" in encoded, encoded)
+        assertTrue("\"id\":\"wave\"" in encoded, encoded)
+        assertTrue("\"format\":\"vrma\"" in encoded, encoded)
     }
 
     @Test

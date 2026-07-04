@@ -17,6 +17,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
+import { loadVrmaAnimation } from './vendor/loaders/loadVrmaAnimation.js';
+import { loadMixamoAnimation } from './vendor/loaders/loadMixamoAnimation.js';
 
 export const PROTOCOL_VERSION = 2;
 
@@ -422,7 +424,18 @@ export function createAvatarRenderer(canvas, emit) {
     }
   }
 
-  async function loadAvatar({ url, format, requestId, accessories }) {
+  // Fetch + parse + retarget one user-provided animation source onto the
+  // loaded VRM, returning its THREE.AnimationClip. `format` is "vrma" or "fbx".
+  // Throws on any failure; the caller treats each source as best-effort so one
+  // bad file never fails the avatar load.
+  async function loadImportedAnimation(source, vrm) {
+    const format = String(source.format ?? '').toLowerCase();
+    if (format === 'vrma') return loadVrmaAnimation(source.url, vrm);
+    if (format === 'fbx') return loadMixamoAnimation(source.url, vrm);
+    throw new Error(`Unsupported animation format: ${source.format}`);
+  }
+
+  async function loadAvatar({ url, format, requestId, accessories, animations }) {
     activeLoadRequestId = requestId;
     try {
       const gltf = await loader.loadAsync(url);
@@ -432,7 +445,11 @@ export function createAvatarRenderer(canvas, emit) {
         VRMUtils.deepDispose(gltf.userData.vrm ? gltf.userData.vrm.scene : gltf.scene);
         return;
       }
-      unloadCurrent();
+      unloadCurrent(); // clears activeLoadRequestId — restore it below so the
+      // per-source supersession guard in the import loop stays valid for OUR
+      // load (unloadCurrent sets it to null, but this load is still the active
+      // one until a newer command arrives).
+      activeLoadRequestId = requestId;
 
       const vrm = gltf.userData.vrm ?? null;
       const root = vrm ? vrm.scene : gltf.scene;
@@ -455,6 +472,39 @@ export function createAvatarRenderer(canvas, emit) {
       // win on any id collision (a model shipping its own "wave" overrides ours).
       const standardClips = buildStandardGestureClips(vrm);
       for (const [id, clip] of standardClips) clipsById.set(id, clip);
+
+      // User-provided standard animations (VRMA + Mixamo FBX) from the host's
+      // drop-in folder, retargeted onto THIS VRM. Registered AFTER the built-in
+      // standards (so a user's "wave" overrides ours) but BEFORE the embedded
+      // clips below (so a model-embedded clip still wins over an imported one):
+      // precedence embedded > imported > built-in. Humanoid-only — skipped for
+      // non-humanoid GLB, which has no normalized bones to retarget onto. Each
+      // source is best-effort: a parse/retarget failure emits a rendererError
+      // with the id and continues, never failing the avatar load.
+      if (vrm?.humanoid && Array.isArray(animations)) {
+        for (const source of animations) {
+          if (!source || !source.id || !source.url) continue;
+          try {
+            const clip = await loadImportedAnimation(source, vrm);
+            // Superseded while we were fetching/parsing — this root was added to
+            // the scene before the import loop but `current` isn't assigned yet,
+            // so a newer load's unloadCurrent() can't reach it. Release it here
+            // and bail without touching the (now newer) scene.
+            if (activeLoadRequestId !== requestId) {
+              scene.remove(root);
+              VRMUtils.deepDispose(root);
+              return;
+            }
+            clip.name = source.id;
+            clipsById.set(source.id, clip);
+          } catch (error) {
+            sendEvent({
+              type: 'rendererError',
+              message: `Animation '${source.id}' failed to load: ${String(error?.message ?? error)}`,
+            });
+          }
+        }
+      }
 
       if (gltf.animations && gltf.animations.length > 0) {
         const seen = new Set();

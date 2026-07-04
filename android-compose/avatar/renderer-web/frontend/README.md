@@ -41,7 +41,11 @@ pixiv's sample models in the [three-vrm repo](https://github.com/pixiv/three-vrm
 |---|---|---|---|
 | `vendor/three.module.min.js` + `vendor/three.core.min.js` | [three.js](https://github.com/mrdoob/three.js) | 0.180.0 | MIT |
 | `vendor/loaders/GLTFLoader.js`, `vendor/utils/BufferGeometryUtils.js` | three.js examples/jsm | 0.180.0 | MIT |
+| `vendor/loaders/FBXLoader.js`, `vendor/libs/fflate.module.js`, `vendor/curves/NURBSCurve.js`, `vendor/curves/NURBSUtils.js` | three.js examples/jsm (Mixamo `.fbx` import graph) | 0.180.0 | MIT |
 | `vendor/three-vrm.module.min.js` | [@pixiv/three-vrm](https://github.com/pixiv/three-vrm) | 3.4.5 | MIT |
+| `vendor/three-vrm-animation.module.min.js` | [@pixiv/three-vrm-animation](https://github.com/pixiv/three-vrm) (`.vrma` import) | 3.4.5 | MIT |
+| `vendor/loaders/loadVrmaAnimation.js` | our thin wrapper over three-vrm-animation | — | MIT |
+| `vendor/loaders/loadMixamoAnimation.js` | ported from the [three-vrm Mixamo example](https://github.com/pixiv/three-vrm/blob/v3.4.5/packages/three-vrm/examples/humanoidAnimation/loadMixamoAnimation.js) | v3.4.5 | MIT |
 
 To upgrade: fetch the same paths from jsdelivr at the new version, update this
 table, and re-run the harness smoke checks (boot → `ready` event, VRM load →

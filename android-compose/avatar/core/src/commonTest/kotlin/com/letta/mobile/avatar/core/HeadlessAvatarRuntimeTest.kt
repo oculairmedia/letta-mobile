@@ -32,6 +32,45 @@ class HeadlessAvatarRuntimeTest {
     }
 
     @Test
+    fun loadRecordsAnimationSourcesAndUnloadClearsThem() = runTest {
+        val runtime = HeadlessAvatarRuntime()
+        val animations = listOf(
+            AvatarAnimationSource("wave", "file:///wave.vrma", AvatarAnimationFormat.VRMA),
+            AvatarAnimationSource("dance", "file:///dance.fbx", AvatarAnimationFormat.FBX),
+        )
+
+        runtime.load(model, animations)
+        assertEquals(animations, runtime.loadedAnimations)
+
+        runtime.unload()
+        assertTrue(runtime.loadedAnimations.isEmpty())
+    }
+
+    @Test
+    fun loadWithoutAnimationsRecordsEmptyList() = runTest {
+        val runtime = HeadlessAvatarRuntime()
+        runtime.load(model)
+        assertTrue(runtime.loadedAnimations.isEmpty())
+    }
+
+    @Test
+    fun animationSourcesReachLoadCapabilitiesHook() = runTest {
+        var received: List<AvatarAnimationSource>? = null
+        val runtime = object : HeadlessAvatarRuntime() {
+            override suspend fun loadCapabilities(
+                model: AvatarModel,
+                animations: List<AvatarAnimationSource>,
+            ): AvatarCapabilities {
+                received = animations
+                return AvatarCapabilities()
+            }
+        }
+        val animations = listOf(AvatarAnimationSource("wave", "file:///wave.vrma", AvatarAnimationFormat.VRMA))
+        runtime.load(model, animations)
+        assertEquals(animations, received)
+    }
+
+    @Test
     fun nonHumanoidFormatReportsNoHumanoidSupport() = runTest {
         val runtime = HeadlessAvatarRuntime()
         runtime.load(model.copy(format = AvatarFormat.GLB))
@@ -101,7 +140,7 @@ class HeadlessAvatarRuntimeTest {
     @Test
     fun failedLoadPublishesFailedStateAndRethrows() = runTest {
         val runtime = object : HeadlessAvatarRuntime() {
-            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
+            override suspend fun loadCapabilities(model: AvatarModel, animations: List<AvatarAnimationSource>): AvatarCapabilities =
                 error("renderer exploded")
         }
 
@@ -167,7 +206,7 @@ class HeadlessAvatarRuntimeTest {
     fun commandsForUnsupportedCapabilitiesAreDropped() = runTest {
         val runtime = object : HeadlessAvatarRuntime() {
             var animationPlays = 0
-            override suspend fun loadCapabilities(model: AvatarModel) = AvatarCapabilities()
+            override suspend fun loadCapabilities(model: AvatarModel, animations: List<AvatarAnimationSource>) = AvatarCapabilities()
             override fun onPlayAnimation(animationId: String, loop: Boolean) {
                 animationPlays += 1
             }
@@ -192,7 +231,7 @@ class HeadlessAvatarRuntimeTest {
     @Test
     fun cancelledLoadReturnsToIdleInsteadOfFailed() = runTest {
         val runtime = object : HeadlessAvatarRuntime() {
-            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
+            override suspend fun loadCapabilities(model: AvatarModel, animations: List<AvatarAnimationSource>): AvatarCapabilities =
                 throw kotlinx.coroutines.CancellationException("scope torn down")
         }
 
@@ -236,7 +275,7 @@ class HeadlessAvatarRuntimeTest {
     fun failedLoadTearsDownPartialRendererResources() = runTest {
         var unloads = 0
         val runtime = object : HeadlessAvatarRuntime() {
-            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities =
+            override suspend fun loadCapabilities(model: AvatarModel, animations: List<AvatarAnimationSource>): AvatarCapabilities =
                 error("exploded after allocating scene resources")
 
             override fun onUnload() {
@@ -256,7 +295,7 @@ class HeadlessAvatarRuntimeTest {
         val firstGate = CompletableDeferred<Unit>()
         var loadCount = 0
         val runtime = object : HeadlessAvatarRuntime() {
-            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
+            override suspend fun loadCapabilities(model: AvatarModel, animations: List<AvatarAnimationSource>): AvatarCapabilities {
                 loadCount += 1
                 if (loadCount == 1) firstGate.await()
                 return AvatarCapabilities(supportsHumanoid = true)
@@ -283,7 +322,7 @@ class HeadlessAvatarRuntimeTest {
     fun unloadDuringInFlightLoadWinsOverLateResult() = runTest {
         val gate = CompletableDeferred<Unit>()
         val runtime = object : HeadlessAvatarRuntime() {
-            override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
+            override suspend fun loadCapabilities(model: AvatarModel, animations: List<AvatarAnimationSource>): AvatarCapabilities {
                 gate.await()
                 return AvatarCapabilities()
             }

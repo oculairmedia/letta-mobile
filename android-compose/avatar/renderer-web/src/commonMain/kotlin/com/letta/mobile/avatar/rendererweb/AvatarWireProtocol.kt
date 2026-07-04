@@ -79,6 +79,20 @@ sealed interface AvatarRendererCommand {
          * back to toggling nodes whose name equals the id.
          */
         val accessories: List<WireAccessory> = emptyList(),
+        /**
+         * User-provided standard animations (VRMA + Mixamo FBX) to fetch,
+         * retarget onto this VRM at load, and register in the clip registry.
+         *
+         * Additive optional field: this stays protocol [AvatarWireProtocol.VERSION]
+         * 2 rather than bumping — an old renderer that never learned about
+         * `animations` simply ignores the unknown JSON key (the renderer's JSON
+         * parse is `ignoreUnknownKeys`-equivalent), so a v2 host and a
+         * pre-animation v2 renderer stay compatible; the animations just don't
+         * appear. Precedence in the registry: model-embedded clips win over
+         * these imports, which in turn win over the built-in procedural
+         * standards. Humanoid-only; ignored for non-humanoid GLB.
+         */
+        val animations: List<WireAnimationSource> = emptyList(),
     ) : AvatarRendererCommand
 
     /** Manifest accessory binding carried on [LoadAvatar]. */
@@ -86,6 +100,18 @@ sealed interface AvatarRendererCommand {
     data class WireAccessory(
         val id: String,
         val nodeNames: List<String> = emptyList(),
+    )
+
+    /**
+     * One user-provided animation source carried on [LoadAvatar]. [id] is the
+     * clip id it registers under (and the id [PlayAnimation] plays); [url] is
+     * renderer-resolvable; [format] is `"vrma"` or `"fbx"` (Mixamo).
+     */
+    @Serializable
+    data class WireAnimationSource(
+        val id: String,
+        val url: String,
+        val format: String,
     )
 
     @Serializable

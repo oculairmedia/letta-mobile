@@ -230,6 +230,41 @@ class WebAvatarRuntimeTest {
     }
 
     @Test
+    fun importedAnimationSourcesRideTheLoadCommand() = runTest {
+        val transport = FakeTransport()
+        val runtime = WebAvatarRuntime(transport)
+        transport.emit(AvatarRendererEvent.Ready(AvatarWireProtocol.VERSION))
+
+        val sources = listOf(
+            com.letta.mobile.avatar.core.AvatarAnimationSource(
+                id = "wave",
+                uri = "file:///wave.vrma",
+                format = com.letta.mobile.avatar.core.AvatarAnimationFormat.VRMA,
+            ),
+            com.letta.mobile.avatar.core.AvatarAnimationSource(
+                id = "dance",
+                uri = "file:///dance.fbx",
+                format = com.letta.mobile.avatar.core.AvatarAnimationFormat.FBX,
+            ),
+        )
+        val job = launch { runCatching { runtime.load(model, sources) } }
+        runCurrent()
+
+        val load = assertIs<AvatarRendererCommand.LoadAvatar>(transport.sent.single())
+        assertEquals(
+            listOf(
+                AvatarRendererCommand.WireAnimationSource("wave", "file:///wave.vrma", "vrma"),
+                AvatarRendererCommand.WireAnimationSource("dance", "file:///dance.fbx", "fbx"),
+            ),
+            load.animations,
+        )
+
+        transport.emit(AvatarRendererEvent.AvatarLoaded(load.requestId, fullCapabilities))
+        runCurrent()
+        job.join()
+    }
+
+    @Test
     fun cameraFramingForwardsWireNames() = runTest {
         val (runtime, transport) = readyRuntime()
 

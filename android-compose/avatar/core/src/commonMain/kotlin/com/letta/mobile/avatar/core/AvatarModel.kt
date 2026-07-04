@@ -53,6 +53,43 @@ data class AvatarModel(
 )
 
 /**
+ * A user-provided standard animation to load alongside an [AvatarModel] and
+ * retarget onto it at runtime — VRMA or Mixamo FBX dropped into the animation
+ * folder, keyed by a stable [id]. Renderer-independent: the web renderer fetches
+ * [uri], parses by [format], and registers the retargeted clip under [id];
+ * headless runtimes just record it. Humanoid-only in practice — non-humanoid
+ * GLB has no rig to retarget onto, so these are ignored there.
+ */
+@Serializable
+data class AvatarAnimationSource(
+    /** Clip id it registers under; also the id used to play it. */
+    val id: String,
+    /** Location of the animation file (renderer-resolvable). */
+    val uri: String,
+    val format: AvatarAnimationFormat,
+)
+
+/** Container format of an [AvatarAnimationSource]. */
+@Serializable
+enum class AvatarAnimationFormat {
+    /** VRM Animation (`.vrma`) — glTF + `VRMC_vrm_animation`. */
+    @SerialName("vrma")
+    VRMA,
+
+    /** Mixamo humanoid animation (`.fbx`). */
+    @SerialName("fbx")
+    FBX,
+    ;
+
+    /** Wire string carried on the renderer protocol. */
+    val wireName: String
+        get() = when (this) {
+            VRMA -> "vrma"
+            FBX -> "fbx"
+        }
+}
+
+/**
  * License metadata captured at import time. `null` on any permission flag
  * means UNKNOWN, which [AvatarImportPolicy] treats as most-restrictive — an
  * asset with unknown redistribution rights never enters the shared catalog.

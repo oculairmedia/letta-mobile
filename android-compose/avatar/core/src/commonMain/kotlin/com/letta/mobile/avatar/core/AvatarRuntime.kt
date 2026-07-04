@@ -44,8 +44,14 @@ sealed interface AvatarRuntimeState {
 interface AvatarRuntime {
     val state: StateFlow<AvatarRuntimeState>
 
-    /** Load [model], replacing any currently-loaded avatar. */
-    suspend fun load(model: AvatarModel)
+    /**
+     * Load [model], replacing any currently-loaded avatar. [animations] are
+     * user-provided standard animations (VRMA/Mixamo FBX) to retarget onto the
+     * model and register in its clip registry (playable by id via
+     * [playAnimation]); default empty. Renderers without animation-import
+     * support (or headless runtimes) simply record them.
+     */
+    suspend fun load(model: AvatarModel, animations: List<AvatarAnimationSource> = emptyList())
 
     /** Unload the current avatar and return to [AvatarRuntimeState.Idle]. */
     suspend fun unload()

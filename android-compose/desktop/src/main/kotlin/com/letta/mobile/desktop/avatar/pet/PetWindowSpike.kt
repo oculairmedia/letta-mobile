@@ -35,6 +35,8 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.avatar.core.AvatarActivity
+import com.letta.mobile.avatar.core.AvatarAnimationFormat
+import com.letta.mobile.avatar.core.AvatarAnimationSource
 import com.letta.mobile.avatar.core.AvatarCameraFraming
 import com.letta.mobile.avatar.core.AvatarDirector
 import com.letta.mobile.avatar.core.AvatarExpression
@@ -130,6 +132,47 @@ private fun resolveDefaultAvatar(): Path? {
         ?.takeIf(Files::isRegularFile)
 }
 
+/**
+ * Scan the drop-in animation folder (`~/.letta-mobile/avatars/animations`) for
+ * user-provided `.vrma`/`.fbx` files and register each with the loopback [host]
+ * so the renderer can fetch it. The folder is created if missing. Each id is the
+ * filename stem lowercased. Ill-formed or duplicate-id files are skipped with a
+ * log line rather than aborting the pet boot.
+ */
+private fun scanDropInAnimations(host: AvatarWebHost, log: (String) -> Unit): List<AvatarAnimationSource> {
+    val dir = defaultAvatarCatalogDir().resolve("animations")
+    runCatching { Files.createDirectories(dir) }
+        .onFailure { log("could not create animation dir $dir: ${it.message}"); return emptyList() }
+
+    val sources = mutableListOf<AvatarAnimationSource>()
+    val seenIds = mutableSetOf<String>()
+    runCatching {
+        Files.list(dir).use { stream ->
+            stream.filter(Files::isRegularFile).sorted().forEach { path ->
+                val name = path.fileName.toString()
+                val format = when {
+                    name.endsWith(".vrma", ignoreCase = true) -> AvatarAnimationFormat.VRMA
+                    name.endsWith(".fbx", ignoreCase = true) -> AvatarAnimationFormat.FBX
+                    else -> return@forEach
+                }
+                val id = name.substringBeforeLast('.').lowercase()
+                if (!seenIds.add(id)) {
+                    log("animation id '$id' already registered — skipping duplicate $name")
+                    return@forEach
+                }
+                sources += AvatarAnimationSource(id = id, uri = host.assetUrl(path), format = format)
+            }
+        }
+    }.onFailure { log("failed to scan animation dir $dir: ${it.message}") }
+
+    if (sources.isEmpty()) {
+        log("animations: none — drop .vrma/.fbx into $dir")
+    } else {
+        log("animations: ${sources.joinToString(", ") { it.id }}")
+    }
+    return sources
+}
+
 private data class Viewport(val widthDip: Int, val heightDip: Int, val scale: Double, val x: Int, val y: Int)
 
 @Composable
@@ -172,6 +215,12 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
             cef = startedCef
             startedCef.open("${host.baseUrl}/pet.html")
 
+            // Drop-in animation folder: user .vrma/.fbx files retargeted onto
+            // the avatar at load. Scanned once at boot; ids are the filename
+            // stem lowercased. Registered via the loopback host so the renderer
+            // can fetch them.
+            val animations = scanDropInAnimations(host, log)
+
             status = "loading avatar…"
             runtime.load(
                 AvatarModel(
@@ -184,6 +233,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
                         AvatarFormat.GLB
                     },
                 ),
+                animations = animations,
             )
             runtime.setCameraFraming(AvatarCameraFraming.FULL_BODY)
             director.setActivity(AvatarActivity.IDLE)

@@ -71,7 +71,10 @@ class WebAvatarRuntime(
         transport.setMessageHandler(::handleRendererMessage)
     }
 
-    override suspend fun loadCapabilities(model: AvatarModel): AvatarCapabilities {
+    override suspend fun loadCapabilities(
+        model: AvatarModel,
+        animations: List<com.letta.mobile.avatar.core.AvatarAnimationSource>,
+    ): AvatarCapabilities {
         // A replacement load supersedes any still-pending one.
         cancelPendingLoad("Superseded by a newer load")
 
@@ -93,6 +96,13 @@ class WebAvatarRuntime(
                         format = model.format.wireName,
                         requestId = pending.requestId,
                         accessories = accessoriesForModel(model),
+                        animations = animations.map {
+                            AvatarRendererCommand.WireAnimationSource(
+                                id = it.id,
+                                url = it.uri,
+                                format = it.format.wireName,
+                            )
+                        },
                     ),
                 )
                 try {
