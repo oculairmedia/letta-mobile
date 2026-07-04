@@ -72,9 +72,9 @@ object ConversationAdminHandlers {
                     .build(),
             )
             // letta-mobile-fe51r (P2b pointer diet): list responses ship
-            // previews for heavy tool-return bodies and never inline
-            // attachment payloads. Full bodies come via tool_return.get /
-            // message.get on demand.
+            // previews for heavy tool-return bodies; full bodies come via
+            // tool_return.get on demand. Inline attachments ship unmodified
+            // (clients have no refetch path for omitted attachment data).
             return MessageListWireProjection.projectMessageList(response, convId)
         }
 

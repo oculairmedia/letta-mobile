@@ -103,8 +103,20 @@ object IrohFrameCodec {
 
     class Decoder(
         private val maxFrameBytes: Int = DEFAULT_MAX_FRAME_BYTES,
-        private val maxReassembledBytes: Int = DEFAULT_MAX_REASSEMBLED_BYTES,
+        /**
+         * Upper bound for `frame_part` reassembly, evaluated per part header so
+         * callers can widen it dynamically (e.g. servers only grant the full
+         * [DEFAULT_MAX_REASSEMBLED_BYTES] once the peer has authenticated and
+         * advertised the capability; before that, unauthenticated peers must
+         * not be able to hold more than a plain frame's worth of memory).
+         */
+        private val maxReassembledBytesProvider: () -> Int = { DEFAULT_MAX_REASSEMBLED_BYTES },
     ) {
+        constructor(
+            maxFrameBytes: Int = DEFAULT_MAX_FRAME_BYTES,
+            maxReassembledBytes: Int,
+        ) : this(maxFrameBytes, { maxReassembledBytes })
+
         private var expectedLength: Int? = null
         private val prefix = ByteArray(LENGTH_PREFIX_BYTES)
         private var prefixBytes = 0
@@ -213,6 +225,7 @@ object IrohFrameCodec {
             if (partLen <= 0 || partLen > maxFrameBytes) {
                 throw ProtocolException("Invalid frame_part payload length: $partLen bytes (max $maxFrameBytes)")
             }
+            val maxReassembledBytes = maxReassembledBytesProvider()
             if (pendingBytes.toLong() + partLen > maxReassembledBytes) {
                 throw FrameTooLargeException(
                     "Reassembled Iroh frame too large: ${pendingBytes.toLong() + partLen} bytes > max $maxReassembledBytes"
@@ -283,9 +296,11 @@ object IrohFrameCodec {
         maxFrameBytes: Int = DEFAULT_MAX_FRAME_BYTES,
         chunkBytes: Int = 8192,
         maxReassembledBytes: Int = DEFAULT_MAX_REASSEMBLED_BYTES,
+        /** When set, overrides [maxReassembledBytes] with a per-part dynamic bound. */
+        maxReassembledBytesProvider: (() -> Int)? = null,
         onFrame: suspend (String) -> Unit,
     ) {
-        val decoder = Decoder(maxFrameBytes, maxReassembledBytes)
+        val decoder = Decoder(maxFrameBytes, maxReassembledBytesProvider ?: { maxReassembledBytes })
         while (true) {
             val chunk = recvStream.read(chunkBytes.toUInt())
             if (chunk.isEmpty()) break

@@ -20,10 +20,10 @@ import kotlinx.serialization.json.contentOrNull
  *   `tool_return_pointer` that names the `tool_return.get` admin_rpc method
  *   clients use to fetch the full body on demand (e.g. when the user expands
  *   a tool card).
- * - Inline attachment payloads (base64 image data / data: URLs) are never
- *   shipped in list responses — the data is blanked and `data_omitted` +
- *   `data_byte_len` markers are left in place. Full messages fetched via
- *   `message.get` / `tool_return.get` keep their attachments inline.
+ * - Inline attachment payloads (base64 image data / data: URLs) ship
+ *   unmodified. Clients have no refetch path for omitted attachment data, so
+ *   stripping it would silently lose images on every hydrate; oversized
+ *   pages ride the capability-gated `frame_part` chunking instead.
  *
  * `tool_return.get` and `message.get` responses are NOT projected.
  */
@@ -58,10 +58,9 @@ object MessageListWireProjection {
 
     /** Projects a single message object for a list response. */
     fun projectMessage(message: JsonObject, conversationId: String): JsonObject {
-        val stripped = stripInlineAttachmentData(message) as JsonObject
-        val messageType = (stripped["message_type"] as? JsonPrimitive)?.contentOrNull
-        if (messageType !in TOOL_RETURN_MESSAGE_TYPES) return stripped
-        return projectToolReturnMessage(stripped, conversationId)
+        val messageType = (message["message_type"] as? JsonPrimitive)?.contentOrNull
+        if (messageType !in TOOL_RETURN_MESSAGE_TYPES) return message
+        return projectToolReturnMessage(message, conversationId)
     }
 
     private fun projectToolReturnMessage(message: JsonObject, conversationId: String): JsonObject {
@@ -117,62 +116,6 @@ object MessageListWireProjection {
             ),
         )
         return JsonObject(out)
-    }
-
-    /**
-     * Recursively blanks inline attachment payloads: Letta image content
-     * parts (`{type:"image", source:{data:...}}`) and OpenAI-style
-     * `{type:"image_url", image_url:{url:"data:..."}}` parts. Leaves a
-     * `data_omitted` marker + original byte length so clients can render a
-     * placeholder and fetch the full message on demand.
-     */
-    fun stripInlineAttachmentData(element: JsonElement): JsonElement = when (element) {
-        is JsonArray -> {
-            var changed = false
-            val mapped = element.map { child ->
-                val stripped = stripInlineAttachmentData(child)
-                if (stripped !== child) changed = true
-                stripped
-            }
-            if (changed) JsonArray(mapped) else element
-        }
-        is JsonObject -> stripInlineAttachmentDataFromObject(element)
-        else -> element
-    }
-
-    private fun stripInlineAttachmentDataFromObject(obj: JsonObject): JsonElement {
-        val type = (obj["type"] as? JsonPrimitive)?.contentOrNull
-        if (type == "image") {
-            val source = obj["source"] as? JsonObject
-            val data = (source?.get("data") as? JsonPrimitive)?.takeIf { it.isString }?.content
-            if (source != null && !data.isNullOrEmpty()) {
-                val newSource = source.toMutableMap().apply {
-                    this["data"] = JsonPrimitive("")
-                    this["data_omitted"] = JsonPrimitive(true)
-                    this["data_byte_len"] = JsonPrimitive(utf8ByteLength(data).toLong())
-                }
-                return JsonObject(obj.toMutableMap().apply { this["source"] = JsonObject(newSource) })
-            }
-        }
-        if (type == "image_url") {
-            val imageUrl = obj["image_url"] as? JsonObject
-            val url = (imageUrl?.get("url") as? JsonPrimitive)?.takeIf { it.isString }?.content
-            if (imageUrl != null && url != null && url.startsWith("data:")) {
-                val newImageUrl = imageUrl.toMutableMap().apply {
-                    this["url"] = JsonPrimitive("")
-                    this["data_omitted"] = JsonPrimitive(true)
-                    this["data_byte_len"] = JsonPrimitive(utf8ByteLength(url).toLong())
-                }
-                return JsonObject(obj.toMutableMap().apply { this["image_url"] = JsonObject(newImageUrl) })
-            }
-        }
-        var changed = false
-        val mapped = obj.mapValues { (_, value) ->
-            val stripped = stripInlineAttachmentData(value)
-            if (stripped !== value) changed = true
-            stripped
-        }
-        return if (changed) JsonObject(mapped) else obj
     }
 
     private fun bodyString(element: JsonElement): String =

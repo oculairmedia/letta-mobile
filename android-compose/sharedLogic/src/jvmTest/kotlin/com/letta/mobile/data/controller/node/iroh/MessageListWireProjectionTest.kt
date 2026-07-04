@@ -169,27 +169,27 @@ class MessageListWireProjectionTest {
     }
 
     @Test
-    fun inlineBase64AttachmentDataIsNeverShippedInListResponses() {
-        val page = buildJsonArray {
-            add(
-                buildJsonObject {
-                    put("id", "msg-img")
-                    put("message_type", "user_message")
-                    put(
-                        "content",
-                        buildJsonArray {
-                            add(buildJsonObject { put("type", "text"); put("text", "look at this") })
-                            add(
+    fun inlineBase64AttachmentDataShipsUnmodifiedInListResponses() {
+        // Regression: the projection must NOT strip inline attachment data.
+        // Clients have no refetch path for omitted attachments — parsing
+        // drops blank-data image parts — so stripping silently loses images
+        // on every hydrate. Oversized pages ride frame_part chunking instead.
+        val imageMessage = buildJsonObject {
+            put("id", "msg-img")
+            put("message_type", "user_message")
+            put(
+                "content",
+                buildJsonArray {
+                    add(buildJsonObject { put("type", "text"); put("text", "look at this") })
+                    add(
+                        buildJsonObject {
+                            put("type", "image")
+                            put(
+                                "source",
                                 buildJsonObject {
-                                    put("type", "image")
-                                    put(
-                                        "source",
-                                        buildJsonObject {
-                                            put("type", "base64")
-                                            put("media_type", "image/png")
-                                            put("data", "A".repeat(64))
-                                        },
-                                    )
+                                    put("type", "base64")
+                                    put("media_type", "image/png")
+                                    put("data", "A".repeat(64))
                                 },
                             )
                         },
@@ -197,21 +197,7 @@ class MessageListWireProjectionTest {
                 },
             )
         }
-
-        val projected = MessageListWireProjection.projectMessageList(page, "conv-1") as JsonArray
-        val content = projected.single().jsonObject.getValue("content").jsonArray
-        val source = content[1].jsonObject.getValue("source").jsonObject
-
-        assertEquals("", source.getValue("data").jsonPrimitive.content)
-        assertTrue(source.getValue("data_omitted").jsonPrimitive.boolean)
-        assertEquals(64L, source.getValue("data_byte_len").jsonPrimitive.long)
-        // text part untouched
-        assertEquals("look at this", content[0].jsonObject.getValue("text").jsonPrimitive.content)
-    }
-
-    @Test
-    fun dataUrlImageUrlAttachmentsAreStripped() {
-        val message = buildJsonObject {
+        val dataUrlMessage = buildJsonObject {
             put("id", "msg-img2")
             put("message_type", "assistant_message")
             put(
@@ -226,33 +212,47 @@ class MessageListWireProjectionTest {
                 },
             )
         }
-        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
-        val imageUrl = projected.getValue("content").jsonArray.single().jsonObject.getValue("image_url").jsonObject
-        assertEquals("", imageUrl.getValue("url").jsonPrimitive.content)
-        assertTrue(imageUrl.getValue("data_omitted").jsonPrimitive.boolean)
+        val page = buildJsonArray {
+            add(imageMessage)
+            add(dataUrlMessage)
+        }
+
+        val projected = MessageListWireProjection.projectMessageList(page, "conv-1") as JsonArray
+
+        assertSame(imageMessage, projected[0])
+        assertSame(dataUrlMessage, projected[1])
+        val source = projected[0].jsonObject.getValue("content").jsonArray[1].jsonObject.getValue("source").jsonObject
+        assertEquals("A".repeat(64), source.getValue("data").jsonPrimitive.content)
+        assertNull(source["data_omitted"])
     }
 
     @Test
-    fun httpImageUrlsAreKept() {
+    fun toolReturnBodyContainingImagePartsUnderThresholdIsNotMutated() {
+        // Regression: attachment stripping used to recurse into structured
+        // tool_return bodies and blank image data without setting the
+        // tool_return_truncated marker — mutated output with no signal.
         val message = buildJsonObject {
-            put("id", "msg-img3")
-            put("message_type", "assistant_message")
+            put("id", "msg-genimg")
+            put("message_type", "tool_return_message")
             put(
-                "content",
-                buildJsonArray {
-                    add(
+                "tool_return",
+                buildJsonObject {
+                    put("type", "image")
+                    put(
+                        "source",
                         buildJsonObject {
-                            put("type", "image_url")
-                            put("image_url", buildJsonObject { put("url", "https://example.com/pic.png") })
+                            put("type", "base64")
+                            put("media_type", "image/png")
+                            put("data", "C".repeat(128))
                         },
                     )
                 },
             )
         }
         val projected = MessageListWireProjection.projectMessage(message, "conv-1")
-        val imageUrl = projected.getValue("content").jsonArray.single().jsonObject.getValue("image_url").jsonObject
-        assertEquals("https://example.com/pic.png", imageUrl.getValue("url").jsonPrimitive.content)
-        assertNull(imageUrl["data_omitted"])
+
+        assertSame(message, projected)
+        assertNull(projected["tool_return_truncated"])
     }
 
     @Test

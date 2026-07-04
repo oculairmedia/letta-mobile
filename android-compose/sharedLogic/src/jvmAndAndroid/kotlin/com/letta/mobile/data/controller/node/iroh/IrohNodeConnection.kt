@@ -152,6 +152,17 @@ class IrohNodeConnection(
             IrohFrameCodec.readAll(
                 recvStream = recvStream,
                 maxFrameBytes = MAX_FRAME_BYTES,
+                // Chunked requests may only widen reassembly memory beyond a
+                // single frame once the peer authenticated AND advertised
+                // frame_part — the auth frame itself arrives on this stream,
+                // so pre-auth peers stay bounded to MAX_FRAME_BYTES.
+                maxReassembledBytesProvider = {
+                    if (authenticated.get() && peerSupportsFrameParts()) {
+                        IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES
+                    } else {
+                        MAX_FRAME_BYTES
+                    }
+                },
             ) { frameJson ->
                 Telemetry.event("IrohNode", "control.recv", "remoteEndpointId" to remoteEndpointId, "bytes" to frameJson.length)
                 try {

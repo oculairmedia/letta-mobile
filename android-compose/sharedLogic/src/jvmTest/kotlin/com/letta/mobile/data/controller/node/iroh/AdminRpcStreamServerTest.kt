@@ -226,6 +226,86 @@ class AdminRpcStreamServerTest {
         assertEquals(1, stream.send.writes.size, "capability-off peer must receive a single plain frame")
     }
 
+    @Test
+    fun chunkedRequestFromUnauthenticatedPeerIsBoundedByMaxFrameBytes() = runTest {
+        // A peer holding just the ticket (no/invalid token) must not be able
+        // to pin more than one frame's worth of reassembly memory per stream.
+        val server = AdminRpcStreamServer(
+            router = router(),
+            authenticated = AtomicBoolean(false),
+            firstFrameTimeoutMs = 1_000,
+            maxFrameBytes = 256,
+        )
+        val stream = FakeBiStream()
+
+        val job = launchTracked(server, stream)
+        stream.sendChunkedFrame(adminRpcWithPadding("rpc-preauth", "health.check", padTo = 600), maxFrameBytes = 256)
+        stream.closeRecv()
+
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertTrue(response["success"]?.jsonPrimitive?.boolean == false)
+        val error = response["error"]?.jsonPrimitive?.content.orEmpty()
+        assertTrue("too large" in error, "pre-auth chunked request must be rejected as too large: $error")
+    }
+
+    @Test
+    fun chunkedRequestFromAuthenticatedFramePartPeerIsAccepted() = runTest {
+        val server = AdminRpcStreamServer(
+            router = router(),
+            authenticated = AtomicBoolean(true),
+            firstFrameTimeoutMs = 1_000,
+            maxFrameBytes = 256,
+            peerSupportsFrameParts = { true },
+        )
+        val stream = FakeBiStream()
+
+        val job = launchTracked(server, stream)
+        stream.sendChunkedFrame(adminRpcWithPadding("rpc-chunked", "health.check", padTo = 600), maxFrameBytes = 256)
+        stream.closeRecv()
+
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("admin_rpc_response", response["type"]?.jsonPrimitive?.content)
+        assertEquals("rpc-chunked", response["request_id"]?.jsonPrimitive?.content)
+        assertTrue(response["success"]?.jsonPrimitive?.boolean == true)
+    }
+
+    @Test
+    fun responseBeyondLogicalFrameCapReturnsTypedErrorEnvelopeToFramePartPeer() = runTest {
+        // Regression: FrameTooLargeException from encodeFrameParts used to
+        // escape writeResponse, so the stream finished silently and the
+        // client burned its full RPC timeout. It must get the same typed
+        // envelope the capability-off path sends.
+        val bigResult = "x".repeat(1_500)
+        val router = AdminRpcRouter().apply { register("big.get") { JsonPrimitive(bigResult) } }
+        val server = AdminRpcStreamServer(
+            router = router,
+            authenticated = AtomicBoolean(true),
+            firstFrameTimeoutMs = 1_000,
+            maxFrameBytes = 256,
+            peerSupportsFrameParts = { true },
+            maxReassembledBytes = 512,
+        )
+        val stream = FakeBiStream()
+
+        val job = launchTracked(server, stream)
+        stream.sendFrame(adminRpc("rpc-huge", "big.get"))
+        stream.closeRecv()
+
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("admin_rpc_response", response["type"]?.jsonPrimitive?.content)
+        assertEquals("rpc-huge", response["request_id"]?.jsonPrimitive?.content)
+        assertTrue(response["success"]?.jsonPrimitive?.boolean == false)
+        val error = response["error"]?.jsonPrimitive?.content.orEmpty()
+        assertTrue("too large" in error, "error should name the size rejection: $error")
+        assertEquals(1, stream.send.writes.size, "fallback must be a single plain frame")
+    }
+
     private fun TestScope.launchTracked(server: AdminRpcStreamServer, stream: AdminRpcBiStream): Job =
         with(server) { launchHandler(stream) }
 
@@ -236,8 +316,17 @@ class AdminRpcStreamServerTest {
     private fun adminRpc(requestId: String, method: String): String =
         """{"type":"admin_rpc","request_id":"$requestId","method":"$method","params":{}}"""
 
+    private fun adminRpcWithPadding(requestId: String, method: String, padTo: Int): String {
+        val base = """{"type":"admin_rpc","request_id":"$requestId","method":"$method","params":{"pad":"PAD"}}"""
+        return base.replace("PAD", "p".repeat((padTo - base.length + 3).coerceAtLeast(1)))
+    }
+
     private suspend fun FakeBiStream.sendFrame(frame: String) {
         recv.chunks.send(IrohFrameCodec.encodeFrame(frame))
+    }
+
+    private suspend fun FakeBiStream.sendChunkedFrame(frame: String, maxFrameBytes: Int) {
+        IrohFrameCodec.encodeFrameParts(frame, maxFrameBytes).forEach { recv.chunks.send(it) }
     }
 
     private suspend fun FakeBiStream.closeRecv() {
