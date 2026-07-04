@@ -445,7 +445,12 @@ class IrohAppServerTransport(
      */
     private fun String.isLegacyFallbackSafeAdminRpcMethod(): Boolean = when (this) {
         "health.check",
-        "goal.get" -> true
+        "goal.get",
+        // Idempotent agent reads issued right after connect (chat-screen load +
+        // conversation-list name resolution) — safe to retry over the legacy
+        // fallback (#818 review).
+        "agent.get",
+        "agent.list" -> true
         else -> false
     }
 
