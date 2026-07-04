@@ -255,6 +255,76 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `iroh cumulative assistant chunks with per-chunk ids but shared otid merge into one row`() {
+        // The App Server streams CUMULATIVE assistant deltas (each chunk carries
+        // the full text so far). Over Iroh it mints a NEW backend letta-msg-* id
+        // per chunk but keeps a STABLE otid for the message. Without the
+        // otid-cumulative-merge, the fuller second chunk is dropped as an otid
+        // duplicate and the UI stays stuck on "Got".
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-5020",
+                contentRaw = JsonPrimitive("Got"),
+                runId = "run-real-app-server",
+                otid = "otid-assistant-1",
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-5021",
+                contentRaw = JsonPrimitive("Got it — Iroh transport is streaming the response."),
+                runId = "run-real-app-server",
+                otid = "otid-assistant-1",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-5020"
+        event.content shouldBe "Got it — Iroh transport is streaming the response."
+        event.seqId shouldBe 2
+        output.next.liveCursor shouldBe "letta-msg-5020"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("letta-msg-5020", "assistant_message")
+        )
+    }
+
+    @Test
+    fun `distinct otids in the same run stay separate assistant rows`() {
+        // Guard against over-merging: a tool-mediated run can legitimately have
+        // multiple assistant messages. They carry DISTINCT otids, so the
+        // otid-cumulative-merge must not collapse them.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-6000",
+                contentRaw = JsonPrimitive("Let me check that."),
+                runId = "run-1",
+                otid = "otid-a",
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-6001",
+                contentRaw = JsonPrimitive("Done — here is the result."),
+                runId = "run-1",
+                otid = "otid-b",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 2
+        val texts = output.next.events.map { (it as TimelineEvent.Confirmed).content }
+        texts shouldBe listOf("Let me check that.", "Done — here is the result.")
+    }
+
+    @Test
     fun `cumulative frames do not double existing text`() {
         val seeded = reduce(
             frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hey"), seqId = 1)

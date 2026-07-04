@@ -245,7 +245,53 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
-    if (timeline.findByOtid(confirmed.otid) != null) {
+    val otidMatch = timeline.findByOtid(confirmed.otid) as? TimelineEvent.Confirmed
+    if (otidMatch != null) {
+        // letta-mobile: the App Server streams CUMULATIVE assistant deltas — each
+        // chunk carries the full text so far. Over Iroh the server mints a NEW
+        // backend `letta-msg-*` id per chunk (unlike the WS path, where the id is
+        // stable), so findByServerId misses and each fuller cumulative snapshot
+        // would otherwise be DROPPED here as an otid duplicate — leaving the UI
+        // stuck on the first fragment ("Got" instead of the full reply). When the
+        // otid-matched row is an assistant message and the incoming frame is a
+        // fuller cumulative snapshot of the SAME otid, merge the newer text into
+        // the existing row (keyed by the row's stable serverId) instead of
+        // dropping it. Distinct assistant messages carry distinct otids, so
+        // tool-mediated multi-assistant runs stay separate.
+        val bothAssistant = otidMatch.messageType == TimelineMessageType.ASSISTANT &&
+            confirmed.messageType == TimelineMessageType.ASSISTANT
+        val merge = if (bothAssistant) {
+            mergeStreamText(
+                existing = otidMatch.content,
+                incoming = confirmed.content,
+                canUseSnapshotMerge = otidMatch.seqId != null && confirmed.seqId != null,
+                incomingIsForwardDelta = otidMatch.seqId == null || confirmed.seqId == null ||
+                    confirmed.seqId > otidMatch.seqId,
+            )
+        } else {
+            null
+        }
+        if (merge != null && merge.text != otidMatch.content) {
+            val merged = otidMatch.copy(
+                content = merge.text,
+                seqId = latestSeqId(otidMatch.seqId, confirmed.seqId),
+            )
+            timeline = timeline.replaceByServerId(merged)
+            timeline = timeline.copy(liveCursor = otidMatch.serverId)
+            pendingEvents += TimelineSyncEvent.StreamEventIngested(otidMatch.serverId, message.messageType)
+            hotPathTelemetry(
+                "streamSubscriber.otidCumulativeMerged",
+                "otid" to confirmed.otid,
+                "serverId" to otidMatch.serverId,
+                "incomingServerId" to confirmed.serverId,
+                "oldLen" to otidMatch.content.length,
+                "newLen" to confirmed.content.length,
+                "mergedLen" to merge.text.length,
+                "mergeBranch" to merge.branch.name,
+                "conversationId" to conversationId,
+            )
+            return output()
+        }
         hotPathTelemetry(
             "streamSubscriber.eventDeduped",
             "reason" to "otidSeen",
