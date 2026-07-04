@@ -48,22 +48,28 @@ open class TimelineRepository(
     private val loopsMutex = Mutex()
 
     // letta-mobile-x1xnl: ingestion-boundary idempotency guard for external
-    // (Iroh) transport frames. The Iroh gate fanout can deliver the SAME stream
-    // frame more than once (observed on-device: every incoming letta-msg-* id
-    // logged twice across multiple threads, and a duplicate mid-stream
-    // accumulator row spawning for one otid). Each stream frame carries a unique
-    // server message id, so (conversationId, serverId) is a stable per-frame
-    // identity: a genuine forward increment has a NEW id, a redelivery repeats
-    // the SAME id. Dropping repeats here — before loop resolution — removes the
-    // double-ingest and the loop-aliasing race that spawns the duplicate row,
-    // without affecting distinct increments. Bounded so it can't grow unbounded.
+    // transport frames. The Iroh gate fanout can deliver the SAME stream frame
+    // more than once (observed on-device: every incoming letta-msg-* id logged
+    // twice across multiple threads, and a duplicate mid-stream accumulator row
+    // spawning for one otid).
+    //
+    // Codex review P1: this guard runs for EVERY external transport, not only
+    // the Iroh per-frame-id fanout. The WS/App Server path keeps a STABLE
+    // assistant id across cumulative chunks (e.g. id="cm-1" content="Hel", then
+    // id="cm-1" content="lo"/"Hello"), relying on the reducer's same-server-id
+    // merge. Keying only on (conversationId, serverId) would drop the second WS
+    // chunk and freeze the UI on the first fragment. So the duplicate key must
+    // include a content fingerprint: a genuine forward increment repeats the id
+    // but carries NEW (longer/different) content and passes through to the
+    // reducer; only an exact (id + payload) repeat is a redelivery to drop.
+    // Bounded so it can't grow unbounded.
     private val seenExternalFrameKeys = LinkedHashSet<String>()
     private val seenExternalFrameKeysMutex = Mutex()
 
     private suspend fun isDuplicateExternalFrame(conversationId: String, message: com.letta.mobile.data.model.LettaMessage): Boolean {
         val serverId = message.id
         if (serverId.isBlank()) return false
-        val key = "$conversationId::$serverId"
+        val key = "$conversationId::$serverId::${externalFramePayloadFingerprint(message)}"
         return seenExternalFrameKeysMutex.withLock {
             if (!seenExternalFrameKeys.add(key)) {
                 true
@@ -81,6 +87,28 @@ open class TimelineRepository(
             }
         }
     }
+
+    // Codex review P1: distinguish a genuine forward increment (same stable id
+    // on the WS path, but a NEW seq / longer content) from an exact redelivery
+    // (same id AND same payload — the Iroh double-fanout). seqId monotonically
+    // advances per real increment on both transports, so it is the primary
+    // signal; when absent, fall back to the content length so a longer
+    // cumulative snapshot is not mistaken for a repeat.
+    private fun externalFramePayloadFingerprint(message: com.letta.mobile.data.model.LettaMessage): String {
+        val seq = message.seqId
+        if (seq != null) return "s$seq"
+        val len = externalFrameContentLength(message)
+        return "l$len"
+    }
+
+    private fun externalFrameContentLength(message: com.letta.mobile.data.model.LettaMessage): Int =
+        when (message) {
+            is com.letta.mobile.data.model.AssistantMessage -> message.content.length
+            is com.letta.mobile.data.model.UserMessage -> message.content.length
+            is com.letta.mobile.data.model.SystemMessage -> message.content.length
+            is com.letta.mobile.data.model.ReasoningMessage -> message.reasoning.length
+            else -> 0
+        }
 
     /** Mutex-guarded LRU get: touches the entry so eviction stays correct. */
     private fun getLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {

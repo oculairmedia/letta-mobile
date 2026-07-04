@@ -187,6 +187,50 @@ class TimelineRepositoryTest {
     }
 
     @Test
+    fun `stable-id WS cumulative increment is not dropped as a duplicate`() = runBlocking {
+        // Codex review P1: the WS/App Server path keeps a STABLE assistant id
+        // across cumulative chunks. Keying the ingestion guard only on
+        // (conversationId, serverId) would drop the second chunk and freeze the
+        // UI on the first fragment. The guard must let a same-id forward
+        // increment (new seq / longer content) through to the reducer's merge.
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+
+        val chunk1 = com.letta.mobile.data.model.AssistantMessage(
+            id = "cm-stream-1",
+            contentRaw = JsonPrimitive("Hel"),
+            runId = "run-ws",
+            otid = "otid-ws",
+            seqId = 1,
+        )
+        val chunk2 = com.letta.mobile.data.model.AssistantMessage(
+            id = "cm-stream-1", // SAME stable id (WS contract)
+            contentRaw = JsonPrimitive("Hello there."),
+            runId = "run-ws",
+            otid = "otid-ws",
+            seqId = 2,
+        )
+        repository.ingestExternalTransportMessage("agent-a", "conv-ws", chunk1)
+        repository.ingestExternalTransportMessage("agent-a", "conv-ws", chunk2)
+
+        val timeline = withTimeout(2_000) {
+            var t = repository.getOrCreate("agent-a", "conv-ws").state.value
+            while (t.events.isEmpty() || (t.events.single() as com.letta.mobile.data.timeline.TimelineEvent.Confirmed).content == "Hel") {
+                delay(10); t = repository.getOrCreate("agent-a", "conv-ws").state.value
+            }
+            t
+        }
+        assertEquals("one row, merged", 1, timeline.events.size)
+        assertEquals(
+            "second WS chunk must merge, not be dropped as duplicate",
+            "Hello there.",
+            (timeline.events.single() as com.letta.mobile.data.timeline.TimelineEvent.Confirmed).content,
+        )
+
+        repository.clearAll()
+    }
+
+    @Test
     fun `unscoped loop promoted to first scoped agent is not reused by different agent`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
