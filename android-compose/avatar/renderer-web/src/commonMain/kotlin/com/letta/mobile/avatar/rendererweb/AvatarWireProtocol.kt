@@ -23,7 +23,7 @@ import kotlinx.serialization.json.Json
  * future native renderer (filament-vrm) must satisfy.
  */
 object AvatarWireProtocol {
-    const val VERSION = 1
+    const val VERSION = 2
 
     val json: Json = Json {
         ignoreUnknownKeys = true
@@ -130,6 +130,24 @@ sealed interface AvatarRendererCommand {
     @Serializable
     @SerialName("setAccessoryEnabled")
     data class SetAccessoryEnabled(val id: String, val enabled: Boolean) : AvatarRendererCommand
+
+    /** Frame the avatar: "headshot", "bust", or "fullBody". */
+    @Serializable
+    @SerialName("setCameraFraming")
+    data class SetCameraFraming(val framing: String) : AvatarRendererCommand
+
+    /**
+     * Rasterize the current avatar into a PNG data-url of roughly
+     * [width]x[height] (cover-fit). Answered by [AvatarRendererEvent.ThumbnailCaptured]
+     * or [AvatarRendererEvent.ThumbnailFailed], correlated by [requestId].
+     */
+    @Serializable
+    @SerialName("captureThumbnail")
+    data class CaptureThumbnail(
+        val requestId: String,
+        val width: Int,
+        val height: Int,
+    ) : AvatarRendererCommand
 }
 
 // ---------------------------------------------------------------------------
@@ -163,4 +181,20 @@ sealed interface AvatarRendererEvent {
     @Serializable
     @SerialName("rendererError")
     data class RendererError(val message: String) : AvatarRendererEvent
+
+    /** Answer to [AvatarRendererCommand.CaptureThumbnail]. */
+    @Serializable
+    @SerialName("thumbnailCaptured")
+    data class ThumbnailCaptured(
+        val requestId: String,
+        /** `data:image/png;base64,...` */
+        val dataUrl: String,
+    ) : AvatarRendererEvent
+
+    @Serializable
+    @SerialName("thumbnailFailed")
+    data class ThumbnailFailed(
+        val requestId: String,
+        val message: String,
+    ) : AvatarRendererEvent
 }

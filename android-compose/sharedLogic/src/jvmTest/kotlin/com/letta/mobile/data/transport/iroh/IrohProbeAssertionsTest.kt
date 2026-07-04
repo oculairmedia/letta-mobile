@@ -99,6 +99,24 @@ class IrohProbeAssertionsTest {
     }
 
 
+
+    @Test
+    fun `orphan fragment assertion stays strict after terminal turn`() {
+        val metrics = IrohProbeAssertions.metricsForFrames(
+            turn = 1,
+            frames = listOf(
+                assistant(id = "assistant-1", content = "OK"),
+                done(),
+            ),
+        )
+
+        val summary = IrohProbeAssertions.summarize(listOf(metrics))
+
+        assertFalse(summary.ok)
+        assertEquals(listOf(2), metrics.assistantFinalTextLengths)
+        assertTrue("orphan_fragment:turn1" in summary.violations)
+    }
+
     @Test
     fun `skipped restart turn is ignored by probe assertions`() {
         val skipped = IrohProbeTurnMetrics(

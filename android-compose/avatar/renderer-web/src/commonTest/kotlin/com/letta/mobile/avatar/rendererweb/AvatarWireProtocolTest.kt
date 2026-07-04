@@ -26,6 +26,8 @@ class AvatarWireProtocolTest {
         AvatarRendererCommand.PlayGesture(id = "wave", fadeSeconds = 0.2f),
         AvatarRendererCommand.PlayAnimation(id = "Idle", loop = true),
         AvatarRendererCommand.SetAccessoryEnabled(id = "glasses", enabled = false),
+        AvatarRendererCommand.SetCameraFraming(framing = "bust"),
+        AvatarRendererCommand.CaptureThumbnail(requestId = "thumb-1", width = 256, height = 256),
     )
 
     private val allEvents: List<AvatarRendererEvent> = listOf(
@@ -36,6 +38,8 @@ class AvatarWireProtocolTest {
         ),
         AvatarRendererEvent.AvatarLoadFailed(requestId = "load-1", message = "404"),
         AvatarRendererEvent.RendererError(message = "shader compile failed"),
+        AvatarRendererEvent.ThumbnailCaptured(requestId = "thumb-1", dataUrl = "data:image/png;base64,AAAA"),
+        AvatarRendererEvent.ThumbnailFailed(requestId = "thumb-1", message = "no avatar"),
     )
 
     @Test

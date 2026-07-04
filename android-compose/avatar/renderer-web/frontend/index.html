@@ -85,6 +85,14 @@
     </fieldset>
 
     <fieldset>
+      <legend>Camera</legend>
+      <button data-framing="headshot">headshot</button>
+      <button data-framing="bust">bust</button>
+      <button data-framing="fullBody">full body</button>
+      <button id="thumb">thumbnail</button>
+    </fieldset>
+
+    <fieldset>
       <legend>Animation</legend>
       <input type="text" id="animid" placeholder="animation id" size="12">
       <button id="play">play</button>
@@ -191,6 +199,13 @@ stage.addEventListener('pointermove', (e) => {
   });
 });
 document.getElementById('clearlook').onclick = () => send({ type: 'clearLookTarget' });
+
+document.querySelectorAll('[data-framing]').forEach((btn) => {
+  btn.onclick = () => send({ type: 'setCameraFraming', framing: btn.dataset.framing });
+});
+let thumbCounter = 0;
+document.getElementById('thumb').onclick = () =>
+  send({ type: 'captureThumbnail', requestId: 'harness-thumb-' + (++thumbCounter), width: 256, height: 256 });
 
 document.getElementById('play').onclick = () =>
   send({ type: 'playAnimation', id: document.getElementById('animid').value, loop: false });

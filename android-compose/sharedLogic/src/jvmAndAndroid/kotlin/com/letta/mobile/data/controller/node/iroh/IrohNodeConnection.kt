@@ -30,11 +30,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
@@ -118,79 +115,16 @@ class IrohNodeConnection(
         }
     }
 
-    private suspend fun acceptAdminRpcStreams() = supervisorScope {
-        val adminRpcStreamPermits = Semaphore(MAX_CONCURRENT_ADMIN_RPC_STREAMS)
-        while (true) {
-            val biStream = connection.acceptBi()
-            Telemetry.event("IrohNode", "admin_rpc.stream.accepted", "remoteEndpointId" to remoteEndpointId)
-            launch {
-                adminRpcStreamPermits.withPermit {
-                    serveAdminRpcStream(biStream)
-                }
-            }
-        }
-    }
-
-    private suspend fun serveAdminRpcStream(biStream: BiStream) {
-        val sendStream = biStream.send()
-        try {
-            val frameJson = withTimeoutOrNull(ADMIN_RPC_REQUEST_TIMEOUT_MS) {
-                IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
-            }
-            val response = if (frameJson == null) {
-                """{"type":"admin_rpc_response","request_id":"","success":false,"error":"admin_rpc request stream closed before request"}"""
-            } else {
-                handleAdminRpcStreamFrame(frameJson)
-            }
-            IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES)
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (error: Exception) {
-            Telemetry.event(
-                "IrohNode", "admin_rpc.stream.failed",
-                "remoteEndpointId" to remoteEndpointId,
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
-            )
-            runCatching {
-                IrohFrameCodec.write(sendStream, """{"type":"admin_rpc_response","request_id":"","success":false,"error":"${error.message?.replace("\"", "\\\"") ?: "admin_rpc stream failed"}"}""", MAX_FRAME_BYTES)
-            }.onFailure { writeError ->
-                Telemetry.event(
-                    "IrohNode", "admin_rpc.stream.error_response_failed",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "error" to (writeError.message ?: writeError.toString()),
-                    "class" to writeError::class.simpleName,
-                )
-            }
-        } finally {
-            runCatching { sendStream.finish() }
-        }
-    }
-
-    private suspend fun handleAdminRpcStreamFrame(frameJson: String): String {
-        return try {
-            val json = Json { ignoreUnknownKeys = true }
-            val obj = json.parseToJsonElement(frameJson).jsonObject
-            val type = obj["type"]?.jsonPrimitive?.content
-            val requestId = obj["request_id"]?.jsonPrimitive?.content
-            val method = obj["method"]?.jsonPrimitive?.content
-            Telemetry.event("IrohNode", "admin_rpc.stream.recv", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "method" to method)
-            if (type != "admin_rpc") {
-                """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"Expected admin_rpc frame"}"""
-            } else if (!authenticated.get()) {
-                val id = requestId ?: ""
-                Telemetry.event("IrohNode", "auth.required", "remoteEndpointId" to remoteEndpointId, "requestId" to id, "reason" to "missing_token")
-                """{"type":"admin_rpc_response","request_id":"$id","success":false,"error":"unauthorized"}"""
-            } else if (method == null || requestId == null) {
-                """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"method and request_id are required"}"""
-            } else {
-                adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
-            }
-        } catch (ce: CancellationException) {
-            throw ce
-        } catch (error: Exception) {
-            """{"type":"admin_rpc_response","request_id":"","success":false,"error":"Failed to parse admin_rpc frame: ${error.message?.replace("\"", "\\\"")}"}"""
-        }
+    private suspend fun acceptAdminRpcStreams() {
+        val server = AdminRpcStreamServer(
+            router = adminRpcRouter,
+            authenticated = authenticated,
+            remoteEndpointId = remoteEndpointId,
+            maxActiveHandlers = MAX_CONCURRENT_ADMIN_RPC_STREAMS,
+            firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
+            maxFrameBytes = MAX_FRAME_BYTES,
+        )
+        server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
 
     private suspend fun serveControlChannel(
