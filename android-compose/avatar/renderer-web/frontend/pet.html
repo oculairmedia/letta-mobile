@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  Pet-mode page: the avatar canvas and nothing else, on a fully transparent
+  background, always host-driven over the /bridge WebSocket. The embedding
+  window (JCEF off-screen host) composites these frames straight onto the
+  desktop, so any opaque pixel here would show up as a box around the pet.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Letta Pet</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { width: 100%; height: 100%; display: block; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.min.js",
+    "@pixiv/three-vrm": "./vendor/three-vrm.module.min.js"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="stage"><canvas id="avatar-canvas"></canvas></div>
+
+<script type="module">
+import { createAvatarRenderer, PROTOCOL_VERSION } from './avatar-renderer.js';
+
+// Same bridge contract as index.html's ?ws=1 mode: buffer events until the
+// socket opens, re-announce `ready` on every (re)connect so a host that
+// restarts still gets the handshake, reconnect with a small backoff.
+const pending = [];
+let socket = null;
+
+const rendererApi = createAvatarRenderer(
+  document.getElementById('avatar-canvas'),
+  (json) => {
+    try { if (JSON.parse(json).type === 'ready') return; } catch { /* buffer as-is */ }
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(json);
+    else pending.push(json);
+  },
+);
+window.lettaAvatar = rendererApi; // host-facing bridge entry point
+
+function connect() {
+  socket = new WebSocket(location.origin.replace(/^http/, 'ws') + '/bridge');
+  socket.onopen = () => {
+    socket.send(JSON.stringify({ type: 'ready', protocolVersion: PROTOCOL_VERSION }));
+    while (pending.length) socket.send(pending.shift());
+  };
+  socket.onmessage = (e) => rendererApi.handleCommand(e.data);
+  socket.onclose = () => setTimeout(connect, 1000); // host restart tolerance
+}
+connect();
+</script>
+</body>
+</html>
