@@ -30,8 +30,11 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
@@ -46,6 +49,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
 
 /**
@@ -70,7 +74,7 @@ class IrohNodeConnection(
 ) {
     private val handledClientMessageIds = LinkedHashSet<String>()
     private val streamWriteMutex = Mutex()
-    private var authenticated: Boolean = requiredBearerToken.isNullOrBlank()
+    private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
 
     suspend fun serve() = coroutineScope {
         try {
@@ -88,7 +92,12 @@ class IrohNodeConnection(
                 serveStreamReadiness(streamBiStream)
             }
 
+            val adminRpcAcceptJob = launch {
+                acceptAdminRpcStreams()
+            }
+
             controlJob.join()
+            adminRpcAcceptJob.cancelAndJoin()
             streamJob.cancelAndJoin()
             runCatching { streamSend.finish() }
         } catch (e: Exception) {
@@ -106,6 +115,81 @@ class IrohNodeConnection(
                 *IrohDiagnostics.connectionStatsAttributes(runCatching { connection.stats() }.getOrNull()).toTypedArray(),
             )
             runCatching { connection.close() }
+        }
+    }
+
+    private suspend fun acceptAdminRpcStreams() = supervisorScope {
+        val adminRpcStreamPermits = Semaphore(MAX_CONCURRENT_ADMIN_RPC_STREAMS)
+        while (true) {
+            val biStream = connection.acceptBi()
+            Telemetry.event("IrohNode", "admin_rpc.stream.accepted", "remoteEndpointId" to remoteEndpointId)
+            launch {
+                adminRpcStreamPermits.withPermit {
+                    serveAdminRpcStream(biStream)
+                }
+            }
+        }
+    }
+
+    private suspend fun serveAdminRpcStream(biStream: BiStream) {
+        val sendStream = biStream.send()
+        try {
+            val frameJson = withTimeoutOrNull(ADMIN_RPC_REQUEST_TIMEOUT_MS) {
+                IrohFrameCodec.readOne(biStream.recv(), MAX_FRAME_BYTES)
+            }
+            val response = if (frameJson == null) {
+                """{"type":"admin_rpc_response","request_id":"","success":false,"error":"admin_rpc request stream closed before request"}"""
+            } else {
+                handleAdminRpcStreamFrame(frameJson)
+            }
+            IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (error: Exception) {
+            Telemetry.event(
+                "IrohNode", "admin_rpc.stream.failed",
+                "remoteEndpointId" to remoteEndpointId,
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
+            )
+            runCatching {
+                IrohFrameCodec.write(sendStream, """{"type":"admin_rpc_response","request_id":"","success":false,"error":"${error.message?.replace("\"", "\\\"") ?: "admin_rpc stream failed"}"}""", MAX_FRAME_BYTES)
+            }.onFailure { writeError ->
+                Telemetry.event(
+                    "IrohNode", "admin_rpc.stream.error_response_failed",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "error" to (writeError.message ?: writeError.toString()),
+                    "class" to writeError::class.simpleName,
+                )
+            }
+        } finally {
+            runCatching { sendStream.finish() }
+        }
+    }
+
+    private suspend fun handleAdminRpcStreamFrame(frameJson: String): String {
+        return try {
+            val json = Json { ignoreUnknownKeys = true }
+            val obj = json.parseToJsonElement(frameJson).jsonObject
+            val type = obj["type"]?.jsonPrimitive?.content
+            val requestId = obj["request_id"]?.jsonPrimitive?.content
+            val method = obj["method"]?.jsonPrimitive?.content
+            Telemetry.event("IrohNode", "admin_rpc.stream.recv", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "method" to method)
+            if (type != "admin_rpc") {
+                """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"Expected admin_rpc frame"}"""
+            } else if (!authenticated.get()) {
+                val id = requestId ?: ""
+                Telemetry.event("IrohNode", "auth.required", "remoteEndpointId" to remoteEndpointId, "requestId" to id, "reason" to "missing_token")
+                """{"type":"admin_rpc_response","request_id":"$id","success":false,"error":"unauthorized"}"""
+            } else if (method == null || requestId == null) {
+                """{"type":"admin_rpc_response","request_id":"${requestId ?: ""}","success":false,"error":"method and request_id are required"}"""
+            } else {
+                adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
+            }
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (error: Exception) {
+            """{"type":"admin_rpc_response","request_id":"","success":false,"error":"Failed to parse admin_rpc frame: ${error.message?.replace("\"", "\\\"")}"}"""
         }
     }
 
@@ -289,8 +373,9 @@ class IrohNodeConnection(
         if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
         val expected = requiredBearerToken
         val provided = obj["token"]?.jsonPrimitive?.contentOrNull
-        authenticated = expected.isNullOrBlank() || provided == expected
-        return if (authenticated) {
+        val isAuthenticated = expected.isNullOrBlank() || provided == expected
+        authenticated.set(isAuthenticated)
+        return if (isAuthenticated) {
             Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId)
             """{"type":"auth_response","request_id":"$requestId","success":true}"""
         } else {
@@ -301,7 +386,7 @@ class IrohNodeConnection(
     }
 
     private inline fun ifAuthorized(requestId: String?, block: () -> String?): String? =
-        if (authenticated) {
+        if (authenticated.get()) {
             block()
         } else {
             val id = requestId ?: ""
@@ -586,5 +671,7 @@ class IrohNodeConnection(
         const val MAX_HANDLED_CLIENT_MESSAGE_IDS = 512
         const val HANDLED_CLIENT_MESSAGE_IDS_TRIM_COUNT = 128
         const val STREAM_JOB_DRAIN_TIMEOUT_MS = 5_000L
+        const val ADMIN_RPC_REQUEST_TIMEOUT_MS = 15_000L
+        const val MAX_CONCURRENT_ADMIN_RPC_STREAMS = 16
     }
 }

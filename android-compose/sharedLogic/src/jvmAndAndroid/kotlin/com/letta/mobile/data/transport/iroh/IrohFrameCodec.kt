@@ -102,6 +102,23 @@ object IrohFrameCodec {
         sendStream.writeAll(encodeFrame(frame, maxFrameBytes))
     }
 
+    suspend fun readOne(
+        recvStream: RecvStream,
+        maxFrameBytes: Int = DEFAULT_MAX_FRAME_BYTES,
+        chunkBytes: Int = 8192,
+    ): String? {
+        val decoder = Decoder(maxFrameBytes)
+        while (true) {
+            val chunk = recvStream.read(chunkBytes.toUInt())
+            if (chunk.isEmpty()) {
+                decoder.finish()
+                return null
+            }
+            val frames = decoder.feed(chunk)
+            if (frames.isNotEmpty()) return frames.first()
+        }
+    }
+
     suspend fun readAll(
         recvStream: RecvStream,
         maxFrameBytes: Int = DEFAULT_MAX_FRAME_BYTES,

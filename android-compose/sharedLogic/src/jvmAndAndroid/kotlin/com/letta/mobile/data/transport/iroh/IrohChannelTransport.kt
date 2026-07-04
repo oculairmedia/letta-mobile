@@ -436,7 +436,7 @@ class IrohChannelTransport(
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
-        val first = supervisor.ready().transport ?: error("Iroh admin_rpc requested without transport")
+        val first = supervisor.ready()
         return runCatching {
             first.adminRpc(method = method, path = path, body = body)
         }.getOrElse { firstError ->
@@ -449,7 +449,7 @@ class IrohChannelTransport(
                 "class" to firstError::class.simpleName,
             )
             supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}")
-            val retry = supervisor.ready().transport ?: error("Iroh admin_rpc retry requested without transport")
+            val retry = supervisor.ready()
             retry.adminRpc(method = method, path = path, body = body)
         }
     }
