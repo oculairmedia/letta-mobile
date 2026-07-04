@@ -1,0 +1,93 @@
+package com.letta.mobile.data.repository
+
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
+/**
+ * Agent reads over the Iroh admin RPC control channel.
+ *
+ * letta-mobile-71orq: after P4 purity (letta-mobile-qfa81) the LettaApiClient
+ * choke-point hard-fails any raw HTTP admin call in iroh:// mode instead of
+ * silently falling back to a stale HTTP config. [AgentRepository.getAgent]
+ * previously always called the raw HTTP [com.letta.mobile.data.api.AgentApi],
+ * so opening a conversation over iroh:// threw
+ * [com.letta.mobile.data.api.IrohAdminApiUnavailableException] before any
+ * stream and the whole chat screen errored out.
+ *
+ * The server-side handlers already exist (AgentAdminHandlers registers
+ * `agent.get` and `agent.list`); this is the missing CLIENT wiring, mirroring
+ * [IrohAdminRpcConversationListSource].
+ */
+class IrohAdminRpcAgentSource(
+    private val channelTransport: IChannelTransport,
+    private val settingsRepository: ISettingsRepository,
+    // Match the raw AgentApi Json config: the server may serialize optional
+    // fields as explicit null (e.g. "metadata": null). explicitNulls=false +
+    // coerceInputValues=true coerce those to the property defaults instead of
+    // failing to decode (letta-mobile-71orq).
+    private val json: Json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+        coerceInputValues = true
+    },
+) {
+    fun shouldUseIroh(): Boolean =
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+
+    suspend fun getAgent(id: AgentId): Agent {
+        val params = buildJsonObject { put("agent_id", id.value) }
+        val response = channelTransport.adminRpc(
+            method = "agent.get",
+            path = "/v1/agents/${id.value}",
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.get failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.get returned no result")
+        return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    /**
+     * List ALL agents by paging through `agent.list`. The server returns only a
+     * default first page (~50) when no limit is given, so agents beyond it never
+     * resolved a name in the conversation list and fell back to `agentId.take(8)`
+     * (letta-mobile-71orq).
+     */
+    suspend fun listAgents(): List<Agent> {
+        val merged = mutableListOf<Agent>()
+        val seenIds = HashSet<String>()
+        var offset = 0
+        while (true) {
+            val params = buildJsonObject {
+                put("limit", AGENT_LIST_PAGE_SIZE.toString())
+                put("offset", offset.toString())
+            }
+            val response = channelTransport.adminRpc(
+                method = "agent.list",
+                path = "/v1/agents?limit=$AGENT_LIST_PAGE_SIZE&offset=$offset",
+                body = params.toString(),
+            )
+            if (!response.success) error(response.error ?: "Iroh admin_rpc agent.list failed")
+            val result = response.result ?: break
+            val page = json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
+            if (page.isEmpty()) break
+            val fresh = page.filter { seenIds.add(it.id.value) }
+            if (fresh.isEmpty()) break
+            merged += fresh
+            if (page.size < AGENT_LIST_PAGE_SIZE) break
+            offset += page.size
+        }
+        return merged
+    }
+
+    private companion object {
+        const val AGENT_LIST_PAGE_SIZE = 100
+    }
+}

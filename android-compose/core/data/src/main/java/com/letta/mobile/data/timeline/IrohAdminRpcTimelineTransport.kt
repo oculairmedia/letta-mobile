@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
@@ -14,8 +15,27 @@ import java.util.concurrent.ConcurrentHashMap
 class IrohAdminRpcTimelineTransport(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
+    // letta-mobile-71orq: the server may serialize optional fields as explicit
+    // null (e.g. "metadata": null / "tool_return": null). explicitNulls=false +
+    // coerceInputValues=true coerce those to property defaults instead of
+    // failing to decode with "Expected JsonObject, but had JsonNull" — matching
+    // the leniency the agent.get fix (IrohAdminRpcAgentSource) already uses.
+    private val json: Json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+        explicitNulls = false
+        coerceInputValues = true
+    },
 ) : TimelineTransport {
+    /**
+     * letta-mobile-71orq: true when the active backend is an `iroh://`
+     * endpoint, so callers (e.g. MessageRepository.fetchOlderMessages) can
+     * branch reads onto admin_rpc instead of the raw HTTP path that the
+     * LettaApiClient purity choke-point hard-fails in iroh:// mode.
+     */
+    fun shouldUseIroh(): Boolean =
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+
     override suspend fun sendConversationMessage(
         conversationId: String,
         request: MessageCreateRequest,
@@ -49,6 +69,27 @@ class IrohAdminRpcTimelineTransport(
         val response = channelTransport.adminRpc(method = "message.list", path = path, body = null)
         if (!response.success) {
             throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc message.list failed")
+        }
+        val result = response.result ?: return emptyList()
+        return json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(LettaMessage.serializer()), result)
+    }
+
+    /**
+     * letta-mobile-71orq: backward pagination for the "scroll up for older
+     * history" pager. Cursors on `before` (the raw HTTP path uses the same
+     * query param against the same endpoint). Routed over `message.list`
+     * admin_rpc so it works in iroh:// mode instead of hard-failing at the
+     * LettaApiClient purity choke-point.
+     */
+    suspend fun listOlderConversationMessages(
+        conversationId: String,
+        beforeMessageId: String,
+        limit: Int,
+    ): List<LettaMessage> {
+        val path = "/v1/conversations/$conversationId/messages?limit=$limit&before=$beforeMessageId&order=desc"
+        val response = channelTransport.adminRpc(method = "message.list", path = path, body = null)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc message.list (before) failed")
         }
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(LettaMessage.serializer()), result)
