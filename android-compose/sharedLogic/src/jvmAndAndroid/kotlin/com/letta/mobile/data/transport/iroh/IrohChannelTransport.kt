@@ -738,6 +738,13 @@ class IrohChannelTransport(
             "conversation.list",
             "goal.get",
             "health.check",
+            // #822 review: idempotent agent reads issued right after connect
+            // (chat-screen load + conversation-list name resolution). Retrying
+            // these on a closed/timed-out connection over the stream-per-request
+            // (chunk-capable) path is safe — unlike the legacy control fallback,
+            // which they must stay OFF (see isLegacyFallbackSafeAdminRpcMethod).
+            "agent.get",
+            "agent.list",
         )
 
         fun isIrohUrl(url: String?): Boolean {
