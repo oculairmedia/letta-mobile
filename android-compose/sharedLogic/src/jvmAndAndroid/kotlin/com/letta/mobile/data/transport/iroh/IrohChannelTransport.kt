@@ -23,11 +23,15 @@ import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -56,6 +60,10 @@ class IrohChannelTransport(
     private val forcedIrohUrl: String = "",
     private val activeConfigProvider: () -> IrohConnectConfig? = { null },
     private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
+    // Bounded window (ms) to await the server's own terminal after an abort
+    // before synthesizing a cancelled terminal. Overridable so tests need not
+    // wait the full production window.
+    private val serverTerminalWaitMs: Long = SERVER_TERMINAL_WAIT_MS,
 ) : IChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
@@ -80,6 +88,57 @@ class IrohChannelTransport(
     }
 
     private var activeSendJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * The turn currently being streamed, if any. Holds the promotable run id and
+     * the exactly-one-terminal guard so [cancel] can address an `abort_message`
+     * to the real (server) run id and route a synthetic cancelled terminal
+     * through the SAME guard the streaming path uses — the turn can only ever
+     * emit one [ServerFrame.TurnDone], no matter which side reaches it first.
+     */
+    @Volatile
+    private var activeTurn: ActiveTurn? = null
+
+    /**
+     * Per-turn client state shared between the streaming send job and [cancel].
+     * Guards are atomic because the send job (Dispatchers.IO) and a cancel
+     * request race for the single terminal.
+     */
+    private class ActiveTurn(
+        val turnId: String,
+        initialRunId: String,
+        val agentId: String,
+        val conversationId: String,
+    ) {
+        private val runIdRef = atomic(initialRunId)
+        private val terminalClaimed = atomic(false)
+        /** Completes with the terminal status once the one terminal is emitted. */
+        val terminalReached = CompletableDeferred<String>()
+        @Volatile
+        var job: Job? = null
+
+        /** The canonical run id — the real server run id once promoted. */
+        val runId: String get() = runIdRef.value
+
+        /**
+         * Promote a still-synthetic run id to the real server run id. Returns
+         * true only on the first real promotion so the caller re-emits
+         * TurnStarted exactly once.
+         */
+        fun promoteRunId(real: String): Boolean {
+            if (real.isBlank() || real.isIrohSyntheticRunId()) return false
+            while (true) {
+                val current = runIdRef.value
+                if (!current.isIrohSyntheticRunId() || current == real) return false
+                if (runIdRef.compareAndSet(current, real)) return true
+            }
+        }
+
+        /** Wins exactly once; the first terminal (server or synthetic) claims it. */
+        fun claimTerminal(): Boolean = terminalClaimed.compareAndSet(false, true)
+        val hasTerminal: Boolean get() = terminalClaimed.value
+    }
+
     private var explicitConfig: IrohConnectConfig? = null
     private val supervisor = IrohConnectionSupervisor(
         scope = scope,
@@ -192,28 +251,19 @@ class IrohChannelTransport(
         )
         val runId = "iroh-run-${UUID.randomUUID()}"
         val turnId = "iroh-turn-${UUID.randomUUID()}"
+        val turn = ActiveTurn(
+            turnId = turnId,
+            initialRunId = runId,
+            agentId = agentId,
+            conversationId = conversationId,
+        )
+        activeTurn = turn
         val sendJob = scope.launch {
-            var terminalEmitted = false
-            suspend fun emitTurnFrame(frame: ServerFrame) {
-                if (frame is ServerFrame.TurnDone) {
-                    if (terminalEmitted) {
-                        Telemetry.event(
-                            "IrohTrace", "transport.turn_done.duplicate_skipped",
-                            "turnId" to turnId,
-                            "runId" to frame.runId,
-                            "status" to frame.status,
-                        )
-                        return
-                    }
-                    terminalEmitted = true
-                }
-                emitBoth(frame)
-            }
-
             com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
             val handle = runCatching { supervisor.ready() }.getOrElse { error ->
                 com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.ready_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
                 emitTurnFrame(
+                    turn,
                     ServerFrame.Error(
                         id = frameId("error"),
                         ts = nowIso(),
@@ -221,15 +271,16 @@ class IrohChannelTransport(
                         message = error.message ?: error.toString(),
                         conversationId = conversationId,
                         turnId = turnId,
-                        runId = runId,
+                        runId = turn.runId,
                     ),
                 )
                 emitTurnFrame(
+                    turn,
                     ServerFrame.TurnDone(
                         id = frameId("turn_done"),
                         ts = nowIso(),
                         turnId = turnId,
-                        runId = runId,
+                        runId = turn.runId,
                         status = "failed",
                     ),
                 )
@@ -239,6 +290,7 @@ class IrohChannelTransport(
             if (engine.isBusy) {
                 com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.busy", "turnId" to turnId, "runId" to runId)
                 emitTurnFrame(
+                    turn,
                     ServerFrame.Error(
                         id = frameId("error"),
                         ts = nowIso(),
@@ -246,28 +298,30 @@ class IrohChannelTransport(
                         message = "Iroh App Server turn engine is already busy.",
                         conversationId = conversationId,
                         turnId = turnId,
-                        runId = runId,
+                        runId = turn.runId,
                     ),
                 )
                 emitTurnFrame(
+                    turn,
                     ServerFrame.TurnDone(
                         id = frameId("turn_done"),
                         ts = nowIso(),
                         turnId = turnId,
-                        runId = runId,
+                        runId = turn.runId,
                         status = "failed",
                     ),
                 )
                 return@launch
             }
             emitTurnFrame(
+                turn,
                 ServerFrame.TurnStarted(
                     id = frameId("turn_started"),
                     ts = nowIso(),
                     agentId = agentId,
                     conversationId = conversationId,
                     turnId = turnId,
-                    runId = runId,
+                    runId = turn.runId,
                 ),
             )
             runCatching {
@@ -284,16 +338,16 @@ class IrohChannelTransport(
                         ),
                     ),
                 ).collect { draft ->
-                    emitDraft(draft, agentId, conversationId, turnId, runId)
-                        .forEach { emitTurnFrame(it) }
+                    emitDraft(draft, turn).forEach { emitTurnFrame(turn, it) }
                 }
             }.onFailure { error ->
                 if (error is CancellationException) {
-                    com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to runId)
+                    com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to turn.runId)
                     return@onFailure
                 }
                 com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
                 emitTurnFrame(
+                    turn,
                     ServerFrame.Error(
                         id = frameId("error"),
                         ts = nowIso(),
@@ -301,38 +355,95 @@ class IrohChannelTransport(
                         message = error.message ?: error.toString(),
                         conversationId = conversationId,
                         turnId = turnId,
-                        runId = runId,
+                        runId = turn.runId,
                     ),
                 )
                 emitTurnFrame(
+                    turn,
                     ServerFrame.TurnDone(
                         id = frameId("turn_done"),
                         ts = nowIso(),
                         turnId = turnId,
-                        runId = runId,
+                        runId = turn.runId,
                         status = "failed",
                     ),
                 )
             }
         }
+        turn.job = sendJob
+        sendJob.invokeOnCompletion {
+            if (activeTurn === turn) activeTurn = null
+        }
         activeSendJob = sendJob
         return true
     }
 
+    /**
+     * Emits a turn frame through the single exactly-one-terminal guard shared by
+     * the streaming send job and [cancel]. Only the first [ServerFrame.TurnDone]
+     * for a turn is forwarded; the loser is dropped. This holds no matter which
+     * side (server terminal or synthetic cancel) reaches the terminal first.
+     */
+    private suspend fun emitTurnFrame(turn: ActiveTurn, frame: ServerFrame) {
+        if (frame is ServerFrame.TurnDone) {
+            if (!turn.claimTerminal()) {
+                Telemetry.event(
+                    "IrohTrace", "transport.turn_done.duplicate_skipped",
+                    "turnId" to turn.turnId,
+                    "runId" to frame.runId,
+                    "status" to frame.status,
+                )
+                return
+            }
+            emitBoth(frame)
+            turn.terminalReached.complete(frame.status)
+            return
+        }
+        emitBoth(frame)
+    }
+
     private fun emitDraft(
         draft: com.letta.mobile.runtime.RuntimeEventDraft,
-        agentId: String,
-        conversationId: String,
-        turnId: String,
-        runId: String,
+        turn: ActiveTurn,
     ): List<ServerFrame> {
-        val effectiveRunId = draft.runId?.value ?: runId
+        val agentId = turn.agentId
+        val conversationId = turn.conversationId
+        val turnId = turn.turnId
+        // T5 canonical ids: the first server frame carrying the real run id
+        // promotes the turn off its synthetic `iroh-run-*` placeholder. Once
+        // promoted, TurnStarted is re-emitted with the real run id and EVERY
+        // subsequent frame (including the terminal TurnDone) carries it, so the
+        // reducer merges synthetic-live and letta-msg-* rows on run id alone —
+        // no otid/semantic fallback required.
+        val realRunId = draft.runId?.value?.takeIf { it.isNotBlank() }
+        val promoted = realRunId != null && turn.promoteRunId(realRunId)
+        val effectiveRunId = turn.runId
         com.letta.mobile.util.Telemetry.event(
             "IrohTrace", "transport.emitDraft",
             "payload" to (draft.payload::class.simpleName ?: ""),
             "runId" to effectiveRunId,
+            "promoted" to promoted,
         )
-        return when (val payload = draft.payload) {
+        val promotionFrames: List<ServerFrame> = if (promoted) {
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "turn.run_id_promoted",
+                "turnId" to turnId,
+                "runId" to effectiveRunId,
+            )
+            listOf(
+                ServerFrame.TurnStarted(
+                    id = frameId("turn_started"),
+                    ts = nowIso(),
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    turnId = turnId,
+                    runId = effectiveRunId,
+                ),
+            )
+        } else {
+            emptyList()
+        }
+        return promotionFrames + when (val payload = draft.payload) {
             is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
                 payload = payload,
                 context = IrohStreamDeltaServerFrameMapper.Context(
@@ -425,18 +536,80 @@ class IrohChannelTransport(
     }
 
     override fun cancel(conversationId: String): Boolean {
-        activeSendJob?.cancel()
-        activeSendJob = null
+        val turn = activeTurn
+        if (turn == null) {
+            // Nothing streaming: preserve the "cancel always yields a terminal"
+            // contract so the UI can never get stuck streaming, but there is no
+            // run to abort server-side.
+            Telemetry.event("IrohTransport", "cancel.no_active_turn", "conversationId" to conversationId)
+            activeSendJob?.cancel()
+            activeSendJob = null
+            scope.launch {
+                emitBoth(
+                    ServerFrame.TurnDone(
+                        id = frameId("cancelled"),
+                        ts = nowIso(),
+                        turnId = "cancelled-${UUID.randomUUID()}",
+                        runId = "cancelled-${UUID.randomUUID()}",
+                        status = "cancelled",
+                    ),
+                )
+            }
+            return true
+        }
+        Telemetry.event(
+            "IrohTransport", "cancel.begin",
+            "conversationId" to conversationId,
+            "turnId" to turn.turnId,
+            "runId" to turn.runId,
+        )
         scope.launch {
-            emitBoth(
-                ServerFrame.TurnDone(
-                    id = frameId("cancelled"),
-                    ts = nowIso(),
-                    turnId = "cancelled-${UUID.randomUUID()}",
-                    runId = "cancelled-${UUID.randomUUID()}",
-                    status = "cancelled",
-                ),
-            )
+            // 1. Ask the server to abort the active run so it emits its own
+            //    authoritative terminal (and, per 8s45p, closes open tool_calls).
+            //    A still-synthetic run id means the real run id has not streamed
+            //    yet — pass null so the server aborts whatever run is active for
+            //    the runtime.
+            runCatching {
+                val handle = supervisor.ready()
+                handle.turnEngine?.abort(turn.runId.takeUnless { it.isIrohSyntheticRunId() })
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Telemetry.event(
+                    "IrohTransport", "cancel.abort_failed",
+                    "turnId" to turn.turnId,
+                    "error" to (error.message ?: error.toString()),
+                    "class" to error::class.simpleName,
+                )
+            }
+            // 2. Bounded wait for the server terminal to flow through the normal
+            //    streaming path (emitTurnFrame claims the single terminal).
+            val serverTerminalStatus = withTimeoutOrNull(serverTerminalWaitMs) {
+                turn.terminalReached.await()
+            }
+            // 3. Fallback: only if the server never produced a terminal, synthesize
+            //    a cancelled one — routed through the SAME guard so exactly one
+            //    terminal is ever emitted for the turn.
+            if (serverTerminalStatus == null && !turn.hasTerminal) {
+                Telemetry.event(
+                    "IrohTransport", "cancel.synthetic_terminal",
+                    "turnId" to turn.turnId,
+                    "runId" to turn.runId,
+                )
+                emitTurnFrame(
+                    turn,
+                    ServerFrame.TurnDone(
+                        id = frameId("cancelled"),
+                        ts = nowIso(),
+                        turnId = turn.turnId,
+                        runId = turn.runId,
+                        status = "cancelled",
+                    ),
+                )
+            }
+            // 4. Terminal settled — tear down the streaming job.
+            turn.job?.cancel()
+            if (activeSendJob === turn.job) activeSendJob = null
+            if (activeTurn === turn) activeTurn = null
         }
         return true
     }
@@ -528,6 +701,9 @@ class IrohChannelTransport(
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
+        // Bounded window to let the server's own terminal (from abort) arrive
+        // before falling back to a synthetic cancelled TurnDone.
+        internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it
@@ -552,3 +728,10 @@ class IrohChannelTransport(
         }
     }
 }
+
+/**
+ * A client-synthesized run id placeholder used before the server's real run id
+ * has streamed. Mirrors the reducer's own `iroh-run-` recognition so both sides
+ * agree on which ids are promotable placeholders vs canonical server run ids.
+ */
+private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
