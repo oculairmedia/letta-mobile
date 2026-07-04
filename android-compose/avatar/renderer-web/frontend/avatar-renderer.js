@@ -68,10 +68,12 @@ export function createAvatarRenderer(canvas, emit) {
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
   camera.position.set(0, 1.35, 1.8);
 
-  const keyLight = new THREE.DirectionalLight(0xffffff, Math.PI);
+  // 0.7x/0.28x of the stock PI-based rig: full intensity read blown-out when
+  // composited over desktop wallpapers (pet mode has no dark app chrome).
+  const keyLight = new THREE.DirectionalLight(0xffffff, 0.7 * Math.PI);
   keyLight.position.set(1, 2, 1.5);
   scene.add(keyLight);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.4 * Math.PI));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.28 * Math.PI));
 
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
