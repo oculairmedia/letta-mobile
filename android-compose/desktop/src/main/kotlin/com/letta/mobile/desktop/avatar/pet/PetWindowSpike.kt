@@ -39,6 +39,7 @@ import com.letta.mobile.avatar.core.AvatarCameraFraming
 import com.letta.mobile.avatar.core.AvatarDirector
 import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarFormat
+import com.letta.mobile.avatar.core.AvatarGesture
 import com.letta.mobile.avatar.core.AvatarModel
 import com.letta.mobile.avatar.rendererweb.AvatarWebHost
 import com.letta.mobile.avatar.rendererweb.WebAvatarRuntime
@@ -242,6 +243,15 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
                 }
                 Chip(text = "sad!") {
                     directorRef.get()?.flashEmotion(AvatarExpression.Sad)
+                }
+                // Built-in standard gesture set (renderer authors these
+                // procedurally for VRM humanoids): a one-shot wave and a
+                // celebratory "party" wave-both-arms.
+                Chip(text = "wave") {
+                    runtimeRef.get()?.playGesture(AvatarGesture("wave"), fadeSeconds = 0.3f)
+                }
+                Chip(text = "party") {
+                    runtimeRef.get()?.playGesture(AvatarGesture("celebrate"), fadeSeconds = 0.3f)
                 }
                 Chip(text = "ghost") {
                     PetWindowStyles.setClickThrough(window, true)

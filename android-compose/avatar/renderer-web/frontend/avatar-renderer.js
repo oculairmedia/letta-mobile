@@ -166,6 +166,161 @@ export function createAvatarRenderer(canvas, emit) {
     if (bones.head) bones.head.rotation.x = BREATH_HEAD_X * s;
   }
 
+  // --- Standard built-in gesture clips --------------------------------------
+  // Procedural THREE.AnimationClips authored on the SAME normalized humanoid
+  // bones the rest pose drives (getNormalizedBoneNode), so a clip and the rest
+  // pose are expressed in one space. Each track keys a bone's LOCAL quaternion,
+  // and every clip both STARTS and ENDS on the rest-pose rotation for that bone
+  // (rest offset from REST_POSE, or identity for bones the rest pose leaves
+  // alone). That anchoring is what lets playGesture's fade-in/out cross between
+  // the additive rest-pose/breathing world (suspended while a clip drives, see
+  // clipDriving()) and the clip without a pop: at t=0 and t=end the clip's pose
+  // equals the pose the frame loop resumes writing.
+  //
+  // A track value at a keyframe is (rest euler for that bone) + (per-keyframe
+  // delta), converted to a quaternion. Deltas reuse the rest-pose sign
+  // convention: on the arms a MORE-NEGATIVE Z (left) / MORE-POSITIVE Z (right)
+  // pushes further down; the opposite raises toward/over the head.
+  const _euler = new THREE.Euler();
+  const _quat = new THREE.Quaternion();
+
+  // Rest euler (x,y,z) for a bone name — REST_POSE offset if it has one, else 0.
+  function restEuler(boneName) {
+    const r = REST_POSE[boneName];
+    return r ? [r.x, r.y, r.z] : [0, 0, 0];
+  }
+
+  // Build a QuaternionKeyframeTrack for `.quaternion` of the normalized bone
+  // `boneName`. `keys` is [{ t, dx?, dy?, dz? }, …]; each delta is added to the
+  // bone's rest euler before conversion. Returns null if the rig lacks the bone
+  // so partial rigs degrade gracefully.
+  function boneTrack(vrm, boneName, keys) {
+    const node = vrm.humanoid.getNormalizedBoneNode(boneName);
+    if (!node) return null;
+    const [rx, ry, rz] = restEuler(boneName);
+    const times = new Float32Array(keys.length);
+    const values = new Float32Array(keys.length * 4);
+    keys.forEach((k, i) => {
+      times[i] = k.t;
+      _euler.set(rx + (k.dx ?? 0), ry + (k.dy ?? 0), rz + (k.dz ?? 0), 'XYZ');
+      _quat.setFromEuler(_euler);
+      values[i * 4 + 0] = _quat.x;
+      values[i * 4 + 1] = _quat.y;
+      values[i * 4 + 2] = _quat.z;
+      values[i * 4 + 3] = _quat.w;
+    });
+    // Track name is the node's own name; the mixer is rooted at the model, and
+    // normalized bone nodes have unique names, so this resolves unambiguously.
+    return new THREE.QuaternionKeyframeTrack(`${node.name}.quaternion`, times, values);
+  }
+
+  function makeClip(name, duration, vrm, trackSpecs) {
+    const tracks = [];
+    for (const [boneName, keys] of trackSpecs) {
+      const track = boneTrack(vrm, boneName, keys);
+      if (track) tracks.push(track);
+    }
+    return tracks.length > 0 ? new THREE.AnimationClip(name, duration, tracks) : null;
+  }
+
+  // The four standard gestures. Durations match the spec; every track's first
+  // and last key are delta-zero (rest pose). Angles are radians.
+  function buildStandardGestureClips(vrm) {
+    if (!vrm?.humanoid) return new Map();
+    const clips = new Map();
+
+    // wave (~1.8s): raise the right arm up past horizontal, then 3 hand waves
+    // from the elbow, then lower back to rest. Right arm rests at +ARM_DOWN_Z
+    // (down); a NEGATIVE dz raises it toward/over the head.
+    const waveUp = -(ARM_DOWN_Z + 0.35); // right arm up beside the head
+    const wave = makeClip('wave', 1.8, vrm, [
+      ['rightUpperArm', [
+        { t: 0, dz: 0 }, { t: 0.35, dz: waveUp },
+        { t: 1.45, dz: waveUp }, { t: 1.8, dz: 0 },
+      ]],
+      ['rightLowerArm', [
+        // Rock the forearm side to side from the elbow for the wave. Right
+        // forearm rests at +ELBOW_BEND_Z; oscillate around a raised-out pose.
+        { t: 0, dz: 0 }, { t: 0.35, dz: 0.5 },
+        { t: 0.6, dz: 0.85 }, { t: 0.85, dz: 0.2 },
+        { t: 1.1, dz: 0.85 }, { t: 1.35, dz: 0.2 },
+        { t: 1.45, dz: 0.5 }, { t: 1.8, dz: 0 },
+      ]],
+    ]);
+    if (wave) clips.set('wave', wave);
+
+    // nod (~1.2s): head pitches down twice (positive X dips the chin down in
+    // normalized space) and returns.
+    const nodDown = 0.35;
+    const nod = makeClip('nod', 1.2, vrm, [
+      ['head', [
+        { t: 0, dx: 0 }, { t: 0.3, dx: nodDown }, { t: 0.55, dx: 0 },
+        { t: 0.85, dx: nodDown }, { t: 1.2, dx: 0 },
+      ]],
+    ]);
+    if (nod) clips.set('nod', nod);
+
+    // shrug (~1.6s): shoulders lift, elbows swing out into the classic
+    // palms-out shrug, head tilts; hold ~0.65s; release.
+    const shrug = makeClip('shrug', 1.6, vrm, [
+      ['leftShoulder', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: 0.4 }, { t: 1.1, dz: 0.4 }, { t: 1.6, dz: 0 },
+      ]],
+      ['rightShoulder', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: -0.4 }, { t: 1.1, dz: -0.4 }, { t: 1.6, dz: 0 },
+      ]],
+      // Elbows out: raise upper arms (less drop) and swing forearms outward.
+      ['leftUpperArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: 0.55 }, { t: 1.1, dz: 0.55 }, { t: 1.6, dz: 0 },
+      ]],
+      ['rightUpperArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: -0.55 }, { t: 1.1, dz: -0.55 }, { t: 1.6, dz: 0 },
+      ]],
+      ['leftLowerArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: -0.9 }, { t: 1.1, dz: -0.9 }, { t: 1.6, dz: 0 },
+      ]],
+      ['rightLowerArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: 0.9 }, { t: 1.1, dz: 0.9 }, { t: 1.6, dz: 0 },
+      ]],
+      ['head', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: 0.22 }, { t: 1.1, dz: 0.22 }, { t: 1.6, dz: 0 },
+      ]],
+    ]);
+    if (shrug) clips.set('shrug', shrug);
+
+    // celebrate (~2s): both arms swing up overhead with a small settle bounce.
+    // Left arm rests at -ARM_DOWN_Z, right at +ARM_DOWN_Z; raising overhead
+    // means POSITIVE dz on the left and NEGATIVE dz on the right (mirror).
+    const armsUp = ARM_DOWN_Z + 0.5; // magnitude past horizontal, overhead
+    const celebrate = makeClip('celebrate', 2.0, vrm, [
+      ['leftUpperArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: armsUp },
+        { t: 0.85, dz: armsUp - 0.25 }, { t: 1.2, dz: armsUp },
+        { t: 1.6, dz: armsUp }, { t: 2.0, dz: 0 },
+      ]],
+      ['rightUpperArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: -armsUp },
+        { t: 0.85, dz: -(armsUp - 0.25) }, { t: 1.2, dz: -armsUp },
+        { t: 1.6, dz: -armsUp }, { t: 2.0, dz: 0 },
+      ]],
+      // Slight elbow bend so hands read as raised, not stiff.
+      ['leftLowerArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: -0.25 }, { t: 1.6, dz: -0.25 }, { t: 2.0, dz: 0 },
+      ]],
+      ['rightLowerArm', [
+        { t: 0, dz: 0 }, { t: 0.45, dz: 0.25 }, { t: 1.6, dz: 0.25 }, { t: 2.0, dz: 0 },
+      ]],
+      // Small upward bob via chest lift synced to the arm swing.
+      ['chest', [
+        { t: 0, dx: 0 }, { t: 0.45, dx: -0.06 }, { t: 0.85, dx: 0 },
+        { t: 1.2, dx: -0.06 }, { t: 2.0, dx: 0 },
+      ]],
+    ]);
+    if (celebrate) clips.set('celebrate', celebrate);
+
+    return clips;
+  }
+
   function sendEvent(event) {
     emit(JSON.stringify(event));
   }
@@ -295,9 +450,13 @@ export function createAvatarRenderer(canvas, emit) {
       frameCamera(root);
 
       const clipsById = new Map();
-      let mixer = null;
+      // Renderer-built-in standard gestures for VRM humanoids, authored against
+      // THIS model's normalized bones. Registered FIRST so embedded clips below
+      // win on any id collision (a model shipping its own "wave" overrides ours).
+      const standardClips = buildStandardGestureClips(vrm);
+      for (const [id, clip] of standardClips) clipsById.set(id, clip);
+
       if (gltf.animations && gltf.animations.length > 0) {
-        mixer = new THREE.AnimationMixer(root);
         const seen = new Set();
         gltf.animations.forEach((clip, index) => {
           // Mirror AvatarFormatDetector's id scheme exactly: non-blank name,
@@ -307,9 +466,12 @@ export function createAvatarRenderer(canvas, emit) {
           let suffix = index;
           while (seen.has(id)) { id = `${base}-${suffix}`; suffix += 1; }
           seen.add(id);
-          clipsById.set(id, clip);
+          clipsById.set(id, clip); // embedded wins on id clash with a standard clip
         });
       }
+      // One mixer drives both standard and embedded clips; needed whenever any
+      // clip exists (rooted at the model so normalized-bone track names bind).
+      const mixer = clipsById.size > 0 ? new THREE.AnimationMixer(root) : null;
 
       const accessoryBindings = new Map(
         (accessories ?? []).map((a) => [a.id, a.nodeNames ?? []]),
@@ -333,8 +495,16 @@ export function createAvatarRenderer(canvas, emit) {
           supportsVisemes: expressions.some((k) => VISEME_KEYS.includes(k)),
           supportsLookAt: !!vrm?.lookAt,
           supportsSpringBones: !!vrm?.springBoneManager,
+          // Now true whenever ANY clip is registered — embedded or the standard
+          // built-in gestures we author for VRM humanoids above.
           supportsEmbeddedAnimations: clipsById.size > 0,
           supportsAccessories: true, // node-visibility toggles always work
+          // Playable clip ids (standard + embedded, deduped). The Kotlin
+          // AvatarCapabilities schema has no id-list field, so this is an extra
+          // wire key the host's forward-tolerant decoder (ignoreUnknownKeys)
+          // drops into AvatarCapabilities — but it IS visible in the raw
+          // avatarLoaded event for the host/director/harness log to inspect.
+          animationIds: Array.from(clipsById.keys()),
         },
       });
     } catch (error) {
