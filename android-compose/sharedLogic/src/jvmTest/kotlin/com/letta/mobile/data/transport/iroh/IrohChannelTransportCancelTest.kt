@@ -136,6 +136,15 @@ class IrohChannelTransportCancelTest {
             delay(150) // let the SharedFlow collector subscribe before frames are emitted
             transport.send("agent-1", "conv-1", "hi", "otid-1", null, false)
             withTimeout(3_000) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10) }
+            // TurnStarted is emitted by the transport BEFORE the engine subscribes
+            // to client.events (subscription happens inside runTurn's collector,
+            // after runtimeStart). Gate on inputReceived — set once the engine has
+            // sent input, which happens strictly after the collector registered its
+            // client.events subscription — so the driven StreamDelta below is never
+            // emitted into a subscriber-less (replay=0) flow and dropped. Without
+            // this gate the assistant frame races the subscription and is lost under
+            // CPU load, timing out the "hello" await.
+            withTimeout(3_000) { while (!client.inputReceived) delay(10) }
 
             // The first assistant frame carries the real server run id.
             client.emitAssistant(messageId = "letta-msg-1", content = "hello", runId = REAL_RUN_ID)
