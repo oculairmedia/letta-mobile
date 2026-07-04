@@ -1,5 +1,6 @@
 package com.letta.mobile.avatar.rendererweb
 
+import com.letta.mobile.avatar.core.AvatarCameraFraming
 import com.letta.mobile.avatar.core.AvatarCapabilities
 import com.letta.mobile.avatar.core.AvatarExpression
 import com.letta.mobile.avatar.core.AvatarFormat
@@ -58,6 +59,8 @@ class WebAvatarRuntime(
     private val rendererReady = CompletableDeferred<Int>()
     private var pendingLoad: PendingLoad? = null
     private var loadCounter = 0
+    private var thumbnailCounter = 0
+    private val pendingThumbnails = mutableMapOf<String, CompletableDeferred<String>>()
 
     private class PendingLoad(
         val requestId: String,
@@ -111,8 +114,11 @@ class WebAvatarRuntime(
     override fun onUnload() {
         // An unload (or a replacement load / dispose) invalidates any load
         // still awaiting its ack — a late avatarLoaded for that request must
-        // not resurrect the model the caller just navigated away from.
+        // not resurrect the model the caller just navigated away from. The
+        // same applies to in-flight thumbnail captures: the renderer is being
+        // told to drop the avatar and may never answer them.
         cancelPendingLoad("Unloaded while the load was in flight")
+        cancelPendingThumbnails("Avatar unloaded during thumbnail capture")
         sendCommand(AvatarRendererCommand.Unload)
     }
 
@@ -157,10 +163,57 @@ class WebAvatarRuntime(
         sendCommand(AvatarRendererCommand.SetAccessoryEnabled(accessoryId, enabled))
     }
 
+    override fun onCameraFramingChanged(framing: AvatarCameraFraming) {
+        sendCommand(
+            AvatarRendererCommand.SetCameraFraming(
+                when (framing) {
+                    AvatarCameraFraming.HEADSHOT -> "headshot"
+                    AvatarCameraFraming.BUST -> "bust"
+                    AvatarCameraFraming.FULL_BODY -> "fullBody"
+                },
+            ),
+        )
+    }
+
+    /**
+     * Rasterize the currently loaded avatar into a PNG data-url
+     * (`data:image/png;base64,...`), cover-fit to roughly [width]x[height].
+     * Requires a Ready runtime; bounded by [timeoutMillis].
+     */
+    suspend fun captureThumbnail(
+        width: Int = 512,
+        height: Int = 512,
+        timeoutMillis: Long = 10_000,
+    ): String {
+        check(state.value is com.letta.mobile.avatar.core.AvatarRuntimeState.Ready) {
+            "captureThumbnail requires a loaded avatar"
+        }
+        thumbnailCounter += 1
+        val requestId = "thumb-$thumbnailCounter"
+        val pending = CompletableDeferred<String>()
+        pendingThumbnails[requestId] = pending
+        sendCommand(AvatarRendererCommand.CaptureThumbnail(requestId, width, height))
+        return try {
+            withTimeout(timeoutMillis) { pending.await() }
+        } catch (e: TimeoutCancellationException) {
+            throw AvatarWireException("Renderer did not answer the thumbnail capture in time", e)
+        } finally {
+            pendingThumbnails.remove(requestId)
+        }
+    }
+
     override fun dispose() {
         super.dispose()
         cancelPendingLoad("Runtime disposed")
+        cancelPendingThumbnails("Runtime disposed")
         transport.close()
+    }
+
+    private fun cancelPendingThumbnails(reason: String) {
+        pendingThumbnails.values.forEach {
+            it.completeExceptionally(AvatarWireException(reason))
+        }
+        pendingThumbnails.clear()
     }
 
     private fun handleRendererMessage(message: String) {
@@ -173,9 +226,12 @@ class WebAvatarRuntime(
         when (event) {
             is AvatarRendererEvent.Ready -> {
                 if (!rendererReady.complete(event.protocolVersion)) {
-                    // Renderer rebooted (e.g. page reload) — the current
-                    // avatar is gone on the far side; surface it for the host
-                    // to decide on a reload.
+                    // Renderer rebooted (e.g. page reload): the page that
+                    // received our in-flight commands is gone and can't answer
+                    // them, so fail pending load/thumbnail waiters now instead
+                    // of leaving callers to time out.
+                    cancelPendingLoad("Renderer rebooted before the load was acknowledged")
+                    cancelPendingThumbnails("Renderer rebooted before the thumbnail was captured")
                     onRendererError(
                         "Renderer re-announced (protocol ${event.protocolVersion}) — a reload may be required",
                     )
@@ -190,6 +246,11 @@ class WebAvatarRuntime(
                     ?.result?.completeExceptionally(AvatarWireException(event.message))
             }
             is AvatarRendererEvent.RendererError -> onRendererError(event.message)
+            is AvatarRendererEvent.ThumbnailCaptured ->
+                pendingThumbnails.remove(event.requestId)?.complete(event.dataUrl)
+            is AvatarRendererEvent.ThumbnailFailed ->
+                pendingThumbnails.remove(event.requestId)
+                    ?.completeExceptionally(AvatarWireException(event.message))
         }
     }
 

@@ -35,6 +35,9 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     /** Accessory ids currently toggled off (default is enabled). */
     val disabledAccessoryIds: Set<String> get() = disabledAccessories.toSet()
 
+    var cameraFraming: AvatarCameraFraming = AvatarCameraFraming.FULL_BODY
+        private set
+
     var isDisposed: Boolean = false
         private set
 
@@ -161,6 +164,13 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         onAccessoryToggled(accessoryId, enabled)
     }
 
+    override fun setCameraFraming(framing: AvatarCameraFraming) {
+        // Framing needs no model capability — any renderer can move a camera.
+        if (readyCapabilities() == null) return
+        cameraFraming = framing
+        onCameraFramingChanged(framing)
+    }
+
     override fun update(deltaSeconds: Float) {
         // Nothing time-driven headlessly; renderer subclasses override.
     }
@@ -206,6 +216,9 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
     /** Hook for subclasses: an accessory was toggled. */
     protected open fun onAccessoryToggled(accessoryId: String, enabled: Boolean) {}
 
+    /** Hook for subclasses: the camera framing changed. */
+    protected open fun onCameraFramingChanged(framing: AvatarCameraFraming) {}
+
     /** The Ready-state capabilities, or null when commands must be dropped. */
     private fun readyCapabilities(): AvatarCapabilities? {
         if (isDisposed) return null
@@ -218,6 +231,7 @@ open class HeadlessAvatarRuntime : AvatarRuntime {
         disabledAccessories.clear()
         mouthOpen = 0f
         lookTarget = null
+        cameraFraming = AvatarCameraFraming.FULL_BODY
     }
 
     /** Contract promises 0..1 levels; NaN survives coerceIn, so drop it to 0. */
