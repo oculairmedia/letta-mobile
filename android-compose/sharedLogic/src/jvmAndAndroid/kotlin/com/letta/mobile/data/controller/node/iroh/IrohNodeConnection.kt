@@ -68,8 +68,22 @@ class IrohNodeConnection(
     private val requiredBearerToken: String? = null,
     private val allowedPeerIds: Set<String> = emptySet(),
     private val remoteEndpointId: String = "",
+    /**
+     * Server-process-scoped duplicate-suppression for client message ids. Shared
+     * across connections so a redial re-delivery of the same turn does not
+     * double-run (P3, 3wq5g). Injectable for tests.
+     */
+    private val clientMessageDedupe: ProcessScopedClientMessageDedupe = SHARED_CLIENT_MESSAGE_DEDUPE,
+    /**
+     * Server-process-scoped store of terminal frames dropped when a channel died
+     * mid-turn, replayed on redial re-send (P3, q71yi). Injectable for tests.
+     */
+    private val parkedTerminals: ParkedTerminalStore = SHARED_PARKED_TERMINALS,
 ) {
-    private val handledClientMessageIds = LinkedHashSet<String>()
+    // Per-connection, strictly-monotonic event_seq with a disjoint process-scoped
+    // base — replaces the shared mutable companion var that raced across
+    // connections/threads (P3).
+    private val eventSeq = IrohEventSeqAllocator.newConnectionSeq()
     private val streamWriteMutex = Mutex()
     private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
 
@@ -440,23 +454,38 @@ class IrohNodeConnection(
             ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
             ?: ""
         val clientMsgId = userMsg?.clientMessageId
-        if (clientMsgId != null && !handledClientMessageIds.add(clientMsgId)) {
-            Telemetry.event(
-                "IrohNode", "input.duplicate_ignored",
-                "clientMessageId" to clientMsgId,
-                "agentId" to input.runtime.agentId,
-                "conversationId" to input.runtime.conversationId,
-            )
-            return
-        }
-        if (handledClientMessageIds.size > MAX_HANDLED_CLIENT_MESSAGE_IDS) {
-            val iterator = handledClientMessageIds.iterator()
-            repeat(HANDLED_CLIENT_MESSAGE_IDS_TRIM_COUNT) {
-                if (iterator.hasNext()) {
-                    iterator.next()
-                    iterator.remove()
+        if (clientMsgId != null && !clientMessageDedupe.markHandled(clientMsgId)) {
+            // Duplicate re-delivery (typically a redial re-send). If the previous
+            // connection died before delivering this turn's terminal we parked
+            // one — replay it now so the client's turn resolves instead of
+            // hanging forever (q71yi). Otherwise the original turn is still
+            // in-flight or already completed, so drop silently.
+            val parkedDelta = parkedTerminals.takeParked(clientMsgId)
+            if (parkedDelta != null) {
+                Telemetry.event(
+                    "IrohNode", "input.duplicate_replayed_parked_terminal",
+                    "clientMessageId" to clientMsgId,
+                    "agentId" to input.runtime.agentId,
+                    "conversationId" to input.runtime.conversationId,
+                )
+                runCatching {
+                    val delta = AppServerProtocol.json.parseToJsonElement(parkedDelta).jsonObject
+                    writeStreamDelta(streamSend, input.runtime, delta)
+                }.onFailure { replayError ->
+                    // Could not deliver on this stream either — re-park so a
+                    // later redial can still resolve the turn.
+                    parkedTerminals.park(clientMsgId, parkedDelta)
+                    if (replayError is CancellationException) throw replayError
                 }
+            } else {
+                Telemetry.event(
+                    "IrohNode", "input.duplicate_ignored",
+                    "clientMessageId" to clientMsgId,
+                    "agentId" to input.runtime.agentId,
+                    "conversationId" to input.runtime.conversationId,
+                )
             }
+            return
         }
         val command = TurnCommand(
             backendId = BackendId("iroh-node-server"),
@@ -470,6 +499,9 @@ class IrohNodeConnection(
             ),
         )
         var terminalWritten = false
+        // Tracks tool_calls opened but not yet returned so failure/abort can
+        // close them with a synthetic tool_return before the terminal (8s45p).
+        val openToolCalls = OpenToolCallTracker()
         runCatching {
             controller.runTurn(command).collect { draft ->
                 val payload = draft.payload
@@ -482,11 +514,18 @@ class IrohNodeConnection(
                     )
                     return@collect
                 }
-                terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload) || terminalWritten
+                // Before a failure/cancel terminal, close any dangling tool_calls
+                // so the client never renders a tool_call without a return.
+                if (payload.isFailureOrCancelLifecycle()) {
+                    flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
+                }
+                terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls) || terminalWritten
             }
         }.onFailure { error ->
             val wroteTerminal = runCatching {
                 withContext(NonCancellable) {
+                    // Same dangling-tool_call guarantee on the exception path.
+                    flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
                     writeStreamDelta(
                         streamSend = streamSend,
                         runtime = input.runtime,
@@ -505,10 +544,59 @@ class IrohNodeConnection(
                     "class" to error::class.simpleName,
                     level = Telemetry.Level.WARN,
                 )
+                // Channel died before any terminal reached the client. Park a
+                // terminal keyed by client_message_id so a redial re-send replays
+                // it instead of the client hanging on "Thinking…" (q71yi).
+                if (clientMsgId != null && !terminalWritten) {
+                    parkedTerminals.park(clientMsgId, interruptedTerminalDelta().toString())
+                    Telemetry.event(
+                        "IrohNode", "stream.terminal_parked",
+                        "remoteEndpointId" to remoteEndpointId,
+                        "clientMessageId" to clientMsgId,
+                        "conversationId" to input.runtime.conversationId,
+                    )
+                }
             }
             if (error is CancellationException) throw error
         }
     }
+
+    /**
+     * Writes a synthetic terminal `tool_return(status=error, "cancelled")` for
+     * every tool_call still open on [tracker], then clears them. Runs before the
+     * turn's terminal frame on failure/abort (8s45p).
+     */
+    private suspend fun flushOpenToolCalls(
+        streamSend: SendStream,
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+        tracker: OpenToolCallTracker,
+    ) {
+        val openIds = tracker.openIds()
+        if (openIds.isEmpty()) return
+        Telemetry.event(
+            "IrohNode", "stream.dangling_tool_calls_synthesized",
+            "remoteEndpointId" to remoteEndpointId,
+            "count" to openIds.size,
+        )
+        openIds.forEach { toolCallId ->
+            writeStreamDelta(
+                streamSend = streamSend,
+                runtime = runtime,
+                delta = DanglingToolCallSynthesizer.cancelledToolReturnDelta(toolCallId),
+            )
+            tracker.close(toolCallId)
+        }
+    }
+
+    private fun interruptedTerminalDelta(): kotlinx.serialization.json.JsonObject = buildJsonObject {
+        put("message_type", "error_message")
+        put("message", "connection interrupted before the turn completed")
+        put("status", "cancelled")
+    }
+
+    private fun RuntimeEventPayload.isFailureOrCancelLifecycle(): Boolean =
+        this is RuntimeEventPayload.RunLifecycleChanged &&
+            (status == RuntimeRunStatus.Failed || status == RuntimeRunStatus.Cancelled)
 
     private fun extractTextFromContentParts(parts: kotlinx.serialization.json.JsonArray?): String? =
         parts?.firstOrNull { part ->
@@ -519,16 +607,19 @@ class IrohNodeConnection(
         streamSend: SendStream,
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         payload: RuntimeEventPayload,
+        openToolCalls: OpenToolCallTracker,
     ): Boolean {
         return when (payload) {
             // DefaultAppServerController already gives us raw App Server wire
             // frames here (usually stream_delta). Forward them unchanged so we
             // preserve message_type, runtime metadata, and terminal semantics.
             is RuntimeEventPayload.RemoteStreamFrame -> {
+                openToolCalls.observe(payload.body)
                 writeRawFrame(streamSend, payload.body)
                 rawFrameIsTerminal(payload.body)
             }
             is RuntimeEventPayload.ExternalTransportFrame -> {
+                openToolCalls.observe(payload.body)
                 writeRawFrame(streamSend, payload.body)
                 rawFrameIsTerminal(payload.body)
             }
@@ -596,7 +687,7 @@ class IrohNodeConnection(
         val frame = buildJsonObject {
             put("type", "stream_delta")
             put("runtime", AppServerProtocol.json.encodeToJsonElement(runtime))
-            put("event_seq", nextEventSeq++)
+            put("event_seq", eventSeq.next())
             put("emitted_at", Instant.now().toString())
             put("idempotency_key", "iroh-delta-${UUID.randomUUID()}")
             put("delta", delta)
@@ -631,13 +722,20 @@ class IrohNodeConnection(
         runCatching { recvStream.read(1u) }
     }
 
-    private companion object {
-        var nextEventSeq: Long = 1L
+    companion object {
         const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
-        const val MAX_HANDLED_CLIENT_MESSAGE_IDS = 512
-        const val HANDLED_CLIENT_MESSAGE_IDS_TRIM_COUNT = 128
-        const val STREAM_JOB_DRAIN_TIMEOUT_MS = 5_000L
+        // Raised 5s -> 60s (P3): a heavy final turn (large tool_return, long
+        // stop_reason flush) can legitimately still be draining when the control
+        // channel closes; the old 5s cap cancelled those turns before their
+        // terminal reached the client, stranding "Thinking…". Undelivered
+        // terminals are additionally parked for redial replay (q71yi).
+        const val STREAM_JOB_DRAIN_TIMEOUT_MS = 60_000L
         const val ADMIN_RPC_REQUEST_TIMEOUT_MS = 15_000L
         const val MAX_CONCURRENT_ADMIN_RPC_STREAMS = 16
+
+        // Process-scoped so they persist across the per-connection lifecycle and
+        // survive a redial (new IrohNodeConnection instance).
+        internal val SHARED_CLIENT_MESSAGE_DEDUPE = ProcessScopedClientMessageDedupe()
+        internal val SHARED_PARKED_TERMINALS = ParkedTerminalStore()
     }
 }

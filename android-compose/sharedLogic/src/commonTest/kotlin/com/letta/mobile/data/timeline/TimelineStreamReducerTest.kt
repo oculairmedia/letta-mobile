@@ -527,6 +527,71 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `mid-stream run id promotion keeps appended tokens instead of dropping them`() {
+        // P3 canonical ids: the transport promotes a synthetic iroh-run row to
+        // the real server run id mid-stream. A promoted frame that also carries a
+        // strictly-higher seq id is a genuine forward stream delta, NOT the
+        // message.list reconcile snapshot the synthetic->real path was written
+        // for. It must merge as a forward delta (append) rather than a snapshot
+        // keep-longer, which would drop the earlier tokens.
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-700",
+                contentRaw = JsonPrimitive("Hello"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 1,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-700",
+                contentRaw = JsonPrimitive(" world"),
+                runId = "run-real-app-server",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-700"
+        // Merge decided by serverId + run id (single row), not otid/semantic dedup.
+        event.runId shouldBe "run-real-app-server"
+        event.content shouldBe "Hello world"
+    }
+
+    @Test
+    fun `reconcile snapshot without seq id still replaces synthetic live row longer text`() {
+        // The message.list reconcile final carries no seq id, so it must stay on
+        // the snapshot-replacement path (keep the complete final) and NOT be
+        // treated as a forward delta appended to the partial.
+        val live = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-701",
+                contentRaw = JsonPrimitive("Hel"),
+                runId = "iroh-run-client-synthetic",
+                seqId = 5,
+            ),
+        ).next
+
+        val output = reduce(
+            prev = live,
+            frame = AssistantMessage(
+                id = "letta-msg-701",
+                contentRaw = JsonPrimitive("Hello, world"),
+                runId = "run-real-app-server",
+                seqId = null,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.runId shouldBe "run-real-app-server"
+        event.content shouldBe "Hello, world"
+    }
+
+    @Test
     fun `reconcile copy without run id does not duplicate live row with real run id`() {
         val live = reduce(
             frame = AssistantMessage(
