@@ -1,6 +1,7 @@
 package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.chat.projection.deduplicateRenderItemsByMessageId
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.assertEquals
@@ -518,6 +519,98 @@ class ChatRenderModelBuilderTest {
         // (user repeating themselves across turns). Only adjacent twins
         // indicate the optimistic-Local-orphan race.
         assertEquals(listOf("client-1", "server-mid", "server-1"), deduped.map { it.first.id })
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId drops a Single whose id is owned by a RunBlock`() {
+        // letta-mobile-x1xnl: incremental tail/committed join can emit the same
+        // assistant message as a Single (key msg-<id>) AND inside a RunBlock
+        // (key run-<runId>). Different keys => key dedup misses => stranded
+        // duplicate on screen. Collapse by underlying message id.
+        val a1 = assistant("a1", runId = "r1")
+        val a2 = assistant("a2", runId = "r1")
+        val staleSingle = ChatRenderItem.Single(message = a1, groupPosition = GroupPosition.None)
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "r1",
+            messages = listOf(a1 to GroupPosition.First, a2 to GroupPosition.Last),
+        )
+
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, staleSingle))
+
+        assertEquals(1, out.size)
+        assertTrue(out.single() is ChatRenderItem.RunBlock)
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId drops a Single ADJACENT to a RunBlock with the same runId`() {
+        // letta-mobile-x1xnl (on-device root cause): the streaming reply renders
+        // as a RunBlock (key run-<runId>) in one rebuild, then the SAME turn's
+        // reconciled final renders as a standalone Single with a DIFFERENT server
+        // message id (key msg-<newId>) in a later Full rebuild. They share no
+        // message id but DO share the runId, so both used to render (the stranded
+        // fragment). Collapse the Single into the RunBlock by runId.
+        val streamed = assistant("a1", runId = "local-run-107")
+        val streamed2 = assistant("a2", runId = "local-run-107")
+        val reconciledFinal = assistant("a1-final", runId = "local-run-107")
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "local-run-107",
+            messages = listOf(streamed to GroupPosition.First, streamed2 to GroupPosition.Last),
+        )
+        val strandedSingle = ChatRenderItem.Single(message = reconciledFinal, groupPosition = GroupPosition.None)
+
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, strandedSingle))
+
+        assertEquals(1, out.size)
+        assertTrue(out.single() is ChatRenderItem.RunBlock)
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId keeps a non-assistant Single sharing a RunBlock runId`() {
+        // #824 review (P2): an ERROR/status bubble (role != assistant) can carry
+        // the same runId as an assistant RunBlock but is a distinct bubble — it
+        // must NOT be collapsed by runId.
+        val a1 = assistant("a1", runId = "r9")
+        val a2 = assistant("a2", runId = "r9")
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "r9",
+            messages = listOf(a1 to GroupPosition.First, a2 to GroupPosition.Last),
+        )
+        val errorBubble = ChatRenderItem.Single(
+            message = UiMessage(id = "err-1", role = "system", content = "Error", timestamp = "2026-04-19T12:00:00Z", runId = "r9"),
+            groupPosition = GroupPosition.None,
+        )
+
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, errorBubble))
+
+        assertEquals(2, out.size)
+        assertTrue(out.any { it is ChatRenderItem.Single && (it as ChatRenderItem.Single).message.id == "err-1" })
+    }
+
+    @Test
+    fun `deduplicateRenderItemsByMessageId keeps a NON-ADJACENT Single sharing a RunBlock runId`() {
+        // #824 review (P1): a run can be split across history by user turns, so an
+        // assistant Single from the same run elsewhere in the list is a REAL older
+        // message — only the streaming/final duplicate is adjacent. Do not drop a
+        // non-adjacent same-run Single.
+        val a1 = assistant("a1", runId = "rshared")
+        val a2 = assistant("a2", runId = "rshared")
+        val runBlock = ChatRenderItem.RunBlock(
+            runId = "rshared",
+            messages = listOf(a1 to GroupPosition.First, a2 to GroupPosition.Last),
+        )
+        val userTurn = ChatRenderItem.Single(
+            message = UiMessage(id = "u1", role = "user", content = "hi", timestamp = "2026-04-19T12:00:00Z"),
+            groupPosition = GroupPosition.None,
+        )
+        val olderSameRunAssistant = ChatRenderItem.Single(
+            message = assistant("a-old", runId = "rshared"),
+            groupPosition = GroupPosition.None,
+        )
+        // RunBlock, then a user turn, then the older same-run assistant — NOT adjacent.
+        val out = deduplicateRenderItemsByMessageId(listOf(runBlock, userTurn, olderSameRunAssistant))
+
+        assertEquals(3, out.size)
+        assertTrue(out.any { it is ChatRenderItem.Single && (it as ChatRenderItem.Single).message.id == "a-old" })
     }
 
     private fun user(

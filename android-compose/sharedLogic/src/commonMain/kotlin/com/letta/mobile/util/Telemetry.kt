@@ -68,8 +68,17 @@ object Telemetry {
     @Suppress("MemberVisibilityCanBePrivate")
     val chatHotPathDebugEnabled = TelemetryFlag(false)
 
+    // letta-mobile-x1xnl: per-frame chat RENDER diagnostics (LazyColumn item
+    // composition, render-item list identity/keys, projector fast/full path
+    // flips). Off by default; enable in code via renderDiagEnabled.set(true) or
+    // on-device with `adb shell setprop log.tag.LettaRenderDiag VERBOSE` (no
+    // rebuild). Left in the tree for future render-layer diagnosis.
+    @Suppress("MemberVisibilityCanBePrivate")
+    val renderDiagEnabled = TelemetryFlag(false)
+
     private const val TIMELINE_DUMP_TAG = "LettaTimelineDump"
     private const val CHAT_HOT_PATH_DEBUG_TAG = "LettaChatHotPath"
+    private const val RENDER_DIAG_TAG = "LettaRenderDiag"
     private const val TAG_PREFIX = "Telemetry"
     private const val MAX_RING_SIZE = 1000
     private const val TRACE_MAX_LEN = 127
@@ -84,6 +93,9 @@ object Telemetry {
 
     fun isChatHotPathDebugEnabled(): Boolean =
         chatHotPathDebugEnabled.get() || (delegate?.isLoggable(CHAT_HOT_PATH_DEBUG_TAG, 2) ?: false)
+
+    fun isRenderDiagEnabled(): Boolean =
+        renderDiagEnabled.get() || (delegate?.isLoggable(RENDER_DIAG_TAG, 2) ?: false)
 
     fun event(
         tag: String,

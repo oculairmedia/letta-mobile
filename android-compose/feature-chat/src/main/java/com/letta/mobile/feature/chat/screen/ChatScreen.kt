@@ -1003,7 +1003,14 @@ private fun ChatContent(
             messages = state.messages,
             mode = chatDisplayMode,
             change = state.messageListChange,
-        )
+        ).also { built ->
+            // letta-mobile-x1xnl render diagnostics (flag-gated, no-op when off).
+            com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderItemsBuilt(
+                conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
+                path = state.messageListChange.toString(),
+                items = built,
+            )
+        }
     }
 
     var a2uiStackHeightDp by remember { mutableStateOf(0.dp) }
