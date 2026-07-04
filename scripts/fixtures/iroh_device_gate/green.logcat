@@ -1,0 +1,11 @@
+06-30 12:00:00.100  1234  1250 I Telemetry/AdminChatVM: sendMessage.route via=iroh conversationId=conv-selfcheck length=5 attachments=0
+06-30 12:00:00.300  1234  1260 I Telemetry/IrohTransport: frame.recv channel=Stream type=stream_delta
+06-30 12:00:00.310  1234  1260 I Telemetry/IrohGate: gate1.emitBoth frame=AssistantMessage messageId=m1 conversationId=conv-selfcheck
+06-30 12:00:00.320  1234  1260 I Telemetry/IrohGate: gate3.coordinatorMessageDelta resolvedConversationId=conv-selfcheck messageId=m1 messageType=assistant_message isReplay=false
+06-30 12:00:00.330  1234  1260 I Telemetry/IrohGate: gate4.repositoryIngest agentId=a1 conversationId=conv-selfcheck messageId=m1 messageType=assistant_message
+06-30 12:00:00.340  1234  1270 I Telemetry/TimelineSync: uiProjection.snapshot (2ms) conversationId=conv-selfcheck eventsTotal=10 messageCount=4 isStreaming=true isReconciling=false
+06-30 12:00:00.360  1234  1260 I Telemetry/IrohTransport: frame.recv channel=Stream type=stream_delta
+06-30 12:00:00.370  1234  1260 I Telemetry/IrohGate: gate1.emitBoth frame=AssistantMessage messageId=m1 conversationId=conv-selfcheck
+06-30 12:00:00.380  1234  1270 I Telemetry/TimelineSync: uiProjection.snapshot (1ms) conversationId=conv-selfcheck eventsTotal=12 messageCount=5 isStreaming=true isReconciling=false
+06-30 12:00:00.500  1234  1250 I Telemetry/AdminChatVM: ws.turnComplete status=completed turnId=t1 runId=r1 stopReason=end_turn lossy=false reason=turnDone
+06-30 12:00:00.520  1234  1270 I Telemetry/TimelineSync: uiProjection.snapshot (1ms) conversationId=conv-selfcheck eventsTotal=13 messageCount=5 isStreaming=false isReconciling=false
