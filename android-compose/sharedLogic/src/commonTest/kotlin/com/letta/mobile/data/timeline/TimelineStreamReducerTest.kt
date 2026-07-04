@@ -287,10 +287,75 @@ class TimelineStreamReducerTest {
         event.serverId shouldBe "letta-msg-5020"
         event.content shouldBe "Got it — Iroh transport is streaming the response."
         event.seqId shouldBe 2
-        output.next.liveCursor shouldBe "letta-msg-5020"
+        // liveCursor advances to the just-ingested chunk id so reconcile's
+        // `after` cursor does not stall on the first chunk (codex review P2).
+        output.next.liveCursor shouldBe "letta-msg-5021"
         output.emittedEvents shouldBe listOf(
             TimelineSyncEvent.StreamEventIngested("letta-msg-5020", "assistant_message")
         )
+    }
+
+    @Test
+    fun `seq-less same-otid cumulative chunks snapshot-merge instead of appending`() {
+        // Codex review P2: when both frames lack seq ids, the old
+        // canUseSnapshotMerge=false path fell through to APPEND, turning
+        // "Got" + "Got it" into "GotGot it". Same-otid assistant frames are
+        // cumulative by contract, so snapshot-merge must win regardless of seq.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-6000",
+                contentRaw = JsonPrimitive("Got"),
+                runId = "run-app",
+                otid = "otid-seqless",
+                seqId = null,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-6001",
+                contentRaw = JsonPrimitive("Got it working now."),
+                runId = "run-app",
+                otid = "otid-seqless",
+                seqId = null,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Got it working now."
+    }
+
+    @Test
+    fun `otid merge promotes synthetic iroh-run id to the real run id`() {
+        // Codex review P2: per-chunk backend ids route through the otid path,
+        // bypassing the serverId-merge run-id promotion. The merged row must
+        // adopt the real run id so run-scoped grouping/collapse works.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-7000",
+                contentRaw = JsonPrimitive("I be"),
+                runId = "iroh-run-synthetic-1",
+                otid = "otid-runpromote",
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-7001",
+                contentRaw = JsonPrimitive("I bet. Debugging heisenbugs is hell."),
+                runId = "run-real-server",
+                otid = "otid-runpromote",
+                seqId = 2,
+            ),
+        )
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "I bet. Debugging heisenbugs is hell."
+        event.runId shouldBe "run-real-server"
     }
 
     @Test

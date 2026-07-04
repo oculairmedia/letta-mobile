@@ -261,10 +261,17 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val bothAssistant = otidMatch.messageType == TimelineMessageType.ASSISTANT &&
             confirmed.messageType == TimelineMessageType.ASSISTANT
         val merge = if (bothAssistant) {
+            // Same-otid assistant frames are ALWAYS cumulative snapshots (each
+            // chunk carries the full text so far). Codex review P2: when seq
+            // ids are absent (both nullable on the wire), the old
+            // canUseSnapshotMerge=false path fell through to APPEND, turning
+            // "Got" + "Got it" into "GotGot it". Because same-otid frames are
+            // cumulative by contract, snapshot-merge is always safe here — the
+            // longer/equal text wins, never concatenation.
             mergeStreamText(
                 existing = otidMatch.content,
                 incoming = confirmed.content,
-                canUseSnapshotMerge = otidMatch.seqId != null && confirmed.seqId != null,
+                canUseSnapshotMerge = true,
                 incomingIsForwardDelta = otidMatch.seqId == null || confirmed.seqId == null ||
                     confirmed.seqId > otidMatch.seqId,
             )
@@ -275,9 +282,19 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             val merged = otidMatch.copy(
                 content = merge.text,
                 seqId = latestSeqId(otidMatch.seqId, confirmed.seqId),
+                // Codex review P2: per-chunk backend ids route through this otid
+                // path, so the serverId-merge run-id promotion above never runs.
+                // Adopt the incoming frame's real run id when it supersedes a
+                // synthetic iroh-run-* id, so run-scoped grouping/collapse keys
+                // on the real run id.
+                runId = promoteRunId(otidMatch.runId, confirmed.runId),
             )
             timeline = timeline.replaceByServerId(merged)
-            timeline = timeline.copy(liveCursor = otidMatch.serverId)
+            // Keep the row's stable serverId as identity, but advance liveCursor
+            // to the just-ingested chunk id (codex review P2): reconcile uses
+            // liveCursor as the `after` cursor, so leaving it on the first chunk
+            // could make a long reply's reconcile miss later messages.
+            timeline = timeline.copy(liveCursor = confirmed.serverId)
             pendingEvents += TimelineSyncEvent.StreamEventIngested(otidMatch.serverId, message.messageType)
             hotPathTelemetry(
                 "streamSubscriber.otidCumulativeMerged",
@@ -434,6 +451,24 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
     runId?.takeIf { it.isNotBlank() }?.isIrohSyntheticRunId() == true
 
 private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
+
+/**
+ * When an otid-matched cumulative chunk arrives carrying the real server run
+ * id after the row was created under a synthetic `iroh-run-*` id, adopt the
+ * real id so run-scoped grouping/collapse keys on it. Otherwise keep the
+ * existing id (never regress a real id back to a synthetic one, and never
+ * clobber with a blank incoming id).
+ */
+private fun promoteRunId(existing: String?, incoming: String?): String? {
+    val existingRunId = existing?.takeIf { it.isNotBlank() }
+    val incomingRunId = incoming?.takeIf { it.isNotBlank() } ?: return existingRunId
+    if (existingRunId == null) return incomingRunId
+    return if (existingRunId.isIrohSyntheticRunId() && !incomingRunId.isIrohSyntheticRunId()) {
+        incomingRunId
+    } else {
+        existingRunId
+    }
+}
 
 private fun String?.isCompatibleAssistantPrefixRunId(other: String): Boolean {
     val thisRunId = this?.takeIf { it.isNotBlank() } ?: return false
