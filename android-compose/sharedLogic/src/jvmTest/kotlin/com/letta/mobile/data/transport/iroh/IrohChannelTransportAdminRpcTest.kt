@@ -109,6 +109,64 @@ class IrohChannelTransportAdminRpcTest {
     }
 
     @Test
+    fun payloadSizeErrorFailsOnlyTheRequestWithoutRedialOrClose() = runTest {
+        // k7yyc: a frame-size (payload) rejection on a list-sized read must fail
+        // ONLY that request — no supervisor invalidation, no redial, no close of
+        // the shared connection. A single oversized list response cannot be
+        // allowed to tear down streaming for every other request.
+        var dials = 0
+        var calls = 0
+        val closed = mutableListOf<String>()
+        val sizeError = IrohFrameCodec.FrameTooLargeException("Iroh frame too large: 2000000 bytes > max 1048576")
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                calls += 1
+                throw sizeError
+            }
+        }
+
+        val thrown = assertFailsWith<IrohFrameCodec.FrameTooLargeException> {
+            transport.adminRpc("message.list", "/messages", null)
+        }
+        advanceUntilIdle()
+
+        assertSame(sizeError, thrown)
+        assertEquals(1, dials)
+        assertEquals(1, calls)
+        assertTrue(closed.isEmpty())
+    }
+
+    @Test
+    fun decodeErrorFailsOnlyTheRequestWithoutRedialOrClose() = runTest {
+        // k7yyc: a decode (protocol) error is a per-request payload fault, not a
+        // transport fault — fail only the request, never reconnect.
+        var dials = 0
+        var calls = 0
+        val closed = mutableListOf<String>()
+        val decodeError = IrohFrameCodec.ProtocolException("admin_rpc expected admin_rpc_response but received garbage")
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                calls += 1
+                throw decodeError
+            }
+        }
+
+        val thrown = assertFailsWith<IrohFrameCodec.ProtocolException> {
+            transport.adminRpc("conversation.list", "/conversations", null)
+        }
+        advanceUntilIdle()
+
+        assertSame(decodeError, thrown)
+        assertEquals(1, dials)
+        assertEquals(1, calls)
+        assertTrue(closed.isEmpty())
+    }
+
+    @Test
     fun unknownMethodReturnsFailureEnvelopeWithoutThrowing() = runTest {
         val transport = transportWithHandles {
             fakeHandle("dial-1") { method, _, _ ->

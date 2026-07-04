@@ -430,23 +430,22 @@ class IrohAppServerTransport(
         return pending != null
     }
 
+    /**
+     * letta-mobile-k7yyc (P4 request isolation): the legacy control-channel
+     * fallback muxes a response onto the SHARED control stream. That is only
+     * ever safe for trivially-small, bounded payloads — a list-sized response
+     * (message.list / *.list / a single large message or tool_return body) on
+     * the control channel can starve or corrupt every other multiplexed frame.
+     *
+     * With #792 stream-per-request server support landed, every admin_rpc gets
+     * its own bi-stream, so the fallback is legacy-only. We keep it ONLY for the
+     * two tiny control-plane methods and let all list-sized reads hard-fail the
+     * single request (see [adminRpc]) instead of degrading to the control
+     * channel — failure stays isolated to the request, never the transport.
+     */
     private fun String.isLegacyFallbackSafeAdminRpcMethod(): Boolean = when (this) {
         "health.check",
-        "conversation.list",
-        "message.list",
-        "message.get",
-        "tool_return.get",
-        "goal.get",
-        "agent.list",
-        "agent.get",
-        "archive.list",
-        "identity.list",
-        "model.list",
-        "schedule.list",
-        "tool.list",
-        "mcp.list",
-        "run.list",
-        "run.get" -> true
+        "goal.get" -> true
         else -> false
     }
 

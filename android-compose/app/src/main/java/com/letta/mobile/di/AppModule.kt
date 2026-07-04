@@ -12,6 +12,7 @@ import com.letta.mobile.data.health.ServerHealthRepository
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
+import com.letta.mobile.data.repository.IrohAdminRpcApprovalSource
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.SlashCommandRepository
@@ -104,6 +105,19 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideWsChatBridge(transport: IChannelTransport): WsChatBridge = WsChatBridge(transport)
+
+        // letta-mobile-qfa81 (P4 row 13): approval submission routed over
+        // admin_rpc when the active backend is iroh://. Injected into
+        // MessageRepository.submitApproval.
+        @Provides
+        @Singleton
+        fun provideIrohAdminRpcApprovalSource(
+            transport: IChannelTransport,
+            settingsRepository: ISettingsRepository,
+        ): IrohAdminRpcApprovalSource = IrohAdminRpcApprovalSource(
+            channelTransport = transport,
+            settingsRepository = settingsRepository,
+        )
 
         @Provides
         @Singleton

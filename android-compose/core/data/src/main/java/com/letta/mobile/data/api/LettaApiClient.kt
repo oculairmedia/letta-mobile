@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryContext
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -26,6 +27,24 @@ data class ApiSession(val client: HttpClient, val baseUrl: String)
 
 class AdminApiUnavailableForLocalRuntimeException : IllegalStateException(
     "Admin API widgets require an HTTP(S) Letta or admin-shim URL. Local LettaCode is a chat runtime selector, not an Admin API endpoint."
+)
+
+/**
+ * letta-mobile-qfa81 (P4 iroh purity): thrown by [LettaApiClient] when an Admin
+ * API call is attempted while the active backend is an Iroh endpoint
+ * (`iroh://<ticket>`). The Admin API MUST travel over `admin_rpc` frames on the
+ * Iroh transport for such backends; silently falling back to some *other* saved
+ * HTTP config would send the call to a stale, possibly unrelated server (the
+ * dangerous path P4 closes). This is a HARD failure by design: a route with no
+ * `admin_rpc` path must fail visibly rather than read the wrong backend over
+ * HTTP. Route the call over [com.letta.mobile.data.transport.api.IChannelTransport.adminRpc]
+ * (see IrohAdminRpc*Source / IrohAdminRpcTimelineTransport) or gate the feature
+ * off while `iroh://` is active.
+ */
+class IrohAdminApiUnavailableException(serverUrl: String) : IllegalStateException(
+    "Admin API call attempted while the active backend is an Iroh endpoint ($serverUrl). " +
+        "This route has no admin_rpc path, so it will not fall back to a stale HTTP config. " +
+        "Route it over IChannelTransport.adminRpc or gate it off in iroh:// mode."
 )
 
 @Singleton
@@ -85,6 +104,18 @@ open class LettaApiClient @Inject constructor(
 
     private fun resolveAdminApiConfig(): LettaConfig? {
         val activeConfig = settingsRepository.activeConfig.value ?: return null
+
+        // letta-mobile-qfa81 (P4 iroh purity) CHOKE POINT: this guard MUST run
+        // before the HTTP check because a corrupted `https://iroh://<ticket>`
+        // config also startsWith "https://" yet is still an Iroh endpoint, not
+        // an HTTP admin server. When the active backend is Iroh, hard-fail
+        // instead of scanning `configs` for any stale HTTP config — a single
+        // guard here closes ~30 per-Api call sites at once. Admin reads with an
+        // Iroh path route over admin_rpc before ever reaching this client;
+        // anything still landing here has no Iroh path and must fail visibly.
+        if (IrohChannelTransport.isIrohUrl(activeConfig.serverUrl)) {
+            throw IrohAdminApiUnavailableException(activeConfig.serverUrl)
+        }
 
         if (activeConfig.serverUrl.isHttpAdminUrl()) {
             return activeConfig

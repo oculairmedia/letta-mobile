@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -47,5 +48,59 @@ class IrohAdminRpcConversationListSource(
         }
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+    }
+
+    // letta-mobile-qfa81 (P4 rows 3-6): conversation B-tier reads/writes whose
+    // server handlers already exist (ConversationAdminHandlers). Client wiring
+    // only. summary-update + fork are C-tier (no handler) and stay on the HTTP
+    // path where the LettaApiClient choke point hard-fails them in iroh:// mode.
+
+    suspend fun getConversation(id: ConversationId): Conversation {
+        val response = channelTransport.adminRpc(
+            method = "conversation.get",
+            path = "/v1/conversations/${id.value}",
+            body = null,
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.get failed")
+        val result = response.result ?: error("Iroh admin_rpc conversation.get returned no result")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
+    }
+
+    suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
+        val body = buildJsonObject {
+            put("agent_id", agentId.value)
+            summary?.let { put("summary", it) }
+        }
+        val response = channelTransport.adminRpc(
+            method = "conversation.create",
+            path = "/v1/agents/${agentId.value}/conversations",
+            body = body.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.create failed")
+        val result = response.result ?: error("Iroh admin_rpc conversation.create returned no result")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
+    }
+
+    suspend fun deleteConversation(id: ConversationId) {
+        val response = channelTransport.adminRpc(
+            method = "conversation.delete",
+            path = "/v1/conversations/${id.value}",
+            body = null,
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.delete failed")
+    }
+
+    /** Archive (true) or restore/unarchive (false) a conversation. */
+    suspend fun setConversationArchived(id: ConversationId, archived: Boolean): Conversation {
+        val method = if (archived) "conversation.archive" else "conversation.restore"
+        val suffix = if (archived) "archive" else "unarchive"
+        val response = channelTransport.adminRpc(
+            method = method,
+            path = "/v1/conversations/${id.value}/$suffix",
+            body = null,
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc $method failed")
+        val result = response.result ?: error("Iroh admin_rpc $method returned no result")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 }

@@ -108,20 +108,29 @@ open class ConversationRepository(
 
     override suspend fun getConversation(id: ConversationId): Conversation {
         return try {
-            conversationApi.getConversation(id).also { conversation ->
-                upsertCachedConversation(conversation)
+            val irohSource = irohConversationListSource
+            val fetched = if (irohSource?.shouldUseIroh() == true) {
+                irohSource.getConversation(id)
+            } else {
+                conversationApi.getConversation(id)
             }
+            fetched.also { conversation -> upsertCachedConversation(conversation) }
         } catch (e: Exception) {
             conversationDao.getByIdOnce(id.value)?.toConversation() ?: throw e
         }
     }
 
     override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
-        val conversation = if (localConversationSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)) {
-            localConversationSource.createConversation(agentId, summary)
-        } else {
-            val params = ConversationCreateParams(agentId = agentId, summary = summary)
-            conversationApi.createConversation(params)
+        val irohSource = irohConversationListSource
+        val conversation = when {
+            localConversationSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value) ->
+                localConversationSource.createConversation(agentId, summary)
+            irohSource?.shouldUseIroh() == true ->
+                irohSource.createConversation(agentId, summary)
+            else -> {
+                val params = ConversationCreateParams(agentId = agentId, summary = summary)
+                conversationApi.createConversation(params)
+            }
         }
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
@@ -133,7 +142,12 @@ open class ConversationRepository(
         writeAgentConversations(agentId, optimistic, System.currentTimeMillis())
 
         try {
-            conversationApi.deleteConversation(id)
+            val irohSource = irohConversationListSource
+            if (irohSource?.shouldUseIroh() == true) {
+                irohSource.deleteConversation(id)
+            } else {
+                conversationApi.deleteConversation(id)
+            }
         } catch (e: Exception) {
             writeAgentConversations(agentId, snapshot, System.currentTimeMillis())
             throw e
@@ -173,8 +187,12 @@ open class ConversationRepository(
         writeAgentConversations(agentId, optimisticList, System.currentTimeMillis())
 
         try {
-            val params = ConversationUpdateParams(archived = archived)
-            val updated = conversationApi.updateConversation(id, params)
+            val irohSource = irohConversationListSource
+            val updated = if (irohSource?.shouldUseIroh() == true) {
+                irohSource.setConversationArchived(id, archived)
+            } else {
+                conversationApi.updateConversation(id, ConversationUpdateParams(archived = archived))
+            }
             writeAgentConversations(
                 agentId = agentId,
                 conversations = optimisticList.map { if (it.id == updated.id) updated else it },
