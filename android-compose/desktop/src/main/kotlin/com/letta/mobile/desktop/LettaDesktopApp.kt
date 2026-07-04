@@ -475,12 +475,48 @@ fun LettaDesktopApp(
     // the rail, and the sidebar lists the whole stack's conversations together.
     // Ordered most-recent-first so each stack's "first" member (the click/open
     // fallback) is the one with the most recent conversation, not just first-seen.
-    val railAgents = remember(chatState.conversations) {
-        chatState.conversations
+    // Full roster from the agent repository, so agents WITHOUT recent (or any)
+    // conversations still appear — conversations only cover the newest
+    // DEFAULT_CONVERSATION_LIMIT entries, which hid bulk-imported agent fleets.
+    val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
+    val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
+    LaunchedEffect(sessionGraph, chatState.connectionState) {
+        runCatching {
+            sessionGraph.agentRepository.refreshAgentsIfStale(
+                maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS,
+            )
+        }
+    }
+    val railAgents = remember(chatState.conversations, rosterAgents) {
+        val fromConversations = chatState.conversations
             .sortedByDescending { conversationRecency(it.updatedAtLabel) }
             .filter { !it.agentId.isNullOrBlank() }
             .distinctBy { it.agentId }
             .map { it.agentId!! to it.agentName }
+        val seenIds = fromConversations.mapTo(mutableSetOf()) { it.first }
+        // Roster-only agents follow the conversation-active ones, alphabetically.
+        val fromRoster = rosterAgents
+            .filter { it.id.value !in seenIds }
+            .map { it.id.value to it.name.ifBlank { it.id.value } }
+            .sortedBy { it.second.lowercase() }
+        fromConversations + fromRoster
+    }
+
+    // Single entry point for "open this agent" from any surface (rail, command
+    // palette): select its most-recent loaded conversation, or — for a
+    // roster-only agent with none loaded (e.g. bulk-imported) — create its
+    // first chat. createConversationForAgent serializes rapid opens.
+    fun openAgent(agentId: String) {
+        editAgentId = null
+        val existing = chatState.conversations
+            .filter { it.agentId == agentId }
+            .maxByOrNull { conversationRecency(it.updatedAtLabel) }
+        if (existing != null) {
+            chatController.selectConversation(existing.id)
+        } else {
+            chatController.createConversationForAgent(agentId)
+        }
+        selectedDestination = DesktopDestination.Conversations
     }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
@@ -648,13 +684,7 @@ fun LettaDesktopApp(
                     avatarStyleByAgentId = avatarStyleByAgentId,
                     selectedAgentId = selectedAgentId,
                     thinkingAgentId = thinkingAgentId,
-                    onAgentSelected = { agentId ->
-                        editAgentId = null
-                        chatState.conversations
-                            .firstOrNull { it.agentId == agentId }
-                            ?.let { chatController.selectConversation(it.id) }
-                        selectedDestination = DesktopDestination.Conversations
-                    },
+                    onAgentSelected = { agentId -> openAgent(agentId) },
                     onNewSession = { showNewAgentDialog = true },
                     onSearch = { showCommandPalette = true },
                     onAvatarCompanion = ::toggleAvatarCompanion,
@@ -686,7 +716,12 @@ fun LettaDesktopApp(
                     onNewChat = {
                         editAgentId = null
                         selectedDestination = DesktopDestination.Conversations
-                        chatController.createConversation()
+                        // Target the focused agent explicitly — for a roster-only
+                        // agent, createConversation()'s conversation-derived agent
+                        // id would miss it.
+                        selectedAgentId
+                            ?.let(chatController::createConversationForAgent)
+                            ?: chatController.createConversation()
                     },
                     onEditAgent = { editAgentId = selectedAgentId },
                 )
@@ -905,11 +940,7 @@ fun LettaDesktopApp(
                                 chatController.selectConversation(item.id)
                                 selectedDestination = DesktopDestination.Conversations
                             }
-                            PaletteItemKind.Agent -> {
-                                chatState.conversations.firstOrNull { it.agentId == item.id }
-                                    ?.let { chatController.selectConversation(it.id) }
-                                selectedDestination = DesktopDestination.Conversations
-                            }
+                            PaletteItemKind.Agent -> openAgent(item.id)
                             PaletteItemKind.Destination ->
                                 DesktopDestination.entries.firstOrNull { it.name == item.id }
                                     ?.let { selectedDestination = it }

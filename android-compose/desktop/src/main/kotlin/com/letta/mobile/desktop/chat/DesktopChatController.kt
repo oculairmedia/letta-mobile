@@ -188,6 +188,7 @@ class DesktopChatController(
     private var loadJob: Job? = null
     private var selectJob: Job? = null
     private var sendJob: Job? = null
+    private var createConversationJob: Job? = null
     private var started = false
     private var closed = false
 
@@ -226,6 +227,7 @@ class DesktopChatController(
         loadJob?.cancel()
         selectJob?.cancel()
         sendJob?.cancel()
+        createConversationJob?.cancel()
         timelineJob?.cancel()
         activeLoop?.close()
         activeLoop = null
@@ -312,7 +314,22 @@ class DesktopChatController(
             _state.update { it.copy(errorMessage = "Select an agent before starting a new chat.") }
             return
         }
-        scope.launch {
+        createConversationForAgent(agentId)
+    }
+
+    /**
+     * Create and select a conversation for an EXPLICIT agent — used when the
+     * rail selects an agent that has no conversations yet (e.g. bulk-imported
+     * fleets), where selection can't go through an existing conversation.
+     */
+    fun createConversationForAgent(agentId: String) {
+        if (closed) return
+        if (agentId.isBlank()) return
+        // Serialize: clicking through several roster agents quickly must not
+        // spawn a pile of racing empty conversations (each unaware of the
+        // others' unsent chat). The latest click supersedes the previous.
+        createConversationJob?.cancel()
+        createConversationJob = scope.launch {
             try {
                 // Drop the previous untouched chat first so the reload below
                 // doesn't surface it (and it never piles up in the history).
