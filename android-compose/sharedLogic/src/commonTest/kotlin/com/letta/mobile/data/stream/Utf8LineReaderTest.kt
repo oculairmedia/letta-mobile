@@ -1,10 +1,5 @@
 package com.letta.mobile.data.stream
 
-import io.ktor.utils.io.ByteChannel
-import io.ktor.utils.io.close
-import io.ktor.utils.io.writeFully
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,29 +36,22 @@ class Utf8LineReaderTest {
         // of its 3-byte sequence (after the first em-dash byte).
         val emStart = "a".encodeToByteArray().size
         val splitAt = emStart + 1 // mid-codepoint
-        val channel = this.byteChannelInChunks(bytes, splitAt)
-        val reader = Utf8LineReader(channel)
+        // Force a tiny reader chunk so readAvailable returns few bytes per call,
+        // guaranteeing the em dash's 3 bytes span multiple reads (the boundary
+        // this test guards). A pre-filled ByteReadChannel delivers all bytes.
+        val channel = io.ktor.utils.io.ByteReadChannel(bytes)
+        val reader = Utf8LineReader(channel, chunkSize = splitAt)
         assertEquals("a—b", reader.readLine())
         assertNull(reader.readLine())
     }
 
     @Test
     fun `plain lines still split on newline`() = runTest {
-        val channel = this.byteChannelInChunks("hello\nworld\n".encodeToByteArray(), 3)
-        val reader = Utf8LineReader(channel)
+        val channel = io.ktor.utils.io.ByteReadChannel("hello\nworld\n".encodeToByteArray())
+        val reader = Utf8LineReader(channel, chunkSize = 3)
         assertEquals("hello", reader.readLine())
         assertEquals("world", reader.readLine())
         assertNull(reader.readLine())
     }
 
-    private fun TestScope.byteChannelInChunks(bytes: ByteArray, firstChunk: Int): io.ktor.utils.io.ByteReadChannel {
-        val channel = ByteChannel(autoFlush = true)
-        launch {
-            channel.writeFully(bytes, 0, firstChunk)
-            channel.flush()
-            channel.writeFully(bytes, firstChunk, bytes.size)
-            channel.close()
-        }
-        return channel
-    }
 }
