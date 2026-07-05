@@ -38,4 +38,29 @@ class StreamingMarkdownBytePreservationTest {
             assertEquals("prefix len $end must round-trip", prefix, reconstruct(prefix))
         }
     }
+
+    @Test
+    fun `repair pass does not drop punctuation from plain streamed prose`() {
+        // repairIncompleteMarkdownForStreaming runs ONLY on the streamed tail (not
+        // the reconciled final) — the exact stream-vs-final asymmetry. Plain prose
+        // with punctuation must pass through untouched at every streaming prefix.
+        val source = "we've been here before — clean for a stretch, then it resurfaces. " +
+            "Don't trust it yet. Keep the harness running, keep the data flowing. I'll be here either way."
+        for (end in 1..source.length) {
+            val prefix = source.substring(0, end)
+            val repaired = repairIncompleteMarkdownForStreaming(prefix)
+            // The repair may only APPEND closing markers to the tail; it must never
+            // DROP characters from the source prefix.
+            assertEquals(
+                "repair dropped chars at prefix len $end",
+                prefix,
+                repaired.substring(0, minOf(prefix.length, repaired.length)),
+            )
+            // and never shrink below the input
+            if (repaired.length < prefix.length) {
+                throw AssertionError("repair SHRANK prefix len $end: '$prefix' -> '$repaired'")
+            }
+        }
+    }
+
 }
