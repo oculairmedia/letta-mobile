@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -167,6 +168,23 @@ class IrohNodeConnectionSupportTest {
             put("otid", kotlinx.serialization.json.JsonPrimitive("o1"))
         }
         assertEquals("cm-stream-o1", tagStreamDeltaForOptimisticDedup(already)["id"]?.jsonPrimitive?.contentOrNull)
+    }
+
+
+    @Test
+    fun retagStreamDeltaFrame_tagsAssistantDeltaInsideWireFrame() {
+        val raw = """{"type":"stream_delta","event_seq":5,"delta":{"id":"letta-msg-3255","message_type":"assistant_message","otid":"provider-assistant-1-abc","content":"Hey"}}"""
+        val out = retagStreamDeltaFrameForOptimisticDedup(raw)
+        val delta = kotlinx.serialization.json.Json.parseToJsonElement(out).jsonObject["delta"]!!.jsonObject
+        assertEquals("cm-stream-provider-assistant-1-abc", delta["id"]?.jsonPrimitive?.contentOrNull)
+        // structure preserved
+        assertEquals("assistant_message", delta["message_type"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun retagStreamDeltaFrame_nonStreamDelta_unchanged() {
+        val raw = """{"type":"turn_done","status":"completed"}"""
+        assertEquals(raw, retagStreamDeltaFrameForOptimisticDedup(raw))
     }
 
 }

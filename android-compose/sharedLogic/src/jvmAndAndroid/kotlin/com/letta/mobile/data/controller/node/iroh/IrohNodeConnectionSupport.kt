@@ -243,3 +243,16 @@ internal fun tagStreamDeltaForOptimisticDedup(
         put("id", "$prefix$otid")
     }
 }
+
+/** Frame-level wrapper: parse a raw wire frame; if stream_delta, tag its inner delta id. */
+internal fun retagStreamDeltaFrameForOptimisticDedup(rawFrame: String): String = runCatching {
+    val obj = kotlinx.serialization.json.Json.parseToJsonElement(rawFrame).jsonObject
+    if ((obj["type"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull != "stream_delta") return@runCatching rawFrame
+    val delta = obj["delta"] as? kotlinx.serialization.json.JsonObject ?: return@runCatching rawFrame
+    val taggedDelta = tagStreamDeltaForOptimisticDedup(delta)
+    if (taggedDelta === delta) return@runCatching rawFrame
+    kotlinx.serialization.json.buildJsonObject {
+        obj.forEach { (k, v) -> if (k != "delta") put(k, v) }
+        put("delta", taggedDelta)
+    }.toString()
+}.getOrDefault(rawFrame)

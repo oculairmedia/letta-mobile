@@ -669,15 +669,26 @@ class IrohNodeConnection(
         streamSend: SendStream,
         rawFrame: String,
     ) {
+        // letta-mobile-h30cy: RemoteStreamFrame forwards the App Server wire frame
+        // UNCHANGED, which is the real assistant stream_delta path (writeStreamDelta
+        // only handles synthesized/lifecycle frames). The raw delta keeps its
+        // provider id (letta-msg-*), but message.list reconcile returns the same
+        // reply as ui-msg-* / null-run — zero identity overlap, so mobile renders
+        // it twice (Iroh dupes; HTTPS does not, because the shim tags there). Tag
+        // the delta's assistant/reasoning id to cm-stream-/cm-reason-<otid> here,
+        // exactly as the shim does, so mobile's optimistic-twin dedup collapses the
+        // streamed row against the disk copy.
+        val outgoing = retagStreamDeltaFrameForOptimisticDedup(rawFrame)
         Telemetry.event(
             "IrohNode", "stream.write",
             "remoteEndpointId" to remoteEndpointId,
-            *IrohDiagnostics.redactedFrameAttributes(frameType(rawFrame), rawFrame.length).toTypedArray(),
+            *IrohDiagnostics.redactedFrameAttributes(frameType(outgoing), outgoing.length).toTypedArray(),
         )
         streamWriteMutex.withLock {
-            IrohFrameCodec.write(streamSend, rawFrame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
+            IrohFrameCodec.write(streamSend, outgoing, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
     }
+
 
     private suspend fun writeStreamDelta(
         streamSend: SendStream,
