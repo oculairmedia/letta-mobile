@@ -882,6 +882,55 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `iroh reconciled final collapses into synthetic-otid streamed draft even when not a clean prefix`() {
+        // letta-mobile-x1xnl SECOND path. The live Iroh stream lands the
+        // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
+        // otid (iroh-assistant-<turnId>) minted by IrohStreamDeltaServerFrameMapper
+        // because the wire frames carry no otid. A moment later the SAME reply
+        // arrives again via the message.list reconcile snapshot — this time with
+        // a REAL server otid/id (a different letta-msg-* id than the last rotating
+        // streamed fragment) and the FULL text. The on-device symptom is the first
+        // word lagging on the draft ("Still" strands) so the draft text is NOT a
+        // clean prefix of the reconciled full text — defeating the
+        // startsWith-based prefix replace. Both rows share the SAME real run id, so
+        // the reconcile must collapse the snapshot into the draft row instead of
+        // appending a second, near-identical row.
+        val streamedDraft = reduce(
+            frame = AssistantMessage(
+                // Last rotating backend id observed on the live stream.
+                id = "letta-msg-5021",
+                // Draft is missing the leading word ("Still") — first-word lag.
+                contentRaw = JsonPrimitive(" kicking. Did anything else break?"),
+                runId = "run-real-app-server",
+                otid = "iroh-assistant-turn-42",
+                seqId = 7,
+            ),
+        ).next
+
+        streamedDraft.events shouldHaveSize 1
+
+        val (mergedTimeline, changed) = streamedDraft.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    // Reconcile mints its OWN id, distinct from the streamed one.
+                    id = "letta-msg-final-99",
+                    contentRaw = JsonPrimitive("Still kicking. Did anything else break?"),
+                    runId = "run-real-app-server",
+                    otid = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Still kicking. Did anything else break?"
+        event.serverId shouldBe "letta-msg-final-99"
+        event.position shouldBe (streamedDraft.events.single() as TimelineEvent.Confirmed).position
+    }
+
+    @Test
     fun `reused assistant server id from a different run appends live event`() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",
@@ -1492,6 +1541,68 @@ class TimelineStreamReducerTest {
 
         output.next.events shouldHaveSize 5_000
         output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
+    fun `REAL WIRE rotating per-fragment ids with NULL otid must reduce to one row h30cy`() {
+        // Faithful replay of the ACTUAL Iroh wire shape captured headlessly via
+        // app-server-iroh-probe: a single assistant reply arrives as N stream_delta
+        // fragments, each with a NEW sequential letta-msg id and NO otid (otid=null).
+        // Prior tests hardcoded a shared otid, which the real wire does NOT provide —
+        // that false assumption is why fixes passed tests but duplicated on device.
+        // Cumulative content grows per fragment; all share one real run id.
+        val runId = "run-real-app-server"
+        val fragments = listOf("Hey", "Hey back", "Hey back.", "Hey back. Still", "Hey back. Still here.")
+        var tl = timeline()
+        fragments.forEachIndexed { i, cumulative ->
+            tl = reduce(
+                prev = tl,
+                frame = AssistantMessage(
+                    id = "letta-msg-${1312 + i}", // rotating, +1 per fragment (real wire)
+                    contentRaw = JsonPrimitive(cumulative),
+                    runId = runId,
+                    otid = null, // REAL WIRE: assistant stream_delta carries no otid
+                    seqId = i,
+                ),
+            ).next
+        }
+        // The whole reply must collapse to exactly ONE assistant row with the full text.
+        tl.events shouldHaveSize 1
+        val event = tl.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Hey back. Still here."
+    }
+
+    @Test
+    fun `REAL reconcile dup ui-msg final with null run collapses into streamed row h30cy`() {
+        // Ground truth (admin message.list): the reconciled FINAL has id==otid==ui-msg-*,
+        // run_id=NULL, and content that is a SUPERSET (or near-equal, first-word-lag
+        // means not byte-identical) of the streamed row. Different otid + null run +
+        // non-exact content defeated every match, so it inserted as a 2nd row.
+        // The streamed row is a live assistant row (synthetic otid, real run).
+        val streamedRow = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799",
+                contentRaw = JsonPrimitive("m Lester, a dedicated test agent"), // first-word-lag: missing "I'"
+                runId = "local-run-30",
+                otid = "provider-assistant-1-abc",
+                seqId = 42,
+            ),
+        ).next
+        // The reconcile snapshot: ui-msg id/otid, NULL run, FULL text.
+        val reconciled = listOf(
+            AssistantMessage(
+                id = "ui-msg-9006572",
+                contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
+                runId = null,
+                otid = "ui-msg-9006572",
+                seqId = null,
+            )
+        )
+        val (afterReconcile, _) = streamedRow.mergeServerMessages(reconciled)
+        val assistantRows = afterReconcile.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, assistantRows.size)
+        assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
     }
 
     private fun reduce(

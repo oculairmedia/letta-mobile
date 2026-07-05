@@ -388,6 +388,55 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
+    // letta-mobile-h30cy: real-wire forward-GROWTH merge. The App Server streams
+    // assistant deltas with a NEW sequential letta-msg id per fragment AND NO otid
+    // (captured live via app-server-iroh-probe: one reply = N fragments, ids
+    // letta-msg-1312..1334, otid=null, content grows monotonically). serverId
+    // rotates so findByServerId misses; otid is null so the otidRow merge misses;
+    // the same-run prefix target only catches REPLAY prefixes (existing longer).
+    // So each cumulative fragment appends → N rows = the on-device duplicate.
+    //
+    // Merge ONLY on STRICT forward growth: the immediately-preceding (last) event
+    // is a same-run assistant row AND the incoming content EXTENDS it
+    // (incoming.startsWith(existing) && incoming strictly longer). This excludes:
+    //   • post-tool continuations — those START a new message ("Y" after a longer
+    //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
+    //     not incoming.startsWith(existing) → not a forward growth → not merged.
+    //   • distinct same-run assistant messages — no forward-prefix relationship.
+    val liveAssistant = (timeline.events.lastOrNull() as? TimelineEvent.Confirmed)
+        ?.takeIf { it.messageType == TimelineMessageType.ASSISTANT }
+    val isForwardGrowthFragment = liveAssistant != null &&
+        confirmed.messageType == TimelineMessageType.ASSISTANT &&
+        liveAssistant.serverId != confirmed.serverId &&
+        confirmed.runId?.takeIf { it.isNotBlank() }?.let { inRun ->
+            liveAssistant.runId?.takeIf { it.isNotBlank() }
+                ?.isCompatibleAssistantPrefixRunId(inRun) == true
+        } == true &&
+        run {
+            val existing = liveAssistant.content.trim()
+            val incoming = confirmed.content.trim()
+            existing.isNotEmpty() && incoming.length > existing.length && incoming.startsWith(existing)
+        }
+    if (isForwardGrowthFragment && liveAssistant != null) {
+        val merged = liveAssistant.copy(
+            content = confirmed.content,
+            runId = promoteRunId(liveAssistant.runId, confirmed.runId),
+            seqId = latestSeqId(liveAssistant.seqId, confirmed.seqId),
+        )
+        timeline = timeline.replaceByServerId(merged)
+        timeline = timeline.copy(liveCursor = liveAssistant.serverId)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(liveAssistant.serverId, message.messageType)
+        hotPathTelemetry(
+            "streamSubscriber.forwardGrowthMerged",
+            "serverId" to liveAssistant.serverId,
+            "incomingServerId" to confirmed.serverId,
+            "runId" to (confirmed.runId ?: "<null>"),
+            "mergedLen" to confirmed.content.length,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
     timeline = timeline.append(applyPendingToolReturns(confirmed, pendingToolReturnsByCallId))
     timeline = timeline.copy(liveCursor = confirmed.serverId)
     pendingEvents += TimelineSyncEvent.StreamEventIngested(confirmed.serverId, message.messageType)

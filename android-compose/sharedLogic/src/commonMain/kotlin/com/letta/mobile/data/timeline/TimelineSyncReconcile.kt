@@ -172,10 +172,45 @@ fun Timeline.mergeServerMessages(
             merged++
         } else if (existingByServerId == null) {
             val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)
-            if (prefixIndex != null) {
-                timeline = timeline.replaceEventAt(prefixIndex, confirmed.copy(position = timeline.events[prefixIndex].position))
+            // letta-mobile-x1xnl (SECOND path). The live Iroh stream lands the
+            // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
+            // otid (iroh-assistant-<turnId>) with a rotating letta-msg-* serverId,
+            // then a moment later the SAME reply arrives again via this reconcile
+            // snapshot carrying a REAL, DIFFERENT server id/otid and the full
+            // text. serverId/otid/semantic identity all miss (different ids;
+            // first-word-lag means the draft text is not even a clean prefix of
+            // the full text — "Still" strands), so without this guard the
+            // reconciled final is inserted as a SECOND, near-duplicate assistant
+            // row. Because both rows carry the SAME REAL run id and share
+            // overlapping content, they are the same in-flight message split by
+            // the transport: collapse the snapshot INTO the draft row (snapshot
+            // REPLACE, never append) instead of stranding a duplicate.
+            val sameRunIndex = if (prefixIndex == null) {
+                timeline.findRecentSameRealRunAssistantIndex(confirmed)
+            } else {
+                null
+            }
+            // letta-mobile-h30cy (THE reconcile dup, ground-truthed via
+            // app-server-iroh-probe --dump-frames + admin message.list): the
+            // reconciled FINAL has id==otid==ui-msg-*, run_id=NULL, and content
+            // that is a SUPERSET of the streamed row (first-word-lag means it is
+            // NOT byte-identical, so recentTailContainsEquivalent's exact match
+            // misses; null run means findRecentSameRealRunAssistantIndex can't
+            // fire). Fall back to CONTENT-SUPERSET: a recent assistant row whose
+            // content is contained within the incoming full text is the same
+            // in-flight reply — replace it with the fuller final (one row).
+            val contentSupersetIndex = if (prefixIndex == null && sameRunIndex == null) {
+                timeline.findRecentAssistantContentSupersetIndex(confirmed)
+            } else {
+                null
+            }
+            val replaceIndex = prefixIndex ?: sameRunIndex ?: contentSupersetIndex
+            if (replaceIndex != null) {
+                timeline = timeline.replaceEventAt(replaceIndex, confirmed.copy(position = timeline.events[replaceIndex].position))
                 Telemetry.event(
-                    "TimelineSync", "recentReconcile.assistantPrefixReplaced",
+                    "TimelineSync",
+                    if (prefixIndex != null) "recentReconcile.assistantPrefixReplaced"
+                    else "recentReconcile.assistantSameRunReplaced",
                     "conversationId" to timeline.conversationId,
                     "serverId" to confirmed.serverId,
                     "incomingLen" to confirmed.content.length,
@@ -226,6 +261,108 @@ private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Conf
     return null
 }
 
+/**
+ * letta-mobile-x1xnl (SECOND path). Find a recent assistant row that is the
+ * live-streamed draft of the SAME in-flight reply as [incoming] (the reconcile
+ * snapshot), so the snapshot can REPLACE it instead of appending a duplicate.
+ *
+ * A row qualifies when it shares the SAME REAL run id with [incoming] and its
+ * content overlaps — one is a prefix, suffix, or substring of the other. This
+ * catches the on-device symptom where the draft's first word lags and strands
+ * ("Still kicking…" reconciled vs " kicking…" draft), which the strict
+ * prefix-only [findRecentAssistantPrefixIndex] misses because the draft is a
+ * SUFFIX (not a prefix) of the full text.
+ *
+ * Constraints that keep this from collapsing genuinely-distinct rows:
+ *  - Both sides must carry a real (non-`iroh-run-*`) run id, and it must MATCH.
+ *    Distinct assistant messages within one run are rare (tool-mediated), and
+ *    even then only collapse when their text overlaps as a prefix/suffix, which
+ *    independent replies do not.
+ *  - The synthetic-live→real-run replacement is already handled by
+ *    [canReplaceIrohSyntheticLiveRow]/id match above; here the run ids are BOTH
+ *    real, so this only fires once the transport has promoted the row's run id.
+ */
+private fun Timeline.findRecentSameRealRunAssistantIndex(incoming: TimelineEvent.Confirmed): Int? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() && !it.isReconcileSyntheticRunId() } ?: return null
+    val incomingText = incoming.content.trim()
+    if (incomingText.isBlank()) return null
+    val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    for (index in events.size - 1 downTo start) {
+        val event = events[index] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != TimelineMessageType.ASSISTANT) continue
+        if (event.serverId == incoming.serverId) continue
+        val existingRunId = event.runId?.takeIf { it.isNotBlank() && !it.isReconcileSyntheticRunId() } ?: continue
+        if (existingRunId != incomingRunId) continue
+        val existingText = event.content.trim()
+        if (existingText.isBlank()) continue
+        if (existingText == incomingText ||
+            existingText.contains(incomingText) ||
+            incomingText.contains(existingText)
+        ) {
+            return index
+        }
+    }
+    return null
+}
+
+/**
+ * letta-mobile-h30cy: content-superset fallback for the reconcile duplicate when
+ * NO id/otid/run match is possible. The reconciled final (message.list) has a
+ * ui-msg-* id/otid and NULL run id, so it cannot be matched by identity; and its
+ * text differs slightly from the streamed row (first-word-lag), so the exact
+ * recentTailContainsEquivalent misses. Match a recent assistant row whose trimmed
+ * content is CONTAINED in the incoming full text (the incoming is the superset /
+ * fuller final of that in-flight reply). Guarded to a meaningful length and the
+ * recent tail so distinct short messages don't coincidentally collapse.
+ */
+private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineEvent.Confirmed): Int? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    // #826 review (P1) + headless-replay guard: only the RECONCILE final has this
+    // signature — a NULL (or reconcile-synthetic) run id. The live stream frames
+    // and normal replayed assistant messages carry a real run id, so restricting
+    // to a blank/synthetic incoming run id ensures we ONLY collapse the ui-msg
+    // reconcile duplicate and never a legitimate prefix/superset relationship
+    // between two real-run messages (e.g. the cm-prefix/cm-full prefix-orphan
+    // diagnostic case).
+    val incomingRun = incoming.runId?.takeIf { it.isNotBlank() }
+    if (incomingRun != null && !incomingRun.isReconcileSyntheticRunId()) return null
+    val incomingText = incoming.content.trim()
+    if (incomingText.length < 3) return null
+    // #826 review (P1): ONLY collapse into the actively-LIVE-STREAMED row — the
+    // one the live Iroh stream is currently writing (liveCursor). Do NOT scan all
+    // recent assistant rows and replace any whose text is a substring of the
+    // incoming: a normal reconciled/older assistant reply can legitimately be a
+    // substring of a different, longer message (e.g. "After checking..." inside a
+    // later fuller reply), and collapsing it would DELETE a real message (this is
+    // exactly the "prefix orphan" the headless replay test guards). The live
+    // stream row is identified by liveCursor; the reconciled ui-msg final that
+    // duplicates it is the fuller superset of that specific row.
+    val liveServerId = liveCursor ?: return null
+    val liveIndex = events.indexOfFirst {
+        it is TimelineEvent.Confirmed && it.serverId == liveServerId
+    }
+    if (liveIndex < 0) return null
+    val live = events[liveIndex] as? TimelineEvent.Confirmed ?: return null
+    if (live.messageType != TimelineMessageType.ASSISTANT) return null
+    if (live.serverId == incoming.serverId) return null
+    val existingText = live.content.trim()
+    if (existingText.length < 3) return null
+    // The incoming full reply must strictly CONTAIN the live row's text (the
+    // incoming is the fuller final of that same in-flight reply). Not exact-equal
+    // (handled earlier); the incoming is longer.
+    return if (
+        incomingText != existingText &&
+        incomingText.contains(existingText) &&
+        incomingText.length > existingText.length
+    ) {
+        liveIndex
+    } else {
+        null
+    }
+}
+
+private fun String.isReconcileSyntheticRunId(): Boolean = startsWith("iroh-run-")
 
 private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     incoming: TimelineEvent.Confirmed,

@@ -56,7 +56,23 @@ internal object IrohStreamDeltaServerFrameMapper {
                     turnId = meta.turnId,
                     runId = meta.runId,
                     content = delta.contentText(),
-                    otid = delta.string("otid") ?: delta.string("client_message_id"),
+                    // letta-mobile-x1xnl (root cause): App Server assistant
+                    // stream_delta frames carry NO `otid`/`client_message_id`
+                    // (those are user-message echo fields), and over Iroh the
+                    // backend `id` ROTATES per streamed fragment. The client
+                    // projection then synthesizes `effectiveOtid` off that
+                    // rotating id (server-<id>-assistant-<runId>), so every
+                    // fragment gets a DIFFERENT otid — defeating every otid- and
+                    // serverId-keyed dedup/merge branch in the reducer and
+                    // stranding the trailing fragment(s) as a duplicate row.
+                    // Anchor a STABLE otid on the (stable, per-turn) turn id
+                    // instead so all fragments of one assistant message group
+                    // into one row. A wire-provided otid still wins when present.
+                    // The WS path is unaffected: it keeps a stable backend id and
+                    // its own otid derivation.
+                    otid = delta.string("otid")
+                        ?: delta.string("client_message_id")
+                        ?: meta.assistantStreamOtid(),
                     seq = meta.eventSeq,
                     seqId = meta.seqId,
                 ),
@@ -249,7 +265,26 @@ internal object IrohStreamDeltaServerFrameMapper {
             "hidden_reasoning_message" -> "iroh-$messageType-$runId-$turnId"
             else -> messageId ?: frameId
         }
-
+        /**
+         * Stable synthetic otid for an assistant stream_delta whose wire frame
+         * carries no otid. Anchored on the (stable, per-turn) [turnId] — NOT the
+         * rotating backend id and NOT the run id — so every fragment of the SAME
+         * assistant message shares one otid and the reducer merges them into a
+         * single row, instead of the rotating id producing a new otid per
+         * fragment and stranding the tail as a duplicate row (letta-mobile-x1xnl).
+         *
+         * [turnId] is deliberate: over Iroh the run id starts as the
+         * client-synthetic `iroh-run-*` placeholder and is later promoted to the
+         * real server run id mid-stream, so keying on run id would still split
+         * pre- and post-promotion fragments. The turn id is minted once per
+         * send() and is invariant for the whole turn, so it is the stable
+         * grouping anchor. Distinct assistant messages within one turn (rare;
+         * tool-mediated multi-assistant runs) are still separated downstream by
+         * the reducer's content-aware, seq-ordered merge; grouping the in-flight
+         * message's fragments is strictly safer than the current per-fragment
+         * split that produces the visible duplicate.
+         */
+        fun assistantStreamOtid(): String = "iroh-assistant-$turnId"
         companion object {
             fun from(
                 payload: RuntimeEventPayload.RemoteStreamFrame,
