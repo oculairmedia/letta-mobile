@@ -91,6 +91,18 @@ fun rememberSmoothedStreamingText(
             currentOnRevealStep?.invoke(finalText)
         }
         displayedText = finalText
+        // letta-mobile-h30cy: when the turn has ended (!isStreaming), the settled
+        // canonical text is FINAL — force displayedText to it unconditionally.
+        // Otherwise a divergent rewrite (Iroh streamed row's smoothedText left at a
+        // truncated common-prefix after replaceBuffer) or a mid-step effect
+        // cancellation can strand the row showing partial/mangled text forever,
+        // which then never content-matches the reconciled final -> duplicate row.
+        // The smoother's own skipToEnd() should reach this, but the settle here is
+        // the invariant guarantee independent of step timing / cancellation races.
+        if (!isStreaming && displayedText != rawText) {
+            currentOnRevealStep?.invoke(rawText)
+            displayedText = rawText
+        }
     }
 
     return displayedText
