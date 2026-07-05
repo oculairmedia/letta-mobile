@@ -50,6 +50,7 @@ open class TimelineRepository(
     /** Mutex-guarded LRU get: touches the entry so eviction stays correct. */
     private fun getLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
         val loop = loops.remove(key) ?: return null
+        com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record("gate.loopCreated.loop" + loop.hashCode(), key.conversationId, "loop", "agent=" + (key.agentId ?: "null"))
         loops[key] = loop
         return loop
     }
@@ -267,6 +268,9 @@ open class TimelineRepository(
         conversationId: String,
         message: com.letta.mobile.data.model.LettaMessage,
     ) {
+        (message as? com.letta.mobile.data.model.AssistantMessage)?.let {
+            com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record("gate.coordinatorIngest", it.otid ?: it.id, "assistant_message", it.content)
+        }
         getOrCreate(conversationId).ingestStreamEvent(message)
     }
 
@@ -282,6 +286,9 @@ open class TimelineRepository(
             "messageId" to message.id,
             "messageType" to message.messageType,
         )
+        (message as? com.letta.mobile.data.model.AssistantMessage)?.let {
+            com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record("gate.coordinatorIngest", it.otid ?: it.id, "assistant_message", it.content)
+        }
         getOrCreate(agentId, conversationId).ingestStreamEvent(message)
     }
 

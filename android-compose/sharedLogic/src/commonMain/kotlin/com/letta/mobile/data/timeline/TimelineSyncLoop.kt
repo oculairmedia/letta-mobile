@@ -179,10 +179,14 @@ class TimelineSyncLoop(
     }
 
     private suspend fun processEventQueue() {
+        com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record("gate.processQueueStart.loop" + this.hashCode(), conversationId, "loop", conversationId)
         for (event in eventQueue) {
             try {
                 when (event) {
                     is TimelineGatewayEvent.StreamMessage -> {
+                        (event.message as? com.letta.mobile.data.model.AssistantMessage)?.let {
+                            com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record("gate.queueDispatch.loop" + this.hashCode().toString(), it.otid ?: it.id, "assistant_message", it.content)
+                        }
                         streamDispatcher.dispatch(event.message)
                         event.ack?.complete(Unit)
                     }
@@ -342,6 +346,9 @@ class TimelineSyncLoop(
     }
 
     suspend fun submitStreamEvent(message: LettaMessage) {
+        (message as? com.letta.mobile.data.model.AssistantMessage)?.let {
+            com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record("gate.subscriberIngest", it.otid ?: it.id, "assistant_message", it.content)
+        }
         if (wsSubscription.isActive()) {
             Telemetry.event("TimelineSync", "streamSubscriber.skippedDualIngest", "conversationId" to conversationId, "messageType" to message.messageType, "messageId" to message.id)
             return
