@@ -86,6 +86,24 @@ object RenderDiagnostics {
      * Call inside each LazyColumn item() body. If [key] was already composed in
      * the current render generation, that is the phantom double-draw.
      */
+    /**
+     * letta-mobile-h30cy: capture the ACTUAL displayed text of an assistant row at
+     * a render site (streamed StreamingMarkdownText vs final MarkdownText), so the
+     * stream-vs-final punctuation mangle is observable ON DEVICE without a human
+     * eyeballing the screen. Flag-gated (LettaRenderDiag VERBOSE); zero-cost off.
+     */
+    fun onDisplayedText(conversationId: String, site: String, serverId: String, text: String) {
+        if (!enabled()) return
+        Telemetry.event(
+            "RenderDiag", "displayedText",
+            "conversationId" to conversationId,
+            "site" to site,
+            "serverId" to serverId,
+            "len" to text.length,
+            "head" to text.take(160).replace("\n", "\\n"),
+        )
+    }
+
     fun onLazyItemComposed(conversationId: String, key: String, contentType: String) {
         if (!enabled()) return
         val gen = renderGeneration.value
