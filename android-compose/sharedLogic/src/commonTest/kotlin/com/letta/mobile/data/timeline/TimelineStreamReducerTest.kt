@@ -1605,6 +1605,103 @@ class TimelineStreamReducerTest {
         assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
     }
 
+    @Test
+    fun `reconcile ui-msg final collapses even when liveCursor moved off the streamed row h30cy`() {
+        // h30cy RESURFACE: the earlier fix required the match to be the liveCursor
+        // row, but at reconcile time liveCursor has often moved off the streamed
+        // reply (e.g. a later turn started, or it was cleared), so the duplicate
+        // slipped through. The null-run signature is the correct discriminator;
+        // liveCursor must NOT be required.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799", contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
+                runId = "local-run-30", otid = "provider-assistant-1-abc", seqId = 42,
+            ),
+        ).next
+        // liveCursor moves OFF the streamed row (a later user/other event advances it).
+        tl = tl.copy(liveCursor = "some-other-server-id")
+        val reconciled = listOf(
+            AssistantMessage(
+                id = "ui-msg-9006572",
+                contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent for validating mobile"),
+                runId = null, otid = "ui-msg-9006572", seqId = null,
+            )
+        )
+        val (after, _) = tl.mergeServerMessages(reconciled)
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size)
+        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows.single().content)
+    }
+
+    @Test
+    fun `server double-stores reply as two ui-msg finals both dedupe to one row h30cy`() {
+        // GROUND TRUTH (admin message.list): the App Server persists the reply
+        // TWICE — two ui-msg finals, DIFFERENT ids, SAME content "Hey.", null run.
+        // The streamed row already holds "Hey."; both reconcile copies must dedupe.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-3255", contentRaw = JsonPrimitive("Hey"),
+                runId = "local-run-43", otid = "provider-assistant-1-x", seqId = 22,
+            ),
+        ).next
+        tl = reduce(prev = tl, frame = AssistantMessage(
+            id = "letta-msg-3256", contentRaw = JsonPrimitive("."),
+            runId = "local-run-43", otid = "provider-assistant-1-x", seqId = 23,
+        )).next
+        // streamed row is now "Hey."; reconcile returns TWO identical "Hey." finals.
+        val reconciled = listOf(
+            AssistantMessage(id = "ui-msg-9006596", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-9006596", seqId = null),
+            AssistantMessage(id = "ui-msg-9006598", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-9006598", seqId = null),
+        )
+        val (after, _) = tl.mergeServerMessages(reconciled)
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals("Hey.", rows.single().content)
+    }
+
+    @Test
+    fun `second identical ui-msg final in a LATER reconcile poll still dedupes h30cy`() {
+        // GROUND TRUTH: the server persists the reply twice, 8s apart, so the two
+        // identical "Hey." finals arrive in SEPARATE reconcile polls (not one
+        // batch). streamed row -> poll1 "Hey." dedupes -> poll2 "Hey." (NEW ui-msg
+        // id) must ALSO dedupe, not insert a 2nd row.
+        var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 1)).next
+        tl = reduce(prev = tl, frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("."), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 2)).next
+        // poll 1
+        tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-596", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-596", seqId = null))).first
+        // poll 2 (8s later): a NEW server-persisted identical copy
+        tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-598", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-598", seqId = null))).first
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+    }
+
+    @Test
+    fun `reconcile final does not overwrite an unrelated older reply that is a substring h30cy`() {
+        // #827 review (Major): an OLDER distinct reply whose text is a substring of
+        // the null-run final must NOT be overwritten. Only the STREAMED row (real
+        // run id) being finalized is a valid target.
+        // older distinct reply — seed it as a reconciled null-run row via merge.
+        var tl = Timeline(conversationId = "c").mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-old", contentRaw = JsonPrimitive("Hey"), runId = null, otid = "ui-msg-old", seqId = null)
+        )).first
+        // the actual STREAMED row being finalized (real run id).
+        tl = reduce(prev = tl, frame = AssistantMessage(
+            id = "letta-msg-9", contentRaw = JsonPrimitive("Hey there, how are"),
+            runId = "local-run-9", otid = "provider-assistant-1-z", seqId = 9,
+        )).next
+        // reconcile final "Hey there, how are you?" contains BOTH "Hey" (old) and
+        // the streamed "Hey there, how are". Must replace the STREAMED row only.
+        val (after, _) = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("Hey there, how are you?"), runId = null, otid = "ui-msg-final", seqId = null)
+        ))
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        // old "Hey" preserved, streamed row replaced by the full final = 2 rows.
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals("Hey", rows[0].content)
+        assertEquals("Hey there, how are you?", rows[1].content)
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
