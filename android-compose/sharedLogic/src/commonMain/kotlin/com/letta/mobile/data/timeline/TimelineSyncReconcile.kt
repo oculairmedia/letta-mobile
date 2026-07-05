@@ -325,41 +325,45 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
     // reconcile duplicate and never a legitimate prefix/superset relationship
     // between two real-run messages (e.g. the cm-prefix/cm-full prefix-orphan
     // diagnostic case).
+    // #826 review (P1): the RECONCILE final is discriminated by its NULL (or
+    // reconcile-synthetic) run id — the streamed rows and normal replayed
+    // assistant messages carry a REAL run id. Requiring incoming.runId to be
+    // blank/synthetic is what keeps this from ever collapsing a legitimate
+    // prefix/superset relationship between two REAL-run messages (the
+    // cm-prefix/cm-full prefix-orphan diagnostic case, run_id=run-1).
     val incomingRun = incoming.runId?.takeIf { it.isNotBlank() }
     if (incomingRun != null && !incomingRun.isReconcileSyntheticRunId()) return null
     val incomingText = incoming.content.trim()
     if (incomingText.length < 3) return null
-    // #826 review (P1): ONLY collapse into the actively-LIVE-STREAMED row — the
-    // one the live Iroh stream is currently writing (liveCursor). Do NOT scan all
-    // recent assistant rows and replace any whose text is a substring of the
-    // incoming: a normal reconciled/older assistant reply can legitimately be a
-    // substring of a different, longer message (e.g. "After checking..." inside a
-    // later fuller reply), and collapsing it would DELETE a real message (this is
-    // exactly the "prefix orphan" the headless replay test guards). The live
-    // stream row is identified by liveCursor; the reconciled ui-msg final that
-    // duplicates it is the fuller superset of that specific row.
-    val liveServerId = liveCursor ?: return null
-    val liveIndex = events.indexOfFirst {
-        it is TimelineEvent.Confirmed && it.serverId == liveServerId
+    // h30cy resurface fix: do NOT also require the match to be the liveCursor row.
+    // At reconcile time the liveCursor has often moved off (or been cleared to) the
+    // streamed reply, so the liveCursor gate silently missed the duplicate. The
+    // null-run gate above is the correct and sufficient discriminator; scan the
+    // recent tail for the streamed row this null-run final is the fuller superset
+    // of, and collapse it. Prefer the LONGEST such existing match (the streamed
+    // reply row) so we never pick a coincidentally-contained shorter earlier row.
+    var bestIndex: Int? = null
+    var bestLen = -1
+    val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    for (index in events.size - 1 downTo start) {
+        val event = events[index] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != TimelineMessageType.ASSISTANT) continue
+        if (event.serverId == incoming.serverId) continue
+        val existingText = event.content.trim()
+        if (existingText.length < 3) continue
+        // The incoming null-run final must STRICTLY contain this row's text (it is
+        // the fuller final of the same in-flight reply). Not exact-equal (handled
+        // earlier); the incoming is longer.
+        if (incomingText != existingText &&
+            incomingText.contains(existingText) &&
+            incomingText.length > existingText.length &&
+            existingText.length > bestLen
+        ) {
+            bestIndex = index
+            bestLen = existingText.length
+        }
     }
-    if (liveIndex < 0) return null
-    val live = events[liveIndex] as? TimelineEvent.Confirmed ?: return null
-    if (live.messageType != TimelineMessageType.ASSISTANT) return null
-    if (live.serverId == incoming.serverId) return null
-    val existingText = live.content.trim()
-    if (existingText.length < 3) return null
-    // The incoming full reply must strictly CONTAIN the live row's text (the
-    // incoming is the fuller final of that same in-flight reply). Not exact-equal
-    // (handled earlier); the incoming is longer.
-    return if (
-        incomingText != existingText &&
-        incomingText.contains(existingText) &&
-        incomingText.length > existingText.length
-    ) {
-        liveIndex
-    } else {
-        null
-    }
+    return bestIndex
 }
 
 private fun String.isReconcileSyntheticRunId(): Boolean = startsWith("iroh-run-")

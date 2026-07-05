@@ -1605,6 +1605,35 @@ class TimelineStreamReducerTest {
         assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
     }
 
+    @Test
+    fun `reconcile ui-msg final collapses even when liveCursor moved off the streamed row h30cy`() {
+        // h30cy RESURFACE: the earlier fix required the match to be the liveCursor
+        // row, but at reconcile time liveCursor has often moved off the streamed
+        // reply (e.g. a later turn started, or it was cleared), so the duplicate
+        // slipped through. The null-run signature is the correct discriminator;
+        // liveCursor must NOT be required.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799", contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
+                runId = "local-run-30", otid = "provider-assistant-1-abc", seqId = 42,
+            ),
+        ).next
+        // liveCursor moves OFF the streamed row (a later user/other event advances it).
+        tl = tl.copy(liveCursor = "some-other-server-id")
+        val reconciled = listOf(
+            AssistantMessage(
+                id = "ui-msg-9006572",
+                contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent for validating mobile"),
+                runId = null, otid = "ui-msg-9006572", seqId = null,
+            )
+        )
+        val (after, _) = tl.mergeServerMessages(reconciled)
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size)
+        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows.single().content)
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
