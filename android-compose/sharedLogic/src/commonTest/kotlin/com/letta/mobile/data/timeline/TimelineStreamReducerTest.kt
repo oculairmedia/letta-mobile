@@ -882,6 +882,55 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `iroh reconciled final collapses into synthetic-otid streamed draft even when not a clean prefix`() {
+        // letta-mobile-x1xnl SECOND path. The live Iroh stream lands the
+        // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
+        // otid (iroh-assistant-<turnId>) minted by IrohStreamDeltaServerFrameMapper
+        // because the wire frames carry no otid. A moment later the SAME reply
+        // arrives again via the message.list reconcile snapshot — this time with
+        // a REAL server otid/id (a different letta-msg-* id than the last rotating
+        // streamed fragment) and the FULL text. The on-device symptom is the first
+        // word lagging on the draft ("Still" strands) so the draft text is NOT a
+        // clean prefix of the reconciled full text — defeating the
+        // startsWith-based prefix replace. Both rows share the SAME real run id, so
+        // the reconcile must collapse the snapshot into the draft row instead of
+        // appending a second, near-identical row.
+        val streamedDraft = reduce(
+            frame = AssistantMessage(
+                // Last rotating backend id observed on the live stream.
+                id = "letta-msg-5021",
+                // Draft is missing the leading word ("Still") — first-word lag.
+                contentRaw = JsonPrimitive(" kicking. Did anything else break?"),
+                runId = "run-real-app-server",
+                otid = "iroh-assistant-turn-42",
+                seqId = 7,
+            ),
+        ).next
+
+        streamedDraft.events shouldHaveSize 1
+
+        val (mergedTimeline, changed) = streamedDraft.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    // Reconcile mints its OWN id, distinct from the streamed one.
+                    id = "letta-msg-final-99",
+                    contentRaw = JsonPrimitive("Still kicking. Did anything else break?"),
+                    runId = "run-real-app-server",
+                    otid = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Still kicking. Did anything else break?"
+        event.serverId shouldBe "letta-msg-final-99"
+        event.position shouldBe (streamedDraft.events.single() as TimelineEvent.Confirmed).position
+    }
+
+    @Test
     fun `reused assistant server id from a different run appends live event`() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",
