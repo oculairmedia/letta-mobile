@@ -262,6 +262,82 @@ class IrohStreamDeltaServerFrameMapperTest {
         assertEquals("run-fallback", assistant.runId)
     }
 
+    @Test
+    fun assistantFragmentsWithRotatingIdsShareStableOtidAnchoredOnTurn() {
+        // letta-mobile-x1xnl root-cause guard. App Server assistant deltas carry
+        // NO otid/client_message_id, and over Iroh the backend `id` ROTATES per
+        // streamed fragment. Before the fix, the client projection synthesized a
+        // NEW effectiveOtid per fragment (server-<id>-assistant-<runId>), so the
+        // reducer's otid/serverId dedup never matched and the trailing fragment
+        // stranded as a duplicate row. The mapper must instead emit a STABLE otid
+        // for all fragments of one assistant message so they merge into one row.
+        val first = assertIs<ServerFrame.AssistantMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 1,
+                  "idempotency_key": "evt-a1",
+                  "delta": {
+                    "id": "letta-msg-5020",
+                    "message_type": "assistant_message",
+                    "content": "Got",
+                    "run_id": "iroh-run-synthetic"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+        val second = assertIs<ServerFrame.AssistantMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 2,
+                  "idempotency_key": "evt-a2",
+                  "delta": {
+                    "id": "letta-msg-5021",
+                    "message_type": "assistant_message",
+                    "content": " it — streaming works.",
+                    "run_id": "run-real-app-server"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+
+        // Backend ids AND run ids rotate across fragments...
+        assertEquals("letta-msg-5020", first.id)
+        assertEquals("letta-msg-5021", second.id)
+        // ...but the otid is stable (anchored on the invariant turn id), so the
+        // reducer groups both fragments into a single assistant row.
+        assertEquals("iroh-assistant-turn-fallback", first.otid)
+        assertEquals(first.otid, second.otid)
+    }
+
+    @Test
+    fun wireProvidedOtidStillWinsOverSyntheticTurnAnchor() {
+        val frame = assertIs<ServerFrame.AssistantMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 1,
+                  "idempotency_key": "evt-otid",
+                  "delta": {
+                    "id": "letta-msg-9",
+                    "message_type": "assistant_message",
+                    "content": "hi",
+                    "otid": "wire-otid-123",
+                    "run_id": "run-app"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+        assertEquals("wire-otid-123", frame.otid)
+    }
+
     private fun map(body: String): List<ServerFrame> =
         IrohStreamDeltaServerFrameMapper.map(
             payload = RuntimeEventPayload.RemoteStreamFrame(
