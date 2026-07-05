@@ -173,43 +173,88 @@ export function retargetMixamoClip(asset, clip, vrm) {
           });
         }
 
+        const values = track.values.map(
+          (v, i) => (vrm.meta?.metaVersion === '0' && i % 2 === 0 ? -v : v),
+        );
+
+        // Quaternion hemisphere continuity pass. q and -q are the same
+        // rotation, but the mixer interpolates the raw 4-vectors: if two
+        // successive keys land on opposite hemispheres (dot < 0) the slerp
+        // takes the long way round, and with keyframe-reduced 24fps tracks
+        // that reads as a violent limb spin between neighbours (the "glitch
+        // fest"). The conjugation above (premultiply parentRestWorld,
+        // multiply restWorldInverse) and the VRM0 x/z flip can both introduce
+        // such sign flips. Walk the keys and negate any whose dot with the
+        // previous key is negative so every neighbour pair stays on the short
+        // arc. Standard, cheap, and lossless (same rotation, canonical sign).
+        for (let i = 4; i < values.length; i += 4) {
+          const dot = values[i] * values[i - 4]
+            + values[i + 1] * values[i - 3]
+            + values[i + 2] * values[i - 2]
+            + values[i + 3] * values[i - 1];
+          if (dot < 0) {
+            values[i] = -values[i];
+            values[i + 1] = -values[i + 1];
+            values[i + 2] = -values[i + 2];
+            values[i + 3] = -values[i + 3];
+          }
+        }
+
         tracks.push(
           new THREE.QuaternionKeyframeTrack(
             `${vrmNodeName}.${propertyName}`,
             track.times,
-            track.values.map((v, i) => (vrm.meta?.metaVersion === '0' && i % 2 === 0 ? -v : v)),
+            values,
           ),
         );
       } else if (track instanceof THREE.VectorKeyframeTrack) {
         const value = track.values.map(
           (v, i) => (vrm.meta?.metaVersion === '0' && i % 3 !== 1 ? -v : v) * hipsPositionScale,
         );
-        // Root-motion stripping (hips only). Mixamo clips downloaded WITHOUT the
-        // "in place" option translate the hips across the floor (walks, dances),
-        // which carries the avatar out of a stationary pet window. For the hips
-        // position track we pin the horizontal (X/Z) channels while keeping Y
-        // fully intact — crouches, jumps, sits and the natural walk bob all live
-        // in Y and must survive. Two steps:
-        //   1. strip the per-frame X/Z delta relative to the first keyframe, so
-        //      the body no longer travels;
-        //   2. recenter that now-constant X/Z onto the VRM rest hips X/Z, so a
-        //      clip whose first frame is already offset (some Mixamo takes start
-        //      the hips far from origin) still plays centered in frame.
-        // Net effect: X/Z are held at the rest hips position for the whole clip
-        // while Y animates freely. Applied only to the hips bone; no other
-        // Mixamo bone carries a position track.
-        if (vrmBoneName === 'hips' && value.length >= 3) {
+        // Root-motion handling (hips only; no other Mixamo bone has a position
+        // track). Mixamo clips downloaded WITHOUT "in place" translate the hips
+        // across the floor, carrying the avatar out of the stationary pet
+        // window. The previous pass pinned X/Z to a constant, which also killed
+        // the choreographed side-to-side sway of dances and stationary idles —
+        // the body then slides/floats instead of shifting its weight. We keep
+        // the sway and remove only the net travel:
+        //   1. DETREND (locomotion only): if the total X/Z displacement from the
+        //      first to the last key exceeds ~0.25 m, this is a travelling clip
+        //      (walk/strafe). Subtract a linear ramp from 0 (at key 0) to that
+        //      full displacement (at the last key) from every key, cancelling
+        //      the steady drift while leaving the per-step bob and weight-shift
+        //      wobble on top. Under the threshold it is a stationary clip whose
+        //      X/Z motion IS the intended sway — left untouched.
+        //   2. RECENTRE (always): shift key 0's X/Z onto the VRM rest hips X/Z
+        //      so a clip whose first frame starts offset still plays centred.
+        // Y is never touched — crouches, jumps, sits and the walk bob live there.
+        if (vrmBoneName === 'hips' && value.length >= 6) {
           const restX = restHips[0];
           const restZ = restHips[2];
-          for (let i = 0; i < value.length; i += 3) {
-            // Step 1 (strip drift) collapses every frame's X/Z onto the first
-            // frame's X/Z: value[i] − (value[i] − value[0]) = value[0]. Step 2
-            // (recenter) then shifts that constant to the rest hips X/Z. The two
-            // compose to a single assignment — every frame's X/Z becomes the rest
-            // value — so we write it directly rather than reconstructing the
-            // intermediate. Y (value[i+1]) is left untouched.
-            value[i] = restX;
-            value[i + 2] = restZ;
+          const n = value.length;
+          const firstX = value[0];
+          const firstZ = value[2];
+          const lastX = value[n - 3];
+          const lastZ = value[n - 1];
+          const dispX = lastX - firstX;
+          const dispZ = lastZ - firstZ;
+          const dispMag = Math.hypot(dispX, dispZ);
+          const DRIFT_THRESHOLD = 0.25; // metres of net XZ travel = locomotion
+          const keyCount = n / 3;
+          const lastIndex = keyCount - 1; // ramp denominator (>= 1 here)
+          const detrend = dispMag > DRIFT_THRESHOLD;
+          for (let k = 0; k < keyCount; k += 1) {
+            const i = k * 3;
+            if (detrend) {
+              // Linear ramp 0 -> full displacement across the clip, removed.
+              const f = k / lastIndex;
+              value[i] -= dispX * f;
+              value[i + 2] -= dispZ * f;
+            }
+            // Recentre key 0 onto rest hips X/Z (same shift applied to every
+            // key so relative sway/detrended motion is preserved).
+            value[i] += restX - firstX;
+            value[i + 2] += restZ - firstZ;
           }
         }
         tracks.push(new THREE.VectorKeyframeTrack(`${vrmNodeName}.${propertyName}`, track.times, value));
