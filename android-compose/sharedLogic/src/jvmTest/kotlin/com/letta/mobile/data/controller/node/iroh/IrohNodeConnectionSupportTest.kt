@@ -120,4 +120,53 @@ class IrohNodeConnectionSupportTest {
 
     private fun streamDelta(deltaFields: String): String =
         """{"type":"stream_delta","event_seq":1,"delta":{${deltaFields.trim()}}}"""
+
+    @Test
+    fun tagStreamDelta_assistant_getsCmStreamOtidId() {
+        val delta = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("letta-msg-3255"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("assistant_message"))
+            put("otid", kotlinx.serialization.json.JsonPrimitive("provider-assistant-1-abc"))
+        }
+        val tagged = tagStreamDeltaForOptimisticDedup(delta)
+        assertEquals("cm-stream-provider-assistant-1-abc", tagged["id"]?.jsonPrimitive?.contentOrNull)
+        // otid + message_type preserved
+        assertEquals("provider-assistant-1-abc", tagged["otid"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun tagStreamDelta_reasoning_getsCmReasonId() {
+        val delta = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("letta-msg-9"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("reasoning_message"))
+            put("otid", kotlinx.serialization.json.JsonPrimitive("otid-r"))
+        }
+        assertEquals("cm-reason-otid-r", tagStreamDeltaForOptimisticDedup(delta)["id"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun tagStreamDelta_noOtid_or_toolCall_unchanged() {
+        val noOtid = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("letta-msg-1"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("assistant_message"))
+        }
+        assertEquals("letta-msg-1", tagStreamDeltaForOptimisticDedup(noOtid)["id"]?.jsonPrimitive?.contentOrNull)
+        val tool = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("toolcall-x"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("tool_call_message"))
+            put("otid", kotlinx.serialization.json.JsonPrimitive("o"))
+        }
+        assertEquals("toolcall-x", tagStreamDeltaForOptimisticDedup(tool)["id"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun tagStreamDelta_idempotent() {
+        val already = kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive("cm-stream-o1"))
+            put("message_type", kotlinx.serialization.json.JsonPrimitive("assistant_message"))
+            put("otid", kotlinx.serialization.json.JsonPrimitive("o1"))
+        }
+        assertEquals("cm-stream-o1", tagStreamDeltaForOptimisticDedup(already)["id"]?.jsonPrimitive?.contentOrNull)
+    }
+
 }

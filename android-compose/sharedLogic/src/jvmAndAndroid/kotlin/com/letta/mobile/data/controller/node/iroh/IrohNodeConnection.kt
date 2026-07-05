@@ -684,13 +684,25 @@ class IrohNodeConnection(
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         delta: kotlinx.serialization.json.JsonObject,
     ) {
+        // letta-mobile-h30cy: the Iroh stream forwards the App Server delta with
+        // its raw provider id (letta-msg-*), but message.list later returns the
+        // SAME reply with a DIFFERENT id namespace (ui-msg-*, null run) — the two
+        // never share an identity field, so the mobile reconcile cannot dedupe the
+        // streamed row against the disk-fetched copy and renders it twice. The
+        // WS/HTTP shim paths already solve this by rewriting the streamed
+        // assistant id to a stable `cm-stream-<otid>` (and reasoning to
+        // `cm-reason-<otid>`), which mobile's optimistic-twin dedup collapses
+        // against the disk copy. The Iroh serve path bypassed the shim, so it
+        // never got this tag — THE reason Iroh dupes and HTTPS does not. Apply the
+        // identical tagging here.
+        val taggedDelta = tagStreamDeltaForOptimisticDedup(delta)
         val frame = buildJsonObject {
             put("type", "stream_delta")
             put("runtime", AppServerProtocol.json.encodeToJsonElement(runtime))
             put("event_seq", eventSeq.next())
             put("emitted_at", Instant.now().toString())
             put("idempotency_key", "iroh-delta-${UUID.randomUUID()}")
-            put("delta", delta)
+            put("delta", taggedDelta)
         }.toString()
         Telemetry.event(
             "IrohNode", "stream.write",
@@ -701,6 +713,7 @@ class IrohNodeConnection(
             IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
     }
+
 
     private fun frameType(rawFrame: String): String? = runCatching {
         AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull
