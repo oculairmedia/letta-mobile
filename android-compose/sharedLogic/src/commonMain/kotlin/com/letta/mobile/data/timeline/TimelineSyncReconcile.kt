@@ -190,7 +190,21 @@ fun Timeline.mergeServerMessages(
             } else {
                 null
             }
-            val replaceIndex = prefixIndex ?: sameRunIndex
+            // letta-mobile-h30cy (THE reconcile dup, ground-truthed via
+            // app-server-iroh-probe --dump-frames + admin message.list): the
+            // reconciled FINAL has id==otid==ui-msg-*, run_id=NULL, and content
+            // that is a SUPERSET of the streamed row (first-word-lag means it is
+            // NOT byte-identical, so recentTailContainsEquivalent's exact match
+            // misses; null run means findRecentSameRealRunAssistantIndex can't
+            // fire). Fall back to CONTENT-SUPERSET: a recent assistant row whose
+            // content is contained within the incoming full text is the same
+            // in-flight reply — replace it with the fuller final (one row).
+            val contentSupersetIndex = if (prefixIndex == null && sameRunIndex == null) {
+                timeline.findRecentAssistantContentSupersetIndex(confirmed)
+            } else {
+                null
+            }
+            val replaceIndex = prefixIndex ?: sameRunIndex ?: contentSupersetIndex
             if (replaceIndex != null) {
                 timeline = timeline.replaceEventAt(replaceIndex, confirmed.copy(position = timeline.events[replaceIndex].position))
                 Telemetry.event(
@@ -285,6 +299,40 @@ private fun Timeline.findRecentSameRealRunAssistantIndex(incoming: TimelineEvent
         if (existingText == incomingText ||
             existingText.contains(incomingText) ||
             incomingText.contains(existingText)
+        ) {
+            return index
+        }
+    }
+    return null
+}
+
+/**
+ * letta-mobile-h30cy: content-superset fallback for the reconcile duplicate when
+ * NO id/otid/run match is possible. The reconciled final (message.list) has a
+ * ui-msg-* id/otid and NULL run id, so it cannot be matched by identity; and its
+ * text differs slightly from the streamed row (first-word-lag), so the exact
+ * recentTailContainsEquivalent misses. Match a recent assistant row whose trimmed
+ * content is CONTAINED in the incoming full text (the incoming is the superset /
+ * fuller final of that in-flight reply). Guarded to a meaningful length and the
+ * recent tail so distinct short messages don't coincidentally collapse.
+ */
+private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineEvent.Confirmed): Int? {
+    if (incoming.messageType != TimelineMessageType.ASSISTANT) return null
+    val incomingText = incoming.content.trim()
+    if (incomingText.length < 3) return null
+    val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    for (index in events.size - 1 downTo start) {
+        val event = events[index] as? TimelineEvent.Confirmed ?: continue
+        if (event.messageType != TimelineMessageType.ASSISTANT) continue
+        if (event.serverId == incoming.serverId) continue
+        val existingText = event.content.trim()
+        if (existingText.length < 3) continue
+        // The incoming full reply must contain (be a superset of) the existing
+        // streamed row's text — that identifies them as the same in-flight reply.
+        // Not exact-equal (that path is handled earlier); the incoming is fuller.
+        if (incomingText != existingText &&
+            incomingText.contains(existingText) &&
+            incomingText.length >= existingText.length
         ) {
             return index
         }

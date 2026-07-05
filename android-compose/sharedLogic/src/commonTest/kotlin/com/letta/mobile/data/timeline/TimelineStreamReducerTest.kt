@@ -1572,6 +1572,39 @@ class TimelineStreamReducerTest {
         event.content shouldBe "Hey back. Still here."
     }
 
+    @Test
+    fun `REAL reconcile dup ui-msg final with null run collapses into streamed row h30cy`() {
+        // Ground truth (admin message.list): the reconciled FINAL has id==otid==ui-msg-*,
+        // run_id=NULL, and content that is a SUPERSET (or near-equal, first-word-lag
+        // means not byte-identical) of the streamed row. Different otid + null run +
+        // non-exact content defeated every match, so it inserted as a 2nd row.
+        // The streamed row is a live assistant row (synthetic otid, real run).
+        val streamedRow = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799",
+                contentRaw = JsonPrimitive("m Lester, a dedicated test agent"), // first-word-lag: missing "I'"
+                runId = "local-run-30",
+                otid = "provider-assistant-1-abc",
+                seqId = 42,
+            ),
+        ).next
+        // The reconcile snapshot: ui-msg id/otid, NULL run, FULL text.
+        val reconciled = listOf(
+            AssistantMessage(
+                id = "ui-msg-9006572",
+                contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
+                runId = null,
+                otid = "ui-msg-9006572",
+                seqId = null,
+            )
+        )
+        val (afterReconcile, _) = streamedRow.mergeServerMessages(reconciled)
+        val assistantRows = afterReconcile.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, assistantRows.size)
+        assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
