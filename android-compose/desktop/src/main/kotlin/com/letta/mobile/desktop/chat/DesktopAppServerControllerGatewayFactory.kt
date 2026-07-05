@@ -2,12 +2,19 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
+import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
+import computer.iroh.Endpoint
+import computer.iroh.EndpointOptions
+import computer.iroh.RelayMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 
 /**
  * Factory for creating a desktop chat gateway backed by the App Server controller.
@@ -49,20 +56,40 @@ class DesktopAppServerControllerGatewayFactory(
                     "${DesktopAppServerRuntimeConfig.SERVER_URL_ENV}."
             )
 
-        // Create the App Server endpoint
-        val endpoint = AppServerEndpoint.fromWebSocketUrl(
-            url = serverUrl,
-            bearerToken = lettaConfig.accessToken,
-        )
-
-        // Create the WebSocket transport
-        // The endpoint.address is the full WebSocket URL for WebSocket endpoints
-        val transport = KtorAppServerWebSocketTransport(
-            httpClient = createDesktopLettaHttpClient(),
-            baseUrl = endpoint.address,
-            scope = controllerScope,
-            bearerToken = endpoint.bearerToken,
-        )
+        // Select the transport by scheme. Desktop is a peer host to Android, so it
+        // supports the same iroh:// backend as mobile — the Iroh client transport
+        // (IrohAppServerTransportAdapter) lives in jvmAndAndroid, which desktop
+        // (jvmMain) consumes, and the computer.iroh:iroh JAR bundles the host-OS
+        // native lib. letta-mobile-cq2ju.
+        val transport = if (IrohChannelTransport.isIrohUrl(serverUrl)) {
+            // iroh://<node-id>@<host:port>[,...] — bind a local iroh endpoint and
+            // dial the backend over QUIC, mirroring the CLI probe + Android path.
+            // Endpoint.bind + awaitConnectionReady are suspend; run them once at
+            // wiring time.
+            val normalizedAddress = serverUrl.trim().removePrefix("iroh://")
+            runBlocking {
+                val irohEndpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.Companion.defaultMode()))
+                val irohTransport = IrohAppServerTransportAdapter(irohEndpoint).createTransport(
+                    endpoint = AppServerEndpoint(scheme = "iroh", address = normalizedAddress),
+                    scope = controllerScope,
+                ) as IrohAppServerTransport
+                // The controller/client contract needs the connection ready before use.
+                irohTransport.awaitConnectionReady()
+                irohTransport
+            }
+        } else {
+            // Default: WebSocket App Server. endpoint.address is the full WS URL.
+            val endpoint = AppServerEndpoint.fromWebSocketUrl(
+                url = serverUrl,
+                bearerToken = lettaConfig.accessToken,
+            )
+            KtorAppServerWebSocketTransport(
+                httpClient = createDesktopLettaHttpClient(),
+                baseUrl = endpoint.address,
+                scope = controllerScope,
+                bearerToken = endpoint.bearerToken,
+            )
+        }
 
         // Create the App Server client
         val client = DefaultAppServerClient(transport)
