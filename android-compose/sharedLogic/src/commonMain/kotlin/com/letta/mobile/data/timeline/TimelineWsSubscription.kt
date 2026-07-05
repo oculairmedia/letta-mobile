@@ -5,19 +5,25 @@ package com.letta.mobile.data.timeline
  *
  * Ensures that if an external transport is active (e.g., admin-shim WS delivering messages),
  * the SSE stream subscriber suppresses dual ingestion.
+ *
+ * letta-mobile-h30cy: the active-flag is now keyed on the conversationId in a
+ * process-wide [TimelineExternalTransportRegistry], NOT per loop instance. Over
+ * Iroh two loop instances could exist for one conversation (scoped/unscoped
+ * aliasing gap), so a per-instance flag left the dual-ingest guard checking the
+ * wrong instance -> both paths ingested every frame (2x reducer input ->
+ * duplicate row + random character drops). Sharing by conversationId makes the
+ * guard correct regardless of instance count.
  */
 class TimelineWsSubscription(
-    @Suppress("unused") private val conversationId: String,
+    private val conversationId: String,
 ) {
-    private val externalTransportActive = TimelineAtomicFlag()
-
-    fun isActive(): Boolean = externalTransportActive.get()
+    fun isActive(): Boolean = TimelineExternalTransportRegistry.isActive(conversationId)
 
     fun markActive() {
-        externalTransportActive.set(true)
+        TimelineExternalTransportRegistry.markActive(conversationId)
     }
 
     fun clear() {
-        externalTransportActive.set(false)
+        TimelineExternalTransportRegistry.clear(conversationId)
     }
 }
