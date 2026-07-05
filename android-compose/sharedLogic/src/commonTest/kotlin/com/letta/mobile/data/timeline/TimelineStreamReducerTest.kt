@@ -1543,6 +1543,35 @@ class TimelineStreamReducerTest {
         output.emittedEvents shouldBe emptyList()
     }
 
+    @Test
+    fun `REAL WIRE rotating per-fragment ids with NULL otid must reduce to one row h30cy`() {
+        // Faithful replay of the ACTUAL Iroh wire shape captured headlessly via
+        // app-server-iroh-probe: a single assistant reply arrives as N stream_delta
+        // fragments, each with a NEW sequential letta-msg id and NO otid (otid=null).
+        // Prior tests hardcoded a shared otid, which the real wire does NOT provide —
+        // that false assumption is why fixes passed tests but duplicated on device.
+        // Cumulative content grows per fragment; all share one real run id.
+        val runId = "run-real-app-server"
+        val fragments = listOf("Hey", "Hey back", "Hey back.", "Hey back. Still", "Hey back. Still here.")
+        var tl = timeline()
+        fragments.forEachIndexed { i, cumulative ->
+            tl = reduce(
+                prev = tl,
+                frame = AssistantMessage(
+                    id = "letta-msg-${1312 + i}", // rotating, +1 per fragment (real wire)
+                    contentRaw = JsonPrimitive(cumulative),
+                    runId = runId,
+                    otid = null, // REAL WIRE: assistant stream_delta carries no otid
+                    seqId = i,
+                ),
+            ).next
+        }
+        // The whole reply must collapse to exactly ONE assistant row with the full text.
+        tl.events shouldHaveSize 1
+        val event = tl.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Hey back. Still here."
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
