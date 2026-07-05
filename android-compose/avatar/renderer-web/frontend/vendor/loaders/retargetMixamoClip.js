@@ -134,6 +134,41 @@ export function resolveMixamoRig(asset) {
  * @param {object} vrm  Target @pixiv/three-vrm VRM (must have .humanoid)
  * @returns {THREE.AnimationClip}
  */
+// Lock the hips facing direction: remove the yaw (rotation about world up) from
+// every key relative to the first key, keeping the swing (pitch/roll — the lean
+// and bend that make a dance read as a dance). Mixamo dances routinely spin the
+// character a full turn; retargeted faithfully onto a stationary, front-facing
+// pet that means she rotates her back to the viewer. Swing-twist decomposition
+// about Y isolates the yaw as the "twist"; we replace each key's twist with the
+// first key's, so facing is pinned while all other motion survives.
+function lockHipsYaw(values) {
+  if (values.length < 8) return;
+  const q = new THREE.Quaternion();
+  const twist = new THREE.Quaternion();
+  const twist0 = new THREE.Quaternion();
+  const twistInv = new THREE.Quaternion();
+  // Twist of (x,y,z,w) about the Y axis = normalize(0, y, 0, w); degenerate
+  // (y,w ~ 0, i.e. a 180° pitch) falls back to identity.
+  const yTwist = (y, w, out) => {
+    const len = Math.hypot(y, w);
+    if (len < 1e-6) out.set(0, 0, 0, 1);
+    else out.set(0, y / len, 0, w / len);
+    return out;
+  };
+  yTwist(values[1], values[3], twist0);
+  for (let i = 0; i < values.length; i += 4) {
+    q.set(values[i], values[i + 1], values[i + 2], values[i + 3]);
+    yTwist(values[i + 1], values[i + 3], twist);
+    twistInv.copy(twist).invert();
+    // q_locked = swing * twist0 = (q * twist^-1) * twist0
+    q.multiply(twistInv).multiply(twist0);
+    values[i] = q.x;
+    values[i + 1] = q.y;
+    values[i + 2] = q.z;
+    values[i + 3] = q.w;
+  }
+}
+
 export function retargetMixamoClip(asset, clip, vrm) {
   const { hipsNode, rigMap } = resolveMixamoRig(asset);
 
@@ -176,6 +211,13 @@ export function retargetMixamoClip(asset, clip, vrm) {
         const values = track.values.map(
           (v, i) => (vrm.meta?.metaVersion === '0' && i % 2 === 0 ? -v : v),
         );
+
+        // Facing lock: pin the hips yaw so travelling/turning dances don't spin
+        // the front-facing pet around. Applied before the continuity pass so any
+        // sign flips it introduces are canonicalised below.
+        if (vrmBoneName === 'hips') {
+          lockHipsYaw(values);
+        }
 
         // Quaternion hemisphere continuity pass. q and -q are the same
         // rotation, but the mixer interpolates the raw 4-vectors: if two
