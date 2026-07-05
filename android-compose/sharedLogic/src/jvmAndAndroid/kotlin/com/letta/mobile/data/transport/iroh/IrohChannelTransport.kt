@@ -94,8 +94,25 @@ class IrohChannelTransport(
             "messageId" to frameMessageId(frame),
             "conversationId" to frameConversationId(frame),
         )
+        // letta-mobile-h30cy: content-length accounting at the emit gate.
+        frameFlowContent(frame)?.let { (key, type, content) ->
+            IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
+        }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
+    }
+
+    /** letta-mobile-h30cy: (key, messageType, content) for content-bearing frames. */
+    private fun frameFlowContent(frame: ServerFrame): Triple<String, String, String>? = when (frame) {
+        is ServerFrame.AssistantMessage -> {
+            val f: ServerFrame.AssistantMessage = frame
+            Triple(f.otid ?: f.id, "assistant_message", f.content)
+        }
+        is ServerFrame.ReasoningMessage -> {
+            val f: ServerFrame.ReasoningMessage = frame
+            Triple(f.id, "reasoning_message", f.reasoning)
+        }
+        else -> null
     }
 
     private var activeSendJob: kotlinx.coroutines.Job? = null

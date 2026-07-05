@@ -75,10 +75,13 @@ object Telemetry {
     // rebuild). Left in the tree for future render-layer diagnosis.
     @Suppress("MemberVisibilityCanBePrivate")
     val renderDiagEnabled = TelemetryFlag(false)
+    // letta-mobile-h30cy: per-gate frame-flow content-length diagnostic.
+    val frameFlowDiagEnabled = TelemetryFlag(false)
 
     private const val TIMELINE_DUMP_TAG = "LettaTimelineDump"
     private const val CHAT_HOT_PATH_DEBUG_TAG = "LettaChatHotPath"
     private const val RENDER_DIAG_TAG = "LettaRenderDiag"
+    private const val FRAME_FLOW_DIAG_TAG = "LettaFrameFlowDiag"
     private const val TAG_PREFIX = "Telemetry"
     private const val MAX_RING_SIZE = 1000
     private const val TRACE_MAX_LEN = 127
@@ -96,6 +99,9 @@ object Telemetry {
 
     fun isRenderDiagEnabled(): Boolean =
         renderDiagEnabled.get() || (delegate?.isLoggable(RENDER_DIAG_TAG, 2) ?: false)
+
+    fun isFrameFlowDiagEnabled(): Boolean =
+        frameFlowDiagEnabled.get() || (delegate?.isLoggable(FRAME_FLOW_DIAG_TAG, 2) ?: false)
 
     fun event(
         tag: String,

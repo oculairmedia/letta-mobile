@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
@@ -26,6 +28,21 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     val pendingEvents = mutableListOf<TimelineSyncEvent>()
     val conversationId = input.prev.conversationId
     val message = input.frame
+
+    // letta-mobile-h30cy: content-length accounting at the reducer INGEST gate.
+    // Compare against gate1.emit (IrohChannelTransport) to find where a fragment's
+    // characters are dropped between transport emit and reducer ingest.
+    if (com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.enabled()) {
+        when (message) {
+            is AssistantMessage -> com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record(
+                "gate.reduceIngest", message.otid ?: message.id, "assistant_message", message.content,
+            )
+            is ReasoningMessage -> com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record(
+                "gate.reduceIngest", message.otid ?: message.id, "reasoning_message", message.reasoning,
+            )
+            else -> Unit
+        }
+    }
 
     fun output(notification: PendingIngestNotification? = null): TimelineReducerOutput =
         TimelineReducerOutput(
