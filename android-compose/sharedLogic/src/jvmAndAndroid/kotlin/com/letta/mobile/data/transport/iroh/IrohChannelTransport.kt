@@ -68,10 +68,21 @@ class IrohChannelTransport(
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    private val _events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 64)
+    // letta-mobile-h30cy: replay=1. A collector that attaches ONE frame late (the
+    // reducer subscribing to a turn's events just after the first stream_delta was
+    // emitted) previously MISSED that first frame — a non-replay SharedFlow drops
+    // anything emitted before subscription. That dropped the leading fragment of
+    // the streamed assistant reply (proven via onDisplayedText: the streamed row's
+    // reducer-input text started mid-word, e.g. "'s a huge..." missing "That'",
+    // while the wire + reconcile were complete), so the streamed row rendered
+    // "full minus first word" and never content-matched the clean reconcile final
+    // -> a duplicate row. replay=1 holds the most-recent frame so a just-attaching
+    // collector still receives it; the reducer dedups by frame identity, so a
+    // replayed frame to an already-live collector is harmless.
+    private val _events = MutableSharedFlow<ServerFrame>(replay = 1, extraBufferCapacity = 64)
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
-    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
+    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(replay = 1, extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
     /** Emit to both event flows so both direct consumers and

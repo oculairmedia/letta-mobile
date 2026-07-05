@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.LettaMessage
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * letta-mobile-h30cy: FAITHFUL device-free repro. These are the REAL Iroh
@@ -175,4 +176,65 @@ class IrohRealFrameReplayTest {
             assistantRows.joinToString(" || ") { it.content.take(30) })
         assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content.take(34))
     }
+
+    @Test
+    fun `first cm-stream fragment is not dropped h30cy`() {
+        val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+        val frames = listOf(
+            "{\"id\": \"cm-stream-provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"otid\": \"provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"run_id\": \"local-run-76\", \"seq_id\": 24, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \"That\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"otid\": \"provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"run_id\": \"local-run-76\", \"seq_id\": 25, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \"'s\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"otid\": \"provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"run_id\": \"local-run-76\", \"seq_id\": 26, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" a\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"otid\": \"provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"run_id\": \"local-run-76\", \"seq_id\": 27, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" huge\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"otid\": \"provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"run_id\": \"local-run-76\", \"seq_id\": 28, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" breakthrough\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"otid\": \"provider-assistant-1-4e7e5775-4b56-4118-89ab-445e409c7009\", \"run_id\": \"local-run-76\", \"seq_id\": 29, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \".\"}]}",
+        )
+        var tl = Timeline(conversationId = "c")
+        for (raw in frames) {
+            val msg = json.decodeFromString(LettaMessage.serializer(), raw)
+            tl = reduceStreamFrame(TimelineReducerInput(prev = tl, frame = msg, pendingToolReturnsByCallId = kotlinx.collections.immutable.persistentMapOf())).next
+        }
+        val row = tl.events.filterIsInstance<TimelineEvent.Confirmed>().first { it.messageType == TimelineMessageType.ASSISTANT }
+        println("REDUCED: [" + row.content + "]")
+        assertTrue(row.content.startsWith("That's"), "leading fragment dropped: [" + row.content + "]")
+        assertEquals("That's a huge breakthrough.", row.content.trim())
+    }
+
+
+    @Test
+    fun `punctuation-only fragments are not dropped by reducer h30cy`() {
+        val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+        val frames = listOf(
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 49, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \"So\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 50, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \",\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 51, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" after\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 52, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" all\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 53, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" this\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 54, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" debugging\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 55, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \",\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 56, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" what\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 57, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" do\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 58, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" you\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 59, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" think\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 60, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" is\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 61, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" actually\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 62, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" causing\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 63, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" the\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 64, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" stream\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 65, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" to\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 66, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" drop\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 67, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \" characters\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"otid\": \"provider-assistant-1-02cdddfa-621a-458f-ad4e-8923d0a1402e\", \"run_id\": \"local-run-79\", \"seq_id\": 68, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \"?\"}]}",
+        )
+        var tl = Timeline(conversationId = "c")
+        for (raw in frames) {
+            val msg = json.decodeFromString(LettaMessage.serializer(), raw)
+            tl = reduceStreamFrame(TimelineReducerInput(prev = tl, frame = msg, pendingToolReturnsByCallId = kotlinx.collections.immutable.persistentMapOf())).next
+        }
+        val row = tl.events.filterIsInstance<TimelineEvent.Confirmed>().first { it.messageType == TimelineMessageType.ASSISTANT }
+        println("REDUCED: [" + row.content + "]")
+        assertTrue(row.content.contains(","), "comma dropped: [" + row.content + "]")
+        assertTrue(row.content.contains("?"), "question mark dropped: [" + row.content + "]")
+        assertEquals("So, after all this debugging, what do you think is actually causing the stream to drop characters?", row.content.trim())
+    }
+
 }
