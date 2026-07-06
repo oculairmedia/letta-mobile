@@ -33,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -96,11 +97,43 @@ class IrohChannelTransport(
             "messageId" to frameMessageId(frame),
             "conversationId" to frameConversationId(frame),
         )
+        // h30cy first-fragment race: wait for the reducer collector to subscribe
+        // before the first emit so no content frame is dropped into the void. Safe
+        // now that stream dedupe is SHARED across loop instances
+        // (TimelineStreamDedupeRegistry) — if the wait lets a second aliased
+        // subscriber also ingest, the shared seq-dedup drops the duplicate instead
+        // of stranding a second row (the regression that reverted the earlier gate).
+        awaitFrameCollectorReady()
         frameFlowContent(frame)?.let { (key, type, content) ->
             IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
         }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
+    }
+
+    // h30cy: one-shot readiness latch. Once a subscriber has ever been observed
+    // (or the bounded wait elapses once), never wait again — so the gate adds at
+    // most one short wait for the very first frame, never per-frame, and cannot
+    // repeatedly block a consumerless transport (e.g. a unit test that emits
+    // without collecting).
+    @Volatile private var frameCollectorConfirmed = false
+
+    /** Bounded ONE-TIME wait until a frame-flow subscriber is attached, so the
+     *  first emit is not lost to the emit-before-subscribe race. Replay backstops
+     *  the pathological no-consumer case; the latch guarantees we wait at most
+     *  once. */
+    private suspend fun awaitFrameCollectorReady() {
+        if (frameCollectorConfirmed) return
+        if (_frameEvents.subscriptionCount.value > 0) {
+            frameCollectorConfirmed = true
+            return
+        }
+        withTimeoutOrNull(COLLECTOR_READY_TIMEOUT_MS) {
+            _frameEvents.subscriptionCount.first { it > 0 }
+        }
+        // Either a subscriber attached or the bounded wait elapsed — in both
+        // cases stop gating further frames (replay covers the elapsed case).
+        frameCollectorConfirmed = true
     }
 
     /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
@@ -753,6 +786,7 @@ class IrohChannelTransport(
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
+        internal const val COLLECTOR_READY_TIMEOUT_MS = 750L
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it

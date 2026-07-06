@@ -5,6 +5,8 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
 import kotlin.concurrent.Volatile
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +53,9 @@ class TimelineSyncLoop(
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
+    private val seenStreamMessageLock = SynchronizedObject()
+    private val seenStreamMessageKeys = ArrayDeque<String>()
+    private val seenStreamMessageKeySet = mutableSetOf<String>()
     private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
     private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
     
@@ -365,7 +370,18 @@ class TimelineSyncLoop(
 
     private fun shouldDropDuplicateStreamMessage(message: LettaMessage, source: String): Boolean {
         val key = streamMessageKey(message) ?: return false
-        val duplicate = TimelineStreamDedupeRegistry.markSeen(conversationId, key)
+        val duplicate = synchronized(seenStreamMessageLock) {
+            if (key in seenStreamMessageKeySet) {
+                true
+            } else {
+                seenStreamMessageKeySet.add(key)
+                seenStreamMessageKeys.addLast(key)
+                while (seenStreamMessageKeys.size > MAX_SEEN_STREAM_MESSAGES) {
+                    seenStreamMessageKeySet.remove(seenStreamMessageKeys.removeFirst())
+                }
+                false
+            }
+        }
         if (duplicate) {
             Telemetry.event(
                 "TimelineSync", "streamMessage.exactDuplicateDropped",
@@ -395,6 +411,7 @@ class TimelineSyncLoop(
     companion object {
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 12
+        private const val MAX_SEEN_STREAM_MESSAGES = 512
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }
