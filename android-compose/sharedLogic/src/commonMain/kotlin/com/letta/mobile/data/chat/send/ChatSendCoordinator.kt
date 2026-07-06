@@ -495,7 +495,7 @@ class ChatSendCoordinator(
                 }
                 recordRuntimeEvent(event, conversationId)
                 rememberActiveAssistantMessageRunId(event.message)
-                timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
+                timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
                 if (!event.isReplay) {
                     ui.onMessageDelta(conversationId)
                 }
@@ -637,16 +637,31 @@ class ChatSendCoordinator(
 
     private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
         val key = bridgeEventKey(event) ?: return false
-        val isDuplicate = synchronized(seenBridgeEventLock) {
-            if (key in seenBridgeEventKeySet) {
-                true
-            } else {
-                seenBridgeEventKeySet.add(key)
-                seenBridgeEventKeys.addLast(key)
-                while (seenBridgeEventKeys.size > MAX_SEEN_BRIDGE_EVENTS) {
-                    seenBridgeEventKeySet.remove(seenBridgeEventKeys.removeFirst())
+        val isDuplicate = if (event is WsTimelineEvent.MessageDelta) {
+            synchronized(sharedMessageEventLock) {
+                if (key in sharedMessageEventKeySet) {
+                    true
+                } else {
+                    sharedMessageEventKeySet.add(key)
+                    sharedMessageEventKeys.addLast(key)
+                    while (sharedMessageEventKeys.size > MAX_SEEN_BRIDGE_EVENTS) {
+                        sharedMessageEventKeySet.remove(sharedMessageEventKeys.removeFirst())
+                    }
+                    false
                 }
-                false
+            }
+        } else {
+            synchronized(seenBridgeEventLock) {
+                if (key in seenBridgeEventKeySet) {
+                    true
+                } else {
+                    seenBridgeEventKeySet.add(key)
+                    seenBridgeEventKeys.addLast(key)
+                    while (seenBridgeEventKeys.size > MAX_SEEN_BRIDGE_EVENTS) {
+                        seenBridgeEventKeySet.remove(seenBridgeEventKeys.removeFirst())
+                    }
+                    false
+                }
             }
         }
         if (isDuplicate) {
@@ -861,7 +876,7 @@ class ChatSendCoordinator(
             val message = preConversationMessageDeltas.removeFirstOrNull() ?: return
             recordRuntimeEvent(WsTimelineEvent.MessageDelta(message), conversationId)
             rememberActiveAssistantMessageRunId(message)
-            timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message)
+            timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message, source = "coordinator.preConversationDrain")
         }
     }
 
@@ -869,6 +884,9 @@ class ChatSendCoordinator(
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val MAX_SEEN_BRIDGE_EVENTS = 512
+        private val sharedMessageEventLock = SynchronizedObject()
+        private val sharedMessageEventKeys = ArrayDeque<String>()
+        private val sharedMessageEventKeySet = mutableSetOf<String>()
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
         private val POST_SEND_RECONCILE_DELAYS_MS = longArrayOf(750L, 2_500L, 6_000L)
