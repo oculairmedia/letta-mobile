@@ -23,8 +23,8 @@ internal class TimelineStreamDispatcher(
     private val loopScope: CoroutineScope,
     private val ingestNotificationDispatcher: TimelineIngestNotificationDispatcher,
 ) {
-    // h30cy: the experimental "shadow holder" (ConversationStateHolder) parallel
-    // reducer was REMOVED. It ran a second reduceStreamFrame off a lossy tryEmit
+    // h30cy: the experimental shadow parallel reducer was REMOVED. It ran a second
+    // reduceStreamFrame off a lossy tryEmit
     // SharedFlow, diverged from the authoritative loop (matched=false,
     // shadowHolderLag≈32) and polluted the reduce/ingest path with an untagged
     // "unknown" second ingest — the dual-reducer race behind the intermittent
