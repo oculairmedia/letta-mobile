@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class DesktopChatController(
@@ -189,6 +190,11 @@ class DesktopChatController(
     private var selectJob: Job? = null
     private var sendJob: Job? = null
     private var createConversationJob: Job? = null
+    // Periodically re-lists conversations so the sidebar surfaces new chats and
+    // reorders on new activity (created elsewhere — mobile/python — or on another
+    // agent in this app) without a manual reload. Non-destructive: the open
+    // conversation, its live stream, and the composer are never disturbed.
+    private var refreshLoopJob: Job? = null
     private var started = false
     private var closed = false
 
@@ -204,6 +210,7 @@ class DesktopChatController(
         selectJob?.cancel()
         sendJob?.cancel()
         timelineJob?.cancel()
+        refreshLoopJob?.cancel()
         activeLoop?.close()
         activeLoop = null
         (gateway as? AutoCloseable)?.close()
@@ -229,6 +236,7 @@ class DesktopChatController(
         sendJob?.cancel()
         createConversationJob?.cancel()
         timelineJob?.cancel()
+        refreshLoopJob?.cancel()
         activeLoop?.close()
         activeLoop = null
         (gateway as? AutoCloseable)?.close()
@@ -624,6 +632,7 @@ class DesktopChatController(
             }
 
             reloadConversationsAndSelect(preferConversationId = null)
+            startConversationRefreshLoop()
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -646,16 +655,24 @@ class DesktopChatController(
      * recent. Runs in the caller's coroutine so callers can sequence reliably
      * (no race against an async reload).
      */
-    private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
-        val nextGateway = gateway ?: return
-        // Fetch every conversation (active + archived, newest first); the UI filters
-        // the displayed list by [archiveFilter] so switching is instant and the
-        // rail stays stable.
+    /**
+     * Fetch every conversation (active + archived, newest first) and map to
+     * summaries, overlaying the durable local archived flag. The UI filters the
+     * displayed list by [archiveFilter] so switching is instant and the rail
+     * stays stable. Shared by the initial load, explicit reloads, and the poll.
+     */
+    private suspend fun fetchConversationSummaries(): List<DesktopConversationSummary> {
+        val nextGateway = gateway ?: return emptyList()
         val conversations = nextGateway.listConversations(archiveStatus = ConversationArchiveFilter.All.apiValue)
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
-        val summaries = conversations.toChatConversationSummaries(agentNamesById)
+        return conversations.toChatConversationSummaries(agentNamesById)
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
+    }
+
+    private suspend fun reloadConversationsAndSelect(preferConversationId: String?) {
+        gateway ?: return
+        val summaries = fetchConversationSummaries()
         if (closed) return
         val loadedRuntime = ChatSessionReducer.conversationsLoaded(
             state = _state.value.runtimeState,
@@ -665,6 +682,52 @@ class DesktopChatController(
         val selectedId = preferConversationId?.takeIf { id -> summaries.any { it.id == id } }
             ?: summaries.firstOrNull()?.id
         selectedId?.let { selectRemoteConversation(it, loadedRuntime.selectionGeneration) }
+    }
+
+    /**
+     * Poll the conversation list on a conservative interval so newly-created
+     * conversations appear and existing ones reorder on new activity — without a
+     * reload/restart. Merged NON-destructively via
+     * [ChatSessionReducer.conversationsRefreshed]: the open conversation, its
+     * live SSE stream, the composer, and any unsent optimistic chat are all
+     * preserved (no re-select, no re-hydrate, no selection-generation bump).
+     *
+     * Idempotent: a second call cancels the prior loop first. Failures are
+     * swallowed and retried next tick so a transient blip doesn't kill polling.
+     */
+    private fun startConversationRefreshLoop() {
+        if (closed) return
+        refreshLoopJob?.cancel()
+        refreshLoopJob = scope.launch {
+            while (isActive && !closed) {
+                kotlinx.coroutines.delay(CONVERSATION_REFRESH_INTERVAL_MS)
+                if (closed) return@launch
+                // Only refresh once we have a live remote list; nothing to merge
+                // into a Demo/Offline/ConfigNeeded surface.
+                if (!_state.value.isRemoteBacked) continue
+                try {
+                    val summaries = fetchConversationSummaries()
+                    if (closed) return@launch
+                    // Keep an in-flight unsent conversation pinned even if the
+                    // server list hasn't caught up to it yet.
+                    val keepLocalIds = unsentConversationId?.let { setOf(it) } ?: emptySet()
+                    _state.update {
+                        it.withRuntimeState(
+                            ChatSessionReducer.conversationsRefreshed(
+                                state = it.runtimeState,
+                                conversations = summaries,
+                                keepLocalIds = keepLocalIds,
+                            ),
+                        )
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Throwable) {
+                    // Transient; retry on the next tick. Don't surface an error —
+                    // the last-known list stays visible.
+                }
+            }
+        }
     }
 
     private suspend fun selectRemoteConversation(conversationId: String, generation: Long) {
@@ -880,3 +943,11 @@ private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
 
 /** Safety cap so the thinking indicator can't get stuck if no reply arrives. */
 private const val THINKING_TIMEOUT_MS = 180_000L
+
+/**
+ * How often the conversation list is re-fetched so new conversations surface and
+ * existing ones reorder on new activity. Conservative to avoid hammering the
+ * backend; the open conversation's own live updates come over its SSE stream,
+ * not this poll.
+ */
+private const val CONVERSATION_REFRESH_INTERVAL_MS = 7_000L

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -389,6 +390,32 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun refreshLoopSurfacesNewConversationWithoutDisturbingOpenSelection() = runTest {
+        val gateway = MutableListDesktopChatGateway(initialConversationIds = listOf("conv-1"))
+        val controller = testController(gateway)
+
+        controller.start()
+        runCurrent()
+        assertEquals(listOf("conv-1"), controller.state.value.conversations.map { it.id })
+        assertEquals("conv-1", controller.state.value.selectedConversationId)
+
+        // A new conversation appears at the top (created elsewhere) and bumps the
+        // existing one down.
+        gateway.currentConversationIds = listOf("conv-new", "conv-1")
+
+        // Advance past the poll interval; the loop re-lists and merges it in.
+        advanceTimeBy(8_000)
+        runCurrent()
+
+        assertEquals(listOf("conv-new", "conv-1"), controller.state.value.conversations.map { it.id })
+        // The open conversation is NOT re-selected out from under the user.
+        assertEquals("conv-1", controller.state.value.selectedConversationId)
+        assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
+
+        controller.close()
+    }
+
+    @Test
     fun retryConnectionReloadsAfterOfflineFailure() = runTest {
         val gateways = ArrayDeque<DesktopChatGateway>()
         gateways += object : FakeDesktopChatGateway() {
@@ -665,6 +692,26 @@ open class FakeDesktopChatGateway(
             ),
         )
     }
+}
+
+/** Gateway whose conversation list can change between calls, to exercise the poll. */
+private class MutableListDesktopChatGateway(
+    initialConversationIds: List<String>,
+) : FakeDesktopChatGateway(conversationIds = initialConversationIds) {
+    @Volatile
+    var currentConversationIds: List<String> = initialConversationIds
+
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
+        currentConversationIds.mapIndexed { index, conversationId ->
+            Conversation(
+                id = ConversationId(conversationId),
+                agentId = AgentId("agent-$index"),
+                summary = "Remote $conversationId",
+                createdAt = "2026-06-07T01:00:00Z",
+                updatedAt = "2026-06-07T01:01:00Z",
+                lastMessageAt = "2026-06-07T01:02:00Z",
+            )
+        }
 }
 
 private class CloseTrackingGateway(

@@ -334,6 +334,102 @@ class ChatSessionReducerTest {
         assertSame(state, ChatSessionReducer.conversationDeleted(state, "missing"))
     }
 
+    @Test
+    fun refreshSurfacesNewConversationsAndReordersWithoutDisturbingSelection() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a"), conversation("b")),
+            selectedConversationId = "a",
+            messagesByConversationId = mapOf("a" to listOf(message("m1", "hi"))),
+            composer = ChatComposerState(text = "draft in progress"),
+            isRemoteBacked = true,
+            connectionState = ChatConnectionState.Live,
+            selectionGeneration = 9,
+        )
+
+        // Server now reports a brand-new conversation "c" at the top (most recent
+        // activity) and "b" bubbled above "a".
+        val refreshed = ChatSessionReducer.conversationsRefreshed(
+            state = state,
+            conversations = listOf(conversation("c"), conversation("b"), conversation("a")),
+        )
+
+        assertEquals(listOf("c", "b", "a"), refreshed.conversations.map { it.id })
+        // Open conversation, its hydrated messages, and the composer are untouched.
+        assertEquals("a", refreshed.selectedConversationId)
+        assertEquals(listOf("m1"), refreshed.messagesByConversationId["a"]?.map { it.id })
+        assertEquals("draft in progress", refreshed.composer.text)
+        // No re-hydrate is triggered.
+        assertEquals(9, refreshed.selectionGeneration)
+        assertEquals(ChatConnectionState.Live, refreshed.connectionState)
+    }
+
+    @Test
+    fun refreshKeepsUnsentLocalConversationNotYetOnServer() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("local-unsent"), conversation("a")),
+            selectedConversationId = "local-unsent",
+            isRemoteBacked = true,
+            connectionState = ChatConnectionState.Live,
+        )
+
+        // Server list doesn't include the freshly-created unsent chat yet.
+        val refreshed = ChatSessionReducer.conversationsRefreshed(
+            state = state,
+            conversations = listOf(conversation("a")),
+            keepLocalIds = setOf("local-unsent"),
+        )
+
+        assertEquals(listOf("local-unsent", "a"), refreshed.conversations.map { it.id })
+        assertEquals("local-unsent", refreshed.selectedConversationId)
+    }
+
+    @Test
+    fun refreshDropsMessagesForVanishedConversationsAndIsNoOpWhenUnchanged() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("a"), conversation("b")),
+            selectedConversationId = "a",
+            messagesByConversationId = mapOf(
+                "a" to listOf(message("m1", "hi")),
+                "b" to listOf(message("m2", "yo")),
+            ),
+            isRemoteBacked = true,
+            connectionState = ChatConnectionState.Live,
+        )
+
+        // "b" deleted elsewhere.
+        val refreshed = ChatSessionReducer.conversationsRefreshed(
+            state = state,
+            conversations = listOf(conversation("a")),
+        )
+        assertEquals(listOf("a"), refreshed.conversations.map { it.id })
+        assertTrue(refreshed.messagesByConversationId.containsKey("a"))
+        assertFalse(refreshed.messagesByConversationId.containsKey("b"))
+
+        // Identical server list => same state instance (no churn).
+        val unchanged = ChatSessionReducer.conversationsRefreshed(
+            state = state,
+            conversations = listOf(conversation("a"), conversation("b")),
+        )
+        assertSame(state, unchanged)
+    }
+
+    @Test
+    fun refreshIsIgnoredWhenNotRemoteBacked() {
+        val state = ChatSessionState(
+            conversations = listOf(conversation("demo")),
+            selectedConversationId = "demo",
+            isRemoteBacked = false,
+            connectionState = ChatConnectionState.Demo,
+        )
+
+        val refreshed = ChatSessionReducer.conversationsRefreshed(
+            state = state,
+            conversations = listOf(conversation("a")),
+        )
+
+        assertSame(state, refreshed)
+    }
+
     private fun conversation(
         id: String,
         unreadCount: Int = 0,

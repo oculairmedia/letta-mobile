@@ -83,6 +83,66 @@ object ChatSessionReducer {
     }
 
     /**
+     * Non-destructively refresh the conversation LIST from a fresh server fetch
+     * (e.g. a periodic poll) without disturbing the open conversation. Unlike
+     * [conversationsLoaded] — which resets selection, clears hydrated messages,
+     * wipes the composer, and bumps the selection generation — this keeps all of
+     * that intact and only:
+     *   - replaces the visible, recency-ordered list with the server's,
+     *   - preserves any local-only conversations not yet on the server (e.g. a
+     *     freshly-created unsent chat identified by [keepLocalIds]) at the front,
+     *   - drops hydrated messages for conversations that vanished server-side,
+     *   - leaves the current selection untouched when it still exists (so the
+     *     open chat, its stream, and its composer are never clobbered).
+     *
+     * The selection generation is NOT bumped: no re-hydrate is triggered, so a
+     * poll landing while the agent is streaming can't reset the timeline.
+     */
+    fun conversationsRefreshed(
+        state: ChatSessionState,
+        conversations: List<ChatConversationSummary>,
+        keepLocalIds: Set<String> = emptySet(),
+        liveStatusMessage: String = "Live",
+        emptyStatusMessage: String = "No conversations",
+    ): ChatSessionState {
+        // Only meaningful once we're remote-backed with a loaded list; ignore
+        // otherwise so a late poll can't override a Demo/Offline/ConfigNeeded UI.
+        if (!state.isRemoteBacked) return state
+        val serverIds = conversations.mapTo(HashSet()) { it.id }
+        // Keep local-only conversations (unsent/optimistic) that the server list
+        // doesn't know about yet, pinned to the front (most-recent) so they don't
+        // vanish under the incoming recency-ordered server list.
+        val localOnly = state.conversations.filter { it.id !in serverIds && it.id in keepLocalIds }
+        val merged = localOnly + conversations
+        if (merged == state.conversations) return state
+        val mergedIds = merged.mapTo(HashSet()) { it.id }
+        return state.copy(
+            conversations = merged,
+            // Selection is never touched by a background refresh: the open chat,
+            // its stream, and its composer stay bound. A conversation deleted
+            // elsewhere simply drops out of the list; the selectedConversation
+            // getter returns null gracefully if the selected id is now absent.
+            // Drop hydrated messages for conversations that no longer exist so the
+            // map doesn't grow unbounded; keep everything still present.
+            messagesByConversationId = state.messagesByConversationId.filterKeys { it in mergedIds },
+            connectionState = when {
+                merged.isEmpty() -> ChatConnectionState.NoConversations
+                // Don't downgrade an in-progress/failed transient state to Live.
+                state.connectionState == ChatConnectionState.Live ||
+                    state.connectionState == ChatConnectionState.NoConversations ->
+                    ChatConnectionState.Live
+                else -> state.connectionState
+            },
+            statusMessage = when {
+                merged.isEmpty() -> emptyStatusMessage
+                state.connectionState == ChatConnectionState.Live ||
+                    state.connectionState == ChatConnectionState.NoConversations -> liveStatusMessage
+                else -> state.statusMessage
+            },
+        )
+    }
+
+    /**
      * Remove a single conversation in place without rebuilding the whole session.
      * Deleting a background conversation leaves the active selection and its
      * hydrated messages untouched (no reload, no flash). Deleting the active
