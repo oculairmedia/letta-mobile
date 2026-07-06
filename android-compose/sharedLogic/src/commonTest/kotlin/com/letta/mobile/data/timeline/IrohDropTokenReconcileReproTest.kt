@@ -133,4 +133,22 @@ class IrohDropTokenReconcileReproTest {
     private companion object {
         const val CONVERSATION_ID = "conv-c297ed6c"
     }
+
+    @Test
+    fun `real hey-dot frames reduce to Hey-dot not just dot h30cy`() {
+        val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+        val frames = listOf(
+            "{\"id\": \"cm-stream-provider-assistant-1-f763f208-2621-42d1-a214-095f7ea9b850\", \"otid\": \"provider-assistant-1-f763f208-2621-42d1-a214-095f7ea9b850\", \"run_id\": \"local-run-3\", \"seq_id\": 36, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \"Hey\"}]}",
+            "{\"id\": \"cm-stream-provider-assistant-1-f763f208-2621-42d1-a214-095f7ea9b850\", \"otid\": \"provider-assistant-1-f763f208-2621-42d1-a214-095f7ea9b850\", \"run_id\": \"local-run-3\", \"seq_id\": 37, \"message_type\": \"assistant_message\", \"content\": [{\"type\": \"text\", \"text\": \".\"}]}",
+        )
+        var tl = Timeline(conversationId = "c")
+        for (raw in frames) {
+            val msg = json.decodeFromString(LettaMessage.serializer(), raw)
+            tl = reduceStreamFrame(TimelineReducerInput(prev = tl, frame = msg, pendingToolReturnsByCallId = kotlinx.collections.immutable.persistentMapOf())).next
+        }
+        val row = tl.events.filterIsInstance<TimelineEvent.Confirmed>().first { it.messageType == TimelineMessageType.ASSISTANT }
+        println("REDUCED-HEY: [" + row.content + "]")
+        assertEquals("Hey.", row.content.trim())
+    }
+
 }

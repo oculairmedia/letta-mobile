@@ -68,10 +68,23 @@ class IrohChannelTransport(
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    private val _events = MutableSharedFlow<ServerFrame>(replay = 1, extraBufferCapacity = 64)
+    // letta-mobile-h30cy first-fragment drop — PROVEN via app-server-iroh-probe:
+    // a live "hey" reply is 2 wire frames (seq36 "Hey", seq37 "."). The wire is
+    // correct and the reducer replays both to "Hey." correctly, but ON DEVICE the
+    // row became just "." — the FIRST frame ("Hey") was lost between the transport
+    // and the reducer's collector. send() emits the reply's opening tokens in a
+    // rapid burst before the collector's SharedFlow subscription is guaranteed
+    // active; with replay=1 the buffer held only the LAST pre-subscription frame
+    // (seq37 ".") and seq36 ("Hey") was overwritten. A short reply's whole opening
+    // burst can precede subscription, so replay must be large enough to hold it.
+    // replay=64 covers a short reply's opening tokens; the seq-based reducer
+    // idempotency guard makes any replayed frame to an already-live collector a
+    // no-op, and per-turn frames push old ones out of the buffer, so there is no
+    // cross-turn stale-replay hazard.
+    private val _events = MutableSharedFlow<ServerFrame>(replay = 64, extraBufferCapacity = 64)
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
-    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(replay = 1, extraBufferCapacity = 64)
+    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(replay = 64, extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
     /** Emit to both event flows so both direct consumers and
