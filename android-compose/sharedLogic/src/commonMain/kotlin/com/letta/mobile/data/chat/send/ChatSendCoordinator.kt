@@ -677,9 +677,23 @@ class ChatSendCoordinator(
     private fun bridgeEventKey(event: WsTimelineEvent): String? = when (event) {
         is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}"
         is WsTimelineEvent.MessageDelta -> {
-            val conversationId = activeWsConversationId ?: activeConversationId().orEmpty()
+            // h30cy: SEQ-ONLY dedup key. A CONTENT-based key (the old
+            // messageContentForDedupe) dropped legitimate incremental Iroh tokens
+            // whose bytes coincidentally repeat (two ",", repeated words) as
+            // "duplicates" — the residual ~12-14% frame drop after shareIn
+            // (gate2=66 -> gate3=53). Only dedup a MessageDelta that carries a real
+            // non-negative seqId (which uniquely identifies frame position);
+            // seq-less incremental frames are NEVER content-deduped (identical
+            // content can be a legitimate repeated token, not a resend). Same rule
+            // as the reducer's streamMessageKey.
             val message = event.message
-            "message|$conversationId|${message.id}|${message.messageType}|${message.runId.orEmpty()}|${messageContentForDedupe(message)}"
+            val seqId = message.seqId
+            if (seqId != null && seqId >= 0) {
+                val conversationId = activeWsConversationId ?: activeConversationId().orEmpty()
+                "message|$conversationId|seq|$seqId|${message.messageType}|${message.id}"
+            } else {
+                null
+            }
         }
         is WsTimelineEvent.StopReason -> "stop|${event.turnId}|${event.runId}|${event.stopReason}"
         is WsTimelineEvent.UsageStatistics -> "usage|${event.turnId}|${event.runId}|${event.promptTokens}|${event.completionTokens}|${event.totalTokens}"
