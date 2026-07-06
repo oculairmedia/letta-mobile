@@ -8,6 +8,8 @@ import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import kotlin.concurrent.Volatile
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -54,7 +56,7 @@ class TimelineSyncLoop(
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
-    private val seenStreamMessageLock = Any()
+    private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
     private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
