@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -162,6 +163,7 @@ class AppServerTurnEngine(
                 lastFrameAt.value = currentTimeMs()
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
+                    if (autoApproveIfAllowed(scope, draft)) return@forEach
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
                 }
@@ -169,6 +171,32 @@ class AppServerTurnEngine(
         } finally {
             watchdog.cancel()
         }
+    }
+
+    private suspend fun autoApproveIfAllowed(
+        scope: AppServerRuntimeScope,
+        draft: RuntimeEventDraft,
+    ): Boolean {
+        if (permissionMode != AppServerPermissionMode.Unrestricted) return false
+        val requested = draft.payload as? RuntimeEventPayload.ApprovalRequested ?: return false
+        com.letta.mobile.util.Telemetry.event(
+            "IrohTurn", "approval.auto_allow",
+            "approvalId" to requested.request.approvalId.value,
+            "toolCallId" to requested.request.callId.value,
+            "tool" to requested.request.toolName.value,
+        )
+        client.input(
+            AppServerCommand.Input(
+                runtime = scope,
+                payload = AppServerInputPayload.ApprovalResponse(
+                    requestId = requested.request.approvalId.value,
+                    decision = AppServerApprovalResponseDecision.Allow(
+                        message = "Approved by default mobile policy.",
+                    ),
+                ),
+            ),
+        )
+        return true
     }
 
     private suspend fun ensureRuntime(command: TurnCommand): AppServerRuntimeScope {
