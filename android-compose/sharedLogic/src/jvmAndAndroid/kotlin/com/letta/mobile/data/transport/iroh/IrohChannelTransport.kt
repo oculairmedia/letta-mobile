@@ -623,6 +623,12 @@ class IrohChannelTransport(
             first.adminRpc(method = method, path = path, body = body)
         }.getOrElse { firstError ->
             if (firstError is CancellationException) throw firstError
+            // k7yyc: a decode / frame-size (payload) error is isolated to THIS
+            // request. It is NOT a transport fault, so never reconnect or close
+            // the shared connection for it — a single oversized or garbled
+            // list response must fail only its own request with the typed
+            // error, never tear down streaming for every other request.
+            if (firstError.isAdminRpcPayloadError()) throw firstError
             if (!firstError.isConnectionLostClass()) throw firstError
             if (!method.isReadOnlyAdminRpcMethod()) throw firstError
             com.letta.mobile.util.Telemetry.event(
@@ -639,6 +645,20 @@ class IrohChannelTransport(
     }
 
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
+
+    /**
+     * k7yyc: true when [this] (or any cause in its chain) is a frame codec
+     * decode/size rejection — a per-request payload fault that must fail only
+     * the request, never trigger a transport reconnect.
+     */
+    private fun Throwable.isAdminRpcPayloadError(): Boolean {
+        var current: Throwable? = this
+        while (current != null) {
+            if (current is IrohFrameCodec.ProtocolException) return true
+            current = current.cause
+        }
+        return false
+    }
 
     override suspend fun disconnect() {
         supervisor.disconnect("disconnect")
@@ -718,6 +738,13 @@ class IrohChannelTransport(
             "conversation.list",
             "goal.get",
             "health.check",
+            // #822 review: idempotent agent reads issued right after connect
+            // (chat-screen load + conversation-list name resolution). Retrying
+            // these on a closed/timed-out connection over the stream-per-request
+            // (chunk-capable) path is safe — unlike the legacy control fallback,
+            // which they must stay OFF (see isLegacyFallbackSafeAdminRpcMethod).
+            "agent.get",
+            "agent.list",
         )
 
         fun isIrohUrl(url: String?): Boolean {

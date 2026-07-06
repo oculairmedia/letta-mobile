@@ -1,0 +1,5 @@
+06-30 12:00:00.100  1234  1250 I Telemetry/AdminChatVM: sendMessage.route via=iroh conversationId=conv-selfcheck length=5 attachments=0
+06-30 12:00:00.300  1234  1260 I Telemetry/IrohTransport: frame.recv channel=Stream type=stream_delta
+06-30 12:00:00.310  1234  1260 I Telemetry/IrohGate: gate1.emitBoth frame=AssistantMessage messageId=m1 conversationId=conv-selfcheck
+06-30 12:00:00.340  1234  1270 I Telemetry/TimelineSync: uiProjection.snapshot (2ms) conversationId=conv-selfcheck eventsTotal=10 messageCount=4 isStreaming=true isReconciling=false
+06-30 12:00:00.380  1234  1270 I Telemetry/TimelineSync: uiProjection.snapshot (1ms) conversationId=conv-selfcheck eventsTotal=12 messageCount=5 isStreaming=true isReconciling=false

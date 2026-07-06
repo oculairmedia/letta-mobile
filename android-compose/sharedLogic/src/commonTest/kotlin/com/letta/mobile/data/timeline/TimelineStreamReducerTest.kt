@@ -255,6 +255,180 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `iroh cumulative assistant chunks with per-chunk ids but shared otid merge into one row`() {
+        // The App Server streams CUMULATIVE assistant deltas (each chunk carries
+        // the full text so far). Over Iroh it mints a NEW backend letta-msg-* id
+        // per chunk but keeps a STABLE otid for the message. Without the
+        // otid-cumulative-merge, the fuller second chunk is dropped as an otid
+        // duplicate and the UI stays stuck on "Got".
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-5020",
+                contentRaw = JsonPrimitive("Got"),
+                runId = "run-real-app-server",
+                otid = "otid-assistant-1",
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-5021",
+                contentRaw = JsonPrimitive("Got it — Iroh transport is streaming the response."),
+                runId = "run-real-app-server",
+                otid = "otid-assistant-1",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-5020"
+        event.content shouldBe "Got it — Iroh transport is streaming the response."
+        event.seqId shouldBe 2
+        // liveCursor advances to the just-ingested chunk id so reconcile's
+        // `after` cursor does not stall on the first chunk (codex review P2).
+        output.next.liveCursor shouldBe "letta-msg-5021"
+        output.emittedEvents shouldBe listOf(
+            TimelineSyncEvent.StreamEventIngested("letta-msg-5020", "assistant_message")
+        )
+    }
+
+    @Test
+    fun `seq-less same-otid cumulative chunks snapshot-merge instead of appending`() {
+        // Codex review P2: when both frames lack seq ids, the old
+        // canUseSnapshotMerge=false path fell through to APPEND, turning
+        // "Got" + "Got it" into "GotGot it". Same-otid assistant frames are
+        // cumulative by contract, so snapshot-merge must win regardless of seq.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-6000",
+                contentRaw = JsonPrimitive("Got"),
+                runId = "run-app",
+                otid = "otid-seqless",
+                seqId = null,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-6001",
+                contentRaw = JsonPrimitive("Got it working now."),
+                runId = "run-app",
+                otid = "otid-seqless",
+                seqId = null,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Got it working now."
+    }
+
+    @Test
+    fun `otid merge promotes synthetic iroh-run id to the real run id`() {
+        // Codex review P2: per-chunk backend ids route through the otid path,
+        // bypassing the serverId-merge run-id promotion. The merged row must
+        // adopt the real run id so run-scoped grouping/collapse works.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-7000",
+                contentRaw = JsonPrimitive("I be"),
+                runId = "iroh-run-synthetic-1",
+                otid = "otid-runpromote",
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-7001",
+                contentRaw = JsonPrimitive("I bet. Debugging heisenbugs is hell."),
+                runId = "run-real-server",
+                otid = "otid-runpromote",
+                seqId = 2,
+            ),
+        )
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "I bet. Debugging heisenbugs is hell."
+        event.runId shouldBe "run-real-server"
+    }
+
+    @Test
+    fun `same otid never creates a second assistant row via the append path`() {
+        // Defensive one-row-per-otid invariant: if an assistant increment reaches
+        // the append path while a row for its otid already exists (a fanout/timing
+        // race that bypassed the earlier otid merge), it must merge into the
+        // existing row rather than append a stranded duplicate. Simulate by
+        // seeding a row whose serverId will NOT match the incoming frame and whose
+        // otid index is present, then feeding a fuller same-otid frame with a new
+        // serverId.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-5785",
+                contentRaw = JsonPrimitive("Hey, welcome back."),
+                runId = "run-1",
+                otid = "otid-dup",
+                seqId = 10,
+            )
+        ).next
+
+        // A racing increment for the SAME otid but a brand-new serverId and no
+        // detectable prefix relationship — the exact shape that produced the
+        // stranded ", welcome back..." row on-device.
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-5815",
+                contentRaw = JsonPrimitive("Hey, welcome back. Connection seems solid."),
+                runId = "run-1",
+                otid = "otid-dup",
+                seqId = 11,
+            ),
+        )
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "letta-msg-5785"
+        event.content shouldBe "Hey, welcome back. Connection seems solid."
+    }
+
+    @Test
+    fun `distinct otids in the same run stay separate assistant rows`() {
+        // Guard against over-merging: a tool-mediated run can legitimately have
+        // multiple assistant messages. They carry DISTINCT otids, so the
+        // otid-cumulative-merge must not collapse them.
+        val seeded = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-6000",
+                contentRaw = JsonPrimitive("Let me check that."),
+                runId = "run-1",
+                otid = "otid-a",
+                seqId = 1,
+            )
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = AssistantMessage(
+                id = "letta-msg-6001",
+                contentRaw = JsonPrimitive("Done — here is the result."),
+                runId = "run-1",
+                otid = "otid-b",
+                seqId = 2,
+            ),
+        )
+
+        output.next.events shouldHaveSize 2
+        val texts = output.next.events.map { (it as TimelineEvent.Confirmed).content }
+        texts shouldBe listOf("Let me check that.", "Done — here is the result.")
+    }
+
+    @Test
     fun `cumulative frames do not double existing text`() {
         val seeded = reduce(
             frame = AssistantMessage(id = "assistant-1", contentRaw = JsonPrimitive("Hey"), seqId = 1)
@@ -705,6 +879,55 @@ class TimelineStreamReducerTest {
         event.serverId shouldBe "letta-msg-301"
         event.runId shouldBe "server-run-real"
         event.content shouldBe "Hello!"
+    }
+
+    @Test
+    fun `iroh reconciled final collapses into synthetic-otid streamed draft even when not a clean prefix`() {
+        // letta-mobile-x1xnl SECOND path. The live Iroh stream lands the
+        // assistant reply as a draft row keyed on the turn-anchored SYNTHETIC
+        // otid (iroh-assistant-<turnId>) minted by IrohStreamDeltaServerFrameMapper
+        // because the wire frames carry no otid. A moment later the SAME reply
+        // arrives again via the message.list reconcile snapshot — this time with
+        // a REAL server otid/id (a different letta-msg-* id than the last rotating
+        // streamed fragment) and the FULL text. The on-device symptom is the first
+        // word lagging on the draft ("Still" strands) so the draft text is NOT a
+        // clean prefix of the reconciled full text — defeating the
+        // startsWith-based prefix replace. Both rows share the SAME real run id, so
+        // the reconcile must collapse the snapshot into the draft row instead of
+        // appending a second, near-identical row.
+        val streamedDraft = reduce(
+            frame = AssistantMessage(
+                // Last rotating backend id observed on the live stream.
+                id = "letta-msg-5021",
+                // Draft is missing the leading word ("Still") — first-word lag.
+                contentRaw = JsonPrimitive(" kicking. Did anything else break?"),
+                runId = "run-real-app-server",
+                otid = "iroh-assistant-turn-42",
+                seqId = 7,
+            ),
+        ).next
+
+        streamedDraft.events shouldHaveSize 1
+
+        val (mergedTimeline, changed) = streamedDraft.mergeServerMessages(
+            listOf(
+                AssistantMessage(
+                    // Reconcile mints its OWN id, distinct from the streamed one.
+                    id = "letta-msg-final-99",
+                    contentRaw = JsonPrimitive("Still kicking. Did anything else break?"),
+                    runId = "run-real-app-server",
+                    otid = null,
+                    seqId = null,
+                )
+            )
+        )
+
+        changed shouldBe 1
+        mergedTimeline.events shouldHaveSize 1
+        val event = mergedTimeline.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Still kicking. Did anything else break?"
+        event.serverId shouldBe "letta-msg-final-99"
+        event.position shouldBe (streamedDraft.events.single() as TimelineEvent.Confirmed).position
     }
 
     @Test
@@ -1318,6 +1541,165 @@ class TimelineStreamReducerTest {
 
         output.next.events shouldHaveSize 5_000
         output.emittedEvents shouldBe emptyList()
+    }
+
+    @Test
+    fun `REAL WIRE rotating per-fragment ids with NULL otid must reduce to one row h30cy`() {
+        // Faithful replay of the ACTUAL Iroh wire shape captured headlessly via
+        // app-server-iroh-probe: a single assistant reply arrives as N stream_delta
+        // fragments, each with a NEW sequential letta-msg id and NO otid (otid=null).
+        // Prior tests hardcoded a shared otid, which the real wire does NOT provide —
+        // that false assumption is why fixes passed tests but duplicated on device.
+        // Cumulative content grows per fragment; all share one real run id.
+        val runId = "run-real-app-server"
+        val fragments = listOf("Hey", "Hey back", "Hey back.", "Hey back. Still", "Hey back. Still here.")
+        var tl = timeline()
+        fragments.forEachIndexed { i, cumulative ->
+            tl = reduce(
+                prev = tl,
+                frame = AssistantMessage(
+                    id = "letta-msg-${1312 + i}", // rotating, +1 per fragment (real wire)
+                    contentRaw = JsonPrimitive(cumulative),
+                    runId = runId,
+                    otid = null, // REAL WIRE: assistant stream_delta carries no otid
+                    seqId = i,
+                ),
+            ).next
+        }
+        // The whole reply must collapse to exactly ONE assistant row with the full text.
+        tl.events shouldHaveSize 1
+        val event = tl.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "Hey back. Still here."
+    }
+
+    @Test
+    fun `REAL reconcile dup ui-msg final with null run collapses into streamed row h30cy`() {
+        // Ground truth (admin message.list): the reconciled FINAL has id==otid==ui-msg-*,
+        // run_id=NULL, and content that is a SUPERSET (or near-equal, first-word-lag
+        // means not byte-identical) of the streamed row. Different otid + null run +
+        // non-exact content defeated every match, so it inserted as a 2nd row.
+        // The streamed row is a live assistant row (synthetic otid, real run).
+        val streamedRow = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799",
+                contentRaw = JsonPrimitive("m Lester, a dedicated test agent"), // first-word-lag: missing "I'"
+                runId = "local-run-30",
+                otid = "provider-assistant-1-abc",
+                seqId = 42,
+            ),
+        ).next
+        // The reconcile snapshot: ui-msg id/otid, NULL run, FULL text.
+        val reconciled = listOf(
+            AssistantMessage(
+                id = "ui-msg-9006572",
+                contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
+                runId = null,
+                otid = "ui-msg-9006572",
+                seqId = null,
+            )
+        )
+        val (afterReconcile, _) = streamedRow.mergeServerMessages(reconciled)
+        val assistantRows = afterReconcile.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, assistantRows.size)
+        assertEquals("I'm Lester, a dedicated test agent", assistantRows.single().content)
+    }
+
+    @Test
+    fun `reconcile ui-msg final collapses even when liveCursor moved off the streamed row h30cy`() {
+        // h30cy RESURFACE: the earlier fix required the match to be the liveCursor
+        // row, but at reconcile time liveCursor has often moved off the streamed
+        // reply (e.g. a later turn started, or it was cleared), so the duplicate
+        // slipped through. The null-run signature is the correct discriminator;
+        // liveCursor must NOT be required.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799", contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent"),
+                runId = "local-run-30", otid = "provider-assistant-1-abc", seqId = 42,
+            ),
+        ).next
+        // liveCursor moves OFF the streamed row (a later user/other event advances it).
+        tl = tl.copy(liveCursor = "some-other-server-id")
+        val reconciled = listOf(
+            AssistantMessage(
+                id = "ui-msg-9006572",
+                contentRaw = JsonPrimitive("I'm Lester, a dedicated test agent for validating mobile"),
+                runId = null, otid = "ui-msg-9006572", seqId = null,
+            )
+        )
+        val (after, _) = tl.mergeServerMessages(reconciled)
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size)
+        assertEquals("I'm Lester, a dedicated test agent for validating mobile", rows.single().content)
+    }
+
+    @Test
+    fun `server double-stores reply as two ui-msg finals both dedupe to one row h30cy`() {
+        // GROUND TRUTH (admin message.list): the App Server persists the reply
+        // TWICE — two ui-msg finals, DIFFERENT ids, SAME content "Hey.", null run.
+        // The streamed row already holds "Hey."; both reconcile copies must dedupe.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-3255", contentRaw = JsonPrimitive("Hey"),
+                runId = "local-run-43", otid = "provider-assistant-1-x", seqId = 22,
+            ),
+        ).next
+        tl = reduce(prev = tl, frame = AssistantMessage(
+            id = "letta-msg-3256", contentRaw = JsonPrimitive("."),
+            runId = "local-run-43", otid = "provider-assistant-1-x", seqId = 23,
+        )).next
+        // streamed row is now "Hey."; reconcile returns TWO identical "Hey." finals.
+        val reconciled = listOf(
+            AssistantMessage(id = "ui-msg-9006596", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-9006596", seqId = null),
+            AssistantMessage(id = "ui-msg-9006598", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-9006598", seqId = null),
+        )
+        val (after, _) = tl.mergeServerMessages(reconciled)
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals("Hey.", rows.single().content)
+    }
+
+    @Test
+    fun `second identical ui-msg final in a LATER reconcile poll still dedupes h30cy`() {
+        // GROUND TRUTH: the server persists the reply twice, 8s apart, so the two
+        // identical "Hey." finals arrive in SEPARATE reconcile polls (not one
+        // batch). streamed row -> poll1 "Hey." dedupes -> poll2 "Hey." (NEW ui-msg
+        // id) must ALSO dedupe, not insert a 2nd row.
+        var tl = reduce(frame = AssistantMessage(id = "letta-msg-1", contentRaw = JsonPrimitive("Hey"), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 1)).next
+        tl = reduce(prev = tl, frame = AssistantMessage(id = "letta-msg-2", contentRaw = JsonPrimitive("."), runId = "local-run-1", otid = "provider-assistant-1-x", seqId = 2)).next
+        // poll 1
+        tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-596", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-596", seqId = null))).first
+        // poll 2 (8s later): a NEW server-persisted identical copy
+        tl = tl.mergeServerMessages(listOf(AssistantMessage(id = "ui-msg-598", contentRaw = JsonPrimitive("Hey."), runId = null, otid = "ui-msg-598", seqId = null))).first
+        val rows = tl.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+    }
+
+    @Test
+    fun `reconcile final does not overwrite an unrelated older reply that is a substring h30cy`() {
+        // #827 review (Major): an OLDER distinct reply whose text is a substring of
+        // the null-run final must NOT be overwritten. Only the STREAMED row (real
+        // run id) being finalized is a valid target.
+        // older distinct reply — seed it as a reconciled null-run row via merge.
+        var tl = Timeline(conversationId = "c").mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-old", contentRaw = JsonPrimitive("Hey"), runId = null, otid = "ui-msg-old", seqId = null)
+        )).first
+        // the actual STREAMED row being finalized (real run id).
+        tl = reduce(prev = tl, frame = AssistantMessage(
+            id = "letta-msg-9", contentRaw = JsonPrimitive("Hey there, how are"),
+            runId = "local-run-9", otid = "provider-assistant-1-z", seqId = 9,
+        )).next
+        // reconcile final "Hey there, how are you?" contains BOTH "Hey" (old) and
+        // the streamed "Hey there, how are". Must replace the STREAMED row only.
+        val (after, _) = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-final", contentRaw = JsonPrimitive("Hey there, how are you?"), runId = null, otid = "ui-msg-final", seqId = null)
+        ))
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        // old "Hey" preserved, streamed row replaced by the full final = 2 rows.
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|"){ it.content })
+        assertEquals("Hey", rows[0].content)
+        assertEquals("Hey there, how are you?", rows[1].content)
     }
 
     private fun reduce(

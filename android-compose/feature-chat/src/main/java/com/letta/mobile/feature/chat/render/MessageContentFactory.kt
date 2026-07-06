@@ -27,6 +27,7 @@ import com.letta.mobile.ui.theme.chatTypography
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import com.letta.mobile.feature.chat.screen.SubagentNotificationCard
+import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import androidx.annotation.VisibleForTesting
 import kotlinx.collections.immutable.toImmutableList
@@ -146,6 +147,14 @@ private fun AssistantResponseText(
     // moment `isStreaming` flips false the height animation collapses
     // mid-catch-up and the bubble flashes back to the smoothed length.
     val effectivelyStreaming = isStreaming || smoothedText != text
+    androidx.compose.runtime.SideEffect {
+        RenderDiagnostics.onDisplayedText(
+            conversationId = "",
+            site = "streaming",
+            serverId = messageId,
+            text = smoothedText,
+        )
+    }
     StreamingMarkdownText(
         text = smoothedText,
         textColor = textColor,
@@ -729,6 +738,14 @@ internal object ToolCallRenderer : MessageContentRenderer {
                         isStreaming = isStreaming,
                     )
                 } else {
+                    androidx.compose.runtime.SideEffect {
+                        RenderDiagnostics.onDisplayedText(
+                            conversationId = "",
+                            site = "final",
+                            serverId = message.id,
+                            text = message.content,
+                        )
+                    }
                     MarkdownText(text = message.content, textColor = textColor)
                 }
             }

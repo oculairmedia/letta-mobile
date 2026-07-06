@@ -2,6 +2,7 @@ package com.letta.mobile.data.health
 
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.SettingsRepository
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -132,9 +133,14 @@ class ServerHealthRepository(
         val baseUrl = config.serverUrl.trim().trimEnd('/')
         // Skip non-HTTP URLs (e.g. iroh://) — they have no HTTP health
         // endpoint and probing them would fail DNS/resolution, marking
-        // a valid transport config as OFFLINE.
-        if (!baseUrl.startsWith("http://", ignoreCase = true) &&
-            !baseUrl.startsWith("https://", ignoreCase = true)) {
+        // a valid transport config as OFFLINE. isIrohUrl() is checked first
+        // (and mirrors the LettaApiClient choke point) because a corrupted
+        // `https://iroh://<ticket>` config startsWith "https://" yet is an Iroh
+        // endpoint — probing it over HTTP would resolve the bogus host and
+        // misclassify a valid Iroh backend as OFFLINE.
+        if (IrohChannelTransport.isIrohUrl(baseUrl) ||
+            (!baseUrl.startsWith("http://", ignoreCase = true) &&
+                !baseUrl.startsWith("https://", ignoreCase = true))) {
             // Non-HTTP transport (e.g. iroh://) — no HTTP health endpoint.
             // Mark ONLINE because the transport itself is valid; the QUIC
             // connection state is the real health signal, not HTTP.

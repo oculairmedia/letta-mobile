@@ -10,6 +10,7 @@ object AdminRpcRegistry {
         "goal.command",
         "agent.list",
         "health.check",
+        "approval.submit",
     )
 
     fun buildRouter(adminBaseUrl: String): AdminRpcRouter {
@@ -27,6 +28,7 @@ object AdminRpcRegistry {
         ToolAdminHandlers.register(router, rpcBase)
         McpAdminHandlers.register(router, rpcBase)
         GoalAdminHandlers.register(router, rpcBase)
+        ApprovalAdminHandlers.register(router, rpcBase)
 
         router.requireNonEmpty()
         val missingMethods = canonicalMethods - router.registeredMethods

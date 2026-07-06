@@ -29,6 +29,7 @@ import com.letta.mobile.cli.commands.SendCommand
 import com.letta.mobile.cli.commands.AppServerServeCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohStubCommand
+import com.letta.mobile.cli.commands.AppServerIrohDeviceGateCommand
 import com.letta.mobile.cli.commands.AppServerIrohProbeCommand
 import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.SetupApplyCommand
@@ -84,6 +85,7 @@ object Main {
                 AppServerServeIrohCommand(),
                 AppServerServeIrohStubCommand(),
                 AppServerIrohProbeCommand(),
+                AppServerIrohDeviceGateCommand(),
                 AppServerSmokeCommand(),
                 StreamCommand(),
             )
@@ -124,6 +126,7 @@ object Main {
           app-server-serve  Launch host letta app-server with optional WS auth.
           app-server-serve-iroh-stub  Hermetic stub app-server over Iroh for probe CI.
           app-server-iroh-probe  Run headless Iroh transport probe scenarios.
+          app-server-iroh-device-gate  Assert on-device Iroh live-stream invariants from logcat + /proc/net/tcp.
           app-server-smoke  Send one turn through a running Letta App Server.
           stream         Direct Letta REST/SSE path for low-level comparison.
 

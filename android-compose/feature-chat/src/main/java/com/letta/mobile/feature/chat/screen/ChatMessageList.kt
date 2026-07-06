@@ -841,6 +841,21 @@ internal fun ChatMessageList(
                         is ChatRenderItem.Single -> "single"
                         is ChatRenderItem.RunBlock -> "runblock"
                     }) {
+                        // letta-mobile-x1xnl render diagnostics (flag-gated).
+                        // Logs each composed key; a key composed twice within one
+                        // render generation is the phantom double-draw.
+                        if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
+                            androidx.compose.runtime.SideEffect {
+                                com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
+                                    conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
+                                    key = renderItem.key,
+                                    contentType = when (renderItem) {
+                                        is ChatRenderItem.Single -> "single"
+                                        is ChatRenderItem.RunBlock -> "runblock"
+                                    },
+                                )
+                            }
+                        }
                         val geometrySignature = renderItem.chatGeometrySignature(
                             state = state,
                             chatMode = chatMode,
