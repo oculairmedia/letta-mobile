@@ -15,7 +15,7 @@ class WsChatBridgeTest {
     @Test
     fun `connection maps transport states without exposing ChannelTransport to consumers`() = runTest {
         val transport = FakeChannelTransport(initialState = ChannelTransportState.Idle)
-        val bridge = WsChatBridge(transport)
+        val bridge = WsChatBridge(transport, injectedShareScope = backgroundScope)
 
         assertEquals(WsConnectionState.Idle, bridge.connection.first())
         assertFalse(bridge.isConnected())
@@ -55,7 +55,7 @@ class WsChatBridgeTest {
     @Test
     fun `awaitConnected resumes with semantic connected state`() = runTest {
         val transport = FakeChannelTransport(initialState = ChannelTransportState.Connecting())
-        val bridge = WsChatBridge(transport)
+        val bridge = WsChatBridge(transport, injectedShareScope = backgroundScope)
 
         val connected = async { bridge.awaitConnected() }
         transport.state.value = ChannelTransportState.Connected(
@@ -75,7 +75,7 @@ class WsChatBridgeTest {
     @Test
     fun `message deltas preserve replay metadata from transport frame events`() = runTest {
         val transport = FakeChannelTransport()
-        val bridge = WsChatBridge(transport)
+        val bridge = WsChatBridge(transport, injectedShareScope = backgroundScope)
         val received = async { bridge.events.first { it is WsTimelineEvent.MessageDelta } as WsTimelineEvent.MessageDelta }
         runCurrent()
 

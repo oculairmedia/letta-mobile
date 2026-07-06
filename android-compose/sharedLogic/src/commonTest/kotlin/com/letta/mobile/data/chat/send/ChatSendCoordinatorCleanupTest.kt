@@ -180,7 +180,7 @@ class ChatSendCoordinatorCleanupTest {
         scope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher()),
         agentId = AGENT_ID,
         activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
-        wsChatBridge = WsChatBridge(transport),
+        wsChatBridge = WsChatBridge(transport, injectedShareScope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher())),
         timelineRepository = timeline,
         conversationRepository = FakeConversationRepository(),
         ui = ui,

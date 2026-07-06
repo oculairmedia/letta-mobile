@@ -12,6 +12,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.mapNotNull
 
 /**
@@ -42,7 +47,13 @@ import kotlinx.coroutines.flow.mapNotNull
  */
 class WsChatBridge(
     private val transport: IChannelTransport,
+    // h30cy: scope used to share the events flow across all coordinator
+    // collectors. Injected so tests can pass their own test scope; production
+    // (DI singleton) passes an app-lifetime SupervisorJob scope.
+    injectedShareScope: CoroutineScope? = null,
 ) {
+    private val shareScope: CoroutineScope =
+        injectedShareScope ?: CoroutineScope(SupervisorJob() + Dispatchers.Default)
     /** Re-export the connection state without forcing callers to know about ChannelTransport. */
     val state: StateFlow<ChannelTransportState> = transport.state
 
@@ -55,7 +66,20 @@ class WsChatBridge(
         .map { state -> (state as ChannelTransportState.Connected).toConnectionState() }
         .first()
 
-    /** High-level event stream tailored for chat consumers. */
+    /** High-level event stream tailored for chat consumers.
+     *
+     * h30cy: shareIn as a HOT flow. This is a GLOBAL flow that EVERY
+     * per-(agentId,conversationId) ChatSendCoordinator collects (see the sfex6
+     * comment in ChatSendCoordinator.handleEvent). As a COLD merge() flow, each of
+     * the N coordinators independently re-ran `transport.frameEvents.mapNotNull`,
+     * so N subscribers attached to the frameEvents SharedFlow at different times
+     * and pulled DIFFERENT subsets of its replay buffer — the authoritative
+     * coordinator dropped ~12-14% of frames (the residual char-drop after the
+     * shadow-holder removal; observed emit=43/reduce=37, 3x gate2.bridgeEvent).
+     * Sharing the flow means ONE upstream collection of frameEvents feeds all
+     * coordinators identically — no per-subscriber replay-cursor divergence, no
+     * multi-collector drop. replay=64 so a coordinator that attaches mid-turn
+     * still receives the opening frames. */
     val events: Flow<WsTimelineEvent> = merge(
         transport.frameEvents.mapNotNull { it.toTimelineEvent() },
         // Surface terminal disconnects as their own event so the
@@ -73,7 +97,7 @@ class WsChatBridge(
                     reconnectAttempt = d.reconnectAttempt,
                 )
             },
-    )
+    ).shareIn(shareScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), replay = 64)
 
     /** A2UI frame stream, kept separate from text/tool timeline events. */
     val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->

@@ -56,13 +56,13 @@ class SelfTodoTimelineExclusionTest {
     )
 
     @Test
-    fun `self-todo frame does not produce a timeline MessageDelta but a real tool call does`() = runTest {
+    fun `self-todo frame does not produce a timeline MessageDelta but a real tool call does`() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeChannelTransport(
             initialState = ChannelTransportState.Connected(
                 serverId = "srv", sessionId = "sess", deviceId = "dev",
             ),
         )
-        val bridge = WsChatBridge(transport)
+        val bridge = WsChatBridge(transport, injectedShareScope = backgroundScope)
 
         val collected = mutableListOf<WsTimelineEvent>()
         val job = launch { bridge.events.toList(collected) }
