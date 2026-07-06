@@ -472,6 +472,35 @@ class TimelineSyncLoopTest {
         )
         scope.coroutineContext.job.cancel()
     }
+
+    @Test
+    fun `duplicate seq frame across two sync loops for same conversation applies once`() = runTest {
+        val conversationId = "conv-shared-dedupe-${Random.nextInt()}"
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val scope = CoroutineScope(dispatcher)
+        val firstLoop = TimelineSyncLoop(MessageApiTimelineTransport(FakeSyncApi()), conversationId, scope)
+        val secondLoop = TimelineSyncLoop(MessageApiTimelineTransport(FakeSyncApi()), conversationId, scope)
+        val duplicateFrame = AssistantMessage(
+            id = "assistant-shared-frame",
+            contentRaw = JsonPrimitive("shared frame"),
+            seqId = 231406,
+        )
+
+        firstLoop.ingestStreamEvent(duplicateFrame, source = "iroh.scoped")
+        secondLoop.ingestStreamEvent(duplicateFrame, source = "iroh.unscoped")
+        advanceUntilIdle()
+
+        val appliedCount = firstLoop.state.value.events.size + secondLoop.state.value.events.size
+        assertEquals(
+            "shared conversation dedupe must collapse aliased loop double-ingest to one reducer application",
+            1,
+            appliedCount,
+        )
+        assertEquals(1, firstLoop.state.value.events.size)
+        assertEquals(0, secondLoop.state.value.events.size)
+        scope.coroutineContext.job.cancel()
+    }
+
     @Test
     fun `submitStreamEvent folds ambient SSE frames through serialized gateway`() = runTest {
         val api = FakeSyncApi()
