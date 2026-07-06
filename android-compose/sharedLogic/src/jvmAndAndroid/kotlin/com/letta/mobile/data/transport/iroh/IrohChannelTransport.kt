@@ -9,6 +9,7 @@ import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.runtime.BackendId
@@ -263,6 +264,14 @@ class IrohChannelTransport(
                     name = "letta-mobile-android-iroh",
                     version = config.clientVersion,
                 ),
+                // h30cy/tooling: Iroh is the app-server transport, and mobile's
+                // default policy is approval-by-default. Starting the runtime in
+                // Standard made every can_use_tool control request surface as an
+                // approval_request_message, blocking tool calls until the user
+                // manually approved. Match the iroh node handler's default
+                // (missing mode -> Unrestricted) and keep approval-required flows
+                // available only when a caller explicitly opts into them later.
+                permissionMode = AppServerPermissionMode.Unrestricted,
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(

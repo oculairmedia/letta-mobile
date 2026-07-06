@@ -86,7 +86,8 @@ class IrohChannelTransportEndToEndTest {
     fun deviceSendOverIrohRoundTripsAssistantResponse() = runBlocking {
         val server = IrohNodeEndpoint(scope = CoroutineScope(SupervisorJob() + Dispatchers.IO))
         server.create()
-        server.start(EchoAssistantController(reply = ASSISTANT_REPLY))
+        val controller = EchoAssistantController(reply = ASSISTANT_REPLY)
+        server.start(controller)
         val ticket = server.ticketString()
 
         val transport = IrohChannelTransport(
@@ -131,6 +132,8 @@ class IrohChannelTransportEndToEndTest {
             }
             collector.cancel()
 
+            assertEquals(AppServerPermissionMode.Unrestricted, controller.lastStartMode)
+
             val assistant = frames.filterIsInstance<ServerFrame.AssistantMessage>()
             assertTrue(assistant.any { it.content.contains(ASSISTANT_REPLY) },
                 "Expected an AssistantMessage containing '$ASSISTANT_REPLY'. Got: ${frames.map { it::class.simpleName }}")
@@ -154,6 +157,8 @@ class IrohChannelTransportEndToEndTest {
      */
     private class EchoAssistantController(private val reply: String) : AppServerController {
         override val state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
+        var lastStartMode: AppServerPermissionMode? = null
+            private set
 
         override suspend fun startRuntime(
             agentId: AgentId,
@@ -162,12 +167,15 @@ class IrohChannelTransportEndToEndTest {
             mode: AppServerPermissionMode?,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = CanonicalRuntime(
-            scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value, actingUserId = null),
-            agent = null,
-            conversation = null,
-            created = null,
-        )
+        ): CanonicalRuntime {
+            lastStartMode = mode
+            return CanonicalRuntime(
+                scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value, actingUserId = null),
+                agent = null,
+                conversation = null,
+                created = null,
+            )
+        }
 
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = flow {
             emit(
