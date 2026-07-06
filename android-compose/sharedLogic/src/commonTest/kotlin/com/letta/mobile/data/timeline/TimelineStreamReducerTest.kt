@@ -533,6 +533,33 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `incremental forward mode still rejects non-forward stale and suffix duplicate frames`() {
+        mergeStreamText(
+            existing = "I'm Lester and still here",
+            incoming = "I'm",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = false,
+            incrementalForwardAppend = true,
+        ) shouldBe StreamTextMergeResult(
+            text = "I'm Lester and still here",
+            branch = StreamTextMergeBranch.STALE,
+            garbleRisk = false,
+        )
+
+        mergeStreamText(
+            existing = "Still debugging now?",
+            incoming = "now?",
+            canUseSnapshotMerge = true,
+            incomingIsForwardDelta = false,
+            incrementalForwardAppend = true,
+        ) shouldBe StreamTextMergeResult(
+            text = "Still debugging now?",
+            branch = StreamTextMergeBranch.SUFFIX_DUPLICATE,
+            garbleRisk = false,
+        )
+    }
+
+    @Test
     fun `stream text merge flags suspicious short appends for diagnostics`() {
         mergeStreamText(
             existing = "The previous assistant text is already long",

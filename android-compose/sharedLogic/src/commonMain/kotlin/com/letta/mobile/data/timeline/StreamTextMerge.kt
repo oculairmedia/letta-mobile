@@ -56,12 +56,35 @@ data class StreamTextMergeResult(
  * suite guards; any near-match there is a coalesced snapshot, not an
  * increment.
  */
+/**
+ * letta-mobile-h30cy (the reducer-side token drop): when the stream delivers
+ * INCREMENTAL single-token deltas (the live Iroh assistant path: each frame is a
+ * new token like "I", "'m", " Lester" under one stable otid, NOT a cumulative
+ * snapshot), a forward token that COINCIDENTALLY equals a prefix of the
+ * accumulated text ("I" after "...bindings).\n\n", where the reply already
+ * starts with "I'm") was misclassified as a STALE prefix-snapshot and DROPPED —
+ * so the streamed row silently lost that character. Downstream, the reconciled
+ * message.list final (the full text) then no longer matched the streamed row as
+ * a prefix/superset, and mergeServerMessages appended it as a DUPLICATE row.
+ *
+ * [incrementalForwardAppend] tells the merge that this stream is incremental
+ * (append-mode), so a genuine FORWARD delta must never be dropped as a STALE
+ * prefix or a SUFFIX duplicate just because its bytes happen to coincide with the
+ * start/end of the accumulated text — those coincidences are new tokens to
+ * append, not re-delivered snapshots. Cumulative growth (incoming.startsWith
+ * existing → CUMULATIVE) and non-forward re-deliveries are unaffected, so the
+ * stable-id cumulative snapshot path (WS) must leave this false.
+ */
 fun mergeStreamText(
     existing: String,
     incoming: String,
     canUseSnapshotMerge: Boolean,
     incomingIsForwardDelta: Boolean = true,
+    incrementalForwardAppend: Boolean = false,
 ): StreamTextMergeResult {
+    // A forward delta in an incremental stream is always new text to append: a
+    // prefix/suffix coincidence must NOT drop it (STALE/SUFFIX_DUPLICATE).
+    val forwardIncrement = incrementalForwardAppend && incomingIsForwardDelta
     // letta-mobile-mvcr4: a forward (higher-seq) snapshot whose body
     // overlaps the existing text by NEARLY all of one side (only differs
     // by the leading or trailing few chars) is a re-tokenized snapshot,
@@ -84,8 +107,8 @@ fun mergeStreamText(
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
         canUseSnapshotMerge && incoming == existing -> StreamTextMergeBranch.EQUAL
         canUseSnapshotMerge && incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
-        canUseSnapshotMerge && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
-        canUseSnapshotMerge && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
+        canUseSnapshotMerge && !forwardIncrement && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
+        canUseSnapshotMerge && !forwardIncrement && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
         // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce
         // to the longer complete text instead of duplicating.
         nearOverlaps -> StreamTextMergeBranch.SNAPSHOT_CONFLICT
