@@ -34,7 +34,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -89,23 +88,7 @@ class IrohChannelTransport(
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
     /** Emit to both event flows so both direct consumers and
-     *  WsChatBridge (via frameEvents) see each frame exactly once.
-     *
-     * letta-mobile-h30cy first-fragment drop — THE ROOT CAUSE, not a buffer size.
-     * SharedFlow.emit does NOT wait for a subscriber; it only fills the replay
-     * buffer. send() emits a turn's opening frames the instant runTurn yields,
-     * which can be BEFORE the reducer's collector (ChatSendCoordinator ->
-     * WsChatBridge -> frameEvents) has finished registering its subscription. Any
-     * frame emitted in that window is delivered to NO live collector (only the
-     * replay buffer), so the first token was lost whenever the buffer was smaller
-     * than the pre-subscription burst — a race a bigger replay only makes rarer,
-     * never impossible (why longer replies could still drop/dup).
-     *
-     * Fix: before emitting a turn's FIRST content frame, suspend until at least
-     * one subscriber is attached to frameEvents. This closes the race
-     * deterministically — no content frame is ever emitted into the void. A small
-     * bounded wait avoids hanging if (unexpectedly) no consumer ever attaches; the
-     * replay buffer still backstops that pathological case. */
+     *  WsChatBridge (via frameEvents) see each frame exactly once. */
     private suspend fun emitBoth(frame: ServerFrame) {
         Telemetry.event(
             "IrohGate", "gate1.emitBoth",
@@ -113,25 +96,11 @@ class IrohChannelTransport(
             "messageId" to frameMessageId(frame),
             "conversationId" to frameConversationId(frame),
         )
-        awaitFrameCollectorReady()
         frameFlowContent(frame)?.let { (key, type, content) ->
             IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
         }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
-    }
-
-    /**
-     * Suspend until a subscriber is attached to the frame flows so the first
-     * emit of a turn is never dropped by the emit-before-subscribe race. Bounded
-     * so a genuinely-consumerless transport cannot hang the send loop; the replay
-     * buffer backstops that case.
-     */
-    private suspend fun awaitFrameCollectorReady() {
-        if (_frameEvents.subscriptionCount.value > 0) return
-        withTimeoutOrNull(COLLECTOR_READY_TIMEOUT_MS) {
-            _frameEvents.subscriptionCount.first { it > 0 }
-        }
     }
 
     /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
@@ -784,10 +753,6 @@ class IrohChannelTransport(
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
-        // h30cy first-fragment drop: bounded wait for the reducer's collector to
-        // attach before the first frame emit, so no content frame is dropped by
-        // the emit-before-subscribe race. Backstopped by the replay buffer.
-        internal const val COLLECTOR_READY_TIMEOUT_MS = 2_000L
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it
