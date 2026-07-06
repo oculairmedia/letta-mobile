@@ -56,15 +56,6 @@ class TimelineSyncLoop(
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
-    private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
-    private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
-    
-    private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
-        conversationId = conversationId,
-        scope = loopScope,
-        frames = holderFramesIn.asSharedFlow(),
-        hydrationSeed = holderHydrationSeed,
-    )
 
     private val ingestNotificationDispatcher = TimelineIngestNotificationDispatcher(
         conversationId = conversationId,
@@ -83,8 +74,6 @@ class TimelineSyncLoop(
         conversationCursorStore = conversationCursorStore,
         loopScope = loopScope,
         ingestNotificationDispatcher = ingestNotificationDispatcher,
-        holderFramesIn = holderFramesIn,
-        getHolderEventCount = { holder.state.value.events.size }
     )
 
     private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
@@ -105,7 +94,6 @@ class TimelineSyncLoop(
         writeMutex = writeMutex,
         state = _state,
         events = _events,
-        holderHydrationSeed = holderHydrationSeed
     )
 
     private val outboundSendProcessor = TimelineOutboundSendProcessor(

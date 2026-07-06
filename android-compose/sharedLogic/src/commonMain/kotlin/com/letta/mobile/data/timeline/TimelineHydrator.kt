@@ -17,7 +17,6 @@ internal class TimelineHydrator(
     private val writeMutex: Mutex,
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
-    private val holderHydrationSeed: MutableStateFlow<Timeline>,
 ) {
     suspend fun hydrate(
         limit: Int = 50,
@@ -72,7 +71,6 @@ internal class TimelineHydrator(
                     diskRecords = diskRecords,
                 ).also { result ->
                     state.value = result.timeline
-                    holderHydrationSeed.value = result.timeline
                 }
             }
             if (recordConversationCursor && hydrateEndSeq != null) {
