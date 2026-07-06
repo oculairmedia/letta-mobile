@@ -82,6 +82,11 @@ class IrohChannelTransport(
     // idempotency guard makes any replayed frame to an already-live collector a
     // no-op, and per-turn frames push old ones out of the buffer, so there is no
     // cross-turn stale-replay hazard.
+    // h30cy: reshape incremental/rotating-id Iroh assistant frames into WS-shaped
+    // cumulative/stable-cm-stream-id frames so the reducer treats Iroh like WS and
+    // inherits its drop-resilience. Per-transport-instance (per-connection) state.
+    private val assistantAccumulator = IrohAssistantAccumulator()
+
     private val _events = MutableSharedFlow<ServerFrame>(replay = 64, extraBufferCapacity = 64)
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
@@ -102,38 +107,18 @@ class IrohChannelTransport(
         // now that stream dedupe is SHARED across loop instances
         // (TimelineStreamDedupeRegistry) — if the wait lets a second aliased
         // subscriber also ingest, the shared seq-dedup drops the duplicate instead
-        // of stranding a second row (the regression that reverted the earlier gate).
-        awaitFrameCollectorReady()
+        // h30cy: the awaitFrameCollectorReady subscribe-gate was REMOVED. It was
+        // meant to close the first-fragment emit-before-subscribe race, but it
+        // introduced new edge cases (a turn hang, a head double-delivery) when
+        // combined with the Eagerly shareIn on WsChatBridge.events. Simpler is
+        // better: the Eagerly-shared bridge keeps ONE upstream permanently
+        // subscribed to _frameEvents, so replay=64 alone deterministically
+        // backstops any collector that attaches a beat late — no gate, no hang.
         frameFlowContent(frame)?.let { (key, type, content) ->
             IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
         }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
-    }
-
-    // h30cy: one-shot readiness latch. Once a subscriber has ever been observed
-    // (or the bounded wait elapses once), never wait again — so the gate adds at
-    // most one short wait for the very first frame, never per-frame, and cannot
-    // repeatedly block a consumerless transport (e.g. a unit test that emits
-    // without collecting).
-    @Volatile private var frameCollectorConfirmed = false
-
-    /** Bounded ONE-TIME wait until a frame-flow subscriber is attached, so the
-     *  first emit is not lost to the emit-before-subscribe race. Replay backstops
-     *  the pathological no-consumer case; the latch guarantees we wait at most
-     *  once. */
-    private suspend fun awaitFrameCollectorReady() {
-        if (frameCollectorConfirmed) return
-        if (_frameEvents.subscriptionCount.value > 0) {
-            frameCollectorConfirmed = true
-            return
-        }
-        withTimeoutOrNull(COLLECTOR_READY_TIMEOUT_MS) {
-            _frameEvents.subscriptionCount.first { it > 0 }
-        }
-        // Either a subscriber attached or the bounded wait elapsed — in both
-        // cases stop gating further frames (replay covers the elapsed case).
-        frameCollectorConfirmed = true
     }
 
     /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
@@ -506,14 +491,16 @@ class IrohChannelTransport(
             emptyList()
         }
         return promotionFrames + when (val payload = draft.payload) {
-            is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
-                payload = payload,
-                context = IrohStreamDeltaServerFrameMapper.Context(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    runId = effectiveRunId,
-                    timestamp = nowIso(),
+            is RuntimeEventPayload.RemoteStreamFrame -> assistantAccumulator.normalize(
+                IrohStreamDeltaServerFrameMapper.map(
+                    payload = payload,
+                    context = IrohStreamDeltaServerFrameMapper.Context(
+                        agentId = agentId,
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = effectiveRunId,
+                        timestamp = nowIso(),
+                    ),
                 ),
             )
             // Non-chat App Server frames (update_device_status, update_queue,
@@ -786,7 +773,6 @@ class IrohChannelTransport(
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
-        internal const val COLLECTOR_READY_TIMEOUT_MS = 750L
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it
