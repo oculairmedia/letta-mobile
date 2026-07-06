@@ -97,7 +97,7 @@ class WsChatBridge(
                     reconnectAttempt = d.reconnectAttempt,
                 )
             },
-    ).shareIn(shareScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), replay = 64)
+    ).shareIn(shareScope, SharingStarted.Eagerly, replay = 64)
 
     /** A2UI frame stream, kept separate from text/tool timeline events. */
     val a2uiEvents: Flow<A2uiFrameEvent> = transport.events.mapNotNull { frame ->
