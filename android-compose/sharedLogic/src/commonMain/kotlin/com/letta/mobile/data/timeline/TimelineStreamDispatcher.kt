@@ -35,7 +35,7 @@ internal class TimelineStreamDispatcher(
     // work. Sample it instead so parity stays observable without the spam.
     private var dispatchCount = 0
 
-    suspend fun dispatch(message: LettaMessage) {
+    suspend fun dispatch(message: LettaMessage, source: String = "unknown") {
         val notification = ingestStreamEvent(
             message = message,
             writeMutex = writeMutex,
@@ -44,6 +44,7 @@ internal class TimelineStreamDispatcher(
             pendingToolReturnsByCallId = pendingToolReturnsByCallId,
             conversationId = conversationId,
             conversationCursorStore = conversationCursorStore,
+            source = source,
         )
         if (notification != null) {
             loopScope.launch { ingestNotificationDispatcher.dispatch(notification) }

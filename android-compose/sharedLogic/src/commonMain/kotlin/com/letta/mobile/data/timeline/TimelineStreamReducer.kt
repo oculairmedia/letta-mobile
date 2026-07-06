@@ -13,6 +13,7 @@ data class TimelineReducerInput(
     val prev: Timeline,
     val frame: LettaMessage,
     val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
+    val source: String = "unknown",
 )
 
 data class TimelineReducerOutput(
@@ -35,10 +36,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     if (com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.enabled()) {
         when (message) {
             is AssistantMessage -> com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record(
-                "gate.reduceIngest", message.otid ?: message.id, "assistant_message", message.content,
+                "gate.reduceIngest.${input.source}", message.otid ?: message.id, "assistant_message", message.content,
             )
             is ReasoningMessage -> com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record(
-                "gate.reduceIngest", message.otid ?: message.id, "reasoning_message", message.reasoning,
+                "gate.reduceIngest.${input.source}", message.otid ?: message.id, "reasoning_message", message.reasoning,
             )
             else -> Unit
         }
