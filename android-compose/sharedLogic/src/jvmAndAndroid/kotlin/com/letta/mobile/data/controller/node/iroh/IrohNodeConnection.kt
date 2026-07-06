@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -14,6 +15,11 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.ToolApprovalDecision
+import com.letta.mobile.runtime.ToolApprovalDecisionValue
+import com.letta.mobile.runtime.ToolApprovalId
+import com.letta.mobile.runtime.ToolApprovalScope
+import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.BiStream
@@ -446,14 +452,51 @@ class IrohNodeConnection(
         streamSend: SendStream,
     ) {
         val input = AppServerProtocol.json.decodeFromString(AppServerCommand.serializer(), frameJson) as AppServerCommand.Input
-        val userMsg = (input.payload as? AppServerInputPayload.CreateMessage)
-            ?.messages
-            ?.firstOrNull { it.role == "user" }
-        val contentParts = userMsg?.content as? kotlinx.serialization.json.JsonArray
-        val text = userMsg?.content
-            ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
-            ?: ""
-        val clientMsgId = userMsg?.clientMessageId
+        val (turnInput, clientMsgId) = when (val payload = input.payload) {
+            is AppServerInputPayload.CreateMessage -> {
+                val userMsg = payload.messages.firstOrNull { it.role == "user" }
+                val contentParts = userMsg?.content as? kotlinx.serialization.json.JsonArray
+                val text = userMsg?.content
+                    ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
+                    ?: ""
+                TurnInput.UserMessage(
+                    localMessageId = userMsg?.clientMessageId ?: "iroh-${UUID.randomUUID()}",
+                    text = text,
+                    contentPartsJson = contentParts?.toString(),
+                ) to userMsg?.clientMessageId
+            }
+            is AppServerInputPayload.ApprovalResponse -> {
+                val decision = when (payload.decision) {
+                    is AppServerApprovalResponseDecision.Deny -> ToolApprovalDecisionValue.Denied
+                    else -> ToolApprovalDecisionValue.Approved
+                }
+                val response = when (val wireDecision = payload.decision) {
+                    is AppServerApprovalResponseDecision.Allow -> wireDecision.message
+                    is AppServerApprovalResponseDecision.Deny -> wireDecision.message
+                    null -> payload.error
+                }
+                Telemetry.event(
+                    "IrohNode", "input.approval_response",
+                    "requestId" to payload.requestId,
+                    "decision" to decision.name,
+                    "agentId" to input.runtime.agentId,
+                    "conversationId" to input.runtime.conversationId,
+                )
+                TurnInput.ToolApprovalResponse(
+                    decision = ToolApprovalDecision(
+                        approvalId = ToolApprovalId(payload.requestId),
+                        // AppServer ApprovalResponse frames key by request id; the
+                        // runtime path only needs approvalId to continue. Use the
+                        // request id as a stable call-id fallback because the wire
+                        // response does not carry tool_call_id.
+                        callId = ToolCallId(payload.requestId),
+                        decision = decision,
+                        scope = ToolApprovalScope.Once,
+                        response = response,
+                    ),
+                ) to null
+            }
+        }
         if (clientMsgId != null && !clientMessageDedupe.markHandled(clientMsgId)) {
             // Duplicate re-delivery (typically a redial re-send). If the previous
             // connection died before delivering this turn's terminal we parked
@@ -492,11 +535,7 @@ class IrohNodeConnection(
             runtimeId = RuntimeId("iroh-node:${input.runtime.agentId}:${input.runtime.conversationId}"),
             agentId = AgentId(input.runtime.agentId),
             conversationId = ConversationId(input.runtime.conversationId),
-            input = TurnInput.UserMessage(
-                localMessageId = clientMsgId ?: "iroh-${UUID.randomUUID()}",
-                text = text,
-                contentPartsJson = contentParts?.toString(),
-            ),
+            input = turnInput,
         )
         var terminalWritten = false
         // Tracks tool_calls opened but not yet returned so failure/abort can
