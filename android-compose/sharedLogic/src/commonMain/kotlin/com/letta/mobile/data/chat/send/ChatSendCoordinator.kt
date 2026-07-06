@@ -677,15 +677,14 @@ class ChatSendCoordinator(
     private fun bridgeEventKey(event: WsTimelineEvent): String? = when (event) {
         is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}"
         is WsTimelineEvent.MessageDelta -> {
-            // h30cy: SEQ-ONLY dedup key. A CONTENT-based key (the old
-            // messageContentForDedupe) dropped legitimate incremental Iroh tokens
-            // whose bytes coincidentally repeat (two ",", repeated words) as
-            // "duplicates" — the residual ~12-14% frame drop after shareIn
-            // (gate2=66 -> gate3=53). Only dedup a MessageDelta that carries a real
-            // non-negative seqId (which uniquely identifies frame position);
-            // seq-less incremental frames are NEVER content-deduped (identical
-            // content can be a legitimate repeated token, not a resend). Same rule
-            // as the reducer's streamMessageKey.
+            // h30cy: SEQ-ONLY dedup key. The old CONTENT-based key dropped
+            // legitimate incremental Iroh tokens whose bytes coincidentally repeat
+            // (two ",", repeated words) as "duplicates" — the residual ~12-14%
+            // frame drop after shareIn (gate2=66 -> gate3=53). Only dedup a
+            // MessageDelta that carries a real non-negative seqId (which uniquely
+            // identifies frame position); seq-less incremental frames are NEVER
+            // content-deduped (identical content can be a legitimate repeated token,
+            // not a resend). Same rule as the reducer's streamMessageKey.
             val message = event.message
             val seqId = message.seqId
             if (seqId != null && seqId >= 0) {
@@ -701,16 +700,6 @@ class ChatSendCoordinator(
         is WsTimelineEvent.Error -> "error|${event.conversationId.orEmpty()}|${event.turnId.orEmpty()}|${event.runId.orEmpty()}|${event.code}|${event.message}"
         is WsTimelineEvent.UserActionOutcome -> "action|${event.frameId}|${event.actionId.orEmpty()}|${event.outcome}|${event.reason.orEmpty()}"
         else -> null
-    }
-
-    private fun messageContentForDedupe(message: LettaMessage): String = when (message) {
-        is AssistantMessage -> message.content
-        is UserMessage -> message.content
-        is SystemMessage -> message.content
-        is ReasoningMessage -> message.reasoning
-        is ToolCallMessage -> message.effectiveToolCalls.joinToString(separator = "|") { it.effectiveId + ":" + (it.name ?: "") }
-        is ToolReturnMessage -> message.toolCallId.orEmpty() + ":" + message.toolReturn.funcResponse.orEmpty()
-        else -> message.date.orEmpty() + ":" + message.seqId.toString()
     }
 
     private fun rememberActiveAssistantMessageRunId(message: LettaMessage) {
