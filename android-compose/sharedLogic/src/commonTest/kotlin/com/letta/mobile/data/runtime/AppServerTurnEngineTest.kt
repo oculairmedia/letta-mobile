@@ -109,6 +109,52 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun unrestrictedRuntimeAutoApprovesStreamedApprovalRequestMessagesWithoutEmittingCards() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            permissionMode = AppServerPermissionMode.Unrestricted,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerInputPayload.CreateMessage>(assertIs<AppServerCommand.Input>(client.sentCommands.single()).payload)
+
+            val approvalDelta = buildJsonObject {
+                put("message_type", "approval_request_message")
+                put("id", "approval-1")
+                put("run_id", "run-1")
+                put("tool_call", buildJsonObject {
+                    put("tool_call_id", "tool-call-1")
+                    put("name", "Skill")
+                    put("arguments", "{}")
+                })
+            }
+            client.emit(
+                AppServerInboundFrame.StreamDelta(
+                    runtime = runtime,
+                    eventSeq = 1,
+                    emittedAt = "2026-06-24T00:00:00Z",
+                    idempotencyKey = "approval-evt-1",
+                    delta = approvalDelta,
+                ),
+            )
+            runCurrent()
+
+            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
+            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
+            assertEquals("approval-1", approval.requestId)
+            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            expectNoEvents()
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+    }
+
+    @Test
     fun runTurnPreservesMultimodalContentParts() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)
@@ -270,6 +316,9 @@ private class FakeAppServerClient : AppServerClient {
                 raw = buildJsonObject {
                     put("type", frame.type ?: "unknown")
                     put("idempotency_key", "evt-1")
+                    if (frame is AppServerInboundFrame.StreamDelta) {
+                        put("delta", frame.delta)
+                    }
                 },
             ),
         )
