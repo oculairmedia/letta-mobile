@@ -41,6 +41,40 @@ class IrohExternalTransportDuplicateIngestTest {
         loop.close()
     }
 
+    @Test
+    fun seq_less_incremental_repeated_tokens_are_not_deduped() = runTest {
+        val loop = TimelineSyncLoop(
+            messageApi = EmptyTimelineTransport,
+            conversationId = "conv-mermaid",
+            scope = this,
+            pendingLocalStore = NoOpPendingLocalStore,
+            conversationCursorStore = NoOpConversationCursorStore,
+            startStreamSubscriber = false,
+        )
+        val tokens = listOf("A", "[", "L", "L", "M", " ", " ", "snapshots", "]")
+
+        tokens.forEach { token ->
+            loop.ingestStreamEvent(
+                AssistantMessage(
+                    id = "reply-mermaid",
+                    contentRaw = JsonPrimitive(token),
+                    runId = "run-mermaid",
+                    otid = "mermaid-otid",
+                    seqId = null,
+                ),
+                source = "coordinator",
+            )
+        }
+
+        val assistantRows = loop.state.value.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+
+        assertEquals(1, assistantRows.size)
+        assertEquals("A[LLM  snapshots]", assistantRows.single().content)
+        loop.close()
+    }
+
     private object EmptyTimelineTransport : TimelineTransport {
         override suspend fun sendConversationMessage(
             conversationId: String,

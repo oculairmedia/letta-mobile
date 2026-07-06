@@ -1,11 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.Telemetry
-import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ReasoningMessage
-import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -400,15 +397,10 @@ class TimelineSyncLoop(
 
     private fun streamMessageKey(message: LettaMessage): String? {
         val seqId = message.seqId
-        if (seqId != null && seqId >= 0) {
-            return "seq|$seqId|${message.messageType}|${message.id}"
-        }
-        return when (message) {
-            is AssistantMessage -> "assistant|${message.runId.orEmpty()}|${message.otid ?: message.id}|${message.content}"
-            is ReasoningMessage -> "reasoning|${message.runId.orEmpty()}|${message.otid ?: message.id}|${message.reasoning}"
-            is ToolCallMessage -> "toolcall|${message.runId.orEmpty()}|${message.id}|${message.effectiveToolCalls.joinToString("|") { it.effectiveId + ":" + (it.name ?: "") }}"
-            is ToolReturnMessage -> "toolreturn|${message.runId.orEmpty()}|${message.id}|${message.toolCallId.orEmpty()}|${message.toolReturn.funcResponse.orEmpty()}"
-            else -> null
+        return if (seqId != null && seqId >= 0) {
+            "seq|$seqId|${message.messageType}|${message.id}"
+        } else {
+            null
         }
     }
 
