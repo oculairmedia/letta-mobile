@@ -245,7 +245,70 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
-    if (timeline.findByOtid(confirmed.otid) != null) {
+    val otidMatch = timeline.findByOtid(confirmed.otid) as? TimelineEvent.Confirmed
+    if (otidMatch != null) {
+        // letta-mobile: the App Server streams CUMULATIVE assistant deltas — each
+        // chunk carries the full text so far. Over Iroh the server mints a NEW
+        // backend `letta-msg-*` id per chunk (unlike the WS path, where the id is
+        // stable), so findByServerId misses and each fuller cumulative snapshot
+        // would otherwise be DROPPED here as an otid duplicate — leaving the UI
+        // stuck on the first fragment ("Got" instead of the full reply). When the
+        // otid-matched row is an assistant message and the incoming frame is a
+        // fuller cumulative snapshot of the SAME otid, merge the newer text into
+        // the existing row (keyed by the row's stable serverId) instead of
+        // dropping it. Distinct assistant messages carry distinct otids, so
+        // tool-mediated multi-assistant runs stay separate.
+        val bothAssistant = otidMatch.messageType == TimelineMessageType.ASSISTANT &&
+            confirmed.messageType == TimelineMessageType.ASSISTANT
+        val merge = if (bothAssistant) {
+            // Same-otid assistant frames are ALWAYS cumulative snapshots (each
+            // chunk carries the full text so far). Codex review P2: when seq
+            // ids are absent (both nullable on the wire), the old
+            // canUseSnapshotMerge=false path fell through to APPEND, turning
+            // "Got" + "Got it" into "GotGot it". Because same-otid frames are
+            // cumulative by contract, snapshot-merge is always safe here — the
+            // longer/equal text wins, never concatenation.
+            mergeStreamText(
+                existing = otidMatch.content,
+                incoming = confirmed.content,
+                canUseSnapshotMerge = true,
+                incomingIsForwardDelta = otidMatch.seqId == null || confirmed.seqId == null ||
+                    confirmed.seqId > otidMatch.seqId,
+            )
+        } else {
+            null
+        }
+        if (merge != null && merge.text != otidMatch.content) {
+            val merged = otidMatch.copy(
+                content = merge.text,
+                seqId = latestSeqId(otidMatch.seqId, confirmed.seqId),
+                // Codex review P2: per-chunk backend ids route through this otid
+                // path, so the serverId-merge run-id promotion above never runs.
+                // Adopt the incoming frame's real run id when it supersedes a
+                // synthetic iroh-run-* id, so run-scoped grouping/collapse keys
+                // on the real run id.
+                runId = promoteRunId(otidMatch.runId, confirmed.runId),
+            )
+            timeline = timeline.replaceByServerId(merged)
+            // Keep the row's stable serverId as identity, but advance liveCursor
+            // to the just-ingested chunk id (codex review P2): reconcile uses
+            // liveCursor as the `after` cursor, so leaving it on the first chunk
+            // could make a long reply's reconcile miss later messages.
+            timeline = timeline.copy(liveCursor = confirmed.serverId)
+            pendingEvents += TimelineSyncEvent.StreamEventIngested(otidMatch.serverId, message.messageType)
+            hotPathTelemetry(
+                "streamSubscriber.otidCumulativeMerged",
+                "otid" to confirmed.otid,
+                "serverId" to otidMatch.serverId,
+                "incomingServerId" to confirmed.serverId,
+                "oldLen" to otidMatch.content.length,
+                "newLen" to confirmed.content.length,
+                "mergedLen" to merge.text.length,
+                "mergeBranch" to merge.branch.name,
+                "conversationId" to conversationId,
+            )
+            return output()
+        }
         hotPathTelemetry(
             "streamSubscriber.eventDeduped",
             "reason" to "otidSeen",
@@ -274,6 +337,101 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             "runId" to (confirmed.runId ?: "<null>"),
             "incomingLen" to confirmed.content.length,
             "existingLen" to prefixOrphanTarget.content.length,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
+    // letta-mobile-x1xnl: one-row-per-otid invariant. The App Server streams
+    // assistant deltas with a NEW backend letta-msg-* id per chunk but a STABLE
+    // otid. If — through a fanout/timing race — an increment reaches the append
+    // path while a row for this otid already exists (the earlier findByOtid
+    // merge above having been bypassed on a prior racing frame), appending would
+    // create a SECOND assistant row for the same message that the user sees as a
+    // stranded duplicate. Never let that happen: if a confirmed assistant row
+    // already carries this otid, merge into it (keyed by its stable serverId)
+    // instead of appending a new row. Distinct assistant messages carry distinct
+    // otids, so tool-mediated multi-assistant runs stay separate.
+    val otidRow = confirmed.otid
+        .takeIf { it.isNotBlank() && confirmed.messageType == TimelineMessageType.ASSISTANT }
+        ?.let { otid ->
+            timeline.events.firstOrNull { ev ->
+                ev is TimelineEvent.Confirmed &&
+                    ev.messageType == TimelineMessageType.ASSISTANT &&
+                    ev.otid == otid
+            } as? TimelineEvent.Confirmed
+        }
+    if (otidRow != null) {
+        val merge = mergeStreamText(
+            existing = otidRow.content,
+            incoming = confirmed.content,
+            canUseSnapshotMerge = otidRow.seqId != null && confirmed.seqId != null,
+            incomingIsForwardDelta = otidRow.seqId == null || confirmed.seqId == null ||
+                confirmed.seqId > otidRow.seqId,
+        )
+        val merged = otidRow.copy(
+            content = merge.text,
+            seqId = latestSeqId(otidRow.seqId, confirmed.seqId),
+        )
+        timeline = timeline.replaceByServerId(merged)
+        timeline = timeline.copy(liveCursor = otidRow.serverId)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(otidRow.serverId, message.messageType)
+        hotPathTelemetry(
+            "streamSubscriber.otidAppendMerged",
+            "otid" to confirmed.otid,
+            "serverId" to otidRow.serverId,
+            "incomingServerId" to confirmed.serverId,
+            "mergedLen" to merge.text.length,
+            "mergeBranch" to merge.branch.name,
+            "conversationId" to conversationId,
+        )
+        return output()
+    }
+
+    // letta-mobile-h30cy: real-wire forward-GROWTH merge. The App Server streams
+    // assistant deltas with a NEW sequential letta-msg id per fragment AND NO otid
+    // (captured live via app-server-iroh-probe: one reply = N fragments, ids
+    // letta-msg-1312..1334, otid=null, content grows monotonically). serverId
+    // rotates so findByServerId misses; otid is null so the otidRow merge misses;
+    // the same-run prefix target only catches REPLAY prefixes (existing longer).
+    // So each cumulative fragment appends → N rows = the on-device duplicate.
+    //
+    // Merge ONLY on STRICT forward growth: the immediately-preceding (last) event
+    // is a same-run assistant row AND the incoming content EXTENDS it
+    // (incoming.startsWith(existing) && incoming strictly longer). This excludes:
+    //   • post-tool continuations — those START a new message ("Y" after a longer
+    //     prior assistant), where incoming is SHORTER, so existing.startsWith(incoming)
+    //     not incoming.startsWith(existing) → not a forward growth → not merged.
+    //   • distinct same-run assistant messages — no forward-prefix relationship.
+    val liveAssistant = (timeline.events.lastOrNull() as? TimelineEvent.Confirmed)
+        ?.takeIf { it.messageType == TimelineMessageType.ASSISTANT }
+    val isForwardGrowthFragment = liveAssistant != null &&
+        confirmed.messageType == TimelineMessageType.ASSISTANT &&
+        liveAssistant.serverId != confirmed.serverId &&
+        confirmed.runId?.takeIf { it.isNotBlank() }?.let { inRun ->
+            liveAssistant.runId?.takeIf { it.isNotBlank() }
+                ?.isCompatibleAssistantPrefixRunId(inRun) == true
+        } == true &&
+        run {
+            val existing = liveAssistant.content.trim()
+            val incoming = confirmed.content.trim()
+            existing.isNotEmpty() && incoming.length > existing.length && incoming.startsWith(existing)
+        }
+    if (isForwardGrowthFragment && liveAssistant != null) {
+        val merged = liveAssistant.copy(
+            content = confirmed.content,
+            runId = promoteRunId(liveAssistant.runId, confirmed.runId),
+            seqId = latestSeqId(liveAssistant.seqId, confirmed.seqId),
+        )
+        timeline = timeline.replaceByServerId(merged)
+        timeline = timeline.copy(liveCursor = liveAssistant.serverId)
+        pendingEvents += TimelineSyncEvent.StreamEventIngested(liveAssistant.serverId, message.messageType)
+        hotPathTelemetry(
+            "streamSubscriber.forwardGrowthMerged",
+            "serverId" to liveAssistant.serverId,
+            "incomingServerId" to confirmed.serverId,
+            "runId" to (confirmed.runId ?: "<null>"),
+            "mergedLen" to confirmed.content.length,
             "conversationId" to conversationId,
         )
         return output()
@@ -342,6 +500,24 @@ private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
     runId?.takeIf { it.isNotBlank() }?.isIrohSyntheticRunId() == true
 
 private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
+
+/**
+ * When an otid-matched cumulative chunk arrives carrying the real server run
+ * id after the row was created under a synthetic `iroh-run-*` id, adopt the
+ * real id so run-scoped grouping/collapse keys on it. Otherwise keep the
+ * existing id (never regress a real id back to a synthetic one, and never
+ * clobber with a blank incoming id).
+ */
+private fun promoteRunId(existing: String?, incoming: String?): String? {
+    val existingRunId = existing?.takeIf { it.isNotBlank() }
+    val incomingRunId = incoming?.takeIf { it.isNotBlank() } ?: return existingRunId
+    if (existingRunId == null) return incomingRunId
+    return if (existingRunId.isIrohSyntheticRunId() && !incomingRunId.isIrohSyntheticRunId()) {
+        incomingRunId
+    } else {
+        existingRunId
+    }
+}
 
 private fun String?.isCompatibleAssistantPrefixRunId(other: String): Boolean {
     val thisRunId = this?.takeIf { it.isNotBlank() } ?: return false

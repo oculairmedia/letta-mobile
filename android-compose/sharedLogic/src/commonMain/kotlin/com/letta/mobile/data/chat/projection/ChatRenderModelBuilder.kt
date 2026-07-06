@@ -58,7 +58,12 @@ fun buildChatRenderModel(
 
     val reversed = dedupeGroupedMessagesForLazyKeys(groupedMessages).asReversed()
 
-    val renderItems = groupMessagesForRender(reversed)
+    // letta-mobile-x1xnl: collapse the streaming-RunBlock vs reconciled-final-
+    // Single duplicate (same run, adjacent, different server ids) here in the
+    // single common chokepoint so EVERY caller — incremental cache, desktop's
+    // buildDesktopChatRenderItems, and any other direct render path — is covered
+    // (#824 review P2).
+    val renderItems = deduplicateRenderItemsByMessageId(groupMessagesForRender(reversed))
 
     return ChatRenderModel(
         visibleMessages = visibleMessages,
@@ -105,7 +110,15 @@ class IncrementalChatRenderItemsCache {
             // already holds one. Two identical keys crash the LazyColumn
             // ("Key was already used"). Re-run the global key de-dupe across
             // the joined list so the boundary can never produce a collision.
-            val next = deduplicateRenderKeys(tailRenderItems + committedRenderItems)
+            // letta-mobile-x1xnl: collapse a turn that appears as a RunBlock in
+            // one half and a standalone Single (a reconciled final with a
+            // DIFFERENT server id but the SAME runId) in the other, before the
+            // key-level dedup — otherwise the two DIFFERENT keys both render as a
+            // stranded duplicate. Then run the key dedup for remaining same-key
+            // collisions.
+            val next = deduplicateRenderKeys(
+                deduplicateRenderItemsByMessageId(tailRenderItems + committedRenderItems),
+            )
             cachedMode = mode
             previousMessages = messages
             previousTailStartIndex = tailStartIndex
@@ -148,6 +161,8 @@ class IncrementalChatRenderItemsCache {
         mode: ChatDisplayMode,
         tailStartIndex: Int,
     ): List<ChatRenderItem> {
+        // buildChatRenderModel already applies deduplicateRenderItemsByMessageId
+        // internally (single chokepoint), so no extra wrap needed here.
         val full = buildChatRenderModel(messages, mode).renderItems
         committedRenderItems = if (tailStartIndex > 0) {
             buildChatRenderModel(

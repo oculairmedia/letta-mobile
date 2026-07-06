@@ -36,8 +36,6 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.session.SessionManager
-import com.letta.mobile.data.timeline.DeliveryState
-import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
@@ -75,8 +73,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.async
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
@@ -160,19 +156,6 @@ internal class AdminChatViewModel @Inject constructor(
 ) : ViewModel() {
     companion object {
         private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
-        private const val IROH_RECENT_RECONCILE_INTERVAL_MS = 1_500L
-        private const val IROH_RECENT_RECONCILE_ATTEMPTS = 40
-        // letta-mobile-b6vxb: when the iroh reconcile loop sees the same
-        // server message count (appended=0) for this many consecutive
-        // attempts, the live stream dropped the terminal TurnDone and
-        // the previous turn is wedged (isStreaming=true forever,
-        // ChatSendCoordinator.activeTurn lock held until the 5min idle
-        // watchdog). Force-clear UI streaming state and mark the
-        // optimistic local as failed so the user can compose + send
-        // again. The AppServerTurnEngine idle watchdog still owns the
-        // activeTurn lock release — a fresh send hitting engineBusy
-        // is far less broken than a permanently stuck composer.
-        private const val IROH_RECENT_RECONCILE_STALL_THRESHOLD = 5
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
         private const val TAG = "AdminChatViewModel"
     }
@@ -899,168 +882,20 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun removeAttachment(index: Int) = composerCoordinator.removeAttachment(index)
 
-    private var irohRecentReconcileJob: Job? = null
-
     private fun startTimelineObserver(conversationId: String) {
         adminChatA2uiCoordinator.ensureA2uiConversation(conversationId)
         chatTimelineObserver.start(agentId.value, conversationId)
-        startIrohRecentReconcileLoop(conversationId)
-    }
-
-    private fun startIrohRecentReconcileLoop(conversationId: String) {
-        irohRecentReconcileJob?.cancel()
-        val serverUrl = settingsRepository.activeConfig.value?.serverUrl.orEmpty()
-            .trimStart()
-            .removePrefix("https://")
-            .removePrefix("http://")
-        if (!serverUrl.startsWith("iroh://")) return
-        irohRecentReconcileJob = viewModelScope.launch {
-            var consecutiveNoProgress = 0
-            // letta-mobile-b6vxb (codex P1 / CodeRabbit Major): only arm
-            // the stall detector while a turn is actually in flight on
-            // the UI. An idle chat will naturally see appended=0 forever,
-            // and we must not flash a false "Connection stalled" banner
-            // on a chat the user isn't even sending into. Set this the
-            // first time we observe isStreaming=true and require it to
-            // be true to fire recovery.
-            var sawStreaming = false
-            repeat(IROH_RECENT_RECONCILE_ATTEMPTS) { attempt ->
-                delay(IROH_RECENT_RECONCILE_INTERVAL_MS)
-                if (_uiState.value.isStreaming) sawStreaming = true
-                val appended = runCatching {
-                    timelineRepository.reconcileRecentMessages(
-                        agentId = agentId.value,
-                        conversationId = conversationId,
-                        reason = "iroh-active-$attempt",
-                        forceRefresh = true,
-                    )
-                }.onSuccess { count ->
-                    if (count > 0) {
-                        // Real progress landed. Only restart the observer on
-                        // actual progress — stopping it inside a no-progress
-                        // stall would drop live iroh frames the producer is
-                        // still trying to send.
-                        chatTimelineObserver.stop()
-                        chatTimelineObserver.start(agentId.value, conversationId)
-                        consecutiveNoProgress = 0
-                        Telemetry.event(
-                            "TimelineSync", "irohActiveReconcile.ok",
-                            "conversationId" to conversationId,
-                            "attempt" to attempt,
-                            "appended" to count,
-                        )
-                    } else {
-                        consecutiveNoProgress += 1
-                        Telemetry.event(
-                            "TimelineSync", "irohActiveReconcile.noProgress",
-                            "conversationId" to conversationId,
-                            "attempt" to attempt,
-                            "consecutiveNoProgress" to consecutiveNoProgress,
-                            "sawStreaming" to sawStreaming,
-                        )
-                    }
-                }.onFailure { error ->
-                    Telemetry.error(
-                        "TimelineSync", "irohActiveReconcile.failed", error,
-                        "conversationId" to conversationId,
-                        "attempt" to attempt,
-                    )
-                }.getOrNull() ?: 0
-                // letta-mobile-b6vxb: stall recovery. The iroh live stream
-                // can drop the terminal TurnDone / RunLifecycleChanged
-                // (Completed) frame for a turn that already completed on
-                // the backend. In that case this loop sees appended=0
-                // forever and the chat is wedged in isStreaming=true
-                // with the activeTurn mutex held. After the stall
-                // threshold of consecutive no-progress attempts AND
-                // having observed a streaming turn in this loop, force-
-                // clear the UI streaming state and mark the active
-                // optimistic local as failed so the user can compose +
-                // send again. The `sawStreaming` gate is what
-                // prevents an idle chat from flashing a false banner.
-                if (sawStreaming &&
-                    consecutiveNoProgress >= IROH_RECENT_RECONCILE_STALL_THRESHOLD
-                ) {
-                    recoverFromIrohStall(conversationId, attempt)
-                    return@launch
-                }
-            }
-        }
-    }
-
-    /**
-     * letta-mobile-b6vxb: recover from a wedged iroh session where the
-     * live stream dropped the terminal TurnDone frame. Clears the
-     * composer / streaming state, marks any pending optimistic locals
-     * as failed so the user sees WHY they're back at the composer,
-     * clears the timeline's external-transport-active flag (normally
-     * only cleared on the TurnDone path), and stops the reconcile
-     * loop. The AppServerTurnEngine 5-min idle watchdog still owns
-     * the activeTurn lock release.
-     *
-     * Order matters (codex P2 / CodeRabbit Major): mark pending locals
-     * FIRST and clear the timeline flag FIRST while the observer is
-     * still running, so the failed-bubble state and the "active"
-     * flag clear actually render. Then clear the UI streaming state
-     * + stop the observer. The previous implementation fired mark
-     * async and immediately stopped the observer, which could leave
-     * the visible message in SENDING while the composer was already
-     * re-enabled for a fast retry.
-     */
-    private fun recoverFromIrohStall(conversationId: String, attempt: Int) {
-        Telemetry.event(
-            "TimelineSync", "irohActiveReconcile.stallRecovered",
-            "conversationId" to conversationId,
-            "attempt" to attempt,
-        )
-        viewModelScope.launch {
-            // Step 1: synchronously mark any pending optimistic locals
-            // as FAILED so the user sees the message they sent did not
-            // reach a terminal state, and clear the external-transport-
-            // active flag so the persistent stream subscriber stops
-            // treating the external transport as active.
-            runCatching {
-                val loop = timelineRepository.getOrCreate(conversationId)
-                val pendingOtids = loop.state.value.events
-                    .mapNotNull { event ->
-                        val local = event as? TimelineEvent.Local ?: return@mapNotNull null
-                        if (local.deliveryState == DeliveryState.SENDING) local.otid else null
-                    }
-                pendingOtids.forEach { otid ->
-                    timelineRepository.markExternalTransportLocalFailed(
-                        agentId = agentId.value,
-                        conversationId = conversationId,
-                        otid = otid,
-                    )
-                }
-                timelineRepository.clearExternalTransportActive(conversationId)
-            }.onFailure { error ->
-                Telemetry.error(
-                    "TimelineSync", "irohActiveReconcile.markFailedError",
-                    error,
-                    "conversationId" to conversationId,
-                    "attempt" to attempt,
-                )
-            }
-            // Step 2: clear UI streaming state so the composer + send
-            // become interactive. The activeTurn mutex in
-            // AppServerTurnEngine is still held and will release on
-            // the 5-min idle watchdog or on a fresh user send attempt.
-            chatBannerController.clearStreamingAfterInterrupt()
-            chatBannerController.showError(
-                "Connection stalled; the previous message did not reach a response. " +
-                    "Tap Send to retry.",
-            )
-            // Step 3: stop the observer so the user can pull-to-refresh
-            // and the timeline is clean. The reconcile loop is exiting
-            // anyway.
-            chatTimelineObserver.stop()
-        }
+        // letta-mobile-qfa81 (P4): the iroh active-reconcile poll loop
+        // (startIrohRecentReconcileLoop) and its stall-recovery crutch were
+        // removed here. P3 (canonical run ids + durable dedupe + parked
+        // terminals replayed across redial) guarantees the terminal TurnDone
+        // reaches the client, so the client no longer needs to poll
+        // reconcileRecentMessages on a timer to un-wedge a dropped terminal.
+        // The single post-send reconcile (wired via reconcileRecentMessages in
+        // the send coordinator above) still runs.
     }
 
     private fun stopTimelineObserver() {
-        irohRecentReconcileJob?.cancel()
-        irohRecentReconcileJob = null
         chatTimelineObserver.stop()
     }
 

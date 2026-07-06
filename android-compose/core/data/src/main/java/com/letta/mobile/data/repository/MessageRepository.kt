@@ -68,6 +68,14 @@ import javax.inject.Singleton
 @Singleton
 open class MessageRepository @Inject constructor(
     private val messageApi: MessageApi,
+    // letta-mobile-qfa81 (P4 row 13): when the active backend is iroh://,
+    // approvals must not silently hit HTTP (the choke-point in LettaApiClient
+    // now hard-fails that path). Nullable + Hilt-provided so unit tests can
+    // construct the repo with the HTTP path only.
+    private val irohApprovalSource: IrohAdminRpcApprovalSource? = null,
+    // letta-mobile-71orq: older-message pagination over admin_rpc for iroh://.
+    // Nullable + Hilt-provided so unit tests can construct the HTTP-only repo.
+    private val irohTimelineTransport: com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport? = null,
 ) : IMessageRepository, IConversationInspectorMessageRepository {
     companion object {
         /** Number of messages to display on initial chat load */
@@ -164,6 +172,15 @@ open class MessageRepository @Inject constructor(
         beforeMessageId: String,
     ): List<AppMessage> {
         if (beforeMessageId.isBlank()) return emptyList()
+
+        val iroh = irohTimelineTransport
+        if (iroh?.shouldUseIroh() == true) {
+            return iroh.listOlderConversationMessages(
+                conversationId = conversationId.value,
+                beforeMessageId = beforeMessageId,
+                limit = OLDER_MESSAGES_PAGE_SIZE,
+            ).toAppMessages()
+        }
 
         return messageApi.fetchRecentMessages(
             conversationId = conversationId,
@@ -465,7 +482,12 @@ open class MessageRepository @Inject constructor(
             streaming = false,
         )
 
-        messageApi.sendMessage(agentId, request)
+        val irohApproval = irohApprovalSource
+        if (irohApproval?.shouldUseIroh() == true) {
+            irohApproval.submitApproval(agentId, request)
+        } else {
+            messageApi.sendMessage(agentId, request)
+        }
     }
 
     override suspend fun resetMessages(agentId: AgentId) {

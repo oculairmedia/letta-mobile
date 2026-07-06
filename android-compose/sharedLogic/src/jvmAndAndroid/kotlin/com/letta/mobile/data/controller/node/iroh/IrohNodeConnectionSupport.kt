@@ -209,3 +209,50 @@ internal object DanglingToolCallSynthesizer {
         put("tool_return", "cancelled")
     }
 }
+
+/**
+ * letta-mobile-h30cy: mirror the shim's tagAsOptimistic / cm-stream tagging on the
+ * Iroh serve path. The Iroh stream forwards the App Server delta with its raw
+ * provider id (letta-msg-*), but message.list later returns the SAME reply with a
+ * DIFFERENT id namespace (ui-msg-*, null run) that shares NO identity field with
+ * the stream — so mobile cannot dedupe the streamed row against the disk-fetched
+ * copy and renders it twice (Iroh dupes; HTTPS does not, because the WS/HTTP shim
+ * paths already apply this tag). Rewrite an assistant/reasoning stream_delta's id
+ * to a stable `cm-stream-<otid>` / `cm-reason-<otid>`, which mobile's
+ * optimistic-twin dedup collapses against the disk copy. tool_call/tool_return
+ * keep their stable ids; frames without an otid are left unchanged; idempotent.
+ */
+internal fun tagStreamDeltaForOptimisticDedup(
+    delta: kotlinx.serialization.json.JsonObject,
+): kotlinx.serialization.json.JsonObject {
+    val messageType = delta["message_type"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+        ?: return delta
+    val prefix = when (messageType) {
+        "assistant_message" -> "cm-stream-"
+        "reasoning_message", "hidden_reasoning_message" -> "cm-reason-"
+        else -> return delta
+    }
+    val otid = delta["otid"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+    if (otid.isNullOrEmpty()) return delta
+    val currentId = delta["id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+    if (currentId != null && (currentId.startsWith("cm-stream-") || currentId.startsWith("cm-reason-"))) {
+        return delta
+    }
+    return kotlinx.serialization.json.buildJsonObject {
+        delta.forEach { (k, v) -> if (k != "id") put(k, v) }
+        put("id", "$prefix$otid")
+    }
+}
+
+/** Frame-level wrapper: parse a raw wire frame; if stream_delta, tag its inner delta id. */
+internal fun retagStreamDeltaFrameForOptimisticDedup(rawFrame: String): String = runCatching {
+    val obj = kotlinx.serialization.json.Json.parseToJsonElement(rawFrame).jsonObject
+    if ((obj["type"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull != "stream_delta") return@runCatching rawFrame
+    val delta = obj["delta"] as? kotlinx.serialization.json.JsonObject ?: return@runCatching rawFrame
+    val taggedDelta = tagStreamDeltaForOptimisticDedup(delta)
+    if (taggedDelta === delta) return@runCatching rawFrame
+    kotlinx.serialization.json.buildJsonObject {
+        obj.forEach { (k, v) -> if (k != "delta") put(k, v) }
+        put("delta", taggedDelta)
+    }.toString()
+}.getOrDefault(rawFrame)

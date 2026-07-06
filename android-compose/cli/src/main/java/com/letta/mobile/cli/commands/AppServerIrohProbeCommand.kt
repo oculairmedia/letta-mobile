@@ -31,6 +31,7 @@ import computer.iroh.RelayMode
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URI
+import java.io.File
 import java.net.URL
 import java.util.Collections
 import java.util.UUID
@@ -147,10 +148,20 @@ internal class AppServerIrohProbeCommand : CliktCommand(
 
     private val jsonOutput by option("--json", help = "Print machine-readable JSON summary.").flag(default = false)
 
+    // letta-mobile-h30cy: dump each raw stream_delta payload (id/otid/content/
+    // run_id/message_type, exactly as the wire delivers it) to a JSONL file, so
+    // the captured sequence can be replayed through the REAL ingest pipeline
+    // (HeadlessTimelineReplayer) for a faithful device-free dup repro.
+    private val dumpFramesPath by option(
+        "--dump-frames",
+        help = "Append each stream_delta's raw delta JSON to this JSONL file.",
+    )
+
     private val json = Json {
         prettyPrint = false
         encodeDefaults = true
     }
+
 
     override fun run() = runBlocking {
         if (secondTurnDelayMs < 0) throw UsageError("--second-turn-delay-ms must be >= 0")
@@ -581,7 +592,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         quiesceMs: Long = 3_000,
         block: suspend () -> Unit,
     ): ProbeAccumulator {
-        val accumulator = ProbeAccumulator(turn = 0)
+        val accumulator = ProbeAccumulator(turn = 0, dumpPath = dumpFramesPath)
         val collector = session.scope.launch {
             session.client.events.collect { received ->
                 val inbound = received.frame
@@ -643,7 +654,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
                     turnStartedAt = turnStartedAt,
                 )
                 session = established
-                val observed = ProbeAccumulator(turn = 1)
+                val observed = ProbeAccumulator(turn = 1, dumpPath = dumpFramesPath)
                 var firstFrameMs: Long? = null
                 val collector = established.scope.launch {
                     established.client.events.collect { received ->
@@ -955,7 +966,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(
         scenario: String? = null,
         clientMessageId: String = "probe-local-${UUID.randomUUID()}",
     ): IrohProbeTurnMetrics {
-        val observed = ProbeAccumulator(turn)
+        val observed = ProbeAccumulator(turn, dumpPath = dumpFramesPath)
         observed.scenarioViolations += session.scenarioViolations
         var firstFrameMs: Long? = null
         var timedOut = false
@@ -1178,7 +1189,7 @@ private class ProbeSetupMetrics(private val turn: Int) {
     }
 }
 
-internal class ProbeAccumulator(private val turn: Int) {
+internal class ProbeAccumulator(private val turn: Int, private val dumpPath: String? = null) {
     private val assistantIds = linkedSetOf<String>()
     private val assistantFinalTextLengths = linkedMapOf<String, Int>()
     private val reasoningIds = linkedSetOf<String>()
@@ -1218,6 +1229,9 @@ internal class ProbeAccumulator(private val turn: Int) {
         private set
 
     fun record(frame: AppServerInboundFrame) {
+        if (dumpPath != null && frame is AppServerInboundFrame.StreamDelta) {
+            runCatching { java.io.File(dumpPath).appendText(frame.delta.toString() + "\n") }
+        }
         recordedFrameCount += 1
         when (frame) {
             is AppServerInboundFrame.StreamDelta -> {

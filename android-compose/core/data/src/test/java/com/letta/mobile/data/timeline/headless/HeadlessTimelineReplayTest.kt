@@ -336,11 +336,20 @@ class HeadlessTimelineReplayTest {
             expectedUiMessageCountPerRun = 1,
         )
 
+        // letta-mobile-h30cy: the forward-growth reducer merge now collapses
+        // same-run forward fragments (cm-prefix "Hello" -> cm-full "Hello world")
+        // into ONE row at the source, so the prefix-orphan can no longer exist to
+        // be flagged and the run has the expected single UiMessage. The empty-body
+        // diagnostic (cm-empty) still fires — that is a genuinely malformed frame,
+        // not a forward-growth fragment. (The reverse-order companion test
+        // `replay drops late assistant prefix orphan after full assistant` already
+        // asserted this merged shape.)
         result.assertionReport.passed shouldBe false
         result.assertionReport.failures shouldContain "empty UiMessage body in run run-1: cm-empty"
-        result.assertionReport.failures shouldContain
-            "prefix orphan UiMessage in run run-1: cm-prefix is a strict prefix of cm-full"
-        result.assertionReport.failures shouldContain "run run-1 has 3 UiMessages; expected 1"
+        result.assertionReport.failures.none { it.contains("prefix orphan") } shouldBe true
+        // cm-prefix merged into cm-full's row → the surviving assistant row holds
+        // the full text, and the empty cm-empty frame does not create a row.
+        result.timelineJson.contains("Hello world") shouldBe true
     }
 
     @Test
