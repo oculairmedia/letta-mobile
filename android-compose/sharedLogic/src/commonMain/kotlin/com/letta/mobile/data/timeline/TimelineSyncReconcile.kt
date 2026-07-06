@@ -372,12 +372,55 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
         ) {
             return index
         }
+        // h30cy (first-word + scattered-drop dup): the streamed row can be a
+        // CORRUPTED copy of this final rather than a clean substring — the Iroh
+        // transport can drop the leading token ("The chase continues" -> " chase
+        // continues") or scattered mid tokens ("welcome them back and check" ->
+        // "welcome them and check"). Those are NOT contiguous substrings, so the
+        // contains() guard above missed them and the final was stranded as a
+        // SECOND row (the "dupe shows up after some time" the reconcile poll
+        // produces). Collapse when the streamed row is clearly the SAME reply as
+        // this final, just byte-lossy: its characters are an ordered SUBSEQUENCE
+        // of the final AND it covers most of the final's length. This is strictly
+        // for the null-run reconcile final vs a real-run streamed row (guards
+        // above), so it never merges two distinct real-run replies.
+        if (incomingText != existingText &&
+            incomingText.length > existingText.length &&
+            incomingText.isLossyCopyOf(existingText)
+        ) {
+            return index
+        }
         // A more-recent streamed row that is NOT contained by this final means the
         // final belongs to a different (earlier) reply — do not overwrite the
         // newer streamed row; stop rather than reach past it.
         return null
     }
     return null
+}
+
+/**
+ * h30cy: is [candidate] a byte-lossy copy of the same reply as this full text?
+ * True when every character of [candidate] appears in `this` in order (an ordered
+ * subsequence — tolerant of dropped leading/mid/trailing characters) AND
+ * [candidate] covers a high fraction of `this`'s length (so a genuinely different,
+ * shorter earlier reply is not mistaken for a corrupted copy). Deliberately
+ * conservative: requires ≥80% length coverage so only a near-complete corrupted
+ * streamed row of THIS reply matches, never a distinct short message.
+ */
+private fun String.isLossyCopyOf(candidate: String): Boolean {
+    if (candidate.isEmpty() || length == 0) return false
+    if (candidate.length > length) return false
+    // Coverage gate first (cheap): the streamed row must be almost as long as the
+    // final — a corrupted copy loses a few chars, not most of them.
+    if (candidate.length.toDouble() / length.toDouble() < 0.80) return false
+    // Ordered-subsequence check: walk the final, consuming candidate chars in order.
+    var ci = 0
+    var fi = 0
+    while (ci < candidate.length && fi < length) {
+        if (candidate[ci] == this[fi]) ci++
+        fi++
+    }
+    return ci == candidate.length
 }
 
 private fun String.isReconcileSyntheticRunId(): Boolean = startsWith("iroh-run-")

@@ -1729,6 +1729,53 @@ class TimelineStreamReducerTest {
         assertEquals("Hey there, how are you?", rows[1].content)
     }
 
+    @Test
+    fun `reconcile final collapses a lossy streamed row that dropped a leading word h30cy`() {
+        // The Iroh streamed row lost its LEADING word ("The chase continues" ->
+        // " chase continues"): NOT a contiguous substring of the final, so the
+        // old contains() collapse missed it and the final stranded as a 2nd row.
+        var tl = reduce(frame = AssistantMessage(
+            id = "letta-msg-42", contentRaw = JsonPrimitive(" chase continues. I'll be here."),
+            runId = "local-run-42", otid = "provider-assistant-1-a", seqId = 42,
+        )).next
+        val (after, _) = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-f", contentRaw = JsonPrimitive("The chase continues. I'll be here."), runId = null, otid = "ui-msg-f", seqId = null)
+        ))
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "lossy streamed row must collapse with final: " + rows.joinToString("|"){ it.content })
+        assertEquals("The chase continues. I'll be here.", rows[0].content)
+    }
+
+    @Test
+    fun `reconcile final collapses a lossy streamed row that dropped scattered mid words h30cy`() {
+        // Scattered mid-word drop ("welcome them back and check" ->
+        // "welcome them and check"): also not a contiguous substring.
+        var tl = reduce(frame = AssistantMessage(
+            id = "letta-msg-43", contentRaw = JsonPrimitive("Let me welcome them and check the bug."),
+            runId = "local-run-43", otid = "provider-assistant-1-b", seqId = 43,
+        )).next
+        val (after, _) = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-g", contentRaw = JsonPrimitive("Let me welcome them back and check the bug."), runId = null, otid = "ui-msg-g", seqId = null)
+        ))
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(1, rows.size, "lossy scattered streamed row must collapse: " + rows.joinToString("|"){ it.content })
+        assertEquals("Let me welcome them back and check the bug.", rows[0].content)
+    }
+
+    @Test
+    fun `reconcile final does NOT collapse a distinct shorter earlier reply h30cy`() {
+        // Guard: an unrelated short reply must NOT be swallowed by coverage<80%.
+        var tl = reduce(frame = AssistantMessage(
+            id = "letta-msg-44", contentRaw = JsonPrimitive("Yes."),
+            runId = "local-run-44", otid = "provider-assistant-1-c", seqId = 44,
+        )).next
+        val (after, _) = tl.mergeServerMessages(listOf(
+            AssistantMessage(id = "ui-msg-h", contentRaw = JsonPrimitive("Yes, absolutely — I can do that for you right now."), runId = null, otid = "ui-msg-h", seqId = null)
+        ))
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(2, rows.size, "distinct short reply must NOT collapse: " + rows.joinToString("|"){ it.content })
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
