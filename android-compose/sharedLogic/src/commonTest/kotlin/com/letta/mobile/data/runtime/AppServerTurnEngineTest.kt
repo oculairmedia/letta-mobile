@@ -141,10 +141,18 @@ class AppServerTurnEngineTest {
             )
             runCurrent()
 
-            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
-            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
-            assertEquals("approval-1", approval.requestId)
-            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            val approvalSubmit = assertIs<AppServerCommand.AdminRpc>(client.sentCommands.last())
+            assertEquals("approval.submit", approvalSubmit.method)
+            val params = approvalSubmit.params!!
+            assertEquals(runtime.agentId, params.getValue("agent_id").jsonPrimitive.content)
+            val payload = params.getValue("payload").jsonObject
+            assertEquals(false, payload.getValue("streaming").jsonPrimitive.content.toBoolean())
+            val approval = payload.getValue("messages").jsonArray[0].jsonObject
+            assertEquals("approval-1", approval.getValue("approval_request_id").jsonPrimitive.content)
+            assertEquals(true, approval.getValue("approve").jsonPrimitive.content.toBoolean())
+            val approvalItem = approval.getValue("approvals").jsonArray[0].jsonObject
+            assertEquals("tool-call-1", approvalItem.getValue("tool_call_id").jsonPrimitive.content)
+            assertEquals(true, approvalItem.getValue("approve").jsonPrimitive.content.toBoolean())
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
@@ -301,8 +309,14 @@ private class FakeAppServerClient : AppServerClient {
     override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
         error("abort is not used by these tests")
 
-    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        throw UnsupportedOperationException()
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
+        sentCommands += command
+        return AppServerInboundFrame.AdminRpcResponse(
+            requestId = command.requestId,
+            success = true,
+            result = null,
+        )
+    }
 
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) {
         sentCommands += command

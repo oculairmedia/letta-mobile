@@ -1,5 +1,8 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.model.ApprovalCreate
+import com.letta.mobile.data.model.ApprovalSubmission
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -28,9 +31,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * TurnEngine backed by one App Server client/control owner.
@@ -190,18 +196,74 @@ class AppServerTurnEngine(
             "tool" to (approval.toolName ?: ""),
             "source" to approval.source,
         )
-        client.input(
-            AppServerCommand.Input(
-                runtime = scope,
-                payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = approval.requestId,
-                    decision = AppServerApprovalResponseDecision.Allow(
-                        message = "Approved by default mobile policy.",
+        if (approval.source == "approval_request_message") {
+            submitApprovalMessage(scope.agentId, approval)
+        } else {
+            client.input(
+                AppServerCommand.Input(
+                    runtime = scope,
+                    payload = AppServerInputPayload.ApprovalResponse(
+                        requestId = approval.requestId,
+                        decision = AppServerApprovalResponseDecision.Allow(
+                            message = "Approved by default mobile policy.",
+                        ),
                     ),
                 ),
+            )
+        }
+        return true
+    }
+
+    private suspend fun submitApprovalMessage(
+        agentId: String,
+        approval: ApprovalAutoAllowRequest,
+    ) {
+        val approvalMessage = AppServerProtocol.json.encodeToJsonElement(
+            ApprovalCreate.serializer(),
+            ApprovalCreate(
+                approvals = approval.toolCallId?.let { toolCallId ->
+                    listOf(
+                        ApprovalSubmission(
+                            toolCallId = toolCallId,
+                            approve = true,
+                            reason = "Approved by default mobile policy.",
+                        ),
+                    )
+                },
+                approve = true,
+                approvalRequestId = approval.requestId,
+                reason = "Approved by default mobile policy.",
             ),
         )
-        return true
+        val request = MessageCreateRequest(
+            messages = listOf(approvalMessage),
+            streaming = false,
+        )
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put(
+                "payload",
+                AppServerProtocol.json.encodeToJsonElement(
+                    MessageCreateRequest.serializer(),
+                    request,
+                ),
+            )
+        }
+        val response = client.adminRpc(
+            AppServerCommand.AdminRpc(
+                requestId = requestIdFactory(),
+                method = "approval.submit",
+                params = body,
+            ),
+        )
+        if (!response.success) {
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTurn", "approval.auto_allow_submit_failed",
+                "approvalId" to approval.requestId,
+                "error" to (response.error ?: ""),
+            )
+            error(response.error ?: "Iroh approval.submit auto-allow failed")
+        }
     }
 
     private fun RuntimeEventDraft.toApprovalAutoAllowRequest(): ApprovalAutoAllowRequest? {
