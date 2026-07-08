@@ -389,18 +389,17 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
         val candidateRun = event.runId?.takeIf { it.isNotBlank() }
         if (candidateRun == null || candidateRun.isReconcileSyntheticRunId()) continue
         // Guard (2): first (most recent) streamed row strictly contained by the
-        // incoming final IS the reply being finalized. Return it immediately;
-        // never scan past it to an earlier reply.
+        // incoming final IS the reply being finalized. Return it immediately.
+        // If not contained, continue scanning backwards — there may be an older
+        // streamed row (from an earlier turn) that IS contained and should be
+        // collapsed (e.g., delayed reconcile final arriving after a newer turn
+        // has already started).
         if (incomingText != existingText &&
             incomingText.contains(existingText) &&
             incomingText.length > existingText.length
         ) {
             return index
         }
-        // A more-recent streamed row that is NOT contained by this final means the
-        // final belongs to a different (earlier) reply — do not overwrite the
-        // newer streamed row; stop rather than reach past it.
-        return null
     }
     return null
 }
