@@ -18,11 +18,17 @@ import kotlinx.coroutines.flow.update
 
 class IdentityRepository(
     private val identityApi: IdentityApi,
+    private val irohIdentitySource: IrohAdminRpcIdentitySource? = null,
 ) : IIdentityRepository {
     private val _identities = MutableStateFlow<List<Identity>>(emptyList())
     override val identities: StateFlow<List<Identity>> = _identities.asStateFlow()
 
     override suspend fun refreshIdentities() {
+        val irohSource = irohIdentitySource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _identities.value = irohSource.listIdentities()
+            return
+        }
         _identities.value = identityApi.listIdentities()
     }
 
@@ -31,6 +37,10 @@ class IdentityRepository(
     }
 
     override suspend fun getIdentity(identityId: IdentityId): Identity {
+        val irohSource = irohIdentitySource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getIdentity(identityId.value)
+        }
         return identityApi.retrieveIdentity(identityId.value)
     }
 

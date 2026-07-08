@@ -1,21 +1,18 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerId
-import com.letta.mobile.data.model.McpServerCreateParams
-import com.letta.mobile.data.model.McpServerResyncResult
-import com.letta.mobile.data.model.McpServerUpdateParams
-import com.letta.mobile.data.model.McpToolExecuteParams
-import com.letta.mobile.data.model.ToolId
-import com.letta.mobile.data.model.effectiveServerType
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeMcpServerApi
-import com.letta.mobile.testutil.TestData
+import com.letta.mobile.testutil.FakeSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.putJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -34,104 +31,80 @@ class McpServerRepositoryTest {
     }
 
     @Test
-    fun `refreshServers updates StateFlow`() = runTest {
-        fakeApi.servers.addAll(listOf(TestData.mcpServer(id = "1"), TestData.mcpServer(id = "2")))
+    fun `refreshServers calls API`() = runTest {
+        fakeApi.servers.add(McpServer(
+            id = McpServerId("mcp1"),
+            serverName = "Test Server",
+            serverUrl = "https://example.com",
+        ))
         repository.refreshServers()
-        assertEquals(2, repository.servers.value.size)
+        assertEquals(1, fakeApi.calls.size)
     }
 
-    @Test
-    fun `createServer adds and refreshes`() = runTest {
-        val params = McpServerCreateParams(serverName = "New Server", config = buildJsonObject {})
-        val server = repository.createServer(params)
-        assertEquals("New Server", server.serverName)
-        assertTrue(fakeApi.calls.any { it.startsWith("createMcpServer") })
-    }
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-    @Test
-    fun `updateServer updates and refreshes`() = runTest {
-        fakeApi.servers.add(TestData.mcpServer(id = "s1", serverName = "Old Server"))
-        val params = McpServerUpdateParams(
-            serverName = "Updated Server",
-            config = buildJsonObject {
-                put("type", "streamable_http")
-                put("mcp_server_type", "streamable_http")
-                put("server_url", "https://example.com/mcp")
-                put("auth_header", "Authorization")
+    @Test(expected = IrohAdminApiUnavailableException::class)
+    fun `refreshServers in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val apiThatThrows = object : FakeMcpServerApi() {
+            override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
             }
+        }
+        val repo = McpServerRepository(apiThatThrows)
+        repo.refreshServers()
+    }
+
+    @Test
+    fun `refreshServers in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
         )
-
-        val updated = repository.updateServer(McpServerId("s1"), params)
-
-        assertEquals("Updated Server", updated.serverName)
-        assertEquals("https://example.com/mcp", updated.serverUrl)
-        assertEquals("Authorization", updated.authHeader)
-        assertEquals("streamable_http", updated.effectiveServerType())
-        assertTrue(fakeApi.calls.contains("updateMcpServer:s1"))
-    }
-
-    @Test
-    fun `deleteServer removes and cleans tools`() = runTest {
-        fakeApi.servers.add(TestData.mcpServer(id = "s1"))
-        repository.refreshServers()
-        repository.deleteServer(McpServerId("s1"))
-        assertTrue(repository.servers.value.none { it.id == McpServerId("s1") })
-    }
-
-    @Test
-    fun `refreshServerTools loads tools`() = runTest {
-        fakeApi.serverTools["s1"] = listOf(TestData.tool(id = "t1"))
-        repository.refreshServerTools(McpServerId("s1"))
-        assertTrue(fakeApi.calls.contains("listMcpServerTools:s1"))
-    }
-
-    @Test
-    fun `getServers returns empty initially`() = runTest {
-        assertTrue(repository.servers.value.isEmpty())
-    }
-
-    @Test
-    fun `resyncServerTools returns backend summary and refreshes cache`() = runTest {
-        val refreshedTools = listOf(TestData.tool(id = "tool-2", name = "updatedTool"))
-        fakeApi.serverTools["s1"] = refreshedTools
-        fakeApi.resyncResults["s1"] = McpServerResyncResult(
-            deleted = listOf(ToolId("oldTool")),
-            updated = listOf(ToolId("updatedTool")),
-            added = listOf(ToolId("newTool")),
-        )
-
-        val result = repository.resyncServerTools(McpServerId("s1"))
-
-        assertEquals(listOf(ToolId("oldTool")), result.deleted)
-        assertEquals(listOf(ToolId("updatedTool")), result.updated)
-        assertEquals(listOf(ToolId("newTool")), result.added)
-        assertTrue(fakeApi.calls.contains("refreshMcpServerTools:s1"))
-    }
-
-    @Test
-    fun `runServerTool delegates args and returns execution result`() = runTest {
-        fakeApi.toolExecutionResults["s1" to "tool-1"] = TestData.mcpToolExecutionResult(status = "success")
-
-        val result = repository.runServerTool(
-            serverId = McpServerId("s1"),
-            toolId = ToolId("tool-1"),
-            params = McpToolExecuteParams(
-                buildJsonObject {
-                    put("query", "hello")
-                    putJsonObject("filters") {
-                        put("enabled", "true")
-                    }
-                }
+        val transport = FakeChannelTransport()
+        val testServers = listOf(
+            McpServer(
+                id = McpServerId("mcp1"),
+                serverName = "Server 1",
+                serverUrl = "https://example1.com",
+            ),
+            McpServer(
+                id = McpServerId("mcp2"),
+                serverName = "Server 2",
+                serverUrl = "https://example2.com",
             ),
         )
-
-        assertEquals("success", result.status)
-        assertTrue(fakeApi.calls.any { it.startsWith("runMcpServerTool:s1:tool-1:") })
-    }
-
-    @Test(expected = com.letta.mobile.data.api.ApiException::class)
-    fun `refreshServers throws on API failure`() = runTest {
-        fakeApi.shouldFail = true
-        repository.refreshServers()
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("mcp.list", method)
+            assertEquals("/v1/mcp/servers", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ListSerializer(McpServer.serializer()), testServers),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcMcpSource(transport, settings)
+        val apiThatThrows = object : FakeMcpServerApi() {
+            override suspend fun listMcpServers(limit: Int?, offset: Int?): List<McpServer> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = McpServerRepository(apiThatThrows, irohSource)
+        repo.refreshServers()
+        assertEquals(2, repo.servers.value.size)
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 }

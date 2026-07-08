@@ -30,8 +30,13 @@ import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.data.repository.IrohAdminRpcArchiveSource
+import com.letta.mobile.data.repository.IrohAdminRpcIdentitySource
+import com.letta.mobile.data.repository.IrohAdminRpcJobSource
+import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
+import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
+import com.letta.mobile.data.repository.IrohAdminRpcRunSource
 import com.letta.mobile.data.repository.IrohAdminRpcScheduleSource
 import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.JobRepository
@@ -276,8 +281,24 @@ class SessionGraphFactory internal constructor(
             ),
             folderRepository = FolderRepository(folderApi),
             groupRepository = GroupRepository(groupApi),
-            identityRepository = IdentityRepository(identityApi),
-            mcpServerRepository = McpServerRepository(mcpServerApi),
+            identityRepository = IdentityRepository(
+                identityApi = identityApi,
+                irohIdentitySource = settingsRepository?.let { settings ->
+                    IrohAdminRpcIdentitySource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            mcpServerRepository = McpServerRepository(
+                mcpServerApi = mcpServerApi,
+                irohMcpSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcMcpSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             modelRepository = ModelRepository(
                 modelApi = modelApi,
                 localModelSource = localModelSource,
@@ -300,9 +321,33 @@ class SessionGraphFactory internal constructor(
             ),
             projectRepository = ProjectRepository(projectApi),
             projectWorkRepository = ProjectWorkRepository(projectWorkApi),
-            runRepository = RunRepository(runApi),
-            jobRepository = JobRepository(jobApi),
-            providerRepository = ProviderRepository(providerApi),
+            runRepository = RunRepository(
+                runApi = runApi,
+                irohRunSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcRunSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            jobRepository = JobRepository(
+                jobApi = jobApi,
+                irohJobSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcJobSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            providerRepository = ProviderRepository(
+                providerApi = providerApi,
+                irohProviderSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcProviderSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             scheduleRepository = ScheduleRepository(
                 scheduleApi = scheduleApi,
                 irohScheduleSource = settingsRepository?.let { settings ->

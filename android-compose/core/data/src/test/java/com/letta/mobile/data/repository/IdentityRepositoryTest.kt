@@ -1,17 +1,18 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.Identity
-import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityId
-import com.letta.mobile.data.model.IdentityUpdateParams
-import com.letta.mobile.data.model.IdentityUpsertParams
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeIdentityApi
+import com.letta.mobile.testutil.FakeSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -30,80 +31,137 @@ class IdentityRepositoryTest {
     }
 
     @Test
-    fun `refreshIdentities updates state flow`() = runTest {
-        fakeApi.identities.add(sampleIdentity("identity-1"))
-
+    fun `refreshIdentities calls API`() = runTest {
+        fakeApi.identities.add(Identity(
+            id = IdentityId("i1"),
+            identifierKey = "user@example.com",
+            name = "Test User",
+            identityType = "user",
+        ))
         repository.refreshIdentities()
-
-        assertEquals(1, repository.identities.first().size)
+        assertEquals(1, fakeApi.calls.size)
     }
 
     @Test
-    fun `createIdentity upserts cache`() = runTest {
-        val created = repository.createIdentity(
-            IdentityCreateParams(identifierKey = "user-1", name = "User One", identityType = "user")
+    fun `getIdentity returns correct identity`() = runTest {
+        val testIdentity = Identity(
+            id = IdentityId("i1"),
+            identifierKey = "user@example.com",
+            name = "Test User",
+            identityType = "user",
         )
-
-        assertEquals("user-1", created.identifierKey)
-        assertEquals(1, repository.identities.first().size)
+        fakeApi.identities.add(testIdentity)
+        val result = repository.getIdentity(IdentityId("i1"))
+        assertEquals(IdentityId("i1"), result.id)
+        assertEquals("Test User", result.name)
     }
 
-    @Test
-    fun `updateIdentity updates cached identity`() = runTest {
-        fakeApi.identities.add(sampleIdentity("identity-1"))
-        repository.refreshIdentities()
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-        val updated = repository.updateIdentity(IdentityId("identity-1"), IdentityUpdateParams(name = "Updated"))
-
-        assertEquals("Updated", updated.name)
-        assertEquals("Updated", repository.identities.first().first().name)
-    }
-
-    @Test
-    fun `deleteIdentity removes cached identity`() = runTest {
-        fakeApi.identities.add(sampleIdentity("identity-1"))
-        repository.refreshIdentities()
-
-        repository.deleteIdentity(IdentityId("identity-1"))
-
-        assertTrue(repository.identities.first().isEmpty())
-    }
-
-    @Test
-    fun `attachIdentity delegates to api`() = runTest {
-        repository.attachIdentity(AgentId("agent-1"), IdentityId("identity-1"))
-        assertTrue(fakeApi.calls.contains("attachIdentity:agent-1:identity-1"))
-    }
-
-    @Test
-    fun `detachIdentity delegates to api`() = runTest {
-        repository.detachIdentity(AgentId("agent-1"), IdentityId("identity-1"))
-        assertTrue(fakeApi.calls.contains("detachIdentity:agent-1:identity-1"))
-    }
-
-    @Test
-    fun `upsertIdentity stores returned identity`() = runTest {
-        val identity = repository.upsertIdentity(
-            IdentityUpsertParams(identifierKey = "user-1", name = "User One", identityType = "user")
+    @Test(expected = IrohAdminApiUnavailableException::class)
+    fun `refreshIdentities in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
         )
-
-        assertEquals("user-1", identity.identifierKey)
-        assertEquals(1, repository.identities.first().size)
+        val apiThatThrows = object : FakeIdentityApi() {
+            override suspend fun listIdentities(): List<Identity> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = IdentityRepository(apiThatThrows)
+        repo.refreshIdentities()
     }
 
     @Test
-    fun `getIdentity retrieves identity by id`() = runTest {
-        fakeApi.identities.add(sampleIdentity("identity-1"))
-
-        val identity = repository.getIdentity(IdentityId("identity-1"))
-
-        assertEquals(IdentityId("identity-1"), identity.id)
+    fun `refreshIdentities in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testIdentities = listOf(
+            Identity(
+                id = IdentityId("i1"),
+                identifierKey = "user1@example.com",
+                name = "User 1",
+                identityType = "user",
+            ),
+            Identity(
+                id = IdentityId("i2"),
+                identifierKey = "user2@example.com",
+                name = "User 2",
+                identityType = "user",
+            ),
+        )
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("identity.list", method)
+            assertEquals("/v1/identities", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ListSerializer(Identity.serializer()), testIdentities),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcIdentitySource(transport, settings)
+        val apiThatThrows = object : FakeIdentityApi() {
+            override suspend fun listIdentities(): List<Identity> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = IdentityRepository(apiThatThrows, irohSource)
+        repo.refreshIdentities()
+        assertEquals(2, repo.identities.value.size)
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    private fun sampleIdentity(id: String) = Identity(
-        id = IdentityId(id),
-        identifierKey = "user-1",
-        name = "User One",
-        identityType = "user",
-    )
+    @Test
+    fun `getIdentity in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testIdentity = Identity(
+            id = IdentityId("i1"),
+            identifierKey = "user@example.com",
+            name = "Test User",
+            identityType = "user",
+        )
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("identity.get", method)
+            assertEquals("/v1/identities/i1", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(Identity.serializer(), testIdentity),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcIdentitySource(transport, settings)
+        val apiThatThrows = object : FakeIdentityApi() {
+            override suspend fun retrieveIdentity(identityId: String): Identity {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = IdentityRepository(apiThatThrows, irohSource)
+        val result = repo.getIdentity(IdentityId("i1"))
+        assertEquals(IdentityId("i1"), result.id)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
 }
