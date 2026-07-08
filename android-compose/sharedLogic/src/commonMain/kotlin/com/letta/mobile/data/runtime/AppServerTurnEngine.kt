@@ -207,7 +207,24 @@ class AppServerTurnEngine(
                 lastFrameAt.value = currentTimeMs()
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
-                    if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
+                    val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
+                    if (autoApproved != null) {
+                        // letta-mobile toolchip-live: auto-approving must not
+                        // swallow the tool-call announcement. Over Iroh the
+                        // approval_request_message IS the tool call frame; the
+                        // shim path still renders a tool card when it
+                        // auto-allows, so emit a ToolCallObserved draft here
+                        // (suppressing only the approval CARD, not the call).
+                        emittedToolCallIds.add(autoApproved.toolCallId.value)
+                        emitDraft(
+                            command.draftFor(
+                                runId = draft.runId,
+                                payload = autoApproved,
+                            ),
+                        )
+                        rescheduleCompletedTerminal()
+                        return@forEach
+                    }
                     
                     // letta-mobile-oqfbj: track tool_call emissions and returns
                     when (val payload = draft.payload) {
@@ -282,6 +299,53 @@ class AppServerTurnEngine(
             watchdog.cancel()
         }
     }
+
+    /**
+     * When the runtime is Unrestricted and [draft] is an approval request,
+     * auto-allows it and returns a [RuntimeEventPayload.ToolCallObserved]
+     * payload describing the underlying tool call so the caller can surface
+     * the tool card immediately (the approval CARD is suppressed; the tool
+     * CALL announcement must not be). Returns null when the draft is not an
+     * auto-approvable approval request.
+     */
+    private suspend fun autoApprovedToolCallDraft(
+        scope: AppServerRuntimeScope,
+        turnPermissionMode: AppServerPermissionMode,
+        command: TurnCommand,
+        draft: RuntimeEventDraft,
+    ): RuntimeEventPayload.ToolCallObserved? {
+        if (!autoApproveIfAllowed(scope, turnPermissionMode, draft)) return null
+        val approval = draft.toApprovalAutoAllowRequest() ?: return null
+        return RuntimeEventPayload.ToolCallObserved(
+            toolCallId = ToolCallId(approval.toolCallId ?: approval.requestId),
+            toolName = ToolName(approval.toolName ?: "tool"),
+            argumentsJson = draft.approvalArgumentsPreview(),
+        )
+    }
+
+    private fun RuntimeEventDraft.approvalArgumentsPreview(): String? = when (val payload = this.payload) {
+        is RuntimeEventPayload.ApprovalRequested -> payload.request.argumentsPreview
+        is RuntimeEventPayload.RemoteStreamFrame -> runCatching {
+            val raw = AppServerProtocol.json.parseToJsonElement(payload.body).jsonObject
+            val delta = raw["delta"]?.jsonObject ?: raw
+            (delta["tool_call"] as? JsonObject)?.get("arguments")?.toString()
+                ?: delta["arguments"]?.toString()
+        }.getOrNull()
+        else -> null
+    }
+
+    private fun TurnCommand.draftFor(
+        runId: com.letta.mobile.runtime.RunId?,
+        payload: RuntimeEventPayload,
+    ): RuntimeEventDraft = RuntimeEventDraft(
+        backendId = backendId,
+        runtimeId = runtimeId,
+        agentId = agentId,
+        conversationId = conversationId,
+        runId = runId,
+        source = RuntimeEventSource.LocalRuntime,
+        payload = payload,
+    )
 
     private suspend fun autoApproveIfAllowed(
         scope: AppServerRuntimeScope,
@@ -527,13 +591,16 @@ class AppServerTurnEngine(
     private suspend fun settleDanglingToolCalls(
         command: TurnCommand,
         emittedToolCallIds: Set<String>,
-        returnedToolCallIds: Set<String>,
+        returnedToolCallIds: MutableSet<String>,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
         settlementReason: String?,
     ) {
         val dangling = emittedToolCallIds - returnedToolCallIds
         if (dangling.isEmpty()) return
-        
+        // Mark as returned FIRST so a second settlement pass (terminal path +
+        // the finally-block safety net) cannot synthesize duplicates.
+        returnedToolCallIds += dangling
+
         val reasonText = settlementReason ?: "Tool execution interrupted by turn completion"
         
         for (toolCallId in dangling) {

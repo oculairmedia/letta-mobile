@@ -232,9 +232,18 @@ class AppServerTurnEngineTest {
             val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
             assertEquals("approval-1", approval.requestId)
             assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            // The approval CARD is suppressed, but the tool-call announcement
+            // must surface so the tool chip renders live (toolchip-live fix).
+            val toolCall = assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
+            assertEquals("tool-call-1", toolCall.toolCallId.value)
+            assertEquals("searxng_web_search", toolCall.toolName.value)
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            // No tool return arrived before the terminal, so settlement
+            // synthesizes a failed return for the dangling call (oqfbj).
+            val settled = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+            assertEquals("tool-call-1", settled.toolCallId.value)
             assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
@@ -280,7 +289,15 @@ class AppServerTurnEngineTest {
             val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
             assertEquals("approval-1", approval.requestId)
             assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            // Approval card suppressed; tool-call announcement surfaces so the
+            // Skill tool chip renders live (toolchip-live fix).
+            val toolCall = assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
+            assertEquals("tool-call-1", toolCall.toolCallId.value)
+            assertEquals("Skill", toolCall.toolName.value)
             expectNoEvents()
+
+            client.emit(streamDelta(messageType = "tool_return_message", runId = "run-1", toolCallId = "tool-call-1"))
+            assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
             assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
@@ -476,6 +493,7 @@ private fun streamDelta(
     runtime: AppServerRuntimeScope = AppServerTurnEngineTest.runtime,
     stopReason: String? = null,
     totalTokens: Int? = null,
+    toolCallId: String? = null,
 ): AppServerInboundFrame.StreamDelta =
     AppServerInboundFrame.StreamDelta(
         runtime = runtime,
@@ -487,6 +505,7 @@ private fun streamDelta(
             put("run_id", runId)
             if (stopReason != null) put("stop_reason", stopReason)
             if (totalTokens != null) put("total_tokens", totalTokens)
+            if (toolCallId != null) put("tool_call_id", toolCallId)
         },
     )
 
