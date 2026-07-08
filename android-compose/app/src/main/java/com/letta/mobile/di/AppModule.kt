@@ -146,16 +146,6 @@ abstract class AppModule {
         // MessageApi.fetchRecentMessages hard-fails at the purity choke-point.
         @Provides
         @Singleton
-        fun provideIrohAdminRpcBlockSource(
-            transport: IChannelTransport,
-            settingsRepository: ISettingsRepository,
-        ): IrohAdminRpcBlockSource = IrohAdminRpcBlockSource(
-            channelTransport = transport,
-            settingsRepository = settingsRepository,
-        )
-
-        @Provides
-        @Singleton
         fun provideIrohAdminRpcTimelineTransport(
             transport: IChannelTransport,
             settingsRepository: ISettingsRepository,

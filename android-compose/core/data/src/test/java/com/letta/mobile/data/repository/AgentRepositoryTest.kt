@@ -514,11 +514,19 @@ class AgentRepositoryTest {
         val transport = com.letta.mobile.testutil.FakeChannelTransport()
         val createdAgent = TestData.agent(id = "a1", name = "Created Agent")
         transport.adminRpcHandler = { method, _, _ ->
-            assertEquals("agent.create", method)
             val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
-                requestId = "req", success = true, result = json.encodeToJsonElement(com.letta.mobile.data.model.Agent.serializer(), createdAgent), error = null
-            )
+            when (method) {
+                "agent.create" -> com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req", success = true, result = json.encodeToJsonElement(com.letta.mobile.data.model.Agent.serializer(), createdAgent), error = null
+                )
+                // The repository init/refresh path pages agent.list in the
+                // background; answer it benignly instead of failing the create
+                // assertion on an unrelated concurrent call.
+                "agent.list" -> com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req", success = true, result = kotlinx.serialization.json.JsonArray(emptyList()), error = null
+                )
+                else -> error("unexpected admin_rpc method: $method")
+            }
         }
         val irohSource = IrohAdminRpcAgentSource(transport, settings)
         val apiThatThrows = object : FakeAgentApi() {
@@ -530,7 +538,7 @@ class AgentRepositoryTest {
         val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
         val result = repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
         assertEquals("Created Agent", result.name)
-        assertEquals(1, transport.adminRpcCalls.size)
+        assertTrue(transport.adminRpcCalls.any { it.method == "agent.create" })
     }
 
     @Test

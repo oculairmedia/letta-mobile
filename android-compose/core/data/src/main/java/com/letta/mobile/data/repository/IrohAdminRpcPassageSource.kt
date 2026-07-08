@@ -32,6 +32,8 @@ class IrohAdminRpcPassageSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc passage.list failed")
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Passage.serializer()), result)
+    }
+
     suspend fun createPassage(agentId: String, text: String): Passage {
         val response = channelTransport.adminRpc(
             method = "passage.create",
