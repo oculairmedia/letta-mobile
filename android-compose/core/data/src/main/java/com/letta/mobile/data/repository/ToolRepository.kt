@@ -18,6 +18,7 @@ import javax.inject.Inject
 
 open class ToolRepository @Inject constructor(
     private val toolApi: ToolApi,
+    private val irohToolSource: IrohAdminRpcToolSource? = null,
 ) : IToolRepository {
     private val _tools = MutableStateFlow<List<Tool>>(emptyList())
     private val _toolsByAgent = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
@@ -62,7 +63,12 @@ open class ToolRepository @Inject constructor(
     }
 
     override open suspend fun attachTool(agentId: String, toolId: String) {
-        toolApi.attachTool(agentId, toolId)
+        val irohSource = irohToolSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.attachTool(agentId, toolId)
+        } else {
+            toolApi.attachTool(agentId, toolId)
+        }
         val tool = _tools.value.find { it.id == ToolId(toolId) }
         if (tool != null) {
             _toolsByAgent.update { current -> current.toMutableMap().apply {
@@ -73,7 +79,12 @@ open class ToolRepository @Inject constructor(
     }
 
     override open suspend fun detachTool(agentId: String, toolId: String) {
-        toolApi.detachTool(agentId, toolId)
+        val irohSource = irohToolSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.detachTool(agentId, toolId)
+        } else {
+            toolApi.detachTool(agentId, toolId)
+        }
         _toolsByAgent.update { current -> current.toMutableMap().apply {
                     val existing = get(agentId) ?: emptyList()
                     put(agentId, existing.filter { it.id != ToolId(toolId) })

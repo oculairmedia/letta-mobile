@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 open class PassageRepository(
     private val passageApi: PassageApi,
+    private val irohPassageSource: IrohAdminRpcPassageSource? = null,
 ) : IPassageRepository, BackendScopedCache {
     private val cacheLock = Any()
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
@@ -38,13 +39,24 @@ open class PassageRepository(
     }
 
     override open suspend fun createPassage(agentId: String, text: String): Passage {
+        val irohSource = irohPassageSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            val passage = irohSource.createPassage(agentId, text)
+            replaceCachedPassages(agentId, _passages.value[agentId].orEmpty() + passage)
+            return passage
+        }
         val passage = passageApi.createPassage(agentId, PassageCreateParams(text = text))
         refreshPassages(agentId)
         return passage
     }
 
     override open suspend fun deletePassage(agentId: String, passageId: String) {
-        passageApi.deletePassage(agentId, passageId)
+        val irohSource = irohPassageSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.deletePassage(agentId, passageId)
+        } else {
+            passageApi.deletePassage(agentId, passageId)
+        }
         replaceCachedPassages(
             agentId = agentId,
             passages = _passages.value[agentId].orEmpty().filter { it.id != passageId },

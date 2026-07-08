@@ -30,6 +30,8 @@ import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
+import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
+import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
@@ -277,7 +279,15 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            passageRepository = PassageRepository(passageApi),
+            passageRepository = PassageRepository(
+                passageApi = passageApi,
+                irohPassageSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcPassageSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             projectRepository = ProjectRepository(projectApi),
             projectWorkRepository = ProjectWorkRepository(projectWorkApi),
             runRepository = RunRepository(runApi),
@@ -293,7 +303,15 @@ class SessionGraphFactory internal constructor(
                 transport = channelTransport,
                 scope = scope,
             ),
-            toolRepository = ToolRepository(toolApi),
+            toolRepository = ToolRepository(
+                toolApi = toolApi,
+                irohToolSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcToolSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(
                 apiClient = lettaApiClient,
                 scope = scope,
