@@ -458,4 +458,66 @@ class AgentRepositoryTest {
             agents.value = emptyList()
         }
     }
+
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
+
+    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
+    fun `createAgent in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = AgentRepository(apiThatThrows, FakeAgentDao())
+        repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
+    }
+
+    @Test
+    fun `createAgent in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val createdAgent = TestData.agent(id = "a1", name = "Created Agent")
+        transport.adminRpcHandler = { method, _, _ ->
+            assertEquals("agent.create", method)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req", success = true, result = json.encodeToJsonElement(com.letta.mobile.data.model.Agent.serializer(), createdAgent), error = null
+            )
+        }
+        val irohSource = IrohAdminRpcAgentSource(transport, settings)
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+            override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<com.letta.mobile.data.model.Agent> = emptyList()
+        }
+        val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
+        val result = repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
+        assertEquals("Created Agent", result.name)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `deleteAgent in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        transport.adminRpcHandler = { method, path, _ ->
+            assertEquals("agent.delete", method)
+            assertEquals("/v1/agents/a1", path)
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = true, result = kotlinx.serialization.json.JsonNull, error = null)
+        }
+        val irohSource = IrohAdminRpcAgentSource(transport, settings)
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun deleteAgent(id: AgentId) {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
+        repo.deleteAgent(AgentId("a1"))
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
 }

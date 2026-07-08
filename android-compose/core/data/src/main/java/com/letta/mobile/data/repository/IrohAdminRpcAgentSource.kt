@@ -80,6 +80,35 @@ class IrohAdminRpcAgentSource(
     }
 
     /**
+     * Create an agent over admin_rpc (server AgentAdminHandlers `agent.create`
+     * proxies POST /v1/agents). P4 purity client batch.
+     */
+    suspend fun createAgent(paramsJson: String): Agent {
+        val response = channelTransport.adminRpc(
+            method = "agent.create",
+            path = "/v1/agents",
+            body = paramsJson,
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.create failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.create returned no result")
+        return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    /**
+     * Delete an agent over admin_rpc (server AgentAdminHandlers `agent.delete`
+     * proxies DELETE /v1/agents/{id}). P4 purity client batch.
+     */
+    suspend fun deleteAgent(id: AgentId) {
+        val params = buildJsonObject { put("agent_id", id.value) }
+        val response = channelTransport.adminRpc(
+            method = "agent.delete",
+            path = "/v1/agents/${id.value}",
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.delete failed")
+    }
+
+    /**
      * List ALL agents by paging through `agent.list`. The server returns only a
      * default first page (~50) when no limit is given, so agents beyond it never
      * resolved a name in the conversation list and fell back to `agentId.take(8)`

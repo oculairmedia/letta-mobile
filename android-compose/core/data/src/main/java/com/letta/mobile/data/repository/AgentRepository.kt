@@ -377,7 +377,19 @@ open class AgentRepository(
     }
 
     override open suspend fun createAgent(params: AgentCreateParams): Agent {
-        val agent = agentApi.createAgent(params)
+        val irohSource = irohAgentSource
+        val agent = if (irohSource != null && irohSource.shouldUseIroh()) {
+            val json = kotlinx.serialization.json.Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                explicitNulls = false
+                coerceInputValues = true
+            }
+            val paramsJson = json.encodeToString(AgentCreateParams.serializer(), params)
+            irohSource.createAgent(paramsJson)
+        } else {
+            agentApi.createAgent(params)
+        }
         refreshAgents()
         return agent
     }
@@ -447,7 +459,12 @@ open class AgentRepository(
     }
 
     override open suspend fun deleteAgent(id: AgentId) {
-        agentApi.deleteAgent(id)
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.deleteAgent(id)
+        } else {
+            agentApi.deleteAgent(id)
+        }
         _agents.update { current -> current.filterNot { it.id == id } }
         try {
             agentDao.deleteExcept(_agents.value.map { it.id.value })
