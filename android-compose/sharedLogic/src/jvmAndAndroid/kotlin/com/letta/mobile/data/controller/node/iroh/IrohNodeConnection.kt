@@ -627,6 +627,35 @@ class IrohNodeConnection(
                 writeRawFrame(streamSend, outgoing)
                 rawFrameIsTerminal(outgoing)
             }
+            // toolchip-live: the engine synthesizes ToolCallObserved when it
+            // auto-approves an approval_request (the approval frame is consumed,
+            // so without this mapping the client never sees the tool call live)
+            // and ToolReturnObserved for settlement-synthesized returns. Map
+            // both to wire stream_deltas instead of dropping them.
+            is RuntimeEventPayload.ToolCallObserved -> {
+                val delta = buildJsonObject {
+                    put("message_type", "tool_call_message")
+                    put("tool_call", buildJsonObject {
+                        put("tool_call_id", payload.toolCallId.value)
+                        put("name", payload.toolName.value)
+                        put("arguments", payload.argumentsJson ?: "{}")
+                    })
+                }
+                openToolCalls.observe(delta.toString())
+                writeStreamDelta(streamSend = streamSend, runtime = runtime, delta = delta)
+                false
+            }
+            is RuntimeEventPayload.ToolReturnObserved -> {
+                val delta = buildJsonObject {
+                    put("message_type", "tool_return_message")
+                    put("tool_call_id", payload.toolCallId.value)
+                    put("status", if (payload.status == com.letta.mobile.runtime.ToolExecutionStatus.Failed) "error" else "success")
+                    put("tool_return", payload.body)
+                }
+                openToolCalls.observe(delta.toString())
+                writeStreamDelta(streamSend = streamSend, runtime = runtime, delta = delta)
+                false
+            }
             is RuntimeEventPayload.RunLifecycleChanged -> if (payload.status == RuntimeRunStatus.Completed) {
                 writeStreamDelta(
                     streamSend = streamSend,
