@@ -559,17 +559,16 @@ open class TimelineRepository(
     }
 
     private fun externalFrameKey(message: LettaMessage): String? {
+        // Only deduplicate frames with explicit sequence identity (seqId).
+        // Forward incremental streaming deltas (no seqId) may legitimately
+        // have identical content when streaming character-by-character and
+        // must NOT be deduplicated based on content alone.
         val seqId = message.seqId
         if (seqId != null && seqId >= 0) {
             return "seq|$seqId|${message.messageType}|${message.id}"
         }
-        return when (message) {
-            is AssistantMessage -> "assistant|${message.runId.orEmpty()}|${message.otid ?: message.id}|${message.content}"
-            is ReasoningMessage -> "reasoning|${message.runId.orEmpty()}|${message.otid ?: message.id}|${message.reasoning}"
-            is ToolCallMessage -> "toolcall|${message.runId.orEmpty()}|${message.id}|${message.effectiveToolCalls.joinToString("|") { it.effectiveId + ":" + (it.name ?: "") }}"
-            is ToolReturnMessage -> "toolreturn|${message.runId.orEmpty()}|${message.id}|${message.toolCallId.orEmpty()}|${message.toolReturn.funcResponse.orEmpty()}"
-            else -> null
-        }
+        // No seqId: this is a forward streaming delta. Do not deduplicate.
+        return null
     }
 
     private companion object {
