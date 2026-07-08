@@ -1,7 +1,9 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -37,7 +39,16 @@ internal suspend fun ingestStreamEvent(
         message.seqId?.takeIf { it >= 0 }?.let { seq ->
             conversationCursorStore.recordFrame(conversationId, seq.toLong())
         }
-        state.value = out.next
+        state.value = out.next.forceVisibleEmissionIfNeeded(message, state.value)
+        if (Telemetry.isTimelineSyncGateDebugEnabled()) {
+            Telemetry.event(
+                "TimelineSyncIngest", "gate5.stateUpdated",
+                "conversationId" to conversationId,
+                "events.size" to state.value.events.size,
+                "messageType" to message.messageType,
+                level = Telemetry.Level.DEBUG,
+            )
+        }
         // Keep the loop-owned LinkedHashMap in reducer-return order so buffered
         // tool returns preserve insertion order across frames.
         pendingToolReturnsByCallId.clear()
@@ -49,3 +60,19 @@ internal suspend fun ingestStreamEvent(
     dumpTimelineState("streamIngest.${message.messageType}", conversationId, state.value)
     return output.notification
 }
+
+private fun Timeline.forceVisibleEmissionIfNeeded(message: LettaMessage, previousEmitted: Timeline): Timeline {
+    if (message is ToolReturnMessage) return forceVisibleEmission()
+    if (message is AssistantMessage && message.id != previousEmitted.events.lastConfirmedAssistantIdForOtid(message.otid)) {
+        return forceVisibleEmission()
+    }
+    return this
+}
+
+private fun List<TimelineEvent>.lastConfirmedAssistantIdForOtid(otid: String?): String? =
+    (lastOrNull() as? TimelineEvent.Confirmed)
+        ?.takeIf { event ->
+            event.messageType == TimelineMessageType.ASSISTANT &&
+                (otid.isNullOrBlank() || event.otid == otid)
+        }
+        ?.serverId

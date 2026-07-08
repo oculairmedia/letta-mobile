@@ -21,6 +21,7 @@ import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.util.Telemetry
 
 /**
  * Owns the long-lived timeline subscriptions and projection of timeline events
@@ -140,6 +141,14 @@ internal class ChatTimelineObserver(
                 // delta, so Compose hit-testing / gesture handling get a clean
                 // pass and tool-card taps land mid-stream.
                 flow.collect { timeline ->
+                    if (Telemetry.isTimelineSyncGateDebugEnabled()) {
+                        Telemetry.event(
+                            "TimelineSyncIngest", "gate6.timelineCollected",
+                            "conversationId" to conversationId,
+                            "count" to timeline.events.size,
+                            level = Telemetry.Level.DEBUG,
+                        )
+                    }
                     val prefix = presenter.olderPrefixFor(conversationId)
                     val previousState = uiState.value
                     val projection = withContext(projectionDispatcher) {
