@@ -27,6 +27,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -60,6 +61,7 @@ class AppServerTurnEngine(
      * activeTurn locked so every later send() silently no-ops ("Thinking..." hang).
      */
     private val turnIdleTimeoutMs: Long = DEFAULT_TURN_IDLE_TIMEOUT_MS,
+    private val terminalSettleQuietMs: Long = DEFAULT_TERMINAL_SETTLE_QUIET_MS,
 ) : TurnEngine {
     private val activeTurn = Mutex()
     private var runtime: AppServerRuntimeScope? = null
@@ -163,6 +165,19 @@ class AppServerTurnEngine(
                 delay(remaining)
             }
         }
+        var pendingCompleted: RuntimeEventDraft? = null
+        var terminalSettleJob: Job? = null
+
+        fun rescheduleCompletedTerminal() {
+            val terminal = pendingCompleted ?: return
+            terminalSettleJob?.cancel()
+            terminalSettleJob = launch {
+                delay(terminalSettleQuietMs)
+                emitDraft(terminal)
+                throw TurnCompleted
+            }
+        }
+
         try {
             collectorReady.complete(Unit)
             client.events.collect { received ->
@@ -171,11 +186,18 @@ class AppServerTurnEngine(
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
                     if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
+                    if (draft.isCompletedLifecycle()) {
+                        pendingCompleted = draft
+                        rescheduleCompletedTerminal()
+                        return@forEach
+                    }
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
+                    rescheduleCompletedTerminal()
                 }
             }
         } finally {
+            terminalSettleJob?.cancel()
             watchdog.cancel()
         }
     }
@@ -341,6 +363,11 @@ class AppServerTurnEngine(
             lifecycle.status == RuntimeRunStatus.Cancelled
     }
 
+    private fun RuntimeEventDraft.isCompletedLifecycle(): Boolean {
+        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
+        return lifecycle.status == RuntimeRunStatus.Completed
+    }
+
     private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
     ): Boolean {
@@ -365,6 +392,7 @@ class AppServerTurnEngine(
         // user gives up. Idle-based (reset per frame), so a long actively-streaming
         // turn never trips. Tunable via the ctor param.
         const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
+        const val DEFAULT_TERMINAL_SETTLE_QUIET_MS: Long = 1_500L
 
         fun defaultRequestId(): String {
             nextRequestId += 1
