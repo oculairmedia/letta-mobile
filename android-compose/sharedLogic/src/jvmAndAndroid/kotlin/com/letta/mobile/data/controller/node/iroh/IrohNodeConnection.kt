@@ -86,6 +86,14 @@ class IrohNodeConnection(
     private val eventSeq = IrohEventSeqAllocator.newConnectionSeq()
     private val streamWriteMutex = Mutex()
     private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
+    
+    /**
+     * Mid-turn redial fix: thread-local storage for tracking the active turn's
+     * clientMessageId and frames. Set at the start of handleInput, cleared when
+     * the turn completes or fails. Used by writeStreamDelta to track frames for
+     * parking if the stream dies mid-turn.
+     */
+    private val activeTurnTracking = ThreadLocal<ActiveTurnTracking?>()
 
     /**
      * Transport capabilities advertised by the peer in its auth frame.
@@ -456,25 +464,30 @@ class IrohNodeConnection(
         val clientMsgId = userMsg?.clientMessageId
         if (clientMsgId != null && !clientMessageDedupe.markHandled(clientMsgId)) {
             // Duplicate re-delivery (typically a redial re-send). If the previous
-            // connection died before delivering this turn's terminal we parked
-            // one — replay it now so the client's turn resolves instead of
-            // hanging forever (q71yi). Otherwise the original turn is still
-            // in-flight or already completed, so drop silently.
-            val parkedDelta = parkedTerminals.takeParked(clientMsgId)
-            if (parkedDelta != null) {
+            // connection died before delivering this turn's frames we parked
+            // them — replay them now so the client's turn resolves instead of
+            // hanging forever (q71yi + mid-turn redial fix). Otherwise the original
+            // turn is still in-flight or already completed, so drop silently.
+            val parkedFrameSequence = parkedTerminals.takeParked(clientMsgId)
+            if (parkedFrameSequence != null) {
                 Telemetry.event(
-                    "IrohNode", "input.duplicate_replayed_parked_terminal",
+                    "IrohNode", "input.duplicate_replayed_parked_frames",
                     "clientMessageId" to clientMsgId,
                     "agentId" to input.runtime.agentId,
                     "conversationId" to input.runtime.conversationId,
                 )
                 runCatching {
-                    val delta = AppServerProtocol.json.parseToJsonElement(parkedDelta).jsonObject
-                    writeStreamDelta(streamSend, input.runtime, delta)
+                    // Replay each parked frame (newline-separated)
+                    parkedFrameSequence.split("\n").forEach { frameJson ->
+                        if (frameJson.isNotBlank()) {
+                            val delta = AppServerProtocol.json.parseToJsonElement(frameJson).jsonObject
+                            writeStreamDelta(streamSend, input.runtime, delta)
+                        }
+                    }
                 }.onFailure { replayError ->
                     // Could not deliver on this stream either — re-park so a
                     // later redial can still resolve the turn.
-                    parkedTerminals.park(clientMsgId, parkedDelta)
+                    parkedTerminals.park(clientMsgId, parkedFrameSequence)
                     if (replayError is CancellationException) throw replayError
                 }
             } else {
@@ -503,62 +516,75 @@ class IrohNodeConnection(
         // close them with a synthetic tool_return before the terminal (8s45p).
         val openToolCalls = OpenToolCallTracker()
         val cumulativeText = CumulativeStreamText()
-        runCatching {
-            controller.runTurn(command).collect { draft ->
-                val payload = draft.payload
-                if (terminalWritten && payload.isTerminalLifecycle()) {
+        // Mid-turn redial fix: set thread-local tracking so writeStreamDelta can
+        // record frames for parking if the stream dies mid-turn.
+        if (clientMsgId != null) {
+            activeTurnTracking.set(ActiveTurnTracking(clientMessageId = clientMsgId))
+        }
+        try {
+            runCatching {
+                controller.runTurn(command).collect { draft ->
+                    val payload = draft.payload
+                    if (terminalWritten && payload.isTerminalLifecycle()) {
+                        Telemetry.event(
+                            "IrohNode", "stream.terminal_duplicate_skipped",
+                            "remoteEndpointId" to remoteEndpointId,
+                            "agentId" to input.runtime.agentId,
+                            "conversationId" to input.runtime.conversationId,
+                        )
+                        return@collect
+                    }
+                    // Before a failure/cancel terminal, close any dangling tool_calls
+                    // so the client never renders a tool_call without a return.
+                    if (payload.isFailureOrCancelLifecycle()) {
+                        flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
+                    }
+                    terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls, cumulativeText) || terminalWritten
+                }
+            }.onFailure { error ->
+                val wroteTerminal = runCatching {
+                    withContext(NonCancellable) {
+                        // Same dangling-tool_call guarantee on the exception path.
+                        flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
+                        writeStreamDelta(
+                            streamSend = streamSend,
+                            runtime = input.runtime,
+                            delta = buildJsonObject {
+                                put("message_type", "error_message")
+                                put("message", error.message ?: error.toString())
+                            },
+                        )
+                    }
+                }.isSuccess
+                if (!wroteTerminal) {
                     Telemetry.event(
-                        "IrohNode", "stream.terminal_duplicate_skipped",
+                        "IrohNode", "stream.closed_before_terminal",
                         "remoteEndpointId" to remoteEndpointId,
-                        "agentId" to input.runtime.agentId,
-                        "conversationId" to input.runtime.conversationId,
+                        "error" to (error.message ?: error.toString()),
+                        "class" to error::class.simpleName,
+                        level = Telemetry.Level.WARN,
                     )
-                    return@collect
+                    // Channel died before any terminal reached the client. Park the
+                    // frames we've sent so far + a synthetic terminal, keyed by
+                    // client_message_id so a redial re-send replays them instead of
+                    // the client hanging on "Thinking…" (q71yi + mid-turn redial fix).
+                    if (clientMsgId != null && !terminalWritten) {
+                        val tracking = activeTurnTracking.get()
+                        tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
+                        Telemetry.event(
+                            "IrohNode", "stream.frames_parked",
+                            "remoteEndpointId" to remoteEndpointId,
+                            "clientMessageId" to clientMsgId,
+                            "conversationId" to input.runtime.conversationId,
+                            "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
+                        )
+                    }
                 }
-                // Before a failure/cancel terminal, close any dangling tool_calls
-                // so the client never renders a tool_call without a return.
-                if (payload.isFailureOrCancelLifecycle()) {
-                    flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
-                }
-                terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls, cumulativeText) || terminalWritten
+                if (error is CancellationException) throw error
             }
-        }.onFailure { error ->
-            val wroteTerminal = runCatching {
-                withContext(NonCancellable) {
-                    // Same dangling-tool_call guarantee on the exception path.
-                    flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
-                    writeStreamDelta(
-                        streamSend = streamSend,
-                        runtime = input.runtime,
-                        delta = buildJsonObject {
-                            put("message_type", "error_message")
-                            put("message", error.message ?: error.toString())
-                        },
-                    )
-                }
-            }.isSuccess
-            if (!wroteTerminal) {
-                Telemetry.event(
-                    "IrohNode", "stream.closed_before_terminal",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
-                    level = Telemetry.Level.WARN,
-                )
-                // Channel died before any terminal reached the client. Park a
-                // terminal keyed by client_message_id so a redial re-send replays
-                // it instead of the client hanging on "Thinking…" (q71yi).
-                if (clientMsgId != null && !terminalWritten) {
-                    parkedTerminals.park(clientMsgId, interruptedTerminalDelta().toString())
-                    Telemetry.event(
-                        "IrohNode", "stream.terminal_parked",
-                        "remoteEndpointId" to remoteEndpointId,
-                        "clientMessageId" to clientMsgId,
-                        "conversationId" to input.runtime.conversationId,
-                    )
-                }
-            }
-            if (error is CancellationException) throw error
+        } finally {
+            // Clear thread-local tracking when the turn completes or fails
+            activeTurnTracking.remove()
         }
     }
 
@@ -756,6 +782,8 @@ class IrohNodeConnection(
         streamWriteMutex.withLock {
             IrohFrameCodec.write(streamSend, frame, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
         }
+        // Mid-turn redial fix: track the delta JSON for parking if stream dies
+        activeTurnTracking.get()?.tracker?.track(delta.toString())
     }
 
 
