@@ -3,6 +3,9 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,16 +25,35 @@ class TimelineRecentMessagesReconciler(
     private val applyReturnsAndResponsesFromSnapshot: (List<LettaMessage>) -> Unit,
 ) {
     val seenRunIds = TimelineSeenRunTracker()
+    private val reconcileFlightMutex = Mutex()
+    private var inFlightRecentReconcile: Deferred<Int>? = null
 
     suspend fun reconcileRecentMessages(
         reason: String,
         forceRefresh: Boolean = false,
-    ): Int {
-        return reconcileRecentMessagesFromServer(
-            telemetryName = "recentReconcile",
-            telemetryAttrs = arrayOf("reason" to reason),
-            allowWhileStreamActive = forceRefresh,
-        )
+    ): Int = coroutineScope {
+        val shared = reconcileFlightMutex.withLock {
+            inFlightRecentReconcile?.takeIf { it.isActive }?.also {
+                Telemetry.event(
+                    "TimelineSync", "recentReconcile.coalesced",
+                    "conversationId" to conversationId,
+                    "reason" to reason,
+                )
+            } ?: async {
+                reconcileRecentMessagesFromServer(
+                    telemetryName = "recentReconcile",
+                    telemetryAttrs = arrayOf("reason" to reason),
+                    allowWhileStreamActive = forceRefresh,
+                )
+            }.also { inFlightRecentReconcile = it }
+        }
+        try {
+            shared.await()
+        } finally {
+            reconcileFlightMutex.withLock {
+                if (inFlightRecentReconcile === shared) inFlightRecentReconcile = null
+            }
+        }
     }
 
     suspend fun reconcileRecentMessagesFromServer(

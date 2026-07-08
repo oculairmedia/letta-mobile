@@ -20,6 +20,7 @@ import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.api.IToolRepository
+import com.letta.mobile.util.Telemetry
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
@@ -44,6 +45,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+
+private const val AGENT_LIST_SWEEP_CACHE_TTL_MS = 45_000L
 
 class LettaHttpAdminRepositoryException(
     val code: Int,
@@ -80,38 +83,56 @@ open class LettaHttpAdminRepositories(
     override suspend fun countAgents(): Int =
         getJson("/v1/agents/count")
 
-    override suspend fun refreshAgents() = agentRefreshMutex.withLock {
-        refreshingFlow.value = true
-        try {
-            val fresh = fetchAgentsForCache()
-            agentsFlow.value = fresh
-            lastAgentRefreshAtMillis = nowMillis()
-            refreshErrorFlow.value = null
-        } catch (t: Throwable) {
-            refreshErrorFlow.value = t
-            throw t
-        } finally {
-            refreshingFlow.value = false
+    override suspend fun refreshAgents() {
+        val sharedSweep = agentRefreshMutex.isLocked
+        agentRefreshMutex.withLock {
+            if (agentsFlow.value.isNotEmpty() && nowMillis() - lastAgentRefreshAtMillis <= AGENT_LIST_SWEEP_CACHE_TTL_MS) {
+                Telemetry.event("IrohAdminRpcAgentSource", "adminrpc.agentList.cacheHit", "count" to agentsFlow.value.size)
+                if (sharedSweep) {
+                    Telemetry.event("IrohAdminRpcAgentSource", "adminrpc.agentList.sweepShared", "count" to agentsFlow.value.size)
+                }
+                return
+            }
+            refreshingFlow.value = true
+            try {
+                val fresh = fetchAgentsForCache()
+                agentsFlow.value = fresh
+                lastAgentRefreshAtMillis = nowMillis()
+                refreshErrorFlow.value = null
+            } catch (t: Throwable) {
+                refreshErrorFlow.value = t
+                throw t
+            } finally {
+                refreshingFlow.value = false
+            }
         }
     }
 
-    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = agentRefreshMutex.withLock {
-        if (agentsFlow.value.isNotEmpty() && nowMillis() - lastAgentRefreshAtMillis <= maxAgeMs) {
-            return@withLock false
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
+        val sharedSweep = agentRefreshMutex.isLocked
+        return agentRefreshMutex.withLock {
+            val effectiveMaxAgeMs = maxOf(maxAgeMs, AGENT_LIST_SWEEP_CACHE_TTL_MS)
+            if (agentsFlow.value.isNotEmpty() && nowMillis() - lastAgentRefreshAtMillis <= effectiveMaxAgeMs) {
+                Telemetry.event("IrohAdminRpcAgentSource", "adminrpc.agentList.cacheHit", "count" to agentsFlow.value.size)
+                if (sharedSweep) {
+                    Telemetry.event("IrohAdminRpcAgentSource", "adminrpc.agentList.sweepShared", "count" to agentsFlow.value.size)
+                }
+                return@withLock false
+            }
+            refreshingFlow.value = true
+            try {
+                val fresh = fetchAgentsForCache()
+                agentsFlow.value = fresh
+                lastAgentRefreshAtMillis = nowMillis()
+                refreshErrorFlow.value = null
+            } catch (t: Throwable) {
+                refreshErrorFlow.value = t
+                throw t
+            } finally {
+                refreshingFlow.value = false
+            }
+            true
         }
-        refreshingFlow.value = true
-        try {
-            val fresh = fetchAgentsForCache()
-            agentsFlow.value = fresh
-            lastAgentRefreshAtMillis = nowMillis()
-            refreshErrorFlow.value = null
-        } catch (t: Throwable) {
-            refreshErrorFlow.value = t
-            throw t
-        } finally {
-            refreshingFlow.value = false
-        }
-        true
     }
 
     override fun getCachedAgent(id: AgentId): Agent? =

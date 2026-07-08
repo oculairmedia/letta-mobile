@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
@@ -170,14 +171,45 @@ class ChatSendCoordinatorCleanupTest {
         )
     }
 
+    @Test
+    fun postSendReconcileSkipsWhenLiveIngestArrivesAfterSend() = runTest(UnconfinedTestDispatcher()) {
+        ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(10L)
+        val timeline = RecordingTimelineWriter()
+        val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" }, scope = backgroundScope)
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "m1", contentRaw = JsonPrimitive("a"), runId = "run-1")))
+        advanceTimeBy(11L)
+        advanceUntilIdle()
+
+        assertTrue(timeline.reconciles.isEmpty())
+        ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
+    }
+
+    @Test
+    fun postSendReconcileStillRunsWithoutLiveIngest() = runTest(UnconfinedTestDispatcher()) {
+        ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(10L)
+        val timeline = RecordingTimelineWriter()
+        val coordinator = coordinator(timeline = timeline, ui = RecordingUiSink(), transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" }, scope = backgroundScope)
+
+        coordinator.send("hello").join()
+        advanceTimeBy(11L)
+        advanceUntilIdle()
+
+        assertEquals(listOf(RecordingTimelineWriter.Reconcile("conv-1", "post-send-10", true)), timeline.reconciles)
+        ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
         transport: FakeChannelTransport,
         activeConversationId: () -> String? = { "conv-1" },
         recordRuntimeEvent: suspend (WsTimelineEvent, String?) -> Unit = { _, _ -> },
+        scope: kotlinx.coroutines.CoroutineScope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher()),
     ) = ChatSendCoordinator(
-        scope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher()),
+        scope = scope,
         agentId = AGENT_ID,
         activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
         wsChatBridge = WsChatBridge(transport),
@@ -222,6 +254,7 @@ class ChatSendCoordinatorCleanupTest {
         val failedLocals = mutableListOf<LocalMarker>()
         val clearedActiveConversations = mutableListOf<String>()
         val cleanupTails = mutableListOf<CleanupTail>()
+        val reconciles = mutableListOf<Reconcile>()
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
         override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage) { ingestedMessages += message }
@@ -237,10 +270,11 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun clearExternalTransportActive(conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
-        override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int = 0
+        override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int { reconciles += Reconcile(conversationId, reason, forceRefresh); return 0 }
         data class ExternalLocal(val conversationId: String, val content: String, val otid: String)
         data class LocalMarker(val conversationId: String, val otid: String)
         data class CleanupTail(val agentId: String?, val conversationId: String, val activeRunId: String?, val activeTurnId: String?, val candidateRunIds: Set<String>)
+        data class Reconcile(val conversationId: String, val reason: String, val forceRefresh: Boolean)
     }
 
     private class FakeChannelTransport(val sendResults: MutableList<Boolean>) : IChannelTransport {
