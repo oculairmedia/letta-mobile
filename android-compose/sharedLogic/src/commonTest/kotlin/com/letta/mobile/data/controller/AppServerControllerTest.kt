@@ -194,7 +194,8 @@ class AppServerControllerTest {
             // Emit stop_reason to complete the turn
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
 
-            // Should emit Completed lifecycle event
+            // Should emit stop_reason tail then Completed lifecycle event
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
 

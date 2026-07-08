@@ -56,21 +56,22 @@ class AppServerRuntimeEventMapper {
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         return when (messageType) {
-            "stop_reason" -> if (deltaObject.isTerminalStopReason()) {
-                listOf(command.lifecycle(RuntimeRunStatus.Completed, runId = runId))
-            } else {
-                listOf(
-                    command.draft(
-                        runId = runId,
-                        source = RuntimeEventSource.LocalRuntime,
-                        payload = RuntimeEventPayload.RemoteStreamFrame(
-                            frameId = idempotencyKey,
-                            messageId = deltaObject.string("id"),
-                            messageType = messageType,
-                            body = raw.toString(),
-                        ),
+            "stop_reason" -> {
+                val stopDraft = command.draft(
+                    runId = runId,
+                    source = RuntimeEventSource.LocalRuntime,
+                    payload = RuntimeEventPayload.RemoteStreamFrame(
+                        frameId = idempotencyKey,
+                        messageId = deltaObject.string("id"),
+                        messageType = messageType,
+                        body = raw.toString(),
                     ),
                 )
+                if (deltaObject.isTerminalStopReason()) {
+                    listOf(stopDraft, command.lifecycle(RuntimeRunStatus.Completed, runId = runId))
+                } else {
+                    listOf(stopDraft)
+                }
             }
             "loop_error",
             "error_message",

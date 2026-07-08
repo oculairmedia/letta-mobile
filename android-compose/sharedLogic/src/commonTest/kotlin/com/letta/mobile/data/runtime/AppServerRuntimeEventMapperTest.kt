@@ -23,14 +23,16 @@ class AppServerRuntimeEventMapperTest {
 
     @Test
     fun mapsStopReasonToCompletedLifecycle() {
-        val draft = mapper.map(
+        val drafts = mapper.map(
             command = command,
             received = received(streamDelta(messageType = "stop_reason", runId = "run-1")),
-        ).single()
+        )
 
-        val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(draft.payload)
+        val stop = assertIs<RuntimeEventPayload.RemoteStreamFrame>(drafts[0].payload)
+        assertEquals("stop_reason", stop.messageType)
+        val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload)
         assertEquals(RuntimeRunStatus.Completed, payload.status)
-        assertEquals("run-1", draft.runId?.value)
+        assertEquals("run-1", drafts[1].runId?.value)
     }
 
     @Test

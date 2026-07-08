@@ -166,15 +166,25 @@ class AppServerTurnEngine(
             }
         }
         var pendingCompleted: RuntimeEventDraft? = null
+        var pendingStop: RuntimeEventDraft? = null
+        var pendingUsage: RuntimeEventDraft? = null
         var terminalSettleJob: Job? = null
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
+
+        suspend fun flushTail() {
+            pendingStop?.let { emitDraft(it) }
+            pendingStop = null
+            pendingUsage?.let { emitDraft(it) }
+            pendingUsage = null
+        }
 
         fun rescheduleCompletedTerminal() {
             val terminal = pendingCompleted ?: return
             terminalSettleJob?.cancel()
             terminalSettleJob = launch {
                 delay(terminalSettleQuietMs)
+                flushTail()
                 emitDraft(terminal)
                 throw TurnCompleted
             }
@@ -190,17 +200,30 @@ class AppServerTurnEngine(
                     if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
                     if (draft.isToolReturnFrame()) sawToolReturn = true
                     if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
+                    if (draft.isStopReasonFrame()) {
+                        pendingStop = draft
+                        return@forEach
+                    }
+                    if (draft.isUsageStatisticsFrame()) {
+                        if (pendingUsage == null) pendingUsage = draft
+                        if (sawAssistantAfterToolReturn) {
+                            flushTail()
+                            emitDraft(command.completedDraft(draft.runId))
+                            throw TurnCompleted
+                        }
+                        return@forEach
+                    }
                     if (draft.isCompletedLifecycle()) {
                         pendingCompleted = draft
                         rescheduleCompletedTerminal()
                         return@forEach
                     }
-                    emitDraft(draft)
-                    if (draft.isTerminalLifecycle()) throw TurnCompleted
-                    if (sawAssistantAfterToolReturn && draft.isUsageStatisticsFrame()) {
-                        emitDraft(command.completedDraft(draft.runId))
+                    if (draft.isTerminalLifecycle()) {
+                        flushTail()
+                        emitDraft(draft)
                         throw TurnCompleted
                     }
+                    emitDraft(draft)
                     rescheduleCompletedTerminal()
                 }
             }
@@ -406,6 +429,13 @@ class AppServerTurnEngine(
             frameMessageType(event.body) == "usage_statistics"
         is RuntimeEventPayload.ExternalTransportFrame -> event.body.startsWith("usage:") ||
             frameMessageType(event.body) == "usage_statistics"
+        else -> false
+    }
+
+    private fun RuntimeEventDraft.isStopReasonFrame(): Boolean = when (val event = payload) {
+        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "stop_reason" ||
+            frameMessageType(event.body) == "stop_reason"
+        is RuntimeEventPayload.ExternalTransportFrame -> frameMessageType(event.body) == "stop_reason"
         else -> false
     }
 
