@@ -16,6 +16,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonPrimitive
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,11 +25,19 @@ import org.junit.jupiter.api.Tag
 
 @Tag("integration")
 class TimelineRepositoryTest {
+    private val repositories = mutableListOf<TimelineRepository>()
+
+    @After
+    fun tearDown() = runBlocking {
+        repositories.forEach { it.clearAll() }
+        repositories.clear()
+    }
 
     @Test
     fun `clear cancels cached loop stream subscriber before removing it`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        repositories += repository
 
         repository.getOrCreate("conv-clear")
         api.awaitActive("conv-clear")
@@ -45,6 +54,7 @@ class TimelineRepositoryTest {
     fun `cache evicts least recently used loop and keeps recently accessed loop active`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2)
+        repositories += repository
 
         repository.getOrCreate("conv-a")
         repository.getOrCreate("conv-b")
@@ -61,14 +71,13 @@ class TimelineRepositoryTest {
         assertTrue("recently accessed loop should remain active", api.isActive("conv-a"))
         assertTrue("new loop should remain active", api.isActive("conv-c"))
         assertFalse("least recently used loop should be closed", api.isActive("conv-b"))
-
-        repository.clearAll()
     }
 
     @Test
     fun `post handler collapse cache hit is synchronized and refreshes access order`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 2)
+        repositories += repository
 
         repository.getOrCreate("conv-a")
         repository.getOrCreate("conv-b")
@@ -85,14 +94,13 @@ class TimelineRepositoryTest {
         assertTrue("postHandlerCollapse access should keep conv-a active", api.isActive("conv-a"))
         assertTrue("new loop should remain active", api.isActive("conv-c"))
         assertFalse("least recently used loop should be closed", api.isActive("conv-b"))
-
-        repository.clearAll()
     }
 
     @Test
     fun `getOrCreate hydrates on background dispatcher even when caller is main-like`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        repositories += repository
         val callerDispatcher = Executors.newSingleThreadExecutor { runnable ->
             Thread(runnable, "caller-main-probe")
         }.asCoroutineDispatcher()
@@ -110,14 +118,13 @@ class TimelineRepositoryTest {
             "hydrate should not run on caller dispatcher, ran on $hydrateThread",
             hydrateThread.contains("caller-main-probe"),
         )
-
-        repository.clearAll()
     }
 
     @Test
     fun `scoped access reuses existing unscoped loop for same conversation`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        repositories += repository
 
         val unscoped = repository.getOrCreate("conv-shared")
         api.awaitActive("conv-shared")
@@ -127,14 +134,13 @@ class TimelineRepositoryTest {
         assertTrue("scoped access should reuse the already-live unscoped loop", unscoped === scoped)
         assertEquals("same conversation must not create duplicate persistent stream loops", 1, repository.cachedLoopCount())
         assertEquals("only one stream should be active for the conversation", 1, api.activeCount("conv-shared"))
-
-        repository.clearAll()
     }
 
     @Test
     fun `unscoped access reuses existing scoped loop for same conversation`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        repositories += repository
 
         val scoped = repository.getOrCreate("agent-a", "conv-shared")
         api.awaitActive("conv-shared")
@@ -144,14 +150,13 @@ class TimelineRepositoryTest {
         assertTrue("unscoped access should reuse the already-live scoped loop", scoped === unscoped)
         assertEquals("same conversation must not create duplicate persistent stream loops", 1, repository.cachedLoopCount())
         assertEquals("only one stream should be active for the conversation", 1, api.activeCount("conv-shared"))
-
-        repository.clearAll()
     }
 
     @Test
     fun `unscoped loop promoted to first scoped agent is not reused by different agent`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        repositories += repository
 
         val unscoped = repository.getOrCreate("conv-shared")
         api.awaitActive("conv-shared")
@@ -162,14 +167,13 @@ class TimelineRepositoryTest {
         assertFalse("different scoped agents must remain isolated", agentA === agentB)
         assertEquals("agent-b should create its own loop after agent-a claims the unscoped loop", 2, repository.cachedLoopCount())
         assertEquals("two isolated agent scopes should have two active streams", 2, api.activeCount("conv-shared"))
-
-        repository.clearAll()
     }
 
     @Test
     fun `unscoped observer follows first scoped writer but not later different agent`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+        repositories += repository
 
         val agentA = repository.getOrCreate("agent-a", "conv-shared")
         api.awaitActive("conv-shared")
@@ -180,8 +184,6 @@ class TimelineRepositoryTest {
         assertFalse("later different scoped agent should get a fresh loop", agentA === agentB)
         assertEquals("agent-b should not attach to agent-a's promoted loop", 2, repository.cachedLoopCount())
         assertEquals("agent-a and agent-b should keep isolated streams", 2, api.activeCount("conv-shared"))
-
-        repository.clearAll()
     }
 
     @Test
@@ -189,6 +191,7 @@ class TimelineRepositoryTest {
         val api = CancellableStreamApi()
         val cursorStore = RepositoryRecordingConversationCursorStore()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, cursorStore)
+        repositories += repository
 
         repository.getOrCreate("agent-a", "default")
         repository.repairExpiredConversationCursorScoped("agent-a", "default", fallbackSeq = 42L)
@@ -196,14 +199,13 @@ class TimelineRepositoryTest {
         assertTrue("scoped loop should be hydrated", api.listMessageCalls.contains("default"))
         assertEquals(listOf("default"), cursorStore.cleared)
         assertEquals(1, repository.cachedLoopCount())
-
-        repository.clearAll()
     }
 
     @Test
     fun `cursor repair keeps reused conversation ids isolated by agent scope`() = runBlocking {
         val api = CancellableStreamApi()
         val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, RepositoryRecordingConversationCursorStore())
+        repositories += repository
 
         val agentATimeline = repository.observe("agent-a", "default")
         val agentBTimeline = repository.observe("agent-b", "default")
@@ -215,8 +217,6 @@ class TimelineRepositoryTest {
         assertTrue("agent-a scoped loop should receive repaired message", agentATimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })
         assertFalse("agent-b scoped loop should not receive agent-a repair", agentBTimeline.value.events.any { (it as? TimelineEvent.Confirmed)?.serverId == "msg-a" })
         assertEquals(2, repository.cachedLoopCount())
-
-        repository.clearAll()
     }
 }
 
