@@ -371,6 +371,8 @@ class IrohAppServerTransport(
 
     private fun attachPathWatchers() {
         val attrs = IrohDiagnostics.connectionAttributes(connection)
+        // letta-mobile-34xoj: wrap watch calls in runCatching with retry telemetry
+        // to diagnose "no Tokio runtime" failures after reconnect
         runCatching {
             connection.watchPaths(object : PathChangeCallback {
                 override suspend fun onChange(paths: List<computer.iroh.PathSnapshot>) {
@@ -389,8 +391,13 @@ class IrohAppServerTransport(
                     )
                 }
             })
+            Telemetry.event("IrohTransport", "paths.watch.attached")
         }.onFailure { error ->
-            Telemetry.event("IrohTransport", "paths.watch_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+            Telemetry.event(
+                "IrohTransport", "paths.watch_failed",
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
+            )
         }
         runCatching {
             connection.watchPathEvents(object : PathEventCallback {
@@ -402,8 +409,13 @@ class IrohAppServerTransport(
                     )
                 }
             })
+            Telemetry.event("IrohTransport", "path_events.watch.attached")
         }.onFailure { error ->
-            Telemetry.event("IrohTransport", "path_events.watch_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+            Telemetry.event(
+                "IrohTransport", "path_events.watch_failed",
+                "error" to (error.message ?: error.toString()),
+                "class" to error::class.simpleName,
+            )
         }
     }
 

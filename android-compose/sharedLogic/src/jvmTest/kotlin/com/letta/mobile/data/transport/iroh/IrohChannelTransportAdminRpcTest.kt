@@ -90,7 +90,8 @@ class IrohChannelTransportAdminRpcTest {
                 fakeHandle("dial-$dials") { calledMethod, _, _ ->
                     calls += 1
                     assertEquals(method, calledMethod)
-                    if (dials == 1) throw IllegalStateException("stream closed after old node rejected admin_rpc stream")
+                    // letta-mobile-34xoj: first call fails, retry on SAME connection succeeds
+                    if (calls == 1) throw IllegalStateException("stream closed after old node rejected admin_rpc stream")
                     response("retry-$method", success = true, result = JsonPrimitive("ok:$method"))
                 }
             }
@@ -103,8 +104,9 @@ class IrohChannelTransportAdminRpcTest {
 
             assertEquals(true, result.success, method)
             assertEquals(JsonPrimitive("ok:$method"), result.result, method)
-            assertEquals(2, dials, method)
-            assertEquals(2, calls, method)
+            // letta-mobile-34xoj: only 1 dial (retry on same connection, no reconnect)
+            assertEquals(1, dials, method)
+            assertEquals(2, calls, method) // first attempt + retry on same connection
         }
     }
 
@@ -222,6 +224,7 @@ class IrohChannelTransportAdminRpcTest {
             val sessionId = "dial-$dials"
             fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
                 sessions += sessionId
+                // letta-mobile-34xoj: both attempts on dial-1 fail, triggering escalation
                 if (sessionId == "dial-1") throw IllegalStateException("connection reset by peer")
                 response(sessionId, success = true, result = JsonPrimitive(sessionId))
             }
@@ -234,8 +237,9 @@ class IrohChannelTransportAdminRpcTest {
         val result = pending.await()
 
         assertEquals(JsonPrimitive("dial-2"), result.result)
-        assertEquals(listOf("dial-1", "dial-2"), sessions)
-        assertEquals(listOf("dial-1:admin_rpc_failed: connection reset by peer"), closed)
+        // letta-mobile-34xoj: dial-1 tried twice (original + retry), then escalated to dial-2
+        assertEquals(listOf("dial-1", "dial-1", "dial-2"), sessions)
+        assertTrue(closed.any { it.startsWith("dial-1:admin_rpc_failed_after_retry") })
     }
 
     @Test
@@ -387,4 +391,153 @@ class IrohChannelTransportAdminRpcTest {
 
     private fun kotlinx.serialization.json.JsonElement.jsonPrimitiveContent(): String =
         (this as JsonPrimitive).content
+
+    // letta-mobile-34xoj: admin_rpc timeout during active turn must NOT cancel
+    // the live event collector or emit transport reconnect
+    @Test
+    fun adminRpcTimeoutDuringActiveTurnDoesNotCancelLiveEventCollector() = runTest {
+        var dials = 0
+        var adminRpcCalls = 0
+        val closed = mutableListOf<String>()
+
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                adminRpcCalls += 1
+                // First admin_rpc call throws timeout-like error
+                if (adminRpcCalls == 1) {
+                    throw IllegalStateException("admin_rpc timed out for method=message.list")
+                }
+                // Retry succeeds on same connection
+                response("retry-success", success = true, result = JsonPrimitive("ok"))
+            }
+        }
+
+        // Call admin_rpc (simulating message.list during streaming turn)
+        val result = transport.adminRpc("message.list", "/messages", null)
+
+        // Verify retry succeeded on same connection
+        assertTrue(result.success)
+        assertEquals(JsonPrimitive("ok"), result.result)
+        // Only 1 dial (no reconnect)
+        assertEquals(1, dials)
+        // 2 admin_rpc calls (original timeout + retry)
+        assertEquals(2, adminRpcCalls)
+        // No connection closed
+        assertTrue(closed.isEmpty())
+    }
+
+    @Test
+    fun adminRpcRetrySucceedsOnSecondAttemptOverSameConnection() = runTest {
+        var calls = 0
+        val transport = transportWithHandles {
+            fakeHandle("dial-1") { _, _, _ ->
+                calls += 1
+                if (calls == 1) throw IllegalStateException("connection timed out")
+                // Retry on same connection succeeds
+                response("retry-$calls", success = true, result = JsonPrimitive("retry-ok"))
+            }
+        }
+
+        val result = transport.adminRpc("message.list", "/messages", null)
+
+        assertTrue(result.success)
+        assertEquals(JsonPrimitive("retry-ok"), result.result)
+        assertEquals(2, calls)
+    }
+
+    @Test
+    fun adminRpcEscalatesReconnectOnlyAfterThresholdWithIdleStream() = runTest {
+        var dials = 0
+        var calls = 0
+        val closed = mutableListOf<String>()
+
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                calls += 1
+                // First connection: first call fails, retry succeeds
+                if (calls == 1 && sessionId == "dial-1") {
+                    throw IllegalStateException("timeout $calls")
+                }
+                response("ok-$calls", success = true, result = JsonPrimitive("ok"))
+            }
+        }
+
+        // Make a call that fails then succeeds on retry (consecutive failures reset to 0)
+        val result1 = transport.adminRpc("message.list", "/messages", null)
+        assertTrue(result1.success, "call 1 should succeed after retry")
+
+        // Still on dial-1 (no reconnect, retry succeeded)
+        assertEquals(1, dials)
+        assertEquals(2, calls) // fail + retry-success
+        assertTrue(closed.isEmpty())
+    }
+
+    @Test
+    fun adminRpcEscalatesAfterMultipleFailuresWhenStreamIdle() = runTest {
+        var dials = 0
+        var calls = 0
+        val closed = mutableListOf<String>()
+        val startTimeMs = System.currentTimeMillis()
+
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                calls += 1
+                // First connection: all calls fail (simulating degraded connection)
+                if (sessionId == "dial-1") {
+                    throw IllegalStateException("connection degraded")
+                }
+                // Second connection: succeeds
+                response("ok-$calls", success = true, result = JsonPrimitive("reconnected"))
+            }
+        }
+
+        // First call: fails, retries on same connection, retry also fails -> escalates to reconnect
+        val result1 = transport.adminRpc("message.list", "/messages", null)
+        
+        advanceUntilIdle()
+
+        // After both attempts failed, should have escalated to reconnect
+        assertTrue(result1.success, "should succeed after reconnect")
+        assertEquals(2, dials, "should have escalated to reconnect")
+        assertTrue(closed.any { it.contains("dial-1") }, "first connection should be closed")
+        // 2 calls on dial-1 (original + retry), 1 call on dial-2
+        assertEquals(3, calls)
+    }
+
+    @Test
+    fun adminRpcDoesNotEscalateWhenStreamIsActive() = runTest {
+        var dials = 0
+        var calls = 0
+        val closed = mutableListOf<String>()
+
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                calls += 1
+                // Fail first attempt, succeed on retry
+                if (calls % 2 == 1) throw IllegalStateException("timeout")
+                response("ok-$calls", success = true, result = JsonPrimitive("ok"))
+            }
+        }
+
+        // Simulate active stream by having successful calls in between
+        // (In real code, emitBoth() records stream activity)
+        repeat(5) { index ->
+            val result = transport.adminRpc("message.list", "/messages", null)
+            assertTrue(result.success, "call $index should succeed after retry")
+            advanceTimeBy(100) // Small delay, stream still "active"
+        }
+
+        // Should still be on first connection (no escalation due to active stream)
+        assertEquals(1, dials)
+        assertEquals(10, calls) // 5 pairs of (fail, retry-success)
+        assertTrue(closed.isEmpty())
+    }
 }
