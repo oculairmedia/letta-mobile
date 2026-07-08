@@ -55,55 +55,54 @@ open class TimelineRepository(
     }
 
     /**
-     * Resolve all callers for a conversation to one authoritative loop. Legacy
-     * UI paths may observe with agentId=null while Iroh writers ingest with a
-     * scoped agentId; choosing by exact key (or singleOrNull aliasing) can split
-     * those paths. Instead, deterministically canonicalize by conversationId and
-     * retain the most specific key requested so future callers hit the same loop.
+     * Legacy callers sometimes only know [TimelineCacheKey.conversationId],
+     * while live Iroh writers use an agent-scoped key. Alias those paths only
+     * inside a compatible scope: same agent, or one unscoped side. Once an
+     * unscoped loop is claimed by a scoped agent, it is promoted to that agent
+     * and must not be reused by a different scoped agent with the same bare
+     * conversation id.
      */
-    private fun getConversationLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
-        val matches = loops.entries.filter { it.key.conversationId == key.conversationId }
-        if (matches.isEmpty()) return null
-        val preferred = matches.firstOrNull { it.key == key }
-            ?: matches.firstOrNull { it.key.agentId == key.agentId }
-            ?: matches.firstOrNull { it.key.agentId != null }
-            ?: matches.first()
-        val loop = preferred.value
-        var duplicateCount = 0
-        matches.forEach { (existingKey, existingLoop) ->
-            loops.remove(existingKey)
-            if (existingLoop !== loop) {
-                duplicateCount++
-                existingLoop.close()
-            }
+    private fun getAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
+        val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
+        if (candidates.isEmpty()) return null
+        val compatible = candidates.filter { canAlias(it.key, key) }
+        candidates.filterNot { canAlias(it.key, key) }.forEach { (existingKey, _) ->
+            emitAliasRefused(existingKey, key)
         }
-        val canonicalKey = when {
-            key.agentId != null -> key
-            preferred.key.agentId != null -> preferred.key
-            else -> key
-        }
-        loops[canonicalKey] = loop
+        val match = compatible.singleOrNull() ?: return null
+        val existingKey = match.key
+        val loop = loops.remove(existingKey) ?: return null
+        val promotedKey = if (existingKey.agentId == null && key.agentId != null) key else existingKey
+        loops[promotedKey] = loop
         Telemetry.event(
             "TimelineRepo", "loop.aliasResolved",
             "requestedAgentId" to key.agentId.orEmpty(),
-            "canonicalAgentId" to canonicalKey.agentId.orEmpty(),
+            "canonicalAgentId" to promotedKey.agentId.orEmpty(),
             "conversationId" to key.conversationId,
-            "matchedLoopCount" to matches.size,
-            "closedDuplicateLoopCount" to duplicateCount,
-            level = if (matches.size > 1) Telemetry.Level.WARN else Telemetry.Level.INFO,
         )
         return loop
     }
 
-    private fun removeConversationLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
-        val matches = loops.entries.filter { it.key.conversationId == key.conversationId }
-        if (matches.isEmpty()) return null
-        val preferred = matches.firstOrNull { it.key == key }
-            ?: matches.firstOrNull { it.key.agentId == key.agentId }
-            ?: matches.firstOrNull { it.key.agentId != null }
-            ?: matches.first()
-        matches.forEach { loops.remove(it.key) }
-        return preferred.value
+    private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
+        val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
+        val match = candidates.singleOrNull { canAlias(it.key, key) } ?: return null
+        return loops.remove(match.key)
+    }
+
+    private fun canAlias(existing: TimelineCacheKey, requested: TimelineCacheKey): Boolean =
+        existing.agentId == requested.agentId ||
+            existing.agentId == null ||
+            requested.agentId == null
+
+    private fun emitAliasRefused(existing: TimelineCacheKey, requested: TimelineCacheKey) {
+        if (existing.agentId == null || requested.agentId == null) return
+        Telemetry.event(
+            "TimelineRepo", "loop.aliasRefused",
+            "existingAgentId" to existing.agentId,
+            "requestedAgentId" to requested.agentId,
+            "conversationId" to requested.conversationId,
+            level = Telemetry.Level.WARN,
+        )
     }
 
     /**
@@ -127,7 +126,7 @@ open class TimelineRepository(
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
         // Fast path for already-cached loops. The access-order map mutates on
         // reads, so even cache hits go through the mutex.
-        loopsMutex.withLock { getConversationLoopLocked(key) }?.let { cached ->
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.let { cached ->
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheHit",
                 "agentId" to agentId.orEmpty(),
@@ -178,7 +177,8 @@ open class TimelineRepository(
         // wasn't hydrated until ~15s after app start because earlier slots in
         // the warmup list each held the lock for ~500ms. letta-mobile-mge5.
         loopsMutex.withLock {
-            getConversationLoopLocked(key)?.let { return@withLock it }
+            getLoopLocked(key)?.let { return@withLock it }
+            getAliasedLoopLocked(key)?.let { return@withLock it }
             Telemetry.event(
                 "TimelineRepo", "getOrCreate.cacheMiss",
                 "agentId" to key.agentId.orEmpty(),
@@ -321,13 +321,13 @@ open class TimelineRepository(
 
     suspend fun postHandlerCollapse(conversationId: String) {
         val key = TimelineCacheKey(null, conversationId)
-        val loop = loopsMutex.withLock { getConversationLoopLocked(key) }
+        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }
         loop?.postHandlerCollapse()
     }
 
     suspend fun postHandlerCollapse(agentId: String?, conversationId: String) {
         val key = TimelineCacheKey(agentId, conversationId)
-        val loop = loopsMutex.withLock { getConversationLoopLocked(key) }
+        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }
         loop?.postHandlerCollapse()
     }
 
@@ -386,12 +386,12 @@ open class TimelineRepository(
      */
     override suspend fun clearExternalTransportActive(conversationId: String) {
         val key = TimelineCacheKey(null, conversationId)
-        loopsMutex.withLock { getConversationLoopLocked(key) }?.clearExternalTransportActive()
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.clearExternalTransportActive()
     }
 
     override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) {
         val key = TimelineCacheKey(agentId, conversationId)
-        loopsMutex.withLock { getConversationLoopLocked(key) }?.clearExternalTransportActive()
+        loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }?.clearExternalTransportActive()
     }
 
     override suspend fun cleanupAbandonedAssistantFragments(
@@ -403,7 +403,7 @@ open class TimelineRepository(
         candidateRunIds: Set<String>,
     ): Int {
         val key = TimelineCacheKey(agentId, conversationId)
-        val loop = loopsMutex.withLock { getConversationLoopLocked(key) } ?: return 0
+        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) } ?: return 0
         return loop.cleanupAbandonedAssistantFragments(runId, turnId, reason, candidateRunIds)
     }
 
@@ -478,7 +478,7 @@ open class TimelineRepository(
     /** Force a reload — clears the cached loop for the conversation. */
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(null, conversationId)
-        removeConversationLoopLocked(key)?.let { loop ->
+        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
@@ -489,7 +489,7 @@ open class TimelineRepository(
 
     suspend fun clear(agentId: String?, conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(agentId, conversationId)
-        removeConversationLoopLocked(key)?.let { loop ->
+        (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
