@@ -216,6 +216,7 @@ class IrohChannelTransport(
                     name = "letta-mobile-android-iroh",
                     version = config.clientVersion,
                 ),
+                permissionMode = com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Unrestricted,
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(
