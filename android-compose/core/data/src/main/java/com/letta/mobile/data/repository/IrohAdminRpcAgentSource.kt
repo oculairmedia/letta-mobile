@@ -42,6 +42,31 @@ class IrohAdminRpcAgentSource(
     fun shouldUseIroh(): Boolean =
         IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
+    /**
+     * Update an agent over admin_rpc (server AgentAdminHandlers `agent.update`
+     * proxies PATCH /v1/agents/{id}). The handler reads `agent_id` from params
+     * and forwards the whole params object as the PATCH body; the raw
+     * AgentUpdateParams JSON is merged with the id so unknown-body fields are
+     * simply passed through.
+     */
+    suspend fun updateAgent(id: AgentId, paramsJson: String): Agent {
+        val body = buildJsonObject {
+            put("agent_id", id.value)
+            val parsed = runCatching { json.parseToJsonElement(paramsJson) }.getOrNull()
+            (parsed as? kotlinx.serialization.json.JsonObject)?.forEach { (key, value) ->
+                if (key != "agent_id") put(key, value)
+            }
+        }
+        val response = channelTransport.adminRpc(
+            method = "agent.update",
+            path = "/v1/agents/${id.value}",
+            body = body.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.update failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.update returned no result")
+        return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
     suspend fun getAgent(id: AgentId): Agent {
         val params = buildJsonObject { put("agent_id", id.value) }
         val response = channelTransport.adminRpc(

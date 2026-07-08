@@ -428,6 +428,19 @@ open class AgentRepository(
             updateAgentInCache(preview)
             return preview
         }
+        // P4 iroh purity: raw HTTP AgentApi hard-fails in iroh:// mode; route
+        // the update over admin_rpc agent.update (model switch from the drawer
+        // failed with "Couldn't switch model" without this).
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            val agent = irohSource.updateAgent(
+                id,
+                kotlinx.serialization.json.Json { encodeDefaults = false; explicitNulls = false }
+                    .encodeToString(AgentUpdateParams.serializer(), params),
+            )
+            refreshAgents()
+            return agent
+        }
         val agent = agentApi.updateAgent(id, params)
         refreshAgents()
         return agent
