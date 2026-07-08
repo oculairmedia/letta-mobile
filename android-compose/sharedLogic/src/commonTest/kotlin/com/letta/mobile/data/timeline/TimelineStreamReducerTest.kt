@@ -577,6 +577,24 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `hydration drops persisted synthetic skill doc envelope`() {
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conv-test",
+            serverMessagesChronological = listOf(
+                UserMessage(id = "user-question", contentRaw = JsonPrimitive("What is the router status?")),
+                UserMessage(id = "skill-envelope", contentRaw = JsonPrimitive(realCapturedSkillEnvelope())),
+                AssistantMessage(id = "assistant-answer", contentRaw = JsonPrimitive("The router is online.")),
+            ),
+            timelineBeforeFetch = Timeline("conv-test"),
+            currentTimeline = Timeline("conv-test"),
+            diskRecords = emptyList(),
+        )
+
+        result.timeline.events.map { (it as TimelineEvent.Confirmed).serverId } shouldBe listOf("user-question", "assistant-answer")
+        result.visibleEventCount shouldBe 2
+    }
+
+    @Test
     fun `semantic match dedupes hydrate then ws assistant with different server id`() {
         val hydrated = TimelineHydrationReducer.reduce(
             conversationId = "conv-test",
@@ -1667,6 +1685,32 @@ class TimelineStreamReducerTest {
         )
         return Telemetry.snapshot().map { it.name }.toSet()
     }
+
+    private fun realCapturedSkillEnvelope(): String = """
+        <asus-router>
+        name: asus-router
+        description: Pull stats from ASUS RT-AX82U router and summarize WAN/LAN status.
+        ---
+        # ASUS Router
+
+        This skill connects to the ASUS router API and reports useful status.
+
+        ## Usage
+
+        Ask for router status, WAN uptime, connected clients, or traffic counters.
+
+        ```json
+        { "action": "status" }
+        ```
+
+        ## Notes
+
+        The router credentials are configured by the host environment.
+
+        ARGUMENTS: status
+        </asus-router>
+    """.trimIndent()
+
 }
 
 private infix fun <T> T.shouldBe(expected: T) {

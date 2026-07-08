@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -73,20 +74,10 @@ object MessageListWireProjection {
         return projectToolReturnMessage(message, conversationId)
     }
 
-    /**
-     * letta-mobile-dz5a8: Detects synthetic skill-instruction envelopes that
-     * should be suppressed from message.list projection. These are role:user
-     * messages containing skill XML tags (opening <skill ...> or closing </skill>).
-     * Only user-role messages are checked; assistant/tool messages pass through.
-     */
     private fun isSyntheticSkillInstructionEnvelope(message: JsonObject): Boolean {
         val role = (message["role"] as? JsonPrimitive)?.contentOrNull
-        if (role != "user") return false
-
         val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return false
-        
-        // Detect <skill ...> opening tag or </skill> closing tag
-        return content.contains(Regex("""<skill[\s>]""")) || content.contains("</skill>")
+        return SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role, content)
     }
 
     private fun projectToolReturnMessage(message: JsonObject, conversationId: String): JsonObject {
