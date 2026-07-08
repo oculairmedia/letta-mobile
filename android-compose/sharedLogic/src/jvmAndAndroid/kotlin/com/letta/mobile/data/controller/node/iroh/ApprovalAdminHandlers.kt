@@ -1,5 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.runtime.ConversationId
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -16,24 +19,30 @@ import kotlinx.serialization.json.put
  * on the per-request `admin_rpc` stream path so the submission is isolated from
  * the live turn stream (k7yyc).
  *
- * The mobile REST-shaped approval payload carries `approval_request_id` and one
- * or more `tool_call_id`s. The admin shim's durable approval API is keyed by the
- * pending run id, so this handler resolves the pending approval by tool_call_id
- * and then POSTs `/shim/v1/approvals/{run_id}/decision`.
+ * For live AppServer turns, route directly through [AppServerController] so the
+ * active runtime receives an `ApprovalResponse` on the control channel. The shim
+ * pending-approval REST endpoint remains a fallback for durable shim approvals.
  */
 object ApprovalAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String, controller: AppServerController? = null) {
         val proxy = AdminProxyClient(adminBaseUrl)
-        router.register("approval.submit") { params -> submit(proxy, params) }
+        router.register("approval.submit") { params -> submit(proxy, params, controller) }
     }
 
-    private fun submit(proxy: AdminProxyClient, params: JsonObject?): JsonElement {
+    private suspend fun submit(
+        proxy: AdminProxyClient,
+        params: JsonObject?,
+        controller: AppServerController?,
+    ): JsonElement {
         val agentId = params?.get("agent_id")?.jsonPrimitive?.contentOrNull
             ?: throw IllegalArgumentException("agent_id required")
+        val conversationId = params["conversation_id"]?.jsonPrimitive?.contentOrNull
         val payload = params["payload"]?.jsonObject
             ?: throw IllegalArgumentException("payload required")
         val approval = payload["messages"]?.jsonArray?.firstOrNull()?.jsonObject
             ?: throw IllegalArgumentException("approval message required")
+        val approvalRequestId = approval["approval_request_id"]?.jsonPrimitive?.contentOrNull
+            ?: throw IllegalArgumentException("approval_request_id required")
         val approve = approval["approve"]?.jsonPrimitive?.booleanOrNull
             ?: approval["approvals"]?.jsonArray?.firstOrNull()?.jsonObject?.get("approve")?.jsonPrimitive?.booleanOrNull
             ?: throw IllegalArgumentException("approval decision required")
@@ -42,8 +51,23 @@ object ApprovalAdminHandlers {
         val toolCallIds = approval["approvals"]?.jsonArray
             ?.mapNotNull { it.jsonObject["tool_call_id"]?.jsonPrimitive?.contentOrNull }
             ?.takeIf { it.isNotEmpty() }
-            ?: throw IllegalArgumentException("tool_call_id required")
+            .orEmpty()
 
+        if (controller != null) {
+            runCatching {
+                controller.submitApproval(
+                    agentId = AgentId(agentId),
+                    conversationId = conversationId?.let(::ConversationId),
+                    approvalRequestId = approvalRequestId,
+                    approve = approve,
+                    reason = reason,
+                )
+            }.onSuccess {
+                return buildJsonObject { put("status", if (approve) "approved" else "denied") }
+            }
+        }
+
+        if (toolCallIds.isEmpty()) throw IllegalArgumentException("tool_call_id required")
         val pending = proxy.get(
             adminProxyRequest("shim", "v1", "approvals", "pending")
                 .query("agent_id", agentId)

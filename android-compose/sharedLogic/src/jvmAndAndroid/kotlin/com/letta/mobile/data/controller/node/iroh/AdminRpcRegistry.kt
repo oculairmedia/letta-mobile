@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.AppServerController
+
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
         "conversation.list",
@@ -13,7 +15,7 @@ object AdminRpcRegistry {
         "approval.submit",
     )
 
-    fun buildRouter(adminBaseUrl: String): AdminRpcRouter {
+    fun buildRouter(adminBaseUrl: String, controller: AppServerController? = null): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val router = AdminRpcRouter()
 
@@ -28,7 +30,7 @@ object AdminRpcRegistry {
         ToolAdminHandlers.register(router, rpcBase)
         McpAdminHandlers.register(router, rpcBase)
         GoalAdminHandlers.register(router, rpcBase)
-        ApprovalAdminHandlers.register(router, rpcBase)
+        ApprovalAdminHandlers.register(router, rpcBase, controller)
 
         router.requireNonEmpty()
         val missingMethods = canonicalMethods - router.registeredMethods

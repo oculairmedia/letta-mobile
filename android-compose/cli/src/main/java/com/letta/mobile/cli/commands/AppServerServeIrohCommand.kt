@@ -135,7 +135,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             // to this host (Iroh purity: letta-mobile-qfa81). The handlers
             // proxy to the server-local HTTP API; only this process dials it.
             val rpcBase = adminBaseUrl.trimEnd('/')
-            val adminRpcRouter = com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry.buildRouter(rpcBase)
+            val adminRpcRouter = com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry.buildRouter(rpcBase, controller)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println("[iroh-app-server] admin_rpc handlers registered (proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount})")
 
