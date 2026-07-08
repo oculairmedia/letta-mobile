@@ -1,6 +1,10 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.util.Telemetry
+import io.ktor.client.request.header
+import io.ktor.client.request.request
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import java.io.OutputStreamWriter
@@ -108,6 +112,12 @@ class HttpUrlConnectionAdminProxyTransport(
     private val readTimeoutMs: Int = 15_000,
 ) : AdminProxyTransport {
     override fun execute(method: String, url: String, body: String?): AdminProxyTransportResponse {
+        // HttpURLConnection hard-rejects PATCH (ProtocolException "Invalid HTTP
+        // method: PATCH") and reflection is sealed on modern JDKs — this broke
+        // admin_rpc agent.update (drawer model switch). Route PATCH through the
+        // ktor CIO engine instead; other methods keep the proven URLConnection
+        // path unchanged.
+        if (method == "PATCH") return executePatchViaKtor(url, body)
         val connection = URL(url).openConnection() as HttpURLConnection
         return try {
             connection.requestMethod = method
@@ -132,6 +142,20 @@ class HttpUrlConnectionAdminProxyTransport(
         }
     }
 }
+
+/** PATCH via ktor CIO (HttpURLConnection cannot send PATCH on any JDK). */
+private fun executePatchViaKtor(url: String, body: String?): AdminProxyTransportResponse =
+    kotlinx.coroutines.runBlocking {
+        io.ktor.client.HttpClient(io.ktor.client.engine.cio.CIO).use { client ->
+            val response = client.request(url) {
+                this.method = io.ktor.http.HttpMethod.Patch
+                header(io.ktor.http.HttpHeaders.ContentType, "application/json")
+                header(io.ktor.http.HttpHeaders.Accept, "application/json")
+                setBody(body ?: "{}")
+            }
+            AdminProxyTransportResponse(response.status.value, response.bodyAsText())
+        }
+    }
 
 fun adminProxyRequest(vararg segments: String): AdminProxyRequest.Builder =
     AdminProxyRequest.Builder().segments(*segments)
