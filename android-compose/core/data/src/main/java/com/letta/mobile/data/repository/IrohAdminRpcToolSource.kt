@@ -8,15 +8,15 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Tool CRUD over the Iroh admin RPC control channel.
+ * Tool CRUD + agent attach/detach over the Iroh admin RPC control channel.
  *
- * P4 purity client batch: server handlers exist (ToolAdminHandlers registers
- * tool.list, tool.create, tool.update, tool.delete); this is the client wiring.
+ * P4 purity batches: server handlers in ToolAdminHandlers register tool.list,
+ * tool.create, tool.update, tool.delete (client batch) and tool.attach,
+ * tool.detach (server batch); this is the merged client wiring.
  */
 class IrohAdminRpcToolSource(
     private val channelTransport: IChannelTransport,
@@ -80,5 +80,29 @@ class IrohAdminRpcToolSource(
             body = params.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc tool.delete failed")
+    }
+
+    suspend fun attachTool(agentId: String, toolId: String) {
+        val response = channelTransport.adminRpc(
+            method = "tool.attach",
+            path = "/v1/agents/$agentId/tools/attach/$toolId",
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("tool_id", toolId)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.attach failed")
+    }
+
+    suspend fun detachTool(agentId: String, toolId: String) {
+        val response = channelTransport.adminRpc(
+            method = "tool.detach",
+            path = "/v1/agents/$agentId/tools/detach/$toolId",
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("tool_id", toolId)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc tool.detach failed")
     }
 }

@@ -32,5 +32,29 @@ class IrohAdminRpcPassageSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc passage.list failed")
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Passage.serializer()), result)
+    suspend fun createPassage(agentId: String, text: String): Passage {
+        val response = channelTransport.adminRpc(
+            method = "passage.create",
+            path = "/v1/agents/$agentId/archival-memory",
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("text", text)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc passage.create failed")
+        val result = response.result ?: error("Iroh admin_rpc passage.create returned no result")
+        return json.decodeFromJsonElement(Passage.serializer(), result)
+    }
+
+    suspend fun deletePassage(agentId: String, passageId: String) {
+        val response = channelTransport.adminRpc(
+            method = "passage.delete",
+            path = "/v1/agents/$agentId/archival-memory/$passageId",
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("passage_id", passageId)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc passage.delete failed")
     }
 }

@@ -364,6 +364,10 @@ open class AgentRepository(
             // transcript (same chars/4 heuristic letta.js uses internally).
             return localSource.contextWindowOverview(agentId) ?: ContextWindowOverview()
         }
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getContextWindow(agentId, conversationId)
+        }
         return agentApi.getContextWindow(agentId, conversationId)
     }
 

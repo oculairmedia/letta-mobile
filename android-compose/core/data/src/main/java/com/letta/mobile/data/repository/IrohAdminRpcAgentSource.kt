@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -65,6 +67,25 @@ class IrohAdminRpcAgentSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc agent.update failed")
         val result = response.result ?: error("Iroh admin_rpc agent.update returned no result")
         return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+        val params = buildJsonObject {
+            put("agent_id", agentId.value)
+            conversationId?.let { put("conversation_id", it.value) }
+        }
+        val path = buildString {
+            append("/v1/agents/${agentId.value}/context")
+            conversationId?.let { append("?conversation_id=${it.value}") }
+        }
+        val response = channelTransport.adminRpc(
+            method = "agent.context",
+            path = path,
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.context failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.context returned no result")
+        return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
     }
 
     suspend fun getAgent(id: AgentId): Agent {

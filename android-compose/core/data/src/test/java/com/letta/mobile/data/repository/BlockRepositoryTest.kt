@@ -82,6 +82,44 @@ class BlockRepositoryTest {
         assertEquals(null, result.limit)
     }
 
+    @Test
+    fun `agent block mutations route through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                val result = if (method == "block.update_agent") {
+                    "{\"id\":\"block-persona\",\"label\":\"persona\",\"value\":\"Updated\"}"
+                } else {
+                    "{}"
+                }
+                AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement(result))
+            }
+        }
+        val irohRepository = BlockRepository(
+            blockApi = fakeApi,
+            irohBlockSource = IrohAdminRpcBlockSource(transport, irohSettings()),
+        )
+
+        irohRepository.attachBlock("agent-1", "block-1")
+        irohRepository.detachBlock("agent-1", "block-1")
+        val block = irohRepository.updateAgentBlock("agent-1", "persona", BlockUpdateParams(value = "Updated"))
+
+        assertTrue(fakeApi.calls.none { it.startsWith("attachBlock") || it.startsWith("detachBlock") || it.startsWith("updateAgentBlock") })
+        assertEquals(listOf("block.attach", "block.detach", "block.update_agent"), transport.adminRpcCalls.map { it.method })
+        assertEquals("/v1/agents/agent-1/core-memory/blocks/attach/block-1", transport.adminRpcCalls[0].path)
+        assertEquals("/v1/agents/agent-1/core-memory/blocks/detach/block-1", transport.adminRpcCalls[1].path)
+        assertEquals("/v1/agents/agent-1/core-memory/blocks/persona", transport.adminRpcCalls[2].path)
+        assertTrue(transport.adminRpcCalls[2].body.orEmpty().contains("\"value\":\"Updated\""))
+        assertEquals("Updated", block.value)
+    }
+
+    private fun irohSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://EndpointTicket",
+        ),
+    )
+
     @Test(expected = com.letta.mobile.data.api.ApiException::class)
     fun `updateAgentBlock throws on API failure`() = runTest {
         fakeApi.shouldFail = true

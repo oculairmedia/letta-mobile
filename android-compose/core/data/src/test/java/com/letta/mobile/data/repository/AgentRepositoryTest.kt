@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeAgentApi
@@ -22,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -112,6 +114,38 @@ class AgentRepositoryTest {
 
         assertEquals(420, overview.contextWindowSizeCurrent)
         assertTrue(fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `getContextWindow routes through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    "req",
+                    true,
+                    Json.parseToJsonElement("{\"context_window_size_current\":420,\"context_window_size_max\":128000}"),
+                )
+            }
+        }
+        val irohRepo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            settingsRepository = com.letta.mobile.testutil.FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "iroh",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://EndpointTicket",
+                ),
+            ),
+            transport = transport,
+        )
+
+        val overview = irohRepo.getContextWindow(AgentId("agent-1"), com.letta.mobile.data.model.ConversationId("conversation-1"))
+
+        assertTrue(fakeApi.calls.none { it.startsWith("getContextWindow") })
+        assertEquals("agent.context", transport.adminRpcCalls.single().method)
+        assertEquals("/v1/agents/agent-1/context?conversation_id=conversation-1", transport.adminRpcCalls.single().path)
+        assertEquals(420, overview.contextWindowSizeCurrent)
     }
 
     @Test

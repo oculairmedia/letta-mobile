@@ -34,6 +34,10 @@ class BlockRepository @Inject constructor(
     }
 
     override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
+        val irohSource = irohBlockSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.updateAgentBlock(agentId, blockLabel, params)
+        }
         return blockApi.updateAgentBlock(agentId, blockLabel, params)
     }
 
@@ -68,10 +72,20 @@ class BlockRepository @Inject constructor(
     }
 
     override suspend fun attachBlock(agentId: String, blockId: String) {
+        val irohSource = irohBlockSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.attachBlock(agentId, blockId)
+            return
+        }
         blockApi.attachBlock(agentId, blockId)
     }
 
     override suspend fun detachBlock(agentId: String, blockId: String) {
+        val irohSource = irohBlockSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.detachBlock(agentId, blockId)
+            return
+        }
         blockApi.detachBlock(agentId, blockId)
     }
 

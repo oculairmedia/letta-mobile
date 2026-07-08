@@ -5,10 +5,16 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.PassageApi
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
+import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -52,6 +58,42 @@ class PassageRepositoryTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `create and delete passage route through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                val result = if (method == "passage.create") {
+                    "{\"id\":\"passage-1\",\"text\":\"New passage\",\"agent_id\":\"agent-1\"}"
+                } else {
+                    "{}"
+                }
+                AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement(result))
+            }
+        }
+        val irohRepository = PassageRepository(
+            passageApi = fakeApi,
+            irohPassageSource = IrohAdminRpcPassageSource(transport, irohSettings()),
+        )
+
+        val created = irohRepository.createPassage("agent-1", "New passage")
+        irohRepository.deletePassage("agent-1", "passage-1")
+
+        assertTrue(fakeApi.calls.none { it.startsWith("createPassage") || it.startsWith("deletePassage") })
+        assertEquals(listOf("passage.create", "passage.delete"), transport.adminRpcCalls.map { it.method })
+        assertEquals("/v1/agents/agent-1/archival-memory", transport.adminRpcCalls[0].path)
+        assertTrue(transport.adminRpcCalls[0].body.orEmpty().contains("\"text\":\"New passage\""))
+        assertEquals("/v1/agents/agent-1/archival-memory/passage-1", transport.adminRpcCalls[1].path)
+        assertEquals("passage-1", created.id)
+    }
+
+    private fun irohSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://EndpointTicket",
+        ),
+    )
 
     @Test
     fun `deletePassage emits removal from cache`() = runTest {

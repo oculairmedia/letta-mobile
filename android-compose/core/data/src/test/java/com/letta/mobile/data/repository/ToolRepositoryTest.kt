@@ -1,6 +1,10 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
+import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -8,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -93,6 +98,33 @@ class ToolRepositoryTest {
         repository.detachTool("a1", "t1")
         assertTrue(fakeApi.calls.contains("detachTool:a1:t1"))
     }
+
+    @Test
+    fun `attach detach tool route through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement("{}")) }
+        }
+        val irohRepository = ToolRepository(
+            toolApi = fakeApi,
+            irohToolSource = IrohAdminRpcToolSource(transport, irohSettings()),
+        )
+
+        irohRepository.attachTool("agent-1", "tool-1")
+        irohRepository.detachTool("agent-1", "tool-1")
+
+        assertTrue(fakeApi.calls.none { it.startsWith("attachTool") || it.startsWith("detachTool") })
+        assertEquals(listOf("tool.attach", "tool.detach"), transport.adminRpcCalls.map { it.method })
+        assertEquals("/v1/agents/agent-1/tools/attach/tool-1", transport.adminRpcCalls[0].path)
+        assertEquals("/v1/agents/agent-1/tools/detach/tool-1", transport.adminRpcCalls[1].path)
+    }
+
+    private fun irohSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://EndpointTicket",
+        ),
+    )
 
     @Test
     fun `upsertTool creates and refreshes`() = runTest {

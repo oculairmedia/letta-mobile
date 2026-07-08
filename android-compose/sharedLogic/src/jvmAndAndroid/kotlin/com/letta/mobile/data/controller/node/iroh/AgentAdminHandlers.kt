@@ -18,6 +18,7 @@ object AgentAdminHandlers {
         router.register("agent.create") { params -> api.create(params) }
         router.register("agent.update") { params -> api.update(params) }
         router.register("agent.delete") { params -> api.delete(params) }
+        router.register("agent.context") { params -> api.context(params) }
     }
 
     private class AgentApi(private val proxy: AdminProxyClient) {
@@ -43,6 +44,14 @@ object AgentAdminHandlers {
         fun delete(params: JsonObject?): JsonElement {
             val id = param(params, "agent_id") ?: return jsonError("agent_id required")
             return proxy.delete(adminProxyRequest("v1", "agents", id).build())
+        }
+        fun context(params: JsonObject?): JsonElement {
+            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
+            return proxy.get(
+                adminProxyRequest("v1", "agents", id, "context")
+                    .query("conversation_id", param(params, "conversation_id"))
+                    .build()
+            )
         }
     }
 

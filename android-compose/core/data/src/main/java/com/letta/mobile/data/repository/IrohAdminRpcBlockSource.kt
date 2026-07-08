@@ -108,4 +108,45 @@ class IrohAdminRpcBlockSource(
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Block.serializer()), result)
     }
+    suspend fun attachBlock(agentId: String, blockId: String) {
+        val response = channelTransport.adminRpc(
+            method = "block.attach",
+            path = "/v1/agents/$agentId/core-memory/blocks/attach/$blockId",
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("block_id", blockId)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc block.attach failed")
+    }
+
+    suspend fun detachBlock(agentId: String, blockId: String) {
+        val response = channelTransport.adminRpc(
+            method = "block.detach",
+            path = "/v1/agents/$agentId/core-memory/blocks/detach/$blockId",
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("block_id", blockId)
+            }.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc block.detach failed")
+    }
+
+    suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("label", blockLabel)
+            params.value?.let { put("value", it) }
+            params.limit?.let { put("limit", it) }
+            params.description?.let { put("description", it) }
+        }
+        val response = channelTransport.adminRpc(
+            method = "block.update_agent",
+            path = "/v1/agents/$agentId/core-memory/blocks/$blockLabel",
+            body = body.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc block.update_agent failed")
+        val result = response.result ?: error("Iroh admin_rpc block.update_agent returned no result")
+        return json.decodeFromJsonElement(Block.serializer(), result)
+    }
 }
