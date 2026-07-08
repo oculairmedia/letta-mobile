@@ -165,22 +165,14 @@ class AppServerTurnEngine(
         }
         try {
             collectorReady.complete(Unit)
-            var sawAssistantFrame = false
-            var sawToolActivity = false
             client.events.collect { received ->
                 if (!received.matches(scope)) return@collect
                 lastFrameAt.value = currentTimeMs()
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
                     if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
-                    if (draft.isAssistantFrame()) sawAssistantFrame = true
-                    if (draft.isToolActivity()) sawToolActivity = true
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
-                    if (sawAssistantFrame && !sawToolActivity && draft.isUsageStatisticsFrame()) {
-                        emitDraft(command.completedDraft(draft.runId))
-                        throw TurnCompleted
-                    }
                 }
             }
         } finally {
@@ -332,17 +324,6 @@ class AppServerTurnEngine(
             payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started),
         )
 
-    private fun TurnCommand.completedDraft(runId: com.letta.mobile.runtime.RunId?): RuntimeEventDraft =
-        RuntimeEventDraft(
-            backendId = backendId,
-            runtimeId = runtimeId,
-            agentId = agentId,
-            conversationId = conversationId,
-            runId = runId,
-            source = RuntimeEventSource.LocalRuntime,
-            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
-        )
-
     private fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
         RuntimeEventDraft(
             backendId = backendId,
@@ -358,47 +339,6 @@ class AppServerTurnEngine(
         return lifecycle.status == RuntimeRunStatus.Completed ||
             lifecycle.status == RuntimeRunStatus.Failed ||
             lifecycle.status == RuntimeRunStatus.Cancelled
-    }
-
-    private fun RuntimeEventDraft.isAssistantFrame(): Boolean {
-        val frame = payload as? RuntimeEventPayload.RemoteStreamFrame ?: return false
-        return frame.messageType == "assistant_message"
-    }
-
-    private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean {
-        val frame = payload as? RuntimeEventPayload.RemoteStreamFrame ?: return false
-        if (frame.messageType == "usage_statistics") return true
-        val messageType = runCatching {
-            val raw = AppServerProtocol.json.parseToJsonElement(frame.body).jsonObject
-            val delta = raw["delta"]?.jsonObject ?: raw
-            delta.string("message_type")
-        }.getOrNull()
-        return messageType == "usage_statistics"
-    }
-
-    private fun RuntimeEventDraft.isToolActivity(): Boolean = when (payload) {
-        is RuntimeEventPayload.ToolCallObserved,
-        is RuntimeEventPayload.ToolReturnObserved,
-        is RuntimeEventPayload.ApprovalRequested,
-        -> true
-        is RuntimeEventPayload.RemoteStreamFrame -> {
-            val frame = payload as RuntimeEventPayload.RemoteStreamFrame
-            frame.messageType == "tool_call_message" ||
-                frame.messageType == "tool_return_message" ||
-                frame.messageType == "approval_request_message" ||
-                runCatching {
-                    val raw = AppServerProtocol.json.parseToJsonElement(frame.body).jsonObject
-                    val delta = raw["delta"]?.jsonObject ?: raw
-                    delta.string("message_type") in setOf(
-                        "tool_call_message",
-                        "tool_return_message",
-                        "approval_request_message",
-                        "client_tool_start",
-                        "client_tool_end",
-                    )
-                }.getOrDefault(false)
-        }
-        else -> false
     }
 
     private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.matches(
