@@ -15,6 +15,8 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolApprovalDecisionValue
+import com.letta.mobile.runtime.ToolCallId
+import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
@@ -169,6 +171,10 @@ class AppServerTurnEngine(
         var terminalSettleJob: Job? = null
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
+        
+        // letta-mobile-oqfbj: track emitted and returned tool_call_ids for settlement
+        val emittedToolCallIds = mutableSetOf<String>()
+        val returnedToolCallIds = mutableSetOf<String>()
 
         fun rescheduleCompletedTerminal() {
             val terminal = pendingCompleted ?: return
@@ -180,6 +186,8 @@ class AppServerTurnEngine(
             }
         }
 
+        var turnEndReason: String? = null
+        var shouldEmitTerminal = true
         try {
             collectorReady.complete(Unit)
             client.events.collect { received ->
@@ -188,6 +196,23 @@ class AppServerTurnEngine(
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
                     if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
+                    
+                    // letta-mobile-oqfbj: track tool_call emissions and returns
+                    when (val payload = draft.payload) {
+                        is RuntimeEventPayload.ToolCallObserved -> emittedToolCallIds.add(payload.toolCallId.value)
+                        is RuntimeEventPayload.ApprovalRequested -> emittedToolCallIds.add(payload.request.callId.value)
+                        is RuntimeEventPayload.ToolReturnObserved -> returnedToolCallIds.add(payload.toolCallId.value)
+                        is RuntimeEventPayload.RemoteStreamFrame -> {
+                            // Extract tool_call_id from tool_call_message and approval_request_message frames
+                            extractToolCallId(payload.body)?.let { emittedToolCallIds.add(it) }
+                            // Extract returned tool_call_id from tool_return_message frames
+                            if (payload.messageType == "tool_return_message") {
+                                extractToolCallId(payload.body)?.let { returnedToolCallIds.add(it) }
+                            }
+                        }
+                        else -> {}
+                    }
+                    
                     if (draft.isToolReturnFrame()) sawToolReturn = true
                     if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
                     if (draft.isCompletedLifecycle()) {
@@ -195,16 +220,40 @@ class AppServerTurnEngine(
                         rescheduleCompletedTerminal()
                         return@forEach
                     }
+                    // letta-mobile-oqfbj: settle dangling calls BEFORE emitting terminal lifecycle
+                    if (draft.isTerminalLifecycle()) {
+                        settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn termination")
+                        emitDraft(draft)
+                        shouldEmitTerminal = false
+                        throw TurnCompleted
+                    }
                     emitDraft(draft)
-                    if (draft.isTerminalLifecycle()) throw TurnCompleted
                     if (sawAssistantAfterToolReturn && draft.isUsageStatisticsFrame()) {
+                        shouldEmitTerminal = false
+                        settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                         emitDraft(command.completedDraft(draft.runId))
                         throw TurnCompleted
                     }
                     rescheduleCompletedTerminal()
                 }
             }
+        } catch (idle: TurnIdleTimedOutMarker) {
+            // letta-mobile-oqfbj: settle before emitting the failed draft
+            settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
+            throw idle
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // letta-mobile-oqfbj: settle on cancellation/abort
+            turnEndReason = "Tool execution interrupted by cancellation"
+            throw e
+        } catch (e: Throwable) {
+            // letta-mobile-oqfbj: settle on collector failure
+            turnEndReason = "Tool execution interrupted by stream error"
+            throw e
         } finally {
+            // letta-mobile-oqfbj: settle any remaining dangling calls before cleanup
+            if (turnEndReason != null) {
+                settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, turnEndReason)
+            }
             terminalSettleJob?.cancel()
             watchdog.cancel()
         }
@@ -421,6 +470,64 @@ class AppServerTurnEngine(
         val eventRuntime = frame.runtime ?: return true
         return eventRuntime.agentId == scope.agentId &&
             eventRuntime.conversationId == scope.conversationId
+    }
+    
+    /**
+     * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.
+     * Handles tool_call_message, approval_request_message, and tool_return_message frames.
+     */
+    private fun extractToolCallId(body: String): String? = runCatching {
+        val raw = AppServerProtocol.json.parseToJsonElement(body).jsonObject
+        val delta = raw["delta"]?.jsonObject ?: raw
+        // Try tool_call.tool_call_id first (tool_call_message shape)
+        delta["tool_call"]?.jsonObject?.string("tool_call_id")
+            // Then direct tool_call_id field (approval_request_message / tool_return_message shape)
+            ?: delta.string("tool_call_id")
+    }.getOrNull()
+    
+    /**
+     * letta-mobile-oqfbj: emit synthetic ToolReturnObserved drafts for every tool_call_id
+     * that was emitted but never returned. No-op when all emitted calls have returns.
+     * 
+     * Called from the collector's finally block (abnormal exit: cancel, timeout, collector
+     * error) AND from the terminal lifecycle path (when a TERMINAL failure arrives from the
+     * server with dangling calls still in flight).
+     */
+    private suspend fun settleDanglingToolCalls(
+        command: TurnCommand,
+        emittedToolCallIds: Set<String>,
+        returnedToolCallIds: Set<String>,
+        emitDraft: suspend (RuntimeEventDraft) -> Unit,
+        settlementReason: String?,
+    ) {
+        val dangling = emittedToolCallIds - returnedToolCallIds
+        if (dangling.isEmpty()) return
+        
+        val reasonText = settlementReason ?: "Tool execution interrupted by turn completion"
+        
+        for (toolCallId in dangling) {
+            val syntheticReturn = RuntimeEventDraft(
+                backendId = command.backendId,
+                runtimeId = command.runtimeId,
+                agentId = command.agentId,
+                conversationId = command.conversationId,
+                runId = null,
+                source = RuntimeEventSource.LocalRuntime,
+                payload = RuntimeEventPayload.ToolReturnObserved(
+                    toolCallId = ToolCallId(toolCallId),
+                    status = ToolExecutionStatus.Failed,
+                    body = reasonText,
+                ),
+            )
+            emitDraft(syntheticReturn)
+            
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTurn",
+                "settlement.synthesized",
+                "toolCallId" to toolCallId,
+                "reason" to reasonText,
+            )
+        }
     }
 
     private object TurnCompleted : TurnCompletedMarker()
