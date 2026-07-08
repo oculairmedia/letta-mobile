@@ -166,6 +166,7 @@ class AppServerTurnEngine(
         try {
             collectorReady.complete(Unit)
             var sawAssistantFrame = false
+            var sawToolActivity = false
             client.events.collect { received ->
                 if (!received.matches(scope)) return@collect
                 lastFrameAt.value = currentTimeMs()
@@ -173,9 +174,10 @@ class AppServerTurnEngine(
                 drafts.forEach { draft ->
                     if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
                     if (draft.isAssistantFrame()) sawAssistantFrame = true
+                    if (draft.isToolActivity()) sawToolActivity = true
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
-                    if (sawAssistantFrame && draft.isUsageStatisticsFrame()) {
+                    if (sawAssistantFrame && !sawToolActivity && draft.isUsageStatisticsFrame()) {
                         emitDraft(command.completedDraft(draft.runId))
                         throw TurnCompleted
                     }
@@ -372,6 +374,31 @@ class AppServerTurnEngine(
             delta.string("message_type")
         }.getOrNull()
         return messageType == "usage_statistics"
+    }
+
+    private fun RuntimeEventDraft.isToolActivity(): Boolean = when (payload) {
+        is RuntimeEventPayload.ToolCallObserved,
+        is RuntimeEventPayload.ToolReturnObserved,
+        is RuntimeEventPayload.ApprovalRequested,
+        -> true
+        is RuntimeEventPayload.RemoteStreamFrame -> {
+            val frame = payload as RuntimeEventPayload.RemoteStreamFrame
+            frame.messageType == "tool_call_message" ||
+                frame.messageType == "tool_return_message" ||
+                frame.messageType == "approval_request_message" ||
+                runCatching {
+                    val raw = AppServerProtocol.json.parseToJsonElement(frame.body).jsonObject
+                    val delta = raw["delta"]?.jsonObject ?: raw
+                    delta.string("message_type") in setOf(
+                        "tool_call_message",
+                        "tool_return_message",
+                        "approval_request_message",
+                        "client_tool_start",
+                        "client_tool_end",
+                    )
+                }.getOrDefault(false)
+        }
+        else -> false
     }
 
     private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.matches(
