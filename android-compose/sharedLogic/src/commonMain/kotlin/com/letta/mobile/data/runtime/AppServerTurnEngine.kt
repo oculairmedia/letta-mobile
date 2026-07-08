@@ -167,6 +167,8 @@ class AppServerTurnEngine(
         }
         var pendingCompleted: RuntimeEventDraft? = null
         var terminalSettleJob: Job? = null
+        var sawToolReturn = false
+        var sawAssistantAfterToolReturn = false
 
         fun rescheduleCompletedTerminal() {
             val terminal = pendingCompleted ?: return
@@ -186,6 +188,8 @@ class AppServerTurnEngine(
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
                     if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
+                    if (draft.isToolReturnFrame()) sawToolReturn = true
+                    if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
                     if (draft.isCompletedLifecycle()) {
                         pendingCompleted = draft
                         rescheduleCompletedTerminal()
@@ -193,6 +197,10 @@ class AppServerTurnEngine(
                     }
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
+                    if (sawAssistantAfterToolReturn && draft.isUsageStatisticsFrame()) {
+                        emitDraft(command.completedDraft(draft.runId))
+                        throw TurnCompleted
+                    }
                     rescheduleCompletedTerminal()
                 }
             }
@@ -346,6 +354,17 @@ class AppServerTurnEngine(
             payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started),
         )
 
+    private fun TurnCommand.completedDraft(runId: com.letta.mobile.runtime.RunId?): RuntimeEventDraft =
+        RuntimeEventDraft(
+            backendId = backendId,
+            runtimeId = runtimeId,
+            agentId = agentId,
+            conversationId = conversationId,
+            runId = runId,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed),
+        )
+
     private fun TurnCommand.failedDraft(reason: String): RuntimeEventDraft =
         RuntimeEventDraft(
             backendId = backendId,
@@ -367,6 +386,34 @@ class AppServerTurnEngine(
         val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
         return lifecycle.status == RuntimeRunStatus.Completed
     }
+
+    private fun RuntimeEventDraft.isToolReturnFrame(): Boolean = when (val event = payload) {
+        is RuntimeEventPayload.ToolReturnObserved -> true
+        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_end" ||
+            event.messageType == "tool_return_message" ||
+            frameMessageType(event.body) in setOf("client_tool_end", "tool_return_message")
+        else -> false
+    }
+
+    private fun RuntimeEventDraft.isAssistantFrame(): Boolean = when (val event = payload) {
+        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "assistant_message" ||
+            frameMessageType(event.body) == "assistant_message"
+        else -> false
+    }
+
+    private fun RuntimeEventDraft.isUsageStatisticsFrame(): Boolean = when (val event = payload) {
+        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "usage_statistics" ||
+            frameMessageType(event.body) == "usage_statistics"
+        is RuntimeEventPayload.ExternalTransportFrame -> event.body.startsWith("usage:") ||
+            frameMessageType(event.body) == "usage_statistics"
+        else -> false
+    }
+
+    private fun frameMessageType(body: String): String? = runCatching {
+        val raw = AppServerProtocol.json.parseToJsonElement(body).jsonObject
+        val delta = raw["delta"]?.jsonObject ?: raw
+        delta.string("message_type")
+    }.getOrNull()
 
     private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,

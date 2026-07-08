@@ -68,6 +68,36 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun runTurnCompletesOnUsageAfterPostToolAssistantText() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            runCurrent()
+            expectNoEvents()
+
+            client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1"))
+            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-2"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            client.emit(streamDelta(messageType = "usage_statistics", runId = "run-2"))
+            assertEquals("usage_statistics", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+    }
+
+    @Test
     fun unrestrictedRuntimeAutoApprovesControlRequestsWithoutEmittingApprovalCards() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(
