@@ -29,6 +29,7 @@ import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
+import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
@@ -269,6 +270,12 @@ class SessionGraphFactory internal constructor(
                 modelApi = modelApi,
                 localModelSource = localModelSource,
                 settingsRepository = settingsRepository,
+                irohModelSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcModelSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
             ),
             passageRepository = PassageRepository(passageApi),
             projectRepository = ProjectRepository(projectApi),
