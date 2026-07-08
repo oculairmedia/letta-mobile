@@ -157,7 +157,17 @@ internal class TimelineOutboundSendProcessor(
     }
 
     private suspend fun listMessagesWithRetry(otid: String): List<LettaMessage> {
-        val afterCursor = state.value.liveCursor
+        // #827 review (P2): the `after` cursor MUST be a backend message id. Over
+        // Iroh the streamed row's serverId (stored in liveCursor) is now an
+        // optimistic `cm-stream-*` / `cm-reason-*` id (so mobile can dedupe it
+        // against the disk copy) — that is NOT a backend id and cannot be used to
+        // paginate message.list. If liveCursor is a tagged optimistic id, drop the
+        // cursor and do the no-cursor recent-refetch (order=desc) instead, exactly
+        // as when liveCursor is null. Backend ids still page normally.
+        val liveCursor = state.value.liveCursor
+        val afterCursor = liveCursor?.takeUnless {
+            it.startsWith("cm-") || it.startsWith("client-")
+        }
         var lastError: Throwable? = null
         for (attempt in 0 until RECONCILE_RETRY_ATTEMPTS) {
             try {

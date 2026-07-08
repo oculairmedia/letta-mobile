@@ -844,6 +844,7 @@ class IrohNodeConnection(
         }.getOrDefault(rawFrame)
     }
 
+
     private fun frameType(rawFrame: String): String? = runCatching {
         AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull
     }.getOrNull()

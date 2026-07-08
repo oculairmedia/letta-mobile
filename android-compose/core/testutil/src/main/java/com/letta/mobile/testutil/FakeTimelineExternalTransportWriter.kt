@@ -40,11 +40,11 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         return otid
     }
 
-    override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage) {
+    override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) {
         ingestedMessages += IngestedMessage(conversationId, message)
     }
 
-    override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage) {
+    override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) {
         ingestedMessages += IngestedMessage(scopedConversationId(agentId, conversationId), message)
     }
 

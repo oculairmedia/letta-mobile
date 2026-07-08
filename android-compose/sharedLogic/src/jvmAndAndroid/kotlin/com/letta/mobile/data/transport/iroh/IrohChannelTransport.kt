@@ -92,8 +92,24 @@ class IrohChannelTransport(
             "messageId" to frameMessageId(frame),
             "conversationId" to frameConversationId(frame),
         )
+        frameFlowContent(frame)?.let { (key, type, content) ->
+            IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
+        }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
+    }
+
+    /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
+    private fun frameFlowContent(frame: ServerFrame): Triple<String, String, String>? = when (frame) {
+        is ServerFrame.AssistantMessage -> {
+            val f: ServerFrame.AssistantMessage = frame
+            Triple(f.otid ?: f.id, "assistant_message", f.content)
+        }
+        is ServerFrame.ReasoningMessage -> {
+            val f: ServerFrame.ReasoningMessage = frame
+            Triple(f.id, "reasoning_message", f.reasoning)
+        }
+        else -> null
     }
 
     private var activeSendJob: kotlinx.coroutines.Job? = null

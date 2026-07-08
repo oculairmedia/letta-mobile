@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
@@ -11,6 +13,7 @@ data class TimelineReducerInput(
     val prev: Timeline,
     val frame: LettaMessage,
     val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
+    val source: String = "unknown",
 )
 
 data class TimelineReducerOutput(
@@ -26,6 +29,21 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     val pendingEvents = mutableListOf<TimelineSyncEvent>()
     val conversationId = input.prev.conversationId
     val message = input.frame
+
+    // FrameFlowDiag: content-length at the reducer INGEST gate. Compare against
+    // gate1.emit (IrohChannelTransport) to locate where fragment characters are
+    // dropped between transport emit and reducer ingest.
+    if (com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.enabled()) {
+        when (message) {
+            is AssistantMessage -> com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record(
+                "gate.reduceIngest.${input.source}", message.otid ?: message.id, "assistant_message", message.content,
+            )
+            is ReasoningMessage -> com.letta.mobile.data.transport.iroh.IrohFrameFlowDiagnostics.record(
+                "gate.reduceIngest.${input.source}", message.otid ?: message.id, "reasoning_message", message.reasoning,
+            )
+            else -> Unit
+        }
+    }
 
     fun output(notification: PendingIngestNotification? = null): TimelineReducerOutput =
         TimelineReducerOutput(
@@ -247,33 +265,32 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
 
     val otidMatch = timeline.findByOtid(confirmed.otid) as? TimelineEvent.Confirmed
     if (otidMatch != null) {
-        // letta-mobile: the App Server streams CUMULATIVE assistant deltas — each
-        // chunk carries the full text so far. Over Iroh the server mints a NEW
-        // backend `letta-msg-*` id per chunk (unlike the WS path, where the id is
-        // stable), so findByServerId misses and each fuller cumulative snapshot
-        // would otherwise be DROPPED here as an otid duplicate — leaving the UI
-        // stuck on the first fragment ("Got" instead of the full reply). When the
-        // otid-matched row is an assistant message and the incoming frame is a
-        // fuller cumulative snapshot of the SAME otid, merge the newer text into
-        // the existing row (keyed by the row's stable serverId) instead of
-        // dropping it. Distinct assistant messages carry distinct otids, so
-        // tool-mediated multi-assistant runs stay separate.
+        // App Server assistant frames for one logical reply share a stable otid,
+        // while backend server ids may rotate per chunk. The chunk body can be a
+        // cumulative snapshot ("Got" -> "Got it") or an incremental token stream
+        // ("I" -> "'m" -> " Lester"), but seq ids still tell us whether an
+        // incoming frame is forward progress. Merge forward same-otid assistant
+        // text into the existing row instead of dropping it as an otid duplicate;
+        // distinct assistant messages carry distinct otids, so tool-mediated
+        // multi-assistant runs stay separate.
         val bothAssistant = otidMatch.messageType == TimelineMessageType.ASSISTANT &&
             confirmed.messageType == TimelineMessageType.ASSISTANT
         val merge = if (bothAssistant) {
-            // Same-otid assistant frames are ALWAYS cumulative snapshots (each
-            // chunk carries the full text so far). Codex review P2: when seq
-            // ids are absent (both nullable on the wire), the old
-            // canUseSnapshotMerge=false path fell through to APPEND, turning
-            // "Got" + "Got it" into "GotGot it". Because same-otid frames are
-            // cumulative by contract, snapshot-merge is always safe here — the
-            // longer/equal text wins, never concatenation.
+            // Same-otid assistant frames with seq ids support both cumulative
+            // snapshots and incremental tokens. Snapshot-merge remains enabled so
+            // cumulative growth replaces the prior body before any append logic,
+            // while incomingIsForwardDelta + incrementalForwardAppend ensures only
+            // monotonic forward tokens bypass the STALE/SUFFIX drop branches.
             mergeStreamText(
                 existing = otidMatch.content,
                 incoming = confirmed.content,
                 canUseSnapshotMerge = true,
                 incomingIsForwardDelta = otidMatch.seqId == null || confirmed.seqId == null ||
                     confirmed.seqId > otidMatch.seqId,
+                // h30cy: for monotonic forward incremental tokens, a
+                // prefix/suffix byte coincidence is new text, not a stale resend;
+                // true cumulative snapshots still route to CUMULATIVE above.
+                incrementalForwardAppend = true,
             )
         } else {
             null
@@ -368,6 +385,9 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             canUseSnapshotMerge = otidRow.seqId != null && confirmed.seqId != null,
             incomingIsForwardDelta = otidRow.seqId == null || confirmed.seqId == null ||
                 confirmed.seqId > otidRow.seqId,
+            // h30cy: same-otid monotonic forward tokens must append even when
+            // their bytes coincide with existing prefix/suffix text.
+            incrementalForwardAppend = true,
         )
         val merged = otidRow.copy(
             content = merge.text,
