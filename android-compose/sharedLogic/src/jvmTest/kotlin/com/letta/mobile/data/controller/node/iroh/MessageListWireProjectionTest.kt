@@ -33,7 +33,7 @@ class MessageListWireProjectionTest {
     @Test
     fun bodyAtThresholdIsNotProjected() {
         val body = "a".repeat(threshold)
-        val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")
+        val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")!!
 
         assertEquals(body, projected.getValue("tool_return").jsonPrimitive.content)
         assertNull(projected["tool_return_truncated"])
@@ -44,7 +44,7 @@ class MessageListWireProjectionTest {
     @Test
     fun bodyOneByteOverThresholdIsProjectedWithPreviewAndPointer() {
         val body = "a".repeat(threshold + 1)
-        val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")
+        val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")!!
 
         val preview = projected.getValue("tool_return").jsonPrimitive.content
         assertTrue(preview.startsWith("a".repeat(previewBytes)))
@@ -65,7 +65,7 @@ class MessageListWireProjectionTest {
     fun previewNeverSplitsAMultiByteCodePoint() {
         // 3-byte UTF-8 chars; 2048 is not a multiple of 3 so a naive cut splits one.
         val body = "€".repeat(threshold) // euro sign, 3 bytes each
-        val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")
+        val projected = MessageListWireProjection.projectMessage(toolReturnMessage(body), "conv-1")!!
         val preview = projected.getValue("tool_return").jsonPrimitive.content
         val kept = preview.substringBefore("\n…")
         assertTrue(MessageListWireProjection.utf8ByteLength(kept) <= previewBytes)
@@ -80,7 +80,7 @@ class MessageListWireProjectionTest {
             put("message_type", "tool_return_message")
             put("tool_return", big)
         }
-        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")!!
 
         assertTrue(projected.getValue("tool_return").jsonPrimitive.isString)
         assertTrue(projected.getValue("tool_return_truncated").jsonPrimitive.boolean)
@@ -105,7 +105,7 @@ class MessageListWireProjectionTest {
             )
             put("stdout", buildJsonArray { add(JsonPrimitive("line ".repeat(threshold))) })
         }
-        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")!!
 
         val entry = projected.getValue("tool_returns").jsonArray.single().jsonObject
         assertTrue(entry.getValue("func_response").jsonPrimitive.content.contains("[truncated"))
@@ -249,7 +249,7 @@ class MessageListWireProjectionTest {
                 },
             )
         }
-        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")!!
 
         assertSame(message, projected)
         assertNull(projected["tool_return_truncated"])
@@ -262,8 +262,122 @@ class MessageListWireProjectionTest {
             put("message_type", "assistant_message")
             put("content", "no images here")
         }
-        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")!!
         assertSame(message, projected)
         assertFalse("tool_return_truncated" in projected)
+    }
+
+    @Test
+    fun syntheticSkillInstructionEnvelopeIsSuppressedFromProjection() {
+        // letta-mobile-dz5a8 (P1): synthetic role:user skill-instruction
+        // envelopes (content starts with or contains <skill ...> / <skill-name>
+        // XML block, often with trailing "ARGUMENTS:" line) must be suppressed
+        // from message.list projection so they don't render as giant blue user
+        // bubbles on the phone. The persisted backend row stays intact for
+        // model context; only the wire projection filters them out.
+        val skillEnvelopeMessage = buildJsonObject {
+            put("id", "msg-skill-1")
+            put("role", "user")
+            put("message_type", "user_message")
+            put("content", """
+                <skill id="asus-router">
+                <skill-name>asus-router</skill-name>
+                <skill-description>Pull stats from ASUS RT-AX82U router...</skill-description>
+                </skill>
+                
+                ARGUMENTS:
+                { "action": "get_stats" }
+            """.trimIndent())
+        }
+
+        val projected = MessageListWireProjection.projectMessage(skillEnvelopeMessage, "conv-1")
+
+        assertNull(projected, "Synthetic skill-instruction envelope should be suppressed from projection")
+    }
+
+    @Test
+    fun skillEnvelopeWithLeadingSkillTagIsSuppressed() {
+        val message = buildJsonObject {
+            put("id", "msg-skill-2")
+            put("role", "user")
+            put("message_type", "user_message")
+            put("content", "<skill id=\"test\">content</skill>\n\nARGUMENTS:\n{}")
+        }
+
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+
+        assertNull(projected, "Message with leading <skill...> tag should be suppressed")
+    }
+
+    @Test
+    fun skillEnvelopeWithClosingSkillTagIsSuppressed() {
+        val message = buildJsonObject {
+            put("id", "msg-skill-3")
+            put("role", "user")
+            put("message_type", "user_message")
+            put("content", "some preamble\n</skill>\n\nARGUMENTS:\n{\"key\": \"value\"}")
+        }
+
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+
+        assertNull(projected, "Message containing </skill> should be suppressed")
+    }
+
+    @Test
+    fun regularUserMessageWithSkillWordIsNotSuppressed() {
+        val message = buildJsonObject {
+            put("id", "msg-user")
+            put("role", "user")
+            put("message_type", "user_message")
+            put("content", "I want to learn a new skill today")
+        }
+
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+
+        assertSame(message, projected, "Regular user message mentioning 'skill' should pass through")
+    }
+
+    @Test
+    fun assistantMessageIsNeverSuppressedEvenWithSkillTags() {
+        val message = buildJsonObject {
+            put("id", "msg-assistant")
+            put("role", "assistant")
+            put("message_type", "assistant_message")
+            put("content", "<skill>this is in assistant output</skill>")
+        }
+
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+
+        assertSame(message, projected, "Assistant messages should never be suppressed")
+    }
+
+    @Test
+    fun skillEnvelopeMessageListArrayFiltersOutSyntheticRows() {
+        val page = buildJsonArray {
+            add(buildJsonObject {
+                put("id", "msg-1")
+                put("role", "user")
+                put("message_type", "user_message")
+                put("content", "What's the router status?")
+            })
+            add(buildJsonObject {
+                put("id", "msg-skill")
+                put("role", "user")
+                put("message_type", "user_message")
+                put("content", "<skill id=\"asus-router\">...</skill>\n\nARGUMENTS:\n{}")
+            })
+            add(buildJsonObject {
+                put("id", "msg-2")
+                put("role", "assistant")
+                put("message_type", "assistant_message")
+                put("content", "Here are the stats...")
+            })
+        }
+
+        val projected = MessageListWireProjection.projectMessageList(page, "conv-1") as JsonArray
+
+        assertEquals(2, projected.size, "Skill-instruction envelope should be filtered from list")
+        assertEquals("msg-1", projected[0].jsonObject.getValue("id").jsonPrimitive.content)
+        assertEquals("msg-2", projected[1].jsonObject.getValue("id").jsonPrimitive.content)
     }
 }
