@@ -502,6 +502,7 @@ class IrohNodeConnection(
         // Tracks tool_calls opened but not yet returned so failure/abort can
         // close them with a synthetic tool_return before the terminal (8s45p).
         val openToolCalls = OpenToolCallTracker()
+        val cumulativeText = CumulativeStreamText()
         runCatching {
             controller.runTurn(command).collect { draft ->
                 val payload = draft.payload
@@ -519,7 +520,7 @@ class IrohNodeConnection(
                 if (payload.isFailureOrCancelLifecycle()) {
                     flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
                 }
-                terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls) || terminalWritten
+                terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls, cumulativeText) || terminalWritten
             }
         }.onFailure { error ->
             val wroteTerminal = runCatching {
@@ -608,6 +609,7 @@ class IrohNodeConnection(
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
         payload: RuntimeEventPayload,
         openToolCalls: OpenToolCallTracker,
+        cumulativeText: CumulativeStreamText,
     ): Boolean {
         return when (payload) {
             // DefaultAppServerController already gives us raw App Server wire
@@ -615,13 +617,15 @@ class IrohNodeConnection(
             // preserve message_type, runtime metadata, and terminal semantics.
             is RuntimeEventPayload.RemoteStreamFrame -> {
                 openToolCalls.observe(payload.body)
-                writeRawFrame(streamSend, payload.body)
-                rawFrameIsTerminal(payload.body)
+                val outgoing = cumulativeText.applyToRawFrame(payload.body)
+                writeRawFrame(streamSend, outgoing)
+                rawFrameIsTerminal(outgoing)
             }
             is RuntimeEventPayload.ExternalTransportFrame -> {
                 openToolCalls.observe(payload.body)
-                writeRawFrame(streamSend, payload.body)
-                rawFrameIsTerminal(payload.body)
+                val outgoing = cumulativeText.applyToRawFrame(payload.body)
+                writeRawFrame(streamSend, outgoing)
+                rawFrameIsTerminal(outgoing)
             }
             is RuntimeEventPayload.RunLifecycleChanged -> if (payload.status == RuntimeRunStatus.Completed) {
                 writeStreamDelta(
@@ -725,6 +729,63 @@ class IrohNodeConnection(
         }
     }
 
+
+    private class CumulativeStreamText {
+        private val byKey = LinkedHashMap<String, String>()
+
+        private fun textFrom(element: kotlinx.serialization.json.JsonElement?): String? {
+            if (element == null) return null
+            (element as? JsonPrimitive)?.contentOrNull?.let { return it }
+            val array = element as? kotlinx.serialization.json.JsonArray ?: return null
+            return array.joinToString("") { part ->
+                runCatching {
+                    val obj = part.jsonObject
+                    if (obj["type"]?.jsonPrimitive?.contentOrNull == "text") {
+                        obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                    } else {
+                        ""
+                    }
+                }.getOrDefault("")
+            }.takeIf { it.isNotEmpty() }
+        }
+
+        fun applyToRawFrame(rawFrame: String): String = runCatching {
+            val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
+            if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
+            val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
+            val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
+            if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
+                return@runCatching rawFrame
+            }
+            val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
+                ?: delta["id"]?.jsonPrimitive?.contentOrNull
+                ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
+                ?: messageType
+            val field = if (messageType == "assistant_message") "content" else "reasoning"
+            val chunk = textFrom(delta[field])
+                ?: textFrom(delta["content"])
+                ?: textFrom(delta["text"])
+                ?: return@runCatching rawFrame
+            val existing = byKey[textKey].orEmpty()
+            val cumulative = when {
+                existing.isEmpty() -> chunk
+                chunk.startsWith(existing) -> chunk
+                existing.endsWith(chunk) -> existing
+                else -> existing + chunk
+            }.also { byKey[textKey] = it }
+            val cumulativeDelta = buildJsonObject {
+                delta.forEach { (key, value) -> if (key != field) put(key, value) }
+                put(field, cumulative)
+                if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
+                    put("reasoning", cumulative)
+                }
+            }
+            buildJsonObject {
+                obj.forEach { (key, value) -> if (key != "delta") put(key, value) }
+                put("delta", cumulativeDelta)
+            }.toString()
+        }.getOrDefault(rawFrame)
+    }
 
     private fun frameType(rawFrame: String): String? = runCatching {
         AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull

@@ -157,6 +157,34 @@ internal class ChatTimelineObserver(
                     // storm over every tool card. Telemetry was already emitted
                     // as uiProjection.suppressed by the presenter.
                     if (projection.noChange) {
+                        val prev = uiState.value
+                        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
+                            clearFollowingDuplicateInitialMessageInFlight()
+                        }
+                        val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
+                        val a2uiResponseArrived = a2uiStartMessageCount != null && projection.ui
+                            .drop(a2uiStartMessageCount)
+                            .any { it.role == "assistant" && !it.isReasoning }
+                        if (a2uiResponseArrived) {
+                            clearA2uiThinkingOnResponse()
+                        }
+                        val presentation = presenter.present(
+                            projection = projection,
+                            signals = ChatPresenceSignals(
+                                replyStreaming = activeReplyStreams.value.contains(conversationId),
+                                clientModeStreamInFlight = isClientModeStreamInFlight(),
+                                a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
+                                duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
+                            ),
+                            previousIsStreaming = prev.isStreaming,
+                            previousIsAgentTyping = prev.isAgentTyping,
+                        )
+                        if (presentation.isStreaming != prev.isStreaming || presentation.isAgentTyping != prev.isAgentTyping) {
+                            uiState.value = prev.copy(
+                                isStreaming = presentation.isStreaming,
+                                isAgentTyping = presentation.isAgentTyping,
+                            )
+                        }
                         return@collect
                     }
                     val ui = projection.ui

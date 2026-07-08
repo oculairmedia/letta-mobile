@@ -50,6 +50,7 @@ class DefaultAppServerController(
         AppServerTurnEngine(
             client = client,
             clientInfo = clientInfo,
+            permissionMode = AppServerPermissionMode.Unrestricted,
             requestIdFactory = requestIdFactory,
         )
     }

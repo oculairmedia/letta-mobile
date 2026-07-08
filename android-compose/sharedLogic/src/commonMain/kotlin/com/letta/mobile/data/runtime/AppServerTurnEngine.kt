@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -26,6 +27,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * TurnEngine backed by one App Server client/control owner.
@@ -162,6 +167,7 @@ class AppServerTurnEngine(
                 lastFrameAt.value = currentTimeMs()
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
+                    if (autoApproveIfAllowed(scope, draft)) return@forEach
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
                 }
@@ -170,6 +176,72 @@ class AppServerTurnEngine(
             watchdog.cancel()
         }
     }
+
+    private suspend fun autoApproveIfAllowed(
+        scope: AppServerRuntimeScope,
+        draft: RuntimeEventDraft,
+    ): Boolean {
+        if (permissionMode != AppServerPermissionMode.Unrestricted) return false
+        val approval = draft.toApprovalAutoAllowRequest() ?: return false
+        com.letta.mobile.util.Telemetry.event(
+            "IrohTurn", "approval.auto_allow",
+            "approvalId" to approval.requestId,
+            "toolCallId" to (approval.toolCallId ?: ""),
+            "tool" to (approval.toolName ?: ""),
+            "source" to approval.source,
+        )
+        client.input(
+            AppServerCommand.Input(
+                runtime = scope,
+                payload = AppServerInputPayload.ApprovalResponse(
+                    requestId = approval.requestId,
+                    decision = AppServerApprovalResponseDecision.Allow(
+                        message = "Approved by default mobile policy.",
+                    ),
+                ),
+            ),
+        )
+        return true
+    }
+
+    private fun RuntimeEventDraft.toApprovalAutoAllowRequest(): ApprovalAutoAllowRequest? {
+        when (val payload = this.payload) {
+            is RuntimeEventPayload.ApprovalRequested -> return ApprovalAutoAllowRequest(
+                requestId = payload.request.approvalId.value,
+                toolCallId = payload.request.callId.value,
+                toolName = payload.request.toolName.value,
+                source = "control_request",
+            )
+            is RuntimeEventPayload.RemoteStreamFrame -> {
+                if (payload.messageType != "approval_request_message") return null
+                val delta = runCatching {
+                    val raw = AppServerProtocol.json.parseToJsonElement(payload.body).jsonObject
+                    raw["delta"]?.jsonObject ?: raw
+                }.getOrNull() ?: return null
+                val requestId = delta.string("approval_request_id")
+                    ?: delta.string("id")
+                    ?: payload.messageId
+                    ?: payload.frameId
+                val toolCall = delta["tool_call"] as? JsonObject
+                return ApprovalAutoAllowRequest(
+                    requestId = requestId,
+                    toolCallId = toolCall?.string("tool_call_id") ?: delta.string("tool_call_id"),
+                    toolName = toolCall?.string("name") ?: delta.string("tool_name") ?: delta.string("name"),
+                    source = "approval_request_message",
+                )
+            }
+            else -> return null
+        }
+    }
+
+    private data class ApprovalAutoAllowRequest(
+        val requestId: String,
+        val toolCallId: String?,
+        val toolName: String?,
+        val source: String,
+    )
+
+    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     private suspend fun ensureRuntime(command: TurnCommand): AppServerRuntimeScope {
         runtime?.let { cached ->

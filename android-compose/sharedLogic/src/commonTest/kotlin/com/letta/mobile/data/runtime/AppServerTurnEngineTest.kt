@@ -2,9 +2,12 @@ package com.letta.mobile.data.runtime
 
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInputPayload
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -62,6 +65,94 @@ class AppServerTurnEngineTest {
         }
 
         assertEquals("runtime-start-1", client.runtimeStartCommands.single().requestId)
+    }
+
+    @Test
+    fun unrestrictedRuntimeAutoApprovesControlRequestsWithoutEmittingApprovalCards() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            permissionMode = AppServerPermissionMode.Unrestricted,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            val userInput = assertIs<AppServerCommand.Input>(client.sentCommands.single())
+            assertIs<AppServerInputPayload.CreateMessage>(userInput.payload)
+
+            client.emit(
+                AppServerInboundFrame.ControlRequest(
+                    requestId = "approval-1",
+                    request = buildJsonObject {
+                        put("subtype", "can_use_tool")
+                        put("tool_name", "searxng_web_search")
+                        put("tool_call_id", "tool-call-1")
+                        put("input", buildJsonObject { put("query", "iroh") })
+                    },
+                    agentId = runtime.agentId,
+                    conversationId = runtime.conversationId,
+                ),
+            )
+            runCurrent()
+
+            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
+            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
+            assertEquals("approval-1", approval.requestId)
+            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            expectNoEvents()
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun unrestrictedRuntimeAutoApprovesStreamedApprovalRequestMessagesWithoutEmittingCards() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            permissionMode = AppServerPermissionMode.Unrestricted,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerInputPayload.CreateMessage>(assertIs<AppServerCommand.Input>(client.sentCommands.single()).payload)
+
+            val approvalDelta = buildJsonObject {
+                put("message_type", "approval_request_message")
+                put("id", "approval-1")
+                put("run_id", "run-1")
+                put("tool_call", buildJsonObject {
+                    put("tool_call_id", "tool-call-1")
+                    put("name", "Skill")
+                    put("arguments", "{}")
+                })
+            }
+            client.emit(
+                AppServerInboundFrame.StreamDelta(
+                    runtime = runtime,
+                    eventSeq = 1,
+                    emittedAt = "2026-06-24T00:00:00Z",
+                    idempotencyKey = "approval-evt-1",
+                    delta = approvalDelta,
+                ),
+            )
+            runCurrent()
+
+            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
+            assertEquals(runtime, approvalInput.runtime)
+            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
+            assertEquals("approval-1", approval.requestId)
+            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+            expectNoEvents()
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
     }
 
     @Test
@@ -211,8 +302,14 @@ private class FakeAppServerClient : AppServerClient {
     override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
         error("abort is not used by these tests")
 
-    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        throw UnsupportedOperationException()
+    override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
+        sentCommands += command
+        return AppServerInboundFrame.AdminRpcResponse(
+            requestId = command.requestId,
+            success = true,
+            result = null,
+        )
+    }
 
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) {
         sentCommands += command
@@ -226,6 +323,9 @@ private class FakeAppServerClient : AppServerClient {
                 raw = buildJsonObject {
                     put("type", frame.type ?: "unknown")
                     put("idempotency_key", "evt-1")
+                    if (frame is AppServerInboundFrame.StreamDelta) {
+                        put("delta", frame.delta)
+                    }
                 },
             ),
         )
