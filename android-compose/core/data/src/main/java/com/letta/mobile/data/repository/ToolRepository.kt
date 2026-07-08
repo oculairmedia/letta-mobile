@@ -18,6 +18,7 @@ import javax.inject.Inject
 
 open class ToolRepository @Inject constructor(
     private val toolApi: ToolApi,
+    private val irohToolSource: IrohAdminRpcToolSource? = null,
 ) : IToolRepository {
     private val _tools = MutableStateFlow<List<Tool>>(emptyList())
     private val _toolsByAgent = MutableStateFlow<Map<String, List<Tool>>>(emptyMap())
@@ -37,6 +38,12 @@ open class ToolRepository @Inject constructor(
     }
 
     private suspend fun refreshToolsLocked() {
+        val irohSource = irohToolSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _tools.update { irohSource.listTools() }
+            lastRefreshAtMillis = System.currentTimeMillis()
+            return
+        }
         _tools.update { toolApi.listTools() }
         lastRefreshAtMillis = System.currentTimeMillis()
     }
@@ -81,7 +88,12 @@ open class ToolRepository @Inject constructor(
     }
 
     override open suspend fun upsertTool(params: ToolCreateParams): Tool {
-        val tool = toolApi.upsertTool(params)
+        val irohSource = irohToolSource
+        val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.createTool(params)
+        } else {
+            toolApi.upsertTool(params)
+        }
         _tools.update { current ->
             val index = current.indexOfFirst { it.id == tool.id }
             if (index >= 0) current.toMutableList().apply { this[index] = tool } else current + tool
@@ -90,7 +102,12 @@ open class ToolRepository @Inject constructor(
     }
 
     override open suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
-        val tool = toolApi.updateTool(toolId, params)
+        val irohSource = irohToolSource
+        val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.updateTool(toolId, params)
+        } else {
+            toolApi.updateTool(toolId, params)
+        }
         _tools.update { current ->
             current.map { existing -> if (existing.id == tool.id) tool else existing }
         }
@@ -103,7 +120,12 @@ open class ToolRepository @Inject constructor(
     }
 
     override open suspend fun deleteTool(toolId: String) {
-        toolApi.deleteTool(toolId)
+        val irohSource = irohToolSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.deleteTool(toolId)
+        } else {
+            toolApi.deleteTool(toolId)
+        }
         _tools.update { current -> current.filterNot { it.id == ToolId(toolId) } }
         _toolsByAgent.update { current ->
             current.mapValues { (_, tools) -> tools.filterNot { it.id == ToolId(toolId) } }
