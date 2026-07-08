@@ -101,6 +101,14 @@ internal object IrohStreamDeltaServerFrameMapper {
 
             "usage_statistics" -> listOf(mapUsage(delta, meta))
 
+            // Parity with the TS shim (mobile-channel-host.ts lcp-8ri): a
+            // stop_reason frame reaching this mapper is NON-terminal (the
+            // runtime event mapper already converts terminal reasons into a
+            // Completed lifecycle). Multi-step tool turns emit intermediate
+            // stop_reasons like `requires_approval`; emitting TurnDone here
+            // ended the UI turn before the tool return / post-tool assistant
+            // continuation. Emit only the StopReason frame — TurnDone comes
+            // exclusively from the engine's terminal lifecycle.
             "stop_reason" -> listOf(
                 ServerFrame.StopReason(
                     id = meta.frameId,
@@ -108,14 +116,6 @@ internal object IrohStreamDeltaServerFrameMapper {
                     turnId = meta.turnId,
                     runId = meta.runId,
                     stopReason = delta.string("stop_reason") ?: delta.string("reason") ?: "end_turn",
-                    seq = meta.eventSeq,
-                ),
-                ServerFrame.TurnDone(
-                    id = meta.frameId,
-                    ts = meta.timestamp,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                    status = "completed",
                     seq = meta.eventSeq,
                 ),
             )
