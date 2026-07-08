@@ -14,6 +14,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -31,6 +32,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -1070,6 +1072,111 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
+    fun `redial during active turn reconciles and settles without resend`() = runTest {
+        val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
+        val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-default-agent-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-redial",
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                runId = "run-redial",
+            )
+        )
+        advanceUntilIdle()
+
+        redials.emit(
+            RedialWhileTurnActive(
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                turnId = "turn-redial",
+                runId = "run-redial",
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery", emptySet(), true)),
+            timelineRepository.recentReconciles,
+        )
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+        verify(exactly = 1) {
+            wsChatBridge.send(
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                text = "hello",
+                otid = any(),
+                attachments = emptyList(),
+                startNewConversation = false,
+            )
+        }
+    }
+
+    @Test
+    fun `replayed terminal on new connection settles active turn`() = runTest {
+        val events = MutableSharedFlow<WsTimelineEvent>(extraBufferCapacity = 4)
+        val wsChatBridge = mockBridge(sendAccepted = true, eventFlow = events)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-default-agent-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        verify(exactly = 0) { wsChatBridge.send(any(), any(), any(), any(), any(), any()) }
+        wsChatBridge.send(
+            agentId = "agent-1",
+            conversationId = "conv-default-agent-1",
+            text = "hello",
+            otid = "cm-test",
+            attachments = emptyList(),
+            startNewConversation = false,
+        )
+        events.emit(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-replay",
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                runId = "run-replay",
+            )
+        )
+        events.emit(WsTimelineEvent.TurnDone(turnId = "turn-replay", runId = "run-replay", status = "completed"))
+        advanceUntilIdle()
+
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
+    }
+
+    @Test
     fun `failed turn marks active optimistic local failed`() = runTest {
         val wsChatBridge = mockBridge(sendAccepted = true)
         val timelineRepository = FakeTimelineExternalTransportWriter()
@@ -1239,16 +1346,19 @@ class WsChatSendCoordinatorTest {
     private fun mockBridge(
         sendAccepted: Boolean,
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
+        redialFlow: kotlinx.coroutines.flow.Flow<RedialWhileTurnActive> = emptyFlow(),
         cancelResult: Boolean = true,
     ): WsChatBridge = mockBridge(
         sendResults = listOf(sendAccepted),
         eventFlow = eventFlow,
+        redialFlow = redialFlow,
         cancelResult = cancelResult,
     )
 
     private fun mockBridge(
         sendResults: List<Boolean>,
         eventFlow: kotlinx.coroutines.flow.Flow<WsTimelineEvent> = emptyFlow(),
+        redialFlow: kotlinx.coroutines.flow.Flow<RedialWhileTurnActive> = emptyFlow(),
         cancelResult: Boolean = true,
     ): WsChatBridge = mockk(relaxed = true) {
         every { state } returns MutableStateFlow(
@@ -1259,6 +1369,7 @@ class WsChatSendCoordinatorTest {
             )
         )
         every { events } returns eventFlow
+        every { redialWhileTurnActive } returns redialFlow
         every { isConnected() } returns true
         coEvery { awaitConnected() } returns WsConnectionState.Connected(
             a2uiEnabled = false,

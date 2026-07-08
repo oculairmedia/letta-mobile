@@ -14,6 +14,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -99,6 +100,9 @@ class ChatSendCoordinator(
     init {
         scope.launch {
             wsChatBridge.events.collect { event -> handleEvent(event) }
+        }
+        scope.launch {
+            wsChatBridge.redialWhileTurnActive.collect { event -> handleRedialWhileTurnActive(event) }
         }
     }
 
@@ -663,6 +667,41 @@ class ChatSendCoordinator(
             is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event, activeWsConversationId)
         }
+    }
+
+    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) {
+        if (event.agentId != agentId) return
+        val activeConversation = activeWsConversationId ?: activeConversationId()
+        if (activeConversation != event.conversationId) return
+        if (activeWsOtid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
+        runCatching {
+            timelineRepository.reconcileRecentMessages(
+                agentId = agentId,
+                conversationId = event.conversationId,
+                reason = "redial-recovery",
+                forceRefresh = true,
+            )
+        }.onFailure { error ->
+            Telemetry.error(
+                "AdminChatVM", "ws.redialRecovery.reconcileFailed", error,
+                "conversationId" to event.conversationId,
+                "turnId" to event.turnId,
+                "runId" to event.runId,
+            )
+        }
+        finishActiveTurn(
+            status = "completed",
+            runId = event.runId,
+            turnId = event.turnId,
+            lossy = false,
+            dropCount = 0L,
+            reason = "redial-recovery",
+            recordEvent = WsTimelineEvent.TurnDone(
+                turnId = event.turnId,
+                runId = event.runId,
+                status = "completed",
+            ),
+        )
     }
 
     private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {

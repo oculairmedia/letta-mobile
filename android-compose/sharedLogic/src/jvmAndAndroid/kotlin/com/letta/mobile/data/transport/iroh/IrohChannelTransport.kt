@@ -8,6 +8,8 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -66,7 +68,7 @@ class IrohChannelTransport(
     // before synthesizing a cancelled terminal. Overridable so tests need not
     // wait the full production window.
     private val serverTerminalWaitMs: Long = SERVER_TERMINAL_WAIT_MS,
-) : IChannelTransport {
+) : IChannelTransport, RedialAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -75,6 +77,9 @@ class IrohChannelTransport(
 
     private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
+
+    private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
+    override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
 
     /** Emit to both event flows so both direct consumers and
      *  WsChatBridge (via frameEvents) see each frame exactly once. */
@@ -148,8 +153,24 @@ class IrohChannelTransport(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
-        onStateChanged = { supervisorState -> _state.value = supervisorState.toChannelTransportState() },
+        onStateChanged = { supervisorState ->
+            _state.value = supervisorState.toChannelTransportState()
+            if (supervisorState is IrohConnectionState.Ready) notifyRedialIfTurnActive()
+        },
     )
+
+    private fun notifyRedialIfTurnActive() {
+        val turn = activeTurn ?: return
+        if (turn.hasTerminal) return
+        _redialWhileTurnActive.tryEmit(
+            RedialWhileTurnActive(
+                agentId = turn.agentId,
+                conversationId = turn.conversationId,
+                turnId = turn.turnId,
+                runId = turn.runId,
+            )
+        )
+    }
 
     // letta-mobile-34xoj: track consecutive admin_rpc failures and last stream frame
     // time to decide retry-on-same-connection vs. escalate-to-reconnect.

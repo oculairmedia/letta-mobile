@@ -1091,6 +1091,48 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `same backend config emission does not rebuild graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeLettaApiClient(),
+                FakeMcpServerApi(),
+                FakeModelApi(),
+                FakePassageApi(),
+                FakeProjectApi(),
+                FakeProjectWorkApi(),
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                FakeToolApi(),
+                appContext = mockk(relaxed = true),
+                settingsRepository = settingsRepository,
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        advanceUntilIdle()
+
+        val firstGraph = sessionManager.current
+        settingsRepository.activeConfigState.value = config("backend-b", serverUrl = "https://backend-a.example.test")
+        advanceUntilIdle()
+
+        assertEquals(System.identityHashCode(firstGraph), System.identityHashCode(sessionManager.current))
+        assertEquals(System.identityHashCode(firstGraph.channelTransport), System.identityHashCode(sessionManager.current.channelTransport))
+    }
+
+    @Test
     fun `channel transport proxy switches to rebuilt graph state`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
@@ -1201,10 +1243,10 @@ class SessionManagerTest {
         }
     }
 
-    private fun config(id: String): LettaConfig = LettaConfig(
+    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = LettaConfig(
         id = id,
         mode = LettaConfig.Mode.SELF_HOSTED,
-        serverUrl = "https://$id.example.test",
+        serverUrl = serverUrl,
     )
 
     private fun localConfig(

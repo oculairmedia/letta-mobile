@@ -1,6 +1,7 @@
 package com.letta.mobile.data.session
 
 import android.util.Log
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
@@ -34,6 +35,7 @@ class SessionManager internal constructor(
         managerScope = defaultSessionManagerScope(),
     )
 
+    private var graphBackendKey: BackendConnectionKey? = settingsRepository.activeConfig.value?.backendConnectionKey()
     private val _currentGraph = MutableStateFlow(sessionGraphFactory.create())
     override val currentGraph: StateFlow<SessionGraph> = _currentGraph.asStateFlow()
     private val _sessionError = MutableStateFlow<Throwable?>(null)
@@ -41,9 +43,9 @@ class SessionManager internal constructor(
 
     init {
         managerScope.launch {
-            settingsRepository.activeConfigChanges.collect {
+            settingsRepository.activeConfigChanges.collect { config ->
                 try {
-                    rebuild()
+                    rebuildIfBackendChanged(config)
                 } catch (t: Throwable) {
                     Log.e("SessionManager", "Failed to auto-rebuild session graph on config change", t)
                 }
@@ -53,11 +55,20 @@ class SessionManager internal constructor(
 
     private val rebuildLock = ReentrantLock()
 
-    override fun rebuild(): SessionGraph = rebuildLock.withLock {
+    private fun rebuildIfBackendChanged(config: LettaConfig) {
+        val nextKey = config.backendConnectionKey()
+        if (nextKey == graphBackendKey) return
+        rebuild(nextKey)
+    }
+
+    override fun rebuild(): SessionGraph = rebuild(settingsRepository.activeConfig.value?.backendConnectionKey())
+
+    private fun rebuild(nextBackendKey: BackendConnectionKey?): SessionGraph = rebuildLock.withLock {
         val previous = _currentGraph.value
         try {
             val next = sessionGraphFactory.create()
             _currentGraph.value = next
+            graphBackendKey = nextBackendKey
             previous.close()
             _sessionError.value = null
             next
@@ -79,3 +90,13 @@ class SessionManager internal constructor(
         return result
     }
 }
+
+private data class BackendConnectionKey(
+    val serverUrl: String,
+    val accessToken: String?,
+)
+
+private fun LettaConfig.backendConnectionKey(): BackendConnectionKey = BackendConnectionKey(
+    serverUrl = serverUrl,
+    accessToken = accessToken,
+)
