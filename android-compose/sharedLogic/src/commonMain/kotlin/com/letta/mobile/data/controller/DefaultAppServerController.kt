@@ -40,6 +40,7 @@ class DefaultAppServerController(
      * Thread-safe access via [runtimeMutex].
      */
     private val runtimeCache = mutableMapOf<RuntimeKey, CanonicalRuntime>()
+    private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
     /**
@@ -50,7 +51,10 @@ class DefaultAppServerController(
         AppServerTurnEngine(
             client = client,
             clientInfo = clientInfo,
-            permissionMode = AppServerPermissionMode.Unrestricted,
+            permissionModeProvider = { command ->
+                runtimePermissionModes[RuntimeKey(command.agentId.value, command.conversationId.value)]
+                    ?: AppServerPermissionMode.Standard
+            },
             requestIdFactory = requestIdFactory,
         )
     }
@@ -64,6 +68,8 @@ class DefaultAppServerController(
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime = runtimeMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
+        val effectiveMode = mode ?: AppServerPermissionMode.Standard
+        runtimePermissionModes[key] = effectiveMode
 
         // Return cached runtime if already started for this agent+conversation
         runtimeCache[key]?.let { return it }
@@ -76,7 +82,7 @@ class DefaultAppServerController(
                     agentId = agentId.value,
                     conversationId = conversationId.value,
                     cwd = cwd,
-                    mode = mode,
+                    mode = effectiveMode,
                     clientInfo = clientInfo,
                     recoverApprovals = recoverApprovals,
                     forceDeviceStatus = forceDeviceStatus,

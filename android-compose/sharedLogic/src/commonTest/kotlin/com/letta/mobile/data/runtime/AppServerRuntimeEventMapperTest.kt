@@ -34,6 +34,28 @@ class AppServerRuntimeEventMapperTest {
     }
 
     @Test
+    fun mapsToolUseStopReasonToRemoteFrameSoTurnContinues() {
+        val draft = mapper.map(
+            command = command,
+            received = received(
+                streamDelta(
+                    messageType = "stop_reason",
+                    runId = "run-1",
+                    body = buildJsonObject {
+                        put("message_type", "stop_reason")
+                        put("run_id", "run-1")
+                        put("stop_reason", "tool_use")
+                    },
+                ),
+            ),
+        ).single()
+
+        val payload = assertIs<RuntimeEventPayload.RemoteStreamFrame>(draft.payload)
+        assertEquals("stop_reason", payload.messageType)
+        assertEquals("run-1", draft.runId?.value)
+    }
+
+    @Test
     fun mapsLoopErrorToFailedLifecycle() {
         val draft = mapper.map(
             command = command,

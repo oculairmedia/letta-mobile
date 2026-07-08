@@ -56,7 +56,22 @@ class AppServerRuntimeEventMapper {
         val messageType = deltaObject.string("message_type")
         val runId = deltaObject.string("run_id")?.let(::RunId)
         return when (messageType) {
-            "stop_reason" -> listOf(command.lifecycle(RuntimeRunStatus.Completed, runId = runId))
+            "stop_reason" -> if (deltaObject.isTerminalStopReason()) {
+                listOf(command.lifecycle(RuntimeRunStatus.Completed, runId = runId))
+            } else {
+                listOf(
+                    command.draft(
+                        runId = runId,
+                        source = RuntimeEventSource.LocalRuntime,
+                        payload = RuntimeEventPayload.RemoteStreamFrame(
+                            frameId = idempotencyKey,
+                            messageId = deltaObject.string("id"),
+                            messageType = messageType,
+                            body = raw.toString(),
+                        ),
+                    ),
+                )
+            }
             "loop_error",
             "error_message",
             -> listOf(command.lifecycle(RuntimeRunStatus.Failed, runId = runId, reason = deltaObject.errorMessage()))
@@ -185,6 +200,11 @@ class AppServerRuntimeEventMapper {
         )
 
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
+
+    private fun JsonObject.isTerminalStopReason(): Boolean {
+        val reason = string("stop_reason") ?: string("reason") ?: return true
+        return reason == "end_turn" || reason == "stop_sequence" || reason == "max_tokens" || reason == "cancelled" || reason == "error"
+    }
 
     private fun JsonObject.errorMessage(): String =
         string("message")

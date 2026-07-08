@@ -180,9 +180,12 @@ internal class ChatTimelineObserver(
                             previousIsAgentTyping = prev.isAgentTyping,
                         )
                         if (presentation.isStreaming != prev.isStreaming || presentation.isAgentTyping != prev.isAgentTyping) {
-                            uiState.value = prev.copy(
-                                isStreaming = presentation.isStreaming,
-                                isAgentTyping = presentation.isAgentTyping,
+                            uiState.value = collapseCompletedRunsIfStreamingFinished(
+                                prev,
+                                prev.copy(
+                                    isStreaming = presentation.isStreaming,
+                                    isAgentTyping = presentation.isAgentTyping,
+                                ),
                             )
                         }
                         return@collect

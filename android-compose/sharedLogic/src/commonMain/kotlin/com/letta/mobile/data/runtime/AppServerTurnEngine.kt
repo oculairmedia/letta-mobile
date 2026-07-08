@@ -47,6 +47,7 @@ class AppServerTurnEngine(
         version = "0.1",
     ),
     private val permissionMode: AppServerPermissionMode = AppServerPermissionMode.Standard,
+    private val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
     private val requestIdFactory: () -> String = ::defaultRequestId,
     /**
      * Idle-liveness window (ms). If NO event frame for the current turn arrives
@@ -102,15 +103,16 @@ class AppServerTurnEngine(
 
         var collector: kotlinx.coroutines.Job? = null
         try {
+            val turnPermissionMode = permissionModeProvider(command)
             com.letta.mobile.util.Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
-            val scope = ensureRuntime(command)
+            val scope = ensureRuntime(command, turnPermissionMode)
             com.letta.mobile.util.Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
             send(command.startedDraft())
 
             val collectorReady = CompletableDeferred<Unit>()
             collector = launch {
                 try {
-                    collectTurnWithIdleWatchdog(scope, command, collectorReady) { draft -> send(draft) }
+                    collectTurnWithIdleWatchdog(scope, command, turnPermissionMode, collectorReady) { draft -> send(draft) }
                 } catch (completed: TurnCompletedMarker) {
                     // Flow completed after a terminal App Server lifecycle event.
                 } catch (idle: TurnIdleTimedOutMarker) {
@@ -146,6 +148,7 @@ class AppServerTurnEngine(
     private suspend fun collectTurnWithIdleWatchdog(
         scope: AppServerRuntimeScope,
         command: TurnCommand,
+        turnPermissionMode: AppServerPermissionMode,
         collectorReady: CompletableDeferred<Unit>,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
@@ -167,7 +170,7 @@ class AppServerTurnEngine(
                 lastFrameAt.value = currentTimeMs()
                 val drafts = mapper.map(command, received)
                 drafts.forEach { draft ->
-                    if (autoApproveIfAllowed(scope, draft)) return@forEach
+                    if (autoApproveIfAllowed(scope, turnPermissionMode, draft)) return@forEach
                     emitDraft(draft)
                     if (draft.isTerminalLifecycle()) throw TurnCompleted
                 }
@@ -179,9 +182,10 @@ class AppServerTurnEngine(
 
     private suspend fun autoApproveIfAllowed(
         scope: AppServerRuntimeScope,
+        turnPermissionMode: AppServerPermissionMode,
         draft: RuntimeEventDraft,
     ): Boolean {
-        if (permissionMode != AppServerPermissionMode.Unrestricted) return false
+        if (turnPermissionMode != AppServerPermissionMode.Unrestricted) return false
         val approval = draft.toApprovalAutoAllowRequest() ?: return false
         com.letta.mobile.util.Telemetry.event(
             "IrohTurn", "approval.auto_allow",
@@ -243,7 +247,7 @@ class AppServerTurnEngine(
 
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
-    private suspend fun ensureRuntime(command: TurnCommand): AppServerRuntimeScope {
+    private suspend fun ensureRuntime(command: TurnCommand, turnPermissionMode: AppServerPermissionMode): AppServerRuntimeScope {
         runtime?.let { cached ->
             if (cached.matches(command)) return cached
         }
@@ -252,7 +256,7 @@ class AppServerTurnEngine(
                 requestId = requestIdFactory(),
                 agentId = command.agentId.value,
                 conversationId = command.conversationId.value,
-                mode = permissionMode,
+                mode = turnPermissionMode,
                 clientInfo = clientInfo,
                 recoverApprovals = true,
                 forceDeviceStatus = true,
