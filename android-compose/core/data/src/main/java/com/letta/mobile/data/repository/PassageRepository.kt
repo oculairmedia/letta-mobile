@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 
 open class PassageRepository(
     private val passageApi: PassageApi,
+    private val irohPassageSource: IrohAdminRpcPassageSource? = null,
 ) : IPassageRepository, BackendScopedCache {
     private val cacheLock = Any()
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
@@ -25,7 +26,12 @@ open class PassageRepository(
     }
 
     override open suspend fun refreshPassages(agentId: String) {
-        val passages = passageApi.listPassages(agentId, limit = 100)
+        val irohSource = irohPassageSource
+        val passages = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.listPassages(agentId)
+        } else {
+            passageApi.listPassages(agentId, limit = 100)
+        }
         replaceCachedPassages(agentId, passages)
     }
 
