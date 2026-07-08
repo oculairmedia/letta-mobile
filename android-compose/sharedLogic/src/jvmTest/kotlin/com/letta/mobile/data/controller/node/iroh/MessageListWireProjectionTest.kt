@@ -279,15 +279,15 @@ class MessageListWireProjectionTest {
             put("id", "msg-skill-1")
             put("role", "user")
             put("message_type", "user_message")
-            put("content", """
-                <skill id="asus-router">
-                <skill-name>asus-router</skill-name>
-                <skill-description>Pull stats from ASUS RT-AX82U router...</skill-description>
-                </skill>
-                
-                ARGUMENTS:
-                { "action": "get_stats" }
-            """.trimIndent())
+            put(
+                "content",
+                v1SkillEnvelope("""
+                    <skill id="asus-router">
+                    <skill-name>asus-router</skill-name>
+                    <skill-description>Pull stats from ASUS RT-AX82U router...</skill-description>
+                    </skill>
+                """.trimIndent()),
+            )
         }
 
         val projected = MessageListWireProjection.projectMessage(skillEnvelopeMessage, "conv-1")
@@ -301,7 +301,7 @@ class MessageListWireProjectionTest {
             put("id", "msg-skill-2")
             put("role", "user")
             put("message_type", "user_message")
-            put("content", "<skill id=\"test\">content</skill>\n\nARGUMENTS:\n{}")
+            put("content", v1SkillEnvelope("<skill id=\"test\">content</skill>"))
         }
 
         val projected = MessageListWireProjection.projectMessage(message, "conv-1")
@@ -315,12 +315,40 @@ class MessageListWireProjectionTest {
             put("id", "msg-skill-3")
             put("role", "user")
             put("message_type", "user_message")
-            put("content", "some preamble\n</skill>\n\nARGUMENTS:\n{\"key\": \"value\"}")
+            put("content", v1SkillEnvelope("some preamble\n</skill>"))
         }
 
         val projected = MessageListWireProjection.projectMessage(message, "conv-1")
 
         assertNull(projected, "Message containing </skill> should be suppressed")
+    }
+
+    @Test
+    fun realCapturedSkillDocEnvelopeIsSuppressedFromProjection() {
+        val message = buildJsonObject {
+            put("id", "msg-skill-real")
+            put("role", "user")
+            put("message_type", "user_message")
+            put("content", realCapturedSkillEnvelope())
+        }
+
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+
+        assertNull(projected, "Real skill-doc envelope with slug tag and frontmatter should be suppressed")
+    }
+
+    @Test
+    fun shortTaggedUserMessageIsNotSuppressed() {
+        val message = buildJsonObject {
+            put("id", "msg-short-tagged")
+            put("role", "user")
+            put("message_type", "user_message")
+            put("content", "<asus-router>status</asus-router>")
+        }
+
+        val projected = MessageListWireProjection.projectMessage(message, "conv-1")
+
+        assertSame(message, projected, "Short user content with tags should not be suppressed")
     }
 
     @Test
@@ -364,7 +392,7 @@ class MessageListWireProjectionTest {
                 put("id", "msg-skill")
                 put("role", "user")
                 put("message_type", "user_message")
-                put("content", "<skill id=\"asus-router\">...</skill>\n\nARGUMENTS:\n{}")
+                put("content", v1SkillEnvelope("<skill id=\"asus-router\">...</skill>"))
             })
             add(buildJsonObject {
                 put("id", "msg-2")
@@ -380,4 +408,40 @@ class MessageListWireProjectionTest {
         assertEquals("msg-1", projected[0].jsonObject.getValue("id").jsonPrimitive.content)
         assertEquals("msg-2", projected[1].jsonObject.getValue("id").jsonPrimitive.content)
     }
+
+    private fun v1SkillEnvelope(tagBlock: String): String = """
+        $tagBlock
+
+        This is a persisted synthetic skill instruction envelope with enough body text to exceed the short-content guard.
+        It represents the legacy v1 literal skill XML variants that must continue to be suppressed from message.list.
+
+        ARGUMENTS:
+        {}
+    """.trimIndent()
+
+    private fun realCapturedSkillEnvelope(): String = """
+        <asus-router>
+        name: asus-router
+        description: Pull stats from ASUS RT-AX82U router and summarize WAN/LAN status.
+        ---
+        # ASUS Router
+
+        This skill connects to the ASUS router API and reports useful status.
+
+        ## Usage
+
+        Ask for router status, WAN uptime, connected clients, or traffic counters.
+
+        ```json
+        { "action": "status" }
+        ```
+
+        ## Notes
+
+        The router credentials are configured by the host environment.
+
+        ARGUMENTS: status
+        </asus-router>
+    """.trimIndent()
+
 }
