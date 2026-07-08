@@ -93,6 +93,8 @@ class ChatSendCoordinator(
     private val seenBridgeEventLock = SynchronizedObject()
     private val seenBridgeEventKeys = ArrayDeque<String>()
     private val seenBridgeEventKeySet = mutableSetOf<String>()
+    private val liveIngestLock = SynchronizedObject()
+    private val lastLiveIngestByConversation = mutableMapOf<String, Long>()
 
     init {
         scope.launch {
@@ -258,9 +260,19 @@ class ChatSendCoordinator(
     }
 
     private fun schedulePostSendReconcile(pending: PendingWsSend) {
+        val sentAtMillis = currentTimeMillis()
         scope.launch {
-            for (delayMs in POST_SEND_RECONCILE_DELAYS_MS) {
+            for (delayMs in postSendReconcileDelaysMs) {
                 delay(delayMs)
+                if (hasLiveIngestSince(pending.conversationId, sentAtMillis)) {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.postSendReconcile.skippedLiveStream",
+                        "conversationId" to pending.conversationId,
+                        "otid" to pending.otid,
+                        "delayMs" to delayMs,
+                    )
+                    continue
+                }
                 runCatching {
                     timelineRepository.reconcileRecentMessages(
                         agentId = agentId,
@@ -514,6 +526,7 @@ class ChatSendCoordinator(
                 rememberActiveAssistantMessageRunId(event.message)
                 timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message)
                 if (!event.isReplay) {
+                    rememberLiveIngest(conversationId)
                     ui.onMessageDelta(conversationId)
                 }
             }
@@ -701,6 +714,18 @@ class ChatSendCoordinator(
         else -> message.date.orEmpty() + ":" + message.seqId.toString()
     }
 
+    private fun rememberLiveIngest(conversationId: String) {
+        synchronized(liveIngestLock) {
+            lastLiveIngestByConversation[conversationId] = currentTimeMillis()
+        }
+    }
+
+    private fun hasLiveIngestSince(conversationId: String, sinceMillis: Long): Boolean = synchronized(liveIngestLock) {
+        (lastLiveIngestByConversation[conversationId] ?: Long.MIN_VALUE) >= sinceMillis
+    }
+
+    private fun currentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+
     private fun rememberActiveAssistantMessageRunId(message: LettaMessage) {
         if (message !is AssistantMessage) return
         val messageRunId = message.runId?.takeIf { it.isNotBlank() } ?: return
@@ -882,13 +907,13 @@ class ChatSendCoordinator(
         }
     }
 
-    private companion object {
+    internal companion object {
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val MAX_SEEN_BRIDGE_EVENTS = 512
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
-        private val POST_SEND_RECONCILE_DELAYS_MS = longArrayOf(750L, 2_500L, 6_000L)
+        internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

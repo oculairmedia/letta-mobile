@@ -15,7 +15,11 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
@@ -192,10 +196,42 @@ class LettaHttpAdminRepositoriesTest {
         assertEquals(false, repositories.refreshAgentsIfStale(maxAgeMs = 10_000L))
         assertEquals(1, agentFetches)
 
-        // Past TTL → refetch.
+        // Still inside the short full-sweep cache TTL → no second fetch.
         now += 20_000L
+        assertFalse(repositories.refreshAgentsIfStale(maxAgeMs = 10_000L))
+        assertEquals(1, agentFetches)
+
+        // Past the full-sweep cache TTL → refetch.
+        now += 30_000L
         assertTrue(repositories.refreshAgentsIfStale(maxAgeMs = 10_000L), "expired cache must refetch")
         assertEquals(2, agentFetches)
+    }
+
+    @Test
+    fun concurrentRefreshAgentsShareSingleFullPaginationSweep() = runTest {
+        var agentFetches = 0
+        val client = HttpClient(
+            MockEngine { request ->
+                if (request.url.encodedPath == "/v1/agents") {
+                    agentFetches += 1
+                    delay(25)
+                    jsonResponse("""[{"id":"agent-1","name":"Ada"}]""")
+                } else {
+                    jsonResponse("[]")
+                }
+            },
+        ) {
+            install(ContentNegotiation) { json(testJson) }
+        }
+        val repositories = repositories(client, nowMillis = { 1_000L })
+
+        awaitAll(
+            async { repositories.refreshAgents() },
+            async { repositories.refreshAgents() },
+        )
+
+        assertEquals(1, agentFetches)
+        assertEquals("Ada", repositories.agents.value.single().name)
     }
 
     private fun repositories(
