@@ -167,6 +167,24 @@ class TimelineRepositoryTest {
     }
 
     @Test
+    fun `unscoped observer follows first scoped writer but not later different agent`() = runBlocking {
+        val api = CancellableStreamApi()
+        val repository = TimelineRepository(MessageApiTimelineTransport(api), NoOpPendingLocalStore, maxCachedLoops = 4)
+
+        val agentA = repository.getOrCreate("agent-a", "conv-shared")
+        api.awaitActive("conv-shared")
+        val unscoped = repository.getOrCreate("conv-shared")
+        val agentB = repository.getOrCreate("agent-b", "conv-shared")
+
+        assertTrue("unscoped observer should follow the first scoped writer", agentA === unscoped)
+        assertFalse("later different scoped agent should get a fresh loop", agentA === agentB)
+        assertEquals("agent-b should not attach to agent-a's promoted loop", 2, repository.cachedLoopCount())
+        assertEquals("agent-a and agent-b should keep isolated streams", 2, api.activeCount("conv-shared"))
+
+        repository.clearAll()
+    }
+
+    @Test
     fun `cursor repair hydrates the scoped loop when agent is present`() = runBlocking {
         val api = CancellableStreamApi()
         val cursorStore = RepositoryRecordingConversationCursorStore()
