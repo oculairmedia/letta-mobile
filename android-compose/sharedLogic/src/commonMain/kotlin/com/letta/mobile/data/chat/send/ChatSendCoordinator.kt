@@ -457,6 +457,23 @@ class ChatSendCoordinator(
         if (dropDuplicateBridgeEvent(event)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
+                // Iroh run-id promotion re-emits TurnStarted for the SAME turn
+                // once the real server run id replaces the synthetic
+                // `iroh-run-*` placeholder. That is a run-id update, not a new
+                // turn: resetting per-turn state here (stop/usage/error guards,
+                // assistant run-id set) mid-turn corrupted post-tool
+                // settlement and contributed to the flicker. Update the run id
+                // and keep the turn state intact.
+                if (event.turnId == activeWsTurnId && activeWsConversationId == event.conversationId) {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.turnStarted.runPromoted",
+                        "turnId" to event.turnId,
+                        "previousRunId" to (activeWsRunId ?: ""),
+                        "runId" to event.runId,
+                    )
+                    activeWsRunId = event.runId
+                    return
+                }
                 activeWsConversationId = event.conversationId
                 activeWsTurnId = event.turnId
                 activeWsRunId = event.runId
