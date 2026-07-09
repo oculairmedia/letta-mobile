@@ -32,6 +32,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
+import app.cash.turbine.test
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
@@ -42,7 +43,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import app.cash.turbine.test
 import java.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -752,12 +752,26 @@ class TimelineSyncLoopTest {
         val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
 
         val send = async { sync.send("draw it") }
-        advanceUntilIdle()
         send.await()
 
-        val assistant = sync.state.value.events.firstOrNull {
+        // Deterministically settle the ingest pipeline before reading state.
+        // Reading state.value once right after a single advanceUntilIdle() raced
+        // the char-by-char ingest and made this test flaky (letta-mobile-95gij):
+        // some frames were still queued on the (virtual) dispatcher. Loop
+        // advanceUntilIdle() until the reassembled content stops growing, bounded
+        // so a genuine character drop still fails via the assertion below rather
+        // than hanging.
+        fun currentAssistant(): TimelineEvent? = sync.state.value.events.firstOrNull {
             it is TimelineEvent.Confirmed && it.serverId == "reply-mermaid"
         }
+        var lastLen = -1
+        repeat(50) {
+            advanceUntilIdle()
+            val len = currentAssistant()?.content?.length ?: 0
+            if (len == mermaid.length || len == lastLen) return@repeat
+            lastLen = len
+        }
+        val assistant = currentAssistant()
         assertNotNull(assistant)
         assertEquals(
             "lettabot-uww.11: mermaid char-by-char reassembly must be byte-perfect",
