@@ -172,6 +172,8 @@ data class Timeline(
     val abandonedAssistantFragmentSuppressions: kotlinx.collections.immutable.PersistentSet<AbandonedAssistantFragmentSuppression> = kotlinx.collections.immutable.persistentSetOf(),
     /** Monotonic fingerprint for all non-tail events so UI projections can trust unchanged history. */
     val stablePrefixVersion: Long = events.stablePrefixFingerprint(),
+    /** Monotonic nudge for event-driven visible timeline invalidations with unchanged event lists. */
+    val visibleRevision: Long = 0L,
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashMap<String, Int>(events.size).also { map ->
@@ -215,6 +217,8 @@ data class Timeline(
             )
         }
     }
+
+    fun forceVisibleEmission(): Timeline = copy(visibleRevision = visibleRevision + 1)
 
     /** Next position for an append at the end. */
     fun nextLocalPosition(): Double {

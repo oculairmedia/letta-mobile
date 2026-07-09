@@ -64,17 +64,31 @@ class ProcessScopedClientMessageDedupe(
  * parked terminal instead of silently dropping the duplicate, so the client's
  * "Thinking…" turn actually resolves. Bounded so a flood of dropped turns can't
  * grow memory without bound.
+ *
+ * EXTENDED (mid-turn redial fix): Now parks FRAME SEQUENCES (not just the terminal)
+ * in a bounded ring. When a SendStream dies mid-turn, we park the last N frames
+ * (typically assistant deltas + terminal) so a redial can replay the entire turn's
+ * tail instead of just an interrupted-terminal stub. This resolves the case where
+ * the client redials WHILE the server is streaming — the new connection receives
+ * the parked frames and the turn settles normally instead of hanging on "Thinking".
  */
 class ParkedTerminalStore(
     private val maxEntries: Int = DEFAULT_MAX_ENTRIES,
+    private val maxFramesPerEntry: Int = DEFAULT_MAX_FRAMES_PER_ENTRY,
 ) {
     private val lock = Any()
-    private val parked = LinkedHashMap<String, String>()
+    private val parked = LinkedHashMap<String, ParkedFrameSequence>()
 
-    /** Park (or overwrite) the terminal delta JSON for [key]. */
-    fun park(key: String, terminalDeltaJson: String) = synchronized(lock) {
+    /**
+     * Park (or append to) the frame sequence for [key].
+     * Frames are stored in a bounded ring: oldest frames are dropped when
+     * [maxFramesPerEntry] is exceeded, but the terminal is always retained.
+     */
+    fun park(key: String, frameDeltaJson: String) = synchronized(lock) {
+        val existing = parked[key] ?: ParkedFrameSequence(maxFramesPerEntry)
+        existing.addFrame(frameDeltaJson)
         parked.remove(key)
-        parked[key] = terminalDeltaJson
+        parked[key] = existing
         while (parked.size > maxEntries) {
             val oldest = parked.keys.iterator()
             if (oldest.hasNext()) {
@@ -86,8 +100,13 @@ class ParkedTerminalStore(
         }
     }
 
-    /** Remove and return the parked terminal delta JSON for [key], or null. */
-    fun takeParked(key: String): String? = synchronized(lock) { parked.remove(key) }
+    /**
+     * Remove and return the concatenated parked frame sequence for [key], or null.
+     * Frames are joined with newlines.
+     */
+    fun takeParked(key: String): String? = synchronized(lock) {
+        parked.remove(key)?.toFrameString()
+    }
 
     fun contains(key: String): Boolean = synchronized(lock) { parked.containsKey(key) }
 
@@ -95,8 +114,66 @@ class ParkedTerminalStore(
 
     companion object {
         const val DEFAULT_MAX_ENTRIES = 256
+        const val DEFAULT_MAX_FRAMES_PER_ENTRY = 256
     }
 }
+
+/**
+ * Bounded ring buffer for parked stream frames.
+ * Keeps the last [maxFrames] frames, automatically evicting oldest when full.
+ */
+private class ParkedFrameSequence(
+    private val maxFrames: Int,
+) {
+    private val frames = ArrayDeque<String>()
+
+    fun addFrame(frame: String) {
+        frames.addLast(frame)
+        while (frames.size > maxFrames) {
+            frames.removeFirst()
+        }
+    }
+
+    fun toFrameString(): String = frames.joinToString("\n")
+}
+
+/**
+ * Tracks frames written during a turn so they can be parked if the stream dies
+ * mid-turn (mid-turn redial fix). Bounded ring: keeps last 256 frames to prevent
+ * memory bloat on very long turns.
+ */
+internal class TurnFrameTracker(
+    private val maxFrames: Int = 256,
+) {
+    private val frames = ArrayDeque<String>()
+
+    /** Record a frame delta JSON that was successfully written to the stream. */
+    fun track(deltaJson: String) {
+        frames.addLast(deltaJson)
+        while (frames.size > maxFrames) {
+            frames.removeFirst()
+        }
+    }
+
+    /** Park all tracked frames + a synthetic terminal into the store. */
+    fun parkFrames(store: ParkedTerminalStore, key: String, terminalDelta: String) {
+        // Park all tracked frames
+        frames.forEach { store.park(key, it) }
+        // Park the terminal
+        store.park(key, terminalDelta)
+    }
+
+    fun frameCount(): Int = frames.size
+}
+
+/**
+ * Thread-local state for tracking an active turn's frames during streaming.
+ * Used by IrohNodeConnection to park frames if the SendStream dies mid-turn.
+ */
+internal data class ActiveTurnTracking(
+    val clientMessageId: String,
+    val tracker: TurnFrameTracker = TurnFrameTracker(),
+)
 
 /**
  * Per-connection, atomically-incrementing `event_seq` source with a

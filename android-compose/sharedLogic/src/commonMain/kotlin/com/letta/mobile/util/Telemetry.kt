@@ -68,6 +68,9 @@ object Telemetry {
     @Suppress("MemberVisibilityCanBePrivate")
     val chatHotPathDebugEnabled = TelemetryFlag(false)
 
+    @Suppress("MemberVisibilityCanBePrivate")
+    val timelineSyncGateDebugEnabled = TelemetryFlag(false)
+
     // letta-mobile-x1xnl: per-frame chat RENDER diagnostics (LazyColumn item
     // composition, render-item list identity/keys, projector fast/full path
     // flips). Off by default; enable in code via renderDiagEnabled.set(true) or
@@ -75,10 +78,14 @@ object Telemetry {
     // rebuild). Left in the tree for future render-layer diagnosis.
     @Suppress("MemberVisibilityCanBePrivate")
     val renderDiagEnabled = TelemetryFlag(false)
+    // Per-gate Iroh frame-flow content-length diagnostic (see IrohFrameFlowDiagnostics).
+    val frameFlowDiagEnabled = TelemetryFlag(false)
 
     private const val TIMELINE_DUMP_TAG = "LettaTimelineDump"
     private const val CHAT_HOT_PATH_DEBUG_TAG = "LettaChatHotPath"
+    private const val TIMELINE_SYNC_GATE_DEBUG_TAG = "LettaTimelineSyncGate"
     private const val RENDER_DIAG_TAG = "LettaRenderDiag"
+    private const val FRAME_FLOW_DIAG_TAG = "LettaFrameFlowDiag"
     private const val TAG_PREFIX = "Telemetry"
     private const val MAX_RING_SIZE = 1000
     private const val TRACE_MAX_LEN = 127
@@ -94,8 +101,14 @@ object Telemetry {
     fun isChatHotPathDebugEnabled(): Boolean =
         chatHotPathDebugEnabled.get() || (delegate?.isLoggable(CHAT_HOT_PATH_DEBUG_TAG, 2) ?: false)
 
+    fun isTimelineSyncGateDebugEnabled(): Boolean =
+        timelineSyncGateDebugEnabled.get() || (delegate?.isLoggable(TIMELINE_SYNC_GATE_DEBUG_TAG, 2) ?: false)
+
     fun isRenderDiagEnabled(): Boolean =
         renderDiagEnabled.get() || (delegate?.isLoggable(RENDER_DIAG_TAG, 2) ?: false)
+
+    fun isFrameFlowDiagEnabled(): Boolean =
+        frameFlowDiagEnabled.get() || (delegate?.isLoggable(FRAME_FLOW_DIAG_TAG, 2) ?: false)
 
     fun event(
         tag: String,

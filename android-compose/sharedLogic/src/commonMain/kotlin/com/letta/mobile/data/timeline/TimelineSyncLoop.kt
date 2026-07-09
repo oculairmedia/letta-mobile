@@ -1,10 +1,15 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import kotlin.concurrent.Volatile
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +39,7 @@ class TimelineSyncLoop(
     pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
+    private val startStreamSubscriber: Boolean = true,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
@@ -50,6 +56,9 @@ class TimelineSyncLoop(
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
+    private val seenStreamMessageLock = SynchronizedObject()
+    private val seenStreamMessageKeys = ArrayDeque<String>()
+    private val seenStreamMessageKeySet = mutableSetOf<String>()
     private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
     private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
     
@@ -136,7 +145,9 @@ class TimelineSyncLoop(
 
     init {
         loopScope.launch { processEventQueue() }
-        loopScope.launch { runStreamSubscriber() }
+        if (startStreamSubscriber) {
+            loopScope.launch { runStreamSubscriber() }
+        }
     }
 
     suspend fun emitHydrateFailed(message: String) {
@@ -183,8 +194,12 @@ class TimelineSyncLoop(
             try {
                 when (event) {
                     is TimelineGatewayEvent.StreamMessage -> {
-                        streamDispatcher.dispatch(event.message)
-                        event.ack?.complete(Unit)
+                        if (shouldDropDuplicateStreamMessage(event.message, event.source)) {
+                            event.ack?.complete(Unit)
+                        } else {
+                            streamDispatcher.dispatch(event.message, event.source)
+                            event.ack?.complete(Unit)
+                        }
                     }
                     is TimelineGatewayEvent.LocalSendAppend -> stateTransitionHandler.applyLocalSendAppend(event)
                     is TimelineGatewayEvent.ExternalTransportLocalAppend -> externalTransportAppender.applyExternalTransportLocalAppend(event)
@@ -346,14 +361,54 @@ class TimelineSyncLoop(
             Telemetry.event("TimelineSync", "streamSubscriber.skippedDualIngest", "conversationId" to conversationId, "messageType" to message.messageType, "messageId" to message.id)
             return
         }
-        eventQueue.send(TimelineGatewayEvent.StreamMessage(message))
+        eventQueue.send(TimelineGatewayEvent.StreamMessage(message, source = "subscriber.loop${hashCode()}"))
     }
 
-    suspend fun ingestStreamEvent(message: LettaMessage) {
+    suspend fun ingestStreamEvent(message: LettaMessage, source: String = "external") {
         wsSubscription.markActive()
         val ack = CompletableDeferred<Unit>()
-        eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack))
+        eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack, source = "$source.loop${hashCode()}"))
         ack.await()
+    }
+
+    private fun shouldDropDuplicateStreamMessage(message: LettaMessage, source: String): Boolean {
+        val key = streamMessageKey(message) ?: return false
+        val duplicate = synchronized(seenStreamMessageLock) {
+            if (key in seenStreamMessageKeySet) {
+                true
+            } else {
+                seenStreamMessageKeySet.add(key)
+                seenStreamMessageKeys.addLast(key)
+                while (seenStreamMessageKeys.size > MAX_SEEN_STREAM_MESSAGES) {
+                    seenStreamMessageKeySet.remove(seenStreamMessageKeys.removeFirst())
+                }
+                false
+            }
+        }
+        if (duplicate) {
+            Telemetry.event(
+                "TimelineSync", "streamMessage.exactDuplicateDropped",
+                "conversationId" to conversationId,
+                "messageId" to message.id,
+                "messageType" to message.messageType,
+                "seqId" to (message.seqId ?: -1),
+                "source" to source,
+            )
+        }
+        return duplicate
+    }
+
+    private fun streamMessageKey(message: LettaMessage): String? {
+        // Only deduplicate frames with explicit sequence identity (seqId).
+        // Forward incremental streaming deltas (no seqId) may legitimately
+        // have identical content when streaming character-by-character and
+        // must NOT be deduplicated based on content alone.
+        val seqId = message.seqId
+        if (seqId != null && seqId >= 0) {
+            return "seq|$seqId|${message.messageType}|${message.id}"
+        }
+        // No seqId: this is a forward streaming delta. Do not deduplicate.
+        return null
     }
 
     fun clearExternalTransportActive() {
@@ -363,6 +418,7 @@ class TimelineSyncLoop(
     companion object {
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 12
+        private const val MAX_SEEN_STREAM_MESSAGES = 512
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }

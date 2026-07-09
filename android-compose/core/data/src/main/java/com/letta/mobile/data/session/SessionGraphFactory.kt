@@ -29,6 +29,16 @@ import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
+import com.letta.mobile.data.repository.IrohAdminRpcArchiveSource
+import com.letta.mobile.data.repository.IrohAdminRpcIdentitySource
+import com.letta.mobile.data.repository.IrohAdminRpcJobSource
+import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
+import com.letta.mobile.data.repository.IrohAdminRpcModelSource
+import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
+import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
+import com.letta.mobile.data.repository.IrohAdminRpcRunSource
+import com.letta.mobile.data.repository.IrohAdminRpcScheduleSource
+import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.data.repository.ModelRepository
@@ -260,23 +270,93 @@ class SessionGraphFactory internal constructor(
                 transport = channelTransport,
                 scope = scope,
             ),
-            archiveRepository = ArchiveRepository(archiveApi),
+            archiveRepository = ArchiveRepository(
+                archiveApi = archiveApi,
+                irohArchiveSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcArchiveSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             folderRepository = FolderRepository(folderApi),
             groupRepository = GroupRepository(groupApi),
-            identityRepository = IdentityRepository(identityApi),
-            mcpServerRepository = McpServerRepository(mcpServerApi),
+            identityRepository = IdentityRepository(
+                identityApi = identityApi,
+                irohIdentitySource = settingsRepository?.let { settings ->
+                    IrohAdminRpcIdentitySource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            mcpServerRepository = McpServerRepository(
+                mcpServerApi = mcpServerApi,
+                irohMcpSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcMcpSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             modelRepository = ModelRepository(
                 modelApi = modelApi,
                 localModelSource = localModelSource,
                 settingsRepository = settingsRepository,
+                irohModelSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcModelSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
             ),
-            passageRepository = PassageRepository(passageApi),
+            passageRepository = PassageRepository(
+                passageApi = passageApi,
+                irohPassageSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcPassageSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             projectRepository = ProjectRepository(projectApi),
             projectWorkRepository = ProjectWorkRepository(projectWorkApi),
-            runRepository = RunRepository(runApi),
-            jobRepository = JobRepository(jobApi),
-            providerRepository = ProviderRepository(providerApi),
-            scheduleRepository = ScheduleRepository(scheduleApi),
+            runRepository = RunRepository(
+                runApi = runApi,
+                irohRunSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcRunSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            jobRepository = JobRepository(
+                jobApi = jobApi,
+                irohJobSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcJobSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            providerRepository = ProviderRepository(
+                providerApi = providerApi,
+                irohProviderSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcProviderSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            scheduleRepository = ScheduleRepository(
+                scheduleApi = scheduleApi,
+                irohScheduleSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcScheduleSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             selfTodoRepository = SelfTodoRepository(
                 transport = channelTransport,
                 scope = scope,
@@ -286,7 +366,15 @@ class SessionGraphFactory internal constructor(
                 transport = channelTransport,
                 scope = scope,
             ),
-            toolRepository = ToolRepository(toolApi),
+            toolRepository = ToolRepository(
+                toolApi = toolApi,
+                irohToolSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcToolSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(
                 apiClient = lettaApiClient,
                 scope = scope,

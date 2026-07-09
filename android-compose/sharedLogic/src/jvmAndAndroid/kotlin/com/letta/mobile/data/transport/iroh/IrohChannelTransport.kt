@@ -8,6 +8,8 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -39,6 +41,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -64,7 +68,7 @@ class IrohChannelTransport(
     // before synthesizing a cancelled terminal. Overridable so tests need not
     // wait the full production window.
     private val serverTerminalWaitMs: Long = SERVER_TERMINAL_WAIT_MS,
-) : IChannelTransport {
+) : IChannelTransport, RedialAwareChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -74,17 +78,38 @@ class IrohChannelTransport(
     private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
+    private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
+    override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = _redialWhileTurnActive.asSharedFlow()
+
     /** Emit to both event flows so both direct consumers and
      *  WsChatBridge (via frameEvents) see each frame exactly once. */
     private suspend fun emitBoth(frame: ServerFrame) {
+        // letta-mobile-34xoj: record stream activity to prevent premature reconnect
+        adminRpcRetryState.recordStreamActivity()
         Telemetry.event(
             "IrohGate", "gate1.emitBoth",
             "frame" to (frame::class.simpleName ?: ""),
             "messageId" to frameMessageId(frame),
             "conversationId" to frameConversationId(frame),
         )
+        frameFlowContent(frame)?.let { (key, type, content) ->
+            IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
+        }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
+    }
+
+    /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
+    private fun frameFlowContent(frame: ServerFrame): Triple<String, String, String>? = when (frame) {
+        is ServerFrame.AssistantMessage -> {
+            val f: ServerFrame.AssistantMessage = frame
+            Triple(f.otid ?: f.id, "assistant_message", f.content)
+        }
+        is ServerFrame.ReasoningMessage -> {
+            val f: ServerFrame.ReasoningMessage = frame
+            Triple(f.id, "reasoning_message", f.reasoning)
+        }
+        else -> null
     }
 
     private var activeSendJob: kotlinx.coroutines.Job? = null
@@ -144,8 +169,48 @@ class IrohChannelTransport(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
-        onStateChanged = { supervisorState -> _state.value = supervisorState.toChannelTransportState() },
+        onStateChanged = { supervisorState ->
+            _state.value = supervisorState.toChannelTransportState()
+            if (supervisorState is IrohConnectionState.Ready) notifyRedialIfTurnActive()
+        },
     )
+
+    private fun notifyRedialIfTurnActive() {
+        val turn = activeTurn ?: return
+        if (turn.hasTerminal) return
+        _redialWhileTurnActive.tryEmit(
+            RedialWhileTurnActive(
+                agentId = turn.agentId,
+                conversationId = turn.conversationId,
+                turnId = turn.turnId,
+                runId = turn.runId,
+            )
+        )
+    }
+
+    // letta-mobile-34xoj: track consecutive admin_rpc failures and last stream frame
+    // time to decide retry-on-same-connection vs. escalate-to-reconnect.
+    private val adminRpcRetryState = AdminRpcRetryState()
+    private class AdminRpcRetryState {
+        private val mutex = Mutex()
+        @Volatile var consecutiveFailures = 0
+        @Volatile var lastStreamFrameMs = System.currentTimeMillis()
+
+        suspend fun recordFailure(): Int = mutex.withLock {
+            consecutiveFailures += 1
+            consecutiveFailures
+        }
+
+        suspend fun reset() = mutex.withLock {
+            consecutiveFailures = 0
+        }
+
+        fun recordStreamActivity() {
+            lastStreamFrameMs = System.currentTimeMillis()
+        }
+
+        fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastStreamFrameMs
+    }
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
         explicitConfig = IrohConnectConfig(
@@ -216,6 +281,7 @@ class IrohChannelTransport(
                     name = "letta-mobile-android-iroh",
                     version = config.clientVersion,
                 ),
+                permissionMode = com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Unrestricted,
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(
@@ -618,29 +684,77 @@ class IrohChannelTransport(
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        // letta-mobile-34xoj: first attempt
         val first = supervisor.ready()
-        return runCatching {
+        val firstAttempt = runCatching {
             first.adminRpc(method = method, path = path, body = body)
-        }.getOrElse { firstError ->
-            if (firstError is CancellationException) throw firstError
-            // k7yyc: a decode / frame-size (payload) error is isolated to THIS
-            // request. It is NOT a transport fault, so never reconnect or close
-            // the shared connection for it — a single oversized or garbled
-            // list response must fail only its own request with the typed
-            // error, never tear down streaming for every other request.
-            if (firstError.isAdminRpcPayloadError()) throw firstError
-            if (!firstError.isConnectionLostClass()) throw firstError
-            if (!method.isReadOnlyAdminRpcMethod()) throw firstError
+        }
+        if (firstAttempt.isSuccess) {
+            adminRpcRetryState.reset()
+            return firstAttempt.getOrThrow()
+        }
+
+        val firstError = firstAttempt.exceptionOrNull()!!
+        if (firstError is CancellationException) throw firstError
+        // k7yyc: a decode / frame-size (payload) error is isolated to THIS
+        // request. It is NOT a transport fault, so never reconnect or close
+        // the shared connection for it — a single oversized or garbled
+        // list response must fail only its own request with the typed
+        // error, never tear down streaming for every other request.
+        if (firstError.isAdminRpcPayloadError()) throw firstError
+        if (!firstError.isConnectionLostClass()) throw firstError
+        if (!method.isReadOnlyAdminRpcMethod()) throw firstError
+
+        // letta-mobile-34xoj: an admin_rpc read timed out or failed with a
+        // connection-like error. NEVER invalidate the live connection while
+        // a turn is actively streaming — retry on the SAME connection.
+        val failures = adminRpcRetryState.recordFailure()
+        val idleMs = adminRpcRetryState.millisSinceLastStream()
+        val shouldEscalate = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
+
+        if (!shouldEscalate) {
+            // Retry on the SAME connection (no supervisor invalidation)
             com.letta.mobile.util.Telemetry.event(
-                "IrohTransport", "admin_rpc.retry_after_failure",
+                "IrohTransport", "admin_rpc.retry.same_connection",
                 "method" to method,
                 "path" to path,
                 "error" to (firstError.message ?: firstError.toString()),
                 "class" to firstError::class.simpleName,
+                "consecutiveFailures" to failures.toString(),
+                "idleMs" to idleMs.toString(),
+            )
+            return runCatching {
+                // Re-use the SAME handle (no redial)
+                first.adminRpc(method = method, path = path, body = body)
+            }.getOrElse { retryError ->
+                if (retryError is CancellationException) throw retryError
+                // Second failure on same connection — now escalate
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohTransport", "admin_rpc.escalate.reconnect",
+                    "method" to method,
+                    "path" to path,
+                    "error" to (retryError.message ?: retryError.toString()),
+                    "class" to retryError::class.simpleName,
+                    "consecutiveFailures" to (failures + 1).toString(),
+                )
+                supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}")
+                val newHandle = supervisor.ready()
+                newHandle.adminRpc(method = method, path = path, body = body)
+            }
+        } else {
+            // Escalate: connection is idle and multiple failures accumulated
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "admin_rpc.escalate.reconnect",
+                "method" to method,
+                "path" to path,
+                "error" to (firstError.message ?: firstError.toString()),
+                "class" to firstError::class.simpleName,
+                "consecutiveFailures" to failures.toString(),
+                "idleMs" to idleMs.toString(),
             )
             supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}")
             val retry = supervisor.ready()
-            retry.adminRpc(method = method, path = path, body = body)
+            return retry.adminRpc(method = method, path = path, body = body)
         }
     }
 
@@ -724,6 +838,9 @@ class IrohChannelTransport(
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
+        // letta-mobile-34xoj: admin_rpc retry thresholds
+        private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
+        private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it

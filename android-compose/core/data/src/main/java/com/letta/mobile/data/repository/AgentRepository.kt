@@ -364,6 +364,10 @@ open class AgentRepository(
             // transcript (same chars/4 heuristic letta.js uses internally).
             return localSource.contextWindowOverview(agentId) ?: ContextWindowOverview()
         }
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getContextWindow(agentId, conversationId)
+        }
         return agentApi.getContextWindow(agentId, conversationId)
     }
 
@@ -377,7 +381,19 @@ open class AgentRepository(
     }
 
     override open suspend fun createAgent(params: AgentCreateParams): Agent {
-        val agent = agentApi.createAgent(params)
+        val irohSource = irohAgentSource
+        val agent = if (irohSource != null && irohSource.shouldUseIroh()) {
+            val json = kotlinx.serialization.json.Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                explicitNulls = false
+                coerceInputValues = true
+            }
+            val paramsJson = json.encodeToString(AgentCreateParams.serializer(), params)
+            irohSource.createAgent(paramsJson)
+        } else {
+            agentApi.createAgent(params)
+        }
         refreshAgents()
         return agent
     }
@@ -428,13 +444,31 @@ open class AgentRepository(
             updateAgentInCache(preview)
             return preview
         }
+        // P4 iroh purity: raw HTTP AgentApi hard-fails in iroh:// mode; route
+        // the update over admin_rpc agent.update (model switch from the drawer
+        // failed with "Couldn't switch model" without this).
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            val agent = irohSource.updateAgent(
+                id,
+                kotlinx.serialization.json.Json { encodeDefaults = false; explicitNulls = false }
+                    .encodeToString(AgentUpdateParams.serializer(), params),
+            )
+            refreshAgents()
+            return agent
+        }
         val agent = agentApi.updateAgent(id, params)
         refreshAgents()
         return agent
     }
 
     override open suspend fun deleteAgent(id: AgentId) {
-        agentApi.deleteAgent(id)
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.deleteAgent(id)
+        } else {
+            agentApi.deleteAgent(id)
+        }
         _agents.update { current -> current.filterNot { it.id == id } }
         try {
             agentDao.deleteExcept(_agents.value.map { it.id.value })

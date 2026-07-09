@@ -111,6 +111,31 @@ suspend fun applyReconcileAfterSendSnapshot(
                     shouldDeletePendingLocal = true
                 }
             }
+        } else {
+            // letta-mobile-20tat (P1): when the server message.list response
+            // does NOT echo the client otid (common over Iroh if the serve path
+            // doesn't persist/echo client_message_id), fall back to content+
+            // recency matching: find the Local user row we're trying to confirm,
+            // and swap it with the reconciled server copy. This ensures the
+            // optimistic send row and its disk twin collapse into one confirmed
+            // event instead of rendering twice.
+            val existing = state.value.findByOtid(otid)
+            if (existing is TimelineEvent.Local && existing.role == Role.USER) {
+                val contentMatch = serverMessages.firstOrNull { msg ->
+                    val confirmed = msg.toTimelineEvent(position = 0.0)
+                    confirmed?.messageType == TimelineMessageType.USER &&
+                        confirmed.content.trim() == existing.content.trim()
+                }
+                if (contentMatch != null) {
+                    val confirmed = contentMatch.toTimelineEvent(position = existing.position)
+                    if (confirmed != null) {
+                        state.value = state.value.replaceLocal(otid, confirmed)
+                        confirmedServerId = contentMatch.id
+                        confirmedLocal = true
+                        shouldDeletePendingLocal = true
+                    }
+                }
+            }
         }
 
         // 2. Pull in any server messages we don't yet have (missed stream events)
@@ -364,18 +389,17 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
         val candidateRun = event.runId?.takeIf { it.isNotBlank() }
         if (candidateRun == null || candidateRun.isReconcileSyntheticRunId()) continue
         // Guard (2): first (most recent) streamed row strictly contained by the
-        // incoming final IS the reply being finalized. Return it immediately;
-        // never scan past it to an earlier reply.
+        // incoming final IS the reply being finalized. Return it immediately.
+        // If not contained, continue scanning backwards — there may be an older
+        // streamed row (from an earlier turn) that IS contained and should be
+        // collapsed (e.g., delayed reconcile final arriving after a newer turn
+        // has already started).
         if (incomingText != existingText &&
             incomingText.contains(existingText) &&
             incomingText.length > existingText.length
         ) {
             return index
         }
-        // A more-recent streamed row that is NOT contained by this final means the
-        // final belongs to a different (earlier) reply — do not overwrite the
-        // newer streamed row; stop rather than reach past it.
-        return null
     }
     return null
 }
@@ -399,6 +423,10 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
  * Scans the recent tail for a row of the same message type with identical
  * trimmed content. Bounded to the tail window so long histories stay O(1)-ish
  * per reconcile and legitimately repeated OLD messages are not collapsed.
+ *
+ * letta-mobile-20tat (P1): enhanced to also check Local user events so the
+ * optimistic send row and its reconciled disk twin collapse even when the
+ * server doesn't echo otid (common over Iroh).
  */
 private const val RECONCILE_CONTENT_DEDUPE_TAIL = 30
 
@@ -413,9 +441,24 @@ private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confir
     if (incomingContent.isEmpty()) return false
     val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
     for (i in events.size - 1 downTo start) {
-        val event = events[i] as? TimelineEvent.Confirmed ?: continue
-        if (event.messageType != incoming.messageType) continue
-        if (event.content.trim() == incomingContent) return true
+        val event = events[i]
+        // letta-mobile-20tat: check both Confirmed AND Local user events
+        when (event) {
+            is TimelineEvent.Confirmed -> {
+                if (event.messageType != incoming.messageType) continue
+                if (event.content.trim() == incomingContent) return true
+            }
+            is TimelineEvent.Local -> {
+                // Only dedupe user messages against Local rows (assistant/
+                // reasoning never appear as Local in production flow)
+                if (incoming.messageType == TimelineMessageType.USER &&
+                    event.role == Role.USER &&
+                    event.content.trim() == incomingContent
+                ) {
+                    return true
+                }
+            }
+        }
     }
     return false
 }

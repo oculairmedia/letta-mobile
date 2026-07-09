@@ -1,5 +1,10 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
@@ -46,6 +51,8 @@ open class TimelineRepository(
     // [loopsMutex], which makes the remove+reinsert touch safe.
     private val loops = LinkedHashMap<TimelineCacheKey, TimelineSyncLoop>()
     private val loopsMutex = Mutex()
+    private val externalSeenMutex = Mutex()
+    private val externalSeenByConversation = LinkedHashMap<String, LinkedHashSet<String>>()
 
     /** Mutex-guarded LRU get: touches the entry so eviction stays correct. */
     private fun getLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
@@ -55,25 +62,37 @@ open class TimelineRepository(
     }
 
     /**
-     * Some legacy call sites only know [conversationId], while newer chat paths
-     * pass (agentId, conversationId). Treat the unscoped key as an alias only
-     * when there is exactly one compatible live loop for the conversation. When
-     * a scoped caller claims an unscoped loop, promote the cache key to that
-     * scope so a later different agent cannot accidentally share it.
+     * Legacy callers sometimes only know [TimelineCacheKey.conversationId],
+     * while live Iroh writers use an agent-scoped key. Alias those paths only
+     * inside a compatible scope: same agent, or one unscoped side. Once an
+     * unscoped loop is claimed by a scoped agent, it is promoted to that agent
+     * and must not be reused by a different scoped agent with the same bare
+     * conversation id.
      */
     private fun getAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
-        val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
+        val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
+        if (candidates.isEmpty()) return null
+        val compatible = candidates.filter { canAlias(it.key, key) }
+        candidates.filterNot { canAlias(it.key, key) }.forEach { (existingKey, _) ->
+            emitAliasRefused(existingKey, key)
+        }
+        val match = compatible.singleOrNull() ?: return null
         val existingKey = match.key
-        if (!canAlias(existingKey, key)) return null
         val loop = loops.remove(existingKey) ?: return null
         val promotedKey = if (existingKey.agentId == null && key.agentId != null) key else existingKey
         loops[promotedKey] = loop
+        Telemetry.event(
+            "TimelineRepo", "loop.aliasResolved",
+            "requestedAgentId" to key.agentId.orEmpty(),
+            "canonicalAgentId" to promotedKey.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
         return loop
     }
 
     private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
-        val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
-        if (!canAlias(match.key, key)) return null
+        val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
+        val match = candidates.singleOrNull { canAlias(it.key, key) } ?: return null
         return loops.remove(match.key)
     }
 
@@ -81,6 +100,17 @@ open class TimelineRepository(
         existing.agentId == requested.agentId ||
             existing.agentId == null ||
             requested.agentId == null
+
+    private fun emitAliasRefused(existing: TimelineCacheKey, requested: TimelineCacheKey) {
+        if (existing.agentId == null || requested.agentId == null) return
+        Telemetry.event(
+            "TimelineRepo", "loop.aliasRefused",
+            "existingAgentId" to existing.agentId,
+            "requestedAgentId" to requested.agentId,
+            "conversationId" to requested.conversationId,
+            level = Telemetry.Level.WARN,
+        )
+    }
 
     /**
      * Listener the :app module can install to receive inbound-message events
@@ -265,15 +295,18 @@ open class TimelineRepository(
     /** Ingest a LettaMessage projected from an external live transport. */
     override suspend fun ingestExternalTransportMessage(
         conversationId: String,
-        message: com.letta.mobile.data.model.LettaMessage,
+        message: LettaMessage,
+        source: String,
     ) {
-        getOrCreate(conversationId).ingestStreamEvent(message)
+        if (markExternalFrameDuplicate(conversationId, message, source)) return
+        getOrCreate(conversationId).ingestStreamEvent(message, source)
     }
 
     override suspend fun ingestExternalTransportMessage(
         agentId: String?,
         conversationId: String,
-        message: com.letta.mobile.data.model.LettaMessage,
+        message: LettaMessage,
+        source: String,
     ) {
         com.letta.mobile.util.Telemetry.event(
             "IrohGate", "gate4.repositoryIngest",
@@ -282,7 +315,8 @@ open class TimelineRepository(
             "messageId" to message.id,
             "messageType" to message.messageType,
         )
-        getOrCreate(agentId, conversationId).ingestStreamEvent(message)
+        if (markExternalFrameDuplicate(conversationId, message, source)) return
+        getOrCreate(agentId, conversationId).ingestStreamEvent(message, source)
     }
 
     /**
@@ -492,9 +526,56 @@ open class TimelineRepository(
         }
     }
 
+    private suspend fun markExternalFrameDuplicate(conversationId: String, message: LettaMessage, source: String): Boolean {
+        val key = externalFrameKey(message) ?: return false
+        val duplicate = externalSeenMutex.withLock {
+            val keys = externalSeenByConversation.getOrPut(conversationId) { LinkedHashSet() }
+            val added = keys.add(key)
+            while (keys.size > MAX_SEEN_EXTERNAL_FRAMES_PER_CONVERSATION) {
+                val oldest = keys.firstOrNull() ?: break
+                keys.remove(oldest)
+            }
+            trimExternalSeenConversationCacheLocked()
+            !added
+        }
+        if (duplicate) {
+            Telemetry.event(
+                "TimelineRepo", "externalFrame.exactDuplicateDropped",
+                "conversationId" to conversationId,
+                "messageId" to message.id,
+                "messageType" to message.messageType,
+                "seqId" to (message.seqId ?: -1),
+                "source" to source,
+            )
+        }
+        return duplicate
+    }
+
+    private fun trimExternalSeenConversationCacheLocked() {
+        while (externalSeenByConversation.size > MAX_SEEN_EXTERNAL_CONVERSATIONS) {
+            val oldest = externalSeenByConversation.keys.firstOrNull() ?: break
+            externalSeenByConversation.remove(oldest)
+        }
+    }
+
+    private fun externalFrameKey(message: LettaMessage): String? {
+        // Only deduplicate frames with explicit sequence identity (seqId).
+        // Forward incremental streaming deltas (no seqId) may legitimately
+        // have identical content when streaming character-by-character and
+        // must NOT be deduplicated based on content alone.
+        val seqId = message.seqId
+        if (seqId != null && seqId >= 0) {
+            return "seq|$seqId|${message.messageType}|${message.id}"
+        }
+        // No seqId: this is a forward streaming delta. Do not deduplicate.
+        return null
+    }
+
     private companion object {
         const val DEFAULT_MAX_CACHED_LOOPS = 32
         const val CURSOR_REPAIR_HYDRATE_LIMIT = 100
+        const val MAX_SEEN_EXTERNAL_FRAMES_PER_CONVERSATION = 512
+        const val MAX_SEEN_EXTERNAL_CONVERSATIONS = 64
     }
 
     private data class TimelineCacheKey(

@@ -207,6 +207,7 @@ class HeadlessTimelineStore(
     override suspend fun ingestExternalTransportMessage(
         conversationId: String,
         message: LettaMessage,
+        source: String,
     ) {
         ingest(conversationId, message)
     }
@@ -215,6 +216,7 @@ class HeadlessTimelineStore(
         agentId: String?,
         conversationId: String,
         message: LettaMessage,
+        source: String,
     ) {
         ingest(scopedConversationId(agentId, conversationId), message)
     }

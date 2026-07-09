@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -44,23 +45,39 @@ object MessageListWireProjection {
      * shape is returned untouched.
      */
     fun projectMessageList(response: JsonElement, conversationId: String): JsonElement = when {
-        response is JsonArray -> JsonArray(response.map { projectElement(it, conversationId) })
+        response is JsonArray -> JsonArray(response.mapNotNull { projectElement(it, conversationId) })
         response is JsonObject && response["messages"] is JsonArray -> JsonObject(
             response.toMutableMap().apply {
-                this["messages"] = JsonArray((response["messages"] as JsonArray).map { projectElement(it, conversationId) })
+                this["messages"] = JsonArray((response["messages"] as JsonArray).mapNotNull { projectElement(it, conversationId) })
             },
         )
         else -> response
     }
 
-    private fun projectElement(element: JsonElement, conversationId: String): JsonElement =
+    private fun projectElement(element: JsonElement, conversationId: String): JsonElement? =
         if (element is JsonObject) projectMessage(element, conversationId) else element
 
-    /** Projects a single message object for a list response. */
-    fun projectMessage(message: JsonObject, conversationId: String): JsonObject {
+    /** Projects a single message object for a list response. Returns null for suppressed messages. */
+    fun projectMessage(message: JsonObject, conversationId: String): JsonObject? {
+        // letta-mobile-dz5a8 (P1): suppress synthetic skill-instruction envelopes
+        // from projection. These are role:user messages whose content starts with
+        // or contains <skill ...> / <skill-name> XML-ish blocks (often with trailing
+        // "ARGUMENTS:" line). The persisted backend row stays intact for model
+        // context; only the wire projection filters them out so they don't render
+        // as giant blue user bubbles on the phone.
+        if (isSyntheticSkillInstructionEnvelope(message)) {
+            return null
+        }
+
         val messageType = (message["message_type"] as? JsonPrimitive)?.contentOrNull
         if (messageType !in TOOL_RETURN_MESSAGE_TYPES) return message
         return projectToolReturnMessage(message, conversationId)
+    }
+
+    private fun isSyntheticSkillInstructionEnvelope(message: JsonObject): Boolean {
+        val role = (message["role"] as? JsonPrimitive)?.contentOrNull
+        val content = (message["content"] as? JsonPrimitive)?.contentOrNull ?: return false
+        return SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(role, content)
     }
 
     private fun projectToolReturnMessage(message: JsonObject, conversationId: String): JsonObject {

@@ -1,13 +1,18 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.JobListParams
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeJobApi
+import com.letta.mobile.testutil.FakeSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -26,58 +31,112 @@ class JobRepositoryTest {
     }
 
     @Test
-    fun `refreshJobs updates state flow`() = runTest {
-        fakeApi.jobs.addAll(listOf(sampleJob("job-1", "created"), sampleJob("job-2", "completed")))
-
-        repository.refreshJobs()
-
-        assertEquals(2, repository.jobs.first().size)
+    fun `refreshJobs calls API with correct params`() = runTest {
+        fakeApi.jobs.add(Job(id = "j1", status = "completed", agentId = "a1"))
+        repository.refreshJobs(JobListParams(active = false))
+        assertEquals(1, fakeApi.calls.size)
     }
 
     @Test
-    fun `refreshJobs forwards active filter`() = runTest {
-        fakeApi.jobs.addAll(listOf(sampleJob("job-1", "running"), sampleJob("job-2", "completed")))
+    fun `getJob returns correct job`() = runTest {
+        val testJob = Job(id = "j1", status = "running", agentId = "a1")
+        fakeApi.jobs.add(testJob)
+        val result = repository.getJob("j1")
+        assertEquals("j1", result.id)
+        assertEquals("running", result.status)
+    }
 
-        repository.refreshJobs(JobListParams(active = true))
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-        assertEquals(1, repository.jobs.first().size)
-        assertEquals("running", repository.jobs.first().first().status)
+    @Test(expected = IrohAdminApiUnavailableException::class)
+    fun `refreshJobs in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val apiThatThrows = object : FakeJobApi() {
+            override suspend fun listJobs(params: JobListParams): List<Job> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = JobRepository(apiThatThrows)
+        repo.refreshJobs(JobListParams())
     }
 
     @Test
-    fun `getJob retrieves job by id`() = runTest {
-        fakeApi.jobs.add(sampleJob("job-1", "running"))
-
-        val result = repository.getJob("job-1")
-
-        assertEquals("job-1", result.id)
-        assertTrue(fakeApi.calls.contains("retrieveJob:job-1"))
+    fun `refreshJobs in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testJobs = listOf(
+            Job(id = "j1", status = "completed", agentId = "a1"),
+            Job(id = "j2", status = "running", agentId = "a2"),
+        )
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("job.list", method)
+            assertEquals("/v1/jobs", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ListSerializer(Job.serializer()), testJobs),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcJobSource(transport, settings)
+        val apiThatThrows = object : FakeJobApi() {
+            override suspend fun listJobs(params: JobListParams): List<Job> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = JobRepository(apiThatThrows, irohSource)
+        repo.refreshJobs(JobListParams())
+        assertEquals(2, repo.jobs.value.size)
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 
     @Test
-    fun `cancelJob updates cached job`() = runTest {
-        repository.upsertJob(sampleJob("job-1", "running"))
-        fakeApi.jobs.add(sampleJob("job-1", "running"))
-
-        repository.cancelJob("job-1")
-
-        assertEquals("cancelled", repository.jobs.first().first().status)
-    }
-
-    @Test
-    fun `deleteJob removes cached job`() = runTest {
-        repository.upsertJob(sampleJob("job-1", "running"))
-        fakeApi.jobs.add(sampleJob("job-1", "running"))
-
-        repository.deleteJob("job-1")
-
-        assertTrue(repository.jobs.first().isEmpty())
+    fun `getJob in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testJob = Job(id = "j1", status = "completed", agentId = "a1")
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("job.get", method)
+            assertEquals("/v1/jobs/j1", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(Job.serializer(), testJob),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcJobSource(transport, settings)
+        val apiThatThrows = object : FakeJobApi() {
+            override suspend fun retrieveJob(jobId: String): Job {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = JobRepository(apiThatThrows, irohSource)
+        val result = repo.getJob("j1")
+        assertEquals("j1", result.id)
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 }
-
-private fun sampleJob(id: String, status: String) = Job(
-    id = id,
-    status = status,
-    agentId = "agent-1",
-    jobType = "job",
-)

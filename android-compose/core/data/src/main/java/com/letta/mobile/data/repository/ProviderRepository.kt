@@ -14,11 +14,17 @@ import kotlinx.coroutines.flow.update
 
 class ProviderRepository(
     private val providerApi: ProviderApi,
+    private val irohProviderSource: IrohAdminRpcProviderSource? = null,
 ) : IProviderRepository {
     private val _providers = MutableStateFlow<List<Provider>>(emptyList())
     override val providers: StateFlow<List<Provider>> = _providers.asStateFlow()
 
     override suspend fun refreshProviders(name: String?, providerType: String?) {
+        val irohSource = irohProviderSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _providers.value = irohSource.listProviders()
+            return
+        }
         _providers.value = providerApi.listProviders(limit = 1000, name = name, providerType = providerType)
     }
 

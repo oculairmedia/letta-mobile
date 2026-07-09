@@ -5,10 +5,16 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.PassageApi
 import com.letta.mobile.data.model.Passage
 import com.letta.mobile.data.model.PassageCreateParams
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
+import com.letta.mobile.testutil.FakeSettingsRepository
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -54,6 +60,42 @@ class PassageRepositoryTest {
     }
 
     @Test
+    fun `create and delete passage route through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                val result = if (method == "passage.create") {
+                    "{\"id\":\"passage-1\",\"text\":\"New passage\",\"agent_id\":\"agent-1\"}"
+                } else {
+                    "{}"
+                }
+                AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement(result))
+            }
+        }
+        val irohRepository = PassageRepository(
+            passageApi = fakeApi,
+            irohPassageSource = IrohAdminRpcPassageSource(transport, irohSettings()),
+        )
+
+        val created = irohRepository.createPassage("agent-1", "New passage")
+        irohRepository.deletePassage("agent-1", "passage-1")
+
+        assertTrue(fakeApi.calls.none { it.startsWith("createPassage") || it.startsWith("deletePassage") })
+        assertEquals(listOf("passage.create", "passage.delete"), transport.adminRpcCalls.map { it.method })
+        assertEquals("/v1/agents/agent-1/archival-memory", transport.adminRpcCalls[0].path)
+        assertTrue(transport.adminRpcCalls[0].body.orEmpty().contains("\"text\":\"New passage\""))
+        assertEquals("/v1/agents/agent-1/archival-memory/passage-1", transport.adminRpcCalls[1].path)
+        assertEquals("passage-1", created.id)
+    }
+
+    private fun irohSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://EndpointTicket",
+        ),
+    )
+
+    @Test
     fun `deletePassage emits removal from cache`() = runTest {
         val first = Passage(id = "p1", text = "First", agentId = "a1")
         val second = Passage(id = "p2", text = "Second", agentId = "a1")
@@ -68,6 +110,57 @@ class PassageRepositoryTest {
             assertEquals(listOf(second), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
+
+    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
+    fun `refreshPassages in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val apiThatThrows = object : FakePassageApi() {
+            override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = PassageRepository(apiThatThrows)
+        repo.refreshPassages("a1")
+    }
+
+    @Test
+    fun `refreshPassages in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "test",
+                mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val testPassages = listOf(Passage(id = "p1", text = "Passage text", agentId = "a1"))
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("passage.list", method)
+            assertEquals("/v1/agents/a1/passages", path)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(Passage.serializer()), testPassages),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcPassageSource(transport, settings)
+        val apiThatThrows = object : FakePassageApi() {
+            override suspend fun listPassages(agentId: String, limit: Int?, after: String?, search: String?): List<Passage> {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = PassageRepository(apiThatThrows, irohSource)
+        repo.refreshPassages("a1")
+        repo.getPassages("a1").test {
+            assertEquals(1, awaitItem().size)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 
     private class FakePassageApi : PassageApi(mockk(relaxed = true)) {

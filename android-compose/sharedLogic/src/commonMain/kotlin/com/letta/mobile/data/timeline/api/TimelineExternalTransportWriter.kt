@@ -24,9 +24,9 @@ interface TimelineExternalTransportWriter {
         attachments: List<MessageContentPart.Image> = emptyList(),
     ): String
 
-    suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage)
+    suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String = "external")
 
-    suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage)
+    suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String = "external")
 
     suspend fun markExternalTransportLocalSent(conversationId: String, otid: String)
 

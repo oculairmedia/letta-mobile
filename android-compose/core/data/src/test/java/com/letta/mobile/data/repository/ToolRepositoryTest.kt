@@ -1,6 +1,10 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
+import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -8,6 +12,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
@@ -95,6 +100,33 @@ class ToolRepositoryTest {
     }
 
     @Test
+    fun `attach detach tool route through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> AppServerInboundFrame.AdminRpcResponse("req", true, Json.parseToJsonElement("{}")) }
+        }
+        val irohRepository = ToolRepository(
+            toolApi = fakeApi,
+            irohToolSource = IrohAdminRpcToolSource(transport, irohSettings()),
+        )
+
+        irohRepository.attachTool("agent-1", "tool-1")
+        irohRepository.detachTool("agent-1", "tool-1")
+
+        assertTrue(fakeApi.calls.none { it.startsWith("attachTool") || it.startsWith("detachTool") })
+        assertEquals(listOf("tool.attach", "tool.detach"), transport.adminRpcCalls.map { it.method })
+        assertEquals("/v1/agents/agent-1/tools/attach/tool-1", transport.adminRpcCalls[0].path)
+        assertEquals("/v1/agents/agent-1/tools/detach/tool-1", transport.adminRpcCalls[1].path)
+    }
+
+    private fun irohSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://EndpointTicket",
+        ),
+    )
+
+    @Test
     fun `upsertTool creates and refreshes`() = runTest {
         val tool = repository.upsertTool(
             com.letta.mobile.data.model.ToolCreateParams(
@@ -149,5 +181,134 @@ class ToolRepositoryTest {
     fun `refreshTools throws on API failure`() = runTest {
         fakeApi.shouldFail = true
         repository.refreshTools()
+    }
+
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
+
+    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
+    fun `refreshTools in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val apiThatThrows = object : FakeToolApi() {
+            override suspend fun listTools(tags: List<String>?, limit: Int?, offset: Int?): List<com.letta.mobile.data.model.Tool> {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = ToolRepository(apiThatThrows)
+        repo.refreshTools()
+    }
+
+    @Test
+    fun `refreshTools in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "test",
+                mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val testTools = listOf(TestData.tool(id = "t1", name = "search"))
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("tool.list", method)
+            assertEquals("/v1/tools", path)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(com.letta.mobile.data.model.Tool.serializer()), testTools),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcToolSource(transport, settings)
+        val apiThatThrows = object : FakeToolApi() {
+            override suspend fun listTools(tags: List<String>?, limit: Int?, offset: Int?): List<com.letta.mobile.data.model.Tool> {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = ToolRepository(apiThatThrows, irohSource)
+        repo.refreshTools()
+        assertEquals(1, repo.getTools().first().size)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `upsertTool in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val createdTool = TestData.tool(id = "t1", name = "new_tool")
+        transport.adminRpcHandler = { method, _, _ ->
+            assertEquals("tool.create", method)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(com.letta.mobile.data.model.Tool.serializer(), createdTool),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcToolSource(transport, settings)
+        val apiThatThrows = object : FakeToolApi() {
+            override suspend fun upsertTool(params: com.letta.mobile.data.model.ToolCreateParams): com.letta.mobile.data.model.Tool {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = ToolRepository(apiThatThrows, irohSource)
+        val result = repo.upsertTool(com.letta.mobile.data.model.ToolCreateParams(sourceCode = "def new_tool(): return 'ok'"))
+        assertEquals("new_tool", result.name)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `updateTool in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val updatedTool = TestData.tool(id = "t1", name = "updated_tool", description = "Updated")
+        transport.adminRpcHandler = { method, path, _ ->
+            assertEquals("tool.update", method)
+            assertEquals("/v1/tools/t1", path)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(com.letta.mobile.data.model.Tool.serializer(), updatedTool),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcToolSource(transport, settings)
+        val apiThatThrows = object : FakeToolApi() {
+            override suspend fun updateTool(toolId: String, params: com.letta.mobile.data.model.ToolUpdateParams): com.letta.mobile.data.model.Tool {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = ToolRepository(apiThatThrows, irohSource)
+        val result = repo.updateTool("t1", com.letta.mobile.data.model.ToolUpdateParams(description = "Updated"))
+        assertEquals("Updated", result.description)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `deleteTool in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        transport.adminRpcHandler = { method, path, _ ->
+            assertEquals("tool.delete", method)
+            assertEquals("/v1/tools/t1", path)
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = true, result = kotlinx.serialization.json.JsonNull, error = null)
+        }
+        val irohSource = IrohAdminRpcToolSource(transport, settings)
+        val apiThatThrows = object : FakeToolApi() {
+            override suspend fun deleteTool(toolId: String) {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = ToolRepository(apiThatThrows, irohSource)
+        repo.deleteTool("t1")
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 }

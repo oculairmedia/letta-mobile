@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeAgentApi
@@ -22,6 +23,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -112,6 +114,38 @@ class AgentRepositoryTest {
 
         assertEquals(420, overview.contextWindowSizeCurrent)
         assertTrue(fakeApi.calls.isEmpty())
+    }
+
+    @Test
+    fun `getContextWindow routes through admin rpc in iroh mode`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    "req",
+                    true,
+                    Json.parseToJsonElement("{\"context_window_size_current\":420,\"context_window_size_max\":128000}"),
+                )
+            }
+        }
+        val irohRepo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            settingsRepository = com.letta.mobile.testutil.FakeSettingsRepository(
+                initialActiveConfig = LettaConfig(
+                    id = "iroh",
+                    mode = LettaConfig.Mode.SELF_HOSTED,
+                    serverUrl = "iroh://EndpointTicket",
+                ),
+            ),
+            transport = transport,
+        )
+
+        val overview = irohRepo.getContextWindow(AgentId("agent-1"), com.letta.mobile.data.model.ConversationId("conversation-1"))
+
+        assertTrue(fakeApi.calls.none { it.startsWith("getContextWindow") })
+        assertEquals("agent.context", transport.adminRpcCalls.single().method)
+        assertEquals("/v1/agents/agent-1/context?conversation_id=conversation-1", transport.adminRpcCalls.single().path)
+        assertEquals(420, overview.contextWindowSizeCurrent)
     }
 
     @Test
@@ -457,5 +491,75 @@ class AgentRepositoryTest {
         override suspend fun deleteAll() {
             agents.value = emptyList()
         }
+    }
+
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
+
+    @Test(expected = com.letta.mobile.data.api.IrohAdminApiUnavailableException::class)
+    fun `createAgent in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = AgentRepository(apiThatThrows, FakeAgentDao())
+        repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
+    }
+
+    @Test
+    fun `createAgent in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val createdAgent = TestData.agent(id = "a1", name = "Created Agent")
+        transport.adminRpcHandler = { method, _, _ ->
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            when (method) {
+                "agent.create" -> com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req", success = true, result = json.encodeToJsonElement(com.letta.mobile.data.model.Agent.serializer(), createdAgent), error = null
+                )
+                // The repository init/refresh path pages agent.list in the
+                // background; answer it benignly instead of failing the create
+                // assertion on an unrelated concurrent call.
+                "agent.list" -> com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req", success = true, result = kotlinx.serialization.json.JsonArray(emptyList()), error = null
+                )
+                else -> error("unexpected admin_rpc method: $method")
+            }
+        }
+        val irohSource = IrohAdminRpcAgentSource(transport, settings)
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+            override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<com.letta.mobile.data.model.Agent> = emptyList()
+        }
+        val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
+        val result = repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
+        assertEquals("Created Agent", result.name)
+        assertTrue(transport.adminRpcCalls.any { it.method == "agent.create" })
+    }
+
+    @Test
+    fun `deleteAgent in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        transport.adminRpcHandler = { method, path, _ ->
+            assertEquals("agent.delete", method)
+            assertEquals("/v1/agents/a1", path)
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = true, result = kotlinx.serialization.json.JsonNull, error = null)
+        }
+        val irohSource = IrohAdminRpcAgentSource(transport, settings)
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun deleteAgent(id: AgentId) {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
+        repo.deleteAgent(AgentId("a1"))
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 }

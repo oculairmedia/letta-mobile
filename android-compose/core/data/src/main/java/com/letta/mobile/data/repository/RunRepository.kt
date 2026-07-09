@@ -15,11 +15,17 @@ import kotlinx.coroutines.flow.update
 
 class RunRepository(
     private val runApi: RunApi,
+    private val irohRunSource: IrohAdminRpcRunSource? = null,
 ) : IRunRepository {
     private val _runs = MutableStateFlow<List<Run>>(emptyList())
     override val runs: StateFlow<List<Run>> = _runs.asStateFlow()
 
     override suspend fun refreshRuns(params: RunListParams) {
+        val irohSource = irohRunSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _runs.value = irohSource.listRuns()
+            return
+        }
         _runs.value = runApi.listRuns(params)
     }
 
@@ -34,6 +40,10 @@ class RunRepository(
     }
 
     override suspend fun getRun(runId: String): Run {
+        val irohSource = irohRunSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getRun(runId)
+        }
         return runApi.retrieveRun(runId)
     }
 
@@ -50,6 +60,10 @@ class RunRepository(
     }
 
     override suspend fun getRunSteps(runId: String): List<Step> {
+        val irohSource = irohRunSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getRunSteps(runId)
+        }
         return runApi.listRunSteps(runId = runId, order = "desc")
     }
 
