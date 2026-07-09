@@ -134,11 +134,12 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
-    fun listAgentMessagesIsGatedOverIroh() = runTest(UnconfinedTestDispatcher()) {
+    fun listAgentMessagesDegradesToEmptyOverIroh() = runTest(UnconfinedTestDispatcher()) {
+        // No agent-scoped message.list handler exists over Iroh — degrade to
+        // empty (keeps a default-shim conversation functional) instead of
+        // throwing a load error.
         val gateway = IrohAdminRpcChatGateway(FakeIrohTransport())
-        assertFailsWith<TimelineTransportHttpException> {
-            gateway.listAgentMessages("agent-1")
-        }
+        assertEquals(emptyList(), gateway.listAgentMessages("agent-1"))
     }
 
     // ------------------------------------------------------------------

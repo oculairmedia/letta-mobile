@@ -125,9 +125,17 @@ class IrohAdminRpcChatGateway(
         order: String?,
         conversationId: String?,
     ): List<LettaMessage> {
-        // No agent-scoped message.list handler exists server-side; Android
-        // gates this identically while the backend is iroh://.
-        throw TimelineTransportHttpException(0, "Agent message reads are not available over iroh://")
+        // No agent-scoped message.list handler exists server-side over Iroh.
+        // Degrade to empty (no reachable history) rather than throwing — a throw
+        // surfaces a "Message load failed" banner when a default-shim agent
+        // conversation is opened, whereas empty leaves it functional for live
+        // send/stream. Live turns still flow through the frame path.
+        Telemetry.event(
+            "IrohChatGateway", "listAgentMessages.gated",
+            "agentId" to agentId,
+            "conversationId" to (conversationId ?: "<null>"),
+        )
+        return emptyList()
     }
 
     override suspend fun getToolReturn(conversationId: String, messageId: String): LettaMessage? {
