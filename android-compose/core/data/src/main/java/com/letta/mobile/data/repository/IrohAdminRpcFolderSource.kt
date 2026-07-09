@@ -26,7 +26,7 @@ class IrohAdminRpcFolderSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+        settingsRepository.activeBackendIsIroh()
 
     suspend fun listFolders(agentId: String): List<Folder> {
         val params = buildJsonObject { put("agent_id", agentId) }

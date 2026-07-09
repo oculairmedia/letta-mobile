@@ -20,7 +20,7 @@ class IrohAdminRpcPassageSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+        settingsRepository.activeBackendIsIroh()
 
     suspend fun listPassages(agentId: String): List<Passage> {
         val params = buildJsonObject { put("agent_id", agentId) }
