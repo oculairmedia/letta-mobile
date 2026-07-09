@@ -24,7 +24,7 @@ class IrohAdminRpcGroupSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+        settingsRepository.activeBackendIsIroh()
 
     suspend fun listGroups(): List<Group> {
         val response = channelTransport.adminRpc(

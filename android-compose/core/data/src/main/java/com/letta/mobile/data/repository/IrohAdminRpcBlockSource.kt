@@ -31,7 +31,7 @@ class IrohAdminRpcBlockSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+        settingsRepository.activeBackendIsIroh()
 
     suspend fun retrieveBlock(blockId: String): Block {
         val params = buildJsonObject { put("block_id", blockId) }
