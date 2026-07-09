@@ -13,7 +13,7 @@ object McpAdminHandlers {
         router.register("mcp.list") { api.get("mcp", "servers") }
         router.register("passage.list") { params ->
             val agentId = param(params, "agent_id")
-            if (agentId != null) api.get("agents", agentId, "passages") else jsonError("agent_id required")
+            if (agentId != null) api.get("agents", agentId, "passages") else adminError("agent_id required")
         }
     }
 
@@ -22,5 +22,5 @@ object McpAdminHandlers {
     }
 
     private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
+
 }
