@@ -47,6 +47,30 @@ internal object IrohStreamDeltaServerFrameMapper {
         val meta = Metadata.from(payload, envelope, delta, context)
 
         return when (messageType) {
+            // letta-mobile-r3i1z (observer ingestion): the fanned-out user echo
+            // arrives as a `user_message` stream_delta (id = cm-user-<otid>,
+            // otid = <otid>, content = text/content-parts). The INITIATOR never
+            // needs this branch — it dedups against its own optimistic Local row —
+            // but a passive OBSERVER has no optimistic twin, so it must project the
+            // echo into a real user row. The stable `cm-user-<otid>` id + otid make
+            // the reducer collapse replays idempotently (eaczz.5). Emitting it here
+            // (instead of a separate observer-only mapper) keeps observer frame
+            // shape byte-identical to what the initiator path would produce.
+            "user_message" -> listOf(
+                ServerFrame.UserMessage(
+                    id = delta.string("id") ?: meta.messageId(),
+                    ts = meta.timestamp,
+                    agentId = meta.agentId,
+                    conversationId = meta.conversationId,
+                    turnId = meta.turnId,
+                    runId = meta.runId,
+                    content = delta.contentText(),
+                    otid = delta.string("otid") ?: delta.string("client_message_id"),
+                    seq = meta.eventSeq,
+                    seqId = meta.seqId,
+                ),
+            )
+
             "assistant_message" -> listOf(
                 ServerFrame.AssistantMessage(
                     id = meta.messageId(),

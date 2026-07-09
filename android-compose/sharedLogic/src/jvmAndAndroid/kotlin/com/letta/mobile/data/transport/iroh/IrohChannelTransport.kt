@@ -46,6 +46,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
 import java.util.UUID
 
@@ -171,9 +172,136 @@ class IrohChannelTransport(
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
         onStateChanged = { supervisorState ->
             _state.value = supervisorState.toChannelTransportState()
-            if (supervisorState is IrohConnectionState.Ready) notifyRedialIfTurnActive()
+            if (supervisorState is IrohConnectionState.Ready) {
+                notifyRedialIfTurnActive()
+                // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
+                // bound to THIS connection generation. Any prior collector (tied to
+                // an older, now-dead flow) is cancelled first so a stale collector
+                // never ingests from a torn-down transport.
+                startObserverIngest(supervisorState.handle)
+            } else {
+                // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
+                // stops observer ingestion. On redial a fresh Ready fires and the
+                // collector restarts against the new handle above.
+                stopObserverIngest("state:${supervisorState::class.simpleName}")
+            }
         },
     )
+
+    // letta-mobile-r3i1z: OBSERVER INGESTION.
+    //
+    // Every fanned-out frame for a conversation this client is a registered viewer
+    // of already ARRIVES on the transport's stream channel (IrohAppServerTransport
+    // .streamFrames == streamFrameFlow). But nothing consumed that flow unless a
+    // LOCAL turn's engine.runTurn was active — so frames for turns this client did
+    // NOT initiate were dropped and a passive observer rendered nothing. This
+    // long-lived collector fixes that: while connected it continuously ingests
+    // stream_delta frames into the SAME _events/_frameEvents seam the initiator
+    // uses, so observer frames reduce identically.
+    private val observerMapper = com.letta.mobile.data.runtime.AppServerRuntimeEventMapper()
+    private val observerGeneration = atomic(0)
+    @Volatile
+    private var observerJob: Job? = null
+
+    private fun startObserverIngest(handle: IrohConnectionHandle) {
+        val streamFrames = handle.effectiveObserverStreamFrames ?: return
+        // Bump the generation and cancel any prior collector: exactly one observer
+        // collector is ever live, and it is pinned to this handle's session.
+        val generation = observerGeneration.incrementAndGet()
+        observerJob?.cancel()
+        observerJob = scope.launch {
+            Telemetry.event(
+                "IrohObserver", "ingest.start",
+                "sessionId" to handle.sessionId,
+                "generation" to generation.toString(),
+            )
+            runCatching {
+                streamFrames.collect { received ->
+                    // Guard against a stale collector that a redial has superseded.
+                    if (observerGeneration.value != generation) return@collect
+                    ingestObserverFrame(received)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Telemetry.event(
+                    "IrohObserver", "ingest.failed",
+                    "error" to (error.message ?: error.toString()),
+                    "class" to error::class.simpleName,
+                )
+            }
+        }
+    }
+
+    private fun stopObserverIngest(reason: String) {
+        val job = observerJob ?: return
+        observerJob = null
+        // Invalidate the generation so an in-flight collect body drops its frame.
+        observerGeneration.incrementAndGet()
+        job.cancel()
+        Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
+    }
+
+    /**
+     * Ingest ONE fanned-out stream frame the observer path owns.
+     *
+     * DUAL-INGEST GUARD (letta-mobile-h30cy hazard): the engine's runTurn ALSO
+     * collects this exact SharedFlow (via client.events = merge(control, stream))
+     * while a local turn is active — both collectors therefore see every frame.
+     * To keep exactly ONE consumer per frame, the observer collector SKIPS any
+     * frame whose conversation matches the currently-active local turn: the engine
+     * OWNS frames for its own conversation while its turn runs. The observer OWNS
+     * a frame only when NO local turn is active for that frame's conversation.
+     * Ownership is decided per-frame by the frame's own conversation_id vs the
+     * live activeTurn.conversationId — airtight (no overlap: a frame is engine-owned
+     * XOR observer-owned; no gap: every stream_delta is owned by exactly one side).
+     */
+    private suspend fun ingestObserverFrame(received: AppServerReceivedFrame) {
+        val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
+        val conversationId = streamDelta.runtime.conversationId
+        val agentId = streamDelta.runtime.agentId
+
+        // DUAL-INGEST GUARD: if a local turn is active on THIS conversation, the
+        // engine's collect already consumes+emits its frames — the observer must
+        // not touch them. Frames for a DIFFERENT conversation than the active turn
+        // (or when there is no active turn at all) belong to the observer.
+        val localTurn = activeTurn
+        if (localTurn != null && localTurn.conversationId == conversationId) {
+            Telemetry.event(
+                "IrohObserver", "ingest.skip_engine_owned",
+                "conversationId" to conversationId,
+                "turnId" to localTurn.turnId,
+            )
+            return
+        }
+
+        // Project via the EXACT initiator chain: raw StreamDelta -> RuntimeEventDraft
+        // (AppServerRuntimeEventMapper, the same mapper engine.collect uses) ->
+        // ServerFrame(s) (payloadToServerFrames, shared with emitDraft). The
+        // observer supplies only fallback context; wire envelope ids win.
+        val command = observerTurnCommand(agentId, conversationId)
+        observerMapper.map(command, received).forEach { draft ->
+            val frames = payloadToServerFrames(
+                payload = draft.payload,
+                agentId = draft.agentId?.value ?: agentId,
+                conversationId = draft.conversationId?.value ?: conversationId,
+                turnId = "iroh-observer-turn-$conversationId",
+                runId = draft.runId?.value ?: "iroh-observer-run-$conversationId",
+            )
+            frames.forEach { emitBoth(it) }
+        }
+    }
+
+    private fun observerTurnCommand(agentId: String, conversationId: String): TurnCommand =
+        TurnCommand(
+            backendId = BackendId("iroh-app-server"),
+            runtimeId = RuntimeId("iroh-observer"),
+            agentId = AgentId(agentId),
+            conversationId = ConversationId(conversationId),
+            input = TurnInput.UserMessage(
+                localMessageId = "iroh-observer-$conversationId",
+                text = "",
+            ),
+        )
 
     private fun notifyRedialIfTurnActive() {
         val turn = activeTurn ?: return
@@ -509,78 +637,104 @@ class IrohChannelTransport(
         } else {
             emptyList()
         }
-        return promotionFrames + when (val payload = draft.payload) {
-            is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
-                payload = payload,
-                context = IrohStreamDeltaServerFrameMapper.Context(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    runId = effectiveRunId,
-                    timestamp = nowIso(),
-                ),
-            )
-            // Non-chat App Server frames (update_device_status, update_queue,
-            // update_subagent_state, etc.) are side-channel runtime events, not
-            // assistant text. Do not fold them into the chat timeline.
-            is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
-            is RuntimeEventPayload.ToolCallObserved -> listOf(
-                ServerFrame.ToolCallMessage(
-                    id = "toolcall-${payload.toolCallId.value}",
-                    ts = nowIso(),
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    runId = effectiveRunId,
-                    toolCall = ToolCallPayload(
-                        toolCallId = payload.toolCallId.value,
-                        name = payload.toolName.value,
-                        arguments = payload.argumentsJson ?: "{}",
-                    ),
-                    seq = null,
-                ),
-            )
-            is RuntimeEventPayload.ToolReturnObserved -> listOf(
-                ServerFrame.ToolReturnMessage(
-                    id = "toolreturn-${payload.toolCallId.value}",
-                    ts = nowIso(),
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    runId = effectiveRunId,
+        return promotionFrames + payloadToServerFrames(
+            payload = draft.payload,
+            agentId = agentId,
+            conversationId = conversationId,
+            turnId = turnId,
+            runId = effectiveRunId,
+        )
+    }
+
+    /**
+     * Shared payload -> [ServerFrame] projection used by BOTH the initiator send
+     * path ([emitDraft]) and the passive OBSERVER ingestion loop
+     * ([observeStreamFrames]).
+     *
+     * Extracting it guarantees the observer produces byte-identical frame shapes
+     * to the initiator — the ONLY difference between the two paths is who supplies
+     * the (agentId, conversationId, turnId, runId) context, and for
+     * [RuntimeEventPayload.RemoteStreamFrame] even those are read from the wire
+     * envelope first (context is only a fallback). This is the letta-mobile-r3i1z
+     * "identical shape" contract: same mapper, same defaults, same output.
+     */
+    private fun payloadToServerFrames(
+        payload: RuntimeEventPayload,
+        agentId: String,
+        conversationId: String,
+        turnId: String,
+        runId: String,
+    ): List<ServerFrame> = when (payload) {
+        is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
+            payload = payload,
+            context = IrohStreamDeltaServerFrameMapper.Context(
+                agentId = agentId,
+                conversationId = conversationId,
+                turnId = turnId,
+                runId = runId,
+                timestamp = nowIso(),
+            ),
+        )
+        // Non-chat App Server frames (update_device_status, update_queue,
+        // update_subagent_state, etc.) are side-channel runtime events, not
+        // assistant text. Do not fold them into the chat timeline.
+        is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
+        is RuntimeEventPayload.ToolCallObserved -> listOf(
+            ServerFrame.ToolCallMessage(
+                id = "toolcall-${payload.toolCallId.value}",
+                ts = nowIso(),
+                agentId = agentId,
+                conversationId = conversationId,
+                turnId = turnId,
+                runId = runId,
+                toolCall = ToolCallPayload(
                     toolCallId = payload.toolCallId.value,
-                    status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
-                    toolReturn = JsonPrimitive(payload.body),
+                    name = payload.toolName.value,
+                    arguments = payload.argumentsJson ?: "{}",
                 ),
-            )
-            is RuntimeEventPayload.ApprovalRequested -> listOf(
-                ServerFrame.ToolCallMessage(
-                    type = "approval_request_message",
-                    id = payload.request.approvalId.value,
-                    ts = nowIso(),
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    runId = effectiveRunId,
-                    toolCall = ToolCallPayload(
-                        toolCallId = payload.request.callId.value,
-                        name = payload.request.toolName.value,
-                        arguments = payload.request.argumentsPreview ?: "{}",
-                    ),
-                    seq = null,
+                seq = null,
+            ),
+        )
+        is RuntimeEventPayload.ToolReturnObserved -> listOf(
+            ServerFrame.ToolReturnMessage(
+                id = "toolreturn-${payload.toolCallId.value}",
+                ts = nowIso(),
+                agentId = agentId,
+                conversationId = conversationId,
+                turnId = turnId,
+                runId = runId,
+                toolCallId = payload.toolCallId.value,
+                status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
+                toolReturn = JsonPrimitive(payload.body),
+            ),
+        )
+        is RuntimeEventPayload.ApprovalRequested -> listOf(
+            ServerFrame.ToolCallMessage(
+                type = "approval_request_message",
+                id = payload.request.approvalId.value,
+                ts = nowIso(),
+                agentId = agentId,
+                conversationId = conversationId,
+                turnId = turnId,
+                runId = runId,
+                toolCall = ToolCallPayload(
+                    toolCallId = payload.request.callId.value,
+                    name = payload.request.toolName.value,
+                    arguments = payload.request.argumentsPreview ?: "{}",
                 ),
-            )
-            is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
-                RuntimeRunStatus.Completed -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "completed"))
-                RuntimeRunStatus.Failed -> {
-                    com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""))
-                    listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "failed"))
-                }
-                RuntimeRunStatus.Cancelled -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = effectiveRunId, status = "cancelled"))
-                RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
+                seq = null,
+            ),
+        )
+        is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
+            RuntimeRunStatus.Completed -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "completed"))
+            RuntimeRunStatus.Failed -> {
+                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""))
+                listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "failed"))
             }
-            else -> emptyList()
+            RuntimeRunStatus.Cancelled -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "cancelled"))
+            RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
         }
+        else -> emptyList()
     }
 
     private fun frameMessageId(frame: ServerFrame): String? = when (frame) {
@@ -775,6 +929,7 @@ class IrohChannelTransport(
     }
 
     override suspend fun disconnect() {
+        stopObserverIngest("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
