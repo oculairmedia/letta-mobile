@@ -71,7 +71,16 @@ object ConversationAdminHandlers {
 
         fun messageList(params: JsonObject?): JsonElement {
             val convId = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
-            val response = proxy.get("v1", "conversations", convId, "messages") {
+            val response = fetchMessages(convId, params)
+            // letta-mobile-fe51r (P2b pointer diet): list responses ship
+            // previews for heavy tool-return bodies; full bodies come via
+            // tool_return.get on demand. Inline attachments ship unmodified
+            // (clients have no refetch path for omitted attachment data).
+            return MessageListWireProjection.projectMessageList(response, convId)
+        }
+
+        private fun fetchMessages(convId: String, params: JsonObject?): JsonElement {
+            return proxy.get("v1", "conversations", convId, "messages") {
                 query("limit", AdminHandlerSupport.param(params, "limit"))
                 query("after", AdminHandlerSupport.param(params, "after"))
                 // letta-mobile-71orq: backward pagination (scroll up for
@@ -82,11 +91,6 @@ object ConversationAdminHandlers {
                 query("before", AdminHandlerSupport.param(params, "before"))
                 query("order", AdminHandlerSupport.param(params, "order"))
             }
-            // letta-mobile-fe51r (P2b pointer diet): list responses ship
-            // previews for heavy tool-return bodies; full bodies come via
-            // tool_return.get on demand. Inline attachments ship unmodified
-            // (clients have no refetch path for omitted attachment data).
-            return MessageListWireProjection.projectMessageList(response, convId)
         }
 
         fun messageGet(params: JsonObject?): JsonElement {
