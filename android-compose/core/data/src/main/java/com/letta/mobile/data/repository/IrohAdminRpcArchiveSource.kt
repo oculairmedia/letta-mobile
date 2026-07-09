@@ -8,26 +8,15 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 class IrohAdminRpcArchiveSource(
-    private val channelTransport: IChannelTransport,
-    private val settingsRepository: ISettingsRepository,
-    private val json: Json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    },
+    channelTransport: IChannelTransport,
+    settingsRepository: ISettingsRepository,
 ) {
+    private val client = IrohAdminRpcClient(channelTransport, settingsRepository)
+
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        client.shouldUseIroh()
 
     suspend fun listArchives(): List<Archive> {
-        val response = channelTransport.adminRpc(
-            method = "archive.list",
-            path = "/v1/archives",
-            body = "{}",
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc archive.list failed")
-        val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(Archive.serializer()), result)
+        return client.callList<Archive>("archive.list", "/v1/archives", "{}")
     }
 }
