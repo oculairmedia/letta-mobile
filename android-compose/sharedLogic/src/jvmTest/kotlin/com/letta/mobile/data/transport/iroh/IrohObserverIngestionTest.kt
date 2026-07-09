@@ -250,6 +250,87 @@ class IrohObserverIngestionTest {
         }
     }
 
+    // ============ (e) REDIAL SURVIVAL — collector re-arms on reconnect =
+    @Test
+    fun observerIngestionReestablishesAcrossRedial() = runBlocking {
+        // letta-mobile-r3i1z redial gap: after the QUIC connection dies and the
+        // supervisor redials, the observer-ingestion loop must re-arm against the
+        // NEW handle's live stream (fresh Ready -> startObserverIngest(handle2)),
+        // and the stale handle1 collector must never consume again.
+        val stream1 = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        val stream2 = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        var dials = 0
+        val transport = IrohChannelTransport(
+            scope = clientScope,
+            activeConfigProvider = { IrohConnectConfig("iroh://ticket", "", "device", "test") },
+            testDialer = { config ->
+                dials += 1
+                val dialNumber = dials
+                IrohConnectionHandle(
+                    config = config,
+                    ticket = "ticket",
+                    sessionId = "session-$dialNumber",
+                    observerStreamFrames = if (dialNumber == 1) stream1 else stream2,
+                    adminRpcCall = { _, _, _ ->
+                        // handle1's connection is dead: every admin_rpc read fails
+                        // with a connection-lost-class error (original + retry),
+                        // escalating to supervisor invalidation + redial.
+                        if (dialNumber == 1) error("connection closed")
+                        com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                            requestId = "ok",
+                            success = true,
+                        )
+                    },
+                    close = {},
+                )
+            },
+        )
+        transport.connect("iroh://ticket", "", "device", "test")
+        val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+        try {
+            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
+            delay(100)
+
+            // Sanity: the FIRST connection's observer collector ingests.
+            stream1.emit(streamDelta("agent-1", "conv-obs", 1, assistantDelta("cm-before", "before redial")))
+            withTimeout(3_000) {
+                while (frames.none { it is ServerFrame.AssistantMessage && it.content == "before redial" }) delay(20)
+            }
+
+            // REDIAL: connection-lost-class admin_rpc failures on handle1
+            // (original + same-connection retry) invalidate the supervisor and
+            // redial to handle2. The call itself succeeds on the new handle.
+            val response = withTimeout(10_000) { transport.adminRpc("message.list", "/v1/messages", null) }
+            assertTrue(response.success, "admin_rpc must succeed on the redialed handle")
+            assertEquals(2, dials, "escalation must have redialed")
+            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
+            delay(150) // let the re-armed collector subscribe to stream2
+
+            // THE redial-survival assertion: a fanned-out frame arriving on the
+            // NEW connection's stream channel is ingested — the observer
+            // collector re-armed against handle2, generation-pinned.
+            stream2.emit(streamDelta("agent-1", "conv-obs", 2, assistantDelta("cm-after", "after redial")))
+            withTimeout(5_000) {
+                while (frames.none { it is ServerFrame.AssistantMessage && it.content == "after redial" }) delay(20)
+            }
+
+            // Generation guard: the SUPERSEDED handle1 collector must be dead —
+            // a frame on the old stream is neither ingested nor double-consumed.
+            val sizeAfterRedialIngest = frames.size
+            stream1.emit(streamDelta("agent-1", "conv-obs", 3, assistantDelta("cm-stale", "stale flow")))
+            delay(300)
+            assertTrue(
+                frames.none { it is ServerFrame.AssistantMessage && it.content == "stale flow" },
+                "stale handle1 collector must not consume after redial",
+            )
+            assertEquals(sizeAfterRedialIngest, frames.size, "no frames from the dead connection's flow")
+        } finally {
+            collector.cancel()
+            transport.disconnect()
+        }
+    }
+
     // ============ (c) REDUCER END-TO-END ==============================
     @Test
     fun observerEmittedFramesReduceToOneUserOneAssistantAndTerminal() = runBlocking {

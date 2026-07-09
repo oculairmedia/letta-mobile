@@ -122,9 +122,28 @@ class IrohConnectionSupervisor(
         staleHandle?.close("config_changed")
     }
 
-    suspend fun onConnectionLost(reason: String) {
+    suspend fun onConnectionLost(reason: String, lostHandle: IrohConnectionHandle? = null) {
         val staleHandle = mutex.withLock {
             if (closed || authFailed) return@withLock null
+            // letta-mobile-r3i1z: attribute the loss to the connection that died.
+            // A dead transport reports its loss up to TWICE (close watcher +
+            // reader exit), and closing it triggers the second report — which
+            // lands AFTER the supervisor has already redialed. Unattributed,
+            // that stale report was treated as a loss of the NEW connection:
+            // it discarded the healthy redialed handle and tore down the
+            // freshly re-armed observer-ingestion collector (the fanout
+            // "renders nothing after reconnect" failure). Only a loss for the
+            // CURRENT handle may invalidate it; a report for any superseded
+            // handle is stale noise and must be ignored.
+            if (lostHandle != null && lostHandle !== currentHandle) {
+                Telemetry.event(
+                    "IrohSupervisor", "loss.stale_ignored",
+                    "reason" to reason,
+                    "lostSession" to lostHandle.sessionId,
+                    "currentSession" to (currentHandle?.sessionId ?: ""),
+                )
+                return@withLock null
+            }
             val existing = currentHandle
             currentHandle = null
             currentConfig = null
@@ -136,8 +155,8 @@ class IrohConnectionSupervisor(
         staleHandle?.close(reason)
     }
 
-    fun onConnectionLostAsync(reason: String) {
-        scope.launch { onConnectionLost(reason) }
+    fun onConnectionLostAsync(reason: String, lostHandle: IrohConnectionHandle? = null) {
+        scope.launch { onConnectionLost(reason, lostHandle) }
     }
 
     suspend fun disconnect(reason: String = "disconnect") {
@@ -217,44 +236,54 @@ class IrohConnectionSupervisor(
                 transitionTo(IrohConnectionState.Handshaking, "handshake")
                 dialer(config)
             }
+            // letta-mobile-r3i1z: completion bookkeeping runs NonCancellable. If the
+            // dial job is cancelled after dialer() already produced a handle, the
+            // pre-fix code threw CancellationException at the first suspension and
+            // never ran either branch — leaking a LIVE, authed QUIC connection whose
+            // reader jobs (launched in the outer scope) kept pumping frames nobody
+            // collected. Now the stale-dial branch always runs and closes the handle.
             dialAttempt.onSuccess { handle ->
-                mutex.withLock {
-                    if (closed || authFailed || dialConfig != config || currentConfig != config) {
-                        if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial result ignored"))
-                        scope.launch { handle.close("stale_dial") }
-                        return@withLock
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    mutex.withLock {
+                        if (closed || authFailed || dialConfig != config || currentConfig != config) {
+                            if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial result ignored"))
+                            scope.launch { handle.close("stale_dial") }
+                            return@withLock
+                        }
+                        currentHandle = handle
+                        currentConfig = config
+                        failureCount = 0
+                        dialResult = null
+                        dialJob = null
+                        dialConfig = null
+                        transitionTo(IrohConnectionState.Ready(handle), "ready")
+                        if (!result.isCompleted) result.complete(handle)
                     }
-                    currentHandle = handle
-                    currentConfig = config
-                    failureCount = 0
-                    dialResult = null
-                    dialJob = null
-                    dialConfig = null
-                    transitionTo(IrohConnectionState.Ready(handle), "ready")
-                    if (!result.isCompleted) result.complete(handle)
                 }
             }.onFailure { error ->
-                mutex.withLock {
-                    if (dialConfig != config) {
-                        if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial failure ignored"))
-                        return@withLock
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    mutex.withLock {
+                        if (dialConfig != config) {
+                            if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial failure ignored"))
+                            return@withLock
+                        }
+                        currentHandle = null
+                        dialResult = null
+                        dialJob = null
+                        dialConfig = null
+                        if (error is IrohAuthFailure) {
+                            authFailed = true
+                            redialJob?.cancel()
+                            redialJob = null
+                            redialReadyAtMs = null
+                            transitionTo(IrohConnectionState.AuthFailed(error.message ?: "Iroh auth failed"), "auth_failed")
+                        } else {
+                            failureCount += 1
+                            transitionTo(IrohConnectionState.Degraded(error.message ?: error.toString()), "dial_failed")
+                            if (!closed) scheduleRedialLocked(error.message ?: error.toString())
+                        }
+                        if (!result.isCompleted) result.completeExceptionally(error)
                     }
-                    currentHandle = null
-                    dialResult = null
-                    dialJob = null
-                    dialConfig = null
-                    if (error is IrohAuthFailure) {
-                        authFailed = true
-                        redialJob?.cancel()
-                        redialJob = null
-                        redialReadyAtMs = null
-                        transitionTo(IrohConnectionState.AuthFailed(error.message ?: "Iroh auth failed"), "auth_failed")
-                    } else {
-                        failureCount += 1
-                        transitionTo(IrohConnectionState.Degraded(error.message ?: error.toString()), "dial_failed")
-                        if (!closed) scheduleRedialLocked(error.message ?: error.toString())
-                    }
-                    if (!result.isCompleted) result.completeExceptionally(error)
                 }
             }
         }

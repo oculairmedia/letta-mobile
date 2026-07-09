@@ -181,6 +181,48 @@ class IrohConnectionSupervisorTest {
     }
 
     @Test
+    fun staleConnectionLossForSupersededHandleIsIgnored() = runTest {
+        // letta-mobile-r3i1z: a dead transport reports its loss up to twice
+        // (close watcher + reader exit) and the SECOND report lands after the
+        // supervisor has already redialed. It must be attributed to the dead
+        // handle and IGNORED — not treated as a loss of the healthy new
+        // connection (which used to tear down the redialed handle and the
+        // observer-ingestion collector that had just re-armed against it).
+        var dials = 0
+        val closed = mutableListOf<String>()
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(it, sessionId) { reason -> closed += "$sessionId:$reason" }
+        }
+
+        val first = supervisor.ready()
+        // Genuine loss of dial-1 (attributed) -> degrade + automatic redial.
+        supervisor.onConnectionLost("connection_closed: timed out", first)
+        runCurrent()
+        assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+        advanceTimeBy(500)
+        advanceUntilIdle()
+        assertEquals("dial-2", assertIs<IrohConnectionState.Ready>(supervisor.state.value).handle.sessionId)
+
+        // dial-1's late duplicate loss report (triggered by closing it) lands
+        // AFTER the redial completed: stale, must not touch dial-2.
+        supervisor.onConnectionLost("reader_stopped:Stream", first)
+        advanceUntilIdle()
+
+        val still = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals("dial-2", still.handle.sessionId)
+        assertEquals(2, dials)
+        assertTrue(closed.none { it.startsWith("dial-2") }, "healthy redialed handle must not be closed; closed=$closed")
+
+        // Unattributed losses (legacy callers) keep today's behavior: they DO
+        // invalidate whatever is current.
+        supervisor.onConnectionLost("legacy_unattributed")
+        runCurrent()
+        assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+    }
+
+    @Test
     fun configChangeCancelsInFlightDialAndStartsNewConfig() = runTest {
         var config = configA
         val firstDialGate = CompletableDeferred<Unit>()
