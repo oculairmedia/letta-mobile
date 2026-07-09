@@ -2,9 +2,9 @@ package com.letta.mobile.data.controller.node.iroh
 
 object ModelAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val proxy = AdminProxyClient(adminBaseUrl)
-        router.register("model.list") { proxy.get(adminProxyRequest("v1", "models").build()) }
-        router.register("model.list.embedding") { proxy.get(adminProxyRequest("v1", "models", "embedding").build()) }
-        router.register("provider.list") { proxy.get(adminProxyRequest("v1", "providers").build()) }
+        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
+        router.register("model.list") { api.get("models") }
+        router.register("model.list.embedding") { api.get("models", "embedding") }
+        router.register("provider.list") { api.get("providers") }
     }
 }

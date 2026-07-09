@@ -9,7 +9,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object ArchiveAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = Api(AdminProxyClient(adminBaseUrl))
+        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("archive.list") { api.get("archives") }
         router.register("folder.list") { params ->
             val agentId = param(params, "agent_id")
@@ -26,22 +26,4 @@ object ArchiveAdminHandlers {
         }
         router.register("group.list") { api.get("groups") }
     }
-
-    private class Api(private val proxy: AdminProxyClient) {
-        fun get(vararg segments: String): JsonElement = proxy.get(adminProxyRequest("v1", *segments).build())
-        fun post(vararg segments: String, body: String): JsonElement = proxy.post(adminProxyRequest("v1", *segments).build(), body)
-        fun delete(vararg segments: String): JsonElement = proxy.delete(adminProxyRequest("v1", *segments).build())
-    }
-
-    private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun passthroughBody(params: JsonObject?, vararg excludedKeys: String): String {
-        if (params == null) return "{}"
-        val excluded = excludedKeys.toSet()
-        return buildJsonObject {
-            params.forEach { (key, value) ->
-                if (key !in excluded) put(key, value)
-            }
-        }.toString()
-    }
-
 }
