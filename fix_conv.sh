@@ -1,0 +1,1 @@
+sed -i 's/private fun adminError(message: String): Nothing = throw IllegalArgumentException(message)//g' android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt

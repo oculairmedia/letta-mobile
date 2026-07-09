@@ -9,6 +9,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
+ * Throws an IllegalArgumentException so the router's catch path returns success:false.
+ */
+fun adminError(message: String): Nothing = throw IllegalArgumentException(message)
+
+/**
  * Routes incoming admin RPC calls to registered handler functions.
  *
  * Each domain bead registers its handlers here. The [IrohNodeConnection] calls

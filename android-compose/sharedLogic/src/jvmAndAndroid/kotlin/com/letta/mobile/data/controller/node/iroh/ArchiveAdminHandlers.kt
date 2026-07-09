@@ -13,15 +13,15 @@ object ArchiveAdminHandlers {
         router.register("archive.list") { api.get("archives") }
         router.register("folder.list") { params ->
             val agentId = param(params, "agent_id")
-            if (agentId != null) api.get("agents", agentId, "folders") else jsonError("agent_id required")
+            if (agentId != null) api.get("agents", agentId, "folders") else adminError("agent_id required")
         }
         router.register("passage.create") { params ->
-            val agentId = param(params, "agent_id") ?: return@register jsonError("agent_id required")
+            val agentId = param(params, "agent_id") ?: return@register adminError("agent_id required")
             api.post("agents", agentId, "archival-memory", body = passthroughBody(params, "agent_id"))
         }
         router.register("passage.delete") { params ->
-            val agentId = param(params, "agent_id") ?: return@register jsonError("agent_id required")
-            val passageId = param(params, "passage_id") ?: return@register jsonError("passage_id required")
+            val agentId = param(params, "agent_id") ?: return@register adminError("agent_id required")
+            val passageId = param(params, "passage_id") ?: return@register adminError("passage_id required")
             api.delete("agents", agentId, "archival-memory", passageId)
         }
         router.register("group.list") { api.get("groups") }
@@ -43,5 +43,5 @@ object ArchiveAdminHandlers {
             }
         }.toString()
     }
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
+
 }

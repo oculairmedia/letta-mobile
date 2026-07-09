@@ -16,18 +16,18 @@ object GoalAdminHandlers {
 
     private class GoalApi(private val proxy: AdminProxyClient) {
         fun get(params: JsonObject?): JsonElement {
-            val agentId = param(params, "agent_id") ?: return jsonError("agent_id required")
+            val agentId = param(params, "agent_id") ?: return adminError("agent_id required")
             return proxy.get(adminProxyRequest("v1", "agents", agentId, "goal").build())
         }
 
         fun command(params: JsonObject?): JsonElement {
-            val agentId = param(params, "agent_id") ?: return jsonError("agent_id required")
-            val command = param(params, "command") ?: return jsonError("command required")
+            val agentId = param(params, "agent_id") ?: return adminError("agent_id required")
+            val command = param(params, "command") ?: return adminError("command required")
             val body = buildJsonObject { put("command", command) }.toString()
             return proxy.post(adminProxyRequest("v1", "agents", agentId, "goal", "command").build(), body)
         }
     }
 
     private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
+
 }
