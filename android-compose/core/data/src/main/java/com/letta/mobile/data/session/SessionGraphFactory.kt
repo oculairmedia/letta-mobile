@@ -29,7 +29,7 @@ import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
-import com.letta.mobile.data.repository.IrohAdminRpcArchiveSource
+import com.letta.mobile.data.repository.IrohAdminRpcClient
 import com.letta.mobile.data.repository.IrohAdminRpcIdentitySource
 import com.letta.mobile.data.repository.IrohAdminRpcJobSource
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
@@ -288,8 +288,8 @@ class SessionGraphFactory internal constructor(
             ),
             archiveRepository = ArchiveRepository(
                 archiveApi = archiveApi,
-                irohArchiveSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcArchiveSource(
+                irohAdminRpcClient = settingsRepository?.let { settings ->
+                    IrohAdminRpcClient(
                         channelTransport = channelTransport,
                         settingsRepository = settings,
                     )
