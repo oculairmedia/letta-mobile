@@ -1493,9 +1493,9 @@ class TimelineSyncLoopTest {
         val loop = TimelineSyncLoop(
             conversationId = "conv-x",
             messageApi = MessageApiTimelineTransport(api),
-            scope = CoroutineScope(Dispatchers.Unconfined + job).also { scopes.add(it) },
+            scope = CoroutineScope(Dispatchers.Unconfined + job),
         ).also { loops.add(it) }
-
+        try {
         loop.hydrate(limit = 50)
 
         val approvalBase = com.letta.mobile.data.model.ApprovalRequestMessage(
@@ -1538,6 +1538,8 @@ class TimelineSyncLoopTest {
         val firstCall = final.toolCalls.firstOrNull()
         assertNotNull(firstCall)
         assertEquals("{\"command\":\"echo ok\"}", firstCall!!.arguments)
+        } finally {
+        }
     }
 
     /**
