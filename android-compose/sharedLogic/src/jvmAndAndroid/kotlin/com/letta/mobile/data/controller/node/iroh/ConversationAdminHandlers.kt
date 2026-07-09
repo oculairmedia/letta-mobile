@@ -8,7 +8,20 @@ import kotlinx.serialization.json.jsonPrimitive
 object ConversationAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
         val proxy = AdminHandlerProxy(AdminProxyClient(adminBaseUrl))
-        router.register("conversation.list") { params ->
+        val api = ConvApi(proxy)
+        router.register("conversation.list") { api.list(it) }
+        router.register("conversation.get") { api.get(it) }
+        router.register("conversation.create") { api.create(it) }
+        router.register("conversation.delete") { api.delete(it) }
+        router.register("conversation.archive") { api.archive(it) }
+        router.register("conversation.restore") { api.restore(it) }
+        router.register("message.list") { api.messageList(it) }
+        router.register("message.get") { api.messageGet(it) }
+        router.register("tool_return.get") { api.toolReturnGet(it) }
+    }
+
+    private class ConvApi(private val proxy: AdminHandlerProxy) {
+        fun list(params: JsonObject?): JsonElement {
             val agentId = AdminHandlerSupport.param(params, "agent_id")
             val req = if (agentId != null) {
                 adminProxyRequest("v1", "agents", agentId, "conversations")
@@ -22,35 +35,41 @@ object ConversationAdminHandlers {
                 .query("order", AdminHandlerSupport.param(params, "order"))
                 .query("order_by", AdminHandlerSupport.param(params, "order_by"))
                 .build()
-            proxy.proxy.get(req)
+            return proxy.proxy.get(req)
         }
-        router.register("conversation.get") { params ->
+
+        fun get(params: JsonObject?): JsonElement {
             val id = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
-            proxy.get("v1", "conversations", id)
+            return proxy.get("v1", "conversations", id)
         }
-        router.register("conversation.create") { params ->
+
+        fun create(params: JsonObject?): JsonElement {
             val agentId = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
-            proxy.post("v1", "agents", agentId, "conversations", body = params.toString())
+            return proxy.post("v1", "agents", agentId, "conversations", body = params.toString())
         }
-        router.register("conversation.delete") { params ->
+
+        fun delete(params: JsonObject?): JsonElement {
             val id = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
-            proxy.delete("v1", "conversations", id)
+            return proxy.delete("v1", "conversations", id)
         }
+
         // Letta has no /conversations/{id}/archive|/unarchive sub-resource; archive
         // state is a field on the conversation, toggled via PATCH /v1/conversations/{id}
         // with {"archived": bool} (same route + response the HTTP client uses in
         // ConversationApi.updateConversation). That PATCH returns the updated
         // Conversation, which IrohAdminRpcConversationListSource decodes. Hitting a
         // phantom /archive sub-route would 404 and break iroh-mode archive/restore.
-        router.register("conversation.archive") { params ->
+        fun archive(params: JsonObject?): JsonElement {
             val id = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
-            proxy.patch("v1", "conversations", id, body = """{"archived":true}""")
+            return proxy.patch("v1", "conversations", id, body = """{"archived":true}""")
         }
-        router.register("conversation.restore") { params ->
+
+        fun restore(params: JsonObject?): JsonElement {
             val id = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
-            proxy.patch("v1", "conversations", id, body = """{"archived":false}""")
+            return proxy.patch("v1", "conversations", id, body = """{"archived":false}""")
         }
-        router.register("message.list") { params ->
+
+        fun messageList(params: JsonObject?): JsonElement {
             val convId = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
             val response = proxy.get("v1", "conversations", convId, "messages") {
                 query("limit", AdminHandlerSupport.param(params, "limit"))
@@ -67,21 +86,23 @@ object ConversationAdminHandlers {
             // previews for heavy tool-return bodies; full bodies come via
             // tool_return.get on demand. Inline attachments ship unmodified
             // (clients have no refetch path for omitted attachment data).
-            MessageListWireProjection.projectMessageList(response, convId)
+            return MessageListWireProjection.projectMessageList(response, convId)
         }
-        router.register("message.get") { params ->
+
+        fun messageGet(params: JsonObject?): JsonElement {
             val convId = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
             val msgId = AdminHandlerSupport.param(params, "message_id") ?: adminError("message_id required")
-            proxy.get("v1", "conversations", convId, "messages", msgId)
+            return proxy.get("v1", "conversations", convId, "messages", msgId)
         }
+
         /**
          * letta-mobile-fe51r: on-demand full-body fetch for a projected
          * tool-return message. Returns the complete, unprojected message.
          */
-        router.register("tool_return.get") { params ->
+        fun toolReturnGet(params: JsonObject?): JsonElement {
             val convId = AdminHandlerSupport.param(params, "conversation_id") ?: adminError("conversation_id required")
             val msgId = AdminHandlerSupport.param(params, "message_id") ?: adminError("message_id required")
-            proxy.get("v1", "conversations", convId, "messages", msgId)
+            return proxy.get("v1", "conversations", convId, "messages", msgId)
         }
     }
 }
