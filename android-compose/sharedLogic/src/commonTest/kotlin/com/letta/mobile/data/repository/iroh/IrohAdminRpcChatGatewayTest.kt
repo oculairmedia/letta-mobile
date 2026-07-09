@@ -1,0 +1,228 @@
+package com.letta.mobile.data.repository.iroh
+
+import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.model.MessageCreate
+import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.timeline.TimelineStreamFrame
+import com.letta.mobile.data.timeline.TimelineTransportHttpException
+import com.letta.mobile.data.transport.A2uiActionDispatchResult
+import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.TransportFrameEvent
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class IrohAdminRpcChatGatewayTest {
+
+    @Test
+    fun listConversationsDecodesAdminRpcResult() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { method, path, _ ->
+            assertEquals("conversation.list", method)
+            assertEquals("/v1/conversations", path)
+            ok("""[{"id":"conv-1","agent_id":"agent-1","summary":"hi"}]""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val conversations = gateway.listConversations(limit = 10, archiveStatus = "active")
+
+        assertEquals(1, conversations.size)
+        assertEquals("conv-1", conversations.single().id.value)
+        assertEquals("agent-1", conversations.single().agentId.value)
+        val body = transport.rpcCalls.single().body.orEmpty()
+        assertTrue("archive_status" in body && "\"10\"" in body, "body should carry stringified limit + filter: $body")
+    }
+
+    @Test
+    fun listConversationMessagesBuildsQueryStringPath() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { method, path, body ->
+            assertEquals("message.list", method)
+            assertEquals("/v1/conversations/conv-1/messages?limit=50&order=desc", path)
+            assertEquals(null, body)
+            ok("""[{"message_type":"assistant_message","id":"msg-1","content":"hello"}]""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val messages = gateway.listConversationMessages("conv-1", limit = 50, after = null, order = "desc")
+
+        assertEquals(listOf("msg-1"), messages.map { it.id })
+    }
+
+    @Test
+    fun sendStreamsTurnDeltasAndCompletesOnTurnDone() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val collected = async { gateway.sendConversationMessage("conv-1", request("hello")).toList() }
+        transport.frameEvents.subscriptionCount.first { it > 0 }
+        transport.emitFrame(turnStarted(conversationId = "conv-1", turnId = "turn-1"))
+        transport.emitFrame(assistantDelta(id = "cm-stream-1", content = "Hi there", turnId = "turn-1"))
+        transport.emitFrame(turnDone(turnId = "turn-1", status = "completed"))
+
+        val messages = collected.await()
+        assertEquals(listOf("cm-stream-1"), messages.map { it.id })
+        assertEquals("agent-1", transport.sends.single().agentId)
+        assertEquals("hello", transport.sends.single().text)
+    }
+
+    @Test
+    fun sendFailsWhenTurnFails() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val collected = async { runCatching { gateway.sendConversationMessage("conv-1", request("boom")).toList() } }
+        transport.frameEvents.subscriptionCount.first { it > 0 }
+        transport.emitFrame(turnStarted(conversationId = "conv-1", turnId = "turn-9"))
+        transport.emitFrame(turnDone(turnId = "turn-9", status = "failed"))
+
+        val failure = collected.await().exceptionOrNull()
+        assertTrue(failure is TimelineTransportHttpException, "expected transport failure, got $failure")
+    }
+
+    @Test
+    fun sendThrowsWhenTransportRejectsDispatch() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport(sendAccepts = false)
+        transport.rpcResponder = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        assertFailsWith<TimelineTransportHttpException> {
+            gateway.sendConversationMessage("conv-1", request("hello")).toList()
+        }
+    }
+
+    @Test
+    fun streamConversationRoutesDeltasByActiveTurnConversation() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val received = mutableListOf<TimelineStreamFrame>()
+        val collector = launch {
+            gateway.streamConversation("conv-a").collect { received += it }
+        }
+        transport.frameEvents.subscriptionCount.first { it > 0 }
+
+        transport.emitFrame(turnStarted(conversationId = "conv-a", turnId = "turn-a"))
+        transport.emitFrame(assistantDelta(id = "cm-stream-a", content = "for a", turnId = "turn-a"))
+        transport.emitFrame(turnDone(turnId = "turn-a", status = "completed"))
+        transport.emitFrame(turnStarted(conversationId = "conv-b", turnId = "turn-b"))
+        transport.emitFrame(assistantDelta(id = "cm-stream-b", content = "for b", turnId = "turn-b"))
+        collector.cancel()
+
+        val messageIds = received.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
+        assertEquals(listOf("cm-stream-a"), messageIds)
+    }
+
+    @Test
+    fun listAgentMessagesIsGatedOverIroh() = runTest(UnconfinedTestDispatcher()) {
+        val gateway = IrohAdminRpcChatGateway(FakeIrohTransport())
+        assertFailsWith<TimelineTransportHttpException> {
+            gateway.listAgentMessages("agent-1")
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Fixtures
+    // ------------------------------------------------------------------
+
+    private fun request(text: String): MessageCreateRequest = MessageCreateRequest(
+        messages = listOf(
+            Json.encodeToJsonElement(MessageCreate.serializer(), MessageCreate(role = "user", content = JsonPrimitive(text), otid = "otid-1")),
+        ),
+        streaming = true,
+    )
+
+    private fun turnStarted(conversationId: String, turnId: String) = ServerFrame.TurnStarted(
+        id = "frame-$turnId",
+        ts = "2026-07-09T00:00:00Z",
+        agentId = "agent-1",
+        conversationId = conversationId,
+        turnId = turnId,
+        runId = "run-$turnId",
+    )
+
+    private fun assistantDelta(id: String, content: String, turnId: String) = ServerFrame.AssistantMessage(
+        id = id,
+        ts = "2026-07-09T00:00:01Z",
+        conversationId = null,
+        turnId = turnId,
+        runId = "run-$turnId",
+        content = content,
+    )
+
+    private fun turnDone(turnId: String, status: String) = ServerFrame.TurnDone(
+        id = "frame-done-$turnId",
+        ts = "2026-07-09T00:00:02Z",
+        turnId = turnId,
+        runId = "run-$turnId",
+        status = status,
+    )
+
+    private fun ok(resultJson: String) = AppServerInboundFrame.AdminRpcResponse(
+        requestId = "req-1",
+        success = true,
+        result = Json.parseToJsonElement(resultJson),
+    )
+
+    private class FakeIrohTransport(
+        private val sendAccepts: Boolean = true,
+    ) : IChannelTransport {
+        data class RpcCall(val method: String, val path: String, val body: String?)
+        data class SendCall(val agentId: String, val conversationId: String, val text: String, val otid: String?)
+
+        val rpcCalls = mutableListOf<RpcCall>()
+        val sends = mutableListOf<SendCall>()
+        var rpcResponder: (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse = { method, _, _ ->
+            AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "$method has no responder")
+        }
+
+        override val state: StateFlow<ChannelTransportState> =
+            MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
+        override val events = MutableSharedFlow<ServerFrame>()
+        override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
+
+        suspend fun emitFrame(frame: ServerFrame) = frameEvents.emit(TransportFrameEvent(frame))
+
+        override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
+        override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean {
+            sends += SendCall(agentId, conversationId, text, otid)
+            return sendAccepts
+        }
+        override fun cancel(conversationId: String): Boolean = true
+        override fun bye(): Boolean = true
+        override suspend fun disconnect() = Unit
+        override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("frame-1")
+        override fun subscribe(runId: String, cursor: Long): Boolean = false
+        override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+            rpcCalls += RpcCall(method, path, body)
+            return rpcResponder(method, path, body)
+        }
+        override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long) = error("unused")
+        override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long) = error("unused")
+        override suspend fun sendCronGet(taskId: String, timeoutMs: Long) = error("unused")
+        override suspend fun sendCronDelete(taskId: String, timeoutMs: Long) = error("unused")
+        override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long) = error("unused")
+        override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long) = error("unused")
+        override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long) = error("unused")
+    }
+}
