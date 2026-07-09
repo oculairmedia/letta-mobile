@@ -9,25 +9,16 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object GoalAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = GoalApi(AdminProxyClient(adminBaseUrl))
-        router.register("goal.get") { api.get(it) }
-        router.register("goal.command") { api.command(it) }
-    }
-
-    private class GoalApi(private val proxy: AdminProxyClient) {
-        fun get(params: JsonObject?): JsonElement {
-            val agentId = param(params, "agent_id") ?: return adminError("agent_id required")
-            return proxy.get(adminProxyRequest("v1", "agents", agentId, "goal").build())
+        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
+        router.register("goal.get") { params ->
+            val agentId = param(params, "agent_id") ?: return@register adminError("agent_id required")
+            api.get("agents", agentId, "goal")
         }
-
-        fun command(params: JsonObject?): JsonElement {
-            val agentId = param(params, "agent_id") ?: return adminError("agent_id required")
-            val command = param(params, "command") ?: return adminError("command required")
+        router.register("goal.command") { params ->
+            val agentId = param(params, "agent_id") ?: return@register adminError("agent_id required")
+            val command = param(params, "command") ?: return@register adminError("command required")
             val body = buildJsonObject { put("command", command) }.toString()
-            return proxy.post(adminProxyRequest("v1", "agents", agentId, "goal", "command").build(), body)
+            api.post("agents", agentId, "goal", "command", body = body)
         }
     }
-
-    private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-
 }
