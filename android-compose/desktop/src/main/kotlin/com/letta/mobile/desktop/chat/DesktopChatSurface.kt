@@ -79,6 +79,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -158,6 +160,7 @@ import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
 @Composable
@@ -1158,7 +1161,43 @@ private fun DesktopMessageBubble(message: UiMessage, streamingMessageId: String?
     }
 }
 
-/** User prompt — teal bubble, right-aligned, with faint copy/edit affordances. */
+/**
+ * Small, functional copy affordance: click copies [text] to the clipboard and
+ * the glyph briefly flips to a green check. Replaces the former decorative copy
+ * glyphs that did nothing on click.
+ */
+@Composable
+private fun CopyIconButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1200)
+            copied = false
+        }
+    }
+    Icon(
+        imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+        contentDescription = if (copied) "Copied" else "Copy",
+        tint = if (copied) Color(0xFF34C759) else tint,
+        modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            }
+            .padding(2.dp)
+            .size(14.dp),
+    )
+}
+
+/** User prompt — teal bubble, right-aligned, with a copy affordance. */
 @Composable
 private fun UserPrompt(message: UiMessage) {
     Column(
@@ -1187,17 +1226,12 @@ private fun UserPrompt(message: UiMessage) {
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.ContentCopy,
-                contentDescription = "Copy",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            )
-            Icon(
-                imageVector = Icons.Outlined.Edit,
-                contentDescription = "Edit",
-                modifier = Modifier.size(14.dp),
+        // Copy is the only wired affordance — a message "edit"/resend needs
+        // conversation-fork support that isn't in place, so it's omitted rather
+        // than shown as a dead control.
+        if (message.content.isNotBlank()) {
+            CopyIconButton(
+                text = message.content,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             )
         }
@@ -1338,11 +1372,11 @@ private fun ToolCard(toolCall: UiToolCall) {
                 )
                 ToolStatusBadge(toolCall.status ?: "tool call")
                 Spacer(Modifier.weight(1f))
-                Icon(
-                    imageVector = Icons.Outlined.ContentCopy,
-                    contentDescription = "Copy",
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                CopyIconButton(
+                    text = listOfNotNull(
+                        toolCall.arguments.takeIf { it.isNotBlank() },
+                        toolCall.result?.takeIf { it.isNotBlank() },
+                    ).joinToString("\n\n").ifBlank { toolCall.name },
                 )
                 Icon(
                     imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
