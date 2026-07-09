@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerError
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
@@ -181,8 +182,8 @@ class DesktopChatController(
     // effective composer model otherwise comes from the conversation's agent.
     private var conversationModelById: Map<String, String> = emptyMap()
 
-    private val httpGateway: DesktopLettaHttpChatGateway?
-        get() = gateway as? DesktopLettaHttpChatGateway
+    private val gatewayExtras: ChatGatewayExtras?
+        get() = gateway as? ChatGatewayExtras
     private var activeLoop: DesktopTimelineLoop? = null
     private var timelineJob: Job? = null
     private var loadJob: Job? = null
@@ -336,9 +337,9 @@ class DesktopChatController(
                 val priorUnsent = unsentConversationId
                 unsentConversationId = null
                 if (priorUnsent != null) {
-                    runCatching { httpGateway?.deleteConversation(priorUnsent) }
+                    runCatching { gateway?.deleteConversation(priorUnsent) }
                 }
-                val created = httpGateway?.createConversation(agentId) ?: return@launch
+                val created = gatewayExtras?.createConversation(agentId) ?: return@launch
                 unsentConversationId = created.id.value
                 reloadConversationsAndSelect(preferConversationId = created.id.value)
             } catch (cancelled: CancellationException) {
@@ -391,7 +392,7 @@ class DesktopChatController(
         val agentName = name.ifBlank { "New agent" }
         scope.launch {
             try {
-                val gw = httpGateway ?: return@launch
+                val gw = gatewayExtras ?: return@launch
                 val agent = gw.createAgent(
                     AgentCreateParams(
                         name = agentName,
@@ -424,7 +425,7 @@ class DesktopChatController(
         conversationModelById = conversationModelById + (conversationId to model)
         _state.update { it.copy(composerModelLabel = model) }
         scope.launch {
-            runCatching { httpGateway?.setConversationModel(conversationId, model) }
+            runCatching { gatewayExtras?.setConversationModel(conversationId, model) }
                 .onFailure { t ->
                     _state.update {
                         it.copy(errorMessage = t.message ?: "Could not change model")
@@ -464,7 +465,7 @@ class DesktopChatController(
         // once the backend persists `archived`. A failure here doesn't undo the
         // local archive — that's the source of truth for now.
         scope.launch {
-            runCatching { httpGateway?.setConversationArchived(conversationId, archived) }
+            runCatching { gatewayExtras?.setConversationArchived(conversationId, archived) }
         }
     }
 
@@ -619,7 +620,7 @@ class DesktopChatController(
 
             // Load the model catalog for the composer model picker (best-effort).
             scope.launch {
-                val models = runCatching { httpGateway?.listLlmModels() }.getOrNull().orEmpty()
+                val models = runCatching { gatewayExtras?.listLlmModels() }.getOrNull().orEmpty()
                 if (!closed) _availableModels.value = models
             }
 
@@ -655,6 +656,11 @@ class DesktopChatController(
         val agentIds = conversations.map { it.agentId.value }.filter { it.isNotBlank() }.toSet()
         val agentNamesById = runCatching { agentNamesByIdProvider(agentIds) }.getOrDefault(emptyMap())
         val summaries = conversations.toChatConversationSummaries(agentNamesById)
+            // The server can return the same conversation twice while a run is
+            // active on it (order_by=last_message_at fan-out) — verified live
+            // against /v1/conversations. A duplicate id crashes the sidebar
+            // LazyColumn, so dedupe keeping the newest-first entry.
+            .distinctBy { it.id }
             .map { if (it.id in locallyArchivedIds) it.copy(archived = true) else it }
         if (closed) return
         val loadedRuntime = ChatSessionReducer.conversationsLoaded(

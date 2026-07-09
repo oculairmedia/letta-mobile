@@ -103,6 +103,10 @@ import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryController
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
@@ -119,6 +123,7 @@ import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
+import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
@@ -193,41 +198,100 @@ fun LettaDesktopApp(
         mutableStateOf(defaultDesktopBootstrapState(dataBindings, activeConfig))
     }
     val chatScope = rememberCoroutineScope()
-    val chatController = remember(bootstrapState, chatScope, dataBindings.sessionGraphProvider) {
+    // iroh:// backend: one QUIC channel transport shared by the chat gateway,
+    // admin_rpc reads, and (once implemented server-side) registries. Selected
+    // purely by URL scheme, same as Android's SessionGraphFactory.
+    val irohTransport = remember(activeConfig) {
+        activeConfig.takeIf { IrohChannelTransport.isIrohUrl(it.serverUrl) }?.let { config ->
+            IrohChannelTransport(
+                activeConfigProvider = {
+                    IrohConnectConfig(
+                        baseShimUrl = config.serverUrl,
+                        token = config.accessToken.orEmpty(),
+                        deviceId = "letta-desktop",
+                        clientVersion = "letta-desktop-iroh",
+                    )
+                },
+            )
+        }
+    }
+    val irohMode = irohTransport != null
+    DisposableEffect(irohTransport) {
+        val transport = irohTransport
+        if (transport != null) {
+            chatScope.launch {
+                runCatching {
+                    transport.connect(
+                        baseShimUrl = activeConfig.serverUrl,
+                        token = activeConfig.accessToken.orEmpty(),
+                        deviceId = "letta-desktop",
+                        clientVersion = "letta-desktop-iroh",
+                    )
+                }
+            }
+        }
+        onDispose {
+            if (transport != null) {
+                chatScope.launch { runCatching { transport.disconnect() } }
+            }
+        }
+    }
+    val irohAgentDirectory = remember(irohTransport) {
+        irohTransport?.let { IrohAdminRpcAgentDirectory(it) }
+    }
+    val chatController = remember(bootstrapState, chatScope, dataBindings.sessionGraphProvider, irohTransport) {
         DesktopChatController(
             bootstrapState = bootstrapState,
             scope = chatScope,
+            gatewayFactory = {
+                irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = "letta-desktop") }
+                    ?: createDefaultDesktopChatGateway(bootstrapState.config)
+            },
             agentNamesByIdProvider = { agentIds ->
-                val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
-                runCatching {
-                    agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
+                val directory = irohAgentDirectory
+                if (directory != null) {
+                    runCatching { directory.listAgents() }.getOrDefault(emptyList())
+                        .mapNotNull { agent -> agent.name.takeIf { it.isNotBlank() }?.let { agent.id.value to it } }
+                        .toMap()
+                } else {
+                    val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
+                    runCatching {
+                        agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
+                    }
+                    val resolved = mutableMapOf<String, String>()
+                    // Seed from the cached list (fast path).
+                    agentRepository.agents.value.forEach { agent ->
+                        agent.name.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+                    }
+                    // For any conversation agent still unresolved, fetch it directly
+                    // (robust against list pagination / partial caches).
+                    agentIds.filter { it !in resolved }.forEach { id ->
+                        val name = agentRepository.getCachedAgent(id)?.name
+                            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.name
+                        name?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
+                    }
+                    resolved
                 }
-                val resolved = mutableMapOf<String, String>()
-                // Seed from the cached list (fast path).
-                agentRepository.agents.value.forEach { agent ->
-                    agent.name.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
-                }
-                // For any conversation agent still unresolved, fetch it directly
-                // (robust against list pagination / partial caches).
-                agentIds.filter { it !in resolved }.forEach { id ->
-                    val name = agentRepository.getCachedAgent(id)?.name
-                        ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.name
-                    name?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
-                }
-                resolved
             },
             agentModelByIdProvider = { agentIds ->
-                val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
-                val resolved = mutableMapOf<String, String>()
-                agentRepository.agents.value.forEach { agent ->
-                    agent.model?.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+                val directory = irohAgentDirectory
+                if (directory != null) {
+                    runCatching { directory.listAgents() }.getOrDefault(emptyList())
+                        .mapNotNull { agent -> agent.model?.takeIf { it.isNotBlank() }?.let { agent.id.value to it } }
+                        .toMap()
+                } else {
+                    val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
+                    val resolved = mutableMapOf<String, String>()
+                    agentRepository.agents.value.forEach { agent ->
+                        agent.model?.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+                    }
+                    agentIds.filter { it !in resolved }.forEach { id ->
+                        val model = agentRepository.getCachedAgent(id)?.model
+                            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.model
+                        model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
+                    }
+                    resolved
                 }
-                agentIds.filter { it !in resolved }.forEach { id ->
-                    val model = agentRepository.getCachedAgent(id)?.model
-                        ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.model
-                    model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
-                }
-                resolved
             },
             loadArchivedConversationIds = {
                 secureSettingsStore.getString(ARCHIVED_CONVERSATION_IDS_KEY)
@@ -253,29 +317,33 @@ fun LettaDesktopApp(
             label to value
         }
     }
-    val blockApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { DesktopBlockApi(it) }
+    // The APIs below are HTTP-only — an iroh:// backend has no HTTP base URL,
+    // so their panels degrade to empty instead of dialing iroh:// as HTTP.
+    val blockApi = remember(activeConfig, irohMode) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { DesktopBlockApi(it) }
     }
-    val cronApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { CronApi(it, createDesktopLettaHttpClient()) }
+    val cronApi = remember(activeConfig, irohMode) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { CronApi(it, createDesktopLettaHttpClient()) }
     }
     var allCrons by remember(cronApi) { mutableStateOf<List<CronTask>>(emptyList()) }
-    val skillApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { SkillApi(it, createDesktopLettaHttpClient()) }
+    val skillApi = remember(activeConfig, irohMode) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { SkillApi(it, createDesktopLettaHttpClient()) }
     }
     var allSkills by remember(skillApi) { mutableStateOf<List<Skill>>(emptyList()) }
     var installedSkillNames by remember(skillApi) { mutableStateOf<Set<String>>(emptySet()) }
     var skillsLoading by remember(skillApi) { mutableStateOf(false) }
     var skillsError by remember(skillApi) { mutableStateOf<String?>(null) }
-    val slashCommandApi = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() }?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
+    val slashCommandApi = remember(activeConfig, irohMode) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
     }
     var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
     // Active-subagent registry (Background tasks). Desktop streams chat over SSE,
     // but the subagent registry only exists on the shim's mobile WS protocol, so
     // we open a lean WS side-channel and feed the shared SubagentRepository.
-    val subagentTransport = remember(activeConfig) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() }
+    // Skipped in iroh mode: IrohChannelTransport stubs sendSubagentList until
+    // the iroh node serves the subagent registry.
+    val subagentTransport = remember(activeConfig, irohMode) {
+        activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
             ?.let { DesktopWsChannelTransport(chatScope) }
     }
     val subagentRepository = remember(subagentTransport) {
