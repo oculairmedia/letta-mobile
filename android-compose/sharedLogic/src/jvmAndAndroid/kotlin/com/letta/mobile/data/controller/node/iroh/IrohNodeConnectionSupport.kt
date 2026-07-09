@@ -1,6 +1,8 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -174,6 +176,51 @@ internal data class ActiveTurnTracking(
     val clientMessageId: String,
     val tracker: TurnFrameTracker = TurnFrameTracker(),
 )
+
+/**
+ * eaczz.3: per-connection conversation-viewer subscription with the Option A
+ * de-scope rule.
+ *
+ * A single [IrohNodeConnection] owns ONE [ViewerHandle] identity (its
+ * selfViewer) and, at any time, views exactly ONE conversation — its
+ * most-recently hydrated (message.list) or started (runtime_start) one. Both
+ * subscription signals funnel through [subscribe]; a signal for a DIFFERENT
+ * conversation unregisters the previously-viewed conversation before
+ * registering the new one, so a client switching conversations never leaves a
+ * stale viewer entry behind. Idempotent for the same conversation.
+ *
+ * The two signal paths arrive on DIFFERENT BiStreams (control channel vs an
+ * admin_rpc stream), so [subscribe] is guarded by an internal mutex to keep the
+ * view state consistent under concurrent signals. Registry mutations are
+ * best-effort — a failing register/unregister never propagates into the caller
+ * (a subscription hiccup must not break a turn or an admin RPC).
+ */
+internal class ConversationViewerSubscription(
+    private val registry: ConnectionRegistry,
+    private val viewer: ViewerHandle,
+) {
+    private val mutex = Mutex()
+    private var viewed: String? = null
+
+    /** The conversation currently viewed (test/telemetry). */
+    val currentConversation: String? get() = viewed
+
+    /**
+     * Register [viewer] as a viewer of [conversationId], de-scoping any prior
+     * conversation. No-op when already viewing [conversationId].
+     */
+    suspend fun subscribe(conversationId: String) {
+        mutex.withLock {
+            val previous = viewed
+            if (previous == conversationId) return@withLock
+            if (previous != null) {
+                runCatching { registry.unregister(previous, viewer) }
+            }
+            runCatching { registry.register(conversationId, viewer) }
+            viewed = conversationId
+        }
+    }
+}
 
 /**
  * Per-connection, atomically-incrementing `event_seq` source with a

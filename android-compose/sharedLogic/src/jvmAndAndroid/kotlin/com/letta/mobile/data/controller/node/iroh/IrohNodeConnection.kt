@@ -110,6 +110,68 @@ class IrohNodeConnection(
     private fun peerSupportsFrameParts(): Boolean =
         IrohFrameCodec.FRAME_PART_CAPABILITY in peerCapabilities.get()
 
+    /**
+     * eaczz.3: this connection's single viewer handle onto its own turn/stream
+     * BiStream. Built once when the stream opens in [serve] (it needs the
+     * stream's [SendStream]) and reused for every conversation this connection
+     * views. It reuses the connection's per-connection [eventSeq] and
+     * [streamWriteMutex] so fanned-out frames keep this connection's monotonic
+     * seq + serialized writes, exactly like the single-viewer path.
+     */
+    private var selfViewer: IrohViewerHandle? = null
+
+    /**
+     * eaczz.3: this connection's viewer subscription state (Option A de-scope
+     * rule). Built alongside [selfViewer] once the turn stream opens; null when
+     * there is no [connectionRegistry] (legacy/test constructions). Both
+     * subscription signals — runtime_start and message.list — call
+     * [registerAsViewer], which delegates the de-scope bookkeeping here.
+     */
+    private var viewerSubscription: ConversationViewerSubscription? = null
+
+    /**
+     * eaczz.3: build this connection's [selfViewer] once, bound to the turn
+     * stream's [SendStream]. Idempotent — later calls return the existing handle
+     * so every conversation this connection views shares ONE viewer identity
+     * (so [ConnectionRegistry.unregisterAll] can drop them all on disconnect).
+     */
+    private fun ensureSelfViewer(streamSend: SendStream): IrohViewerHandle {
+        selfViewer?.let { return it }
+        val handle = IrohViewerHandle(
+            connectionId = remoteEndpointId,
+            sink = sendStreamSink(streamSend),
+            eventSeq = eventSeq,
+            streamWriteMutex = streamWriteMutex,
+            frameParts = { peerSupportsFrameParts() },
+            maxFrameBytes = MAX_FRAME_BYTES,
+        )
+        selfViewer = handle
+        connectionRegistry?.let { registry ->
+            viewerSubscription = ConversationViewerSubscription(registry, handle)
+        }
+        return handle
+    }
+
+    /**
+     * eaczz.3: register this connection as the viewer of [conversationId],
+     * applying the Option A de-scope rule (a new signal for a DIFFERENT
+     * conversation unregisters the prior one first). No-op when there is no
+     * registry / no live stream (subscription is null). Safe to call from either
+     * signal path (control channel runtime_start, admin_rpc message.list)
+     * concurrently.
+     */
+    private suspend fun registerAsViewer(conversationId: String) {
+        val subscription = viewerSubscription ?: return
+        val previous = subscription.currentConversation
+        subscription.subscribe(conversationId)
+        Telemetry.event(
+            "IrohNode", "viewer.registered",
+            "remoteEndpointId" to remoteEndpointId,
+            "conversationId" to conversationId,
+            "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
+        )
+    }
+
     suspend fun serve() = coroutineScope {
         try {
             val controlBiStream = connection.acceptBi()
@@ -117,6 +179,11 @@ class IrohNodeConnection(
             val streamBiStream = connection.acceptBi()
             Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" to remoteEndpointId)
             val streamSend = streamBiStream.send()
+            // eaczz.3: build this connection's viewer handle now that its turn
+            // stream is open, so both subscription signals (runtime_start on the
+            // control channel, message.list on an admin_rpc stream) can register
+            // it as a conversation viewer.
+            ensureSelfViewer(streamSend)
 
             val controlJob = launch {
                 serveControlChannel(controlBiStream, streamSend)
@@ -164,6 +231,21 @@ class IrohNodeConnection(
             firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
             maxFrameBytes = MAX_FRAME_BYTES,
             peerSupportsFrameParts = { peerSupportsFrameParts() },
+            // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
+            // so the shared message.list handler has no connection identity —
+            // associate it HERE, where remoteEndpointId + selfViewer are in
+            // scope. When a connection hydrates conversation X via message.list,
+            // register it as a viewer of X (de-scoping any prior conversation).
+            onMethodObserved = { method, params ->
+                if (method == "message.list") {
+                    val conversationId = params
+                        ?.get("conversation_id")
+                        ?.let { (it as? JsonPrimitive)?.contentOrNull }
+                    if (!conversationId.isNullOrEmpty()) {
+                        registerAsViewer(conversationId)
+                    }
+                }
+            },
         )
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
@@ -419,6 +501,10 @@ class IrohNodeConnection(
                     recoverApprovals = false,
                     forceDeviceStatus = false,
                 )
+                // eaczz.3: the initiator/sender signal — a successful
+                // runtime_start subscribes THIS connection to conversation_id so
+                // its turn frames fan out to it (and, via S4, to co-viewers).
+                registerAsViewer(runtime.scope.conversationId)
                 """{"type":"runtime_start_response","request_id":"$requestId","success":true,"runtime":{"agent_id":"${runtime.scope.agentId}","conversation_id":"${runtime.scope.conversationId}"}}"""
             } catch (e: Exception) {
                 """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"${e.message?.replace("\"", "\\\"")}"}"""
