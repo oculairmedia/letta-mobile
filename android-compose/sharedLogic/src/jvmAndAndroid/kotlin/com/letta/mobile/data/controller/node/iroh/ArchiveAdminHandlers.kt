@@ -9,39 +9,21 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object ArchiveAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = Api(AdminProxyClient(adminBaseUrl))
-        router.register("archive.list") { api.get("archives") }
+        val proxy = AdminHandlerProxy(AdminProxyClient(adminBaseUrl))
+        router.register("archive.list") { proxy.get("v1", "archives") }
         router.register("folder.list") { params ->
-            val agentId = param(params, "agent_id")
-            if (agentId != null) api.get("agents", agentId, "folders") else jsonError("agent_id required")
+            val agentId = AdminHandlerSupport.param(params, "agent_id")
+            if (agentId != null) proxy.get("v1", "agents", agentId, "folders") else adminError("agent_id required")
         }
         router.register("passage.create") { params ->
-            val agentId = param(params, "agent_id") ?: return@register jsonError("agent_id required")
-            api.post("agents", agentId, "archival-memory", body = passthroughBody(params, "agent_id"))
+            val agentId = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
+            proxy.post("v1", "agents", agentId, "archival-memory", body = AdminHandlerSupport.passthroughBody(params, "agent_id"))
         }
         router.register("passage.delete") { params ->
-            val agentId = param(params, "agent_id") ?: return@register jsonError("agent_id required")
-            val passageId = param(params, "passage_id") ?: return@register jsonError("passage_id required")
-            api.delete("agents", agentId, "archival-memory", passageId)
+            val agentId = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
+            val passageId = AdminHandlerSupport.param(params, "passage_id") ?: adminError("passage_id required")
+            proxy.delete("v1", "agents", agentId, "archival-memory", passageId)
         }
-        router.register("group.list") { api.get("groups") }
+        router.register("group.list") { proxy.get("v1", "groups") }
     }
-
-    private class Api(private val proxy: AdminProxyClient) {
-        fun get(vararg segments: String): JsonElement = proxy.get(adminProxyRequest("v1", *segments).build())
-        fun post(vararg segments: String, body: String): JsonElement = proxy.post(adminProxyRequest("v1", *segments).build(), body)
-        fun delete(vararg segments: String): JsonElement = proxy.delete(adminProxyRequest("v1", *segments).build())
-    }
-
-    private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun passthroughBody(params: JsonObject?, vararg excludedKeys: String): String {
-        if (params == null) return "{}"
-        val excluded = excludedKeys.toSet()
-        return buildJsonObject {
-            params.forEach { (key, value) ->
-                if (key !in excluded) put(key, value)
-            }
-        }.toString()
-    }
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }

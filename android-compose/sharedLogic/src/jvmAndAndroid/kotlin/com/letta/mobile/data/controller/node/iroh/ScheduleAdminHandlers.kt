@@ -9,21 +9,12 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object ScheduleAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = Api(AdminProxyClient(adminBaseUrl))
-        router.register("schedule.list") { api.get("schedules") }
-        router.register("schedule.get") { p -> id(p, "schedule_id")?.let { api.get("schedules", it) } ?: jsonError("schedule_id required") }
-        router.register("schedule.create") { p -> api.post("schedules", body = p?.toString() ?: "{}") }
-        router.register("schedule.delete") { p -> id(p, "schedule_id")?.let { api.delete("schedules", it) } ?: jsonError("schedule_id required") }
-        router.register("job.list") { api.get("jobs") }
-        router.register("job.get") { p -> id(p, "job_id")?.let { api.get("jobs", it) } ?: jsonError("job_id required") }
+        val proxy = AdminHandlerProxy(AdminProxyClient(adminBaseUrl))
+        router.register("schedule.list") { proxy.get("v1", "schedules") }
+        router.register("schedule.get") { p -> AdminHandlerSupport.param(p, "schedule_id")?.let { proxy.get("v1", "schedules", it) } ?: adminError("schedule_id required") }
+        router.register("schedule.create") { p -> proxy.post("v1", "schedules", body = p?.toString() ?: "{}") }
+        router.register("schedule.delete") { p -> AdminHandlerSupport.param(p, "schedule_id")?.let { proxy.delete("v1", "schedules", it) } ?: adminError("schedule_id required") }
+        router.register("job.list") { proxy.get("v1", "jobs") }
+        router.register("job.get") { p -> AdminHandlerSupport.param(p, "job_id")?.let { proxy.get("v1", "jobs", it) } ?: adminError("job_id required") }
     }
-
-    private class Api(private val proxy: AdminProxyClient) {
-        fun get(vararg segments: String): JsonElement = proxy.get(adminProxyRequest("v1", *segments).build())
-        fun post(vararg segments: String, body: String): JsonElement = proxy.post(adminProxyRequest("v1", *segments).build(), body)
-        fun delete(vararg segments: String): JsonElement = proxy.delete(adminProxyRequest("v1", *segments).build())
-    }
-
-    private fun id(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }

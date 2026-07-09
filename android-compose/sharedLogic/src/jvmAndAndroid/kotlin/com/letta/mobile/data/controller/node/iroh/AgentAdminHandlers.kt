@@ -12,49 +12,37 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 object AgentAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = AgentApi(AdminProxyClient(adminBaseUrl))
-        router.register("agent.list") { params -> api.list(params) }
-        router.register("agent.get") { params -> api.get(params) }
-        router.register("agent.create") { params -> api.create(params) }
-        router.register("agent.update") { params -> api.update(params) }
-        router.register("agent.delete") { params -> api.delete(params) }
-        router.register("agent.context") { params -> api.context(params) }
-    }
-
-    private class AgentApi(private val proxy: AdminProxyClient) {
+        val proxy = AdminHandlerProxy(AdminProxyClient(adminBaseUrl))
         // letta-mobile-71orq: forward pagination params so the client can page
         // through ALL agents. Without a limit the server returns only its default
         // first page (~50), so agents beyond it never resolve a name in the
         // conversation list (fall back to agentId.take(8)).
-        fun list(params: JsonObject?): JsonElement = proxy.get(
-            adminProxyRequest("v1", "agents")
-                .query("limit", param(params, "limit"))
-                .query("offset", param(params, "offset"))
-                .build()
-        )
-        fun get(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
-            return proxy.get(adminProxyRequest("v1", "agents", id).build())
+        router.register("agent.list") { params ->
+            proxy.get("v1", "agents") {
+                query("limit", AdminHandlerSupport.param(params, "limit"))
+                query("offset", AdminHandlerSupport.param(params, "offset"))
+            }
         }
-        fun create(params: JsonObject?): JsonElement = proxy.post(adminProxyRequest("v1", "agents").build(), params?.toString() ?: "{}")
-        fun update(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
-            return proxy.patch(adminProxyRequest("v1", "agents", id).build(), params.toString())
+        router.register("agent.get") { params ->
+            val id = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
+            proxy.get("v1", "agents", id)
         }
-        fun delete(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
-            return proxy.delete(adminProxyRequest("v1", "agents", id).build())
+        router.register("agent.create") { params ->
+            proxy.post("v1", "agents", body = params?.toString() ?: "{}")
         }
-        fun context(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
-            return proxy.get(
-                adminProxyRequest("v1", "agents", id, "context")
-                    .query("conversation_id", param(params, "conversation_id"))
-                    .build()
-            )
+        router.register("agent.update") { params ->
+            val id = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
+            proxy.patch("v1", "agents", id, body = params.toString())
+        }
+        router.register("agent.delete") { params ->
+            val id = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
+            proxy.delete("v1", "agents", id)
+        }
+        router.register("agent.context") { params ->
+            val id = AdminHandlerSupport.param(params, "agent_id") ?: adminError("agent_id required")
+            proxy.get("v1", "agents", id, "context") {
+                query("conversation_id", AdminHandlerSupport.param(params, "conversation_id"))
+            }
         }
     }
-
-    private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }
