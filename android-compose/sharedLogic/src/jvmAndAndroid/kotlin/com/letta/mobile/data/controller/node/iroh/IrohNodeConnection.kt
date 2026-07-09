@@ -13,7 +13,6 @@ import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.BiStream
@@ -604,21 +603,35 @@ class IrohNodeConnection(
                 contentPartsJson = contentParts?.toString(),
             ),
         )
-        var terminalWritten = false
-        // Tracks tool_calls opened but not yet returned so failure/abort can
-        // close them with a synthetic tool_return before the terminal (8s45p).
-        val openToolCalls = OpenToolCallTracker()
-        val cumulativeText = CumulativeStreamText()
-        // Mid-turn redial fix: set thread-local tracking so writeStreamDelta can
-        // record frames for parking if the stream dies mid-turn.
+        // Mid-turn redial fix: set thread-local tracking so the INITIATOR-ONLY
+        // parking hook can record frames for parking if the stream dies mid-turn.
         if (clientMsgId != null) {
             activeTurnTracking.set(ActiveTurnTracking(clientMessageId = clientMsgId))
         }
+        // eaczz.4: the fanout core. Owns this turn's per-connection frame-shaping
+        // state (cumulative text + open-tool_call tracking + terminal-dedup) and
+        // publishes each cumulated+tagged delta body to EVERY viewer of the
+        // conversation via each viewer's own writeBroadcastFrame — the initiator
+        // (its selfViewer) is just one viewer in that set. Parking stays
+        // INITIATOR-ONLY through [trackInitiatorFrame].
+        val fanout = ConversationTurnFanout(
+            conversationId = input.runtime.conversationId,
+            runtime = input.runtime,
+            remoteEndpointId = remoteEndpointId,
+            viewersFor = { conv -> connectionRegistry?.viewersFor(conv) ?: emptySet() },
+            initiatorViewer = ensureSelfViewer(streamSend),
+            trackInitiatorFrame = { deltaJson ->
+                // INITIATOR-ONLY: matches the pre-fanout writeStreamDelta, which
+                // tracked the delta it was handed for redial replay. Never runs
+                // per-observer.
+                activeTurnTracking.get()?.tracker?.track(deltaJson)
+            },
+        )
         try {
             runCatching {
                 controller.runTurn(command).collect { draft ->
                     val payload = draft.payload
-                    if (terminalWritten && payload.isTerminalLifecycle()) {
+                    if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) {
                         Telemetry.event(
                             "IrohNode", "stream.terminal_duplicate_skipped",
                             "remoteEndpointId" to remoteEndpointId,
@@ -629,24 +642,17 @@ class IrohNodeConnection(
                     }
                     // Before a failure/cancel terminal, close any dangling tool_calls
                     // so the client never renders a tool_call without a return.
-                    if (payload.isFailureOrCancelLifecycle()) {
-                        flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
+                    if (fanout.isFailureOrCancelLifecycle(payload)) {
+                        fanout.flushOpenToolCalls()
                     }
-                    terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls, cumulativeText) || terminalWritten
+                    fanout.onDraft(payload)
                 }
             }.onFailure { error ->
                 val wroteTerminal = runCatching {
                     withContext(NonCancellable) {
                         // Same dangling-tool_call guarantee on the exception path.
-                        flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
-                        writeStreamDelta(
-                            streamSend = streamSend,
-                            runtime = input.runtime,
-                            delta = buildJsonObject {
-                                put("message_type", "error_message")
-                                put("message", error.message ?: error.toString())
-                            },
-                        )
+                        fanout.flushOpenToolCalls()
+                        fanout.emitErrorTerminal(error.message ?: error.toString())
                     }
                 }.isSuccess
                 if (!wroteTerminal) {
@@ -661,7 +667,7 @@ class IrohNodeConnection(
                     // frames we've sent so far + a synthetic terminal, keyed by
                     // client_message_id so a redial re-send replays them instead of
                     // the client hanging on "Thinking…" (q71yi + mid-turn redial fix).
-                    if (clientMsgId != null && !terminalWritten) {
+                    if (clientMsgId != null && !fanout.anyTerminalWritten) {
                         val tracking = activeTurnTracking.get()
                         tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
                         Telemetry.event(
@@ -681,167 +687,24 @@ class IrohNodeConnection(
         }
     }
 
-    /**
-     * Writes a synthetic terminal `tool_return(status=error, "cancelled")` for
-     * every tool_call still open on [tracker], then clears them. Runs before the
-     * turn's terminal frame on failure/abort (8s45p).
-     */
-    private suspend fun flushOpenToolCalls(
-        streamSend: SendStream,
-        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
-        tracker: OpenToolCallTracker,
-    ) {
-        val openIds = tracker.openIds()
-        if (openIds.isEmpty()) return
-        Telemetry.event(
-            "IrohNode", "stream.dangling_tool_calls_synthesized",
-            "remoteEndpointId" to remoteEndpointId,
-            "count" to openIds.size,
-        )
-        openIds.forEach { toolCallId ->
-            writeStreamDelta(
-                streamSend = streamSend,
-                runtime = runtime,
-                delta = DanglingToolCallSynthesizer.cancelledToolReturnDelta(toolCallId),
-            )
-            tracker.close(toolCallId)
-        }
-    }
-
     private fun interruptedTerminalDelta(): kotlinx.serialization.json.JsonObject = buildJsonObject {
         put("message_type", "error_message")
         put("message", "connection interrupted before the turn completed")
         put("status", "cancelled")
     }
 
-    private fun RuntimeEventPayload.isFailureOrCancelLifecycle(): Boolean =
-        this is RuntimeEventPayload.RunLifecycleChanged &&
-            (status == RuntimeRunStatus.Failed || status == RuntimeRunStatus.Cancelled)
-
     private fun extractTextFromContentParts(parts: kotlinx.serialization.json.JsonArray?): String? =
         parts?.firstOrNull { part ->
             runCatching { part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }.getOrDefault(false)
         }?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
 
-    private suspend fun writeDraftAsStreamDelta(
-        streamSend: SendStream,
-        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
-        payload: RuntimeEventPayload,
-        openToolCalls: OpenToolCallTracker,
-        cumulativeText: CumulativeStreamText,
-    ): Boolean {
-        return when (payload) {
-            // DefaultAppServerController already gives us raw App Server wire
-            // frames here (usually stream_delta). Forward them unchanged so we
-            // preserve message_type, runtime metadata, and terminal semantics.
-            is RuntimeEventPayload.RemoteStreamFrame -> {
-                openToolCalls.observe(payload.body)
-                val outgoing = cumulativeText.applyToRawFrame(payload.body)
-                writeRawFrame(streamSend, outgoing)
-                rawFrameIsTerminal(outgoing)
-            }
-            is RuntimeEventPayload.ExternalTransportFrame -> {
-                openToolCalls.observe(payload.body)
-                val outgoing = cumulativeText.applyToRawFrame(payload.body)
-                writeRawFrame(streamSend, outgoing)
-                rawFrameIsTerminal(outgoing)
-            }
-            // toolchip-live: the engine synthesizes ToolCallObserved when it
-            // auto-approves an approval_request (the approval frame is consumed,
-            // so without this mapping the client never sees the tool call live)
-            // and ToolReturnObserved for settlement-synthesized returns. Map
-            // both to wire stream_deltas instead of dropping them.
-            is RuntimeEventPayload.ToolCallObserved -> {
-                val delta = buildJsonObject {
-                    put("message_type", "tool_call_message")
-                    put("tool_call", buildJsonObject {
-                        put("tool_call_id", payload.toolCallId.value)
-                        put("name", payload.toolName.value)
-                        put("arguments", payload.argumentsJson ?: "{}")
-                    })
-                }
-                openToolCalls.observe(delta.toString())
-                writeStreamDelta(streamSend = streamSend, runtime = runtime, delta = delta)
-                false
-            }
-            is RuntimeEventPayload.ToolReturnObserved -> {
-                val delta = buildJsonObject {
-                    put("message_type", "tool_return_message")
-                    put("tool_call_id", payload.toolCallId.value)
-                    put("status", if (payload.status == com.letta.mobile.runtime.ToolExecutionStatus.Failed) "error" else "success")
-                    put("tool_return", payload.body)
-                }
-                openToolCalls.observe(delta.toString())
-                writeStreamDelta(streamSend = streamSend, runtime = runtime, delta = delta)
-                false
-            }
-            is RuntimeEventPayload.RunLifecycleChanged -> if (payload.status == RuntimeRunStatus.Completed) {
-                writeStreamDelta(
-                    streamSend = streamSend,
-                    runtime = runtime,
-                    delta = buildJsonObject {
-                        put("message_type", "stop_reason")
-                        put("stop_reason", payload.reason ?: "end_turn")
-                    },
-                )
-                true
-            } else if (payload.status == RuntimeRunStatus.Failed) {
-                writeStreamDelta(
-                    streamSend = streamSend,
-                    runtime = runtime,
-                    delta = buildJsonObject {
-                        put("message_type", "error_message")
-                        put("message", payload.reason ?: "turn failed")
-                    },
-                )
-                true
-            } else if (payload.status == RuntimeRunStatus.Cancelled) {
-                writeStreamDelta(
-                    streamSend = streamSend,
-                    runtime = runtime,
-                    delta = buildJsonObject {
-                        put("message_type", "error_message")
-                        put("message", payload.reason ?: "turn cancelled")
-                        put("status", "cancelled")
-                    },
-                )
-                true
-            } else {
-                false
-            }
-            else -> false
-        }
-    }
-
-    private fun RuntimeEventPayload.isTerminalLifecycle(): Boolean =
-        this is RuntimeEventPayload.RunLifecycleChanged &&
-            (status == RuntimeRunStatus.Completed || status == RuntimeRunStatus.Failed || status == RuntimeRunStatus.Cancelled)
-
-    private suspend fun writeRawFrame(
-        streamSend: SendStream,
-        rawFrame: String,
-    ) {
-        // letta-mobile-h30cy: RemoteStreamFrame forwards the App Server wire frame
-        // UNCHANGED, which is the real assistant stream_delta path (writeStreamDelta
-        // only handles synthesized/lifecycle frames). The raw delta keeps its
-        // provider id (letta-msg-*), but message.list reconcile returns the same
-        // reply as ui-msg-* / null-run — zero identity overlap, so mobile renders
-        // it twice (Iroh dupes; HTTPS does not, because the shim tags there). Tag
-        // the delta's assistant/reasoning id to cm-stream-/cm-reason-<otid> here,
-        // exactly as the shim does, so mobile's optimistic-twin dedup collapses the
-        // streamed row against the disk copy.
-        val outgoing = retagStreamDeltaFrameForOptimisticDedup(rawFrame)
-        Telemetry.event(
-            "IrohNode", "stream.write",
-            "remoteEndpointId" to remoteEndpointId,
-            *IrohDiagnostics.redactedFrameAttributes(frameType(outgoing), outgoing.length).toTypedArray(),
-        )
-        streamWriteMutex.withLock {
-            IrohFrameCodec.write(streamSend, outgoing, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
-        }
-    }
-
-
+    /**
+     * eaczz.4: retained ONLY for the redial parked-frame REPLAY path — a
+     * reconnecting INITIATOR re-sends the same turn and we replay its parked
+     * frame tail to ITS OWN stream (observers reconcile via message.list, so they
+     * are not part of this replay). Live turn frames go through
+     * [ConversationTurnFanout] now.
+     */
     private suspend fun writeStreamDelta(
         streamSend: SendStream,
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
@@ -880,78 +743,9 @@ class IrohNodeConnection(
     }
 
 
-    private class CumulativeStreamText {
-        private val byKey = LinkedHashMap<String, String>()
-
-        private fun textFrom(element: kotlinx.serialization.json.JsonElement?): String? {
-            if (element == null) return null
-            (element as? JsonPrimitive)?.contentOrNull?.let { return it }
-            val array = element as? kotlinx.serialization.json.JsonArray ?: return null
-            return array.joinToString("") { part ->
-                runCatching {
-                    val obj = part.jsonObject
-                    if (obj["type"]?.jsonPrimitive?.contentOrNull == "text") {
-                        obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                    } else {
-                        ""
-                    }
-                }.getOrDefault("")
-            }.takeIf { it.isNotEmpty() }
-        }
-
-        fun applyToRawFrame(rawFrame: String): String = runCatching {
-            val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
-            if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
-            val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
-            val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
-            if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
-                return@runCatching rawFrame
-            }
-            val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
-                ?: delta["id"]?.jsonPrimitive?.contentOrNull
-                ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
-                ?: messageType
-            val field = if (messageType == "assistant_message") "content" else "reasoning"
-            val chunk = textFrom(delta[field])
-                ?: textFrom(delta["content"])
-                ?: textFrom(delta["text"])
-                ?: return@runCatching rawFrame
-            val existing = byKey[textKey].orEmpty()
-            val cumulative = when {
-                existing.isEmpty() -> chunk
-                chunk.startsWith(existing) -> chunk
-                existing.endsWith(chunk) -> existing
-                else -> existing + chunk
-            }.also { byKey[textKey] = it }
-            val cumulativeDelta = buildJsonObject {
-                delta.forEach { (key, value) -> if (key != field) put(key, value) }
-                put(field, cumulative)
-                if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
-                    put("reasoning", cumulative)
-                }
-            }
-            buildJsonObject {
-                obj.forEach { (key, value) -> if (key != "delta") put(key, value) }
-                put("delta", cumulativeDelta)
-            }.toString()
-        }.getOrDefault(rawFrame)
-    }
-
-
     private fun frameType(rawFrame: String): String? = runCatching {
         AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull
     }.getOrNull()
-
-    private fun rawFrameIsTerminal(rawFrame: String): Boolean = runCatching {
-        val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
-        val delta = obj["delta"]?.jsonObject ?: obj
-        when (delta["message_type"]?.jsonPrimitive?.contentOrNull) {
-            "stop_reason",
-            "loop_error",
-            "error_message" -> true
-            else -> false
-        }
-    }.getOrDefault(false)
 
     private suspend fun serveStreamReadiness(biStream: BiStream) {
         val recvStream = biStream.recv()
