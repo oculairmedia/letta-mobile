@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.update
 
 open class ScheduleRepository(
     private val scheduleApi: ScheduleApi,
+    private val irohScheduleSource: IrohAdminRpcScheduleSource? = null,
 ) : IScheduleRepository {
     private val _schedules = MutableStateFlow<Map<String, List<ScheduledMessage>>>(emptyMap())
 
@@ -20,9 +21,15 @@ open class ScheduleRepository(
     }
 
     override open suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
-        val response = scheduleApi.listSchedules(agentId = agentId, limit = limit, after = after)
+        val irohSource = irohScheduleSource
+        val schedules = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.listSchedules()
+        } else {
+            val response = scheduleApi.listSchedules(agentId = agentId, limit = limit, after = after)
+            response.scheduledMessages
+        }
         _schedules.update { current ->
-            current.toMutableMap().apply { put(agentId, response.scheduledMessages) }
+            current.toMutableMap().apply { put(agentId, schedules) }
         }
     }
 
@@ -31,13 +38,23 @@ open class ScheduleRepository(
     }
 
     override open suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
-        val schedule = scheduleApi.createSchedule(agentId, params)
+        val irohSource = irohScheduleSource
+        val schedule = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.createSchedule(params)
+        } else {
+            scheduleApi.createSchedule(agentId, params)
+        }
         refreshSchedules(agentId)
         return schedule
     }
 
     override open suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
-        scheduleApi.deleteSchedule(agentId, scheduledMessageId)
+        val irohSource = irohScheduleSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.deleteSchedule(scheduledMessageId)
+        } else {
+            scheduleApi.deleteSchedule(agentId, scheduledMessageId)
+        }
         _schedules.update { current ->
             current.toMutableMap().apply {
                 val existing = get(agentId) ?: emptyList()

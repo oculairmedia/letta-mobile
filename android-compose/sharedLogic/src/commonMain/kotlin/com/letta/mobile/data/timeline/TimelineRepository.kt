@@ -62,25 +62,37 @@ open class TimelineRepository(
     }
 
     /**
-     * Some legacy call sites only know [conversationId], while newer chat paths
-     * pass (agentId, conversationId). Treat the unscoped key as an alias only
-     * when there is exactly one compatible live loop for the conversation. When
-     * a scoped caller claims an unscoped loop, promote the cache key to that
-     * scope so a later different agent cannot accidentally share it.
+     * Legacy callers sometimes only know [TimelineCacheKey.conversationId],
+     * while live Iroh writers use an agent-scoped key. Alias those paths only
+     * inside a compatible scope: same agent, or one unscoped side. Once an
+     * unscoped loop is claimed by a scoped agent, it is promoted to that agent
+     * and must not be reused by a different scoped agent with the same bare
+     * conversation id.
      */
     private fun getAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
-        val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
+        val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
+        if (candidates.isEmpty()) return null
+        val compatible = candidates.filter { canAlias(it.key, key) }
+        candidates.filterNot { canAlias(it.key, key) }.forEach { (existingKey, _) ->
+            emitAliasRefused(existingKey, key)
+        }
+        val match = compatible.singleOrNull() ?: return null
         val existingKey = match.key
-        if (!canAlias(existingKey, key)) return null
         val loop = loops.remove(existingKey) ?: return null
         val promotedKey = if (existingKey.agentId == null && key.agentId != null) key else existingKey
         loops[promotedKey] = loop
+        Telemetry.event(
+            "TimelineRepo", "loop.aliasResolved",
+            "requestedAgentId" to key.agentId.orEmpty(),
+            "canonicalAgentId" to promotedKey.agentId.orEmpty(),
+            "conversationId" to key.conversationId,
+        )
         return loop
     }
 
     private fun removeAliasedLoopLocked(key: TimelineCacheKey): TimelineSyncLoop? {
-        val match = loops.entries.singleOrNull { it.key.conversationId == key.conversationId } ?: return null
-        if (!canAlias(match.key, key)) return null
+        val candidates = loops.entries.filter { it.key.conversationId == key.conversationId }
+        val match = candidates.singleOrNull { canAlias(it.key, key) } ?: return null
         return loops.remove(match.key)
     }
 
@@ -88,6 +100,17 @@ open class TimelineRepository(
         existing.agentId == requested.agentId ||
             existing.agentId == null ||
             requested.agentId == null
+
+    private fun emitAliasRefused(existing: TimelineCacheKey, requested: TimelineCacheKey) {
+        if (existing.agentId == null || requested.agentId == null) return
+        Telemetry.event(
+            "TimelineRepo", "loop.aliasRefused",
+            "existingAgentId" to existing.agentId,
+            "requestedAgentId" to requested.agentId,
+            "conversationId" to requested.conversationId,
+            level = Telemetry.Level.WARN,
+        )
+    }
 
     /**
      * Listener the :app module can install to receive inbound-message events
@@ -536,17 +559,16 @@ open class TimelineRepository(
     }
 
     private fun externalFrameKey(message: LettaMessage): String? {
+        // Only deduplicate frames with explicit sequence identity (seqId).
+        // Forward incremental streaming deltas (no seqId) may legitimately
+        // have identical content when streaming character-by-character and
+        // must NOT be deduplicated based on content alone.
         val seqId = message.seqId
         if (seqId != null && seqId >= 0) {
             return "seq|$seqId|${message.messageType}|${message.id}"
         }
-        return when (message) {
-            is AssistantMessage -> "assistant|${message.runId.orEmpty()}|${message.otid ?: message.id}|${message.content}"
-            is ReasoningMessage -> "reasoning|${message.runId.orEmpty()}|${message.otid ?: message.id}|${message.reasoning}"
-            is ToolCallMessage -> "toolcall|${message.runId.orEmpty()}|${message.id}|${message.effectiveToolCalls.joinToString("|") { it.effectiveId + ":" + (it.name ?: "") }}"
-            is ToolReturnMessage -> "toolreturn|${message.runId.orEmpty()}|${message.id}|${message.toolCallId.orEmpty()}|${message.toolReturn.funcResponse.orEmpty()}"
-            else -> null
-        }
+        // No seqId: this is a forward streaming delta. Do not deduplicate.
+        return null
     }
 
     private companion object {

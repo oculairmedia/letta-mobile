@@ -101,6 +101,14 @@ internal object IrohStreamDeltaServerFrameMapper {
 
             "usage_statistics" -> listOf(mapUsage(delta, meta))
 
+            // Parity with the TS shim (mobile-channel-host.ts lcp-8ri): a
+            // stop_reason frame reaching this mapper is NON-terminal (the
+            // runtime event mapper already converts terminal reasons into a
+            // Completed lifecycle). Multi-step tool turns emit intermediate
+            // stop_reasons like `requires_approval`; emitting TurnDone here
+            // ended the UI turn before the tool return / post-tool assistant
+            // continuation. Emit only the StopReason frame — TurnDone comes
+            // exclusively from the engine's terminal lifecycle.
             "stop_reason" -> listOf(
                 ServerFrame.StopReason(
                     id = meta.frameId,
@@ -108,14 +116,6 @@ internal object IrohStreamDeltaServerFrameMapper {
                     turnId = meta.turnId,
                     runId = meta.runId,
                     stopReason = delta.string("stop_reason") ?: delta.string("reason") ?: "end_turn",
-                    seq = meta.eventSeq,
-                ),
-                ServerFrame.TurnDone(
-                    id = meta.frameId,
-                    ts = meta.timestamp,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                    status = "completed",
                     seq = meta.eventSeq,
                 ),
             )
@@ -267,24 +267,36 @@ internal object IrohStreamDeltaServerFrameMapper {
         }
         /**
          * Stable synthetic otid for an assistant stream_delta whose wire frame
-         * carries no otid. Anchored on the (stable, per-turn) [turnId] — NOT the
-         * rotating backend id and NOT the run id — so every fragment of the SAME
-         * assistant message shares one otid and the reducer merges them into a
-         * single row, instead of the rotating id producing a new otid per
-         * fragment and stranding the tail as a duplicate row (letta-mobile-x1xnl).
+         * carries no otid.
          *
-         * [turnId] is deliberate: over Iroh the run id starts as the
-         * client-synthetic `iroh-run-*` placeholder and is later promoted to the
-         * real server run id mid-stream, so keying on run id would still split
-         * pre- and post-promotion fragments. The turn id is minted once per
-         * send() and is invariant for the whole turn, so it is the stable
-         * grouping anchor. Distinct assistant messages within one turn (rare;
-         * tool-mediated multi-assistant runs) are still separated downstream by
-         * the reducer's content-aware, seq-ordered merge; grouping the in-flight
-         * message's fragments is strictly safer than the current per-fragment
-         * split that produces the visible duplicate.
+         * Anchor priority is the PER-MESSAGE stable id: since the serve-path
+         * IrohAssistantAccumulator retags assistant deltas with a stable
+         * `cm-stream-<uuid>` id per logical assistant message, that id is both
+         * stable across a message's fragments AND distinct between separate
+         * assistant messages in one turn. That distinction matters for
+         * tool-mediated turns: the pre-tool preamble and the post-tool final
+         * response are DIFFERENT messages, and giving them one shared per-turn
+         * otid made the reducer's findByOtid merge fold the final response into
+         * the earlier preamble row — mutating an old row instead of appending,
+         * so the final text only became visible after the next reconcile
+         * (the "populates after I respond" bug).
+         *
+         * The per-turn [turnId] fallback remains ONLY for legacy frames with no
+         * stable message id at all (pre-accumulator servers), where grouping the
+         * whole turn is still safer than a per-fragment split
+         * (letta-mobile-x1xnl).
          */
-        fun assistantStreamOtid(): String = "iroh-assistant-$turnId"
+        fun assistantStreamOtid(): String {
+            // Only trust ids the serve-path accumulator stamped: raw backend
+            // ids (`letta-msg-*`) ROTATE per fragment and would re-split one
+            // message into per-fragment rows (the original x1xnl bug).
+            val stableMessageId = messageId?.takeIf { it.startsWith("cm-stream-") }
+            return if (stableMessageId != null) {
+                "iroh-assistant-$stableMessageId"
+            } else {
+                "iroh-assistant-$turnId"
+            }
+        }
         companion object {
             fun from(
                 payload: RuntimeEventPayload.RemoteStreamFrame,

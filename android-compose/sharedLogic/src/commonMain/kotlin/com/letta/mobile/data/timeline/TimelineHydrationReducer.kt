@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 
@@ -29,11 +30,14 @@ object TimelineHydrationReducer {
         currentTimeline: Timeline,
         diskRecords: List<PendingLocalRecord>,
     ): HydratedTimelineResult {
-        val rawConverted = serverMessagesChronological.mapIndexedNotNull { idx, msg ->
+        val displayableServerMessages = serverMessagesChronological.filterNot {
+            SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(it)
+        }
+        val rawConverted = displayableServerMessages.mapIndexedNotNull { idx, msg ->
             msg.toTimelineEvent(position = (idx + 1).toDouble())
         }
         val converted = attachToolReturnsAndDropStandaloneReturns(
-            serverMessages = serverMessagesChronological,
+            serverMessages = displayableServerMessages,
             rawConverted = rawConverted,
         )
         val pendingLocals = currentTimeline.events.filterIsInstance<TimelineEvent.Local>()

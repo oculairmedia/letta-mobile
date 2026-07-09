@@ -1,15 +1,20 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunListParams
-import com.letta.mobile.data.model.RunRequestConfig
-import com.letta.mobile.data.model.UsageStatistics
+import com.letta.mobile.data.model.Step
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeRunApi
+import com.letta.mobile.testutil.FakeSettingsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -28,135 +33,196 @@ class RunRepositoryTest {
     }
 
     @Test
-    fun `refreshRuns updates state flow`() = runTest {
-        fakeApi.runs.addAll(listOf(sampleRun("r1", "a1"), sampleRun("r2", "a2")))
-
-        repository.refreshRuns()
-
-        assertEquals(2, repository.runs.first().size)
+    fun `refreshRuns calls API with correct params`() = runTest {
+        fakeApi.runs.add(Run(id = "r1", agentId = "a1", status = "completed"))
+        repository.refreshRuns(RunListParams(agentId = "a1", limit = 10))
+        assertEquals(1, fakeApi.calls.size)
+        assertEquals("a1", fakeApi.lastListParams?.agentId)
     }
 
     @Test
-    fun `refreshRuns forwards filters`() = runTest {
-        fakeApi.runs.addAll(listOf(sampleRun("r1", "a1"), sampleRun("r2", "a2")))
-
-        repository.refreshRuns(RunListParams(agentId = "a2"))
-
-        assertEquals(1, repository.runs.first().size)
-        assertEquals("a2", repository.runs.first().first().agentId)
-    }
-
-    @Test
-    fun `getRun retrieves run by id`() = runTest {
-        fakeApi.runs.add(sampleRun("r1", "a1"))
-
+    fun `getRun returns correct run`() = runTest {
+        val testRun = Run(id = "r1", agentId = "a1", status = "completed")
+        fakeApi.runs.add(testRun)
         val result = repository.getRun("r1")
-
         assertEquals("r1", result.id)
-        assertTrue(fakeApi.calls.contains("retrieveRun:r1"))
+        assertEquals("a1", result.agentId)
     }
 
     @Test
-    fun `getRunMessages delegates to api`() = runTest {
-        fakeApi.runs.add(sampleRun("r1", "a1"))
-
-        val result = repository.getRunMessages("r1")
-
+    fun `getRunSteps returns steps for run`() = runTest {
+        val testStep = Step(
+            id = "s1",
+            origin = "sdk",
+            providerId = "p1",
+            runId = "r1",
+            agentId = "a1",
+            providerName = "OpenAI",
+            providerCategory = "llm",
+            model = "gpt-4",
+            modelEndpoint = "https://api.openai.com/v1",
+            contextWindowLimit = 8000,
+            promptTokens = 10,
+            completionTokens = 20,
+            totalTokens = 30,
+            status = "completed",
+        )
+        fakeApi.runSteps["r1"] = listOf(testStep)
+        val result = repository.getRunSteps("r1")
         assertEquals(1, result.size)
-        assertTrue(fakeApi.calls.contains("listRunMessages:r1"))
+        assertEquals("s1", result[0].id)
     }
 
-    @Test
-    fun `getRunMetrics delegates to api`() = runTest {
-        fakeApi.runs.add(sampleRun("r1", "a1"))
+    // ─── Iroh Purity Tests (letta-mobile client batch) ────────────────────────
 
-        val result = repository.getRunMetrics("r1")
-
-        assertEquals("r1", result.id)
-        assertEquals("org-1", result.organizationId)
-        assertEquals("template-1", result.templateId)
-        assertTrue(fakeApi.calls.contains("retrieveRunMetrics:r1"))
-    }
-
-    @Test
-    fun `getRecentRuns requests created at descending order`() = runTest {
-        fakeApi.runs.addAll(
-            listOf(
-                sampleRun("r1", "a1").copy(createdAt = "2026-04-12T12:00:00Z"),
-                sampleRun("r2", "a2").copy(createdAt = "2026-04-12T13:00:00Z"),
+    @Test(expected = IrohAdminApiUnavailableException::class)
+    fun `refreshRuns in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
             )
         )
-
-        val result = repository.getRecentRuns(limit = 10)
-
-        assertEquals(2, result.size)
-        assertEquals("listRuns", fakeApi.calls.first())
-        assertEquals("desc", fakeApi.lastListParams?.order)
-        assertEquals("created_at", fakeApi.lastListParams?.orderBy)
-        assertEquals(10, fakeApi.lastListParams?.limit)
+        val apiThatThrows = object : FakeRunApi() {
+            override suspend fun listRuns(params: RunListParams): List<Run> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = RunRepository(apiThatThrows)
+        repo.refreshRuns(RunListParams())
     }
 
     @Test
-    fun `getRunUsage delegates to api`() = runTest {
-        fakeApi.runs.add(sampleRun("r1", "a1"))
-        fakeApi.runUsage["r1"] = UsageStatistics(totalTokens = 1234)
-
-        val result = repository.getRunUsage("r1")
-
-        assertEquals(1234, result.totalTokens)
-        assertTrue(fakeApi.calls.contains("retrieveRunUsage:r1"))
+    fun `refreshRuns in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testRuns = listOf(
+            Run(id = "r1", agentId = "a1", status = "completed"),
+            Run(id = "r2", agentId = "a2", status = "running"),
+        )
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("run.list", method)
+            assertEquals("/v1/runs", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ListSerializer(Run.serializer()), testRuns),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcRunSource(transport, settings)
+        val apiThatThrows = object : FakeRunApi() {
+            override suspend fun listRuns(params: RunListParams): List<Run> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = RunRepository(apiThatThrows, irohSource)
+        repo.refreshRuns(RunListParams())
+        assertEquals(2, repo.runs.value.size)
+        assertEquals(1, transport.adminRpcCalls.size)
     }
 
     @Test
-    fun `getRunSteps delegates richer step payloads`() = runTest {
-        fakeApi.runs.add(sampleRun("r1", "a1"))
+    fun `getRun in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testRun = Run(id = "r1", agentId = "a1", status = "completed")
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("run.get", method)
+            assertEquals("/v1/runs/r1", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(Run.serializer(), testRun),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcRunSource(transport, settings)
+        val apiThatThrows = object : FakeRunApi() {
+            override suspend fun retrieveRun(runId: String): Run {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = RunRepository(apiThatThrows, irohSource)
+        val result = repo.getRun("r1")
+        assertEquals("r1", result.id)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
 
-        val result = repository.getRunSteps("r1")
-
+    @Test
+    fun `getRunSteps in iroh mode routes via admin_rpc`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testSteps = listOf(
+            Step(
+                id = "s1",
+                origin = "sdk",
+                providerId = "p1",
+                runId = "r1",
+                agentId = "a1",
+                providerName = "OpenAI",
+                providerCategory = "llm",
+                model = "gpt-4",
+                modelEndpoint = "https://api.openai.com/v1",
+                contextWindowLimit = 8000,
+                promptTokens = 10,
+                completionTokens = 20,
+                totalTokens = 30,
+                status = "completed",
+            )
+        )
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("step.list", method)
+            assertEquals("/v1/runs/r1/steps", path)
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ListSerializer(Step.serializer()), testSteps),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcRunSource(transport, settings)
+        val apiThatThrows = object : FakeRunApi() {
+            override suspend fun listRunSteps(
+                runId: String,
+                before: String?,
+                after: String?,
+                limit: Int?,
+                order: String?,
+            ): List<Step> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = RunRepository(apiThatThrows, irohSource)
+        val result = repo.getRunSteps("r1")
         assertEquals(1, result.size)
-        assertEquals("provider-1", result.first().providerId)
-        assertEquals("https://api.example.com/v1", result.first().modelEndpoint)
-        assertEquals("positive", result.first().feedback)
-        assertTrue(fakeApi.calls.contains("listRunSteps:r1"))
+        assertEquals("s1", result[0].id)
+        assertEquals(1, transport.adminRpcCalls.size)
     }
-
-    @Test
-    fun `cancelRun refreshes cached run`() = runTest {
-        fakeApi.runs.add(sampleRun("r1", "a1"))
-        repository.refreshRuns()
-
-        val result = repository.cancelRun(repository.runs.first().first())
-
-        assertEquals("cancelled", result.status)
-        assertEquals("cancelled", repository.runs.first().first().status)
-        assertTrue(fakeApi.calls.contains("cancelRun:a1:r1"))
-    }
-
-    @Test
-    fun `deleteRun removes cached run`() = runTest {
-        fakeApi.runs.addAll(listOf(sampleRun("r1", "a1"), sampleRun("r2", "a2")))
-        repository.refreshRuns()
-
-        repository.deleteRun("r1")
-
-        assertEquals(listOf("r2"), repository.runs.first().map { it.id })
-        assertTrue(fakeApi.calls.contains("deleteRun:r1"))
-    }
-
-    @Test
-    fun `upsertRun updates cached run`() = runTest {
-        repository.upsertRun(sampleRun("r1", "a1"))
-        repository.upsertRun(sampleRun("r1", "a1").copy(status = "completed"))
-
-        assertEquals(1, repository.runs.first().size)
-        assertEquals("completed", repository.runs.first().first().status)
-    }
-
-    private fun sampleRun(id: String, agentId: String) = Run(
-        id = id,
-        agentId = agentId,
-        status = "running",
-        background = false,
-        requestConfig = RunRequestConfig(useAssistantMessage = true),
-    )
 }

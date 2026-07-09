@@ -109,6 +109,16 @@ interface AppServerController {
         runtime: AppServerRuntimeScope,
         runId: String? = null,
     ): AppServerInboundFrame.AbortMessageResponse
+
+    suspend fun submitApproval(
+        agentId: AgentId,
+        conversationId: ConversationId? = null,
+        approvalRequestId: String,
+        approve: Boolean,
+        reason: String? = null,
+    ) {
+        error("submitApproval is not supported by this controller")
+    }
 }
 
 /**

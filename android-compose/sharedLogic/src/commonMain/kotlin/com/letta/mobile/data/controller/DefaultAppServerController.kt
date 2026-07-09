@@ -2,8 +2,10 @@ package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -40,6 +42,7 @@ class DefaultAppServerController(
      * Thread-safe access via [runtimeMutex].
      */
     private val runtimeCache = mutableMapOf<RuntimeKey, CanonicalRuntime>()
+    private val runtimePermissionModes = mutableMapOf<RuntimeKey, AppServerPermissionMode>()
     private val runtimeMutex = Mutex()
 
     /**
@@ -50,6 +53,10 @@ class DefaultAppServerController(
         AppServerTurnEngine(
             client = client,
             clientInfo = clientInfo,
+            permissionModeProvider = { command ->
+                runtimePermissionModes[RuntimeKey(command.agentId.value, command.conversationId.value)]
+                    ?: AppServerPermissionMode.Standard
+            },
             requestIdFactory = requestIdFactory,
         )
     }
@@ -63,6 +70,8 @@ class DefaultAppServerController(
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime = runtimeMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
+        val effectiveMode = mode ?: AppServerPermissionMode.Standard
+        runtimePermissionModes[key] = effectiveMode
 
         // Return cached runtime if already started for this agent+conversation
         runtimeCache[key]?.let { return it }
@@ -75,7 +84,7 @@ class DefaultAppServerController(
                     agentId = agentId.value,
                     conversationId = conversationId.value,
                     cwd = cwd,
-                    mode = mode,
+                    mode = effectiveMode,
                     clientInfo = clientInfo,
                     recoverApprovals = recoverApprovals,
                     forceDeviceStatus = forceDeviceStatus,
@@ -114,6 +123,35 @@ class DefaultAppServerController(
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =
         turnEngine.runTurn(command)
+
+    override suspend fun submitApproval(
+        agentId: AgentId,
+        conversationId: ConversationId?,
+        approvalRequestId: String,
+        approve: Boolean,
+        reason: String?,
+    ) {
+        val runtime = runtimeMutex.withLock {
+            val conversationValue = conversationId?.value
+            runtimeCache.entries.firstOrNull { (key, _) ->
+                key.agentId == agentId.value && (conversationValue == null || key.conversationId == conversationValue)
+            }?.value?.scope
+        } ?: throw AppServerControllerException("No active runtime found for approval $approvalRequestId")
+
+        client.input(
+            AppServerCommand.Input(
+                runtime = runtime,
+                payload = AppServerInputPayload.ApprovalResponse(
+                    requestId = approvalRequestId,
+                    decision = if (approve) {
+                        AppServerApprovalResponseDecision.Allow(message = reason ?: "Approved by mobile client.")
+                    } else {
+                        AppServerApprovalResponseDecision.Deny(message = reason ?: "Denied by mobile client.")
+                    },
+                ),
+            ),
+        )
+    }
 
     override suspend fun sync(
         runtime: AppServerRuntimeScope,

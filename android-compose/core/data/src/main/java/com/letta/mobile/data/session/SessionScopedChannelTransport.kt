@@ -7,6 +7,8 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -31,7 +34,7 @@ internal fun defaultSessionScopedChannelTransportScope(): CoroutineScope =
 class SessionScopedChannelTransport internal constructor(
     private val sessionManager: SessionManager,
     private val proxyScope: CoroutineScope,
-) : IChannelTransport {
+) : IChannelTransport, RedialAwareChannelTransport {
     @Inject
     constructor(sessionManager: SessionManager) : this(
         sessionManager = sessionManager,
@@ -47,6 +50,10 @@ class SessionScopedChannelTransport internal constructor(
 
     override val frameEvents: SharedFlow<TransportFrameEvent> = sessionManager.currentGraph
         .flatMapLatest { it.channelTransport.frameEvents }
+        .shareIn(proxyScope, SharingStarted.Eagerly, replay = 0)
+
+    override val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive> = sessionManager.currentGraph
+        .flatMapLatest { (it.channelTransport as? RedialAwareChannelTransport)?.redialWhileTurnActive ?: emptyFlow() }
         .shareIn(proxyScope, SharingStarted.Eagerly, replay = 0)
 
     init {

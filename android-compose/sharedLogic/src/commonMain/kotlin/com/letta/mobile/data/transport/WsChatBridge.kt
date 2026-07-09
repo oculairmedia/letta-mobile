@@ -6,6 +6,8 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * letta-mobile-wecy: chat-flavored projection of [IChannelTransport].
@@ -47,6 +50,9 @@ class WsChatBridge(
     val state: StateFlow<ChannelTransportState> = transport.state
 
     val connection: Flow<WsConnectionState> = transport.state.map { it.toConnectionState() }
+
+    val redialWhileTurnActive: Flow<RedialWhileTurnActive> =
+        (transport as? RedialAwareChannelTransport)?.redialWhileTurnActive ?: emptyFlow()
 
     fun isConnected(): Boolean = transport.state.value is ChannelTransportState.Connected
 

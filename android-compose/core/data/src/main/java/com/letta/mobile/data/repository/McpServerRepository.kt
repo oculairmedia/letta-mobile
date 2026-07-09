@@ -21,6 +21,7 @@ import javax.inject.Inject
 
 open class McpServerRepository @Inject constructor(
     private val mcpServerApi: McpServerApi,
+    private val irohMcpSource: IrohAdminRpcMcpSource? = null,
 ) : IMcpServerRepository {
     private val _servers = MutableStateFlow<List<McpServer>>(emptyList())
     override val servers: StateFlow<List<McpServer>> = _servers.asStateFlow()
@@ -34,6 +35,11 @@ open class McpServerRepository @Inject constructor(
     }
 
     override open suspend fun refreshServers() {
+        val irohSource = irohMcpSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _servers.update { irohSource.listMcpServers() }
+            return
+        }
         _servers.update { mcpServerApi.listMcpServers() }
     }
 

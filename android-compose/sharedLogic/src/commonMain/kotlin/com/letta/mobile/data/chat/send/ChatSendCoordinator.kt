@@ -14,6 +14,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -93,10 +94,15 @@ class ChatSendCoordinator(
     private val seenBridgeEventLock = SynchronizedObject()
     private val seenBridgeEventKeys = ArrayDeque<String>()
     private val seenBridgeEventKeySet = mutableSetOf<String>()
+    private val liveIngestLock = SynchronizedObject()
+    private val lastLiveIngestByConversation = mutableMapOf<String, Long>()
 
     init {
         scope.launch {
             wsChatBridge.events.collect { event -> handleEvent(event) }
+        }
+        scope.launch {
+            wsChatBridge.redialWhileTurnActive.collect { event -> handleRedialWhileTurnActive(event) }
         }
     }
 
@@ -258,9 +264,19 @@ class ChatSendCoordinator(
     }
 
     private fun schedulePostSendReconcile(pending: PendingWsSend) {
+        val sentAtMillis = currentTimeMillis()
         scope.launch {
-            for (delayMs in POST_SEND_RECONCILE_DELAYS_MS) {
+            for (delayMs in postSendReconcileDelaysMs) {
                 delay(delayMs)
+                if (hasLiveIngestSince(pending.conversationId, sentAtMillis)) {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.postSendReconcile.skippedLiveStream",
+                        "conversationId" to pending.conversationId,
+                        "otid" to pending.otid,
+                        "delayMs" to delayMs,
+                    )
+                    continue
+                }
                 runCatching {
                     timelineRepository.reconcileRecentMessages(
                         agentId = agentId,
@@ -457,6 +473,23 @@ class ChatSendCoordinator(
         if (dropDuplicateBridgeEvent(event)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
+                // Iroh run-id promotion re-emits TurnStarted for the SAME turn
+                // once the real server run id replaces the synthetic
+                // `iroh-run-*` placeholder. That is a run-id update, not a new
+                // turn: resetting per-turn state here (stop/usage/error guards,
+                // assistant run-id set) mid-turn corrupted post-tool
+                // settlement and contributed to the flicker. Update the run id
+                // and keep the turn state intact.
+                if (event.turnId == activeWsTurnId && activeWsConversationId == event.conversationId) {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.turnStarted.runPromoted",
+                        "turnId" to event.turnId,
+                        "previousRunId" to (activeWsRunId ?: ""),
+                        "runId" to event.runId,
+                    )
+                    activeWsRunId = event.runId
+                    return
+                }
                 activeWsConversationId = event.conversationId
                 activeWsTurnId = event.turnId
                 activeWsRunId = event.runId
@@ -497,6 +530,7 @@ class ChatSendCoordinator(
                 rememberActiveAssistantMessageRunId(event.message)
                 timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
                 if (!event.isReplay) {
+                    rememberLiveIngest(conversationId)
                     ui.onMessageDelta(conversationId)
                 }
             }
@@ -635,6 +669,41 @@ class ChatSendCoordinator(
         }
     }
 
+    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) {
+        if (event.agentId != agentId) return
+        val activeConversation = activeWsConversationId ?: activeConversationId()
+        if (activeConversation != event.conversationId) return
+        if (activeWsOtid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
+        runCatching {
+            timelineRepository.reconcileRecentMessages(
+                agentId = agentId,
+                conversationId = event.conversationId,
+                reason = "redial-recovery",
+                forceRefresh = true,
+            )
+        }.onFailure { error ->
+            Telemetry.error(
+                "AdminChatVM", "ws.redialRecovery.reconcileFailed", error,
+                "conversationId" to event.conversationId,
+                "turnId" to event.turnId,
+                "runId" to event.runId,
+            )
+        }
+        finishActiveTurn(
+            status = "completed",
+            runId = event.runId,
+            turnId = event.turnId,
+            lossy = false,
+            dropCount = 0L,
+            reason = "redial-recovery",
+            recordEvent = WsTimelineEvent.TurnDone(
+                turnId = event.turnId,
+                runId = event.runId,
+                status = "completed",
+            ),
+        )
+    }
+
     private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
         val key = bridgeEventKey(event) ?: return false
         val isDuplicate = if (event is WsTimelineEvent.MessageDelta) {
@@ -698,6 +767,18 @@ class ChatSendCoordinator(
         is ToolReturnMessage -> message.toolCallId.orEmpty() + ":" + message.toolReturn.funcResponse.orEmpty()
         else -> message.date.orEmpty() + ":" + message.seqId.toString()
     }
+
+    private fun rememberLiveIngest(conversationId: String) {
+        synchronized(liveIngestLock) {
+            lastLiveIngestByConversation[conversationId] = currentTimeMillis()
+        }
+    }
+
+    private fun hasLiveIngestSince(conversationId: String, sinceMillis: Long): Boolean = synchronized(liveIngestLock) {
+        (lastLiveIngestByConversation[conversationId] ?: Long.MIN_VALUE) >= sinceMillis
+    }
+
+    private fun currentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
     private fun rememberActiveAssistantMessageRunId(message: LettaMessage) {
         if (message !is AssistantMessage) return
@@ -880,7 +961,7 @@ class ChatSendCoordinator(
         }
     }
 
-    private companion object {
+    internal companion object {
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
         private const val MAX_SEEN_BRIDGE_EVENTS = 512
@@ -889,7 +970,7 @@ class ChatSendCoordinator(
         private val sharedMessageEventKeySet = mutableSetOf<String>()
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
-        private val POST_SEND_RECONCILE_DELAYS_MS = longArrayOf(750L, 2_500L, 6_000L)
+        internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

@@ -95,3 +95,14 @@ interface IChannelTransport {
         timeoutMs: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS,
     ): ServerFrame.SubagentTodosResponse
 }
+
+interface RedialAwareChannelTransport {
+    val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive>
+}
+
+data class RedialWhileTurnActive(
+    val agentId: String,
+    val conversationId: String,
+    val turnId: String,
+    val runId: String,
+)

@@ -16,6 +16,11 @@ open class ModelRepository(
     private val modelApi: ModelApi,
     private val localModelSource: LocalRuntimeModelSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
+    // letta-mobile P4 iroh purity: when the active backend is iroh://, model
+    // catalog reads MUST route over admin_rpc — the raw HTTP ModelApi
+    // hard-fails at the LettaApiClient choke-point, which left the model
+    // picker dropdown empty.
+    private val irohModelSource: IrohAdminRpcModelSource? = null,
 ) : IModelRepository {
     private val _llmModels = MutableStateFlow<List<LlmModel>>(emptyList())
     override open val llmModels: StateFlow<List<LlmModel>> = _llmModels.asStateFlow()
@@ -34,6 +39,11 @@ open class ModelRepository(
             _llmModels.update { localSource.listLlmModels() }
             return
         }
+        val irohSource = irohModelSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _llmModels.update { irohSource.listLlmModels() }
+            return
+        }
         _llmModels.update { modelApi.listLlmModels() }
     }
 
@@ -41,6 +51,11 @@ open class ModelRepository(
         if (isLocalRuntimeActive()) {
             // The embedded runtime has no embedding models.
             _embeddingModels.update { emptyList() }
+            return
+        }
+        val irohSource = irohModelSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _embeddingModels.update { irohSource.listEmbeddingModels() }
             return
         }
         _embeddingModels.update { modelApi.listEmbeddingModels() }

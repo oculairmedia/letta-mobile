@@ -53,6 +53,7 @@ class AppServerTurnEngineAbortTest {
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             client.emitStopReason()
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
             awaitComplete()

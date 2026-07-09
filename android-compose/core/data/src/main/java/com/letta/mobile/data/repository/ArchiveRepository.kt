@@ -13,12 +13,18 @@ import kotlinx.coroutines.flow.update
 
 open class ArchiveRepository(
     private val archiveApi: ArchiveApi,
+    private val irohArchiveSource: IrohAdminRpcArchiveSource? = null,
 ) : IArchiveRepository {
     private val _archives = MutableStateFlow<List<Archive>>(emptyList())
     override val archives: StateFlow<List<Archive>> = _archives.asStateFlow()
 
     override suspend fun refreshArchives(name: String?, agentId: String?) {
-        _archives.value = archiveApi.listArchives(limit = 1000, name = name, agentId = agentId)
+        val irohSource = irohArchiveSource
+        _archives.value = if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.listArchives()
+        } else {
+            archiveApi.listArchives(limit = 1000, name = name, agentId = agentId)
+        }
     }
 
     override suspend fun getArchive(archiveId: String): Archive {

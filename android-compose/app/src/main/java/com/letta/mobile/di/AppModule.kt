@@ -13,6 +13,8 @@ import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.BugReportRepository
 import com.letta.mobile.data.repository.IrohAdminRpcApprovalSource
+import com.letta.mobile.data.repository.IrohAdminRpcBlockSource
+import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.repository.SlashCommandRepository
@@ -115,6 +117,26 @@ abstract class AppModule {
             transport: IChannelTransport,
             settingsRepository: ISettingsRepository,
         ): IrohAdminRpcApprovalSource = IrohAdminRpcApprovalSource(
+            channelTransport = transport,
+            settingsRepository = settingsRepository,
+        )
+
+        @Provides
+        @Singleton
+        fun provideIrohAdminRpcBlockSource(
+            transport: IChannelTransport,
+            settingsRepository: ISettingsRepository,
+        ): IrohAdminRpcBlockSource = IrohAdminRpcBlockSource(
+            channelTransport = transport,
+            settingsRepository = settingsRepository,
+        )
+
+        @Provides
+        @Singleton
+        fun provideIrohAdminRpcToolSource(
+            transport: IChannelTransport,
+            settingsRepository: ISettingsRepository,
+        ): IrohAdminRpcToolSource = IrohAdminRpcToolSource(
             channelTransport = transport,
             settingsRepository = settingsRepository,
         )

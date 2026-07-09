@@ -411,7 +411,7 @@ private fun ConversationsContent(
                     }
                     itemsIndexed(
                         items = section.items,
-                        key = { _, display -> display.conversation.id.toString() },
+                        key = { _, display -> "${section.key}:${display.conversation.id}" },
                     ) { index, display ->
                         StaggeredListItem(index = sectionBaseIndex + index) {
                             ConversationCard(

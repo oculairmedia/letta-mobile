@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -42,6 +44,50 @@ class IrohAdminRpcAgentSource(
     fun shouldUseIroh(): Boolean =
         IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
+    /**
+     * Update an agent over admin_rpc (server AgentAdminHandlers `agent.update`
+     * proxies PATCH /v1/agents/{id}). The handler reads `agent_id` from params
+     * and forwards the whole params object as the PATCH body; the raw
+     * AgentUpdateParams JSON is merged with the id so unknown-body fields are
+     * simply passed through.
+     */
+    suspend fun updateAgent(id: AgentId, paramsJson: String): Agent {
+        val body = buildJsonObject {
+            put("agent_id", id.value)
+            val parsed = runCatching { json.parseToJsonElement(paramsJson) }.getOrNull()
+            (parsed as? kotlinx.serialization.json.JsonObject)?.forEach { (key, value) ->
+                if (key != "agent_id") put(key, value)
+            }
+        }
+        val response = channelTransport.adminRpc(
+            method = "agent.update",
+            path = "/v1/agents/${id.value}",
+            body = body.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.update failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.update returned no result")
+        return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+        val params = buildJsonObject {
+            put("agent_id", agentId.value)
+            conversationId?.let { put("conversation_id", it.value) }
+        }
+        val path = buildString {
+            append("/v1/agents/${agentId.value}/context")
+            conversationId?.let { append("?conversation_id=${it.value}") }
+        }
+        val response = channelTransport.adminRpc(
+            method = "agent.context",
+            path = path,
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.context failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.context returned no result")
+        return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
+    }
+
     suspend fun getAgent(id: AgentId): Agent {
         val params = buildJsonObject { put("agent_id", id.value) }
         val response = channelTransport.adminRpc(
@@ -52,6 +98,35 @@ class IrohAdminRpcAgentSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc agent.get failed")
         val result = response.result ?: error("Iroh admin_rpc agent.get returned no result")
         return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    /**
+     * Create an agent over admin_rpc (server AgentAdminHandlers `agent.create`
+     * proxies POST /v1/agents). P4 purity client batch.
+     */
+    suspend fun createAgent(paramsJson: String): Agent {
+        val response = channelTransport.adminRpc(
+            method = "agent.create",
+            path = "/v1/agents",
+            body = paramsJson,
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.create failed")
+        val result = response.result ?: error("Iroh admin_rpc agent.create returned no result")
+        return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    /**
+     * Delete an agent over admin_rpc (server AgentAdminHandlers `agent.delete`
+     * proxies DELETE /v1/agents/{id}). P4 purity client batch.
+     */
+    suspend fun deleteAgent(id: AgentId) {
+        val params = buildJsonObject { put("agent_id", id.value) }
+        val response = channelTransport.adminRpc(
+            method = "agent.delete",
+            path = "/v1/agents/${id.value}",
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc agent.delete failed")
     }
 
     /**

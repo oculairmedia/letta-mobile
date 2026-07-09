@@ -11,15 +11,25 @@ import kotlinx.coroutines.flow.update
 
 class JobRepository(
     private val jobApi: JobApi,
+    private val irohJobSource: IrohAdminRpcJobSource? = null,
 ) : IJobRepository {
     private val _jobs = MutableStateFlow<List<Job>>(emptyList())
     override val jobs: StateFlow<List<Job>> = _jobs.asStateFlow()
 
     override suspend fun refreshJobs(params: JobListParams) {
+        val irohSource = irohJobSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _jobs.value = irohSource.listJobs()
+            return
+        }
         _jobs.value = jobApi.listJobs(params)
     }
 
     override suspend fun getJob(jobId: String): Job {
+        val irohSource = irohJobSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getJob(jobId)
+        }
         return jobApi.retrieveJob(jobId)
     }
 

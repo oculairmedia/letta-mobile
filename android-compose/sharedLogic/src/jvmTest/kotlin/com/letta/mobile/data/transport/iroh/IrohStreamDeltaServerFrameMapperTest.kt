@@ -200,7 +200,7 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
-    fun mapsStopReasonToStopReasonAndSingleTerminalCandidate() {
+    fun mapsStopReasonWithoutSynthesizingTurnDone() {
         val frames = map(
             """
             {
@@ -211,21 +211,18 @@ class IrohStreamDeltaServerFrameMapperTest {
               "delta": {
                 "message_type": "stop_reason",
                 "run_id": "run-app",
-                "stop_reason": "end_turn"
+                "stop_reason": "requires_approval"
               }
             }
             """.trimIndent(),
         )
 
+        assertEquals(1, frames.size)
         val stop = assertIs<ServerFrame.StopReason>(frames[0])
-        val done = assertIs<ServerFrame.TurnDone>(frames[1])
         assertEquals("evt-stop", stop.id)
-        assertEquals("end_turn", stop.stopReason)
+        assertEquals("requires_approval", stop.stopReason)
         assertEquals("run-app", stop.runId)
-        assertEquals("evt-stop", done.id)
-        assertEquals("completed", done.status)
-        assertEquals("run-app", done.runId)
-        assertEquals(4L, done.seq)
+        assertTrue(frames.none { it is ServerFrame.TurnDone })
     }
 
     @Test

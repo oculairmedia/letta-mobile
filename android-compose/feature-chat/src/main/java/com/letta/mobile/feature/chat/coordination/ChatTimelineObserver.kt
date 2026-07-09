@@ -21,6 +21,7 @@ import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
+import com.letta.mobile.util.Telemetry
 
 /**
  * Owns the long-lived timeline subscriptions and projection of timeline events
@@ -140,6 +141,14 @@ internal class ChatTimelineObserver(
                 // delta, so Compose hit-testing / gesture handling get a clean
                 // pass and tool-card taps land mid-stream.
                 flow.collect { timeline ->
+                    if (Telemetry.isTimelineSyncGateDebugEnabled()) {
+                        Telemetry.event(
+                            "TimelineSyncIngest", "gate6.timelineCollected",
+                            "conversationId" to conversationId,
+                            "count" to timeline.events.size,
+                            level = Telemetry.Level.DEBUG,
+                        )
+                    }
                     val prefix = presenter.olderPrefixFor(conversationId)
                     val previousState = uiState.value
                     val projection = withContext(projectionDispatcher) {
@@ -157,6 +166,37 @@ internal class ChatTimelineObserver(
                     // storm over every tool card. Telemetry was already emitted
                     // as uiProjection.suppressed by the presenter.
                     if (projection.noChange) {
+                        val prev = uiState.value
+                        if (isFollowingDuplicateInitialMessageInFlight() && projection.tailIsAssistant) {
+                            clearFollowingDuplicateInitialMessageInFlight()
+                        }
+                        val a2uiStartMessageCount = a2uiThinkingStartMessageCount()
+                        val a2uiResponseArrived = a2uiStartMessageCount != null && projection.ui
+                            .drop(a2uiStartMessageCount)
+                            .any { it.role == "assistant" && !it.isReasoning }
+                        if (a2uiResponseArrived) {
+                            clearA2uiThinkingOnResponse()
+                        }
+                        val presentation = presenter.present(
+                            projection = projection,
+                            signals = ChatPresenceSignals(
+                                replyStreaming = activeReplyStreams.value.contains(conversationId),
+                                clientModeStreamInFlight = isClientModeStreamInFlight(),
+                                a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
+                                duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
+                            ),
+                            previousIsStreaming = prev.isStreaming,
+                            previousIsAgentTyping = prev.isAgentTyping,
+                        )
+                        if (presentation.isStreaming != prev.isStreaming || presentation.isAgentTyping != prev.isAgentTyping) {
+                            uiState.value = collapseCompletedRunsIfStreamingFinished(
+                                prev,
+                                prev.copy(
+                                    isStreaming = presentation.isStreaming,
+                                    isAgentTyping = presentation.isAgentTyping,
+                                ),
+                            )
+                        }
                         return@collect
                     }
                     val ui = projection.ui

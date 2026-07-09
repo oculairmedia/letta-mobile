@@ -71,8 +71,9 @@ class AppServerTurnEngineReceiveChainTest {
                 "RemoteStreamFrame body must carry the assistant text; got ${remote.body.take(200)}",
             )
 
-            // 3. Terminal stop_reason completes the turn (→ TurnDone).
+            // 3. Terminal stop_reason is flushed before turn completion (→ TurnDone).
             client.emit(stopReasonDelta(runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
             awaitComplete()
@@ -104,6 +105,7 @@ class AppServerTurnEngineReceiveChainTest {
             assertEquals("letta-msg-1", remote.messageId)
 
             client.emit(stopReasonDelta(runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             awaitComplete()
         }
