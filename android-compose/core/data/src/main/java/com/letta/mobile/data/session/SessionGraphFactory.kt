@@ -228,6 +228,22 @@ class SessionGraphFactory internal constructor(
                 ChannelTransport(scope, runCursorStore, conversationCursorStore)
             }
         }
+        return createSessionGraph(
+            graphId = graphId,
+            activeConfig = activeConfig,
+            localRuntimeBackend = localRuntimeBackend,
+            scope = scope,
+            channelTransport = channelTransport
+        )
+    }
+
+    private fun createSessionGraph(
+        graphId: Long,
+        activeConfig: LettaConfig?,
+        localRuntimeBackend: LocalLettaBackend?,
+        scope: CoroutineScope,
+        channelTransport: com.letta.mobile.data.transport.api.IChannelTransport
+    ): SessionGraph {
         val agentRepository = AgentRepository(
             agentApi = agentApi,
             agentDao = agentDao,
