@@ -19,6 +19,7 @@ import io.mockk.mockk
 import kotlin.random.Random
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
@@ -62,21 +64,32 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 class TimelineSyncLoopTest {
 
+
+    private val loops = mutableListOf<TimelineSyncLoop>()
+    private val scopes = mutableListOf<CoroutineScope>()
+
+    @After
+    fun tearDown() {
+        loops.forEach { it.close() }
+        loops.clear()
+        scopes.forEach { it.cancel() }
+        scopes.clear()
+    }
+
     @Test
     fun `hydrate loads initial messages`() = runBlocking {
         val api = FakeSyncApi()
         api.addStoredMessage(SystemMessage(id = "m1", contentRaw = JsonPrimitive("welcome")))
         api.addStoredMessage(AssistantMessage(id = "m2", contentRaw = JsonPrimitive("hi")))
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         sync.hydrate()
 
         val timeline = sync.state.value
         assertEquals(2, timeline.events.size)
         assertTrue(timeline.events.all { it is TimelineEvent.Confirmed })
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -84,14 +97,13 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         api.addStoredMessage(SystemMessage(id = "m1", contentRaw = JsonPrimitive("welcome")))
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-default-agent-1", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-default-agent-1", scope).also { loops.add(it) }
 
         sync.hydrate()
 
         assertEquals(0, api.listMessagesCalls)
         assertEquals(0, sync.state.value.events.size)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -135,8 +147,8 @@ class TimelineSyncLoopTest {
             )
         )
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         sync.hydrate(limit = 50)
 
@@ -147,7 +159,6 @@ class TimelineSyncLoopTest {
         assertTrue("older visible user message should survive raw overfetch", "older-user" in ids)
         assertTrue("older visible assistant message should survive raw overfetch", "older-assistant" in ids)
         assertTrue("latest turn should still be present", "latest-user" in ids && "latest-assistant" in ids)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -179,8 +190,8 @@ class TimelineSyncLoopTest {
                 runId = runId,
             )
         )
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         sync.hydrate()
 
@@ -188,7 +199,6 @@ class TimelineSyncLoopTest {
         assertEquals(listOf("user-1", "reasoning-1", "assistant-1"), events.map { it.serverId })
         assertEquals(TimelineMessageType.REASONING, events[1].messageType)
         assertEquals(TimelineMessageType.ASSISTANT, events[2].messageType)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -203,8 +213,8 @@ class TimelineSyncLoopTest {
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val otidDeferred = async { sync.send("hello") }
 
@@ -225,7 +235,6 @@ class TimelineSyncLoopTest {
             local is TimelineEvent.Local,
         )
         assertEquals("hello", local.content)
-        scope.coroutineContext.job.cancel()
     }
     @Test
     fun `send then stream appends confirmed assistant event`() = runTest {
@@ -234,8 +243,8 @@ class TimelineSyncLoopTest {
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         sync.state.test {
             assertEquals(0, awaitItem().events.size)
@@ -255,7 +264,6 @@ class TimelineSyncLoopTest {
             assertEquals("OK", events[1].content)
             cancelAndIgnoreRemainingEvents()
         }
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -265,8 +273,8 @@ class TimelineSyncLoopTest {
             AssistantMessage(id = "reply-image", contentRaw = JsonPrimitive("I see it"), otid = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-image", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-image", scope).also { loops.add(it) }
 
         val send = async {
             sync.send(
@@ -286,7 +294,6 @@ class TimelineSyncLoopTest {
         assertEquals("base64", source["type"]!!.jsonPrimitive.content)
         assertEquals("image/png", source["media_type"]!!.jsonPrimitive.content)
         assertEquals("AAAA", source["data"]!!.jsonPrimitive.content)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -296,8 +303,8 @@ class TimelineSyncLoopTest {
             AssistantMessage(id = "reply-text", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-text", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-text", scope).also { loops.add(it) }
 
         val send = async { sync.send("plain text") }
         advanceUntilIdle()
@@ -305,7 +312,6 @@ class TimelineSyncLoopTest {
 
         val firstMessage = api.lastSendRequest!!.messages!!.single().jsonObject
         assertEquals(JsonPrimitive("plain text"), firstMessage["content"])
-        scope.coroutineContext.job.cancel()
     }
 
     /**
@@ -349,8 +355,8 @@ class TimelineSyncLoopTest {
             )
         }
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send = async { sync.send("hello") }
         advanceUntilIdle()
@@ -365,7 +371,6 @@ class TimelineSyncLoopTest {
             expected,
             assistant!!.content,
         )
-        scope.coroutineContext.job.cancel()
     }
 
     /**
@@ -397,8 +402,8 @@ class TimelineSyncLoopTest {
             )
         }
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         sync.state.test {
             // Initial empty timeline before send.
@@ -423,7 +428,6 @@ class TimelineSyncLoopTest {
 
             cancelAndIgnoreRemainingEvents()
         }
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -453,8 +457,8 @@ class TimelineSyncLoopTest {
             ),
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send = async { sync.send("run tools") }
         advanceUntilIdle()
@@ -470,14 +474,13 @@ class TimelineSyncLoopTest {
             1,
             assistant.content.windowed(full.length).count { it == full },
         )
-        scope.coroutineContext.job.cancel()
     }
     @Test
     fun `submitStreamEvent folds ambient SSE frames through serialized gateway`() = runTest {
         val api = FakeSyncApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-gateway", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-gateway", scope).also { loops.add(it) }
 
         sync.submitStreamEvent(
             AssistantMessage(
@@ -504,15 +507,14 @@ class TimelineSyncLoopTest {
         val assistant = sync.state.value.events.single() as TimelineEvent.Confirmed
         assertEquals("gateway-otid", assistant.otid)
         assertEquals("Hello world", assistant.content)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
     fun `externalTransportActive does not auto-expire after long idle (letta-mobile-y8tvn)`() = runTest {
         val api = FakeSyncApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-no-expiry", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-no-expiry", scope).also { loops.add(it) }
 
         // Establish WS as the canonical transport: one WS ingest sets the
         // externalTransportActive flag for this conversation.
@@ -562,7 +564,6 @@ class TimelineSyncLoopTest {
         advanceUntilIdle()
 
         assertEquals(2, sync.state.value.events.size)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -570,13 +571,13 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         val cursorStore = RecordingConversationCursorStore()
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
         val sync = TimelineSyncLoop(
             messageApi = MessageApiTimelineTransport(api),
             conversationId = "conv-cursor",
             scope = scope,
             conversationCursorStore = cursorStore,
-        )
+        ).also { loops.add(it) }
 
         sync.ingestStreamEvent(
             AssistantMessage(
@@ -588,7 +589,6 @@ class TimelineSyncLoopTest {
 
         assertEquals(listOf("conv-cursor" to 17L), cursorStore.records)
         assertEquals(17L, cursorStore.getCursor("conv-cursor"))
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -610,13 +610,13 @@ class TimelineSyncLoopTest {
         )
         val cursorStore = RecordingConversationCursorStore()
         val dispatcher = UnconfinedTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
         val sync = TimelineSyncLoop(
             messageApi = MessageApiTimelineTransport(api),
             conversationId = "conv-cursor-repair",
             scope = scope,
             conversationCursorStore = cursorStore,
-        )
+        ).also { loops.add(it) }
 
         sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 10L)
         sync.hydrate(recordConversationCursor = true, fallbackCursorSeq = 12L)
@@ -626,15 +626,14 @@ class TimelineSyncLoopTest {
             listOf("assistant-repair-1", "assistant-repair-2"),
             sync.state.value.events.map { (it as TimelineEvent.Confirmed).serverId },
         )
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
     fun `external transport local sent and failed markers fold through serialized gateway`() = runTest {
         val api = FakeSyncApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-external-gateway", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-external-gateway", scope).also { loops.add(it) }
 
         val appendJob = launch {
             sync.appendExternalTransportLocal(
@@ -662,7 +661,6 @@ class TimelineSyncLoopTest {
         failedJob.join()
         val failed = sync.state.value.findByOtid("external-otid") as TimelineEvent.Local
         assertEquals(DeliveryState.FAILED, failed.deliveryState)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -670,8 +668,8 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         api.nextSendFailure = java.io.IOException("first send fails")
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-retry-gateway", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-retry-gateway", scope).also { loops.add(it) }
 
         val otid = sync.send("retry me")
         advanceUntilIdle()
@@ -692,7 +690,6 @@ class TimelineSyncLoopTest {
         val retried = sync.state.value.findByOtid(otid)
         assertTrue(retried is TimelineEvent.Confirmed)
         assertEquals(2, api.sendCalls)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -709,8 +706,8 @@ class TimelineSyncLoopTest {
             ),
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send = async { sync.send("hello") }
         advanceUntilIdle()
@@ -726,7 +723,6 @@ class TimelineSyncLoopTest {
             "Reasoning and assistant content must not be concatenated into one echoed bubble",
             assistant.content.contains(reasoning.content) || reasoning.content.contains(assistant.content),
         )
-        scope.coroutineContext.job.cancel()
     }
 
     /**
@@ -748,8 +744,8 @@ class TimelineSyncLoopTest {
             )
         }
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send = async { sync.send("draw it") }
         advanceUntilIdle()
@@ -775,7 +771,6 @@ class TimelineSyncLoopTest {
             "missing closing bracket before --> (destructive-replace signature)",
             assistant.content.contains("] --> B[Coalesce?]"),
         )
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -785,8 +780,8 @@ class TimelineSyncLoopTest {
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "reply-otid")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send = async { sync.send("hello") }
         advanceUntilIdle()
@@ -797,7 +792,6 @@ class TimelineSyncLoopTest {
         val swapped = sync.state.value.findByOtid(userOtid)
         assertTrue(swapped is TimelineEvent.Confirmed)
         assertEquals("hello", swapped!!.content)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -856,8 +850,8 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/jpeg")
         val send = async { sync.send("caption", attachments = listOf(image)) }
@@ -870,7 +864,6 @@ class TimelineSyncLoopTest {
         assertEquals(1, swapped.attachments.size)
         assertEquals("image/jpeg", swapped.attachments.first().mediaType)
         assertEquals("AAAA", swapped.attachments.first().base64)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -880,8 +873,8 @@ class TimelineSyncLoopTest {
             AssistantMessage(id = "reply-1", contentRaw = JsonPrimitive("OK"), otid = "r1")
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send1 = async { sync.send("same") }
         val send2 = async { sync.send("same") }
@@ -896,7 +889,6 @@ class TimelineSyncLoopTest {
         assertNotNull(e2)
         assertEquals("same", e1!!.content)
         assertEquals("same", e2!!.content)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -904,8 +896,8 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()   // no stream body to simplify
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         // Fire 10 concurrent sends
         val sends = (1..10).map { i ->
@@ -921,7 +913,6 @@ class TimelineSyncLoopTest {
         assertEquals(positions.sorted(), positions)
         // otids must be unique
         assertEquals(10, timeline.events.map { it.otid }.toSet().size)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -939,8 +930,8 @@ class TimelineSyncLoopTest {
         api.listMessagesFailure = ApiException(503, "Service Unavailable")
 
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val collectedErrors = mutableListOf<TimelineSyncEvent.ReconcileError>()
         val errorCollector = scope.launch {
@@ -969,7 +960,6 @@ class TimelineSyncLoopTest {
         )
 
         errorCollector.cancel()
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -988,8 +978,8 @@ class TimelineSyncLoopTest {
         api.listMessagesFailure = java.io.IOException("simulated network blip")
 
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val collectedErrors = mutableListOf<TimelineSyncEvent.ReconcileError>()
         val errorCollector = scope.launch {
@@ -1021,7 +1011,6 @@ class TimelineSyncLoopTest {
         )
 
         errorCollector.cancel()
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1036,8 +1025,8 @@ class TimelineSyncLoopTest {
             )
         )
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-reopen", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-reopen", scope).also { loops.add(it) }
         sync.hydrate()
 
         api.addStoredMessage(
@@ -1061,7 +1050,6 @@ class TimelineSyncLoopTest {
             api.conversationLimits,
         )
         assertEquals(listOf("desc", "desc"), api.conversationOrders)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1076,8 +1064,8 @@ class TimelineSyncLoopTest {
             )
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-reconcile-gateway", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-reconcile-gateway", scope).also { loops.add(it) }
 
         sync.hydrate()
         api.addStoredMessage(
@@ -1102,7 +1090,6 @@ class TimelineSyncLoopTest {
         val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
         assertEquals(listOf("older-user", "fresh-user-no-otid"), confirmed.map { it.serverId })
         assertEquals("fresh server prompt", confirmed.last().content)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1110,8 +1097,8 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         api.streamConversationReturnsOpenChannel = true
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-live-skip", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-live-skip", scope).also { loops.add(it) }
 
         runCurrent()
         assertTrue("stream subscriber should be active before reconcile", sync.streamSubscriberActive.value)
@@ -1129,7 +1116,6 @@ class TimelineSyncLoopTest {
 
         assertEquals("active stream should remain the only live writer", 0, api.listMessagesCalls)
         assertTrue(sync.state.value.events.isEmpty())
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1144,8 +1130,8 @@ class TimelineSyncLoopTest {
             )
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-live-refresh", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-live-refresh", scope).also { loops.add(it) }
 
         runCurrent()
         assertTrue("stream subscriber should be active before forced reconcile", sync.streamSubscriberActive.value)
@@ -1157,7 +1143,6 @@ class TimelineSyncLoopTest {
         assertEquals("pull-to-refresh should perform one REST snapshot", 1, api.listMessagesCalls)
         val confirmed = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
         assertEquals(listOf("fresh-user-no-otid"), confirmed.map { it.serverId })
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1171,8 +1156,8 @@ class TimelineSyncLoopTest {
         api.listMessagesFailure = ApiException(401, "Unauthorized")
 
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val collectedErrors = mutableListOf<TimelineSyncEvent.ReconcileError>()
         val errorCollector = scope.launch {
@@ -1193,7 +1178,6 @@ class TimelineSyncLoopTest {
         assertEquals(1, collectedErrors.size)
 
         errorCollector.cancel()
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1207,8 +1191,8 @@ class TimelineSyncLoopTest {
         val api = FakeSyncApi()
         api.nextStreamMessages = emptyList()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         // Retry on an otid that doesn't exist at all — must not throw, must not
         // mutate state.
@@ -1216,8 +1200,6 @@ class TimelineSyncLoopTest {
         advanceUntilIdle()
         retry.await()
         assertEquals(0, sync.state.value.events.size)
-
-        scope.coroutineContext.job.cancel()
     }
 
     // --- letta-mobile-mge5.20: tool call / approval / return wiring --------
@@ -1243,8 +1225,8 @@ class TimelineSyncLoopTest {
             )
         )
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
         sync.hydrate()
 
         val events = sync.state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
@@ -1257,8 +1239,6 @@ class TimelineSyncLoopTest {
         assertEquals(TimelineMessageType.TOOL_CALL, bubble.messageType)
         assertEquals("hi\n", bubble.toolReturnContent)
         assertTrue("approvalDecided must be true once return observed", bubble.approvalDecided)
-
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1292,8 +1272,8 @@ class TimelineSyncLoopTest {
             )
         )
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-batch", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-batch", scope).also { loops.add(it) }
         sync.hydrate()
 
         val bubble = sync.state.value.events
@@ -1305,8 +1285,6 @@ class TimelineSyncLoopTest {
         assertEquals(true, bubble.toolReturnIsErrorByCallId["toolu_b"])
         assertEquals("a-output", bubble.toolReturnContent)
         assertTrue(bubble.approvalDecided)
-
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1329,8 +1307,8 @@ class TimelineSyncLoopTest {
             ),
         )
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
 
         val send = async { sync.send("list files") }
         advanceUntilIdle()
@@ -1346,57 +1324,51 @@ class TimelineSyncLoopTest {
         assertNotNull(toolCallEvent)
         assertEquals("file_a\nfile_b\n", toolCallEvent!!.toolReturnContent)
         assertTrue(toolCallEvent.approvalDecided)
-
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
     fun `streamed tool_return arriving before tool_call attaches when call lands`() = runBlocking {
         val api = FakeSyncApi()
         val job = kotlinx.coroutines.Job()
-        val scope = CoroutineScope(Dispatchers.Unconfined + job)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope)
+        val scope = CoroutineScope(Dispatchers.Unconfined + job).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv1", scope).also { loops.add(it) }
         val toolCallId = "toolu_early_return"
 
-        try {
-            sync.ingestStreamEvent(
-                com.letta.mobile.data.model.ToolReturnMessage(
-                    id = "return-before-call",
-                    toolCallId = toolCallId,
-                    toolReturnRaw = JsonPrimitive("early output"),
-                    status = "success",
-                    runId = "run-early",
-                )
+        sync.ingestStreamEvent(
+            com.letta.mobile.data.model.ToolReturnMessage(
+                id = "return-before-call",
+                toolCallId = toolCallId,
+                toolReturnRaw = JsonPrimitive("early output"),
+                status = "success",
+                runId = "run-early",
             )
+        )
 
-            assertTrue(
-                "tool_return should not render as a standalone event",
-                sync.state.value.events.none {
-                    it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.TOOL_RETURN
-                },
+        assertTrue(
+            "tool_return should not render as a standalone event",
+            sync.state.value.events.none {
+                it is TimelineEvent.Confirmed && it.messageType == TimelineMessageType.TOOL_RETURN
+            },
+        )
+
+        sync.ingestStreamEvent(
+            com.letta.mobile.data.model.ApprovalRequestMessage(
+                id = "call-after-return",
+                runId = "run-early",
+                toolCall = com.letta.mobile.data.model.ToolCall(
+                    id = toolCallId,
+                    name = "Bash",
+                    arguments = "{\"command\":\"echo early\"}",
+                ),
             )
+        )
 
-            sync.ingestStreamEvent(
-                com.letta.mobile.data.model.ApprovalRequestMessage(
-                    id = "call-after-return",
-                    runId = "run-early",
-                    toolCall = com.letta.mobile.data.model.ToolCall(
-                        id = toolCallId,
-                        name = "Bash",
-                        arguments = "{\"command\":\"echo early\"}",
-                    ),
-                )
-            )
-
-            val toolCallEvent = sync.state.value.events
-                .filterIsInstance<TimelineEvent.Confirmed>()
-                .single { it.messageType == TimelineMessageType.TOOL_CALL }
-            assertEquals("early output", toolCallEvent.toolReturnContent)
-            assertEquals("early output", toolCallEvent.toolReturnContentByCallId[toolCallId])
-            assertTrue(toolCallEvent.approvalDecided)
-        } finally {
-            job.cancel()
-        }
+        val toolCallEvent = sync.state.value.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.messageType == TimelineMessageType.TOOL_CALL }
+        assertEquals("early output", toolCallEvent.toolReturnContent)
+        assertEquals("early output", toolCallEvent.toolReturnContentByCallId[toolCallId])
+        assertTrue(toolCallEvent.approvalDecided)
     }
 
     @Test
@@ -1521,9 +1493,9 @@ class TimelineSyncLoopTest {
         val loop = TimelineSyncLoop(
             conversationId = "conv-x",
             messageApi = MessageApiTimelineTransport(api),
-            scope = CoroutineScope(Dispatchers.Unconfined + job),
-        )
-        try {
+            scope = CoroutineScope(Dispatchers.Unconfined + job).also { scopes.add(it) },
+        ).also { loops.add(it) }
+
         loop.hydrate(limit = 50)
 
         val approvalBase = com.letta.mobile.data.model.ApprovalRequestMessage(
@@ -1566,9 +1538,6 @@ class TimelineSyncLoopTest {
         val firstCall = final.toolCalls.firstOrNull()
         assertNotNull(firstCall)
         assertEquals("{\"command\":\"echo ok\"}", firstCall!!.arguments)
-        } finally {
-            job.cancel()
-        }
     }
 
     /**
@@ -1600,10 +1569,10 @@ class TimelineSyncLoopTest {
 
         val api = ExpiredThenIdleApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
 
         // Instantiating TimelineSyncLoop starts the subscriber coroutine in init{}.
-        TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-gqz3", scope)
+        TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-gqz3", scope).also { loops.add(it) }
 
         // Let the subscriber attempt one stream call.
         advanceUntilIdle()
@@ -1633,8 +1602,6 @@ class TimelineSyncLoopTest {
             null,
             errorForGqz3,
         )
-
-scope.coroutineContext.job.cancel()
     }
 
     /**
@@ -1662,9 +1629,9 @@ scope.coroutineContext.job.cancel()
 
         val api = AlwaysIdleApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
 
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-qv6d", scope)
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-qv6d", scope).also { loops.add(it) }
 
         // Drive the subscriber through ≥6 idle iterations on virtual time.
         // Backoff doubles 1_000 → 2_000 → 4_000 → 8_000 → 16_000 → 32_000.
@@ -1700,8 +1667,6 @@ scope.coroutineContext.job.cancel()
                 "letta-mobile-qv6d regression — idle ladder must now reach the higher cap.",
             latest > 5_000L,
         )
-
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1710,14 +1675,14 @@ scope.coroutineContext.job.cancel()
 
         val api = SilentAfterHeartbeatApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
 
         TimelineSyncLoop(
             MessageApiTimelineTransport(api),
             "conv-watchdog",
             scope,
             streamSilenceTimeoutMs = 1_000L,
-        )
+        ).also { loops.add(it) }
 
         testScheduler.advanceTimeBy(6_000)
         testScheduler.runCurrent()
@@ -1745,8 +1710,6 @@ scope.coroutineContext.job.cancel()
                     (it.attrs["reason"] as? String) == "silenceTimeout"
             },
         )
-
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -1754,7 +1717,7 @@ scope.coroutineContext.job.cancel()
         com.letta.mobile.util.Telemetry.clear()
         val api = OneShotAssistantStreamApi()
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val scope = CoroutineScope(dispatcher)
+        val scope = CoroutineScope(dispatcher).also { scopes.add(it) }
         var listener: IngestedMessageListener? = null
         val received = mutableListOf<String>()
 
@@ -1763,7 +1726,7 @@ scope.coroutineContext.job.cancel()
             conversationId = "conv-dynamic-listener",
             scope = scope,
             ingestedListenerProvider = { listener },
-        )
+        ).also { loops.add(it) }
 
         listener = object : IngestedMessageListener {
             override suspend fun onMessageIngested(
@@ -1797,7 +1760,6 @@ scope.coroutineContext.job.cancel()
         assertEquals(true, dispatchEvent.attrs["hasListener"])
         assertEquals(19, dispatchEvent.attrs["previewLength"])
         assertFalse("listener dispatch telemetry must not include raw preview", dispatchEvent.attrs.containsKey("contentPreview"))
-        scope.coroutineContext.job.cancel()
     }
 }
 
@@ -2080,6 +2042,18 @@ private val kotlinx.serialization.json.JsonPrimitive.contentOrNull: String?
  */
 class TimelineSyncLoopImageRestoreTest {
 
+
+    private val loops = mutableListOf<TimelineSyncLoop>()
+    private val scopes = mutableListOf<CoroutineScope>()
+
+    @After
+    fun tearDown() {
+        loops.forEach { it.close() }
+        loops.clear()
+        scopes.forEach { it.cancel() }
+        scopes.clear()
+    }
+
     private class FakeStore : PendingLocalStore {
         val rows = mutableMapOf<String, PendingLocalRecord>()
         override suspend fun save(record: PendingLocalRecord) { rows[record.otid] = record }
@@ -2092,8 +2066,8 @@ class TimelineSyncLoopImageRestoreTest {
     fun `send with attachments writes to disk store synchronously`() = runBlocking {
         val api = FakeSyncApi()
         val store = FakeStore()
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-img", scope, pendingLocalStore = store)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-img", scope, pendingLocalStore = store).also { loops.add(it) }
 
         val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/png")
         val otid = sync.send(content = "look at this", attachments = listOf(image))
@@ -2105,7 +2079,6 @@ class TimelineSyncLoopImageRestoreTest {
         assertEquals("look at this", saved.content)
         assertEquals(1, saved.attachments.size)
         assertEquals("AAAA", saved.attachments.first().base64)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -2124,8 +2097,8 @@ class TimelineSyncLoopImageRestoreTest {
             sentAt = java.time.Instant.parse("2026-04-19T13:00:00Z"),
         )
 
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-restore", scope, pendingLocalStore = store)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-restore", scope, pendingLocalStore = store).also { loops.add(it) }
         sync.hydrate()
 
         val restored = sync.state.value.events.filterIsInstance<TimelineEvent.Local>()
@@ -2134,7 +2107,6 @@ class TimelineSyncLoopImageRestoreTest {
         assertEquals("from a previous session", restored!!.content)
         assertEquals(1, restored.attachments.size)
         assertEquals(DeliveryState.SENT, restored.deliveryState)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
@@ -2152,25 +2124,23 @@ class TimelineSyncLoopImageRestoreTest {
             attachments = persistentListOf(),
             sentAt = java.time.Instant.parse("2026-04-19T13:00:00Z"),
         )
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-dedup", scope, pendingLocalStore = store)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-dedup", scope, pendingLocalStore = store).also { loops.add(it) }
         sync.hydrate()
 
         val withOtid = sync.state.value.events.filter { it.otid == "otid-dup" }
         assertEquals("Expected exactly one event for otid-dup, not a duplicate", 1, withOtid.size)
         assertTrue("Server-confirmed event should win over disk Local", withOtid.first() is TimelineEvent.Confirmed)
-        scope.coroutineContext.job.cancel()
     }
 
     @Test
     fun `text-only send does not write to store`() = runBlocking {
         val api = FakeSyncApi()
         val store = FakeStore()
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-text", scope, pendingLocalStore = store)
+        val scope = CoroutineScope(Dispatchers.Unconfined).also { scopes.add(it) }
+        val sync = TimelineSyncLoop(MessageApiTimelineTransport(api), "conv-text", scope, pendingLocalStore = store).also { loops.add(it) }
 
         sync.send(content = "just words")
-        scope.coroutineContext.job.cancel()
 
         assertEquals("Text-only sends must not be persisted", 0, store.rows.size)
     }
