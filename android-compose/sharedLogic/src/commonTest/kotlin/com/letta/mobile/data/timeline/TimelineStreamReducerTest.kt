@@ -1747,6 +1747,39 @@ class TimelineStreamReducerTest {
         assertEquals("Hey there, how are you?", rows[1].content)
     }
 
+    @Test
+    fun `delayed reconcile final can collapse older streamed row behind newer turn h30cy`() {
+        var tl = reduce(frame = AssistantMessage(
+            id = "cm-stream-provider-assistant-old",
+            contentRaw = JsonPrimitive(", got it — so the original theory still holds. Clean on restart dupes only in streaming path The persistence layer is fine"),
+            runId = "local-run-103",
+            otid = "provider-assistant-old",
+            seqId = 1,
+        )).next
+        tl = reduce(prev = tl, frame = AssistantMessage(
+            id = "cm-stream-provider-assistant-new",
+            contentRaw = JsonPrimitive("Newer turn has already started"),
+            runId = "local-run-104",
+            otid = "provider-assistant-new",
+            seqId = 1,
+        )).next
+
+        val (after, _) = tl.mergeServerMessages(listOf(
+            AssistantMessage(
+                id = "ui-msg-9006716",
+                contentRaw = JsonPrimitive("Ah, got it — so the original theory still holds. Clean on restart dupes only in streaming path. The persistence layer is fine."),
+                runId = null,
+                otid = "ui-msg-9006716",
+                seqId = null,
+            )
+        ))
+
+        val rows = after.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+        assertEquals(2, rows.size, "rows: " + rows.joinToString("|") { it.content })
+        assertEquals("Ah, got it — so the original theory still holds. Clean on restart dupes only in streaming path. The persistence layer is fine.", rows[0].content)
+        assertEquals("Newer turn has already started", rows[1].content)
+    }
 
     private fun reduce(
         prev: Timeline = timeline(),
