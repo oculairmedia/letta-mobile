@@ -55,6 +55,14 @@ class IrohNodeEndpoint(
     private var _adminRpcRouter: AdminRpcRouter? = null
 
     /**
+     * eaczz.1: ONE registry shared across every connection this endpoint
+     * accepts. Maps conversationId -> the set of live viewer handles, enabling
+     * a turn on one connection to fan its frames out to all connections viewing
+     * the same conversation.
+     */
+    private val connectionRegistry = ConnectionRegistry()
+
+    /**
      * The admin RPC router for this endpoint. Created lazily so handlers can
      * register before [start] is called. Passed to every incoming connection.
      */
@@ -226,6 +234,7 @@ class IrohNodeEndpoint(
                                     requiredBearerToken = requiredBearerToken,
                                     allowedPeerIds = allowedPeerIds,
                                     remoteEndpointId = remoteId,
+                                    connectionRegistry = connectionRegistry,
                                 ).serve()
                             }
                         } catch (e: kotlinx.coroutines.CancellationException) {

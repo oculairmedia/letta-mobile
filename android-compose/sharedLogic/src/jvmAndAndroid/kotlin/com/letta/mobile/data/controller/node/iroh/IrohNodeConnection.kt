@@ -68,6 +68,10 @@ class IrohNodeConnection(
     private val requiredBearerToken: String? = null,
     private val allowedPeerIds: Set<String> = emptySet(),
     private val remoteEndpointId: String = "",
+    // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
+    // so a turn on one connection fans out to every connection viewing the same
+    // conversation. Null in legacy/test constructions that don't use fanout.
+    private val connectionRegistry: ConnectionRegistry? = null,
     /**
      * Server-process-scoped duplicate-suppression for client message ids. Shared
      * across connections so a redial re-delivery of the same turn does not
@@ -138,6 +142,9 @@ class IrohNodeConnection(
                 "class" to e::class.simpleName,
             )
         } finally {
+            // eaczz.1: drop every viewer entry this connection registered so a
+            // disconnected client stops receiving fanned-out frames.
+            runCatching { connectionRegistry?.unregisterAll(remoteEndpointId) }
             Telemetry.event(
                 "IrohNode", "connection.closed",
                 "remoteEndpointId" to remoteEndpointId,
