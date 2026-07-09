@@ -626,6 +626,13 @@ class IrohNodeConnection(
                 // per-observer.
                 activeTurnTracking.get()?.tracker?.track(deltaJson)
             },
+            // eaczz.6 fault isolation: drop a wedged/failed OBSERVER from the SAME
+            // registry the fanout reads from, so the broadcaster stops writing to
+            // a dead peer on later deltas. The initiator is never de-registered
+            // here (it follows the parking path).
+            unregisterViewer = { conv, viewer ->
+                connectionRegistry?.unregister(conv, viewer)
+            },
         )
         try {
             // eaczz.5: live user-echo fanout. Before the assistant stream, emit a

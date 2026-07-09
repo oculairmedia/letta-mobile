@@ -6,6 +6,10 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -40,6 +44,21 @@ import kotlinx.serialization.json.put
  * failing observer is never parked. Observers reconcile via message.list on
  * reconnect (eaczz.6), so they get no parking here.
  *
+ * eaczz.6 — OBSERVER LIFECYCLE / CONVERGENCE:
+ *  - JOIN MID-TURN: an observer that subscribes (via its own message.list
+ *    hydrate) AFTER the turn started may miss the earliest deltas, but it always
+ *    reconciles-to-final. Because [snapshotViewers] re-reads the registry on
+ *    EVERY delta, a mid-turn joiner immediately starts receiving the remaining
+ *    live deltas; assistant frames are CUMULATIVE snapshots (each delta carries
+ *    the full text so far), so the next delta self-heals any gap, and the
+ *    terminal + the joiner's own message.list hydrate close the rest. It never
+ *    gets initiator parking (parking is initiator-only).
+ *  - DISCONNECT MID-TURN: the connection's disconnect path unregisters it
+ *    (eaczz.1 unregisterAll); the next [snapshotViewers] no longer contains it,
+ *    so the broadcaster stops writing to it — the initiator is unaffected.
+ *  - RECONNECT: on redial the observer re-subscribes (message.list) and
+ *    reconciles to the same final timeline; it gets NO parking replay.
+ *
  * When no registry is present (legacy/test constructions) the fanout still
  * writes to the single [initiatorViewer], so the pre-fanout single-connection
  * behavior is preserved byte-for-shape.
@@ -62,6 +81,22 @@ internal class ConversationTurnFanout(
      * scoped — q71yi). No-op when the turn is not parkable (no client_message_id).
      */
     private val trackInitiatorFrame: (deltaJson: String) -> Unit = {},
+    /**
+     * eaczz.6 fault isolation: de-register a failed/wedged OBSERVER viewer from
+     * the SAME registry the fanout reads from ([viewersFor]) so the broadcaster
+     * stops writing to a dead peer on subsequent deltas. Never invoked for the
+     * initiator (which follows the parking path, not de-registration). No-op when
+     * there is no registry (legacy/test construction).
+     */
+    private val unregisterViewer: suspend (conversationId: String, viewer: ViewerHandle) -> Unit = { _, _ -> },
+    /**
+     * eaczz.6 non-blocking fanout: bounded per-OBSERVER write timeout. A wedged
+     * QUIC observer stream that does not complete a write within this window is
+     * treated as failed, de-registered, and skipped on later deltas — so one dead
+     * peer cannot serially stall the fanout. The INITIATOR viewer is NEVER subject
+     * to this timeout (it must receive every frame). Injectable for tests.
+     */
+    private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
 ) {
     private val openToolCalls = OpenToolCallTracker()
     private val cumulativeText = CumulativeStreamText()
@@ -268,13 +303,81 @@ internal class ConversationTurnFanout(
      * Publish ONE delta body to every viewer WITHOUT recording an initiator
      * parking entry. Used by the user-echo path, which is derived
      * deterministically from the (redial-resent) input rather than from live
-     * turn frames — so it must not consume a parking slot. Best-effort per
-     * viewer; a failing observer never breaks the loop or the turn.
+     * turn frames — so it must not consume a parking slot.
+     *
+     * eaczz.6 — NON-BLOCKING FANOUT + FAULT ISOLATION. Every viewer is written
+     * CONCURRENTLY inside a [supervisorScope]: a per-viewer failure (thrown
+     * exception, false-return, or observer timeout) can NEVER cancel a sibling
+     * write or propagate to the caller's collect loop / controller.runTurn — the
+     * initiator turn always completes.
+     *
+     * Concurrency (not per-viewer serial) is the chosen non-blocking strategy:
+     * a wedged QUIC observer stream cannot serially-block the others because
+     * writes proceed in parallel. It is ALSO bounded by [observerWriteTimeoutMs]
+     * for OBSERVERS only — a dead peer that never completes a write is timed out,
+     * de-registered on the FIRST stall, and skipped on every subsequent delta, so
+     * the total delay it can add to the turn is at most one timeout window (a
+     * bound), not one-per-delta. Tradeoff vs. a pure fire-and-forget scheme: we
+     * join each delta before the next so per-viewer frame ORDERING + event_seq
+     * monotonicity are preserved (a viewer's mutex still serializes its writes),
+     * at the cost of that single bounded wait; ordering correctness is worth it.
+     *
+     * The INITIATOR viewer is written with NO timeout and its failure is NOT
+     * de-registered here — it must receive EVERY frame, and its stream death is
+     * handled by the existing parking path in [IrohNodeConnection]. Timeout +
+     * drop is observer-only.
      */
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
-        viewers.forEach { viewer ->
-            runCatching { writeToViewer(viewer, delta) }
+        if (viewers.isEmpty()) return
+        supervisorScope {
+            viewers.map { viewer ->
+                async {
+                    val isInitiator = viewer === initiatorViewer ||
+                        (initiatorViewer != null && viewer.connectionId == initiatorViewer.connectionId)
+                    writeToViewerIsolated(viewer, delta, isInitiator)
+                }
+            }.awaitAll()
+        }
+    }
+
+    /**
+     * Write [delta] to one viewer with full fault isolation. Returns Unit; all
+     * failure is absorbed. For OBSERVERS, a write that fails, returns false, or
+     * exceeds [observerWriteTimeoutMs] causes de-registration via
+     * [unregisterViewer] (through the same registry the fanout reads from) so the
+     * broadcaster stops writing to it on later deltas. For the INITIATOR, no
+     * timeout is applied and no de-registration occurs.
+     */
+    private suspend fun writeToViewerIsolated(
+        viewer: ViewerHandle,
+        delta: JsonObject,
+        isInitiator: Boolean,
+    ) {
+        val ok: Boolean? = try {
+            if (isInitiator) {
+                writeToViewer(viewer, delta)
+            } else {
+                // Observer: bounded so a wedged stream cannot stall the fanout.
+                withTimeoutOrNull(observerWriteTimeoutMs) { writeToViewer(viewer, delta) }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+        if (isInitiator) return
+        // Observer: null = timed out, false = write failed. Either way drop it.
+        if (ok != true) {
+            Telemetry.event(
+                "IrohNode", "fanout.observer_dropped",
+                "remoteEndpointId" to remoteEndpointId,
+                "connectionId" to viewer.connectionId,
+                "conversationId" to conversationId,
+                "reason" to if (ok == null) "write_timeout" else "write_failed",
+                level = Telemetry.Level.WARN,
+            )
+            runCatching { unregisterViewer(conversationId, viewer) }
         }
     }
 
@@ -286,8 +389,8 @@ internal class ConversationTurnFanout(
         return initiatorViewer?.let { setOf(it) } ?: emptySet()
     }
 
-    private suspend fun writeToViewer(viewer: ViewerHandle, delta: JsonObject) {
-        if (viewer is IrohViewerHandle) {
+    private suspend fun writeToViewer(viewer: ViewerHandle, delta: JsonObject): Boolean {
+        return if (viewer is IrohViewerHandle) {
             viewer.writeBroadcastFrame(runtime, delta)
         } else {
             // Non-Iroh viewer (test fakes): re-wrap minimally and hand it a frame.
@@ -319,5 +422,11 @@ internal class ConversationTurnFanout(
         // row (distinct serverId + message_type), so the reducer never conflates
         // the two.
         const val USER_ECHO_SEQ_ID = 0
+
+        // eaczz.6: bound one OBSERVER write so a wedged QUIC stream cannot stall
+        // the fanout. Generous enough for a healthy remote peer's writeAll to
+        // complete; a peer that exceeds it is treated as dead and de-registered.
+        // The INITIATOR is never subject to this — it must get every frame.
+        const val OBSERVER_WRITE_TIMEOUT_MS = 5_000L
     }
 }
