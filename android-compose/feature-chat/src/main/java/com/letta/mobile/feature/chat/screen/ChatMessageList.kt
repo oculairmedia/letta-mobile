@@ -467,15 +467,15 @@ internal fun ChatMessageList(
 
     val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
 
-    val isNearBottom by remember {
+    val isNearBottom by remember(renderItems.size) {
         derivedStateOf {
-            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot(isUserScrolling))
+            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot(isUserScrolling, renderItems.size))
         }
     }
 
-    val showScrollFab by remember {
+    val showScrollFab by remember(renderItems.size) {
         derivedStateOf {
-            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling))
+            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling, renderItems.size))
         }
     }
 
@@ -560,8 +560,8 @@ internal fun ChatMessageList(
         }
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling) }
+    LaunchedEffect(listState, renderItems.size) {
+        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling, renderItems.size) }
             .distinctUntilChanged()
             .collect { snapshot ->
                 followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
@@ -1421,13 +1421,15 @@ private fun DebugMessageCard(
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): ChatViewportSnapshot {
-    val totalItems = layoutInfo.totalItemsCount
-    val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()?.index
-    val lastVisibleIndexMapped = if (firstVisible != null) totalItems - 1 - firstVisible else null
+private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(
+    isUserScrolling: Boolean,
+    itemCount: Int
+): ChatViewportSnapshot {
+    // letta-mobile-perf: derive metrics from firstVisibleItemIndex without reading layoutInfo
+    // to avoid triggering continuous recompositions on every scroll frame inside derivedStateOf.
     return ChatViewportSnapshot(
-        totalItems = totalItems,
-        lastVisibleIndex = lastVisibleIndexMapped,
+        totalItems = itemCount,
+        lastVisibleIndex = (itemCount - 1 - firstVisibleItemIndex).takeIf { itemCount > 0 },
         isUserScrolling = isUserScrolling,
     )
 }
