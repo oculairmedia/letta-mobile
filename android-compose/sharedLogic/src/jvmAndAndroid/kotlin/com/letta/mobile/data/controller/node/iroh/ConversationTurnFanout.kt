@@ -329,6 +329,17 @@ internal class ConversationTurnFanout(
      */
     private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
+        // eaczz observability: the fanout write path emits no stream.write
+        // telemetry, so multi-client delivery was invisible in the wrapper log.
+        // Log the viewer count + ids per broadcast so a turn reaching every
+        // viewer is greppable (fanout.broadcast).
+        Telemetry.event(
+            "IrohNode", "fanout.broadcast",
+            "conversationId" to conversationId,
+            "viewerCount" to viewers.size,
+            "viewerIds" to viewers.joinToString(",") { it.connectionId.take(12) },
+            "initiatorId" to (initiatorViewer?.connectionId?.take(12) ?: "none"),
+        )
         if (viewers.isEmpty()) return
         supervisorScope {
             viewers.map { viewer ->
