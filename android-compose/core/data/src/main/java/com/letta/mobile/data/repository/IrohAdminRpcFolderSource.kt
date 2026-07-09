@@ -28,11 +28,17 @@ class IrohAdminRpcFolderSource(
     fun shouldUseIroh(): Boolean =
         IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
-    suspend fun listFolders(agentId: String): List<Folder> {
-        val params = buildJsonObject { put("agent_id", agentId) }
+    suspend fun listFolders(name: String? = null): List<Folder> {
+        val params = buildJsonObject {
+            name?.let { put("name", it) }
+        }
+        val path = buildString {
+            append("/v1/folders")
+            name?.let { append("?name=$it") }
+        }
         val response = channelTransport.adminRpc(
             method = "folder.list",
-            path = "/v1/agents/$agentId/folders",
+            path = path,
             body = params.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc folder.list failed")

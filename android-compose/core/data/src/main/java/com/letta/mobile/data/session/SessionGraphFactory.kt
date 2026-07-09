@@ -279,8 +279,24 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            folderRepository = FolderRepository(folderApi),
-            groupRepository = GroupRepository(groupApi),
+            folderRepository = FolderRepository(
+                folderApi = folderApi,
+                irohFolderSource = settingsRepository?.let { settings ->
+                    com.letta.mobile.data.repository.IrohAdminRpcFolderSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            groupRepository = GroupRepository(
+                groupApi = groupApi,
+                irohGroupSource = settingsRepository?.let { settings ->
+                    com.letta.mobile.data.repository.IrohAdminRpcGroupSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             identityRepository = IdentityRepository(
                 identityApi = identityApi,
                 irohIdentitySource = settingsRepository?.let { settings ->

@@ -17,11 +17,17 @@ import kotlinx.coroutines.flow.update
 
 class FolderRepository(
     private val folderApi: FolderApi,
+    private val irohFolderSource: IrohAdminRpcFolderSource? = null,
 ) : IFolderRepository {
     private val _folders = MutableStateFlow<List<Folder>>(emptyList())
     override val folders: StateFlow<List<Folder>> = _folders.asStateFlow()
 
     override suspend fun refreshFolders(name: String?) {
+        val irohSource = irohFolderSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _folders.value = irohSource.listFolders(name)
+            return
+        }
         _folders.value = folderApi.listFolders(limit = 1000, name = name)
     }
 
