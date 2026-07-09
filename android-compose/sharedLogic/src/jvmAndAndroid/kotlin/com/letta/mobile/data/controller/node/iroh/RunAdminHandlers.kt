@@ -11,8 +11,8 @@ object RunAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
         val api = Api(AdminProxyClient(adminBaseUrl))
         router.register("run.list") { api.get("runs") }
-        router.register("run.get") { p -> id(p, "run_id")?.let { api.get("runs", it) } ?: adminError("run_id required") }
-        router.register("step.list") { p -> id(p, "run_id")?.let { api.get("runs", it, "steps") } ?: adminError("run_id required") }
+        router.register("run.get") { p -> id(p, "run_id")?.let { api.get("runs", it) } ?: jsonError("run_id required") }
+        router.register("step.list") { p -> id(p, "run_id")?.let { api.get("runs", it, "steps") } ?: jsonError("run_id required") }
     }
 
     private class Api(private val proxy: AdminProxyClient) {
@@ -20,5 +20,5 @@ object RunAdminHandlers {
     }
 
     private fun id(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-
+    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }

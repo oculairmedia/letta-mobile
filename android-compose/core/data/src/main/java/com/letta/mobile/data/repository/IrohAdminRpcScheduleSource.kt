@@ -21,7 +21,7 @@ class IrohAdminRpcScheduleSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listSchedules(): List<ScheduledMessage> {
         val response = channelTransport.adminRpc(

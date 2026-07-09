@@ -228,22 +228,6 @@ class SessionGraphFactory internal constructor(
                 ChannelTransport(scope, runCursorStore, conversationCursorStore)
             }
         }
-        return createSessionGraph(
-            graphId = graphId,
-            activeConfig = activeConfig,
-            localRuntimeBackend = localRuntimeBackend,
-            scope = scope,
-            channelTransport = channelTransport
-        )
-    }
-
-    private fun createSessionGraph(
-        graphId: Long,
-        activeConfig: LettaConfig?,
-        localRuntimeBackend: LocalLettaBackend?,
-        scope: CoroutineScope,
-        channelTransport: com.letta.mobile.data.transport.api.IChannelTransport
-    ): SessionGraph {
         val agentRepository = AgentRepository(
             agentApi = agentApi,
             agentDao = agentDao,
@@ -295,24 +279,8 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            folderRepository = FolderRepository(
-                folderApi = folderApi,
-                irohFolderSource = settingsRepository?.let { settings ->
-                    com.letta.mobile.data.repository.IrohAdminRpcFolderSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            groupRepository = GroupRepository(
-                groupApi = groupApi,
-                irohGroupSource = settingsRepository?.let { settings ->
-                    com.letta.mobile.data.repository.IrohAdminRpcGroupSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
+            folderRepository = FolderRepository(folderApi),
+            groupRepository = GroupRepository(groupApi),
             identityRepository = IdentityRepository(
                 identityApi = identityApi,
                 irohIdentitySource = settingsRepository?.let { settings ->

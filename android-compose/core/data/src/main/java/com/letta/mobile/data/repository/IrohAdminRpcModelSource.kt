@@ -30,7 +30,7 @@ class IrohAdminRpcModelSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listLlmModels(): List<LlmModel> {
         val response = channelTransport.adminRpc(

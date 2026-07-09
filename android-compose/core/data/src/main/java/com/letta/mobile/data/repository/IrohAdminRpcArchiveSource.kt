@@ -18,7 +18,7 @@ class IrohAdminRpcArchiveSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listArchives(): List<Archive> {
         val response = channelTransport.adminRpc(

@@ -18,7 +18,7 @@ class IrohAdminRpcConversationListSource(
     private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listConversations(
         agentId: AgentId?,

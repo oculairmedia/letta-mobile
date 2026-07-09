@@ -26,7 +26,7 @@ class IrohAdminRpcIdentitySource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listIdentities(): List<Identity> {
         val response = channelTransport.adminRpc(

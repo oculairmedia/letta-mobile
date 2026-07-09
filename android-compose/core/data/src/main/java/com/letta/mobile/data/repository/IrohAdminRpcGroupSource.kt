@@ -6,8 +6,6 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Group reads over the Iroh admin RPC control channel.
@@ -26,33 +24,13 @@ class IrohAdminRpcGroupSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
-    suspend fun listGroups(
-        managerType: String? = null,
-        projectId: String? = null,
-        showHiddenGroups: Boolean? = null,
-    ): List<Group> {
-        val params = buildJsonObject {
-            managerType?.let { put("manager_type", it) }
-            projectId?.let { put("project_id", it) }
-            showHiddenGroups?.let { put("show_hidden_groups", it) }
-        }
-        val path = buildString {
-            append("/v1/groups")
-            val queryParts = listOfNotNull(
-                managerType?.let { "manager_type=$it" },
-                projectId?.let { "project_id=$it" },
-                showHiddenGroups?.let { "show_hidden_groups=$it" },
-            )
-            if (queryParts.isNotEmpty()) {
-                append(queryParts.joinToString("&", prefix = "?"))
-            }
-        }
+    suspend fun listGroups(): List<Group> {
         val response = channelTransport.adminRpc(
             method = "group.list",
-            path = path,
-            body = params.toString(),
+            path = "/v1/groups",
+            body = "{}",
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc group.list failed")
         val result = response.result ?: return emptyList()

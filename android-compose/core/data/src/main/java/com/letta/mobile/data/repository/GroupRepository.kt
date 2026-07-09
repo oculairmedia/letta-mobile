@@ -19,17 +19,11 @@ import kotlinx.serialization.json.JsonElement
 
 class GroupRepository(
     private val groupApi: GroupApi,
-    private val irohGroupSource: IrohAdminRpcGroupSource? = null,
 ) : IGroupRepository {
     private val _groups = MutableStateFlow<List<Group>>(emptyList())
     override val groups: StateFlow<List<Group>> = _groups.asStateFlow()
 
     override suspend fun refreshGroups(managerType: String?, projectId: ProjectId?, showHiddenGroups: Boolean?) {
-        val irohSource = irohGroupSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            _groups.value = irohSource.listGroups(managerType, projectId?.value, showHiddenGroups)
-            return
-        }
         _groups.value = groupApi.listGroups(limit = 1000, managerType = managerType, projectId = projectId?.value, showHiddenGroups = showHiddenGroups)
     }
 

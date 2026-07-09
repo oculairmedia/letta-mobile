@@ -38,17 +38,17 @@ object ConversationAdminHandlers {
         }
 
         fun get(params: JsonObject?): JsonElement {
-            val id = param(params, "conversation_id") ?: return adminError("conversation_id required")
+            val id = param(params, "conversation_id") ?: return jsonError("conversation_id required")
             return proxy.get(adminProxyRequest("v1", "conversations", id).build())
         }
 
         fun create(params: JsonObject?): JsonElement {
-            val agentId = param(params, "agent_id") ?: return adminError("agent_id required")
+            val agentId = param(params, "agent_id") ?: return jsonError("agent_id required")
             return proxy.post(adminProxyRequest("v1", "agents", agentId, "conversations").build(), params.toString())
         }
 
         fun delete(params: JsonObject?): JsonElement {
-            val id = param(params, "conversation_id") ?: return adminError("conversation_id required")
+            val id = param(params, "conversation_id") ?: return jsonError("conversation_id required")
             return proxy.delete(adminProxyRequest("v1", "conversations", id).build())
         }
 
@@ -59,17 +59,17 @@ object ConversationAdminHandlers {
         // Conversation, which IrohAdminRpcConversationListSource decodes. Hitting a
         // phantom /archive sub-route would 404 and break iroh-mode archive/restore.
         fun archive(params: JsonObject?): JsonElement {
-            val id = param(params, "conversation_id") ?: return adminError("conversation_id required")
+            val id = param(params, "conversation_id") ?: return jsonError("conversation_id required")
             return proxy.patch(adminProxyRequest("v1", "conversations", id).build(), """{"archived":true}""")
         }
 
         fun restore(params: JsonObject?): JsonElement {
-            val id = param(params, "conversation_id") ?: return adminError("conversation_id required")
+            val id = param(params, "conversation_id") ?: return jsonError("conversation_id required")
             return proxy.patch(adminProxyRequest("v1", "conversations", id).build(), """{"archived":false}""")
         }
 
         fun messageList(params: JsonObject?): JsonElement {
-            val convId = param(params, "conversation_id") ?: return adminError("conversation_id required")
+            val convId = param(params, "conversation_id") ?: return jsonError("conversation_id required")
             val response = proxy.get(
                 adminProxyRequest("v1", "conversations", convId, "messages")
                     .query("limit", param(params, "limit"))
@@ -91,8 +91,8 @@ object ConversationAdminHandlers {
         }
 
         fun messageGet(params: JsonObject?): JsonElement {
-            val convId = param(params, "conversation_id") ?: return adminError("conversation_id required")
-            val msgId = param(params, "message_id") ?: return adminError("message_id required")
+            val convId = param(params, "conversation_id") ?: return jsonError("conversation_id required")
+            val msgId = param(params, "message_id") ?: return jsonError("message_id required")
             return proxy.get(adminProxyRequest("v1", "conversations", convId, "messages", msgId).build())
         }
 
@@ -101,8 +101,8 @@ object ConversationAdminHandlers {
          * tool-return message. Returns the complete, unprojected message.
          */
         fun toolReturnGet(params: JsonObject?): JsonElement {
-            val convId = param(params, "conversation_id") ?: return adminError("conversation_id required")
-            val msgId = param(params, "message_id") ?: return adminError("message_id required")
+            val convId = param(params, "conversation_id") ?: return jsonError("conversation_id required")
+            val msgId = param(params, "message_id") ?: return jsonError("message_id required")
             return proxy.get(adminProxyRequest("v1", "conversations", convId, "messages", msgId).build())
         }
     }
@@ -118,5 +118,5 @@ object ConversationAdminHandlers {
      * handler files still carry private `{_error}` helpers — tracked by bead
      * letta-mobile-8vplf.
      */
-
+    private fun jsonError(message: String): Nothing = throw IllegalArgumentException(message)
 }

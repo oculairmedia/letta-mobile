@@ -29,7 +29,7 @@ class IrohAdminRpcToolSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listTools(): List<Tool> {
         val response = channelTransport.adminRpc(

@@ -26,7 +26,7 @@ class IrohAdminRpcJobSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     suspend fun listJobs(): List<Job> {
         val response = channelTransport.adminRpc(

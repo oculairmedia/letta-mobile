@@ -33,20 +33,20 @@ object AgentAdminHandlers {
                 .build()
         )
         fun get(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return adminError("agent_id required")
+            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
             return proxy.get(adminProxyRequest("v1", "agents", id).build())
         }
         fun create(params: JsonObject?): JsonElement = proxy.post(adminProxyRequest("v1", "agents").build(), params?.toString() ?: "{}")
         fun update(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return adminError("agent_id required")
+            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
             return proxy.patch(adminProxyRequest("v1", "agents", id).build(), params.toString())
         }
         fun delete(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return adminError("agent_id required")
+            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
             return proxy.delete(adminProxyRequest("v1", "agents", id).build())
         }
         fun context(params: JsonObject?): JsonElement {
-            val id = param(params, "agent_id") ?: return adminError("agent_id required")
+            val id = param(params, "agent_id") ?: return jsonError("agent_id required")
             return proxy.get(
                 adminProxyRequest("v1", "agents", id, "context")
                     .query("conversation_id", param(params, "conversation_id"))
@@ -56,5 +56,5 @@ object AgentAdminHandlers {
     }
 
     private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-
+    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }

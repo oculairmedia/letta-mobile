@@ -42,7 +42,7 @@ class IrohAdminRpcAgentSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        settingsRepository.activeBackendIsIroh()
+        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     /**
      * Update an agent over admin_rpc (server AgentAdminHandlers `agent.update`

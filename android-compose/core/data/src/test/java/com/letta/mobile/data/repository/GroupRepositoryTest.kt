@@ -4,15 +4,9 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupId
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.GroupUpdateParams
-import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.testutil.FakeGroupApi
-import com.letta.mobile.testutil.FakeChannelTransport
-import com.letta.mobile.testutil.FakeSettingsRepository
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -32,55 +26,6 @@ class GroupRepositoryTest {
     fun setup() {
         fakeApi = FakeGroupApi()
         repository = GroupRepository(fakeApi)
-    }
-
-    // ─── Iroh Purity Tests ────────────────────────
-
-    @Test(expected = IrohAdminApiUnavailableException::class)
-    fun `refreshGroups in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
-            )
-        )
-        val apiThatThrows = object : FakeGroupApi() {
-            override suspend fun listGroups(managerType: String?, before: String?, after: String?, limit: Int?, order: String?, projectId: String?, showHiddenGroups: Boolean?): List<Group> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
-            }
-        }
-        val repo = GroupRepository(apiThatThrows)
-        repo.refreshGroups()
-    }
-
-    @Test
-    fun `refreshGroups in iroh mode routes via admin_rpc`() = runTest {
-        val settings = FakeSettingsRepository(
-            initialActiveConfig = LettaConfig(
-                id = "test",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "iroh://test-node",
-                accessToken = "token",
-            )
-        )
-        val transport = FakeChannelTransport()
-        transport.adminRpcHandler = { method, path, body ->
-            assertEquals("group.list", method)
-            assertEquals("/v1/groups", path)
-            val json = Json { ignoreUnknownKeys = true }
-            AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = true, result = json.parseToJsonElement("[]"), error = null)
-        }
-        val irohSource = IrohAdminRpcGroupSource(transport, settings)
-        val apiThatThrows = object : FakeGroupApi() {
-            override suspend fun listGroups(managerType: String?, before: String?, after: String?, limit: Int?, order: String?, projectId: String?, showHiddenGroups: Boolean?): List<Group> {
-                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
-            }
-        }
-        val repo = GroupRepository(apiThatThrows, irohSource)
-        repo.refreshGroups()
-        assertEquals(1, transport.adminRpcCalls.size)
     }
 
     @Test
