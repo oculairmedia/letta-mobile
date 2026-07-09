@@ -119,6 +119,21 @@ interface AppServerController {
     ) {
         error("submitApproval is not supported by this controller")
     }
+
+    /**
+     * Evict any cached runtime(s) for [agentId] so the next turn issues a fresh
+     * runtime_start, reseeding the model from the (freshly-updated) agent record.
+     *
+     * letta-mobile-eeu5p: the App Server caches its runtime by
+     * (agentId, conversationId) and reuses it; a model switch persists the new
+     * model to the agent record but the live runtime keeps serving the model it
+     * booted with, so turns silently keep hitting the OLD model until the App
+     * Server is restarted. The agent.update handler calls this after a model
+     * change so the switch actually takes effect on the next turn.
+     */
+    suspend fun stopRuntime(agentId: AgentId) {
+        // Default no-op: controllers without a runtime cache have nothing to evict.
+    }
 }
 
 /**
