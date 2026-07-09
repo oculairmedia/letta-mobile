@@ -194,6 +194,16 @@ sealed interface WsTimelineEvent {
     data class MessageDelta(
         val message: LettaMessage,
         val isReplay: Boolean = false,
+        /**
+         * letta-mobile-r3i1z: the wire frame's own `conversation_id`, when it
+         * carried a non-blank one. Fanned-out observer frames (server-side
+         * Iroh fanout writes every turn frame to every registered viewer) are
+         * routed by THIS id — a passive observer never sees the turn_started
+         * of a turn it didn't initiate early enough to gate on it. Null when
+         * the frame had no conversation id; consumers then fall back to
+         * active-turn scoping.
+         */
+        val conversationId: String? = null,
     ) : WsTimelineEvent
 
     data class StopReason(
@@ -355,13 +365,15 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.ToolCallMessage -> if (isSelfTodoChipFrame()) {
         null
     } else {
-        WsFrameMapper.toLettaMessage(this)?.let { WsTimelineEvent.MessageDelta(it, isReplay = isReplay) }
+        WsFrameMapper.toLettaMessage(this)?.let {
+            WsTimelineEvent.MessageDelta(it, isReplay = isReplay, conversationId = messageFrameConversationId())
+        }
     }
     is ServerFrame.UserMessage,
     is ServerFrame.AssistantMessage,
     is ServerFrame.ReasoningMessage,
     is ServerFrame.ToolReturnMessage -> WsFrameMapper.toLettaMessage(this)?.let {
-        WsTimelineEvent.MessageDelta(it, isReplay = isReplay)
+        WsTimelineEvent.MessageDelta(it, isReplay = isReplay, conversationId = messageFrameConversationId())
     }
     // Welcome carries connection metadata, not chat content; surface via state.
     // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
@@ -397,6 +409,21 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     )
     is ServerFrame.Unknown -> null
 }
+
+/**
+ * letta-mobile-r3i1z: the `conversation_id` the message frame itself carries,
+ * normalized to null when absent or blank (ToolReturnMessage defaults it to
+ * ""). Used to tag [WsTimelineEvent.MessageDelta] so consumers can route
+ * fanned-out observer frames without having witnessed the turn_started.
+ */
+private fun ServerFrame.messageFrameConversationId(): String? = when (this) {
+    is ServerFrame.UserMessage -> conversationId
+    is ServerFrame.AssistantMessage -> conversationId
+    is ServerFrame.ReasoningMessage -> conversationId
+    is ServerFrame.ToolCallMessage -> conversationId
+    is ServerFrame.ToolReturnMessage -> conversationId
+    else -> null
+}?.takeIf { it.isNotBlank() }
 
 /**
  * letta-mobile-y70m0: the self-todo sentinel prefix the shim stamps onto

@@ -134,6 +134,57 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun streamConversationEmitsFannedOutFramesForPassiveObserver() = runTest(UnconfinedTestDispatcher()) {
+        // letta-mobile-r3i1z: a passive observer (conversation open, NO local
+        // send) receives the fanned-out turn frames of another client's turn.
+        // The user_message echo arrives BEFORE turn_started, so routing must
+        // key on the frame's own conversation_id — an active-turn-only gate
+        // dropped it (and, transitively, everything the observer should see).
+        val transport = FakeIrohTransport()
+        val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val received = mutableListOf<TimelineStreamFrame>()
+        val collector = launch {
+            gateway.streamConversation("conv-obs").collect { received += it }
+        }
+        transport.frameEvents.subscriptionCount.first { it > 0 }
+
+        // Fanned-out shape: user echo first, then turn_started, deltas, terminal.
+        transport.emitFrame(userMessage(id = "user-echo-1", conversationId = "conv-obs", content = "hi from the other device"))
+        transport.emitFrame(turnStarted(conversationId = "conv-obs", turnId = "turn-obs"))
+        transport.emitFrame(assistantDelta(id = "cm-stream-obs", content = "observed reply", turnId = "turn-obs", conversationId = "conv-obs"))
+        transport.emitFrame(turnDone(turnId = "turn-obs", status = "completed"))
+        collector.cancel()
+
+        val messageIds = received.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
+        assertEquals(listOf("user-echo-1", "cm-stream-obs"), messageIds)
+    }
+
+    @Test
+    fun streamConversationNeverLeaksConversationTaggedFramesOfOtherConversations() = runTest(UnconfinedTestDispatcher()) {
+        // letta-mobile-r3i1z: the frame's own conversation tag is
+        // authoritative — even while conv-a's turn is active, a fanned-out
+        // frame tagged conv-b must not surface on streamConversation("conv-a").
+        val transport = FakeIrohTransport()
+        val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val received = mutableListOf<TimelineStreamFrame>()
+        val collector = launch {
+            gateway.streamConversation("conv-a").collect { received += it }
+        }
+        transport.frameEvents.subscriptionCount.first { it > 0 }
+
+        transport.emitFrame(turnStarted(conversationId = "conv-a", turnId = "turn-a"))
+        transport.emitFrame(assistantDelta(id = "cm-stream-a", content = "for a", turnId = "turn-a"))
+        // Tagged frames from another viewed conversation arriving mid-turn.
+        transport.emitFrame(userMessage(id = "user-echo-b", conversationId = "conv-b", content = "for b"))
+        transport.emitFrame(assistantDelta(id = "cm-stream-b", content = "for b", turnId = "turn-b", conversationId = "conv-b"))
+        transport.emitFrame(turnDone(turnId = "turn-a", status = "completed"))
+        collector.cancel()
+
+        val messageIds = received.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
+        assertEquals(listOf("cm-stream-a"), messageIds)
+    }
+
+    @Test
     fun listAgentMessagesDegradesToEmptyOverIroh() = runTest(UnconfinedTestDispatcher()) {
         // No agent-scoped message.list handler exists over Iroh — degrade to
         // empty (keeps a default-shim conversation functional) instead of
@@ -162,13 +213,27 @@ class IrohAdminRpcChatGatewayTest {
         runId = "run-$turnId",
     )
 
-    private fun assistantDelta(id: String, content: String, turnId: String) = ServerFrame.AssistantMessage(
+    private fun assistantDelta(
+        id: String,
+        content: String,
+        turnId: String,
+        conversationId: String? = null,
+    ) = ServerFrame.AssistantMessage(
         id = id,
         ts = "2026-07-09T00:00:01Z",
-        conversationId = null,
+        conversationId = conversationId,
         turnId = turnId,
         runId = "run-$turnId",
         content = content,
+    )
+
+    private fun userMessage(id: String, conversationId: String, content: String) = ServerFrame.UserMessage(
+        id = id,
+        ts = "2026-07-09T00:00:00Z",
+        agentId = "agent-1",
+        conversationId = conversationId,
+        content = content,
+        otid = "otid-$id",
     )
 
     private fun turnDone(turnId: String, status: String) = ServerFrame.TurnDone(

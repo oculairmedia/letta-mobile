@@ -207,7 +207,16 @@ class IrohAdminRpcChatGateway(
                                 turnId = event.turnId
                             }
                         is WsTimelineEvent.MessageDelta ->
-                            if (turnId != null) send(event.message)
+                            // r3i1z: with server-side fanout, frames for OTHER
+                            // conversations this client observes can arrive
+                            // mid-turn. A conversation-tagged delta must match
+                            // ours; untagged deltas keep the legacy own-turn
+                            // scoping (single-flight turn engine).
+                            if (turnId != null &&
+                                (event.conversationId == null || event.conversationId == conversationId)
+                            ) {
+                                send(event.message)
+                            }
                         is WsTimelineEvent.TurnDone ->
                             if (turnId != null && event.turnId == turnId) {
                                 if (event.status == "failed") {
@@ -263,18 +272,28 @@ class IrohAdminRpcChatGateway(
 
     override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
         val frames = flow {
-            // Deltas carry no conversation id — route them through the turn
-            // that most recently started, the same turn-scoped resolution
-            // ChatSendCoordinator uses on mobile. Single-flight in the Iroh
-            // turn engine means at most one live turn at a time.
+            // letta-mobile-r3i1z: route each delta by the frame's OWN
+            // conversation_id when it carries one. Server-side fanout writes
+            // every turn frame to every registered viewer, and for a passive
+            // observer the user_message echo lands BEFORE turn_started — an
+            // active-turn gate alone would drop it (and, more generally, made
+            // ingestion depend on this client having initiated the turn).
+            // Frames that genuinely lack a conversation id fall back to the
+            // turn that most recently started (the same turn-scoped
+            // resolution ChatSendCoordinator uses on mobile); when the frame
+            // IS tagged, its tag is authoritative, so another conversation's
+            // fanned-out frames can never leak into this stream.
             var activeTurnConversationId: String? = null
             bridge.events.collect { event ->
                 when (event) {
                     is WsTimelineEvent.TurnStarted -> activeTurnConversationId = event.conversationId
-                    is WsTimelineEvent.MessageDelta ->
-                        if (activeTurnConversationId == conversationId) {
+                    is WsTimelineEvent.MessageDelta -> {
+                        val belongs = event.conversationId?.let { it == conversationId }
+                            ?: (activeTurnConversationId == conversationId)
+                        if (belongs) {
                             emit(TimelineStreamFrame.Message(event.message))
                         }
+                    }
                     else -> Unit
                 }
             }
