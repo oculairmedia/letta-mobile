@@ -628,6 +628,24 @@ class IrohNodeConnection(
             },
         )
         try {
+            // eaczz.5: live user-echo fanout. Before the assistant stream, emit a
+            // snapshot `user_message` delta so OBSERVERS see the sender's prompt
+            // immediately, in order, ahead of the reply (today they only get it on
+            // a later message.list reconcile — so the reply could appear first).
+            // The initiator does NOT double-render: the echo carries the sender's
+            // otid (== clientMsgId), which the reducer collapses against the
+            // initiator's own optimistic Local row (idempotent snapshot, never
+            // appended twice). No-op when there is no client_message_id (nothing
+            // to key optimistic dedup on) — the fanout is best-effort regardless.
+            if (clientMsgId != null) {
+                runCatching {
+                    fanout.broadcastUserEcho(
+                        clientMessageId = clientMsgId,
+                        text = text,
+                        contentParts = contentParts,
+                    )
+                }
+            }
             runCatching {
                 controller.runTurn(command).collect { draft ->
                     val payload = draft.payload

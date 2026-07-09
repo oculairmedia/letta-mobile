@@ -6,6 +6,7 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.util.Telemetry
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -196,6 +197,59 @@ internal class ConversationTurnFanout(
     }
 
     /**
+     * eaczz.5 — live user-echo fanout. Synthesize a `user_message` wire delta for
+     * the sender's prompt and fan it out to EVERY viewer at turn start, BEFORE
+     * any assistant stream. Observers render it as a fresh user row so the prompt
+     * appears before the reply; the initiator collapses it against its own
+     * optimistic Local row and does NOT double-render.
+     *
+     * DEDUP / IDEMPOTENCY (see SOP "Timeline reducer replay semantics"): the echo
+     * is a SNAPSHOT, not an append. The mobile reducer keys idempotency on the
+     * event's `otid` (Timeline.identityKeys -> "otid:<otid>") and its stable
+     * server `id`. We carry:
+     *  - `otid` == the initiator's [clientMessageId] — the SAME otid the sender's
+     *    optimistic Local row already holds. On the initiator, the reducer's
+     *    `containsIdentityFor` sees the shared "otid:<clientMessageId>" key and
+     *    drops the echo (optimistic + echo collapse to ONE user row).
+     *  - a STABLE server `id` derived from that otid (`cm-user-<otid>`) so a
+     *    replayed echo shares BOTH identity keys and is never appended twice
+     *    (replaying "hello" never yields "hellohello").
+     * On an OBSERVER (which has no Local row for this otid) the echo appends once
+     * as a user row; a re-delivery of the identical echo is dropped by the same
+     * identity-key rule — idempotent on every viewer.
+     *
+     * Content parts (images) are carried verbatim: when [contentParts] is a JSON
+     * array we forward it as `content`; otherwise the plain [text] string.
+     *
+     * NOT parked: parking (q71yi) replays the INITIATOR's own live turn tail on
+     * redial; the user echo is derived deterministically from the resent input
+     * and the reconnecting initiator re-owns its optimistic row, so echoing it is
+     * pure fanout — it must NOT count toward initiator parking (which stays
+     * scoped to assistant/tool/terminal deltas). Uses [broadcastDeltaBodyNoPark].
+     */
+    suspend fun broadcastUserEcho(
+        clientMessageId: String,
+        text: String,
+        contentParts: JsonElement?,
+    ) {
+        val content: JsonElement = contentParts ?: JsonPrimitive(text)
+        val delta = buildJsonObject {
+            put("message_type", "user_message")
+            // Stable, idempotent server id keyed on the sender otid.
+            put("id", "cm-user-$clientMessageId")
+            // Same otid as the initiator's optimistic Local row => collapse.
+            put("otid", clientMessageId)
+            // Stable seq_id so the reducer treats a re-delivery of this SAME
+            // frame as a snapshot (EQUAL branch), never an append — otherwise
+            // replaying "hello" would concatenate to "hellohello". A user echo
+            // is a single, complete snapshot, so a constant seq is correct.
+            put("seq_id", USER_ECHO_SEQ_ID)
+            put("content", content)
+        }
+        broadcastDeltaBodyNoPark(delta)
+    }
+
+    /**
      * The heart of the fanout: tag-preserving publish of ONE delta body to every
      * viewer of the conversation. The body is already cumulated + cm-stream
      * tagged; viewers do NOT re-accumulate or re-tag. Best-effort per viewer — a
@@ -207,6 +261,17 @@ internal class ConversationTurnFanout(
         // delta JSON once, matching the pre-fanout writeStreamDelta which tracked
         // the delta it was handed. Never runs per-observer.
         trackInitiatorFrame(delta.toString())
+        broadcastDeltaBodyNoPark(delta)
+    }
+
+    /**
+     * Publish ONE delta body to every viewer WITHOUT recording an initiator
+     * parking entry. Used by the user-echo path, which is derived
+     * deterministically from the (redial-resent) input rather than from live
+     * turn frames — so it must not consume a parking slot. Best-effort per
+     * viewer; a failing observer never breaks the loop or the turn.
+     */
+    private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
         val viewers = snapshotViewers()
         viewers.forEach { viewer ->
             runCatching { writeToViewer(viewer, delta) }
@@ -247,4 +312,12 @@ internal class ConversationTurnFanout(
             "stop_reason", "loop_error", "error_message" -> true
             else -> false
         }
+
+    private companion object {
+        // Stable seq for the user echo so a re-delivery is a snapshot, not an
+        // append (see [broadcastUserEcho]). Zero cannot collide with an assistant
+        // row (distinct serverId + message_type), so the reducer never conflates
+        // the two.
+        const val USER_ECHO_SEQ_ID = 0
+    }
 }
