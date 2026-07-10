@@ -31,6 +31,18 @@ internal class TimelineOutboundSendProcessor(
     private val logTag: String,
     scope: CoroutineScope,
     private val ingestStreamEvent: suspend (LettaMessage) -> Unit,
+    /**
+     * letta-mobile-r3i1z: invoked when an outbound send's response stream ends
+     * (terminal or error). Each [ingestStreamEvent] call latches the loop's
+     * external-transport flag (dual-ingest suppression: while OUR turn streams
+     * through the send flow, the persistent stream subscriber must not ingest
+     * the same frames twice). That latch must be RELEASED when the turn ends —
+     * otherwise every later subscriber-delivered frame (e.g. another client's
+     * fanned-out turn observed over Iroh) is dropped as `skippedDualIngest`
+     * forever, and the desktop renders the prompt but never the reply.
+     * Mirrors mobile's ChatSendCoordinator, which clears the latch at turn end.
+     */
+    private val onSendStreamEnded: suspend () -> Unit = {},
 ) {
     val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
 
@@ -125,14 +137,21 @@ internal class TimelineOutboundSendProcessor(
         var firstEventLogged = false
         val firstEventTimer = Telemetry.startTimer("TimelineSync", "send.firstEvent")
 
-        stream.collect { message ->
-            eventCount++
-            if (!firstEventLogged) {
-                firstEventLogged = true
-                firstEventTimer.stop("otid" to otid)
+        try {
+            stream.collect { message ->
+                eventCount++
+                if (!firstEventLogged) {
+                    firstEventLogged = true
+                    firstEventTimer.stop("otid" to otid)
+                }
+                ingestStreamEvent(message)
+                events.emit(TimelineSyncEvent.ServerEvent(message))
             }
-            ingestStreamEvent(message)
-            events.emit(TimelineSyncEvent.ServerEvent(message))
+        } finally {
+            // r3i1z: the turn's send stream is over (terminal or failure) — re-arm
+            // the persistent stream subscriber so externally-initiated turns
+            // (fanned-out observer frames) are ingested again.
+            onSendStreamEnded()
         }
 
         streamTimer.stop("otid" to otid, "eventCount" to eventCount)

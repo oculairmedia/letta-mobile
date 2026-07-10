@@ -213,17 +213,28 @@ class IrohChannelTransport(
     private var observerJob: Job? = null
 
     private fun startObserverIngest(handle: IrohConnectionHandle) {
-        val streamFrames = handle.effectiveObserverStreamFrames ?: return
+        val streamFrames = handle.effectiveObserverStreamFrames
+        if (streamFrames == null) {
+            // A Ready handle with no observable stream must STILL invalidate any
+            // prior collector — a stale collector pinned to a superseded
+            // connection's flow can never be left running (r3i1z redial gap).
+            stopObserverIngest("no_observer_stream")
+            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
+            return
+        }
         // Bump the generation and cancel any prior collector: exactly one observer
         // collector is ever live, and it is pinned to this handle's session.
         val generation = observerGeneration.incrementAndGet()
         observerJob?.cancel()
+        // Log at ARM time (synchronously), not inside the launched job: if a racing
+        // teardown cancels the job before dispatch, telemetry still shows the
+        // (re)start happened — the r3i1z redial diagnosis relied on this signal.
+        Telemetry.event(
+            "IrohObserver", "ingest.start",
+            "sessionId" to handle.sessionId,
+            "generation" to generation.toString(),
+        )
         observerJob = scope.launch {
-            Telemetry.event(
-                "IrohObserver", "ingest.start",
-                "sessionId" to handle.sessionId,
-                "generation" to generation.toString(),
-            )
             runCatching {
                 streamFrames.collect { received ->
                     // Guard against a stale collector that a redial has superseded.
@@ -455,10 +466,17 @@ class IrohChannelTransport(
             com.letta.mobile.util.Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
         }.getOrThrow()
         var transport: IrohAppServerTransport? = null
+        // letta-mobile-r3i1z: attribute this connection's loss reports to the
+        // handle produced by THIS dial. A dead transport reports loss up to
+        // twice (close watcher + reader exit) and the second report can land
+        // after the supervisor has already redialed; attribution lets the
+        // supervisor drop such stale reports instead of tearing down the
+        // healthy redialed connection (and its observer-ingestion collector).
+        val dialedHandle = java.util.concurrent.atomic.AtomicReference<IrohConnectionHandle?>(null)
         return runCatching {
             transport = IrohAppServerTransportAdapter(
                 endpoint = localEndpoint,
-                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason) },
+                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason, dialedHandle.get()) },
             ).createTransport(
                 endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
                 scope = scope,
@@ -502,7 +520,7 @@ class IrohChannelTransport(
                 close = { reason ->
                     closeIrohResources(reason, transport, localEndpoint)
                 },
-            )
+            ).also { handle -> dialedHandle.set(handle) }
         }.getOrElse { error ->
             closeIrohResources("dial_failed", transport, localEndpoint)
             throw error
@@ -977,7 +995,7 @@ class IrohChannelTransport(
                     "class" to retryError::class.simpleName,
                     "consecutiveFailures" to (failures + 1).toString(),
                 )
-                supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}")
+                supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}", first)
                 val newHandle = supervisor.ready()
                 newHandle.adminRpc(method = method, path = path, body = body)
             }
@@ -992,7 +1010,7 @@ class IrohChannelTransport(
                 "consecutiveFailures" to failures.toString(),
                 "idleMs" to idleMs.toString(),
             )
-            supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}")
+            supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}", first)
             val retry = supervisor.ready()
             return retry.adminRpc(method = method, path = path, body = body)
         }

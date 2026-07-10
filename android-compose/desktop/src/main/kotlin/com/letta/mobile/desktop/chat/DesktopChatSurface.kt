@@ -548,6 +548,7 @@ private fun MessageList(
         when (item) {
             is ChatRenderItem.Single -> item.message.content.length
             is ChatRenderItem.RunBlock -> item.messages.sumOf { it.first.content.length }
+            is ChatRenderItem.SkillEnvelopeChip -> item.rawContent.length
         }
     } ?: 0
 
@@ -650,6 +651,7 @@ private fun MessageList(
                     when (item) {
                         is ChatRenderItem.Single -> DesktopMessageBubble(item.message, streamingMessageId)
                         is ChatRenderItem.RunBlock -> DesktopRunBlock(item, streamingMessageId)
+                        is ChatRenderItem.SkillEnvelopeChip -> DesktopSkillEnvelopeChip(item)
                     }
                     // Per-message clock timestamp (Penpot "Grouping + timestamps"),
                     // aligned to the sender side.
@@ -761,6 +763,32 @@ private fun LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): Chat
  * "Conversation (detailed)" board: an optional "Thought" row, a compact
  * "Run · N steps" card (one row per tool call), then the agent's narration.
  */
+@Composable
+private fun DesktopSkillEnvelopeChip(item: ChatRenderItem.SkillEnvelopeChip) {
+    // Desktop parity for the mobile skill-envelope chip: collapsed one-liner,
+    // click to expand the raw envelope (monospace). Mirrors PR #852 mobile UI.
+    var expanded by remember(item.messageId) { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = "\uD83E\uDDE9 Skill: ${item.slug}" + (item.args.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (expanded) {
+            Text(
+                text = item.rawContent,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun DesktopRunBlock(item: ChatRenderItem.RunBlock, streamingMessageId: String? = null) {
     val messages = item.messages.map { it.first }
@@ -1298,6 +1326,7 @@ private fun messageClockLabel(iso: String): String? {
  * last matching one. Returns null for user prompts or items with no narration.
  */
 private fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this) {
+    is ChatRenderItem.SkillEnvelopeChip -> null
     is ChatRenderItem.Single -> message
         .takeIf { it.role != "user" && !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
         ?.id
