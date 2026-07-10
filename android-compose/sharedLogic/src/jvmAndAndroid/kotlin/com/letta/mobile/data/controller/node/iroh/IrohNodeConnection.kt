@@ -13,7 +13,6 @@ import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.BiStream
@@ -68,6 +67,10 @@ class IrohNodeConnection(
     private val requiredBearerToken: String? = null,
     private val allowedPeerIds: Set<String> = emptySet(),
     private val remoteEndpointId: String = "",
+    // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
+    // so a turn on one connection fans out to every connection viewing the same
+    // conversation. Null in legacy/test constructions that don't use fanout.
+    private val connectionRegistry: ConnectionRegistry? = null,
     /**
      * Server-process-scoped duplicate-suppression for client message ids. Shared
      * across connections so a redial re-delivery of the same turn does not
@@ -106,6 +109,68 @@ class IrohNodeConnection(
     private fun peerSupportsFrameParts(): Boolean =
         IrohFrameCodec.FRAME_PART_CAPABILITY in peerCapabilities.get()
 
+    /**
+     * eaczz.3: this connection's single viewer handle onto its own turn/stream
+     * BiStream. Built once when the stream opens in [serve] (it needs the
+     * stream's [SendStream]) and reused for every conversation this connection
+     * views. It reuses the connection's per-connection [eventSeq] and
+     * [streamWriteMutex] so fanned-out frames keep this connection's monotonic
+     * seq + serialized writes, exactly like the single-viewer path.
+     */
+    private var selfViewer: IrohViewerHandle? = null
+
+    /**
+     * eaczz.3: this connection's viewer subscription state (Option A de-scope
+     * rule). Built alongside [selfViewer] once the turn stream opens; null when
+     * there is no [connectionRegistry] (legacy/test constructions). Both
+     * subscription signals — runtime_start and message.list — call
+     * [registerAsViewer], which delegates the de-scope bookkeeping here.
+     */
+    private var viewerSubscription: ConversationViewerSubscription? = null
+
+    /**
+     * eaczz.3: build this connection's [selfViewer] once, bound to the turn
+     * stream's [SendStream]. Idempotent — later calls return the existing handle
+     * so every conversation this connection views shares ONE viewer identity
+     * (so [ConnectionRegistry.unregisterAll] can drop them all on disconnect).
+     */
+    private fun ensureSelfViewer(streamSend: SendStream): IrohViewerHandle {
+        selfViewer?.let { return it }
+        val handle = IrohViewerHandle(
+            connectionId = remoteEndpointId,
+            sink = sendStreamSink(streamSend),
+            eventSeq = eventSeq,
+            streamWriteMutex = streamWriteMutex,
+            frameParts = { peerSupportsFrameParts() },
+            maxFrameBytes = MAX_FRAME_BYTES,
+        )
+        selfViewer = handle
+        connectionRegistry?.let { registry ->
+            viewerSubscription = ConversationViewerSubscription(registry, handle)
+        }
+        return handle
+    }
+
+    /**
+     * eaczz.3: register this connection as the viewer of [conversationId],
+     * applying the Option A de-scope rule (a new signal for a DIFFERENT
+     * conversation unregisters the prior one first). No-op when there is no
+     * registry / no live stream (subscription is null). Safe to call from either
+     * signal path (control channel runtime_start, admin_rpc message.list)
+     * concurrently.
+     */
+    private suspend fun registerAsViewer(conversationId: String) {
+        val subscription = viewerSubscription ?: return
+        val previous = subscription.currentConversation
+        subscription.subscribe(conversationId)
+        Telemetry.event(
+            "IrohNode", "viewer.registered",
+            "remoteEndpointId" to remoteEndpointId,
+            "conversationId" to conversationId,
+            "deregistered" to (previous?.takeIf { it != conversationId } ?: ""),
+        )
+    }
+
     suspend fun serve() = coroutineScope {
         try {
             val controlBiStream = connection.acceptBi()
@@ -113,6 +178,11 @@ class IrohNodeConnection(
             val streamBiStream = connection.acceptBi()
             Telemetry.event("IrohNode", "stream.accepted", "remoteEndpointId" to remoteEndpointId)
             val streamSend = streamBiStream.send()
+            // eaczz.3: build this connection's viewer handle now that its turn
+            // stream is open, so both subscription signals (runtime_start on the
+            // control channel, message.list on an admin_rpc stream) can register
+            // it as a conversation viewer.
+            ensureSelfViewer(streamSend)
 
             val controlJob = launch {
                 serveControlChannel(controlBiStream, streamSend)
@@ -138,6 +208,9 @@ class IrohNodeConnection(
                 "class" to e::class.simpleName,
             )
         } finally {
+            // eaczz.1: drop every viewer entry this connection registered so a
+            // disconnected client stops receiving fanned-out frames.
+            runCatching { connectionRegistry?.unregisterAll(remoteEndpointId) }
             Telemetry.event(
                 "IrohNode", "connection.closed",
                 "remoteEndpointId" to remoteEndpointId,
@@ -157,6 +230,21 @@ class IrohNodeConnection(
             firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
             maxFrameBytes = MAX_FRAME_BYTES,
             peerSupportsFrameParts = { peerSupportsFrameParts() },
+            // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
+            // so the shared message.list handler has no connection identity —
+            // associate it HERE, where remoteEndpointId + selfViewer are in
+            // scope. When a connection hydrates conversation X via message.list,
+            // register it as a viewer of X (de-scoping any prior conversation).
+            onMethodObserved = { method, params ->
+                if (method == "message.list") {
+                    val conversationId = params
+                        ?.get("conversation_id")
+                        ?.let { (it as? JsonPrimitive)?.contentOrNull }
+                    if (!conversationId.isNullOrEmpty()) {
+                        registerAsViewer(conversationId)
+                    }
+                }
+            },
         )
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
@@ -412,6 +500,10 @@ class IrohNodeConnection(
                     recoverApprovals = false,
                     forceDeviceStatus = false,
                 )
+                // eaczz.3: the initiator/sender signal — a successful
+                // runtime_start subscribes THIS connection to conversation_id so
+                // its turn frames fan out to it (and, via S4, to co-viewers).
+                registerAsViewer(runtime.scope.conversationId)
                 """{"type":"runtime_start_response","request_id":"$requestId","success":true,"runtime":{"agent_id":"${runtime.scope.agentId}","conversation_id":"${runtime.scope.conversationId}"}}"""
             } catch (e: Exception) {
                 """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"${e.message?.replace("\"", "\\\"")}"}"""
@@ -511,21 +603,60 @@ class IrohNodeConnection(
                 contentPartsJson = contentParts?.toString(),
             ),
         )
-        var terminalWritten = false
-        // Tracks tool_calls opened but not yet returned so failure/abort can
-        // close them with a synthetic tool_return before the terminal (8s45p).
-        val openToolCalls = OpenToolCallTracker()
-        val cumulativeText = CumulativeStreamText()
-        // Mid-turn redial fix: set thread-local tracking so writeStreamDelta can
-        // record frames for parking if the stream dies mid-turn.
+        // Mid-turn redial fix: set thread-local tracking so the INITIATOR-ONLY
+        // parking hook can record frames for parking if the stream dies mid-turn.
         if (clientMsgId != null) {
             activeTurnTracking.set(ActiveTurnTracking(clientMessageId = clientMsgId))
         }
+        // eaczz.4: the fanout core. Owns this turn's per-connection frame-shaping
+        // state (cumulative text + open-tool_call tracking + terminal-dedup) and
+        // publishes each cumulated+tagged delta body to EVERY viewer of the
+        // conversation via each viewer's own writeBroadcastFrame — the initiator
+        // (its selfViewer) is just one viewer in that set. Parking stays
+        // INITIATOR-ONLY through [trackInitiatorFrame].
+        val fanout = ConversationTurnFanout(
+            conversationId = input.runtime.conversationId,
+            runtime = input.runtime,
+            remoteEndpointId = remoteEndpointId,
+            viewersFor = { conv -> connectionRegistry?.viewersFor(conv) ?: emptySet() },
+            initiatorViewer = ensureSelfViewer(streamSend),
+            trackInitiatorFrame = { deltaJson ->
+                // INITIATOR-ONLY: matches the pre-fanout writeStreamDelta, which
+                // tracked the delta it was handed for redial replay. Never runs
+                // per-observer.
+                activeTurnTracking.get()?.tracker?.track(deltaJson)
+            },
+            // eaczz.6 fault isolation: drop a wedged/failed OBSERVER from the SAME
+            // registry the fanout reads from, so the broadcaster stops writing to
+            // a dead peer on later deltas. The initiator is never de-registered
+            // here (it follows the parking path).
+            unregisterViewer = { conv, viewer ->
+                connectionRegistry?.unregister(conv, viewer)
+            },
+        )
         try {
+            // eaczz.5: live user-echo fanout. Before the assistant stream, emit a
+            // snapshot `user_message` delta so OBSERVERS see the sender's prompt
+            // immediately, in order, ahead of the reply (today they only get it on
+            // a later message.list reconcile — so the reply could appear first).
+            // The initiator does NOT double-render: the echo carries the sender's
+            // otid (== clientMsgId), which the reducer collapses against the
+            // initiator's own optimistic Local row (idempotent snapshot, never
+            // appended twice). No-op when there is no client_message_id (nothing
+            // to key optimistic dedup on) — the fanout is best-effort regardless.
+            if (clientMsgId != null) {
+                runCatching {
+                    fanout.broadcastUserEcho(
+                        clientMessageId = clientMsgId,
+                        text = text,
+                        contentParts = contentParts,
+                    )
+                }
+            }
             runCatching {
                 controller.runTurn(command).collect { draft ->
                     val payload = draft.payload
-                    if (terminalWritten && payload.isTerminalLifecycle()) {
+                    if (fanout.anyTerminalWritten && fanout.isTerminalLifecycle(payload)) {
                         Telemetry.event(
                             "IrohNode", "stream.terminal_duplicate_skipped",
                             "remoteEndpointId" to remoteEndpointId,
@@ -536,24 +667,17 @@ class IrohNodeConnection(
                     }
                     // Before a failure/cancel terminal, close any dangling tool_calls
                     // so the client never renders a tool_call without a return.
-                    if (payload.isFailureOrCancelLifecycle()) {
-                        flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
+                    if (fanout.isFailureOrCancelLifecycle(payload)) {
+                        fanout.flushOpenToolCalls()
                     }
-                    terminalWritten = writeDraftAsStreamDelta(streamSend, input.runtime, payload, openToolCalls, cumulativeText) || terminalWritten
+                    fanout.onDraft(payload)
                 }
             }.onFailure { error ->
                 val wroteTerminal = runCatching {
                     withContext(NonCancellable) {
                         // Same dangling-tool_call guarantee on the exception path.
-                        flushOpenToolCalls(streamSend, input.runtime, openToolCalls)
-                        writeStreamDelta(
-                            streamSend = streamSend,
-                            runtime = input.runtime,
-                            delta = buildJsonObject {
-                                put("message_type", "error_message")
-                                put("message", error.message ?: error.toString())
-                            },
-                        )
+                        fanout.flushOpenToolCalls()
+                        fanout.emitErrorTerminal(error.message ?: error.toString())
                     }
                 }.isSuccess
                 if (!wroteTerminal) {
@@ -568,7 +692,7 @@ class IrohNodeConnection(
                     // frames we've sent so far + a synthetic terminal, keyed by
                     // client_message_id so a redial re-send replays them instead of
                     // the client hanging on "Thinking…" (q71yi + mid-turn redial fix).
-                    if (clientMsgId != null && !terminalWritten) {
+                    if (clientMsgId != null && !fanout.anyTerminalWritten) {
                         val tracking = activeTurnTracking.get()
                         tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
                         Telemetry.event(
@@ -588,167 +712,24 @@ class IrohNodeConnection(
         }
     }
 
-    /**
-     * Writes a synthetic terminal `tool_return(status=error, "cancelled")` for
-     * every tool_call still open on [tracker], then clears them. Runs before the
-     * turn's terminal frame on failure/abort (8s45p).
-     */
-    private suspend fun flushOpenToolCalls(
-        streamSend: SendStream,
-        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
-        tracker: OpenToolCallTracker,
-    ) {
-        val openIds = tracker.openIds()
-        if (openIds.isEmpty()) return
-        Telemetry.event(
-            "IrohNode", "stream.dangling_tool_calls_synthesized",
-            "remoteEndpointId" to remoteEndpointId,
-            "count" to openIds.size,
-        )
-        openIds.forEach { toolCallId ->
-            writeStreamDelta(
-                streamSend = streamSend,
-                runtime = runtime,
-                delta = DanglingToolCallSynthesizer.cancelledToolReturnDelta(toolCallId),
-            )
-            tracker.close(toolCallId)
-        }
-    }
-
     private fun interruptedTerminalDelta(): kotlinx.serialization.json.JsonObject = buildJsonObject {
         put("message_type", "error_message")
         put("message", "connection interrupted before the turn completed")
         put("status", "cancelled")
     }
 
-    private fun RuntimeEventPayload.isFailureOrCancelLifecycle(): Boolean =
-        this is RuntimeEventPayload.RunLifecycleChanged &&
-            (status == RuntimeRunStatus.Failed || status == RuntimeRunStatus.Cancelled)
-
     private fun extractTextFromContentParts(parts: kotlinx.serialization.json.JsonArray?): String? =
         parts?.firstOrNull { part ->
             runCatching { part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }.getOrDefault(false)
         }?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
 
-    private suspend fun writeDraftAsStreamDelta(
-        streamSend: SendStream,
-        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
-        payload: RuntimeEventPayload,
-        openToolCalls: OpenToolCallTracker,
-        cumulativeText: CumulativeStreamText,
-    ): Boolean {
-        return when (payload) {
-            // DefaultAppServerController already gives us raw App Server wire
-            // frames here (usually stream_delta). Forward them unchanged so we
-            // preserve message_type, runtime metadata, and terminal semantics.
-            is RuntimeEventPayload.RemoteStreamFrame -> {
-                openToolCalls.observe(payload.body)
-                val outgoing = cumulativeText.applyToRawFrame(payload.body)
-                writeRawFrame(streamSend, outgoing)
-                rawFrameIsTerminal(outgoing)
-            }
-            is RuntimeEventPayload.ExternalTransportFrame -> {
-                openToolCalls.observe(payload.body)
-                val outgoing = cumulativeText.applyToRawFrame(payload.body)
-                writeRawFrame(streamSend, outgoing)
-                rawFrameIsTerminal(outgoing)
-            }
-            // toolchip-live: the engine synthesizes ToolCallObserved when it
-            // auto-approves an approval_request (the approval frame is consumed,
-            // so without this mapping the client never sees the tool call live)
-            // and ToolReturnObserved for settlement-synthesized returns. Map
-            // both to wire stream_deltas instead of dropping them.
-            is RuntimeEventPayload.ToolCallObserved -> {
-                val delta = buildJsonObject {
-                    put("message_type", "tool_call_message")
-                    put("tool_call", buildJsonObject {
-                        put("tool_call_id", payload.toolCallId.value)
-                        put("name", payload.toolName.value)
-                        put("arguments", payload.argumentsJson ?: "{}")
-                    })
-                }
-                openToolCalls.observe(delta.toString())
-                writeStreamDelta(streamSend = streamSend, runtime = runtime, delta = delta)
-                false
-            }
-            is RuntimeEventPayload.ToolReturnObserved -> {
-                val delta = buildJsonObject {
-                    put("message_type", "tool_return_message")
-                    put("tool_call_id", payload.toolCallId.value)
-                    put("status", if (payload.status == com.letta.mobile.runtime.ToolExecutionStatus.Failed) "error" else "success")
-                    put("tool_return", payload.body)
-                }
-                openToolCalls.observe(delta.toString())
-                writeStreamDelta(streamSend = streamSend, runtime = runtime, delta = delta)
-                false
-            }
-            is RuntimeEventPayload.RunLifecycleChanged -> if (payload.status == RuntimeRunStatus.Completed) {
-                writeStreamDelta(
-                    streamSend = streamSend,
-                    runtime = runtime,
-                    delta = buildJsonObject {
-                        put("message_type", "stop_reason")
-                        put("stop_reason", payload.reason ?: "end_turn")
-                    },
-                )
-                true
-            } else if (payload.status == RuntimeRunStatus.Failed) {
-                writeStreamDelta(
-                    streamSend = streamSend,
-                    runtime = runtime,
-                    delta = buildJsonObject {
-                        put("message_type", "error_message")
-                        put("message", payload.reason ?: "turn failed")
-                    },
-                )
-                true
-            } else if (payload.status == RuntimeRunStatus.Cancelled) {
-                writeStreamDelta(
-                    streamSend = streamSend,
-                    runtime = runtime,
-                    delta = buildJsonObject {
-                        put("message_type", "error_message")
-                        put("message", payload.reason ?: "turn cancelled")
-                        put("status", "cancelled")
-                    },
-                )
-                true
-            } else {
-                false
-            }
-            else -> false
-        }
-    }
-
-    private fun RuntimeEventPayload.isTerminalLifecycle(): Boolean =
-        this is RuntimeEventPayload.RunLifecycleChanged &&
-            (status == RuntimeRunStatus.Completed || status == RuntimeRunStatus.Failed || status == RuntimeRunStatus.Cancelled)
-
-    private suspend fun writeRawFrame(
-        streamSend: SendStream,
-        rawFrame: String,
-    ) {
-        // letta-mobile-h30cy: RemoteStreamFrame forwards the App Server wire frame
-        // UNCHANGED, which is the real assistant stream_delta path (writeStreamDelta
-        // only handles synthesized/lifecycle frames). The raw delta keeps its
-        // provider id (letta-msg-*), but message.list reconcile returns the same
-        // reply as ui-msg-* / null-run — zero identity overlap, so mobile renders
-        // it twice (Iroh dupes; HTTPS does not, because the shim tags there). Tag
-        // the delta's assistant/reasoning id to cm-stream-/cm-reason-<otid> here,
-        // exactly as the shim does, so mobile's optimistic-twin dedup collapses the
-        // streamed row against the disk copy.
-        val outgoing = retagStreamDeltaFrameForOptimisticDedup(rawFrame)
-        Telemetry.event(
-            "IrohNode", "stream.write",
-            "remoteEndpointId" to remoteEndpointId,
-            *IrohDiagnostics.redactedFrameAttributes(frameType(outgoing), outgoing.length).toTypedArray(),
-        )
-        streamWriteMutex.withLock {
-            IrohFrameCodec.write(streamSend, outgoing, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
-        }
-    }
-
-
+    /**
+     * eaczz.4: retained ONLY for the redial parked-frame REPLAY path — a
+     * reconnecting INITIATOR re-sends the same turn and we replay its parked
+     * frame tail to ITS OWN stream (observers reconcile via message.list, so they
+     * are not part of this replay). Live turn frames go through
+     * [ConversationTurnFanout] now.
+     */
     private suspend fun writeStreamDelta(
         streamSend: SendStream,
         runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
@@ -787,78 +768,9 @@ class IrohNodeConnection(
     }
 
 
-    private class CumulativeStreamText {
-        private val byKey = LinkedHashMap<String, String>()
-
-        private fun textFrom(element: kotlinx.serialization.json.JsonElement?): String? {
-            if (element == null) return null
-            (element as? JsonPrimitive)?.contentOrNull?.let { return it }
-            val array = element as? kotlinx.serialization.json.JsonArray ?: return null
-            return array.joinToString("") { part ->
-                runCatching {
-                    val obj = part.jsonObject
-                    if (obj["type"]?.jsonPrimitive?.contentOrNull == "text") {
-                        obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                    } else {
-                        ""
-                    }
-                }.getOrDefault("")
-            }.takeIf { it.isNotEmpty() }
-        }
-
-        fun applyToRawFrame(rawFrame: String): String = runCatching {
-            val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
-            if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
-            val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
-            val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
-            if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
-                return@runCatching rawFrame
-            }
-            val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
-                ?: delta["id"]?.jsonPrimitive?.contentOrNull
-                ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
-                ?: messageType
-            val field = if (messageType == "assistant_message") "content" else "reasoning"
-            val chunk = textFrom(delta[field])
-                ?: textFrom(delta["content"])
-                ?: textFrom(delta["text"])
-                ?: return@runCatching rawFrame
-            val existing = byKey[textKey].orEmpty()
-            val cumulative = when {
-                existing.isEmpty() -> chunk
-                chunk.startsWith(existing) -> chunk
-                existing.endsWith(chunk) -> existing
-                else -> existing + chunk
-            }.also { byKey[textKey] = it }
-            val cumulativeDelta = buildJsonObject {
-                delta.forEach { (key, value) -> if (key != field) put(key, value) }
-                put(field, cumulative)
-                if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
-                    put("reasoning", cumulative)
-                }
-            }
-            buildJsonObject {
-                obj.forEach { (key, value) -> if (key != "delta") put(key, value) }
-                put("delta", cumulativeDelta)
-            }.toString()
-        }.getOrDefault(rawFrame)
-    }
-
-
     private fun frameType(rawFrame: String): String? = runCatching {
         AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject["type"]?.jsonPrimitive?.contentOrNull
     }.getOrNull()
-
-    private fun rawFrameIsTerminal(rawFrame: String): Boolean = runCatching {
-        val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
-        val delta = obj["delta"]?.jsonObject ?: obj
-        when (delta["message_type"]?.jsonPrimitive?.contentOrNull) {
-            "stop_reason",
-            "loop_error",
-            "error_message" -> true
-            else -> false
-        }
-    }.getOrDefault(false)
 
     private suspend fun serveStreamReadiness(biStream: BiStream) {
         val recvStream = biStream.recv()

@@ -1,7 +1,11 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -176,6 +180,51 @@ internal data class ActiveTurnTracking(
 )
 
 /**
+ * eaczz.3: per-connection conversation-viewer subscription with the Option A
+ * de-scope rule.
+ *
+ * A single [IrohNodeConnection] owns ONE [ViewerHandle] identity (its
+ * selfViewer) and, at any time, views exactly ONE conversation — its
+ * most-recently hydrated (message.list) or started (runtime_start) one. Both
+ * subscription signals funnel through [subscribe]; a signal for a DIFFERENT
+ * conversation unregisters the previously-viewed conversation before
+ * registering the new one, so a client switching conversations never leaves a
+ * stale viewer entry behind. Idempotent for the same conversation.
+ *
+ * The two signal paths arrive on DIFFERENT BiStreams (control channel vs an
+ * admin_rpc stream), so [subscribe] is guarded by an internal mutex to keep the
+ * view state consistent under concurrent signals. Registry mutations are
+ * best-effort — a failing register/unregister never propagates into the caller
+ * (a subscription hiccup must not break a turn or an admin RPC).
+ */
+internal class ConversationViewerSubscription(
+    private val registry: ConnectionRegistry,
+    private val viewer: ViewerHandle,
+) {
+    private val mutex = Mutex()
+    private var viewed: String? = null
+
+    /** The conversation currently viewed (test/telemetry). */
+    val currentConversation: String? get() = viewed
+
+    /**
+     * Register [viewer] as a viewer of [conversationId], de-scoping any prior
+     * conversation. No-op when already viewing [conversationId].
+     */
+    suspend fun subscribe(conversationId: String) {
+        mutex.withLock {
+            val previous = viewed
+            if (previous == conversationId) return@withLock
+            if (previous != null) {
+                runCatching { registry.unregister(previous, viewer) }
+            }
+            runCatching { registry.register(conversationId, viewer) }
+            viewed = conversationId
+        }
+    }
+}
+
+/**
  * Per-connection, atomically-incrementing `event_seq` source with a
  * process-scoped disjoint base (P3, fixes the shared companion-var race).
  *
@@ -285,6 +334,75 @@ internal object DanglingToolCallSynthesizer {
         put("status", "error")
         put("tool_return", "cancelled")
     }
+}
+
+/**
+ * Per-turn, per-connection cumulative accumulation of streamed assistant/reasoning
+ * text (h30cy). App Server assistant/reasoning deltas arrive as either cumulative
+ * or incremental chunks keyed by otid/id; this collapses them to a single
+ * cumulative body per key so the client renders one growing row, not N appended
+ * fragments. Idempotent: re-applying a body that is already a prefix/suffix of the
+ * accumulated text does not double it. Non-assistant/reasoning frames pass through
+ * unchanged.
+ *
+ * Extracted from IrohNodeConnection (eaczz.4) so the fanout core can compute the
+ * cumulated body ONCE, initiator-side, before publishing to all viewers.
+ */
+internal class CumulativeStreamText {
+    private val byKey = LinkedHashMap<String, String>()
+
+    private fun textFrom(element: JsonElement?): String? {
+        if (element == null) return null
+        (element as? JsonPrimitive)?.contentOrNull?.let { return it }
+        val array = element as? JsonArray ?: return null
+        return array.joinToString("") { part ->
+            runCatching {
+                val obj = part.jsonObject
+                if (obj["type"]?.jsonPrimitive?.contentOrNull == "text") {
+                    obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                } else {
+                    ""
+                }
+            }.getOrDefault("")
+        }.takeIf { it.isNotEmpty() }
+    }
+
+    fun applyToRawFrame(rawFrame: String): String = runCatching {
+        val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
+        if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
+        val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
+        if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
+            return@runCatching rawFrame
+        }
+        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
+            ?: delta["id"]?.jsonPrimitive?.contentOrNull
+            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
+            ?: messageType
+        val field = if (messageType == "assistant_message") "content" else "reasoning"
+        val chunk = textFrom(delta[field])
+            ?: textFrom(delta["content"])
+            ?: textFrom(delta["text"])
+            ?: return@runCatching rawFrame
+        val existing = byKey[textKey].orEmpty()
+        val cumulative = when {
+            existing.isEmpty() -> chunk
+            chunk.startsWith(existing) -> chunk
+            existing.endsWith(chunk) -> existing
+            else -> existing + chunk
+        }.also { byKey[textKey] = it }
+        val cumulativeDelta = buildJsonObject {
+            delta.forEach { (key, value) -> if (key != field) put(key, value) }
+            put(field, cumulative)
+            if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
+                put("reasoning", cumulative)
+            }
+        }
+        buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "delta") put(key, value) }
+            put("delta", cumulativeDelta)
+        }.toString()
+    }.getOrDefault(rawFrame)
 }
 
 /**

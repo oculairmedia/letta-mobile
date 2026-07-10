@@ -32,8 +32,20 @@ data class IrohConnectionHandle(
     val transport: IrohAppServerTransport? = null,
     val turnEngine: AppServerTurnEngine? = null,
     val adminRpcCall: (suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse)? = null,
+    /**
+     * letta-mobile-r3i1z: the stream-channel frame flow the passive observer
+     * ingestion loop subscribes to. Defaults to the live transport's
+     * `streamFrames` (== IrohAppServerTransport.streamFrameFlow, where fanned-out
+     * frames arrive off QUIC). Overridable so tests can drive observer ingestion
+     * without dialing a real QUIC endpoint.
+     */
+    val observerStreamFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>? = null,
     val close: suspend (String) -> Unit,
 ) {
+    /** The flow the observer ingests: the test override if present, else the live transport's stream. */
+    val effectiveObserverStreamFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>?
+        get() = observerStreamFrames ?: transport?.streamFrames
+
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         adminRpcCall?.invoke(method, path, body)
             ?: transport?.adminRpc(method = method, path = path, body = body)
