@@ -1,7 +1,9 @@
 package com.letta.mobile.data.chat.projection
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.parseSkillEnvelope
 import com.letta.mobile.ui.common.GroupPosition
 
 
@@ -140,6 +142,33 @@ sealed interface ChatRenderItem {
         override fun containsMessageId(messageId: String): Boolean =
             messages.any { it.first.id == messageId }
     }
+
+    /**
+     * A synthetic skill-instruction envelope, rendered as a collapsed chip.
+     * 
+     * These are role:user messages containing skill documentation that the
+     * backend injects as model context. Instead of rendering as a giant blue
+     * bubble, we render a compact, inspectable chip that shows the skill name
+     * and arguments when collapsed, and the full envelope text when expanded.
+     *
+     * letta-mobile-o7ua9
+     */
+    @Immutable
+    data class SkillEnvelopeChip(
+        val messageId: String,
+        val timestamp: String,
+        val slug: String,
+        val name: String,
+        val description: String,
+        val args: String,
+        val rawContent: String,
+        val keyOverride: String? = null,
+    ) : ChatRenderItem {
+        override val key: String = keyOverride ?: "skill-envelope-$messageId"
+        override val stableItemDiscriminator: String = messageId
+        override val boundaryTimestamp: String = timestamp
+        override fun containsMessageId(messageId: String): Boolean = this.messageId == messageId
+    }
 }
 
 /**
@@ -185,6 +214,29 @@ fun groupMessagesForRender(
     var i = 0
     while (i < reversed.size) {
         val (msg, pos) = reversed[i]
+        
+        // letta-mobile-o7ua9: classify synthetic skill envelopes as chips
+        // instead of user prose bubbles. Detection + parse happen once here
+        // in the render model build (frame-budget rule: never per recompose).
+        if (msg.role == "user" && SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope("user", msg.content)) {
+            val parsed = parseSkillEnvelope(msg.content)
+            if (parsed != null) {
+                out.add(
+                    ChatRenderItem.SkillEnvelopeChip(
+                        messageId = msg.id,
+                        timestamp = msg.timestamp,
+                        slug = parsed.slug,
+                        name = parsed.name,
+                        description = parsed.description,
+                        args = parsed.args,
+                        rawContent = parsed.rawContent,
+                    )
+                )
+                i++
+                continue
+            }
+        }
+        
         val runId = msg.runId.takeIf { msg.role == "assistant" && !it.isNullOrBlank() }
         if (runId == null) {
             out.add(ChatRenderItem.Single(msg, pos))
@@ -324,6 +376,7 @@ fun deduplicateRenderItemsByMessageId(items: List<ChatRenderItem>): List<ChatRen
                 out.add(item)
             }
             is ChatRenderItem.RunBlock -> out.add(item)
+            is ChatRenderItem.SkillEnvelopeChip -> out.add(item)
         }
     }
     return if (droppedAny) out else items
@@ -352,6 +405,7 @@ fun deduplicateRenderKeys(items: List<ChatRenderItem>): List<ChatRenderItem> {
             when (item) {
                 is ChatRenderItem.Single -> item.copy(keyOverride = candidate)
                 is ChatRenderItem.RunBlock -> item.copy(keyOverride = candidate)
+                is ChatRenderItem.SkillEnvelopeChip -> item.copy(keyOverride = candidate)
             }
         )
     }

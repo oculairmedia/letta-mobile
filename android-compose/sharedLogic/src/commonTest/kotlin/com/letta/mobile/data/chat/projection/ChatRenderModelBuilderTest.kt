@@ -613,6 +613,7 @@ class ChatRenderModelBuilderTest {
         assertTrue(out.any { it is ChatRenderItem.Single && (it as ChatRenderItem.Single).message.id == "a-old" })
     }
 
+
     private fun user(
         id: String,
         content: String = "u-$id",

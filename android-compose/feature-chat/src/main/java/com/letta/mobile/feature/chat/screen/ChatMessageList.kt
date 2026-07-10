@@ -131,6 +131,9 @@ private fun Collection<ChatRenderItem>.pinchVisibleContentSummary(): ChatPinchVi
                 runBlocks++
                 item.messages.forEach { (message, _) -> countMessage(message) }
             }
+            is ChatRenderItem.SkillEnvelopeChip -> {
+                // Skill envelope chips don't count towards pinch summary stats
+            }
         }
     }
 
@@ -840,6 +843,7 @@ internal fun ChatMessageList(
                     item(key = renderItem.key, contentType = when (renderItem) {
                         is ChatRenderItem.Single -> "single"
                         is ChatRenderItem.RunBlock -> "runblock"
+                        is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
                     }) {
                         // letta-mobile-x1xnl render diagnostics (flag-gated).
                         // Logs each composed key; a key composed twice within one
@@ -852,6 +856,7 @@ internal fun ChatMessageList(
                                     contentType = when (renderItem) {
                                         is ChatRenderItem.Single -> "single"
                                         is ChatRenderItem.RunBlock -> "runblock"
+                                        is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
                                     },
                                 )
                             }
@@ -974,6 +979,18 @@ internal fun ChatMessageList(
                                     )
                                 }
                             }
+
+                                is ChatRenderItem.SkillEnvelopeChip -> {
+                                    SkillEnvelopeChip(
+                                        slug = renderItem.slug,
+                                        name = renderItem.name,
+                                        description = renderItem.description,
+                                        args = renderItem.args,
+                                        rawContent = renderItem.rawContent,
+                                        chatMode = chatMode,
+                                        modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
+                                    )
+                                }
 
                                 is ChatRenderItem.RunBlock -> {
                                 val isHighlighted = renderItem.containsMessageId(highlightedMessageId.orEmpty())

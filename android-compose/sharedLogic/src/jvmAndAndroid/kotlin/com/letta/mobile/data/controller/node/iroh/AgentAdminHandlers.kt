@@ -1,5 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.model.AgentId
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -11,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * Agent CRUD handlers for the Iroh admin RPC router.
  */
 object AgentAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String, controller: AppServerController? = null) {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("agent.list") { params ->
             // letta-mobile-71orq: forward pagination params so the client can page
@@ -34,7 +36,16 @@ object AgentAdminHandlers {
         }
         router.register("agent.update") { params ->
             val id = param(params, "agent_id") ?: return@register adminError("agent_id required")
-            api.patch("agents", id, body = params.toString())
+            val result = api.patch("agents", id, body = params.toString())
+            // letta-mobile-eeu5p: a model switch persists via this PATCH, but the
+            // App Server caches its runtime per (agent, conversation) and keeps
+            // serving the OLD model until restart. When the update changes the
+            // model, evict the agent's cached runtime so the next turn reseeds
+            // from the freshly-updated record.
+            if (params?.get("model") != null) {
+                controller?.stopRuntime(AgentId(id))
+            }
+            result
         }
         router.register("agent.delete") { params ->
             val id = param(params, "agent_id") ?: return@register adminError("agent_id required")
