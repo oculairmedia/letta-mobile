@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
+import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
@@ -26,9 +27,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Hybrid desktop chat gateway: live chat through the App Server controller,
@@ -67,6 +65,18 @@ class DesktopHybridAppServerChatGateway internal constructor(
 
     /** conversationId -> agentId, learned on first send/stream per conversation. */
     private val agentIdByConversation = mutableMapOf<String, String>()
+
+    /**
+     * Projects passively-observed [AppServerInboundFrame.StreamDelta] frames the
+     * SAME way [IrohChannelTransport.ingestObserverFrame] does: raw StreamDelta ->
+     * RuntimeEventDraft (this mapper turns client_tool_start/client_tool_end into
+     * ToolCallObserved/ToolReturnObserved, not just RemoteStreamFrame) -> ServerFrame
+     * (RuntimeEventServerFrameMapper) -> LettaMessage (WsFrameMapper). Without this
+     * step, other-client-initiated tool calls/returns never produce timeline cards
+     * because IrohStreamDeltaServerFrameMapper only understands
+     * assistant_message/reasoning_message/tool_call_message/tool_return_message.
+     */
+    private val runtimeEventMapper = AppServerRuntimeEventMapper()
 
     override suspend fun sendConversationMessage(
         conversationId: String,
@@ -118,26 +128,21 @@ class DesktopHybridAppServerChatGateway internal constructor(
                 val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta
                     ?: return@collect
                 if (streamDelta.runtime.conversationId != conversationId) return@collect
-                val delta = runCatching { streamDelta.delta.jsonObject }.getOrNull()
-                val payload = RuntimeEventPayload.RemoteStreamFrame(
-                    frameId = streamDelta.idempotencyKey,
-                    messageId = delta?.get("id")?.jsonPrimitive?.contentOrNull,
-                    messageType = delta?.get("message_type")?.jsonPrimitive?.contentOrNull,
-                    body = received.raw.toString(),
-                )
-                val runId = delta?.get("run_id")?.jsonPrimitive?.contentOrNull
-                    ?: "desktop-stream-$conversationId"
-                RuntimeEventServerFrameMapper.map(
-                    payload = payload,
-                    context = RuntimeEventServerFrameMapper.Context(
-                        agentId = streamDelta.runtime.agentId.ifBlank { agentId },
-                        conversationId = conversationId,
-                        turnId = "desktop-stream-$runId",
-                        runId = runId,
-                    ),
-                ).forEach { frame ->
-                    WsFrameMapper.toLettaMessage(frame)?.let {
-                        emit(TimelineStreamFrame.Message(it))
+                val effectiveAgentId = streamDelta.runtime.agentId.ifBlank { agentId }
+                val command = streamObserverCommand(effectiveAgentId, conversationId)
+                runtimeEventMapper.map(command, received).forEach { draft ->
+                    RuntimeEventServerFrameMapper.map(
+                        payload = draft.payload,
+                        context = RuntimeEventServerFrameMapper.Context(
+                            agentId = draft.agentId?.value ?: effectiveAgentId,
+                            conversationId = draft.conversationId?.value ?: conversationId,
+                            turnId = "desktop-stream-turn-$conversationId",
+                            runId = draft.runId?.value ?: "desktop-stream-run-$conversationId",
+                        ),
+                    ).forEach { frame ->
+                        WsFrameMapper.toLettaMessage(frame)?.let {
+                            emit(TimelineStreamFrame.Message(it))
+                        }
                     }
                 }
             }
@@ -186,6 +191,24 @@ class DesktopHybridAppServerChatGateway internal constructor(
         httpGateway.close()
         transportResources?.close()
     }
+
+    /**
+     * Synthetic [TurnCommand] fed to [AppServerRuntimeEventMapper] for passively
+     * observed frames — mirrors [IrohChannelTransport.observerTurnCommand]. The
+     * command's ids are only fallback context; the wire envelope's own
+     * agent/conversation/run ids win (see [RuntimeEventDraft.agentId] etc. above).
+     */
+    private fun streamObserverCommand(agentId: String, conversationId: String): TurnCommand =
+        TurnCommand(
+            backendId = BackendId(APP_SERVER_BACKEND_ID),
+            runtimeId = RuntimeId("$APP_SERVER_BACKEND_ID:$conversationId"),
+            agentId = com.letta.mobile.data.model.AgentId(agentId),
+            conversationId = ConversationId(conversationId),
+            input = TurnInput.UserMessage(
+                localMessageId = "desktop-stream-observer-$conversationId",
+                text = "",
+            ),
+        )
 
     private suspend fun agentIdFor(conversationId: String): String =
         agentIdByConversation[conversationId] ?: agentIdResolver(conversationId)

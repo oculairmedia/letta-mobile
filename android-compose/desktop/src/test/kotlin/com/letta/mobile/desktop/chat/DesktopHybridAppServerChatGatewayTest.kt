@@ -93,6 +93,18 @@ class DesktopHybridAppServerChatGatewayTest {
     private fun reasoningDeltaEnvelope(runId: String = "run-1"): String =
         """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":2,"emitted_at":"2026-01-01T00:00:01Z","idempotency_key":"idem-2","delta":{"message_type":"reasoning_message","id":"cm-reason-a1","run_id":"$runId","reasoning":"thinking"}}"""
 
+    // Codex-flagged regression: an OTHER client's turn produces client_tool_start
+    // / client_tool_end stream_delta frames (not tool_call_message/tool_return_message
+    // — those only appear on the initiator's own websocket-shaped frames). The
+    // passive observer must route these through AppServerRuntimeEventMapper
+    // (same as IrohChannelTransport.ingestObserverFrame) so they become
+    // ToolCallObserved/ToolReturnObserved drafts, not dropped RemoteStreamFrames.
+    private fun clientToolStartDeltaEnvelope(toolCallId: String = "tc-42", runId: String = "run-1"): String =
+        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":3,"emitted_at":"2026-01-01T00:00:02Z","idempotency_key":"idem-3","delta":{"message_type":"client_tool_start","tool_call_id":"$toolCallId","tool_name":"search","run_id":"$runId","input":"{\"q\":\"hi\"}"}}"""
+
+    private fun clientToolEndDeltaEnvelope(toolCallId: String = "tc-42", runId: String = "run-1"): String =
+        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":4,"emitted_at":"2026-01-01T00:00:03Z","idempotency_key":"idem-4","delta":{"message_type":"client_tool_end","tool_call_id":"$toolCallId","run_id":"$runId","status":"success","output":"ok"}}"""
+
     private fun draft(payload: RuntimeEventPayload): RuntimeEventDraft = RuntimeEventDraft(
         backendId = BackendId("desktop-app-server"),
         runtimeId = RuntimeId("desktop-app-server:conv-1"),
@@ -222,6 +234,32 @@ class DesktopHybridAppServerChatGatewayTest {
         val message = assertIs<TimelineStreamFrame.Message>(results.single())
         val assistant = assertIs<AssistantMessage>(message.message)
         assertEquals("Hello", assistant.content)
+    }
+
+    @Test
+    fun stream_clientToolFramesProduceToolCards() = runTest {
+        val controller = FakeAppServerController { flowOf() }
+        val client = FakeAppServerClient()
+        val gw = gateway(controller, client = client)
+
+        val results = mutableListOf<TimelineStreamFrame>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            gw.streamConversation("conv-1").take(2).collect { results += it }
+        }
+        runCurrent()
+
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = clientToolStartDeltaEnvelope()))
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = clientToolEndDeltaEnvelope()))
+        job.join()
+
+        val toolCallMessage = assertIs<TimelineStreamFrame.Message>(results[0])
+        val toolCall = assertIs<ToolCallMessage>(toolCallMessage.message)
+        assertEquals("toolcall-tc-42", toolCall.id)
+
+        val toolReturnMessage = assertIs<TimelineStreamFrame.Message>(results[1])
+        val toolReturn = assertIs<ToolReturnMessage>(toolReturnMessage.message)
+        assertEquals("toolreturn-tc-42", toolReturn.id)
+        assertEquals("success", toolReturn.status)
     }
 
     @Test
