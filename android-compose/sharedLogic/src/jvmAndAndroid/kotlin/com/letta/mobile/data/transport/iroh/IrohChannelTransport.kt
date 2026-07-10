@@ -179,6 +179,15 @@ class IrohChannelTransport(
                 // an older, now-dead flow) is cancelled first so a stale collector
                 // never ingests from a torn-down transport.
                 startObserverIngest(supervisorState.handle)
+                // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
+                // redial after a QUIC timeout — re-register this connection as a
+                // viewer of the currently-viewed conversation. Server-side viewer
+                // registration only fires on runtime_start (send) or message.list
+                // (hydrate); a long-lived app that redials without doing either is
+                // invisible to the fanout (viewerCount drops to just the initiator).
+                // Re-issuing the hydrate's message.list both re-registers server-side
+                // AND reconciles frames missed during the dead window.
+                reSubscribeViewedConversation()
             } else {
                 // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
                 // stops observer ingestion. On redial a fresh Ready fires and the
@@ -239,6 +248,78 @@ class IrohChannelTransport(
         observerGeneration.incrementAndGet()
         job.cancel()
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
+    }
+
+    // letta-mobile-r3i1z (A): RE-SUBSCRIBE ON RECONNECT.
+    //
+    // The "currently viewed conversation" is learned from the transport's OWN
+    // message.list admin_rpc traffic — the same hydrate that first registered
+    // this connection as a server-side viewer (path /v1/conversations/<id>/...).
+    // We record its (conversationId, path) and, on every fresh Ready, replay it.
+    // No new callback/provider is needed: the timeline layer already routes its
+    // hydrate through adminRpc(), so the transport already sees which
+    // conversation is being viewed.
+    @Volatile
+    private var viewedConversationId: String? = null
+    @Volatile
+    private var viewedMessageListPath: String? = null
+
+    /**
+     * Records the currently-viewed conversation from a message.list hydrate so a
+     * later reconnect can re-issue it. Called for every message.list adminRpc the
+     * transport handles. Non-message.list reads (agent.list, health.check, …) do
+     * not carry a viewed-conversation identity and are ignored.
+     */
+    private fun recordViewedConversationFrom(method: String, path: String) {
+        if (method != "message.list") return
+        val conversationId = conversationIdFromMessageListPath(path) ?: return
+        // A conversation switch re-points the re-subscribe target (mirrors the
+        // server's Option A de-scope rule). The freshest message.list wins.
+        viewedConversationId = conversationId
+        viewedMessageListPath = path
+    }
+
+    /**
+     * Extracts the conversation id from a message.list path of the shape
+     * `/v1/conversations/<id>/messages[?...]`. Returns null for any other shape.
+     */
+    private fun conversationIdFromMessageListPath(path: String): String? {
+        val marker = "/v1/conversations/"
+        val start = path.indexOf(marker)
+        if (start < 0) return null
+        val after = path.substring(start + marker.length)
+        val id = after.substringBefore('/').substringBefore('?')
+        return id.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * On a fresh Ready, re-issue the recorded message.list for the viewed
+     * conversation so the (possibly brand-new, redialed) connection re-registers
+     * as a viewer server-side. Idempotent — fires on the FIRST Ready too, where
+     * the normal open/hydrate already registers, so a duplicate hydrate is
+     * harmless (message.list is read-only + the server viewer set is a Set).
+     * Fire-and-forget on [scope]; failures are swallowed (a dead connection just
+     * escalates through the normal admin_rpc retry path on the next real read).
+     */
+    private fun reSubscribeViewedConversation() {
+        val path = viewedMessageListPath ?: return
+        val conversationId = viewedConversationId
+        scope.launch {
+            Telemetry.event(
+                "IrohObserver", "resubscribe.begin",
+                "conversationId" to (conversationId ?: ""),
+            )
+            runCatching { adminRpc(method = "message.list", path = path, body = null) }
+                .onFailure { error ->
+                    if (error is CancellationException) throw error
+                    Telemetry.event(
+                        "IrohObserver", "resubscribe.failed",
+                        "conversationId" to (conversationId ?: ""),
+                        "error" to (error.message ?: error.toString()),
+                        "class" to error::class.simpleName,
+                    )
+                }
+        }
     }
 
     /**
@@ -838,6 +919,11 @@ class IrohChannelTransport(
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
+        // letta-mobile-r3i1z (A): learn the currently-viewed conversation from
+        // the hydrate so a later reconnect can re-register this connection as a
+        // server-side viewer with no user action. Recorded before the call so a
+        // hydrate that only succeeds on retry/redial is still captured.
+        recordViewedConversationFrom(method, path)
         // letta-mobile-34xoj: first attempt
         val first = supervisor.ready()
         val firstAttempt = runCatching {
