@@ -5,7 +5,6 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
-import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
@@ -17,8 +16,6 @@ import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeRunStatus
-import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import computer.iroh.Endpoint
@@ -44,7 +41,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
@@ -453,8 +449,11 @@ class IrohChannelTransport(
     private suspend fun dial(config: IrohConnectConfig): IrohConnectionHandle {
         val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
             ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
-            ?: config.baseShimUrl.trimStart().removePrefix("https://").removePrefix("http://")
-        val ticket = effectiveUrl.removePrefix(IROH_URL_PREFIX).takeIf { it != effectiveUrl && it.isNotBlank() }
+            ?: config.baseShimUrl
+        if (!isIrohUrl(effectiveUrl)) {
+            error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
+        }
+        val ticket = normalizeIrohAddress(effectiveUrl).takeIf { it.isNotBlank() }
             ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
         _state.value = ChannelTransportState.Connecting()
         onConnect()
@@ -763,78 +762,15 @@ class IrohChannelTransport(
         conversationId: String,
         turnId: String,
         runId: String,
-    ): List<ServerFrame> = when (payload) {
-        is RuntimeEventPayload.RemoteStreamFrame -> IrohStreamDeltaServerFrameMapper.map(
-            payload = payload,
-            context = IrohStreamDeltaServerFrameMapper.Context(
-                agentId = agentId,
-                conversationId = conversationId,
-                turnId = turnId,
-                runId = runId,
-                timestamp = nowIso(),
-            ),
-        )
-        // Non-chat App Server frames (update_device_status, update_queue,
-        // update_subagent_state, etc.) are side-channel runtime events, not
-        // assistant text. Do not fold them into the chat timeline.
-        is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
-        is RuntimeEventPayload.ToolCallObserved -> listOf(
-            ServerFrame.ToolCallMessage(
-                id = "toolcall-${payload.toolCallId.value}",
-                ts = nowIso(),
-                agentId = agentId,
-                conversationId = conversationId,
-                turnId = turnId,
-                runId = runId,
-                toolCall = ToolCallPayload(
-                    toolCallId = payload.toolCallId.value,
-                    name = payload.toolName.value,
-                    arguments = payload.argumentsJson ?: "{}",
-                ),
-                seq = null,
-            ),
-        )
-        is RuntimeEventPayload.ToolReturnObserved -> listOf(
-            ServerFrame.ToolReturnMessage(
-                id = "toolreturn-${payload.toolCallId.value}",
-                ts = nowIso(),
-                agentId = agentId,
-                conversationId = conversationId,
-                turnId = turnId,
-                runId = runId,
-                toolCallId = payload.toolCallId.value,
-                status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
-                toolReturn = JsonPrimitive(payload.body),
-            ),
-        )
-        is RuntimeEventPayload.ApprovalRequested -> listOf(
-            ServerFrame.ToolCallMessage(
-                type = "approval_request_message",
-                id = payload.request.approvalId.value,
-                ts = nowIso(),
-                agentId = agentId,
-                conversationId = conversationId,
-                turnId = turnId,
-                runId = runId,
-                toolCall = ToolCallPayload(
-                    toolCallId = payload.request.callId.value,
-                    name = payload.request.toolName.value,
-                    arguments = payload.request.argumentsPreview ?: "{}",
-                ),
-                seq = null,
-            ),
-        )
-        is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
-            RuntimeRunStatus.Completed -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "completed"))
-            RuntimeRunStatus.Failed -> {
-                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""))
-                listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "failed"))
-            }
-            RuntimeRunStatus.Cancelled -> listOf(ServerFrame.TurnDone(id = frameId("turn_done"), ts = nowIso(), turnId = turnId, runId = runId, status = "cancelled"))
-            RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
-        }
-        else -> emptyList()
-    }
+    ): List<ServerFrame> = RuntimeEventServerFrameMapper.map(
+        payload = payload,
+        context = RuntimeEventServerFrameMapper.Context(
+            agentId = agentId,
+            conversationId = conversationId,
+            turnId = turnId,
+            runId = runId,
+        ),
+    )
 
     private fun frameMessageId(frame: ServerFrame): String? = when (frame) {
         is ServerFrame.AssistantMessage -> frame.id
@@ -1129,6 +1065,19 @@ class IrohChannelTransport(
             val stripped = url.trimStart().removePrefix("https://").removePrefix("http://")
             return stripped.startsWith(IROH_URL_PREFIX)
         }
+
+        /**
+         * Strips transport-scheme noise off an iroh backend URL and returns the bare
+         * dialable address/ticket. Accepts the same corrupted-config forms
+         * [isIrohUrl] accepts (`https://iroh://…`, `http://iroh://…`, leading
+         * whitespace) so classification and normalization can never disagree.
+         */
+        fun normalizeIrohAddress(url: String): String =
+            url.trimStart()
+                .removePrefix("https://")
+                .removePrefix("http://")
+                .removePrefix(IROH_URL_PREFIX)
+                .trim()
     }
 }
 

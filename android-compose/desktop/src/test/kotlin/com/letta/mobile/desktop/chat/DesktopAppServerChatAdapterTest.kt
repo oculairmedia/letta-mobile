@@ -6,11 +6,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlinx.coroutines.runBlocking
 
 class DesktopAppServerChatAdapterTest {
 
     @Test
-    fun createDefaultDesktopChatGateway_whenAppServerDisabled_returnsHttpGateway() {
+    fun createDefaultDesktopChatGateway_whenAppServerDisabled_returnsHttpGateway() = runBlocking {
         val config = LettaConfig(
             id = "test-config",
             mode = LettaConfig.Mode.SELF_HOSTED,
@@ -29,7 +30,7 @@ class DesktopAppServerChatAdapterTest {
     }
 
     @Test
-    fun createDefaultDesktopChatGateway_whenAppServerEnabledButNoFactory_throws() {
+    fun createDefaultDesktopChatGateway_whenAppServerEnabledButNoFactory_throws() = runBlocking {
         val config = LettaConfig(
             id = "test-config",
             mode = LettaConfig.Mode.SELF_HOSTED,
@@ -50,7 +51,7 @@ class DesktopAppServerChatAdapterTest {
     }
 
     @Test
-    fun createDefaultDesktopChatGateway_whenAppServerEnabledWithFactory_returnsAppServerGateway() {
+    fun createDefaultDesktopChatGateway_whenAppServerEnabledWithFactory_returnsAppServerGateway() = runBlocking {
         val config = LettaConfig(
             id = "test-config",
             mode = LettaConfig.Mode.SELF_HOSTED,
@@ -103,7 +104,7 @@ class DesktopAppServerChatAdapterTest {
     }
 
     @Test
-    fun desktopAppServerControllerGatewayFactory_requiresServerUrl() {
+    fun desktopAppServerControllerGatewayFactory_requiresServerUrl() = runBlocking {
         val config = LettaConfig(
             id = "test-config",
             mode = LettaConfig.Mode.SELF_HOSTED,

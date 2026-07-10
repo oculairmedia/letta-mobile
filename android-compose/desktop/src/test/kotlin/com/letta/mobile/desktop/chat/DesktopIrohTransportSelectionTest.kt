@@ -17,6 +17,7 @@ class DesktopIrohTransportSelectionTest {
     fun `iroh urls are detected for the iroh transport branch`() {
         assertTrue(IrohChannelTransport.isIrohUrl("iroh://abc123@192.168.50.90:4501"))
         assertTrue(IrohChannelTransport.isIrohUrl("iroh://abc@host:4501,host2:4501"))
+        assertTrue(IrohChannelTransport.isIrohUrl("https://iroh://abc@h:1"))
     }
 
     @Test
