@@ -1,8 +1,6 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.controller.AppServerController
-import com.letta.mobile.data.controller.AppServerControllerState
-import com.letta.mobile.data.controller.CanonicalRuntime
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageCreate
@@ -16,12 +14,9 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
-import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
@@ -31,6 +26,7 @@ import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,10 +36,12 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -54,21 +52,21 @@ import kotlinx.serialization.json.put
 
 /**
  * Proves finding 1 (controller-routed send/stream): [DesktopHybridAppServerChatGateway]
- * decodes the outbound [MessageCreateRequest] into a [TurnCommand], seeds an
- * Unrestricted runtime before driving the turn, and projects the resulting
- * [RuntimeEventDraft]s / stream_delta frames through the SAME mappers the
- * Android iroh path uses (RuntimeEventServerFrameMapper + WsFrameMapper).
+ * decodes the outbound [MessageCreateRequest] into a [TurnCommand] and drives it
+ * through a [TurnEngine], and projects the resulting [RuntimeEventDraft]s /
+ * stream_delta frames through the SAME mappers the Android iroh path uses
+ * (RuntimeEventServerFrameMapper + WsFrameMapper).
  */
 class DesktopHybridAppServerChatGatewayTest {
 
     private fun gateway(
-        controller: FakeAppServerController,
+        turnEngine: FakeTurnEngine,
         client: FakeAppServerClient = FakeAppServerClient(),
-        transportResources: DesktopIrohTransportResources? = null,
+        transportResources: DesktopTransportResources? = null,
         heartbeatIntervalMs: Long = 60_000L,
     ): DesktopHybridAppServerChatGateway =
         DesktopHybridAppServerChatGateway(
-            controller = controller,
+            turnEngine = turnEngine,
             client = client,
             httpGateway = DesktopLettaHttpChatGateway(
                 config = LettaConfig(id = "t", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://unused.invalid"),
@@ -178,13 +176,18 @@ class DesktopHybridAppServerChatGatewayTest {
     )
 
     @Test
+    fun gateway_isChatGatewayExtras_viaHttpDelegate() {
+        assertIs<ChatGatewayExtras>(gateway(FakeTurnEngine { flowOf() }))
+    }
+
+    @Test
     fun send_buildsTurnCommandFromRequest() = runTest {
-        val controller = FakeAppServerController { flowOf() }
-        val gw = gateway(controller)
+        val turnEngine = FakeTurnEngine { flowOf() }
+        val gw = gateway(turnEngine)
 
         gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
 
-        val command = controller.recordedTurnCommand ?: error("runTurn was not invoked")
+        val command = turnEngine.recordedTurnCommand ?: error("runTurn was not invoked")
         assertEquals("agent-1", command.agentId.value)
         assertEquals("conv-1", command.conversationId.value)
         val input = assertIs<TurnInput.UserMessage>(command.input)
@@ -195,27 +198,16 @@ class DesktopHybridAppServerChatGatewayTest {
 
     @Test
     fun send_preservesContentPartsJson() = runTest {
-        val controller = FakeAppServerController { flowOf() }
-        val gw = gateway(controller)
+        val turnEngine = FakeTurnEngine { flowOf() }
+        val gw = gateway(turnEngine)
         val parts = buildJsonArray {
             add(buildJsonObject { put("type", "text"); put("text", "hi") })
         }
 
         gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1", contentParts = parts)).toList()
 
-        val input = assertIs<TurnInput.UserMessage>(controller.recordedTurnCommand!!.input)
+        val input = assertIs<TurnInput.UserMessage>(turnEngine.recordedTurnCommand!!.input)
         assertEquals(parts.toString(), input.contentPartsJson)
-    }
-
-    @Test
-    fun send_seedsUnrestrictedRuntimeBeforeTurn() = runTest {
-        val controller = FakeAppServerController { flowOf() }
-        val gw = gateway(controller)
-
-        gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
-
-        assertEquals(listOf("startRuntime", "runTurn"), controller.callOrder)
-        assertEquals(AppServerPermissionMode.Unrestricted, controller.recordedStartRuntimeMode)
     }
 
     @Test
@@ -240,8 +232,8 @@ class DesktopHybridAppServerChatGatewayTest {
             ),
             draft(RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Completed)),
         )
-        val controller = FakeAppServerController { flowOf(*drafts.toTypedArray()) }
-        val gw = gateway(controller)
+        val turnEngine = FakeTurnEngine { flowOf(*drafts.toTypedArray()) }
+        val gw = gateway(turnEngine)
 
         val messages = gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
 
@@ -263,10 +255,10 @@ class DesktopHybridAppServerChatGatewayTest {
 
     @Test
     fun send_failedLifecycleThrows() = runTest {
-        val controller = FakeAppServerController {
+        val turnEngine = FakeTurnEngine {
             flowOf(draft(RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Failed, reason = "boom")))
         }
-        val gw = gateway(controller)
+        val gw = gateway(turnEngine)
 
         val error = assertFailsWith<TimelineTransportHttpException> {
             gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
@@ -277,9 +269,9 @@ class DesktopHybridAppServerChatGatewayTest {
 
     @Test
     fun stream_emitsMessagesForOwnConversationOnly() = runTest {
-        val controller = FakeAppServerController { flowOf() }
+        val turnEngine = FakeTurnEngine { flowOf() }
         val client = FakeAppServerClient()
-        val gw = gateway(controller, client = client)
+        val gw = gateway(turnEngine, client = client)
 
         val results = mutableListOf<TimelineStreamFrame>()
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -303,9 +295,9 @@ class DesktopHybridAppServerChatGatewayTest {
 
     @Test
     fun stream_clientToolFramesProduceToolCards() = runTest {
-        val controller = FakeAppServerController { flowOf() }
+        val turnEngine = FakeTurnEngine { flowOf() }
         val client = FakeAppServerClient()
-        val gw = gateway(controller, client = client)
+        val gw = gateway(turnEngine, client = client)
 
         val results = mutableListOf<TimelineStreamFrame>()
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
@@ -329,8 +321,8 @@ class DesktopHybridAppServerChatGatewayTest {
 
     @Test
     fun stream_synthesizesHeartbeats() = runTest {
-        val controller = FakeAppServerController { flowOf() }
-        val gw = gateway(controller, heartbeatIntervalMs = 10L)
+        val turnEngine = FakeTurnEngine { flowOf() }
+        val gw = gateway(turnEngine, heartbeatIntervalMs = 10L)
 
         val first = gw.streamConversation("conv-1").take(1).toList().single()
 
@@ -338,14 +330,32 @@ class DesktopHybridAppServerChatGatewayTest {
     }
 
     @Test
+    fun stream_heartbeatsStopAfterDisconnect() = runTest {
+        val client = FakeAppServerClient()
+        val gw = gateway(FakeTurnEngine { flowOf() }, client = client, heartbeatIntervalMs = 10L)
+        val frames = mutableListOf<TimelineStreamFrame>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) { gw.streamConversation("conv-1").collect { frames += it } }
+        runCurrent()
+        advanceTimeBy(35L)
+        val beforeDrop = frames.size
+        assertTrue(beforeDrop >= 1)
+        client.connected.value = false
+        advanceTimeBy(200L)
+        assertEquals(beforeDrop, frames.size)
+        job.cancel()
+    }
+
+    @Test
     fun close_closesTransportResources() = runTest {
         val calls = mutableListOf<String>()
-        val resources = DesktopIrohTransportResources(
-            closeTransport = { calls += "transport" },
-            shutdownEndpoint = { calls += "shutdown" },
-            closeEndpoint = { calls += "close" },
+        val resources = DesktopTransportResources(
+            teardownSteps = listOf(
+                { calls += "transport" },
+                { calls += "shutdown" },
+                { calls += "close" },
+            ),
         )
-        val gw = gateway(FakeAppServerController { flowOf() }, transportResources = resources)
+        val gw = gateway(FakeTurnEngine { flowOf() }, transportResources = resources)
 
         gw.close()
 
@@ -354,7 +364,7 @@ class DesktopHybridAppServerChatGatewayTest {
 
     @Test
     fun close_withoutTransportResources_doesNotThrow() {
-        val gw = gateway(FakeAppServerController { flowOf() }, transportResources = null)
+        val gw = gateway(FakeTurnEngine { flowOf() }, transportResources = null)
 
         gw.close()
     }
@@ -364,54 +374,24 @@ class DesktopHybridAppServerChatGatewayTest {
         return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
     }
 
-    private class FakeAppServerController(
+    private class FakeTurnEngine(
         private val runTurnFlow: (TurnCommand) -> Flow<RuntimeEventDraft>,
-    ) : AppServerController {
-        override val state: Flow<AppServerControllerState> =
-            kotlinx.coroutines.flow.MutableStateFlow(AppServerControllerState.Connected)
-
-        val callOrder = mutableListOf<String>()
+    ) : TurnEngine {
         var recordedTurnCommand: TurnCommand? = null
             private set
-        var recordedStartRuntimeMode: AppServerPermissionMode? = null
-            private set
-
-        override suspend fun startRuntime(
-            agentId: com.letta.mobile.data.model.AgentId,
-            conversationId: ConversationId,
-            cwd: String?,
-            mode: AppServerPermissionMode?,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): CanonicalRuntime {
-            callOrder += "startRuntime"
-            recordedStartRuntimeMode = mode
-            return CanonicalRuntime(
-                scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value),
-            )
-        }
 
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
-            callOrder += "runTurn"
             recordedTurnCommand = command
             return runTurnFlow(command)
         }
-
-        override suspend fun sync(
-            runtime: AppServerRuntimeScope,
-            recoverApprovals: Boolean,
-            forceDeviceStatus: Boolean,
-        ): AppServerInboundFrame.SyncResponse = error("sync not supported in fake")
-
-        override suspend fun abort(
-            runtime: AppServerRuntimeScope,
-            runId: String?,
-        ): AppServerInboundFrame.AbortMessageResponse = error("abort not supported in fake")
     }
 
     private class FakeAppServerClient : AppServerClient {
         val eventsFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 16)
         override val events: Flow<AppServerReceivedFrame> = eventsFlow
+
+        val connected = MutableStateFlow(true)
+        override val isConnected: Flow<Boolean> get() = connected
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
             TODO("not needed for hybrid gateway tests")

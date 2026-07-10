@@ -1,7 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
-import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -12,7 +12,6 @@ import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.iroh.RuntimeEventServerFrameMapper
 import com.letta.mobile.runtime.BackendId
@@ -22,22 +21,26 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.TurnCommand
+import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 
 /**
- * Hybrid desktop chat gateway: live chat through the App Server controller,
+ * Hybrid desktop chat gateway: live chat through the App Server TurnEngine,
  * listing/CRUD through HTTP.
  *
  * ROUTING:
- * - [sendConversationMessage]: resolves the conversation's agent, seeds an
- *   Unrestricted runtime (desktop has no approval UI; approvals auto-allow,
- *   matching the Android iroh engine), then drives
- *   [AppServerController.runTurn] and projects the RuntimeEventDraft stream
+ * - [sendConversationMessage]: resolves the conversation's agent, then drives
+ *   [TurnEngine.runTurn] on an engine built Unrestricted (desktop has no
+ *   approval UI; approvals auto-allow, matching the Android iroh engine —
+ *   the mode is baked into the engine so its single runtime_start carries
+ *   it, with no eager seed call) and projects the RuntimeEventDraft stream
  *   into LettaMessages via the SAME mappers the Android iroh path uses
  *   (RuntimeEventServerFrameMapper + WsFrameMapper), so ids/otids/prefixes are
  *   byte-identical and the shared timeline reducer dedups correctly.
@@ -45,27 +48,32 @@ import kotlinx.coroutines.flow.merge
  *   (stream_delta frames routed by their own runtime.conversation_id), with
  *   synthesized heartbeats so the sync loop's silence timeout doesn't cycle
  *   the subscription while the agent idles (same contract as
- *   IrohAdminRpcChatGateway.streamConversation).
+ *   IrohAdminRpcChatGateway.streamConversation). Heartbeats stop once
+ *   [AppServerClient.isConnected] reports the client dropped.
+ * - setConversationModel/setConversationArchived and the rest of
+ *   [ChatGatewayExtras] delegate to the HTTP gateway (chat rides the App
+ *   Server; management operations stay HTTP — same hybrid split as listing).
  * - conversation/message listing, agent CRUD, model catalog: HTTP gateway —
  *   the App Server exposes no listing APIs yet.
  *
  * LIFECYCLE: [close] tears down the HTTP gateway and, when this gateway rode
- * an iroh dial, the endpoint+transport pair via [DesktopIrohTransportResources].
- * The controller scope is owned by the factory.
+ * an iroh or WebSocket dial, the transport-level resources via
+ * [DesktopTransportResources]. The engine/transport scope is owned by the
+ * factory.
  */
 class DesktopHybridAppServerChatGateway internal constructor(
-    private val controller: AppServerController,
+    private val turnEngine: TurnEngine,
     private val client: AppServerClient,
     private val httpGateway: DesktopLettaHttpChatGateway,
-    private val transportResources: DesktopIrohTransportResources? = null,
+    private val transportResources: DesktopTransportResources? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         httpGateway.getConversation(conversationId).agentId.value
     },
-) : DesktopChatGateway, AutoCloseable {
+) : DesktopChatGateway, ChatGatewayExtras by httpGateway, AutoCloseable {
 
     /** conversationId -> agentId, learned on first send/stream per conversation. */
-    private val agentIdByConversation = mutableMapOf<String, String>()
+    private val agentIdByConversation = ConcurrentHashMap<String, String>()
 
     /**
      * Projects passively-observed [AppServerInboundFrame.StreamDelta] frames the
@@ -85,11 +93,6 @@ class DesktopHybridAppServerChatGateway internal constructor(
     ): Flow<LettaMessage> {
         val agentId = agentIdFor(conversationId)
         val outbound = OutboundMessageCreate.decode(request)
-        controller.startRuntime(
-            agentId = com.letta.mobile.data.model.AgentId(agentId),
-            conversationId = ConversationId(conversationId),
-            mode = AppServerPermissionMode.Unrestricted,
-        )
         val turnId = "desktop-turn-${UUID.randomUUID()}"
         val syntheticRunId = "desktop-run-${UUID.randomUUID()}"
         val command = TurnCommand(
@@ -104,7 +107,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
             ),
         )
         return flow {
-            controller.runTurn(command).collect { draft ->
+            turnEngine.runTurn(command).collect { draft ->
                 val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
                 if (lifecycle?.status == RuntimeRunStatus.Failed) {
                     throw TimelineTransportHttpException(
@@ -134,6 +137,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val heartbeats = flow<TimelineStreamFrame> {
             while (true) {
                 delay(heartbeatIntervalMs)
+                if (!client.isConnected.first()) break
                 emit(TimelineStreamFrame.Heartbeat)
             }
         }

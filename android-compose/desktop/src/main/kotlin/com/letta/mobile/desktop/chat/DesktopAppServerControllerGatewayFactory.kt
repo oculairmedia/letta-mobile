@@ -1,10 +1,12 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
@@ -48,11 +50,11 @@ class DesktopAppServerControllerGatewayFactory(
         val (transport, transportResources) = if (IrohChannelTransport.isIrohUrl(serverUrl)) {
             buildIrohTransport(serverUrl, lettaConfig)
         } else {
-            buildWebSocketTransport(serverUrl, lettaConfig) to null
+            buildWebSocketTransport(serverUrl, lettaConfig)
         }
 
         val client = DefaultAppServerClient(transport)
-        val controller = DefaultAppServerController(client)
+        val turnEngine = buildDesktopAppServerTurnEngine(client)
         // The App Server doesn't expose conversation listing, message history,
         // agent CRUD, or the model catalog; those stay on HTTP.
         val httpGateway = DesktopLettaHttpChatGateway(
@@ -60,7 +62,7 @@ class DesktopAppServerControllerGatewayFactory(
             httpClient = createDesktopLettaHttpClient(),
         )
         DesktopHybridAppServerChatGateway(
-            controller = controller,
+            turnEngine = turnEngine,
             client = client,
             httpGateway = httpGateway,
             transportResources = transportResources,
@@ -76,16 +78,16 @@ class DesktopAppServerControllerGatewayFactory(
     private suspend fun buildIrohTransport(
         serverUrl: String,
         lettaConfig: LettaConfig,
-    ): Pair<IrohAppServerTransport, DesktopIrohTransportResources> {
+    ): Pair<IrohAppServerTransport, DesktopTransportResources> {
         val normalizedAddress = IrohChannelTransport.normalizeIrohAddress(serverUrl)
         val irohEndpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.Companion.defaultMode()))
-        var resources: DesktopIrohTransportResources? = null
+        var resources: DesktopTransportResources? = null
         try {
             val irohTransport = IrohAppServerTransportAdapter(irohEndpoint).createTransport(
                 endpoint = AppServerEndpoint(scheme = "iroh", address = normalizedAddress),
                 scope = controllerScope,
             ) as IrohAppServerTransport
-            resources = DesktopIrohTransportResources(irohEndpoint, irohTransport)
+            resources = DesktopTransportResources(irohEndpoint, irohTransport)
             irohTransport.awaitConnectionReady()
             authenticateDesktopIrohAppServer(
                 client = DefaultAppServerClient(irohTransport),
@@ -104,19 +106,36 @@ class DesktopAppServerControllerGatewayFactory(
     private fun buildWebSocketTransport(
         serverUrl: String,
         lettaConfig: LettaConfig,
-    ): AppServerTransport {
-        val endpoint = AppServerEndpoint.fromWebSocketUrl(
-            url = serverUrl,
-            bearerToken = lettaConfig.accessToken,
-        )
-        return KtorAppServerWebSocketTransport(
-            httpClient = createDesktopLettaHttpClient(),
+    ): Pair<AppServerTransport, DesktopTransportResources> {
+        val endpoint = AppServerEndpoint.fromWebSocketUrl(url = serverUrl, bearerToken = lettaConfig.accessToken)
+        val httpClient = createDesktopLettaHttpClient()
+        val transport = KtorAppServerWebSocketTransport(
+            httpClient = httpClient,
             baseUrl = endpoint.address,
             scope = controllerScope,
             bearerToken = endpoint.bearerToken,
         )
+        return transport to DesktopTransportResources.forWebSocket(transport, httpClient)
     }
 }
+
+/**
+ * Desktop runs every turn Unrestricted: no approval UI, so a Standard-mode
+ * approval_request would stall the turn; the engine auto-allows instead
+ * (parity with the Android iroh engine). Baking the mode into the engine lets
+ * ensureRuntime's single runtime_start carry it — no eager
+ * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
+ */
+internal fun buildDesktopAppServerTurnEngine(client: AppServerClient): AppServerTurnEngine =
+    AppServerTurnEngine(
+        client = client,
+        clientInfo = AppServerRuntimeStartClientInfo(
+            name = "letta-desktop",
+            title = "Letta Desktop",
+            version = "0.2.0",
+        ),
+        permissionMode = AppServerPermissionMode.Unrestricted,
+    )
 
 /**
  * The iroh auth exchange doubles as the transport handshake: it advertises the

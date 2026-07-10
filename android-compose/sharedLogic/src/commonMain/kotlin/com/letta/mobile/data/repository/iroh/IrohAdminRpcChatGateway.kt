@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository.iroh
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
+import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -26,20 +27,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-
-// Server sends explicit nulls for optional fields (metadata: null etc.) —
-// explicitNulls=false + coerceInputValues=true coerce those to property
-// defaults instead of failing decode (same config as the Android sources).
-private val irohAdminJson = Json {
-    ignoreUnknownKeys = true
-    isLenient = true
-    explicitNulls = false
-    coerceInputValues = true
-}
 
 /**
  * One `admin_rpc` invocation: the registry method plus the HTTP-equivalent
@@ -76,7 +66,7 @@ class IrohAdminRpcChatGateway(
 ) : ChatGateway, ChatGatewayExtras {
 
     private val bridge = WsChatBridge(transport)
-    private val json = irohAdminJson
+    private val json = lettaWireJson
 
     /** conversationId -> agentId, learned from conversation.get/list. */
     private val agentIdByConversation = mutableMapOf<ConversationId, AgentId>()
@@ -377,7 +367,7 @@ class IrohAdminRpcChatGateway(
 class IrohAdminRpcAgentDirectory(
     private val transport: IChannelTransport,
 ) {
-    private val json = irohAdminJson
+    private val json = lettaWireJson
 
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
         val body = buildJsonObject {

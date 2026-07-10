@@ -2,7 +2,6 @@ package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -24,17 +23,10 @@ data class OutboundMessageCreate(
     val contentParts: JsonArray?,
 ) {
     companion object {
-        private val json = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            explicitNulls = false
-            coerceInputValues = true
-        }
-
         fun decode(request: MessageCreateRequest): OutboundMessageCreate {
             val element = request.messages?.firstOrNull()
                 ?: return OutboundMessageCreate(text = request.input.orEmpty(), otid = null, contentParts = null)
-            val create = json.decodeFromJsonElement(MessageCreate.serializer(), element)
+            val create = lettaWireJson.decodeFromJsonElement(MessageCreate.serializer(), element)
             return when (val content = create.content) {
                 is JsonPrimitive -> OutboundMessageCreate(
                     text = content.contentOrNull.orEmpty(),
