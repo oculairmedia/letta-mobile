@@ -220,9 +220,11 @@ class ChatTimelineProjectorTest {
         val secondEmptyProjection = projector.projectLive(emptyList(), version = 1)
 
         assertEquals(0, secondEmptyProjection.ui.size)
-        // Limitation: ChatTimelineProjector.tailProjectionFastPath explicitly bails on empty event lists,
-        // so it falls through to a full projection rather than taking the no-op fast path.
-        // The render model (UI list) remains unchanged (empty), but noChange is false.
+        // Contract: empty timelines (open/close heartbeats) stay FULL projections.
+        // The g87l6 full-path no-change suppression targets streaming churn only
+        // and explicitly excludes empty UI lists, because the empty emission
+        // carries lifecycle meaning (e.g. clearing the loading state).
         assertFalse(secondEmptyProjection.noChange)
+        assertEquals(ChatMessageListChange.Full, secondEmptyProjection.messageListChange)
     }
 }
