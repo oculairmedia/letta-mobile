@@ -183,6 +183,30 @@ class IrohFanoutServeTest {
         deltaOf(frame)?.get("message_type")?.jsonPrimitive?.content
     private fun seqOf(frame: JsonObject): Long = frame["event_seq"]!!.jsonPrimitive.content.toLong()
 
+    /** case4 helper: interleave N scripted turns delta-by-delta (max cross-talk pressure). */
+    private suspend fun interleaveTurns(vararg turns: Pair<ConversationTurnFanout, List<RuntimeEventPayload>>) {
+        val maxLen = turns.maxOf { it.second.size }
+        for (i in 0 until maxLen) {
+            turns.forEach { (fanout, drafts) ->
+                if (i < drafts.size) {
+                    val p = drafts[i]
+                    if (!(fanout.anyTerminalWritten && fanout.isTerminalLifecycle(p))) fanout.onDraft(p)
+                }
+            }
+        }
+    }
+
+    /** case4 helper: a viewer received the full cumulative sequence for exactly ONE otid, one terminal, monotonic seq. */
+    private fun assertViewerSawOnlyConversation(sink: CapturingSink, who: String, otid: String) {
+        assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative text")
+        val ids = parsed(sink).mapNotNull { deltaOf(it)?.get("id")?.jsonPrimitive?.content }
+            .filter { it.startsWith("cm-stream-") }
+        assertTrue(ids.all { it == "cm-stream-$otid" }, "$who only $otid assistant ids")
+        assertEquals(1, terminalCount(sink), "$who one terminal")
+        val seqs = parsed(sink).map { seqOf(it) }
+        assertEquals(seqs.sorted(), seqs, "$who seq monotonic under interleave")
+    }
+
     private fun terminalCount(sink: CapturingSink): Int =
         parsed(sink).count { deltaTypeOf(it) == "stop_reason" }
 
@@ -334,38 +358,13 @@ class IrohFanoutServeTest {
 
         // Interleave the two turns delta-by-delta on the same coroutine — the
         // most adversarial ordering for cross-talk (both turns in flight at once).
-        val maxLen = maxOf(draftsC.size, draftsX.size)
-        for (i in 0 until maxLen) {
-            if (i < draftsC.size) {
-                val p = draftsC[i]
-                if (!(fanoutC.anyTerminalWritten && fanoutC.isTerminalLifecycle(p))) fanoutC.onDraft(p)
-            }
-            if (i < draftsX.size) {
-                val p = draftsX[i]
-                if (!(fanoutX.anyTerminalWritten && fanoutX.isTerminalLifecycle(p))) fanoutX.onDraft(p)
-            }
-        }
+        interleaveTurns(fanoutC to draftsC, fanoutX to draftsX)
 
-        // C viewers: only conv-C content (cm-stream-otid-C), full sequence, one terminal.
-        listOf(sinkC1 to "C1", sinkC2 to "C2").forEach { (sink, who) ->
-            assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative C text")
-            val ids = parsed(sink).mapNotNull { deltaOf(it)?.get("id")?.jsonPrimitive?.content }
-                .filter { it.startsWith("cm-stream-") }
-            assertTrue(ids.all { it == "cm-stream-otid-C" }, "$who only conv-C assistant ids")
-            assertEquals(1, terminalCount(sink), "$who one terminal")
-            val seqs = parsed(sink).map { seqOf(it) }
-            assertEquals(seqs.sorted(), seqs, "$who seq monotonic under interleave")
-        }
-        // X viewers: only conv-X content (cm-stream-otid-X).
-        listOf(sinkX1 to "X1", sinkX2 to "X2").forEach { (sink, who) ->
-            assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative X text")
-            val ids = parsed(sink).mapNotNull { deltaOf(it)?.get("id")?.jsonPrimitive?.content }
-                .filter { it.startsWith("cm-stream-") }
-            assertTrue(ids.all { it == "cm-stream-otid-X" }, "$who only conv-X assistant ids")
-            assertEquals(1, terminalCount(sink), "$who one terminal")
-            val seqs = parsed(sink).map { seqOf(it) }
-            assertEquals(seqs.sorted(), seqs, "$who seq monotonic under interleave")
-        }
+        // Each viewer sees ONLY its conversation's content, full sequence, one terminal.
+        assertViewerSawOnlyConversation(sinkC1, "C1", "otid-C")
+        assertViewerSawOnlyConversation(sinkC2, "C2", "otid-C")
+        assertViewerSawOnlyConversation(sinkX1, "X1", "otid-X")
+        assertViewerSawOnlyConversation(sinkX2, "X2", "otid-X")
         // Hard cross-talk guard: NO conv-X id ever appears in a C sink and vice versa.
         parsed(sinkC1).plus(parsed(sinkC2)).forEach {
             assertFalse((deltaOf(it)?.toString() ?: "").contains("otid-X"), "no conv-X leakage into C")
