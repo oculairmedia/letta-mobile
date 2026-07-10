@@ -92,8 +92,8 @@ class RuntimeEventServerFrameMapperTest {
     }
 
     @Test
-    fun toolReturnFailed_mapsToErrorStatus() {
-        val frames = RuntimeEventServerFrameMapper.map(
+    fun toolReturnObserved_mapsExecutionStatusToFrameStatus() {
+        val failedFrames = RuntimeEventServerFrameMapper.map(
             RuntimeEventPayload.ToolReturnObserved(
                 toolCallId = ToolCallId("tc-1"),
                 status = ToolExecutionStatus.Failed,
@@ -101,14 +101,11 @@ class RuntimeEventServerFrameMapperTest {
             ),
             context,
         )
-        val toolReturn = assertIs<ServerFrame.ToolReturnMessage>(frames.single())
-        assertEquals("toolreturn-tc-1", toolReturn.id)
-        assertEquals("error", toolReturn.status)
-    }
+        val failedReturn = assertIs<ServerFrame.ToolReturnMessage>(failedFrames.single())
+        assertEquals("toolreturn-tc-1", failedReturn.id)
+        assertEquals("error", failedReturn.status)
 
-    @Test
-    fun toolReturnSucceeded_mapsToSuccessStatus() {
-        val frames = RuntimeEventServerFrameMapper.map(
+        val succeededFrames = RuntimeEventServerFrameMapper.map(
             RuntimeEventPayload.ToolReturnObserved(
                 toolCallId = ToolCallId("tc-1"),
                 status = ToolExecutionStatus.Succeeded,
@@ -116,8 +113,9 @@ class RuntimeEventServerFrameMapperTest {
             ),
             context,
         )
-        val toolReturn = assertIs<ServerFrame.ToolReturnMessage>(frames.single())
-        assertEquals("success", toolReturn.status)
+        val succeededReturn = assertIs<ServerFrame.ToolReturnMessage>(succeededFrames.single())
+        assertEquals("toolreturn-tc-1", succeededReturn.id)
+        assertEquals("success", succeededReturn.status)
     }
 
     @Test

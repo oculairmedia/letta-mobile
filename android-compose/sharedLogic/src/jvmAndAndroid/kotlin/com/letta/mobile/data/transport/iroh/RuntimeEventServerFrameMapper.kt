@@ -49,64 +49,78 @@ object RuntimeEventServerFrameMapper {
         // update_subagent_state, etc.) are side-channel runtime events, not
         // assistant text. Do not fold them into the chat timeline.
         is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
-        is RuntimeEventPayload.ToolCallObserved -> listOf(
-            ServerFrame.ToolCallMessage(
-                id = "toolcall-${payload.toolCallId.value}",
-                ts = nowIso(),
-                agentId = context.agentId,
-                conversationId = context.conversationId,
-                turnId = context.turnId,
-                runId = context.runId,
-                toolCall = ToolCallPayload(
-                    toolCallId = payload.toolCallId.value,
-                    name = payload.toolName.value,
-                    arguments = payload.argumentsJson ?: "{}",
-                ),
-                seq = null,
-            ),
-        )
-        is RuntimeEventPayload.ToolReturnObserved -> listOf(
-            ServerFrame.ToolReturnMessage(
-                id = "toolreturn-${payload.toolCallId.value}",
-                ts = nowIso(),
-                agentId = context.agentId,
-                conversationId = context.conversationId,
-                turnId = context.turnId,
-                runId = context.runId,
-                toolCallId = payload.toolCallId.value,
-                status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
-                toolReturn = JsonPrimitive(payload.body),
-            ),
-        )
-        is RuntimeEventPayload.ApprovalRequested -> listOf(
-            ServerFrame.ToolCallMessage(
-                type = "approval_request_message",
-                id = payload.request.approvalId.value,
-                ts = nowIso(),
-                agentId = context.agentId,
-                conversationId = context.conversationId,
-                turnId = context.turnId,
-                runId = context.runId,
-                toolCall = ToolCallPayload(
-                    toolCallId = payload.request.callId.value,
-                    name = payload.request.toolName.value,
-                    arguments = payload.request.argumentsPreview ?: "{}",
-                ),
-                seq = null,
-            ),
-        )
-        is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
-            RuntimeRunStatus.Completed -> listOf(turnDone(context, "completed"))
-            RuntimeRunStatus.Failed -> {
-                com.letta.mobile.util.Telemetry.event(
-                    "IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""),
-                )
-                listOf(turnDone(context, "failed"))
-            }
-            RuntimeRunStatus.Cancelled -> listOf(turnDone(context, "cancelled"))
-            RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
-        }
+        is RuntimeEventPayload.ToolCallObserved -> listOf(toolCallFrame(payload, context))
+        is RuntimeEventPayload.ToolReturnObserved -> listOf(toolReturnFrame(payload, context))
+        is RuntimeEventPayload.ApprovalRequested -> listOf(approvalFrame(payload, context))
+        is RuntimeEventPayload.RunLifecycleChanged -> lifecycleFrames(payload, context)
         else -> emptyList()
+    }
+
+    private fun toolCallFrame(
+        payload: RuntimeEventPayload.ToolCallObserved,
+        context: Context,
+    ): ServerFrame.ToolCallMessage = ServerFrame.ToolCallMessage(
+        id = "toolcall-${payload.toolCallId.value}",
+        ts = nowIso(),
+        agentId = context.agentId,
+        conversationId = context.conversationId,
+        turnId = context.turnId,
+        runId = context.runId,
+        toolCall = ToolCallPayload(
+            toolCallId = payload.toolCallId.value,
+            name = payload.toolName.value,
+            arguments = payload.argumentsJson ?: "{}",
+        ),
+        seq = null,
+    )
+
+    private fun toolReturnFrame(
+        payload: RuntimeEventPayload.ToolReturnObserved,
+        context: Context,
+    ): ServerFrame.ToolReturnMessage = ServerFrame.ToolReturnMessage(
+        id = "toolreturn-${payload.toolCallId.value}",
+        ts = nowIso(),
+        agentId = context.agentId,
+        conversationId = context.conversationId,
+        turnId = context.turnId,
+        runId = context.runId,
+        toolCallId = payload.toolCallId.value,
+        status = if (payload.status == ToolExecutionStatus.Failed) "error" else "success",
+        toolReturn = JsonPrimitive(payload.body),
+    )
+
+    private fun approvalFrame(
+        payload: RuntimeEventPayload.ApprovalRequested,
+        context: Context,
+    ): ServerFrame.ToolCallMessage = ServerFrame.ToolCallMessage(
+        type = "approval_request_message",
+        id = payload.request.approvalId.value,
+        ts = nowIso(),
+        agentId = context.agentId,
+        conversationId = context.conversationId,
+        turnId = context.turnId,
+        runId = context.runId,
+        toolCall = ToolCallPayload(
+            toolCallId = payload.request.callId.value,
+            name = payload.request.toolName.value,
+            arguments = payload.request.argumentsPreview ?: "{}",
+        ),
+        seq = null,
+    )
+
+    private fun lifecycleFrames(
+        payload: RuntimeEventPayload.RunLifecycleChanged,
+        context: Context,
+    ): List<ServerFrame> = when (payload.status) {
+        RuntimeRunStatus.Completed -> listOf(turnDone(context, "completed"))
+        RuntimeRunStatus.Failed -> {
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""),
+            )
+            listOf(turnDone(context, "failed"))
+        }
+        RuntimeRunStatus.Cancelled -> listOf(turnDone(context, "cancelled"))
+        RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
     }
 
     private fun turnDone(context: Context, status: String): ServerFrame.TurnDone =
