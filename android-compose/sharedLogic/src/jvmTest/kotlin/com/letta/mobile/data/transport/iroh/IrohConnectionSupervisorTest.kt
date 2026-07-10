@@ -223,6 +223,54 @@ class IrohConnectionSupervisorTest {
     }
 
     @Test
+    fun lossForDialedHandleBeforeReadyAbortsInstallInsteadOfGoingReadyOnDeadConnection() = runTest {
+        // letta-mobile-r3i1z (review follow-up): a freshly dialed handle can report
+        // a loss in the window AFTER dial() publishes it (its onConnectionLost is
+        // wired at construction) but BEFORE the supervisor installs it as Ready.
+        // That loss must ABORT the install (close + redial) — not be dropped as
+        // "stale" — otherwise the supervisor goes Ready on an already-dead
+        // connection and observer/admin traffic attaches to it until some later
+        // failure forces another reconnect.
+        var dials = 0
+        val closed = mutableListOf<String>()
+        val gate = CompletableDeferred<Unit>()
+        lateinit var dial1: IrohConnectionHandle
+        val supervisor = supervisor(config = { configA }) { config ->
+            dials += 1
+            val sessionId = "dial-$dials"
+            val handle = fakeHandle(config, sessionId) { reason -> closed += "$sessionId:$reason" }
+            if (dials == 1) {
+                dial1 = handle
+                gate.await() // hold dial-1 open: the handle exists but isn't installed yet
+            }
+            handle
+        }
+
+        val ready = async { runCatching { supervisor.ready() } }
+        runCurrent() // dial-1's dialer is suspended at the gate; dial1 exists, not yet Ready
+
+        // Its connection dies in the publish->install window: attributed loss for a
+        // handle that is not (yet) the current handle.
+        supervisor.onConnectionLost("connection_closed: timed out", dial1)
+        runCurrent()
+
+        // Release the dial: the install must detect the recorded loss and abort.
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(
+            closed.contains("dial-1:lost_before_ready"),
+            "dead dial-1 handle must be closed, not installed as Ready; closed=$closed",
+        )
+
+        advanceTimeBy(500)
+        advanceUntilIdle()
+        val readyState = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals("dial-2", readyState.handle.sessionId, "must redial to a live connection")
+        assertEquals(2, dials)
+        ready.cancel()
+    }
+
+    @Test
     fun configChangeCancelsInFlightDialAndStartsNewConfig() = runTest {
         var config = configA
         val firstDialGate = CompletableDeferred<Unit>()

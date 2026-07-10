@@ -122,6 +122,15 @@ class IrohConnectionSupervisor(
         staleHandle?.close("config_changed")
     }
 
+    // letta-mobile-r3i1z: handles reported lost while NOT the current handle.
+    // A freshly dialed handle can die in the window between dial() publishing it
+    // (its onConnectionLost is wired at construction) and this supervisor
+    // installing it as Ready. Such a loss isn't "stale noise" — recording it by
+    // identity lets the dial-completion path below abort the install instead of
+    // going Ready on an already-dead connection. Cleared on every dial
+    // completion, so it only ever holds losses from the in-flight cycle.
+    private val handlesLostBeforeReady = ArrayList<IrohConnectionHandle>()
+
     suspend fun onConnectionLost(reason: String, lostHandle: IrohConnectionHandle? = null) {
         val staleHandle = mutex.withLock {
             if (closed || authFailed) return@withLock null
@@ -134,8 +143,13 @@ class IrohConnectionSupervisor(
             // freshly re-armed observer-ingestion collector (the fanout
             // "renders nothing after reconnect" failure). Only a loss for the
             // CURRENT handle may invalidate it; a report for any superseded
-            // handle is stale noise and must be ignored.
+            // handle is stale noise and must be ignored — EXCEPT when it is the
+            // handle an in-flight dial is about to install (recorded below so
+            // the install aborts rather than going Ready on a dead connection).
             if (lostHandle != null && lostHandle !== currentHandle) {
+                if (handlesLostBeforeReady.none { it === lostHandle }) {
+                    handlesLostBeforeReady.add(lostHandle)
+                }
                 Telemetry.event(
                     "IrohSupervisor", "loss.stale_ignored",
                     "reason" to reason,
@@ -246,10 +260,30 @@ class IrohConnectionSupervisor(
                 kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
                     mutex.withLock {
                         if (closed || authFailed || dialConfig != config || currentConfig != config) {
+                            handlesLostBeforeReady.clear()
                             if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial result ignored"))
                             scope.launch { handle.close("stale_dial") }
                             return@withLock
                         }
+                        // letta-mobile-r3i1z: the just-dialed handle already reported
+                        // a loss in the publish->install window — do NOT go Ready on a
+                        // dead connection; close it and redial. (The loss's own
+                        // mutex section ran first and recorded it; if it runs after
+                        // this install instead, lostHandle == currentHandle there and
+                        // the normal teardown+redial path handles it.)
+                        if (handlesLostBeforeReady.any { it === handle }) {
+                            handlesLostBeforeReady.clear()
+                            dialResult = null
+                            dialJob = null
+                            dialConfig = null
+                            scope.launch { handle.close("lost_before_ready") }
+                            failureCount += 1
+                            transitionTo(IrohConnectionState.Degraded("dialed handle lost before ready"), "dial_lost_before_ready")
+                            if (!closed) scheduleRedialLocked("dialed handle lost before ready")
+                            if (!result.isCompleted) result.completeExceptionally(IllegalStateException("Iroh dialed handle lost before ready"))
+                            return@withLock
+                        }
+                        handlesLostBeforeReady.clear()
                         currentHandle = handle
                         currentConfig = config
                         failureCount = 0
@@ -263,6 +297,7 @@ class IrohConnectionSupervisor(
             }.onFailure { error ->
                 kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
                     mutex.withLock {
+                        handlesLostBeforeReady.clear()
                         if (dialConfig != config) {
                             if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial failure ignored"))
                             return@withLock
