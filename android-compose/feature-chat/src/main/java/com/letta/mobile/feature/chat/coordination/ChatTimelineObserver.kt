@@ -286,17 +286,20 @@ internal class ChatTimelineObserver(
      * user send toggled state, and it gives the smoother live cadence immediately.
      */
     private fun TimelineProjection.hasGrowingPassiveModelTail(previous: ChatUiState): Boolean {
-        if (messageListChange != com.letta.mobile.data.chat.projection.ChatMessageListChange.ReplaceTail &&
-            messageListChange != com.letta.mobile.data.chat.projection.ChatMessageListChange.AppendTail
-        ) return false
+        // Only a REPLACE of the same tail row proves an existing model tail is
+        // still growing. AppendTail proves a new row arrived (it may already be
+        // a completed reply fanned out from another device), so it must not
+        // force streaming presence — the next growing replace will.
+        if (messageListChange != com.letta.mobile.data.chat.projection.ChatMessageListChange.ReplaceTail) return false
         val current = ui.lastOrNull() ?: return false
-        if (current.role != "assistant" || (!current.isReasoning && !tailIsAssistant)) return false
-        if (messageListChange == com.letta.mobile.data.chat.projection.ChatMessageListChange.AppendTail) {
-            return current.content.isNotEmpty()
-        }
+        if (!current.isModelOutputRow(tailIsAssistant)) return false
         val prior = previous.messages.lastOrNull() ?: return false
         return current.id == prior.id && current.content.length > prior.content.length
     }
+
+    /** Assistant-role reasoning or final-answer row (the model-output tail). */
+    private fun com.letta.mobile.data.model.UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
+        role == "assistant" && (isReasoning || tailIsAssistant)
 
     private data class TimelineObserverBinding(
         val agentId: String?,
