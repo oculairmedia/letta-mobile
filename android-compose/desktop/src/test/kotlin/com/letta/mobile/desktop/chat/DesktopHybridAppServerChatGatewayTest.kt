@@ -87,23 +87,88 @@ class DesktopHybridAppServerChatGatewayTest {
         return MessageCreateRequest(messages = listOf(element))
     }
 
-    private fun assistantDeltaEnvelope(runId: String = "run-1"): String =
-        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":1,"emitted_at":"2026-01-01T00:00:00Z","idempotency_key":"idem-1","delta":{"message_type":"assistant_message","id":"cm-stream-a1","run_id":"$runId","content":"Hello"}}"""
-
-    private fun reasoningDeltaEnvelope(runId: String = "run-1"): String =
-        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":2,"emitted_at":"2026-01-01T00:00:01Z","idempotency_key":"idem-2","delta":{"message_type":"reasoning_message","id":"cm-reason-a1","run_id":"$runId","reasoning":"thinking"}}"""
-
     // Codex-flagged regression: an OTHER client's turn produces client_tool_start
     // / client_tool_end stream_delta frames (not tool_call_message/tool_return_message
     // — those only appear on the initiator's own websocket-shaped frames). The
     // passive observer must route these through AppServerRuntimeEventMapper
     // (same as IrohChannelTransport.ingestObserverFrame) so they become
     // ToolCallObserved/ToolReturnObserved drafts, not dropped RemoteStreamFrames.
-    private fun clientToolStartDeltaEnvelope(toolCallId: String = "tc-42", runId: String = "run-1"): String =
-        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":3,"emitted_at":"2026-01-01T00:00:02Z","idempotency_key":"idem-3","delta":{"message_type":"client_tool_start","tool_call_id":"$toolCallId","tool_name":"search","run_id":"$runId","input":"{\"q\":\"hi\"}"}}"""
 
-    private fun clientToolEndDeltaEnvelope(toolCallId: String = "tc-42", runId: String = "run-1"): String =
-        """{"type":"stream_delta","runtime":{"agent_id":"agent-1","conversation_id":"conv-1"},"event_seq":4,"emitted_at":"2026-01-01T00:00:03Z","idempotency_key":"idem-4","delta":{"message_type":"client_tool_end","tool_call_id":"$toolCallId","run_id":"$runId","status":"success","output":"ok"}}"""
+    /**
+     * Fixture for a single `stream_delta` wire envelope. Consolidates what
+     * used to be several multi-String-param envelope builders (one per
+     * message_type) into one spec object + [streamDeltaEnvelope] builder, so
+     * fixture construction doesn't push the file's primitive/string
+     * function-argument ratio over the CodeScene "Primitive Obsession" /
+     * "String Heavy Function Arguments" thresholds.
+     */
+    private data class DeltaSpec(
+        val messageType: String,
+        val agentId: String = "agent-1",
+        val conversationId: String = "conv-1",
+        val messageId: String? = null,
+        val runId: String? = null,
+        val content: String? = null,
+        val toolCallId: String? = null,
+        val toolName: String? = null,
+        val status: String? = null,
+        val output: String? = null,
+    )
+
+    private fun streamDeltaEnvelope(spec: DeltaSpec): String {
+        val delta = buildJsonObject {
+            put("message_type", spec.messageType)
+            spec.messageId?.let { put("id", it) }
+            spec.runId?.let { put("run_id", it) }
+            spec.toolCallId?.let { put("tool_call_id", it) }
+            spec.toolName?.let { put("tool_name", it) }
+            spec.status?.let { put("status", it) }
+            spec.output?.let { put("output", it) }
+            spec.content?.let {
+                val key = when (spec.messageType) {
+                    "reasoning_message" -> "reasoning"
+                    "client_tool_start" -> "input"
+                    else -> "content"
+                }
+                put(key, it)
+            }
+        }
+        val runtime = buildJsonObject {
+            put("agent_id", spec.agentId)
+            put("conversation_id", spec.conversationId)
+        }
+        val envelope = buildJsonObject {
+            put("type", "stream_delta")
+            put("runtime", runtime)
+            put("event_seq", 1)
+            put("emitted_at", "2026-01-01T00:00:00Z")
+            put("idempotency_key", "idem-1")
+            put("delta", delta)
+        }
+        return envelope.toString()
+    }
+
+    // Fixed fixtures (no test call site varies these) — plain vals rather than
+    // wrapper functions, so the file doesn't just relocate the retired
+    // multi-String-param builders one level down.
+    private val assistantDelta =
+        DeltaSpec(messageType = "assistant_message", messageId = "cm-stream-a1", runId = "run-1", content = "Hello")
+    private val reasoningDelta =
+        DeltaSpec(messageType = "reasoning_message", messageId = "cm-reason-a1", runId = "run-1", content = "thinking")
+    private val clientToolStartDelta = DeltaSpec(
+        messageType = "client_tool_start",
+        toolCallId = "tc-42",
+        toolName = "search",
+        runId = "run-1",
+        content = "{\"q\":\"hi\"}",
+    )
+    private val clientToolEndDelta = DeltaSpec(
+        messageType = "client_tool_end",
+        toolCallId = "tc-42",
+        runId = "run-1",
+        status = "success",
+        output = "ok",
+    )
 
     private fun draft(payload: RuntimeEventPayload): RuntimeEventDraft = RuntimeEventDraft(
         backendId = BackendId("desktop-app-server"),
@@ -157,8 +222,8 @@ class DesktopHybridAppServerChatGatewayTest {
     fun send_mapsDraftsToLettaMessages() = runTest {
         val drafts = listOf(
             draft(RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Started)),
-            draft(RuntimeEventPayload.RemoteStreamFrame(frameId = "f1", body = assistantDeltaEnvelope())),
-            draft(RuntimeEventPayload.RemoteStreamFrame(frameId = "f2", body = reasoningDeltaEnvelope())),
+            draft(RuntimeEventPayload.RemoteStreamFrame(frameId = "f1", body = streamDeltaEnvelope(assistantDelta))),
+            draft(RuntimeEventPayload.RemoteStreamFrame(frameId = "f2", body = streamDeltaEnvelope(reasoningDelta))),
             draft(
                 RuntimeEventPayload.ToolCallObserved(
                     toolCallId = ToolCallId("tc1"),
@@ -227,8 +292,8 @@ class DesktopHybridAppServerChatGatewayTest {
         // (replay=0) SharedFlow drops these emissions on the floor.
         runCurrent()
 
-        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-2", envelope = assistantDeltaEnvelope()))
-        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = assistantDeltaEnvelope()))
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-2", envelope = streamDeltaEnvelope(assistantDelta)))
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = streamDeltaEnvelope(assistantDelta)))
         job.join()
 
         val message = assertIs<TimelineStreamFrame.Message>(results.single())
@@ -248,8 +313,8 @@ class DesktopHybridAppServerChatGatewayTest {
         }
         runCurrent()
 
-        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = clientToolStartDeltaEnvelope()))
-        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = clientToolEndDeltaEnvelope()))
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = streamDeltaEnvelope(clientToolStartDelta)))
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = streamDeltaEnvelope(clientToolEndDelta)))
         job.join()
 
         val toolCallMessage = assertIs<TimelineStreamFrame.Message>(results[0])

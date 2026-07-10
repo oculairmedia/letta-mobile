@@ -13,6 +13,7 @@ import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.iroh.RuntimeEventServerFrameMapper
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -125,25 +126,8 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val agentId = runCatching { agentIdFor(conversationId) }.getOrDefault("")
         val frames = flow {
             client.events.collect { received ->
-                val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta
-                    ?: return@collect
-                if (streamDelta.runtime.conversationId != conversationId) return@collect
-                val effectiveAgentId = streamDelta.runtime.agentId.ifBlank { agentId }
-                val command = streamObserverCommand(effectiveAgentId, conversationId)
-                runtimeEventMapper.map(command, received).forEach { draft ->
-                    RuntimeEventServerFrameMapper.map(
-                        payload = draft.payload,
-                        context = RuntimeEventServerFrameMapper.Context(
-                            agentId = draft.agentId?.value ?: effectiveAgentId,
-                            conversationId = draft.conversationId?.value ?: conversationId,
-                            turnId = "desktop-stream-turn-$conversationId",
-                            runId = draft.runId?.value ?: "desktop-stream-run-$conversationId",
-                        ),
-                    ).forEach { frame ->
-                        WsFrameMapper.toLettaMessage(frame)?.let {
-                            emit(TimelineStreamFrame.Message(it))
-                        }
-                    }
+                observedStreamMessages(received, conversationId, agentId).forEach {
+                    emit(TimelineStreamFrame.Message(it))
                 }
             }
         }
@@ -154,6 +138,36 @@ class DesktopHybridAppServerChatGateway internal constructor(
             }
         }
         return merge(frames, heartbeats)
+    }
+
+    /**
+     * Per-frame projection for [streamConversation]'s passive observer loop:
+     * raw [AppServerReceivedFrame] -> (filtered to this conversation) ->
+     * RuntimeEventDraft(s) via [runtimeEventMapper] -> [LettaMessage]s via the
+     * SAME ServerFrame/WsFrameMapper chain [toLettaMessages] uses for the
+     * initiator send path, so ids/otids/prefixes stay byte-identical.
+     */
+    private fun observedStreamMessages(
+        received: AppServerReceivedFrame,
+        conversationId: String,
+        fallbackAgentId: String,
+    ): List<LettaMessage> {
+        val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta
+            ?: return emptyList()
+        if (streamDelta.runtime.conversationId != conversationId) return emptyList()
+        val effectiveAgentId = streamDelta.runtime.agentId.ifBlank { fallbackAgentId }
+        val command = streamObserverCommand(effectiveAgentId, conversationId)
+        return runtimeEventMapper.map(command, received).flatMap { draft ->
+            RuntimeEventServerFrameMapper.map(
+                payload = draft.payload,
+                context = RuntimeEventServerFrameMapper.Context(
+                    agentId = draft.agentId?.value ?: effectiveAgentId,
+                    conversationId = draft.conversationId?.value ?: conversationId,
+                    turnId = "desktop-stream-turn-$conversationId",
+                    runId = draft.runId?.value ?: "desktop-stream-run-$conversationId",
+                ),
+            ).mapNotNull(WsFrameMapper::toLettaMessage)
+        }
     }
 
     override suspend fun listConversationMessages(

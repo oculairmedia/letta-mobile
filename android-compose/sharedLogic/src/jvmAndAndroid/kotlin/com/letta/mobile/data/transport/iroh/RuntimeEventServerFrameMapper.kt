@@ -59,19 +59,12 @@ object RuntimeEventServerFrameMapper {
     private fun toolCallFrame(
         payload: RuntimeEventPayload.ToolCallObserved,
         context: Context,
-    ): ServerFrame.ToolCallMessage = ServerFrame.ToolCallMessage(
+    ): ServerFrame.ToolCallMessage = toolCallMessage(
+        context = context,
         id = "toolcall-${payload.toolCallId.value}",
-        ts = nowIso(),
-        agentId = context.agentId,
-        conversationId = context.conversationId,
-        turnId = context.turnId,
-        runId = context.runId,
-        toolCall = ToolCallPayload(
-            toolCallId = payload.toolCallId.value,
-            name = payload.toolName.value,
-            arguments = payload.argumentsJson ?: "{}",
-        ),
-        seq = null,
+        toolCallId = payload.toolCallId.value,
+        name = payload.toolName.value,
+        arguments = payload.argumentsJson ?: "{}",
     )
 
     private fun toolReturnFrame(
@@ -92,21 +85,46 @@ object RuntimeEventServerFrameMapper {
     private fun approvalFrame(
         payload: RuntimeEventPayload.ApprovalRequested,
         context: Context,
-    ): ServerFrame.ToolCallMessage = ServerFrame.ToolCallMessage(
-        type = "approval_request_message",
+    ): ServerFrame.ToolCallMessage = toolCallMessage(
+        context = context,
         id = payload.request.approvalId.value,
-        ts = nowIso(),
-        agentId = context.agentId,
-        conversationId = context.conversationId,
-        turnId = context.turnId,
-        runId = context.runId,
-        toolCall = ToolCallPayload(
-            toolCallId = payload.request.callId.value,
-            name = payload.request.toolName.value,
-            arguments = payload.request.argumentsPreview ?: "{}",
-        ),
-        seq = null,
+        toolCallId = payload.request.callId.value,
+        name = payload.request.toolName.value,
+        arguments = payload.request.argumentsPreview ?: "{}",
+        type = "approval_request_message",
     )
+
+    /**
+     * Shared [ServerFrame.ToolCallMessage] builder for [toolCallFrame] (an
+     * observed tool call, default `tool_call_message` type) and
+     * [approvalFrame] (an approval request re-shaped as a tool call, per the
+     * §4.1 approval_request_message <-> tool_call_message contract above).
+     * Both only differ in id/toolCallId/name/arguments/type.
+     */
+    private fun toolCallMessage(
+        context: Context,
+        id: String,
+        toolCallId: String,
+        name: String,
+        arguments: String,
+        type: String? = null,
+    ): ServerFrame.ToolCallMessage {
+        val message = ServerFrame.ToolCallMessage(
+            id = id,
+            ts = nowIso(),
+            agentId = context.agentId,
+            conversationId = context.conversationId,
+            turnId = context.turnId,
+            runId = context.runId,
+            toolCall = ToolCallPayload(
+                toolCallId = toolCallId,
+                name = name,
+                arguments = arguments,
+            ),
+            seq = null,
+        )
+        return if (type == null) message else message.copy(type = type)
+    }
 
     private fun lifecycleFrames(
         payload: RuntimeEventPayload.RunLifecycleChanged,
