@@ -86,6 +86,49 @@ class AppServerControllerTest {
     }
 
     @Test
+    fun stopRuntimeEvictsCacheSoNextStartReseeds() = runTest {
+        // letta-mobile-eeu5p: a model switch calls stopRuntime; the next turn's
+        // startRuntime must issue a FRESH runtime_start (reseeding the model)
+        // instead of returning the stale cached runtime.
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+        )
+
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+        assertEquals(1, client.runtimeStartCommands.size)
+
+        // Model switch -> evict the agent's cached runtime.
+        controller.stopRuntime(AgentId("agent-1"))
+
+        // Next turn re-issues runtime_start (fresh runtime, new model).
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+        assertEquals(2, client.runtimeStartCommands.size)
+    }
+
+    @Test
+    fun stopRuntimeOnlyEvictsTargetAgent() = runTest {
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+        )
+
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+        controller.startRuntime(AgentId("agent-2"), ConversationId("conv-2"))
+        assertEquals(2, client.runtimeStartCommands.size)
+
+        controller.stopRuntime(AgentId("agent-1"))
+
+        // agent-2 still cached (no new start); agent-1 re-starts.
+        controller.startRuntime(AgentId("agent-2"), ConversationId("conv-2"))
+        assertEquals(2, client.runtimeStartCommands.size)
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+        assertEquals(3, client.runtimeStartCommands.size)
+    }
+
+    @Test
     fun startRuntimeStartsNewRuntimeForDifferentAgentOrConversation() = runTest {
         val client = FakeAppServerClient()
         val controller = DefaultAppServerController(

@@ -22,7 +22,7 @@ object AdminRpcRegistry {
         val router = AdminRpcRouter()
 
         HealthAdminHandlers.register(router, rpcBase)
-        AgentAdminHandlers.register(router, rpcBase)
+        AgentAdminHandlers.register(router, rpcBase, controller)
         ConversationAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
         ArchiveAdminHandlers.register(router, rpcBase)
