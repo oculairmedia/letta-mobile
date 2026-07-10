@@ -82,6 +82,10 @@ class IncrementalChatRenderItemsCache {
     private var previousMessages: List<UiMessage> = emptyList()
     private var previousTailStartIndex: Int = -1
     private var committedRenderItems: List<ChatRenderItem> = emptyList()
+    // letta-mobile-g87l6: the full list returned on the previous build, keyed by
+    // LazyColumn key, so a streaming tick can hand back the SAME instance for
+    // items whose content is unchanged (see reuseUnchangedInstances).
+    private var previousResultByKey: Map<String, ChatRenderItem> = emptyMap()
 
     fun renderItems(
         messages: List<UiMessage>,
@@ -93,6 +97,7 @@ class IncrementalChatRenderItemsCache {
             previousMessages = messages
             previousTailStartIndex = 0
             committedRenderItems = emptyList()
+            previousResultByKey = emptyMap()
             return emptyList()
         }
 
@@ -116,12 +121,25 @@ class IncrementalChatRenderItemsCache {
             // key-level dedup — otherwise the two DIFFERENT keys both render as a
             // stranded duplicate. Then run the key dedup for remaining same-key
             // collisions.
-            val next = deduplicateRenderKeys(
+            val rebuilt = deduplicateRenderKeys(
                 deduplicateRenderItemsByMessageId(tailRenderItems + committedRenderItems),
             )
+            // letta-mobile-g87l6 (desktop -> mobile flicker fix): the committed
+            // history items are already reused by identity, but activeTailStartIndex
+            // pulls the latest user prompt AND the immediately-preceding assistant
+            // turn into the rebuilt active tail. Those bubbles are content-unchanged
+            // during streaming, yet buildChatRenderModel gives them a FRESH instance
+            // every fanned-out token. A new instance for the same LazyColumn key
+            // recomposes the whole subtree — the per-token flicker the desktop's
+            // higher frame rate makes visible on mobile. Hand back the SAME instance
+            // for any item that is content-equal to the previous build so Compose
+            // skips recomposing it; only the item that actually changed (the
+            // streaming tail whose text grew) gets a new instance.
+            val next = reuseUnchangedInstances(rebuilt)
             cachedMode = mode
             previousMessages = messages
             previousTailStartIndex = tailStartIndex
+            previousResultByKey = next.associateBy { it.key }
             incrementalBuildCount++
             return next
         }
@@ -175,8 +193,33 @@ class IncrementalChatRenderItemsCache {
         cachedMode = mode
         previousMessages = messages
         previousTailStartIndex = tailStartIndex
+        previousResultByKey = full.associateBy { it.key }
         fullBuildCount++
         return full
+    }
+
+    /**
+     * letta-mobile-g87l6: replace each freshly-built render item with the
+     * previous build's instance when the two are content-equal (ChatRenderItem
+     * variants are data classes, so `==` is a deep content compare). This
+     * preserves object identity for settled bubbles across a streaming tick so
+     * Compose can skip recomposing them, while genuinely-changed items (the
+     * growing streaming tail) still get a new instance and recompose normally.
+     */
+    private fun reuseUnchangedInstances(rebuilt: List<ChatRenderItem>): List<ChatRenderItem> {
+        val previousByKey = previousResultByKey
+        if (previousByKey.isEmpty()) return rebuilt
+        var reusedAny = false
+        val reconciled = rebuilt.map { item ->
+            val prior = previousByKey[item.key]
+            if (prior != null && prior !== item && prior == item) {
+                reusedAny = true
+                prior
+            } else {
+                item
+            }
+        }
+        return if (reusedAny) reconciled else rebuilt
     }
 
     private fun activeTailStartIndex(messages: List<UiMessage>): Int {

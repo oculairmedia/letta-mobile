@@ -322,7 +322,8 @@ class ChatRenderModelBuilderTest {
         // the previous turn's completed answer — must keep its object identity so
         // Compose skips recomposing it.
         val cache = IncrementalChatRenderItemsCache()
-        // Prior settled turn + a just-sent user prompt + the streaming assistant.
+        // Prior settled turn + a just-sent user prompt. This is the state right
+        // before the observed assistant reply begins streaming.
         val history = listOf(
             user("u-prev", content = "previous question", ts = "2026-04-19T12:00:00Z"),
             assistant("a-prev", content = "previous answer", runId = "run-prev", ts = "2026-04-19T12:00:01Z"),
@@ -331,8 +332,11 @@ class ChatRenderModelBuilderTest {
         fun streamingFrame(text: String) =
             history + assistant("a-stream", content = text, runId = "run-now", ts = "2026-04-19T12:00:03Z")
 
-        // Seed the cache with the first streaming frame (Full build).
-        var prev = cache.renderItems(streamingFrame("A"), ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+        // Faithful observer sequence: history hydrates (Full), then the observed
+        // assistant reply's first token APPENDS (AppendTail), then each fanned-out
+        // token REPLACES the tail (ReplaceTail) — the per-token flicker path.
+        cache.renderItems(history, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+        var prev = cache.renderItems(streamingFrame("A"), ChatDisplayMode.Interactive, ChatMessageListChange.AppendTail)
         val settledKeys = prev.drop(1).map { it.key } // everything except the streaming tail (index 0, reverse layout)
 
         // Stream several more tokens as ReplaceTail (the observer per-token path).
