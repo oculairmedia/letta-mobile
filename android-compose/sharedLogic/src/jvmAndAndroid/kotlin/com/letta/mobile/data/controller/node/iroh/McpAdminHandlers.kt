@@ -9,18 +9,11 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object McpAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = Api(AdminProxyClient(adminBaseUrl))
+        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("mcp.list") { api.get("mcp", "servers") }
         router.register("passage.list") { params ->
             val agentId = param(params, "agent_id")
-            if (agentId != null) api.get("agents", agentId, "passages") else jsonError("agent_id required")
+            if (agentId != null) api.get("agents", agentId, "passages") else adminError("agent_id required")
         }
     }
-
-    private class Api(private val proxy: AdminProxyClient) {
-        fun get(vararg segments: String): JsonElement = proxy.get(adminProxyRequest("v1", *segments).build())
-    }
-
-    private fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }

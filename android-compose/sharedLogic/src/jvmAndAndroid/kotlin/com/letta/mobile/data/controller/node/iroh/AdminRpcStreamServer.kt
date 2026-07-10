@@ -12,6 +12,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -79,6 +80,18 @@ internal class AdminRpcStreamServer(
      * capability-off peers are always bounded by [maxFrameBytes].
      */
     private val maxReassembledBytes: Int = IrohFrameCodec.DEFAULT_MAX_REASSEMBLED_BYTES,
+    /**
+     * eaczz.3: per-connection observer of admin_rpc method calls. admin_rpc runs
+     * on its own BiStream(s), disjoint from the turn/stream BiStream, so the
+     * shared [router] handlers (e.g. static ConversationAdminHandlers.message.list)
+     * carry NO connection identity. This hook lets the owning [IrohNodeConnection]
+     * associate a method call with ITS OWN selfViewer — e.g. register the
+     * connection as a conversation viewer when method == "message.list". Invoked
+     * best-effort AFTER the frame is parsed and BEFORE dispatch, only for an
+     * authenticated admin_rpc frame with a non-null method. A throwing hook must
+     * never break the request — the caller swallows failures.
+     */
+    private val onMethodObserved: (suspend (method: String, params: JsonObject?) -> Unit)? = null,
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val permits = Semaphore(maxActiveHandlers)
@@ -251,12 +264,36 @@ internal class AdminRpcStreamServer(
             } else if (method == null || requestId == null) {
                 errorEnvelope(requestId ?: "", "method and request_id are required")
             } else {
-                router.dispatch(requestId, method, obj["params"]?.jsonObject)
+                val params = obj["params"]?.jsonObject
+                notifyMethodObserved(method, params)
+                router.dispatch(requestId, method, params)
             }
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
             errorEnvelope("", "Failed to parse admin_rpc frame: ${error.message ?: error.toString()}")
+        }
+    }
+
+    /**
+     * eaczz.3: let the owning connection observe an authenticated method call
+     * (e.g. subscribe as a viewer on message.list) before dispatch.
+     * Best-effort: a failing hook must never break the RPC.
+     */
+    private suspend fun notifyMethodObserved(method: String, params: JsonObject?) {
+        val observe = onMethodObserved ?: return
+        try {
+            observe(method, params)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (hookError: Exception) {
+            Telemetry.event(
+                "IrohNode", "admin_rpc.method_observer.failed",
+                "remoteEndpointId" to remoteEndpointId,
+                "method" to method,
+                "error" to (hookError.message ?: hookError.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 

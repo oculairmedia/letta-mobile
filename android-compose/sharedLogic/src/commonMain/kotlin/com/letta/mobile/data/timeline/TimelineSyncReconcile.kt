@@ -378,6 +378,7 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
     //      require the incoming final to strictly contain it. This prevents
     //      selecting a distinct older reply that is coincidentally contained.
     val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
+    val normalizedIncoming = incomingText.filterLettersAndDigits()
     for (index in events.size - 1 downTo start) {
         val event = events[index] as? TimelineEvent.Confirmed ?: continue
         if (event.messageType != TimelineMessageType.ASSISTANT) continue
@@ -400,9 +401,31 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
         ) {
             return index
         }
+        // letta-mobile-qq9sd: the streamed row can be MANGLED relative to its
+        // final, not just first-word-lagged — dropped stream fragments leave it
+        // missing scattered punctuation too ("…streaming path The…" vs
+        // "…streaming path. The…"), so the strict containment above misses and
+        // the null-run final re-appends as a near-full-message duplicate. Retry
+        // the SAME containment relation on letters/digits only: punctuation and
+        // whitespace divergence never distinguishes two genuinely different
+        // replies, and the min-length gate keeps short coincidences out. All
+        // row-qualification guards above still apply unchanged.
+        val normalizedExisting = existingText.filterLettersAndDigits()
+        if (normalizedExisting.length >= RECONCILE_MANGLED_SUPERSET_MIN_CHARS &&
+            normalizedIncoming.contains(normalizedExisting)
+        ) {
+            return index
+        }
     }
     return null
 }
+
+// letta-mobile-qq9sd: minimum letters+digits length before the mangled-superset
+// fallback may fire. Short assistant rows ("Nice", "Got it") are either caught
+// by the strict prefix/containment paths or too coincidence-prone to collapse.
+private const val RECONCILE_MANGLED_SUPERSET_MIN_CHARS = 12
+
+private fun String.filterLettersAndDigits(): String = filter { it.isLetterOrDigit() }
 
 private fun String.isReconcileSyntheticRunId(): Boolean = startsWith("iroh-run-")
 

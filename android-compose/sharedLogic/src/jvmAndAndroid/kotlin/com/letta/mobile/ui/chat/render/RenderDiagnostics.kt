@@ -62,6 +62,7 @@ object RenderDiagnostics {
             val (runId, text) = when (item) {
                 is ChatRenderItem.Single -> (item.message.runId ?: "") to item.message.content
                 is ChatRenderItem.RunBlock -> item.runId to item.messages.joinToString("") { it.first.content }
+                is ChatRenderItem.SkillEnvelopeChip -> item.slug to item.rawContent
             }
             if (item is ChatRenderItem.Single && item.message.role != "assistant") continue
             val sig = "run=$runId|len=${text.length}|head=${text.take(24)}"

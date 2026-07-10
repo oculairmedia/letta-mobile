@@ -131,6 +131,9 @@ private fun Collection<ChatRenderItem>.pinchVisibleContentSummary(): ChatPinchVi
                 runBlocks++
                 item.messages.forEach { (message, _) -> countMessage(message) }
             }
+            is ChatRenderItem.SkillEnvelopeChip -> {
+                // Skill envelope chips don't count towards pinch summary stats
+            }
         }
     }
 
@@ -467,15 +470,15 @@ internal fun ChatMessageList(
 
     val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
 
-    val isNearBottom by remember {
+    val isNearBottom by remember(renderItems.size) {
         derivedStateOf {
-            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot(isUserScrolling))
+            ChatViewportFollowPolicy.isNearLatest(listState.toChatViewportSnapshot(isUserScrolling, renderItems.size))
         }
     }
 
-    val showScrollFab by remember {
+    val showScrollFab by remember(renderItems.size) {
         derivedStateOf {
-            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling))
+            ChatViewportFollowPolicy.shouldShowScrollToLatest(listState.toChatViewportSnapshot(isUserScrolling, renderItems.size))
         }
     }
 
@@ -560,8 +563,8 @@ internal fun ChatMessageList(
         }
     }
 
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling) }
+    LaunchedEffect(listState, renderItems.size) {
+        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling, renderItems.size) }
             .distinctUntilChanged()
             .collect { snapshot ->
                 followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
@@ -840,6 +843,7 @@ internal fun ChatMessageList(
                     item(key = renderItem.key, contentType = when (renderItem) {
                         is ChatRenderItem.Single -> "single"
                         is ChatRenderItem.RunBlock -> "runblock"
+                        is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
                     }) {
                         // letta-mobile-x1xnl render diagnostics (flag-gated).
                         // Logs each composed key; a key composed twice within one
@@ -852,6 +856,7 @@ internal fun ChatMessageList(
                                     contentType = when (renderItem) {
                                         is ChatRenderItem.Single -> "single"
                                         is ChatRenderItem.RunBlock -> "runblock"
+                                        is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
                                     },
                                 )
                             }
@@ -974,6 +979,18 @@ internal fun ChatMessageList(
                                     )
                                 }
                             }
+
+                                is ChatRenderItem.SkillEnvelopeChip -> {
+                                    SkillEnvelopeChip(
+                                        slug = renderItem.slug,
+                                        name = renderItem.name,
+                                        description = renderItem.description,
+                                        args = renderItem.args,
+                                        rawContent = renderItem.rawContent,
+                                        chatMode = chatMode,
+                                        modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
+                                    )
+                                }
 
                                 is ChatRenderItem.RunBlock -> {
                                 val isHighlighted = renderItem.containsMessageId(highlightedMessageId.orEmpty())
@@ -1421,13 +1438,15 @@ private fun DebugMessageCard(
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): ChatViewportSnapshot {
-    val totalItems = layoutInfo.totalItemsCount
-    val firstVisible = layoutInfo.visibleItemsInfo.firstOrNull()?.index
-    val lastVisibleIndexMapped = if (firstVisible != null) totalItems - 1 - firstVisible else null
+private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapshot(
+    isUserScrolling: Boolean,
+    itemCount: Int
+): ChatViewportSnapshot {
+    // letta-mobile-perf: derive metrics from firstVisibleItemIndex without reading layoutInfo
+    // to avoid triggering continuous recompositions on every scroll frame inside derivedStateOf.
     return ChatViewportSnapshot(
-        totalItems = totalItems,
-        lastVisibleIndex = lastVisibleIndexMapped,
+        totalItems = itemCount,
+        lastVisibleIndex = (itemCount - 1 - firstVisibleItemIndex).takeIf { itemCount > 0 },
         isUserScrolling = isUserScrolling,
     )
 }

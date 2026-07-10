@@ -10,6 +10,8 @@ object AdminRpcRegistry {
         "tool_return.get",
         "goal.get",
         "goal.command",
+        "slash_command.list",
+        "slash_command.list_agent",
         "agent.list",
         "health.check",
         "approval.submit",
@@ -20,7 +22,7 @@ object AdminRpcRegistry {
         val router = AdminRpcRouter()
 
         HealthAdminHandlers.register(router, rpcBase)
-        AgentAdminHandlers.register(router, rpcBase)
+        AgentAdminHandlers.register(router, rpcBase, controller)
         ConversationAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
         ArchiveAdminHandlers.register(router, rpcBase)
@@ -30,6 +32,7 @@ object AdminRpcRegistry {
         ToolAdminHandlers.register(router, rpcBase)
         McpAdminHandlers.register(router, rpcBase)
         GoalAdminHandlers.register(router, rpcBase)
+        SlashCommandAdminHandlers.register(router, rpcBase)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
 
         router.requireNonEmpty()

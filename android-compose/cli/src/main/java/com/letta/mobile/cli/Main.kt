@@ -31,6 +31,7 @@ import com.letta.mobile.cli.commands.AppServerServeIrohCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohStubCommand
 import com.letta.mobile.cli.commands.AppServerIrohDeviceGateCommand
 import com.letta.mobile.cli.commands.AppServerIrohProbeCommand
+import com.letta.mobile.cli.commands.AppServerIrohTwoClientProbeCommand
 import com.letta.mobile.cli.commands.AppServerSmokeCommand
 import com.letta.mobile.cli.commands.SetupApplyCommand
 import com.letta.mobile.cli.commands.SetupCommand
@@ -85,6 +86,7 @@ object Main {
                 AppServerServeIrohCommand(),
                 AppServerServeIrohStubCommand(),
                 AppServerIrohProbeCommand(),
+                AppServerIrohTwoClientProbeCommand(),
                 AppServerIrohDeviceGateCommand(),
                 AppServerSmokeCommand(),
                 StreamCommand(),

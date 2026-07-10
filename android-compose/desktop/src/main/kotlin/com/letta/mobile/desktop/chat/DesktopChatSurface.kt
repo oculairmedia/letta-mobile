@@ -158,12 +158,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.skia.Image as SkiaImage
-import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 
 @Composable
 internal fun ChatDetailPane(
@@ -537,10 +535,27 @@ private fun MessageList(
     // Everything else is settled history.
     val streamingMessageId = if (isStreamingReply) renderItems.lastOrNull()?.streamingCandidateMessageId() else null
 
+    // The LazyColumn is laid out as [ "__today__" header, ...renderItems,
+    // ("__thinking__" while sending)? ]. The leading header offsets every render
+    // row by one, so the last row is at index renderItems.size (not size - 1),
+    // and the thinking row at size + 1. The scroll targets below must use this
+    // header-aware index — latestIndex(renderItems.size) landed one row short,
+    // which is why a fresh prompt/reply needed a manual nudge to the bottom.
+    val chatBottomIndex = (renderItems.size + if (isSending) 1 else 0).coerceAtLeast(0)
+    // Length of the tail render item's text, so the follow effect re-fires as the
+    // streamed reply grows (its key/count stay fixed while only content changes).
+    val tailContentLength = renderItems.lastOrNull()?.let { item ->
+        when (item) {
+            is ChatRenderItem.Single -> item.message.content.length
+            is ChatRenderItem.RunBlock -> item.messages.sumOf { it.first.content.length }
+            is ChatRenderItem.SkillEnvelopeChip -> item.rawContent.length
+        }
+    } ?: 0
+
     LaunchedEffect(conversationId) {
         followLatest = true
         if (renderItems.isNotEmpty()) {
-            listState.scrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+            listState.scrollToItem(chatBottomIndex)
         }
     }
 
@@ -555,17 +570,19 @@ private fun MessageList(
             }
     }
 
-    LaunchedEffect(latestItemKey, renderItems.size) {
+    LaunchedEffect(latestItemKey, renderItems.size, tailContentLength, isSending) {
         if (ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size)) {
-            listState.scrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+            listState.scrollToItem(chatBottomIndex)
         }
     }
 
-    // When a send starts, snap to the bottom so the thinking row is visible.
+    // When a send starts, always jump to the bottom (the thinking row, then the
+    // streaming reply) regardless of where the user was reading — followLatest is
+    // forced so the auto-follow effect above keeps tracking the reply as it lands.
     LaunchedEffect(isSending) {
         if (isSending) {
             followLatest = true
-            listState.animateScrollToItem(renderItems.size + 1)
+            listState.animateScrollToItem(chatBottomIndex)
         }
     }
 
@@ -626,28 +643,15 @@ private fun MessageList(
                 items = renderItems,
                 key = { it.key },
             ) { item ->
-                val interaction = remember { MutableInteractionSource() }
-                val hovered by interaction.collectIsHoveredAsState()
                 Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .hoverable(interaction),
-                    ) {
-                        when (item) {
-                            is ChatRenderItem.Single -> DesktopMessageBubble(item.message, streamingMessageId)
-                            is ChatRenderItem.RunBlock -> DesktopRunBlock(item, streamingMessageId)
-                        }
-                        // Only plain message bubbles get the hover copy toolbar — a
-                        // RunBlock has its own header chevron at the top-right, which
-                        // the floating toolbar would otherwise cover.
-                        val copyText = item.copyableText()
-                        if (hovered && copyText.isNotBlank() && item is ChatRenderItem.Single) {
-                            MessageHoverToolbar(
-                                text = copyText,
-                                modifier = Modifier.align(Alignment.TopEnd).padding(top = 2.dp),
-                            )
-                        }
+                    // Message text is selectable (SelectionContainer), which is the
+                    // copy path. The floating hover copy toolbar was removed — it
+                    // popped over the content on every hover and read as noise while
+                    // reading/scrolling.
+                    when (item) {
+                        is ChatRenderItem.Single -> DesktopMessageBubble(item.message, streamingMessageId)
+                        is ChatRenderItem.RunBlock -> DesktopRunBlock(item, streamingMessageId)
+                        is ChatRenderItem.SkillEnvelopeChip -> DesktopSkillEnvelopeChip(item)
                     }
                     // Per-message clock timestamp (Penpot "Grouping + timestamps"),
                     // aligned to the sender side.
@@ -678,7 +682,7 @@ private fun MessageList(
                 onClick = {
                     followLatest = true
                     scope.launch {
-                        listState.animateScrollToItem(ChatViewportFollowPolicy.latestIndex(renderItems.size))
+                        listState.animateScrollToItem(chatBottomIndex)
                     }
                 },
                 modifier = Modifier
@@ -759,6 +763,32 @@ private fun LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): Chat
  * "Conversation (detailed)" board: an optional "Thought" row, a compact
  * "Run · N steps" card (one row per tool call), then the agent's narration.
  */
+@Composable
+private fun DesktopSkillEnvelopeChip(item: ChatRenderItem.SkillEnvelopeChip) {
+    // Desktop parity for the mobile skill-envelope chip: collapsed one-liner,
+    // click to expand the raw envelope (monospace). Mirrors PR #852 mobile UI.
+    var expanded by remember(item.messageId) { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+            .padding(vertical = 4.dp),
+    ) {
+        Text(
+            text = "\uD83E\uDDE9 Skill: ${item.slug}" + (item.args.takeIf { it.isNotBlank() }?.let { " — $it" } ?: ""),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        if (expanded) {
+            Text(
+                text = item.rawContent,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
 @Composable
 private fun DesktopRunBlock(item: ChatRenderItem.RunBlock, streamingMessageId: String? = null) {
     val messages = item.messages.map { it.first }
@@ -1159,7 +1189,43 @@ private fun DesktopMessageBubble(message: UiMessage, streamingMessageId: String?
     }
 }
 
-/** User prompt — teal bubble, right-aligned, with faint copy/edit affordances. */
+/**
+ * Small, functional copy affordance: click copies [text] to the clipboard and
+ * the glyph briefly flips to a green check. Replaces the former decorative copy
+ * glyphs that did nothing on click.
+ */
+@Composable
+private fun CopyIconButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    val clipboard = LocalClipboardManager.current
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
+            kotlinx.coroutines.delay(1200)
+            copied = false
+        }
+    }
+    Icon(
+        imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+        contentDescription = if (copied) "Copied" else "Copy",
+        tint = if (copied) Color(0xFF34C759) else tint,
+        modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            }
+            .padding(2.dp)
+            .size(14.dp),
+    )
+}
+
+/** User prompt — teal bubble, right-aligned, with a copy affordance. */
 @Composable
 private fun UserPrompt(message: UiMessage) {
     Column(
@@ -1188,17 +1254,12 @@ private fun UserPrompt(message: UiMessage) {
                 )
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Icon(
-                imageVector = Icons.Outlined.ContentCopy,
-                contentDescription = "Copy",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            )
-            Icon(
-                imageVector = Icons.Outlined.Edit,
-                contentDescription = "Edit",
-                modifier = Modifier.size(14.dp),
+        // Copy is the only wired affordance — a message "edit"/resend needs
+        // conversation-fork support that isn't in place, so it's omitted rather
+        // than shown as a dead control.
+        if (message.content.isNotBlank()) {
+            CopyIconButton(
+                text = message.content,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             )
         }
@@ -1246,47 +1307,6 @@ private fun ThinkingMessageRow() {
     }
 }
 
-/**
- * Floating per-message toolbar (Penpot "Reasoning + hover toolbar" board) shown
- * at the top-right of a message on hover. Only the Copy action is wired — it
- * copies the message text to the clipboard; regenerate/branch/edit need backend
- * support and are intentionally omitted rather than shown as dead controls.
- */
-@Composable
-private fun MessageHoverToolbar(text: String, modifier: Modifier = Modifier) {
-    val clipboard = LocalClipboardManager.current
-    var copied by remember { mutableStateOf(false) }
-    LaunchedEffect(copied) {
-        if (copied) {
-            kotlinx.coroutines.delay(1200)
-            copied = false
-        }
-    }
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp,
-    ) {
-        Box(
-            modifier = Modifier
-                .clickable {
-                    clipboard.setText(AnnotatedString(text))
-                    copied = true
-                }
-                .padding(8.dp),
-        ) {
-            Icon(
-                imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
-                contentDescription = if (copied) "Copied" else "Copy message",
-                tint = if (copied) Color(0xFF34C759) else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(15.dp),
-            )
-        }
-    }
-}
-
 /** Formats a message's ISO timestamp as a local clock label, e.g. "9:41 AM". */
 private fun messageClockLabel(iso: String): String? {
     if (iso.isBlank()) return null
@@ -1306,6 +1326,7 @@ private fun messageClockLabel(iso: String): String? {
  * last matching one. Returns null for user prompts or items with no narration.
  */
 private fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this) {
+    is ChatRenderItem.SkillEnvelopeChip -> null
     is ChatRenderItem.Single -> message
         .takeIf { it.role != "user" && !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
         ?.id
@@ -1313,15 +1334,6 @@ private fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this) 
         .map { it.first }
         .lastOrNull { !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
         ?.id
-}
-
-/** The message text a hover toolbar's Copy action puts on the clipboard. */
-private fun ChatRenderItem.copyableText(): String = when (this) {
-    is ChatRenderItem.Single -> message.content
-    is ChatRenderItem.RunBlock -> messages
-        .map { it.first }
-        .filter { !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank() }
-        .joinToString("\n\n") { it.content }
 }
 
 /** Plain agent narration text, full width (no bubble), per the detailed board. */
@@ -1389,11 +1401,11 @@ private fun ToolCard(toolCall: UiToolCall) {
                 )
                 ToolStatusBadge(toolCall.status ?: "tool call")
                 Spacer(Modifier.weight(1f))
-                Icon(
-                    imageVector = Icons.Outlined.ContentCopy,
-                    contentDescription = "Copy",
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                CopyIconButton(
+                    text = listOfNotNull(
+                        toolCall.arguments.takeIf { it.isNotBlank() },
+                        toolCall.result?.takeIf { it.isNotBlank() },
+                    ).joinToString("\n\n").ifBlank { toolCall.name },
                 )
                 Icon(
                     imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,

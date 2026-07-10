@@ -121,6 +121,20 @@ class DefaultAppServerController(
         canonical
     }
 
+    override suspend fun stopRuntime(agentId: AgentId) {
+        // letta-mobile-eeu5p: drop every cached runtime for this agent so the
+        // next startRuntime re-issues runtime_start and reseeds the model from
+        // the updated agent record. Keyed by (agentId, conversationId) — evict
+        // all conversations for the agent since the model is agent-level.
+        runtimeMutex.withLock {
+            val evicted = runtimeCache.keys.filter { it.agentId == agentId.value }
+            evicted.forEach {
+                runtimeCache.remove(it)
+                runtimePermissionModes.remove(it)
+            }
+        }
+    }
+
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =
         turnEngine.runTurn(command)
 

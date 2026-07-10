@@ -9,21 +9,12 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object ScheduleAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = Api(AdminProxyClient(adminBaseUrl))
+        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("schedule.list") { api.get("schedules") }
-        router.register("schedule.get") { p -> id(p, "schedule_id")?.let { api.get("schedules", it) } ?: jsonError("schedule_id required") }
+        router.register("schedule.get") { p -> param(p, "schedule_id")?.let { api.get("schedules", it) } ?: adminError("schedule_id required") }
         router.register("schedule.create") { p -> api.post("schedules", body = p?.toString() ?: "{}") }
-        router.register("schedule.delete") { p -> id(p, "schedule_id")?.let { api.delete("schedules", it) } ?: jsonError("schedule_id required") }
+        router.register("schedule.delete") { p -> param(p, "schedule_id")?.let { api.delete("schedules", it) } ?: adminError("schedule_id required") }
         router.register("job.list") { api.get("jobs") }
-        router.register("job.get") { p -> id(p, "job_id")?.let { api.get("jobs", it) } ?: jsonError("job_id required") }
+        router.register("job.get") { p -> param(p, "job_id")?.let { api.get("jobs", it) } ?: adminError("job_id required") }
     }
-
-    private class Api(private val proxy: AdminProxyClient) {
-        fun get(vararg segments: String): JsonElement = proxy.get(adminProxyRequest("v1", *segments).build())
-        fun post(vararg segments: String, body: String): JsonElement = proxy.post(adminProxyRequest("v1", *segments).build(), body)
-        fun delete(vararg segments: String): JsonElement = proxy.delete(adminProxyRequest("v1", *segments).build())
-    }
-
-    private fun id(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
-    private fun jsonError(message: String): JsonElement = buildJsonObject { put("_error", message) }
 }

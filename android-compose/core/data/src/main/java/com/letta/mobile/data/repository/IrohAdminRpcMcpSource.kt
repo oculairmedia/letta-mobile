@@ -24,7 +24,7 @@ class IrohAdminRpcMcpSource(
     },
 ) {
     fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+        settingsRepository.activeBackendIsIroh()
 
     suspend fun listMcpServers(): List<McpServer> {
         val response = channelTransport.adminRpc(

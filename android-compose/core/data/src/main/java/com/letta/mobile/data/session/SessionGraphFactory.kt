@@ -29,7 +29,7 @@ import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
-import com.letta.mobile.data.repository.IrohAdminRpcArchiveSource
+import com.letta.mobile.data.repository.IrohAdminRpcClient
 import com.letta.mobile.data.repository.IrohAdminRpcIdentitySource
 import com.letta.mobile.data.repository.IrohAdminRpcJobSource
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
@@ -228,6 +228,22 @@ class SessionGraphFactory internal constructor(
                 ChannelTransport(scope, runCursorStore, conversationCursorStore)
             }
         }
+        return createSessionGraph(
+            graphId = graphId,
+            activeConfig = activeConfig,
+            localRuntimeBackend = localRuntimeBackend,
+            scope = scope,
+            channelTransport = channelTransport
+        )
+    }
+
+    private fun createSessionGraph(
+        graphId: Long,
+        activeConfig: LettaConfig?,
+        localRuntimeBackend: LocalLettaBackend?,
+        scope: CoroutineScope,
+        channelTransport: com.letta.mobile.data.transport.api.IChannelTransport
+    ): SessionGraph {
         val agentRepository = AgentRepository(
             agentApi = agentApi,
             agentDao = agentDao,
@@ -272,15 +288,31 @@ class SessionGraphFactory internal constructor(
             ),
             archiveRepository = ArchiveRepository(
                 archiveApi = archiveApi,
-                irohArchiveSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcArchiveSource(
+                irohAdminRpcClient = settingsRepository?.let { settings ->
+                    IrohAdminRpcClient(
                         channelTransport = channelTransport,
                         settingsRepository = settings,
                     )
                 },
             ),
-            folderRepository = FolderRepository(folderApi),
-            groupRepository = GroupRepository(groupApi),
+            folderRepository = FolderRepository(
+                folderApi = folderApi,
+                irohFolderSource = settingsRepository?.let { settings ->
+                    com.letta.mobile.data.repository.IrohAdminRpcFolderSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
+            groupRepository = GroupRepository(
+                groupApi = groupApi,
+                irohGroupSource = settingsRepository?.let { settings ->
+                    com.letta.mobile.data.repository.IrohAdminRpcGroupSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             identityRepository = IdentityRepository(
                 identityApi = identityApi,
                 irohIdentitySource = settingsRepository?.let { settings ->
