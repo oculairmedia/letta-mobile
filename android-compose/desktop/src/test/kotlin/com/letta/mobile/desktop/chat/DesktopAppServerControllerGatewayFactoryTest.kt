@@ -65,15 +65,20 @@ class DesktopAppServerControllerGatewayFactoryTest {
     }
 
     @Test
-    fun auth_failureWithBlankTokenIsTolerated() = runTest {
+    fun auth_failureAlwaysThrows() = runTest {
         val client = FakeAppServerClient(response = { command ->
             AppServerInboundFrame.AuthResponse(requestId = command.requestId, success = false, error = "no auth required")
         })
 
-        // Servers without a required token still ack+record capabilities even
-        // when they report success = false — must not throw for a blank token.
-        authenticateDesktopIrohAppServer(client = client, accessToken = null)
-        authenticateDesktopIrohAppServer(client = client, accessToken = "   ")
+        // The in-repo server returns success=true for no-token servers, so
+        // success=false unambiguously means unauthenticated — it must throw
+        // regardless of whether the client sent a blank token.
+        assertFailsWith<IllegalStateException> {
+            authenticateDesktopIrohAppServer(client = client, accessToken = null)
+        }
+        assertFailsWith<IllegalStateException> {
+            authenticateDesktopIrohAppServer(client = client, accessToken = "   ")
+        }
     }
 
     /**

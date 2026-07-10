@@ -142,7 +142,11 @@ internal fun buildDesktopAppServerTurnEngine(client: AppServerClient): AppServer
  * frame_part chunked-frame capability so the server may split >1MiB frames.
  * Sent even with a blank token — servers without a required token still ack
  * and record capabilities (mirrors IrohChannelTransport.kt dial() and the
- * CLI probe's tokenless handshake).
+ * CLI probe's tokenless handshake). A failure response is always fatal: the
+ * in-repo server (IrohNodeConnection.handleAuth) returns success=true for
+ * no-token servers, so success=false unambiguously means unauthenticated —
+ * tolerating it would hand an unauthenticated transport onward and surface as
+ * an opaque runtime_start timeout instead of a clear auth error.
  */
 internal suspend fun authenticateDesktopIrohAppServer(
     client: AppServerClient,
@@ -157,7 +161,7 @@ internal suspend fun authenticateDesktopIrohAppServer(
             capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
         ),
     )
-    if (!auth.success && token.isNotBlank()) {
+    if (!auth.success) {
         error("Desktop iroh App Server auth failed: ${auth.error ?: "unknown error"}")
     }
 }

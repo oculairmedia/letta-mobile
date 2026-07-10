@@ -76,6 +76,19 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val agentIdByConversation = ConcurrentHashMap<String, String>()
 
     /**
+     * Conversations with a [sendConversationMessage] flow currently collecting.
+     * The passive [observedStreamMessages] projection and the send flow both
+     * project the same underlying frames but under DIFFERENT synthetic turnIds
+     * (send: `desktop-turn-<uuid>`, stream: `desktop-stream-turn-<conv>`), so
+     * their derived reasoning-message ids diverge and seq-based dedup misses
+     * the duplicate. Mirrors Android's ingestObserverFrame active-turn guard:
+     * while a conversation has a send in flight, the send flow is already
+     * emitting its frames, so the passive observer drops frames for that
+     * conversation at the source instead of re-emitting a duplicate bubble.
+     */
+    private val activeSendConversations = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    /**
      * Projects passively-observed [AppServerInboundFrame.StreamDelta] frames the
      * SAME way [IrohChannelTransport.ingestObserverFrame] does: raw StreamDelta ->
      * RuntimeEventDraft (this mapper turns client_tool_start/client_tool_end into
@@ -107,20 +120,25 @@ class DesktopHybridAppServerChatGateway internal constructor(
             ),
         )
         return flow {
-            turnEngine.runTurn(command).collect { draft ->
-                val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
-                if (lifecycle?.status == RuntimeRunStatus.Failed) {
-                    throw TimelineTransportHttpException(
-                        502,
-                        "App Server turn failed: ${lifecycle.reason ?: "unknown"}",
-                    )
+            activeSendConversations.add(conversationId)
+            try {
+                turnEngine.runTurn(command).collect { draft ->
+                    val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
+                    if (lifecycle?.status == RuntimeRunStatus.Failed) {
+                        throw TimelineTransportHttpException(
+                            502,
+                            "App Server turn failed: ${lifecycle.reason ?: "unknown"}",
+                        )
+                    }
+                    draft.toLettaMessages(
+                        agentId = agentId,
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        fallbackRunId = syntheticRunId,
+                    ).forEach { emit(it) }
                 }
-                draft.toLettaMessages(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    turnId = turnId,
-                    fallbackRunId = syntheticRunId,
-                ).forEach { emit(it) }
+            } finally {
+                activeSendConversations.remove(conversationId)
             }
         }
     }
@@ -159,6 +177,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta
             ?: return emptyList()
         if (streamDelta.runtime.conversationId != conversationId) return emptyList()
+        if (conversationId in activeSendConversations) return emptyList()
         val effectiveAgentId = streamDelta.runtime.agentId.ifBlank { fallbackAgentId }
         val command = streamObserverCommand(effectiveAgentId, conversationId)
         return runtimeEventMapper.map(command, received).flatMap { draft ->

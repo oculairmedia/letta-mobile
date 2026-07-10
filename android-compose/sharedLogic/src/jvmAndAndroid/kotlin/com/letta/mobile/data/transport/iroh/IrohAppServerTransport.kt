@@ -22,6 +22,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -67,6 +68,17 @@ class IrohAppServerTransport(
     private val controlCommandQueue = Channel<AppServerCommand>(Channel.BUFFERED)
     private val controlFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
     private val streamFrameFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER_CAPACITY)
+
+    /**
+     * Tracks whether this transport still has a live QUIC connection. Starts
+     * `true` (matches [AppServerTransport]'s default) and flips to `false` at
+     * the two drop points: a reader loop exiting ([reportReaderExit]) or the
+     * initial connect failing ([runControlChannel]). Lets desktop's heartbeat
+     * gate (`client.isConnected.first()`) actually break on a QUIC drop
+     * instead of spinning forever against the interface's `flowOf(true)`
+     * default.
+     */
+    private val connected = MutableStateFlow(true)
 
     // Connection and streams, initialized in background jobs
     private lateinit var connection: Connection
@@ -154,6 +166,7 @@ class IrohAppServerTransport(
 
     override val controlFrames: Flow<AppServerReceivedFrame> = controlFrameFlow.asSharedFlow()
     override val streamFrames: Flow<AppServerReceivedFrame> = streamFrameFlow.asSharedFlow()
+    override val isConnected: Flow<Boolean> get() = connected
 
     override suspend fun sendControl(command: AppServerCommand) {
         Telemetry.event("IrohTransport", "control.enqueue", "command" to command::class.simpleName)
@@ -266,6 +279,7 @@ class IrohAppServerTransport(
             connectionReady.complete(Unit)
             pathWatchJob = launch { attachPathWatchers() }
         } catch (t: Throwable) {
+            connected.value = false
             onConnectionLost("connect_failed: ${t.message ?: t.toString()}")
             Telemetry.event(
                 "IrohTransport", "connect.failed",
@@ -361,6 +375,7 @@ class IrohAppServerTransport(
 
     private fun reportReaderExit(channel: AppServerChannel, reason: String) {
         if (!readerExitReported.compareAndSet(false, true)) return
+        connected.value = false
         Telemetry.event(
             "IrohSupervisor", "reader.exit",
             "channel" to channel.name,

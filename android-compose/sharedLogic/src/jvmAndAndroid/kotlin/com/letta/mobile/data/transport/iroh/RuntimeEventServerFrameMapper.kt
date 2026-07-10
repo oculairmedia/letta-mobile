@@ -49,25 +49,33 @@ object RuntimeEventServerFrameMapper {
         // update_subagent_state, etc.) are side-channel runtime events, not
         // assistant text. Do not fold them into the chat timeline.
         is RuntimeEventPayload.ExternalTransportFrame -> emptyList()
-        is RuntimeEventPayload.ToolCallObserved -> listOf(toolCallFrame(payload, context))
+        is RuntimeEventPayload.ToolCallObserved -> listOf(
+            toolCallMessage(
+                context = context,
+                id = "toolcall-${payload.toolCallId.value}",
+                toolCall = ToolCallPayload(
+                    toolCallId = payload.toolCallId.value,
+                    name = payload.toolName.value,
+                    arguments = payload.argumentsJson ?: "{}",
+                ),
+            ),
+        )
         is RuntimeEventPayload.ToolReturnObserved -> listOf(toolReturnFrame(payload, context))
-        is RuntimeEventPayload.ApprovalRequested -> listOf(approvalFrame(payload, context))
+        is RuntimeEventPayload.ApprovalRequested -> listOf(
+            toolCallMessage(
+                context = context,
+                id = payload.request.approvalId.value,
+                toolCall = ToolCallPayload(
+                    toolCallId = payload.request.callId.value,
+                    name = payload.request.toolName.value,
+                    arguments = payload.request.argumentsPreview ?: "{}",
+                ),
+                type = "approval_request_message",
+            ),
+        )
         is RuntimeEventPayload.RunLifecycleChanged -> lifecycleFrames(payload, context)
         else -> emptyList()
     }
-
-    private fun toolCallFrame(
-        payload: RuntimeEventPayload.ToolCallObserved,
-        context: Context,
-    ): ServerFrame.ToolCallMessage = toolCallMessage(
-        context = context,
-        id = "toolcall-${payload.toolCallId.value}",
-        toolCall = ToolCallPayload(
-            toolCallId = payload.toolCallId.value,
-            name = payload.toolName.value,
-            arguments = payload.argumentsJson ?: "{}",
-        ),
-    )
 
     private fun toolReturnFrame(
         payload: RuntimeEventPayload.ToolReturnObserved,
@@ -84,26 +92,14 @@ object RuntimeEventServerFrameMapper {
         toolReturn = JsonPrimitive(payload.body),
     )
 
-    private fun approvalFrame(
-        payload: RuntimeEventPayload.ApprovalRequested,
-        context: Context,
-    ): ServerFrame.ToolCallMessage = toolCallMessage(
-        context = context,
-        id = payload.request.approvalId.value,
-        toolCall = ToolCallPayload(
-            toolCallId = payload.request.callId.value,
-            name = payload.request.toolName.value,
-            arguments = payload.request.argumentsPreview ?: "{}",
-        ),
-        type = "approval_request_message",
-    )
-
     /**
-     * Shared [ServerFrame.ToolCallMessage] builder for [toolCallFrame] (an
-     * observed tool call, default `tool_call_message` type) and
-     * [approvalFrame] (an approval request re-shaped as a tool call, per the
-     * §4.1 approval_request_message <-> tool_call_message contract above).
-     * Both only differ in id/toolCall/type.
+     * Shared [ServerFrame.ToolCallMessage] builder for the
+     * [RuntimeEventPayload.ToolCallObserved] arm (an observed tool call,
+     * default `tool_call_message` type) and the
+     * [RuntimeEventPayload.ApprovalRequested] arm (an approval request
+     * re-shaped as a tool call, per the §4.1 approval_request_message <->
+     * tool_call_message contract above) in [map]. Both call sites only differ
+     * in id/toolCall/type.
      */
     private fun toolCallMessage(
         context: Context,

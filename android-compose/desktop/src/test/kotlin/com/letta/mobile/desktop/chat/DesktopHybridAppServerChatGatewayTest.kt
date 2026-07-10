@@ -34,10 +34,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -317,6 +319,50 @@ class DesktopHybridAppServerChatGatewayTest {
         val toolReturn = assertIs<ToolReturnMessage>(toolReturnMessage.message)
         assertEquals("toolreturn-tc-42", toolReturn.id)
         assertEquals("success", toolReturn.status)
+    }
+
+    // SF-1: the passive observer and the send flow both project the same
+    // frames but under different synthetic turnIds, so while a send is in
+    // flight for a conversation the observer must drop that conversation's
+    // frames at the source (the send flow already emits them) — otherwise a
+    // reasoning bubble briefly duplicates. Other conversations with no send
+    // in flight must be unaffected.
+    @Test
+    fun stream_dropsOwnTurnFramesForActiveSendConversationButNotOthers() = runTest {
+        val turnChannel = Channel<RuntimeEventDraft>()
+        val turnEngine = FakeTurnEngine { turnChannel.receiveAsFlow() }
+        val client = FakeAppServerClient()
+        val gw = gateway(turnEngine, client = client)
+
+        // Start a send on conv-1 and drive it to the point where it's
+        // registered as active but still collecting (the fake engine's
+        // channel never emits, so it stays "in flight").
+        val sendJob = launch(start = CoroutineStart.UNDISPATCHED) {
+            gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).collect { }
+        }
+        runCurrent()
+
+        val conv1Results = mutableListOf<TimelineStreamFrame>()
+        val conv2Results = mutableListOf<TimelineStreamFrame>()
+        val conv1Job = launch(start = CoroutineStart.UNDISPATCHED) {
+            gw.streamConversation("conv-1").collect { conv1Results += it }
+        }
+        val conv2Job = launch(start = CoroutineStart.UNDISPATCHED) {
+            gw.streamConversation("conv-2").collect { conv2Results += it }
+        }
+        runCurrent()
+
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-1", envelope = streamDeltaEnvelope(assistantDelta)))
+        client.eventsFlow.emit(streamDeltaFrame(conversationId = "conv-2", envelope = streamDeltaEnvelope(assistantDelta)))
+        runCurrent()
+
+        assertTrue(conv1Results.none { it is TimelineStreamFrame.Message }, "conv-1 own-turn frame was NOT dropped: $conv1Results")
+        assertTrue(conv2Results.any { it is TimelineStreamFrame.Message }, "conv-2 frame (no active send) should still pass: $conv2Results")
+
+        turnChannel.close()
+        sendJob.cancel()
+        conv1Job.cancel()
+        conv2Job.cancel()
     }
 
     @Test
