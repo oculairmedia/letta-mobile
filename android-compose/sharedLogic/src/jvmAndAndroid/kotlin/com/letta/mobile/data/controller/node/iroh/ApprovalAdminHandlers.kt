@@ -25,12 +25,12 @@ import kotlinx.serialization.json.put
  */
 object ApprovalAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String, controller: AppServerController? = null) {
-        val proxy = AdminProxyClient(adminBaseUrl)
-        router.register("approval.submit") { params -> submit(proxy, params, controller) }
+        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
+        router.register("approval.submit") { params -> submit(api, params, controller) }
     }
 
     private suspend fun submit(
-        proxy: AdminProxyClient,
+        api: AdminHandlerSupport,
         params: JsonObject?,
         controller: AppServerController?,
     ): JsonElement {
@@ -68,7 +68,7 @@ object ApprovalAdminHandlers {
         }
 
         if (toolCallIds.isEmpty()) throw IllegalArgumentException("tool_call_id required")
-        val pending = proxy.get(
+        val pending = api.get(
             adminProxyRequest("shim", "v1", "approvals", "pending")
                 .query("agent_id", agentId)
                 .build(),
@@ -87,7 +87,7 @@ object ApprovalAdminHandlers {
             put("scope", if (approve) "Once" else "Deny")
             reason?.let { put("reason", it) }
         }
-        return proxy.post(
+        return api.proxy.post(
             adminProxyRequest("shim", "v1", "approvals", runId, "decision").build(),
             decisionBody.toString(),
         )

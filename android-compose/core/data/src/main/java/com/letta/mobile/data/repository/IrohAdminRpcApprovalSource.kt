@@ -29,7 +29,7 @@ class IrohAdminRpcApprovalSource(
     private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
 ) {
     fun shouldUseIroh(): Boolean =
-        IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
+        settingsRepository.activeBackendIsIroh()
 
     suspend fun submitApproval(agentId: AgentId, payload: MessageCreateRequest) {
         val body = buildJsonObject {

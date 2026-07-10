@@ -10,6 +10,8 @@ object AdminRpcRegistry {
         "tool_return.get",
         "goal.get",
         "goal.command",
+        "slash_command.list",
+        "slash_command.list_agent",
         "agent.list",
         "health.check",
         "approval.submit",
@@ -30,6 +32,7 @@ object AdminRpcRegistry {
         ToolAdminHandlers.register(router, rpcBase)
         McpAdminHandlers.register(router, rpcBase)
         GoalAdminHandlers.register(router, rpcBase)
+        SlashCommandAdminHandlers.register(router, rpcBase)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
 
         router.requireNonEmpty()
