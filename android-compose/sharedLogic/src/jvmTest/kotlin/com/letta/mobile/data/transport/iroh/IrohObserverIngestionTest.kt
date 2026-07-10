@@ -294,9 +294,7 @@ class IrohObserverIngestionTest {
 
             // Sanity: the FIRST connection's observer collector ingests.
             stream1.emit(streamDelta("agent-1", "conv-obs", 1, assistantDelta("cm-before", "before redial")))
-            withTimeout(3_000) {
-                while (frames.none { it is ServerFrame.AssistantMessage && it.content == "before redial" }) delay(20)
-            }
+            awaitAssistantContent(frames, "before redial", timeoutMs = 3_000)
 
             // REDIAL: connection-lost-class admin_rpc failures on handle1
             // (original + same-connection retry) invalidate the supervisor and
@@ -311,9 +309,7 @@ class IrohObserverIngestionTest {
             // NEW connection's stream channel is ingested — the observer
             // collector re-armed against handle2, generation-pinned.
             stream2.emit(streamDelta("agent-1", "conv-obs", 2, assistantDelta("cm-after", "after redial")))
-            withTimeout(5_000) {
-                while (frames.none { it is ServerFrame.AssistantMessage && it.content == "after redial" }) delay(20)
-            }
+            awaitAssistantContent(frames, "after redial")
 
             // Generation guard: the SUPERSEDED handle1 collector must be dead —
             // a frame on the old stream is neither ingested nor double-consumed.
@@ -388,5 +384,14 @@ class IrohObserverIngestionTest {
             collector.cancel()
             transport.disconnect()
         }
+    }
+
+    /** Polls [frames] until an assistant frame with [content] arrives (or times out). */
+    private suspend fun awaitAssistantContent(
+        frames: List<ServerFrame>,
+        content: String,
+        timeoutMs: Long = 5_000,
+    ) = withTimeout(timeoutMs) {
+        while (frames.none { it is ServerFrame.AssistantMessage && it.content == content }) delay(20)
     }
 }
