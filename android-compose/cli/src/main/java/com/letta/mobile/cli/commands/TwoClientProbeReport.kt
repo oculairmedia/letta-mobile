@@ -128,46 +128,60 @@ internal object TwoClientObservation {
         val assistantRows = frames.filterIsInstance<ServerFrame.AssistantMessage>()
         val terminals = frames.filterIsInstance<ServerFrame.TurnDone>()
 
-        val violations = mutableListOf<String>()
-        if (!gotTerminal) violations += "observer_never_received_terminal"
-
-        val userEcho = userRows.lastOrNull { it.content.contains(sentText) } ?: userRows.lastOrNull()
-        if (userEcho == null) {
-            violations += "observer_missing_user_echo"
-        } else if (!userEcho.content.contains(sentText)) {
-            violations += "user_echo_text_mismatch:${userEcho.content.take(40)}"
+        val violations = buildList {
+            if (!gotTerminal) add("observer_never_received_terminal")
+            addAll(userEchoViolations(userRows, sentText))
+            addAll(assistantStreamViolations(assistantRows))
+            addAll(terminalViolations(terminals))
+            addAll(orderingViolations(frames, userRows, sentText, assistantRows, terminals))
         }
-
-        if (assistantRows.isEmpty()) {
-            violations += "observer_missing_assistant_stream"
-        } else {
-            val first = assistantRows.first().content
-            val last = assistantRows.last().content
-            if (last.isEmpty()) violations += "assistant_final_text_empty"
-            if (last.length < first.length) violations += "assistant_stream_not_cumulative:${first.length}->${last.length}"
-        }
-
-        if (terminals.size != 1) violations += "terminal_count_${terminals.size}"
         val terminalStatus = terminals.firstOrNull()?.status
-        if (terminals.isNotEmpty() && terminalStatus != "completed") {
-            violations += "terminal_status_${terminalStatus ?: "missing"}"
-        }
-
-        // Ordering: user echo before assistant text before terminal.
-        if (userEcho != null && assistantRows.isNotEmpty() && terminals.isNotEmpty()) {
-            val userIdx = frames.indexOf(userEcho)
-            val asstIdx = frames.indexOf(assistantRows.last())
-            val termIdx = frames.indexOf(terminals.first())
-            if (!(userIdx <= asstIdx && asstIdx <= termIdx)) {
-                violations += "out_of_order:user=$userIdx asst=$asstIdx term=$termIdx"
-            }
-        }
-
         val detail = buildString {
             append("user=${userRows.size} assistant=${assistantRows.size} terminal=${terminals.size} ")
             append("finalAssistant='${assistantRows.lastOrNull()?.content?.take(40) ?: ""}' ")
             append("terminalStatus=${terminalStatus ?: "NA"}")
         }
         return Result(violations, detail)
+    }
+
+    private fun userEcho(userRows: List<ServerFrame.UserMessage>, sentText: String): ServerFrame.UserMessage? =
+        userRows.lastOrNull { it.content.contains(sentText) } ?: userRows.lastOrNull()
+
+    private fun userEchoViolations(userRows: List<ServerFrame.UserMessage>, sentText: String): List<String> {
+        val echo = userEcho(userRows, sentText) ?: return listOf("observer_missing_user_echo")
+        if (!echo.content.contains(sentText)) return listOf("user_echo_text_mismatch:${echo.content.take(40)}")
+        return emptyList()
+    }
+
+    private fun assistantStreamViolations(assistantRows: List<ServerFrame.AssistantMessage>): List<String> {
+        if (assistantRows.isEmpty()) return listOf("observer_missing_assistant_stream")
+        val first = assistantRows.first().content
+        val last = assistantRows.last().content
+        return buildList {
+            if (last.isEmpty()) add("assistant_final_text_empty")
+            if (last.length < first.length) add("assistant_stream_not_cumulative:${first.length}->${last.length}")
+        }
+    }
+
+    private fun terminalViolations(terminals: List<ServerFrame.TurnDone>): List<String> = buildList {
+        if (terminals.size != 1) add("terminal_count_${terminals.size}")
+        val status = terminals.firstOrNull()?.status
+        if (terminals.isNotEmpty() && status != "completed") add("terminal_status_${status ?: "missing"}")
+    }
+
+    private fun orderingViolations(
+        frames: List<ServerFrame>,
+        userRows: List<ServerFrame.UserMessage>,
+        sentText: String,
+        assistantRows: List<ServerFrame.AssistantMessage>,
+        terminals: List<ServerFrame.TurnDone>,
+    ): List<String> {
+        val echo = userEcho(userRows, sentText) ?: return emptyList()
+        if (assistantRows.isEmpty() || terminals.isEmpty()) return emptyList()
+        val userIdx = frames.indexOf(echo)
+        val asstIdx = frames.indexOf(assistantRows.last())
+        val termIdx = frames.indexOf(terminals.first())
+        if (userIdx <= asstIdx && asstIdx <= termIdx) return emptyList()
+        return listOf("out_of_order:user=$userIdx asst=$asstIdx term=$termIdx")
     }
 }

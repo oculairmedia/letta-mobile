@@ -265,30 +265,35 @@ internal class AdminRpcStreamServer(
                 errorEnvelope(requestId ?: "", "method and request_id are required")
             } else {
                 val params = obj["params"]?.jsonObject
-                // eaczz.3: let the owning connection observe this authenticated
-                // method call (e.g. subscribe as a viewer on message.list) before
-                // dispatch. Best-effort: a failing hook must never break the RPC.
-                onMethodObserved?.let { observe ->
-                    try {
-                        observe(method, params)
-                    } catch (ce: CancellationException) {
-                        throw ce
-                    } catch (hookError: Exception) {
-                        Telemetry.event(
-                            "IrohNode", "admin_rpc.method_observer.failed",
-                            "remoteEndpointId" to remoteEndpointId,
-                            "method" to method,
-                            "error" to (hookError.message ?: hookError.toString()),
-                            level = Telemetry.Level.WARN,
-                        )
-                    }
-                }
+                notifyMethodObserved(method, params)
                 router.dispatch(requestId, method, params)
             }
         } catch (ce: CancellationException) {
             throw ce
         } catch (error: Exception) {
             errorEnvelope("", "Failed to parse admin_rpc frame: ${error.message ?: error.toString()}")
+        }
+    }
+
+    /**
+     * eaczz.3: let the owning connection observe an authenticated method call
+     * (e.g. subscribe as a viewer on message.list) before dispatch.
+     * Best-effort: a failing hook must never break the RPC.
+     */
+    private suspend fun notifyMethodObserved(method: String, params: JsonObject?) {
+        val observe = onMethodObserved ?: return
+        try {
+            observe(method, params)
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (hookError: Exception) {
+            Telemetry.event(
+                "IrohNode", "admin_rpc.method_observer.failed",
+                "remoteEndpointId" to remoteEndpointId,
+                "method" to method,
+                "error" to (hookError.message ?: hookError.toString()),
+                level = Telemetry.Level.WARN,
+            )
         }
     }
 
