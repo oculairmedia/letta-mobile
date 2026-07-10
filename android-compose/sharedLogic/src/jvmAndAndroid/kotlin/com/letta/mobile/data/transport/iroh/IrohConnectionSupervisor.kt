@@ -298,12 +298,18 @@ class IrohConnectionSupervisor(
     ) {
         mutex.withLock {
             val diedBeforeReady = handlesLostBeforeReady.any { it === handle }
-            handlesLostBeforeReady.clear()
             if (isDialSuperseded(config)) {
+                // Stale completion: leave handlesLostBeforeReady INTACT. A newer
+                // in-flight dial may have recorded a pre-ready loss for its own
+                // handle; a blanket clear() here would erase it and let that dead
+                // handle reach Ready.
                 result.settleFailure(CancellationException("stale Iroh dial result ignored"))
                 scope.launch { handle.close("stale_dial") }
                 return@withLock
             }
+            // This valid dial is the only in-flight one (dials are serialized), so
+            // resetting the record is safe now that the stale check has passed.
+            handlesLostBeforeReady.clear()
             if (diedBeforeReady) {
                 clearInFlightDial()
                 scope.launch { handle.close("lost_before_ready") }
@@ -329,11 +335,13 @@ class IrohConnectionSupervisor(
         result: CompletableDeferred<IrohConnectionHandle>,
     ) {
         mutex.withLock {
-            handlesLostBeforeReady.clear()
             if (dialConfig != config) {
+                // Stale failure: don't clear — a newer in-flight dial's pre-ready
+                // loss record must survive (same hazard as installDialedHandle).
                 result.settleFailure(CancellationException("stale Iroh dial failure ignored"))
                 return@withLock
             }
+            handlesLostBeforeReady.clear()
             currentHandle = null
             clearInFlightDial()
             if (error is IrohAuthFailure) {
