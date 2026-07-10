@@ -246,83 +246,109 @@ class IrohConnectionSupervisor(
         dialResult = result
         dialJob = scope.launch {
             transitionTo(IrohConnectionState.Dialing, "dial")
-            val dialAttempt = runCatching {
+            runCatching {
                 transitionTo(IrohConnectionState.Handshaking, "handshake")
                 dialer(config)
             }
-            // letta-mobile-r3i1z: completion bookkeeping runs NonCancellable. If the
-            // dial job is cancelled after dialer() already produced a handle, the
-            // pre-fix code threw CancellationException at the first suspension and
-            // never ran either branch — leaking a LIVE, authed QUIC connection whose
-            // reader jobs (launched in the outer scope) kept pumping frames nobody
-            // collected. Now the stale-dial branch always runs and closes the handle.
-            dialAttempt.onSuccess { handle ->
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                    mutex.withLock {
-                        if (closed || authFailed || dialConfig != config || currentConfig != config) {
-                            handlesLostBeforeReady.clear()
-                            if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial result ignored"))
-                            scope.launch { handle.close("stale_dial") }
-                            return@withLock
-                        }
-                        // letta-mobile-r3i1z: the just-dialed handle already reported
-                        // a loss in the publish->install window — do NOT go Ready on a
-                        // dead connection; close it and redial. (The loss's own
-                        // mutex section ran first and recorded it; if it runs after
-                        // this install instead, lostHandle == currentHandle there and
-                        // the normal teardown+redial path handles it.)
-                        if (handlesLostBeforeReady.any { it === handle }) {
-                            handlesLostBeforeReady.clear()
-                            dialResult = null
-                            dialJob = null
-                            dialConfig = null
-                            scope.launch { handle.close("lost_before_ready") }
-                            failureCount += 1
-                            transitionTo(IrohConnectionState.Degraded("dialed handle lost before ready"), "dial_lost_before_ready")
-                            if (!closed) scheduleRedialLocked("dialed handle lost before ready")
-                            if (!result.isCompleted) result.completeExceptionally(IllegalStateException("Iroh dialed handle lost before ready"))
-                            return@withLock
-                        }
-                        handlesLostBeforeReady.clear()
-                        currentHandle = handle
-                        currentConfig = config
-                        failureCount = 0
-                        dialResult = null
-                        dialJob = null
-                        dialConfig = null
-                        transitionTo(IrohConnectionState.Ready(handle), "ready")
-                        if (!result.isCompleted) result.complete(handle)
+                // Completion bookkeeping runs NonCancellable: if the dial job is
+                // cancelled after dialer() produced a handle, the stale-dial branch
+                // still runs and closes it — else a live authed QUIC connection
+                // leaks, its reader jobs pumping frames nobody collects.
+                .onSuccess { handle ->
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        installDialedHandle(handle, config, result)
                     }
                 }
-            }.onFailure { error ->
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                    mutex.withLock {
-                        handlesLostBeforeReady.clear()
-                        if (dialConfig != config) {
-                            if (!result.isCompleted) result.completeExceptionally(CancellationException("stale Iroh dial failure ignored"))
-                            return@withLock
-                        }
-                        currentHandle = null
-                        dialResult = null
-                        dialJob = null
-                        dialConfig = null
-                        if (error is IrohAuthFailure) {
-                            authFailed = true
-                            redialJob?.cancel()
-                            redialJob = null
-                            redialReadyAtMs = null
-                            transitionTo(IrohConnectionState.AuthFailed(error.message ?: "Iroh auth failed"), "auth_failed")
-                        } else {
-                            failureCount += 1
-                            transitionTo(IrohConnectionState.Degraded(error.message ?: error.toString()), "dial_failed")
-                            if (!closed) scheduleRedialLocked(error.message ?: error.toString())
-                        }
-                        if (!result.isCompleted) result.completeExceptionally(error)
+                .onFailure { error ->
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        failDial(error, config, result)
                     }
                 }
-            }
         }
         return result
+    }
+
+    private fun isDialSuperseded(config: IrohConnectConfig): Boolean =
+        closed || authFailed || dialConfig != config || currentConfig != config
+
+    private fun clearInFlightDial() {
+        dialResult = null
+        dialJob = null
+        dialConfig = null
+    }
+
+    private fun CompletableDeferred<IrohConnectionHandle>.settleSuccess(handle: IrohConnectionHandle) {
+        if (!isCompleted) complete(handle)
+    }
+
+    private fun CompletableDeferred<IrohConnectionHandle>.settleFailure(error: Throwable) {
+        if (!isCompleted) completeExceptionally(error)
+    }
+
+    /**
+     * Install a freshly dialed [handle] as Ready — unless the dial is superseded
+     * (config moved on) or the handle already reported a loss in the
+     * publish->install window ([handlesLostBeforeReady]), in which case close it
+     * and redial rather than go Ready on a dead connection. Runs under the mutex.
+     */
+    private suspend fun installDialedHandle(
+        handle: IrohConnectionHandle,
+        config: IrohConnectConfig,
+        result: CompletableDeferred<IrohConnectionHandle>,
+    ) {
+        mutex.withLock {
+            val diedBeforeReady = handlesLostBeforeReady.any { it === handle }
+            handlesLostBeforeReady.clear()
+            if (isDialSuperseded(config)) {
+                result.settleFailure(CancellationException("stale Iroh dial result ignored"))
+                scope.launch { handle.close("stale_dial") }
+                return@withLock
+            }
+            if (diedBeforeReady) {
+                clearInFlightDial()
+                scope.launch { handle.close("lost_before_ready") }
+                failureCount += 1
+                transitionTo(IrohConnectionState.Degraded("dialed handle lost before ready"), "dial_lost_before_ready")
+                if (!closed) scheduleRedialLocked("dialed handle lost before ready")
+                result.settleFailure(IllegalStateException("Iroh dialed handle lost before ready"))
+                return@withLock
+            }
+            currentHandle = handle
+            currentConfig = config
+            failureCount = 0
+            clearInFlightDial()
+            transitionTo(IrohConnectionState.Ready(handle), "ready")
+            result.settleSuccess(handle)
+        }
+    }
+
+    /** Record a dial failure: auth failures are terminal, everything else degrades + schedules a redial. Runs under the mutex. */
+    private suspend fun failDial(
+        error: Throwable,
+        config: IrohConnectConfig,
+        result: CompletableDeferred<IrohConnectionHandle>,
+    ) {
+        mutex.withLock {
+            handlesLostBeforeReady.clear()
+            if (dialConfig != config) {
+                result.settleFailure(CancellationException("stale Iroh dial failure ignored"))
+                return@withLock
+            }
+            currentHandle = null
+            clearInFlightDial()
+            if (error is IrohAuthFailure) {
+                authFailed = true
+                redialJob?.cancel()
+                redialJob = null
+                redialReadyAtMs = null
+                transitionTo(IrohConnectionState.AuthFailed(error.message ?: "Iroh auth failed"), "auth_failed")
+            } else {
+                failureCount += 1
+                transitionTo(IrohConnectionState.Degraded(error.message ?: error.toString()), "dial_failed")
+                if (!closed) scheduleRedialLocked(error.message ?: error.toString())
+            }
+            result.settleFailure(error)
+        }
     }
 
     private fun scheduleRedialLocked(reason: String) {
