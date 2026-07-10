@@ -411,7 +411,10 @@ private fun ConversationsContent(
                     }
                     itemsIndexed(
                         items = section.items,
-                        key = { _, display -> "${section.key}:${display.conversation.id}" },
+                        // Index-suffixed so a residual duplicate id can never
+                        // collide the LazyColumn key and crash the render thread
+                        // (dedupe above is the primary guard; this is defense).
+                        key = { index, display -> "${section.key}:${display.conversation.id}:$index" },
                     ) { index, display ->
                         StaggeredListItem(index = sectionBaseIndex + index) {
                             ConversationCard(
@@ -686,8 +689,15 @@ private data class ConversationSection(
 private fun buildConversationSections(conversations: List<ConversationDisplay>): List<ConversationSection> {
     if (conversations.isEmpty()) return emptyList()
 
-    val pinned = conversations.filter { it.isPinned }
-    val regular = conversations.filterNot { it.isPinned }
+    // Defensive dedupe by conversation id: a duplicated conversation row (e.g.
+    // from concurrent list refreshes / admin_rpc churn) would otherwise produce
+    // two LazyColumn items with the same "date_<date>:conv-<id>" key and crash
+    // the render thread with IllegalArgumentException "Key ... was already used"
+    // (letta-mobile conversations-list duplicate-key crash class).
+    val deduped = conversations.distinctBy { it.conversation.id }
+
+    val pinned = deduped.filter { it.isPinned }
+    val regular = deduped.filterNot { it.isPinned }
 
     val sections = mutableListOf<ConversationSection>()
     if (pinned.isNotEmpty()) {
