@@ -181,6 +181,96 @@ class IrohConnectionSupervisorTest {
     }
 
     @Test
+    fun staleConnectionLossForSupersededHandleIsIgnored() = runTest {
+        // letta-mobile-r3i1z: a dead transport reports its loss up to twice
+        // (close watcher + reader exit) and the SECOND report lands after the
+        // supervisor has already redialed. It must be attributed to the dead
+        // handle and IGNORED — not treated as a loss of the healthy new
+        // connection (which used to tear down the redialed handle and the
+        // observer-ingestion collector that had just re-armed against it).
+        var dials = 0
+        val closed = mutableListOf<String>()
+        val supervisor = supervisor(config = { configA }) {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(it, sessionId) { reason -> closed += "$sessionId:$reason" }
+        }
+
+        val first = supervisor.ready()
+        // Genuine loss of dial-1 (attributed) -> degrade + automatic redial.
+        supervisor.onConnectionLost("connection_closed: timed out", first)
+        runCurrent()
+        assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+        advanceTimeBy(500)
+        advanceUntilIdle()
+        assertEquals("dial-2", assertIs<IrohConnectionState.Ready>(supervisor.state.value).handle.sessionId)
+
+        // dial-1's late duplicate loss report (triggered by closing it) lands
+        // AFTER the redial completed: stale, must not touch dial-2.
+        supervisor.onConnectionLost("reader_stopped:Stream", first)
+        advanceUntilIdle()
+
+        val still = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals("dial-2", still.handle.sessionId)
+        assertEquals(2, dials)
+        assertTrue(closed.none { it.startsWith("dial-2") }, "healthy redialed handle must not be closed; closed=$closed")
+
+        // Unattributed losses (legacy callers) keep today's behavior: they DO
+        // invalidate whatever is current.
+        supervisor.onConnectionLost("legacy_unattributed")
+        runCurrent()
+        assertIs<IrohConnectionState.Degraded>(supervisor.state.value)
+    }
+
+    @Test
+    fun lossForDialedHandleBeforeReadyAbortsInstallInsteadOfGoingReadyOnDeadConnection() = runTest {
+        // letta-mobile-r3i1z (review follow-up): a freshly dialed handle can report
+        // a loss in the window AFTER dial() publishes it (its onConnectionLost is
+        // wired at construction) but BEFORE the supervisor installs it as Ready.
+        // That loss must ABORT the install (close + redial) — not be dropped as
+        // "stale" — otherwise the supervisor goes Ready on an already-dead
+        // connection and observer/admin traffic attaches to it until some later
+        // failure forces another reconnect.
+        var dials = 0
+        val closed = mutableListOf<String>()
+        val gate = CompletableDeferred<Unit>()
+        lateinit var dial1: IrohConnectionHandle
+        val supervisor = supervisor(config = { configA }) { config ->
+            dials += 1
+            val sessionId = "dial-$dials"
+            val handle = fakeHandle(config, sessionId) { reason -> closed += "$sessionId:$reason" }
+            if (dials == 1) {
+                dial1 = handle
+                gate.await() // hold dial-1 open: the handle exists but isn't installed yet
+            }
+            handle
+        }
+
+        val ready = async { runCatching { supervisor.ready() } }
+        runCurrent() // dial-1's dialer is suspended at the gate; dial1 exists, not yet Ready
+
+        // Its connection dies in the publish->install window: attributed loss for a
+        // handle that is not (yet) the current handle.
+        supervisor.onConnectionLost("connection_closed: timed out", dial1)
+        runCurrent()
+
+        // Release the dial: the install must detect the recorded loss and abort.
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(
+            closed.contains("dial-1:lost_before_ready"),
+            "dead dial-1 handle must be closed, not installed as Ready; closed=$closed",
+        )
+
+        advanceTimeBy(500)
+        advanceUntilIdle()
+        val readyState = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals("dial-2", readyState.handle.sessionId, "must redial to a live connection")
+        assertEquals(2, dials)
+        ready.cancel()
+    }
+
+    @Test
     fun configChangeCancelsInFlightDialAndStartsNewConfig() = runTest {
         var config = configA
         val firstDialGate = CompletableDeferred<Unit>()
