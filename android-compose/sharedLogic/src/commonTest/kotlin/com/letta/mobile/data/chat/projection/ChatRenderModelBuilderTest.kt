@@ -305,6 +305,60 @@ class ChatRenderModelBuilderTest {
     }
 
     @Test
+    fun `letta-mobile-g87l6 streaming tail tick reuses identity of every settled render item`() {
+        // letta-mobile-g87l6 (desktop -> mobile flicker). During a streaming turn
+        // the observer projects a ReplaceTail per fanned-out token. The
+        // incremental cache reuses the FROZEN committed history, but
+        // activeTailStartIndex pulls the latest user prompt AND the immediately
+        // preceding assistant turn into the rebuilt "active tail", so those
+        // already-settled bubbles get a FRESH ChatRenderItem instance on every
+        // token even though their content never changes. In Compose a new item
+        // instance for the same LazyColumn key recomposes the whole subtree —
+        // that per-token recomposition of settled bubbles is the visible flicker.
+        //
+        // Contract: on a ReplaceTail streaming tick, ONLY the render item that
+        // actually changed (the streaming tail whose text grew) may get a new
+        // instance. Every settled item — including the just-sent user prompt and
+        // the previous turn's completed answer — must keep its object identity so
+        // Compose skips recomposing it.
+        val cache = IncrementalChatRenderItemsCache()
+        // Prior settled turn + a just-sent user prompt. This is the state right
+        // before the observed assistant reply begins streaming.
+        val history = listOf(
+            user("u-prev", content = "previous question", ts = "2026-04-19T12:00:00Z"),
+            assistant("a-prev", content = "previous answer", runId = "run-prev", ts = "2026-04-19T12:00:01Z"),
+            user("u-now", content = "current question", ts = "2026-04-19T12:00:02Z"),
+        )
+        fun streamingFrame(text: String) =
+            history + assistant("a-stream", content = text, runId = "run-now", ts = "2026-04-19T12:00:03Z")
+
+        // Faithful observer sequence: history hydrates (Full), then the observed
+        // assistant reply's first token APPENDS (AppendTail), then each fanned-out
+        // token REPLACES the tail (ReplaceTail) — the per-token flicker path.
+        cache.renderItems(history, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
+        var prev = cache.renderItems(streamingFrame("A"), ChatDisplayMode.Interactive, ChatMessageListChange.AppendTail)
+        val settledKeys = prev.drop(1).map { it.key } // everything except the streaming tail (index 0, reverse layout)
+
+        // Stream several more tokens as ReplaceTail (the observer per-token path).
+        for (text in listOf("An", "Ans", "Answ", "Answe", "Answer")) {
+            val next = cache.renderItems(streamingFrame(text), ChatDisplayMode.Interactive, ChatMessageListChange.ReplaceTail)
+            val prevByKey = prev.associateBy { it.key }
+            val reidentifiedSettled = settledKeys.filter { key ->
+                val before = prevByKey.getValue(key)
+                val after = next.first { it.key == key }
+                before !== after
+            }
+            assertEquals(
+                emptyList(),
+                reidentifiedSettled,
+                "settled render items must keep their identity across a streaming ReplaceTail tick " +
+                    "(text='$text'); these got a fresh instance and will recompose/flicker: $reidentifiedSettled",
+            )
+            prev = next
+        }
+    }
+
+    @Test
     fun `incremental render item cache falls back when update is not an active tail change`() {
         val cache = IncrementalChatRenderItemsCache()
         val base = streamingHistory(turnCount = 200)
