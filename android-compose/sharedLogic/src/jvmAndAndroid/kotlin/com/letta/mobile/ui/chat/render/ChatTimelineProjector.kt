@@ -139,18 +139,29 @@ class ChatTimelineProjector {
         val anyConfirmed = confirmedCount > 0
         val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
         val prefixToolCardCount = prefix.sumOf { it.toolCardCount() }
+        val previousSnapshot = lastProjectionSnapshot
+        val renderedNoChange = previousSnapshot != null &&
+            previousSnapshot.conversationId == timeline.conversationId &&
+            previousSnapshot.uiSnapshot == ui &&
+            previousSnapshot.a2uiMessages == a2uiMessages &&
+            previousSnapshot.anyLettaServerLocalPending == anyLettaServerLocalPending &&
+            previousSnapshot.anyConfirmed == anyConfirmed &&
+            previousSnapshot.tailIsAssistant == tailIsAssistant &&
+            previousSnapshot.prefixToolCardCount + previousSnapshot.toolCardCount ==
+                prefixToolCardCount + liveToolCardCount
         val result = TimelineProjection(
-            ui = ui,
+            ui = if (renderedNoChange) previousSnapshot.uiSnapshot!! else ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = anyConfirmed,
-            a2uiMessages = a2uiMessages,
+            a2uiMessages = if (renderedNoChange) previousSnapshot.a2uiMessages else a2uiMessages,
             toolCardCount = prefixToolCardCount + liveToolCardCount,
             eventsReused = eventsReused,
             eventsProjected = eventsProjected,
             prefixEventsChecked = 0,
             fastPath = false,
-            messageListChange = ChatMessageListChange.Full,
+            messageListChange = if (renderedNoChange) ChatMessageListChange.None else ChatMessageListChange.Full,
+            noChange = renderedNoChange,
         )
         lastProjectionSnapshot = CachedTimelineProjectionSnapshot(
             conversationId = timeline.conversationId,
