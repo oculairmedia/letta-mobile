@@ -121,7 +121,17 @@ class TimelineSyncLoop(
         pendingLocalStore = pendingLocalStore,
         logTag = logTag,
         scope = loopScope,
-        ingestStreamEvent = ::ingestStreamEvent
+        ingestStreamEvent = ::ingestStreamEvent,
+        // letta-mobile-r3i1z: every ingestStreamEvent above marks the ws/external-
+        // transport latch active (correct WHILE our own turn streams through the
+        // send flow — the persistent subscriber sees the same frames and must not
+        // double-ingest). Clear it when the send stream ends, or the subscriber
+        // stays muted forever and fanned-out turns from OTHER clients (Iroh
+        // observer frames) are dropped at submitStreamEvent as skippedDualIngest:
+        // the desktop rendered the prompt (via the external-run reconcile) but
+        // never the reply. ChatSendCoordinator clears the same latch at turn end
+        // on the WS/iroh coordinator path; this is the loop-owned send's mirror.
+        onSendStreamEnded = { wsSubscription.clear() },
     )
 
     private val stateTransitionHandler = TimelineStateTransitionHandler(
