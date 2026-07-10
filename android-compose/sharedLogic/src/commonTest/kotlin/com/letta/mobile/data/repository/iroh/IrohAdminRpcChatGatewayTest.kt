@@ -36,9 +36,9 @@ class IrohAdminRpcChatGatewayTest {
     @Test
     fun listConversationsDecodesAdminRpcResult() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
-        transport.rpcResponder = { method, path, _ ->
-            assertEquals("conversation.list", method)
-            assertEquals("/v1/conversations", path)
+        transport.rpcResponder = { call ->
+            assertEquals("conversation.list", call.method)
+            assertEquals("/v1/conversations", call.path)
             ok("""[{"id":"conv-1","agent_id":"agent-1","summary":"hi"}]""")
         }
         val gateway = IrohAdminRpcChatGateway(transport)
@@ -55,10 +55,10 @@ class IrohAdminRpcChatGatewayTest {
     @Test
     fun listConversationMessagesBuildsQueryStringPath() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
-        transport.rpcResponder = { method, path, body ->
-            assertEquals("message.list", method)
-            assertEquals("/v1/conversations/conv-1/messages?limit=50&order=desc", path)
-            assertEquals(null, body)
+        transport.rpcResponder = { call ->
+            assertEquals("message.list", call.method)
+            assertEquals("/v1/conversations/conv-1/messages?limit=50&order=desc", call.path)
+            assertEquals(null, call.body)
             ok("""[{"message_type":"assistant_message","id":"msg-1","content":"hello"}]""")
         }
         val gateway = IrohAdminRpcChatGateway(transport)
@@ -71,14 +71,15 @@ class IrohAdminRpcChatGatewayTest {
     @Test
     fun sendStreamsTurnDeltasAndCompletesOnTurnDone() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
-        transport.rpcResponder = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
         val gateway = IrohAdminRpcChatGateway(transport)
+        val turn = TurnRef(conversationId = "conv-1", turnId = "turn-1")
 
         val collected = async { gateway.sendConversationMessage("conv-1", request("hello")).toList() }
         transport.frameEvents.subscriptionCount.first { it > 0 }
-        transport.emitFrame(turnStarted(conversationId = "conv-1", turnId = "turn-1"))
-        transport.emitFrame(assistantDelta(id = "cm-stream-1", content = "Hi there", turnId = "turn-1"))
-        transport.emitFrame(turnDone(turnId = "turn-1", status = "completed"))
+        transport.emitFrame(turnStarted(turn))
+        transport.emitFrame(assistantDelta(turn, id = "cm-stream-1", content = "Hi there"))
+        transport.emitFrame(turnDone(turn, status = "completed"))
 
         val messages = collected.await()
         assertEquals(listOf("cm-stream-1"), messages.map { it.id })
@@ -89,13 +90,14 @@ class IrohAdminRpcChatGatewayTest {
     @Test
     fun sendFailsWhenTurnFails() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
-        transport.rpcResponder = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
         val gateway = IrohAdminRpcChatGateway(transport)
+        val turn = TurnRef(conversationId = "conv-1", turnId = "turn-9")
 
         val collected = async { runCatching { gateway.sendConversationMessage("conv-1", request("boom")).toList() } }
         transport.frameEvents.subscriptionCount.first { it > 0 }
-        transport.emitFrame(turnStarted(conversationId = "conv-1", turnId = "turn-9"))
-        transport.emitFrame(turnDone(turnId = "turn-9", status = "failed"))
+        transport.emitFrame(turnStarted(turn))
+        transport.emitFrame(turnDone(turn, status = "failed"))
 
         val failure = collected.await().exceptionOrNull()
         assertTrue(failure is TimelineTransportHttpException, "expected transport failure, got $failure")
@@ -104,7 +106,7 @@ class IrohAdminRpcChatGatewayTest {
     @Test
     fun sendThrowsWhenTransportRejectsDispatch() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport(sendAccepts = false)
-        transport.rpcResponder = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-1","agent_id":"agent-1"}""") }
         val gateway = IrohAdminRpcChatGateway(transport)
 
         assertFailsWith<TimelineTransportHttpException> {
@@ -116,17 +118,19 @@ class IrohAdminRpcChatGatewayTest {
     fun streamConversationRoutesDeltasByActiveTurnConversation() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
         val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val turnA = TurnRef(conversationId = "conv-a", turnId = "turn-a")
+        val turnB = TurnRef(conversationId = "conv-b", turnId = "turn-b")
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch {
             gateway.streamConversation("conv-a").collect { received += it }
         }
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
-        transport.emitFrame(turnStarted(conversationId = "conv-a", turnId = "turn-a"))
-        transport.emitFrame(assistantDelta(id = "cm-stream-a", content = "for a", turnId = "turn-a"))
-        transport.emitFrame(turnDone(turnId = "turn-a", status = "completed"))
-        transport.emitFrame(turnStarted(conversationId = "conv-b", turnId = "turn-b"))
-        transport.emitFrame(assistantDelta(id = "cm-stream-b", content = "for b", turnId = "turn-b"))
+        transport.emitFrame(turnStarted(turnA))
+        transport.emitFrame(assistantDelta(turnA, id = "cm-stream-a", content = "for a"))
+        transport.emitFrame(turnDone(turnA, status = "completed"))
+        transport.emitFrame(turnStarted(turnB))
+        transport.emitFrame(assistantDelta(turnB, id = "cm-stream-b", content = "for b"))
         collector.cancel()
 
         val messageIds = received.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
@@ -142,6 +146,7 @@ class IrohAdminRpcChatGatewayTest {
         // dropped it (and, transitively, everything the observer should see).
         val transport = FakeIrohTransport()
         val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val turnObs = TurnRef(conversationId = "conv-obs", turnId = "turn-obs")
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch {
             gateway.streamConversation("conv-obs").collect { received += it }
@@ -149,10 +154,10 @@ class IrohAdminRpcChatGatewayTest {
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
         // Fanned-out shape: user echo first, then turn_started, deltas, terminal.
-        transport.emitFrame(userMessage(id = "user-echo-1", conversationId = "conv-obs", content = "hi from the other device"))
-        transport.emitFrame(turnStarted(conversationId = "conv-obs", turnId = "turn-obs"))
-        transport.emitFrame(assistantDelta(id = "cm-stream-obs", content = "observed reply", turnId = "turn-obs", conversationId = "conv-obs"))
-        transport.emitFrame(turnDone(turnId = "turn-obs", status = "completed"))
+        transport.emitFrame(userMessage(turnObs, id = "user-echo-1", content = "hi from the other device"))
+        transport.emitFrame(turnStarted(turnObs))
+        transport.emitFrame(assistantDelta(turnObs, id = "cm-stream-obs", content = "observed reply", tagged = true))
+        transport.emitFrame(turnDone(turnObs, status = "completed"))
         collector.cancel()
 
         val messageIds = received.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
@@ -166,18 +171,20 @@ class IrohAdminRpcChatGatewayTest {
         // frame tagged conv-b must not surface on streamConversation("conv-a").
         val transport = FakeIrohTransport()
         val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val turnA = TurnRef(conversationId = "conv-a", turnId = "turn-a")
+        val turnB = TurnRef(conversationId = "conv-b", turnId = "turn-b")
         val received = mutableListOf<TimelineStreamFrame>()
         val collector = launch {
             gateway.streamConversation("conv-a").collect { received += it }
         }
         transport.frameEvents.subscriptionCount.first { it > 0 }
 
-        transport.emitFrame(turnStarted(conversationId = "conv-a", turnId = "turn-a"))
-        transport.emitFrame(assistantDelta(id = "cm-stream-a", content = "for a", turnId = "turn-a"))
+        transport.emitFrame(turnStarted(turnA))
+        transport.emitFrame(assistantDelta(turnA, id = "cm-stream-a", content = "for a"))
         // Tagged frames from another viewed conversation arriving mid-turn.
-        transport.emitFrame(userMessage(id = "user-echo-b", conversationId = "conv-b", content = "for b"))
-        transport.emitFrame(assistantDelta(id = "cm-stream-b", content = "for b", turnId = "turn-b", conversationId = "conv-b"))
-        transport.emitFrame(turnDone(turnId = "turn-a", status = "completed"))
+        transport.emitFrame(userMessage(turnB, id = "user-echo-b", content = "for b"))
+        transport.emitFrame(assistantDelta(turnB, id = "cm-stream-b", content = "for b", tagged = true))
+        transport.emitFrame(turnDone(turnA, status = "completed"))
         collector.cancel()
 
         val messageIds = received.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
@@ -204,43 +211,53 @@ class IrohAdminRpcChatGatewayTest {
         streaming = true,
     )
 
-    private fun turnStarted(conversationId: String, turnId: String) = ServerFrame.TurnStarted(
-        id = "frame-$turnId",
+    /**
+     * A turn under test: the conversation it belongs to plus its turn id
+     * (run id derived), so frame builders take one reference instead of
+     * loose conversation/turn/run strings.
+     */
+    private data class TurnRef(val conversationId: String, val turnId: String) {
+        val runId: String get() = "run-$turnId"
+    }
+
+    private fun turnStarted(turn: TurnRef) = ServerFrame.TurnStarted(
+        id = "frame-${turn.turnId}",
         ts = "2026-07-09T00:00:00Z",
         agentId = "agent-1",
-        conversationId = conversationId,
-        turnId = turnId,
-        runId = "run-$turnId",
+        conversationId = turn.conversationId,
+        turnId = turn.turnId,
+        runId = turn.runId,
     )
 
+    /** [tagged] carries the frame's own conversation_id (fanned-out shape). */
     private fun assistantDelta(
+        turn: TurnRef,
         id: String,
         content: String,
-        turnId: String,
-        conversationId: String? = null,
+        tagged: Boolean = false,
     ) = ServerFrame.AssistantMessage(
         id = id,
         ts = "2026-07-09T00:00:01Z",
-        conversationId = conversationId,
-        turnId = turnId,
-        runId = "run-$turnId",
+        conversationId = turn.conversationId.takeIf { tagged },
+        turnId = turn.turnId,
+        runId = turn.runId,
         content = content,
     )
 
-    private fun userMessage(id: String, conversationId: String, content: String) = ServerFrame.UserMessage(
+    private fun userMessage(turn: TurnRef, id: String, content: String) = ServerFrame.UserMessage(
         id = id,
         ts = "2026-07-09T00:00:00Z",
         agentId = "agent-1",
-        conversationId = conversationId,
+        conversationId = turn.conversationId,
         content = content,
         otid = "otid-$id",
     )
 
-    private fun turnDone(turnId: String, status: String) = ServerFrame.TurnDone(
-        id = "frame-done-$turnId",
+    private fun turnDone(turn: TurnRef, status: String) = ServerFrame.TurnDone(
+        id = "frame-done-${turn.turnId}",
         ts = "2026-07-09T00:00:02Z",
-        turnId = turnId,
-        runId = "run-$turnId",
+        turnId = turn.turnId,
+        runId = turn.runId,
         status = status,
     )
 
@@ -258,8 +275,8 @@ class IrohAdminRpcChatGatewayTest {
 
         val rpcCalls = mutableListOf<RpcCall>()
         val sends = mutableListOf<SendCall>()
-        var rpcResponder: (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse = { method, _, _ ->
-            AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "$method has no responder")
+        var rpcResponder: (RpcCall) -> AppServerInboundFrame.AdminRpcResponse = { call ->
+            AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "${call.method} has no responder")
         }
 
         override val state: StateFlow<ChannelTransportState> =
@@ -280,8 +297,9 @@ class IrohAdminRpcChatGatewayTest {
         override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("frame-1")
         override fun subscribe(runId: String, cursor: Long): Boolean = false
         override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
-            rpcCalls += RpcCall(method, path, body)
-            return rpcResponder(method, path, body)
+            val call = RpcCall(method, path, body)
+            rpcCalls += call
+            return rpcResponder(call)
         }
         override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long) = error("unused")
         override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long) = error("unused")

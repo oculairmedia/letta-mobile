@@ -4,7 +4,9 @@ import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreate
@@ -34,6 +36,27 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+// Server sends explicit nulls for optional fields (metadata: null etc.) —
+// explicitNulls=false + coerceInputValues=true coerce those to property
+// defaults instead of failing decode (same config as the Android sources).
+private val irohAdminJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    explicitNulls = false
+    coerceInputValues = true
+}
+
+/**
+ * One `admin_rpc` invocation: the registry method plus the HTTP-equivalent
+ * path (and optional JSON body) the server-side handler expects — the same
+ * conventions the Android IrohAdminRpc*Source classes use.
+ */
+private data class AdminRpcCall(
+    val method: String,
+    val path: String,
+    val body: String? = null,
+)
+
 /**
  * [ChatGateway] served entirely over an Iroh [IChannelTransport] — no HTTP.
  *
@@ -58,19 +81,10 @@ class IrohAdminRpcChatGateway(
 ) : ChatGateway, ChatGatewayExtras {
 
     private val bridge = WsChatBridge(transport)
-
-    // Server sends explicit nulls for optional fields (metadata: null etc.) —
-    // explicitNulls=false + coerceInputValues=true coerce those to property
-    // defaults instead of failing decode (same config as the Android sources).
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    }
+    private val json = irohAdminJson
 
     /** conversationId -> agentId, learned from conversation.get/list. */
-    private val agentIdByConversation = mutableMapOf<String, String>()
+    private val agentIdByConversation = mutableMapOf<ConversationId, AgentId>()
 
     // ------------------------------------------------------------------
     // ChatGateway — admin_rpc reads
@@ -83,23 +97,23 @@ class IrohAdminRpcChatGateway(
             put("order", "desc")
             put("order_by", "last_message_at")
         }.toString()
-        val result = rpc("conversation.list", "/v1/conversations", body) ?: return emptyList()
+        val result = rpc(AdminRpcCall("conversation.list", "/v1/conversations", body)) ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
             .also { conversations ->
-                conversations.forEach { agentIdByConversation[it.id.value] = it.agentId.value }
+                conversations.forEach { agentIdByConversation[it.id] = it.agentId }
             }
     }
 
     override suspend fun getConversation(conversationId: String): Conversation {
-        val result = rpc("conversation.get", "/v1/conversations/$conversationId", null)
+        val result = rpc(AdminRpcCall("conversation.get", "/v1/conversations/$conversationId"))
             ?: throw TimelineTransportHttpException(502, "conversation.get returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
-            .also { agentIdByConversation[it.id.value] = it.agentId.value }
+            .also { agentIdByConversation[it.id] = it.agentId }
     }
 
     override suspend fun deleteConversation(conversationId: String) {
-        rpc("conversation.delete", "/v1/conversations/$conversationId", null)
-        agentIdByConversation.remove(conversationId)
+        rpc(AdminRpcCall("conversation.delete", "/v1/conversations/$conversationId"))
+        agentIdByConversation.remove(ConversationId(conversationId))
     }
 
     override suspend fun listConversationMessages(
@@ -115,7 +129,7 @@ class IrohAdminRpcChatGateway(
         ).joinToString("&")
         val path = "/v1/conversations/$conversationId/messages" +
             (if (query.isEmpty()) "" else "?$query")
-        val result = rpc("message.list", path, null) ?: return emptyList()
+        val result = rpc(AdminRpcCall("message.list", path)) ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), result)
     }
 
@@ -139,7 +153,7 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun getToolReturn(conversationId: String, messageId: String): LettaMessage? {
-        val result = rpc("tool_return.get", "/v1/conversations/$conversationId/messages/$messageId", null)
+        val result = rpc(AdminRpcCall("tool_return.get", "/v1/conversations/$conversationId/messages/$messageId"))
             ?: return null
         return json.decodeFromJsonElement(LettaMessage.serializer(), result)
     }
@@ -153,21 +167,21 @@ class IrohAdminRpcChatGateway(
             put("agent_id", agentId)
             summary?.let { put("summary", it) }
         }.toString()
-        val result = rpc("conversation.create", "/v1/agents/$agentId/conversations", body)
+        val result = rpc(AdminRpcCall("conversation.create", "/v1/agents/$agentId/conversations", body))
             ?: throw TimelineTransportHttpException(502, "conversation.create returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
-            .also { agentIdByConversation[it.id.value] = it.agentId.value }
+            .also { agentIdByConversation[it.id] = it.agentId }
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent {
         val body = json.encodeToString(AgentCreateParams.serializer(), params)
-        val result = rpc("agent.create", "/v1/agents", body)
+        val result = rpc(AdminRpcCall("agent.create", "/v1/agents", body))
             ?: throw TimelineTransportHttpException(502, "agent.create returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
     override suspend fun listLlmModels(): List<LlmModel> {
-        val result = rpc("model.list", "/v1/models", "{}") ?: return emptyList()
+        val result = rpc(AdminRpcCall("model.list", "/v1/models", "{}")) ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(LlmModel.serializer()), result)
     }
 
@@ -178,7 +192,7 @@ class IrohAdminRpcChatGateway(
 
     override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {
         val method = if (archived) "conversation.archive" else "conversation.restore"
-        val result = rpc(method, "/v1/conversations/$conversationId", null)
+        val result = rpc(AdminRpcCall(method, "/v1/conversations/$conversationId"))
             ?: throw TimelineTransportHttpException(502, "$method returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
@@ -191,17 +205,18 @@ class IrohAdminRpcChatGateway(
         conversationId: String,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> {
-        val agentId = agentIdFor(conversationId)
+        val conversation = ConversationId(conversationId)
+        val agentId = agentIdFor(conversation)
         val outbound = decodeOutbound(request)
         return channelFlow {
-            val turn = SendTurn(conversationId)
+            val turn = SendTurn(conversation)
             // UNDISPATCHED so the frame subscription is live before send()
             // dispatches the turn — otherwise a fast turn_started could race past us.
             val collector = launch(start = CoroutineStart.UNDISPATCHED) {
                 bridge.events.collect { event -> turn.route(event) { message -> send(message) } }
             }
             try {
-                dispatchSend(conversationId, agentId, outbound)
+                dispatchSend(conversation, agentId, outbound)
                 turn.awaitTerminal()
             } finally {
                 collector.cancel()
@@ -209,10 +224,10 @@ class IrohAdminRpcChatGateway(
         }
     }
 
-    private suspend fun dispatchSend(conversationId: String, agentId: String, outbound: OutboundMessage) {
+    private suspend fun dispatchSend(conversationId: ConversationId, agentId: AgentId, outbound: OutboundMessage) {
         val accepted = transport.send(
-            agentId = agentId,
-            conversationId = conversationId,
+            agentId = agentId.value,
+            conversationId = conversationId.value,
             text = outbound.text,
             otid = outbound.otid,
             contentParts = outbound.contentParts,
@@ -222,8 +237,8 @@ class IrohAdminRpcChatGateway(
         }
         Telemetry.event(
             "IrohChatGateway", "send.dispatched",
-            "conversationId" to conversationId,
-            "agentId" to agentId,
+            "conversationId" to conversationId.value,
+            "agentId" to agentId.value,
             "otid" to (outbound.otid ?: "<null>"),
             "device" to deviceLabel,
         )
@@ -270,13 +285,13 @@ class IrohAdminRpcChatGateway(
     // Internals
     // ------------------------------------------------------------------
 
-    private suspend fun agentIdFor(conversationId: String): String =
-        agentIdByConversation[conversationId] ?: getConversation(conversationId).agentId.value
+    private suspend fun agentIdFor(conversationId: ConversationId): AgentId =
+        agentIdByConversation[conversationId] ?: getConversation(conversationId.value).agentId
 
-    private suspend fun rpc(method: String, path: String, body: String?): JsonElement? {
-        val response = transport.adminRpc(method = method, path = path, body = body)
+    private suspend fun rpc(call: AdminRpcCall): JsonElement? {
+        val response = transport.adminRpc(method = call.method, path = call.path, body = call.body)
         if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
+            throw TimelineTransportHttpException(502, response.error ?: "${call.method} failed over iroh admin_rpc")
         }
         return response.result
     }
@@ -288,7 +303,7 @@ class IrohAdminRpcChatGateway(
      * terminal disconnect. Extracted from [sendConversationMessage] so each
      * frame case stays flat (one guarded statement per event).
      */
-    private class SendTurn(private val conversationId: String) {
+    private class SendTurn(private val conversationId: ConversationId) {
         private var turnId: String? = null
         private val terminal = CompletableDeferred<Unit>()
 
@@ -306,7 +321,7 @@ class IrohAdminRpcChatGateway(
         suspend fun awaitTerminal() = terminal.await()
 
         private fun onTurnStarted(event: WsTimelineEvent.TurnStarted) {
-            if (event.conversationId == conversationId && turnId == null) {
+            if (event.conversationId == conversationId.value && turnId == null) {
                 turnId = event.turnId
             }
         }
@@ -316,7 +331,7 @@ class IrohAdminRpcChatGateway(
         // match ours; untagged deltas keep the legacy own-turn scoping.
         private suspend fun onMessageDelta(event: WsTimelineEvent.MessageDelta, emit: suspend (LettaMessage) -> Unit) {
             val belongsToTurn = turnId != null &&
-                (event.conversationId == null || event.conversationId == conversationId)
+                (event.conversationId == null || event.conversationId == conversationId.value)
             if (belongsToTurn) emit(event.message)
         }
 
@@ -332,7 +347,7 @@ class IrohAdminRpcChatGateway(
         }
 
         private fun onError(event: WsTimelineEvent.Error) {
-            val forThisTurn = event.conversationId == conversationId ||
+            val forThisTurn = event.conversationId == conversationId.value ||
                 (turnId != null && event.turnId == turnId)
             if (forThisTurn) {
                 terminal.completeExceptionally(
@@ -397,21 +412,17 @@ class IrohAdminRpcChatGateway(
 class IrohAdminRpcAgentDirectory(
     private val transport: IChannelTransport,
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        explicitNulls = false
-        coerceInputValues = true
-    }
+    private val json = irohAdminJson
 
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
         val body = buildJsonObject {
             put("limit", limit.toString())
             put("offset", "0")
         }.toString()
-        val response = transport.adminRpc("agent.list", "/v1/agents?limit=$limit&offset=0", body)
+        val call = AdminRpcCall("agent.list", "/v1/agents?limit=$limit&offset=0", body)
+        val response = transport.adminRpc(call.method, call.path, call.body)
         if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "agent.list failed over iroh admin_rpc")
+            throw TimelineTransportHttpException(502, response.error ?: "${call.method} failed over iroh admin_rpc")
         }
         val result = response.result ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
@@ -419,7 +430,8 @@ class IrohAdminRpcAgentDirectory(
 
     suspend fun getAgent(agentId: String): Agent? {
         val body = buildJsonObject { put("agent_id", agentId) }.toString()
-        val response = transport.adminRpc("agent.get", "/v1/agents/$agentId", body)
+        val call = AdminRpcCall("agent.get", "/v1/agents/$agentId", body)
+        val response = transport.adminRpc(call.method, call.path, call.body)
         if (!response.success) return null
         val result = response.result ?: return null
         return json.decodeFromJsonElement(Agent.serializer(), result)

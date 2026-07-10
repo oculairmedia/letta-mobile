@@ -75,6 +75,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -89,9 +90,11 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.lens.LensDestination
@@ -139,7 +142,9 @@ import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
+import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopLettaConfigStore
+import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.memory.DesktopMemoryController
@@ -233,32 +238,17 @@ private suspend fun resolveDesktopAgentModels(
     return resolved
 }
 
+/**
+ * iroh:// backend: one QUIC channel transport shared by the chat gateway,
+ * admin_rpc reads, and (once implemented server-side) registries. Selected
+ * purely by URL scheme, same as Android's SessionGraphFactory; null for HTTP
+ * backends. Connects on entering composition and disconnects on dispose.
+ */
 @Composable
-fun LettaDesktopApp(
-    onActiveTitleChange: (String) -> Unit = {},
-) {
-    var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
-    var showNewAgentDialog by remember { mutableStateOf(false) }
-    // Avatar styles chosen via the editor this session, applied immediately to the
-    // orbs regardless of whether the backend round-trips agent metadata.
-    var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
-    var editAgentId by remember { mutableStateOf<String?>(null) }
-    val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
-    val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
-    var activeConfig by remember { mutableStateOf(configStore.load()) }
-    val dataBindings = remember(configStore) {
-        createDefaultDesktopDataBindings(
-            secureSettingsStore = secureSettingsStore,
-            configProvider = { activeConfig },
-        )
-    }
-    var bootstrapState by remember(dataBindings) {
-        mutableStateOf(defaultDesktopBootstrapState(dataBindings, activeConfig))
-    }
-    val chatScope = rememberCoroutineScope()
-    // iroh:// backend: one QUIC channel transport shared by the chat gateway,
-    // admin_rpc reads, and (once implemented server-side) registries. Selected
-    // purely by URL scheme, same as Android's SessionGraphFactory.
+private fun rememberIrohTransport(
+    activeConfig: LettaConfig,
+    chatScope: CoroutineScope,
+): IrohChannelTransport? {
     val irohTransport = remember(activeConfig) {
         activeConfig.takeIf { IrohChannelTransport.isIrohUrl(it.serverUrl) }?.let { config ->
             IrohChannelTransport(
@@ -273,7 +263,6 @@ fun LettaDesktopApp(
             )
         }
     }
-    val irohMode = irohTransport != null
     DisposableEffect(irohTransport) {
         val transport = irohTransport
         if (transport != null) {
@@ -294,76 +283,92 @@ fun LettaDesktopApp(
             }
         }
     }
-    val irohAgentDirectory = remember(irohTransport) {
-        irohTransport?.let { IrohAdminRpcAgentDirectory(it) }
-    }
-    val chatController = remember(bootstrapState, chatScope, dataBindings.sessionGraphProvider, irohTransport) {
-        DesktopChatController(
-            bootstrapState = bootstrapState,
-            scope = chatScope,
-            gatewayFactory = {
-                irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = "letta-desktop") }
-                    ?: createDefaultDesktopChatGateway(bootstrapState.config)
-            },
-            agentNamesByIdProvider = { agentIds ->
-                resolveDesktopAgentNames(agentIds, irohAgentDirectory) {
-                    dataBindings.sessionGraphProvider.current.agentRepository
-                }
-            },
-            agentModelByIdProvider = { agentIds ->
-                resolveDesktopAgentModels(agentIds, irohAgentDirectory) {
-                    dataBindings.sessionGraphProvider.current.agentRepository
-                }
-            },
-            loadArchivedConversationIds = {
-                secureSettingsStore.getString(ARCHIVED_CONVERSATION_IDS_KEY)
-                    ?.split(',')
-                    ?.map { it.trim() }
-                    ?.filter { it.isNotEmpty() }
-                    ?.toSet()
-                    ?: emptySet()
-            },
-            persistArchivedConversationIds = { ids ->
-                secureSettingsStore.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
-            },
+    return irohTransport
+}
+
+/** [DesktopChatController] wired for either backend (iroh admin_rpc or HTTP). */
+@Composable
+private fun rememberDesktopChatController(
+    bootstrapState: DesktopBootstrapState,
+    chatScope: CoroutineScope,
+    dataBindings: DesktopDataBindings,
+    irohTransport: IrohChannelTransport?,
+    irohAgentDirectory: IrohAdminRpcAgentDirectory?,
+    secureSettingsStore: DesktopFileSecureSettingsStore,
+): DesktopChatController = remember(bootstrapState, chatScope, dataBindings.sessionGraphProvider, irohTransport) {
+    DesktopChatController(
+        bootstrapState = bootstrapState,
+        scope = chatScope,
+        gatewayFactory = {
+            irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = "letta-desktop") }
+                ?: createDefaultDesktopChatGateway(bootstrapState.config)
+        },
+        agentNamesByIdProvider = { agentIds ->
+            resolveDesktopAgentNames(agentIds, irohAgentDirectory) {
+                dataBindings.sessionGraphProvider.current.agentRepository
+            }
+        },
+        agentModelByIdProvider = { agentIds ->
+            resolveDesktopAgentModels(agentIds, irohAgentDirectory) {
+                dataBindings.sessionGraphProvider.current.agentRepository
+            }
+        },
+        loadArchivedConversationIds = {
+            secureSettingsStore.getString(ARCHIVED_CONVERSATION_IDS_KEY)
+                ?.split(',')
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                ?.toSet()
+                ?: emptySet()
+        },
+        persistArchivedConversationIds = { ids ->
+            secureSettingsStore.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
+        },
+    )
+}
+
+/**
+ * HTTP-only management APIs — an iroh:// backend has no HTTP base URL, so
+ * their panels degrade to empty instead of dialing iroh:// as HTTP.
+ */
+private class DesktopHttpApis(
+    val blockApi: DesktopBlockApi?,
+    val cronApi: CronApi?,
+    val skillApi: SkillApi?,
+    val slashCommandApi: SlashCommandApi?,
+)
+
+@Composable
+private fun rememberDesktopHttpApis(activeConfig: LettaConfig, irohMode: Boolean): DesktopHttpApis =
+    remember(activeConfig, irohMode) {
+        val httpConfig = activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }
+        DesktopHttpApis(
+            blockApi = httpConfig?.let { DesktopBlockApi(it) },
+            cronApi = httpConfig?.let { CronApi(it, createDesktopLettaHttpClient()) },
+            skillApi = httpConfig?.let { SkillApi(it, createDesktopLettaHttpClient()) },
+            slashCommandApi = httpConfig?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) },
         )
     }
-    val chatState by chatController.state.collectAsState()
-    val availableModels by chatController.availableModels.collectAsState()
-    val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
-    val modelOptions = remember(availableModels) {
-        availableModels.map { model ->
-            val label = model.displayNameOverride?.takeIf { it.isNotBlank() }
-                ?: model.name
-            val value = model.handle?.takeIf { it.isNotBlank() } ?: model.name
-            label to value
-        }
-    }
-    // The APIs below are HTTP-only — an iroh:// backend has no HTTP base URL,
-    // so their panels degrade to empty instead of dialing iroh:// as HTTP.
-    val blockApi = remember(activeConfig, irohMode) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { DesktopBlockApi(it) }
-    }
-    val cronApi = remember(activeConfig, irohMode) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { CronApi(it, createDesktopLettaHttpClient()) }
-    }
-    var allCrons by remember(cronApi) { mutableStateOf<List<CronTask>>(emptyList()) }
-    val skillApi = remember(activeConfig, irohMode) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { SkillApi(it, createDesktopLettaHttpClient()) }
-    }
-    var allSkills by remember(skillApi) { mutableStateOf<List<Skill>>(emptyList()) }
-    var installedSkillNames by remember(skillApi) { mutableStateOf<Set<String>>(emptySet()) }
-    var skillsLoading by remember(skillApi) { mutableStateOf(false) }
-    var skillsError by remember(skillApi) { mutableStateOf<String?>(null) }
-    val slashCommandApi = remember(activeConfig, irohMode) {
-        activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
-    }
-    var agentSlashCommands by remember(slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
-    // Active-subagent registry (Background tasks). Desktop streams chat over SSE,
-    // but the subagent registry only exists on the shim's mobile WS protocol, so
-    // we open a lean WS side-channel and feed the shared SubagentRepository.
-    // Skipped in iroh mode: IrohChannelTransport stubs sendSubagentList until
-    // the iroh node serves the subagent registry.
+
+/** The subagent side-channel plus the live active-subagent list it feeds. */
+private class DesktopSubagentRegistry(
+    val repository: SubagentRepository?,
+    val activeSubagents: State<List<SubagentEntry>>,
+)
+
+/**
+ * Active-subagent registry (Background tasks). Desktop streams chat over SSE,
+ * but the subagent registry only exists on the shim's mobile WS protocol, so
+ * we open a lean WS side-channel and feed the shared SubagentRepository.
+ * Skipped in iroh mode: IrohChannelTransport stubs sendSubagentList until
+ * the iroh node serves the subagent registry.
+ */
+@Composable
+private fun rememberSubagentRegistry(
+    activeConfig: LettaConfig,
+    irohMode: Boolean,
+    chatScope: CoroutineScope,
+): DesktopSubagentRegistry {
     val subagentTransport = remember(activeConfig, irohMode) {
         activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
             ?.let { DesktopWsChannelTransport(chatScope) }
@@ -387,7 +392,7 @@ fun LettaDesktopApp(
         }
         onDispose { transport?.close() }
     }
-    val activeSubagents by produceState(emptyList<SubagentEntry>(), subagentRepository) {
+    val activeSubagents = produceState(emptyList<SubagentEntry>(), subagentRepository) {
         val repo = subagentRepository
         if (repo == null) {
             value = emptyList()
@@ -395,41 +400,104 @@ fun LettaDesktopApp(
             repo.activeSubagentsFlow().collect { value = it }
         }
     }
-    var showBackgroundTasks by remember { mutableStateOf(false) }
-    // Work | Play presentation lens over the same agents/memory/conversations.
-    var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
-    var showModelPicker by remember { mutableStateOf(false) }
-    var showCommandPalette by remember { mutableStateOf(false) }
-    val memoryController = remember(bootstrapState.sessionGraphId, chatScope) {
-        DesktopMemoryController(
-            sessionGraphProvider = dataBindings.sessionGraphProvider,
-            scope = chatScope,
-        )
+    return DesktopSubagentRegistry(subagentRepository, activeSubagents)
+}
+
+/** The per-agent library controllers behind the sidebar destinations. */
+private class DesktopLibraryControllers(
+    val memory: DesktopMemoryController,
+    val schedules: DesktopScheduleLibraryController,
+    val channels: DesktopChannelLibraryController,
+    val tools: DesktopToolLibraryController,
+)
+
+@Composable
+private fun rememberDesktopLibraryControllers(
+    sessionGraphId: Long,
+    sessionGraphProvider: DesktopSessionGraphProvider,
+    chatScope: CoroutineScope,
+): DesktopLibraryControllers {
+    val memory = remember(sessionGraphId, chatScope) {
+        DesktopMemoryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
-    val memoryState by memoryController.state.collectAsState()
-    val scheduleLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
-        DesktopScheduleLibraryController(
-            sessionGraphProvider = dataBindings.sessionGraphProvider,
-            scope = chatScope,
-        )
+    val schedules = remember(sessionGraphId, chatScope) {
+        DesktopScheduleLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
-    val scheduleLibraryState by scheduleLibraryController.state.collectAsState()
-    val channelLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
-        DesktopChannelLibraryController(
-            sessionGraphProvider = dataBindings.sessionGraphProvider,
-            scope = chatScope,
-        )
+    val channels = remember(sessionGraphId, chatScope) {
+        DesktopChannelLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
-    val channelLibraryState by channelLibraryController.state.collectAsState()
-    val toolLibraryController = remember(bootstrapState.sessionGraphId, chatScope) {
-        DesktopToolLibraryController(
-            sessionGraphProvider = dataBindings.sessionGraphProvider,
-            scope = chatScope,
-        )
+    val tools = remember(sessionGraphId, chatScope) {
+        DesktopToolLibraryController(sessionGraphProvider = sessionGraphProvider, scope = chatScope)
     }
-    val toolLibraryState by toolLibraryController.state.collectAsState()
-    // Cmd/Ctrl-K opens the command palette (Penpot shows the ⌘K hint). A global
-    // AWT key dispatcher fires regardless of which Compose field has focus.
+    return DesktopLibraryControllers(memory, schedules, channels, tools)
+}
+
+/**
+ * Start/stop lifecycles for the chat + library controllers, plus the
+ * destination-driven agent selection and cron refresh — the same effects,
+ * in the same order, that previously ran inline in [LettaDesktopApp].
+ */
+@Composable
+private fun DesktopControllerLifecycles(
+    chatController: DesktopChatController,
+    libraries: DesktopLibraryControllers,
+    selectedDestination: DesktopDestination,
+    selectedConversationAgentId: String?,
+    cronPanel: DesktopCronPanelState,
+) {
+    LaunchedEffect(chatController) {
+        chatController.start()
+    }
+    DisposableEffect(chatController) {
+        onDispose { chatController.close() }
+    }
+    LaunchedEffect(libraries.memory) {
+        libraries.memory.start()
+    }
+    LaunchedEffect(libraries.schedules) {
+        libraries.schedules.start()
+    }
+    LaunchedEffect(libraries.channels) {
+        libraries.channels.start()
+    }
+    LaunchedEffect(libraries.tools) {
+        libraries.tools.start()
+    }
+    LaunchedEffect(selectedDestination, selectedConversationAgentId, libraries.memory) {
+        if (selectedDestination == DesktopDestination.Memory) {
+            selectedConversationAgentId?.let(libraries.memory::selectAgent)
+        }
+    }
+    LaunchedEffect(selectedDestination, selectedConversationAgentId, libraries.schedules) {
+        if (selectedDestination == DesktopDestination.Schedules) {
+            selectedConversationAgentId?.let(libraries.schedules::selectAgent)
+        }
+    }
+    LaunchedEffect(selectedDestination, cronPanel) {
+        if (selectedDestination == DesktopDestination.Schedules) {
+            cronPanel.refresh()
+        }
+    }
+    DisposableEffect(libraries.memory) {
+        onDispose { libraries.memory.close() }
+    }
+    DisposableEffect(libraries.schedules) {
+        onDispose { libraries.schedules.close() }
+    }
+    DisposableEffect(libraries.channels) {
+        onDispose { libraries.channels.close() }
+    }
+    DisposableEffect(libraries.tools) {
+        onDispose { libraries.tools.close() }
+    }
+}
+
+/**
+ * Cmd/Ctrl-K opens the command palette (Penpot shows the ⌘K hint). A global
+ * AWT key dispatcher fires regardless of which Compose field has focus.
+ */
+@Composable
+private fun CommandPaletteKeyDispatcherEffect(onOpenPalette: () -> Unit) {
     DisposableEffect(Unit) {
         val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
         val dispatcher = java.awt.KeyEventDispatcher { event ->
@@ -437,7 +505,7 @@ fun LettaDesktopApp(
                 event.keyCode == java.awt.event.KeyEvent.VK_K &&
                 (event.isControlDown || event.isMetaDown)
             ) {
-                showCommandPalette = true
+                onOpenPalette()
                 true
             } else {
                 false
@@ -446,6 +514,436 @@ fun LettaDesktopApp(
         focusManager.addKeyEventDispatcher(dispatcher)
         onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
     }
+}
+
+/** Handle for the avatar companion: renderer control + current presence state. */
+private class DesktopAvatarCompanionHandle(
+    val companion: DesktopAvatarCompanion,
+    val state: DesktopAvatarCompanion.State,
+    val toggle: () -> Unit,
+) {
+    val isActive: Boolean
+        get() = state is DesktopAvatarCompanion.State.Running ||
+            state is DesktopAvatarCompanion.State.Starting
+}
+
+/**
+ * Avatar companion (pet mode v1): loopback-hosted three-vrm renderer in
+ * the default browser, driven by the agent's presence via AvatarDirector.
+ * Owns the avatar library window — library-first: pick from imported avatars
+ * (with their license on display) instead of a blind file dialog; imports run
+ * the full pipeline from inside the library window.
+ */
+@Composable
+private fun rememberAvatarCompanion(
+    chatScope: CoroutineScope,
+    secureSettingsStore: DesktopFileSecureSettingsStore,
+): DesktopAvatarCompanionHandle {
+    val avatarCompanion = remember(chatScope) { DesktopAvatarCompanion(chatScope) }
+    val avatarCompanionState by avatarCompanion.state.collectAsState()
+    DisposableEffect(avatarCompanion) {
+        onDispose { avatarCompanion.stop() }
+    }
+    var showAvatarLibrary by remember { mutableStateOf(false) }
+    var activeAvatarModelId by remember { mutableStateOf<String?>(null) }
+    if (showAvatarLibrary) {
+        DesktopAvatarLibraryWindow(
+            catalogDir = remember { defaultAvatarCatalogDir() },
+            activeModelId = activeAvatarModelId,
+            onUseAvatar = { model, assetPath ->
+                showAvatarLibrary = false
+                secureSettingsStore.putString(AVATAR_COMPANION_VRM_PATH_KEY, assetPath.toString())
+                activeAvatarModelId = model.id
+                avatarCompanion.stop()
+                avatarCompanion.start(assetPath)
+            },
+            onClose = { showAvatarLibrary = false },
+        )
+    }
+    return DesktopAvatarCompanionHandle(
+        companion = avatarCompanion,
+        state = avatarCompanionState,
+        toggle = {
+            when (avatarCompanionState) {
+                is DesktopAvatarCompanion.State.Starting,
+                is DesktopAvatarCompanion.State.Running,
+                -> {
+                    avatarCompanion.stop()
+                    activeAvatarModelId = null
+                }
+                else -> showAvatarLibrary = true
+            }
+        },
+    )
+}
+
+/** Agent presence -> avatar companion behavior. */
+@Composable
+private fun AvatarPresenceEffects(
+    avatar: DesktopAvatarCompanionHandle,
+    isStreamingReplySelected: Boolean,
+    thinkingConversationId: String?,
+    errorMessage: String?,
+) {
+    LaunchedEffect(isStreamingReplySelected, thinkingConversationId, avatar.state) {
+        if (avatar.isActive) {
+            avatar.companion.setActivity(
+                when {
+                    isStreamingReplySelected -> AvatarActivity.SPEAKING
+                    thinkingConversationId != null -> AvatarActivity.THINKING
+                    else -> AvatarActivity.IDLE
+                },
+            )
+        }
+    }
+    LaunchedEffect(errorMessage) {
+        if (errorMessage != null) avatar.companion.flashError()
+    }
+}
+
+/** A cron creation request from the schedules surface. */
+private data class CronDraft(
+    val agentId: String,
+    val name: String,
+    val prompt: String,
+    val cron: String,
+    val recurring: Boolean,
+    val timezone: String,
+)
+
+/**
+ * Snapshot-backed state + actions for the cron panel. Every mutation reloads
+ * the list from the API so the panel reflects the server's view; all actions
+ * no-op when the backend has no HTTP cron API (iroh mode).
+ */
+private class DesktopCronPanelState(
+    private val cronApi: CronApi?,
+    private val scope: CoroutineScope,
+) {
+    var crons by mutableStateOf<List<CronTask>>(emptyList())
+        private set
+
+    val available: Boolean get() = cronApi != null
+
+    suspend fun refresh() {
+        val api = cronApi ?: return
+        crons = runCatching { api.listCrons() }.getOrDefault(emptyList())
+    }
+
+    fun delete(id: String) {
+        val api = cronApi ?: return
+        scope.launch {
+            runCatching { api.deleteCron(id) }
+            refresh()
+        }
+    }
+
+    fun create(draft: CronDraft) {
+        val api = cronApi ?: return
+        scope.launch {
+            runCatching {
+                api.createCron(
+                    agentId = draft.agentId,
+                    name = draft.name,
+                    description = draft.name,
+                    prompt = draft.prompt,
+                    cron = draft.cron,
+                    timezone = draft.timezone,
+                    recurring = draft.recurring,
+                )
+            }
+            refresh()
+        }
+    }
+}
+
+/**
+ * Snapshot-backed state + actions for the Skills page: the registry list,
+ * the focused agent's installed set, and install/remove with reload. All
+ * actions no-op when the backend has no HTTP skill API (iroh mode).
+ */
+private class DesktopSkillsPanelState(
+    private val skillApi: SkillApi?,
+    private val scope: CoroutineScope,
+) {
+    var all by mutableStateOf<List<Skill>>(emptyList())
+        private set
+    var installedNames by mutableStateOf<Set<String>>(emptySet())
+        private set
+    var loading by mutableStateOf(false)
+        private set
+    var error by mutableStateOf<String?>(null)
+        private set
+
+    val available: Boolean get() = skillApi != null
+
+    /** Load the registry + [agentId]'s installed skills (null agent -> none). */
+    suspend fun reload(agentId: String?) {
+        val api = skillApi ?: return
+        loading = true
+        error = null
+        runCatching {
+            all = api.listSkills()
+            installedNames = agentId?.let { api.listAgentSkills(it).map { s -> s.name }.toSet() }
+                ?: emptySet()
+        }.onFailure { error = it.message ?: "Could not load skills." }
+        loading = false
+    }
+
+    fun install(agentId: String?, name: String) {
+        val api = skillApi ?: return
+        val agent = agentId ?: return
+        scope.launch {
+            runCatching { api.installSkill(agent, name) }
+                .onFailure { error = it.message ?: "Could not install skill." }
+            reload(agent)
+        }
+    }
+
+    fun uninstall(agentId: String?, name: String) {
+        val api = skillApi ?: return
+        val agent = agentId ?: return
+        scope.launch {
+            runCatching { api.uninstallSkill(agent, name) }
+                .onFailure { error = it.message ?: "Could not remove skill." }
+            reload(agent)
+        }
+    }
+}
+
+/** The focused agent's server slash commands for the composer palette. */
+private suspend fun loadAgentSlashCommands(
+    api: SlashCommandApi?,
+    agentId: String?,
+): List<AgentSlashCommand> = if (api != null && agentId != null) {
+    runCatching { api.listAgentSlashCommands(agentId) }.getOrDefault(emptyList())
+} else {
+    emptyList()
+}
+
+/** Model picker options: display label to model handle (or name fallback). */
+private fun buildModelOptions(availableModels: List<LlmModel>): List<Pair<String, String>> =
+    availableModels.map { model ->
+        val label = model.displayNameOverride?.takeIf { it.isNotBlank() } ?: model.name
+        val value = model.handle?.takeIf { it.isNotBlank() } ?: model.name
+        label to value
+    }
+
+/**
+ * Distinct agents (by id, since many agents share a display name) that have
+ * conversations — the rail orbs — ordered most-recent-first so each stack's
+ * "first" member (the click/open fallback) is the one with the most recent
+ * conversation. Roster-only agents (no recent or any conversations, e.g.
+ * bulk-imported fleets hidden by DEFAULT_CONVERSATION_LIMIT) follow
+ * alphabetically.
+ */
+private fun buildRailAgents(
+    conversations: List<DesktopConversationSummary>,
+    rosterAgents: List<Agent>,
+): List<Pair<String, String>> {
+    val fromConversations = conversations
+        .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+        .filter { !it.agentId.isNullOrBlank() }
+        .distinctBy { it.agentId }
+        .map { it.agentId!! to it.agentName }
+    val seenIds = fromConversations.mapTo(mutableSetOf()) { it.first }
+    val fromRoster = rosterAgents
+        .filter { it.id.value !in seenIds }
+        .map { it.id.value to it.name.ifBlank { it.id.value } }
+        .sortedBy { it.second.lowercase() }
+    return fromConversations + fromRoster
+}
+
+/** The selected stack's conversations under the archive filter, newest first. */
+private fun filterAgentConversations(
+    conversations: List<DesktopConversationSummary>,
+    agentName: String,
+    archiveFilter: ConversationArchiveFilter,
+): List<DesktopConversationSummary> = conversations
+    .filter { it.agentName == agentName }
+    .filter { c ->
+        when (archiveFilter) {
+            ConversationArchiveFilter.Active -> !c.archived
+            ConversationArchiveFilter.Archived -> c.archived
+            ConversationArchiveFilter.All -> true
+        }
+    }
+    .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+
+/**
+ * @mention candidates: other agents + the focused agent's memory blocks.
+ * (Files need a client-side index — tracked as a follow-up.)
+ */
+private fun buildMentionables(
+    railAgents: List<Pair<String, String>>,
+    memoryState: DesktopMemorySurfaceState,
+): List<Mentionable> = buildList {
+    railAgents.forEach { (id, name) ->
+        add(Mentionable(id = id, label = name, sublabel = "agent", kind = MentionKind.Agent, insertText = name))
+    }
+    memoryState.memory.sections
+        .flatMap { it.items }
+        .filterIsInstance<MemoryParityItem.MemoryBlock>()
+        .forEach { block ->
+            add(
+                Mentionable(
+                    id = block.id,
+                    label = block.title,
+                    sublabel = "core block",
+                    kind = MentionKind.Memory,
+                    insertText = block.title,
+                ),
+            )
+        }
+}
+
+/** Cmd/Ctrl-K command palette over conversations, agents, and destinations. */
+private fun buildPaletteItems(
+    conversations: List<DesktopConversationSummary>,
+    railAgents: List<Pair<String, String>>,
+    workPlayMode: WorkPlayMode,
+): List<PaletteItem> = buildList {
+    conversations.forEach { conversation ->
+        val orbIndex = railAgents.indexOfFirst { it.first == conversation.agentId }.coerceAtLeast(0)
+        add(
+            PaletteItem(
+                id = conversation.id,
+                label = conversation.title,
+                sublabel = conversation.agentName,
+                kind = PaletteItemKind.Conversation,
+                orbIndex = orbIndex,
+            ),
+        )
+    }
+    railAgents.forEachIndexed { index, (id, name) ->
+        add(PaletteItem(id = id, label = name, sublabel = "agent", kind = PaletteItemKind.Agent, orbIndex = index))
+    }
+    WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
+        val target = lensNavTarget(workPlayMode, lensDestination)
+        add(
+            PaletteItem(
+                id = target.first.name,
+                label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination),
+                sublabel = null,
+                kind = PaletteItemKind.Destination,
+            ),
+        )
+    }
+}
+
+/**
+ * Composer "/" palette: local navigation commands plus the focused agent's
+ * server slash commands (goal mode + installed skills). Selecting a server
+ * command fills the composer so the user can add args and send; the server
+ * interprets the slash prefix.
+ */
+private fun buildComposerCommands(
+    chatController: DesktopChatController,
+    agentSlashCommands: List<AgentSlashCommand>,
+    onCreateAgent: () -> Unit,
+    onEditAgent: () -> Unit,
+    onNavigate: (DesktopDestination) -> Unit,
+): List<ComposerCommand> = buildList {
+    add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
+    add(ComposerCommand("agent", "Create a new agent") { onCreateAgent() })
+    add(ComposerCommand("edit", "Edit this agent") { onEditAgent() })
+    add(ComposerCommand("memory", "Open memory") { onNavigate(DesktopDestination.Memory) })
+    add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
+    add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
+    add(ComposerCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
+    add(ComposerCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
+    agentSlashCommands.forEach { cmd ->
+        add(
+            ComposerCommand(
+                label = cmd.command,
+                description = cmd.description.ifBlank {
+                    cmd.skillName?.let { "Skill: $it" } ?: "Slash command"
+                },
+                fillsComposer = true,
+            ) { chatController.updateComposerText("/${cmd.command} ") },
+        )
+    }
+}
+
+/** Model/embedding defaults for a new agent, copied from the focused agent. */
+private fun resolveNewAgentDefaults(
+    agentRepository: IAgentRepository,
+    templateAgentId: String?,
+    modelValue: String?,
+): Pair<String?, String?> {
+    val template = templateAgentId?.let { agentRepository.getCachedAgent(it) }
+    return (modelValue ?: template?.model) to template?.embedding
+}
+
+@Composable
+fun LettaDesktopApp(
+    onActiveTitleChange: (String) -> Unit = {},
+) {
+    var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
+    var showNewAgentDialog by remember { mutableStateOf(false) }
+    // Avatar styles chosen via the editor this session, applied immediately to the
+    // orbs regardless of whether the backend round-trips agent metadata.
+    var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
+    var editAgentId by remember { mutableStateOf<String?>(null) }
+    val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
+    val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
+    var activeConfig by remember { mutableStateOf(configStore.load()) }
+    val dataBindings = remember(configStore) {
+        createDefaultDesktopDataBindings(
+            secureSettingsStore = secureSettingsStore,
+            configProvider = { activeConfig },
+        )
+    }
+    var bootstrapState by remember(dataBindings) {
+        mutableStateOf(defaultDesktopBootstrapState(dataBindings, activeConfig))
+    }
+    fun applyConfig(nextConfig: LettaConfig) {
+        configStore.save(nextConfig)
+        activeConfig = configStore.load()
+        dataBindings.sessionGraphProvider.rebuild()
+        bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+    }
+    val chatScope = rememberCoroutineScope()
+    val irohTransport = rememberIrohTransport(activeConfig, chatScope)
+    val irohMode = irohTransport != null
+    val irohAgentDirectory = remember(irohTransport) {
+        irohTransport?.let { IrohAdminRpcAgentDirectory(it) }
+    }
+    val chatController = rememberDesktopChatController(
+        bootstrapState = bootstrapState,
+        chatScope = chatScope,
+        dataBindings = dataBindings,
+        irohTransport = irohTransport,
+        irohAgentDirectory = irohAgentDirectory,
+        secureSettingsStore = secureSettingsStore,
+    )
+    val chatState by chatController.state.collectAsState()
+    val availableModels by chatController.availableModels.collectAsState()
+    val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
+    val modelOptions = remember(availableModels) { buildModelOptions(availableModels) }
+    val httpApis = rememberDesktopHttpApis(activeConfig, irohMode)
+    val blockApi = httpApis.blockApi
+    val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
+    val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
+    var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
+    val subagents = rememberSubagentRegistry(activeConfig, irohMode, chatScope)
+    val subagentRepository = subagents.repository
+    val activeSubagents by subagents.activeSubagents
+    var showBackgroundTasks by remember { mutableStateOf(false) }
+    // Work | Play presentation lens over the same agents/memory/conversations.
+    var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
+    var showModelPicker by remember { mutableStateOf(false) }
+    var showCommandPalette by remember { mutableStateOf(false) }
+    val libraries = rememberDesktopLibraryControllers(
+        sessionGraphId = bootstrapState.sessionGraphId,
+        sessionGraphProvider = dataBindings.sessionGraphProvider,
+        chatScope = chatScope,
+    )
+    val memoryState by libraries.memory.state.collectAsState()
+    val scheduleLibraryState by libraries.schedules.state.collectAsState()
+    val channelLibraryState by libraries.channels.state.collectAsState()
+    val toolLibraryState by libraries.tools.state.collectAsState()
+    CommandPaletteKeyDispatcherEffect(onOpenPalette = { showCommandPalette = true })
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
@@ -467,91 +965,15 @@ fun LettaDesktopApp(
         }
     }
 
-    // ------------------------------------------------------------------
-    // Avatar companion (pet mode v1): loopback-hosted three-vrm renderer in
-    // the default browser, driven by the agent's presence via AvatarDirector.
-    // ------------------------------------------------------------------
-    val avatarCompanion = remember(chatScope) { DesktopAvatarCompanion(chatScope) }
-    val avatarCompanionState by avatarCompanion.state.collectAsState()
-    DisposableEffect(avatarCompanion) {
-        onDispose { avatarCompanion.stop() }
-    }
-    var showAvatarLibrary by remember { mutableStateOf(false) }
-    var activeAvatarModelId by remember { mutableStateOf<String?>(null) }
-    fun toggleAvatarCompanion() {
-        when (avatarCompanionState) {
-            is DesktopAvatarCompanion.State.Starting,
-            is DesktopAvatarCompanion.State.Running,
-            -> {
-                avatarCompanion.stop()
-                activeAvatarModelId = null
-            }
-            // Library-first: pick from imported avatars (with their license
-            // on display) instead of a blind file dialog; imports run the
-            // full pipeline from inside the library window.
-            else -> showAvatarLibrary = true
-        }
-    }
-    if (showAvatarLibrary) {
-        DesktopAvatarLibraryWindow(
-            catalogDir = remember { defaultAvatarCatalogDir() },
-            activeModelId = activeAvatarModelId,
-            onUseAvatar = { model, assetPath ->
-                showAvatarLibrary = false
-                secureSettingsStore.putString(AVATAR_COMPANION_VRM_PATH_KEY, assetPath.toString())
-                activeAvatarModelId = model.id
-                avatarCompanion.stop()
-                avatarCompanion.start(assetPath)
-            },
-            onClose = { showAvatarLibrary = false },
-        )
-    }
+    val avatar = rememberAvatarCompanion(chatScope, secureSettingsStore)
 
-    LaunchedEffect(chatController) {
-        chatController.start()
-    }
-    DisposableEffect(chatController) {
-        onDispose { chatController.close() }
-    }
-    LaunchedEffect(memoryController) {
-        memoryController.start()
-    }
-    LaunchedEffect(scheduleLibraryController) {
-        scheduleLibraryController.start()
-    }
-    LaunchedEffect(channelLibraryController) {
-        channelLibraryController.start()
-    }
-    LaunchedEffect(toolLibraryController) {
-        toolLibraryController.start()
-    }
-    LaunchedEffect(selectedDestination, chatState.selectedConversation?.agentId, memoryController) {
-        if (selectedDestination == DesktopDestination.Memory) {
-            chatState.selectedConversation?.agentId?.let(memoryController::selectAgent)
-        }
-    }
-    LaunchedEffect(selectedDestination, chatState.selectedConversation?.agentId, scheduleLibraryController) {
-        if (selectedDestination == DesktopDestination.Schedules) {
-            chatState.selectedConversation?.agentId?.let(scheduleLibraryController::selectAgent)
-        }
-    }
-    LaunchedEffect(selectedDestination, cronApi) {
-        if (selectedDestination == DesktopDestination.Schedules && cronApi != null) {
-            allCrons = runCatching { cronApi.listCrons() }.getOrDefault(emptyList())
-        }
-    }
-    DisposableEffect(memoryController) {
-        onDispose { memoryController.close() }
-    }
-    DisposableEffect(scheduleLibraryController) {
-        onDispose { scheduleLibraryController.close() }
-    }
-    DisposableEffect(channelLibraryController) {
-        onDispose { channelLibraryController.close() }
-    }
-    DisposableEffect(toolLibraryController) {
-        onDispose { toolLibraryController.close() }
-    }
+    DesktopControllerLifecycles(
+        chatController = chatController,
+        libraries = libraries,
+        selectedDestination = selectedDestination,
+        selectedConversationAgentId = chatState.selectedConversation?.agentId,
+        cronPanel = cronPanel,
+    )
 
     val activeTitle = when (selectedDestination) {
         DesktopDestination.Conversations ->
@@ -560,14 +982,8 @@ fun LettaDesktopApp(
     }
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
-    // Distinct agents (by id, since many agents share a display name) that have
-    // conversations — these are the rail orbs. Same-named agents are stacked in
-    // the rail, and the sidebar lists the whole stack's conversations together.
-    // Ordered most-recent-first so each stack's "first" member (the click/open
-    // fallback) is the one with the most recent conversation, not just first-seen.
-    // Full roster from the agent repository, so agents WITHOUT recent (or any)
-    // conversations still appear — conversations only cover the newest
-    // DEFAULT_CONVERSATION_LIMIT entries, which hid bulk-imported agent fleets.
+    // Same-named agents are stacked in the rail, and the sidebar lists the
+    // whole stack's conversations together (see [buildRailAgents]).
     val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
     val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
     LaunchedEffect(sessionGraph, chatState.connectionState) {
@@ -578,18 +994,7 @@ fun LettaDesktopApp(
         }
     }
     val railAgents = remember(chatState.conversations, rosterAgents) {
-        val fromConversations = chatState.conversations
-            .sortedByDescending { conversationRecency(it.updatedAtLabel) }
-            .filter { !it.agentId.isNullOrBlank() }
-            .distinctBy { it.agentId }
-            .map { it.agentId!! to it.agentName }
-        val seenIds = fromConversations.mapTo(mutableSetOf()) { it.first }
-        // Roster-only agents follow the conversation-active ones, alphabetically.
-        val fromRoster = rosterAgents
-            .filter { it.id.value !in seenIds }
-            .map { it.id.value to it.name.ifBlank { it.id.value } }
-            .sortedBy { it.second.lowercase() }
-        fromConversations + fromRoster
+        buildRailAgents(chatState.conversations, rosterAgents)
     }
 
     // Single entry point for "open this agent" from any surface (rail, command
@@ -631,70 +1036,13 @@ fun LettaDesktopApp(
     // spawns' conversations in one time-ordered list rather than just one agent's.
     val archiveFilter by chatController.archiveFilter.collectAsState()
     val agentConversations = remember(chatState.conversations, selectedAgentName, archiveFilter) {
-        chatState.conversations
-            .filter { it.agentName == selectedAgentName }
-            .filter { c ->
-                when (archiveFilter) {
-                    ConversationArchiveFilter.Active -> !c.archived
-                    ConversationArchiveFilter.Archived -> c.archived
-                    ConversationArchiveFilter.All -> true
-                }
-            }
-            .sortedByDescending { conversationRecency(it.updatedAtLabel) }
+        filterAgentConversations(chatState.conversations, selectedAgentName, archiveFilter)
     }
-    // @mention candidates: other agents + the focused agent's memory blocks.
-    // (Files need a client-side index — tracked as a follow-up.)
     val mentionables = remember(railAgents, memoryState) {
-        buildList {
-            railAgents.forEach { (id, name) ->
-                add(Mentionable(id = id, label = name, sublabel = "agent", kind = MentionKind.Agent, insertText = name))
-            }
-            memoryState.memory.sections
-                .flatMap { it.items }
-                .filterIsInstance<MemoryParityItem.MemoryBlock>()
-                .forEach { block ->
-                    add(
-                        Mentionable(
-                            id = block.id,
-                            label = block.title,
-                            sublabel = "core block",
-                            kind = MentionKind.Memory,
-                            insertText = block.title,
-                        ),
-                    )
-                }
-        }
+        buildMentionables(railAgents, memoryState)
     }
-    // Cmd/Ctrl-K command palette over conversations, agents, and destinations.
     val paletteItems = remember(chatState.conversations, railAgents, workPlayMode) {
-        buildList {
-            chatState.conversations.forEach { conversation ->
-                val orbIndex = railAgents.indexOfFirst { it.first == conversation.agentId }.coerceAtLeast(0)
-                add(
-                    PaletteItem(
-                        id = conversation.id,
-                        label = conversation.title,
-                        sublabel = conversation.agentName,
-                        kind = PaletteItemKind.Conversation,
-                        orbIndex = orbIndex,
-                    ),
-                )
-            }
-            railAgents.forEachIndexed { index, (id, name) ->
-                add(PaletteItem(id = id, label = name, sublabel = "agent", kind = PaletteItemKind.Agent, orbIndex = index))
-            }
-            WorkPlayLens.navDestinations(workPlayMode).forEach { lensDestination ->
-                val target = lensNavTarget(workPlayMode, lensDestination)
-                add(
-                    PaletteItem(
-                        id = target.first.name,
-                        label = WorkPlayLens.destinationLabel(workPlayMode, lensDestination),
-                        sublabel = null,
-                        kind = PaletteItemKind.Destination,
-                    ),
-                )
-            }
-        }
+        buildPaletteItems(chatState.conversations, railAgents, workPlayMode)
     }
     // A conversation is "thinking" from the moment a prompt is sent until the
     // agent's reply starts landing (tracked by the controller — `isSending`
@@ -714,51 +1062,23 @@ fun LettaDesktopApp(
     val replyPresence by chatController.replyPresence.collectAsState()
     val isStreamingReplySelected = replyPresence.isStreaming
 
-    // Agent presence -> avatar companion behavior.
-    LaunchedEffect(isStreamingReplySelected, thinkingConversationId, avatarCompanionState) {
-        if (avatarCompanionState is DesktopAvatarCompanion.State.Running ||
-            avatarCompanionState is DesktopAvatarCompanion.State.Starting
-        ) {
-            avatarCompanion.setActivity(
-                when {
-                    isStreamingReplySelected -> AvatarActivity.SPEAKING
-                    thinkingConversationId != null -> AvatarActivity.THINKING
-                    else -> AvatarActivity.IDLE
-                },
-            )
-        }
-    }
-    LaunchedEffect(chatState.errorMessage) {
-        if (chatState.errorMessage != null) avatarCompanion.flashError()
-    }
+    AvatarPresenceEffects(
+        avatar = avatar,
+        isStreamingReplySelected = isStreamingReplySelected,
+        thinkingConversationId = thinkingConversationId,
+        errorMessage = chatState.errorMessage,
+    )
 
     // Load the skills registry + the focused agent's installed skills when the
     // Skills page is open (or the focused agent changes).
-    suspend fun reloadSkills() {
-        val api = skillApi ?: return
-        skillsLoading = true
-        skillsError = null
-        runCatching {
-            allSkills = api.listSkills()
-            installedSkillNames = selectedAgentId?.let { api.listAgentSkills(it).map { s -> s.name }.toSet() }
-                ?: emptySet()
-        }.onFailure { skillsError = it.message ?: "Could not load skills." }
-        skillsLoading = false
-    }
-    LaunchedEffect(selectedDestination, skillApi, selectedAgentId) {
-        if (selectedDestination == DesktopDestination.Agents && skillApi != null) {
-            reloadSkills()
+    LaunchedEffect(selectedDestination, skillsPanel, selectedAgentId) {
+        if (selectedDestination == DesktopDestination.Agents) {
+            skillsPanel.reload(selectedAgentId)
         }
     }
     // Load the focused agent's server slash commands for the composer palette.
-    LaunchedEffect(slashCommandApi, selectedAgentId) {
-        val api = slashCommandApi
-        val agent = selectedAgentId
-        agentSlashCommands = if (api != null && agent != null) {
-            runCatching { api.listAgentSlashCommands(agent) }.getOrDefault(emptyList())
-        } else {
-            emptyList()
-        }
+    LaunchedEffect(httpApis.slashCommandApi, selectedAgentId) {
+        agentSlashCommands = loadAgentSlashCommands(httpApis.slashCommandApi, selectedAgentId)
     }
 
     DesktopMaterialTheme {
@@ -777,9 +1097,8 @@ fun LettaDesktopApp(
                     onAgentSelected = { agentId -> openAgent(agentId) },
                     onNewSession = { showNewAgentDialog = true },
                     onSearch = { showCommandPalette = true },
-                    onAvatarCompanion = ::toggleAvatarCompanion,
-                    avatarCompanionActive = avatarCompanionState is DesktopAvatarCompanion.State.Running ||
-                        avatarCompanionState is DesktopAvatarCompanion.State.Starting,
+                    onAvatarCompanion = avatar.toggle,
+                    avatarCompanionActive = avatar.isActive,
                 )
                 RailDivider()
                 // Agent sidebar: agent header + nav + conversations.
@@ -838,30 +1157,13 @@ fun LettaDesktopApp(
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else if (selectedDestination == DesktopDestination.Conversations) {
-                        val composerCommands = buildList {
-                            add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
-                            add(ComposerCommand("agent", "Create a new agent") { showNewAgentDialog = true })
-                            add(ComposerCommand("edit", "Edit this agent") { editAgentId = selectedAgentId })
-                            add(ComposerCommand("memory", "Open memory") { selectedDestination = DesktopDestination.Memory })
-                            add(ComposerCommand("schedules", "Open schedules") { selectedDestination = DesktopDestination.Schedules })
-                            add(ComposerCommand("skills", "Open skills & tools") { selectedDestination = DesktopDestination.Agents })
-                            add(ComposerCommand("channels", "Open channels") { selectedDestination = DesktopDestination.Channels })
-                            add(ComposerCommand("settings", "Open settings") { selectedDestination = DesktopDestination.Settings })
-                            // Server-backed slash commands (goal mode + installed skills).
-                            // Selecting one fills the composer so the user can add
-                            // args and send; the server interprets the slash prefix.
-                            agentSlashCommands.forEach { cmd ->
-                                add(
-                                    ComposerCommand(
-                                        label = cmd.command,
-                                        description = cmd.description.ifBlank {
-                                            cmd.skillName?.let { "Skill: $it" } ?: "Slash command"
-                                        },
-                                        fillsComposer = true,
-                                    ) { chatController.updateComposerText("/${cmd.command} ") },
-                                )
-                            }
-                        }
+                        val composerCommands = buildComposerCommands(
+                            chatController = chatController,
+                            agentSlashCommands = agentSlashCommands,
+                            onCreateAgent = { showNewAgentDialog = true },
+                            onEditAgent = { editAgentId = selectedAgentId },
+                            onNavigate = { selectedDestination = it },
+                        )
                         ChatDetailPane(
                             state = chatState,
                             isThinking = isThinkingSelected,
@@ -904,90 +1206,50 @@ fun LettaDesktopApp(
                             onChatAttachImage = { pickerLauncher.launch() },
                             onChatRemoveImageAttachment = chatController::removeImageAttachment,
                             onChatRetryConnection = chatController::retryConnection,
-                            onMemoryRefresh = memoryController::reload,
-                            onMemoryAgentSelected = memoryController::selectAgent,
-                            onSchedulesRefresh = scheduleLibraryController::reload,
-                            onScheduleAgentSelected = scheduleLibraryController::selectAgent,
-                            onChannelsRefresh = channelLibraryController::refresh,
-                            onToolsRefresh = toolLibraryController::reload,
-                            onToolsSearchQueryChanged = toolLibraryController::updateSearchQuery,
-                            onToolsTagToggled = toolLibraryController::toggleTag,
-                            onToolsClearTags = toolLibraryController::clearTags,
-                            onToolsLoadMore = toolLibraryController::loadMore,
-                            onConfigSaved = { nextConfig ->
-                                configStore.save(nextConfig)
-                                activeConfig = configStore.load()
-                                dataBindings.sessionGraphProvider.rebuild()
-                                bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
-                            },
-                            onTokenCleared = {
-                                val nextConfig = activeConfig.copy(accessToken = null)
-                                configStore.save(nextConfig)
-                                activeConfig = configStore.load()
-                                dataBindings.sessionGraphProvider.rebuild()
-                                bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
-                            },
+                            onMemoryRefresh = libraries.memory::reload,
+                            onMemoryAgentSelected = libraries.memory::selectAgent,
+                            onSchedulesRefresh = libraries.schedules::reload,
+                            onScheduleAgentSelected = libraries.schedules::selectAgent,
+                            onChannelsRefresh = libraries.channels::refresh,
+                            onToolsRefresh = libraries.tools::reload,
+                            onToolsSearchQueryChanged = libraries.tools::updateSearchQuery,
+                            onToolsTagToggled = libraries.tools::toggleTag,
+                            onToolsClearTags = libraries.tools::clearTags,
+                            onToolsLoadMore = libraries.tools::loadMore,
+                            onConfigSaved = { applyConfig(it) },
+                            onTokenCleared = { applyConfig(activeConfig.copy(accessToken = null)) },
                             blockApi = blockApi,
-                            crons = allCrons,
-                            onDeleteCron = { id ->
-                                chatScope.launch {
-                                    cronApi?.let {
-                                        runCatching { it.deleteCron(id) }
-                                        allCrons = runCatching { it.listCrons() }.getOrDefault(emptyList())
-                                    }
-                                }
-                            },
-                            canCreateCron = cronApi != null &&
+                            crons = cronPanel.crons,
+                            onDeleteCron = cronPanel::delete,
+                            canCreateCron = cronPanel.available &&
                                 (scheduleLibraryState.selectedAgentId != null || selectedAgentId != null),
                             onCreateCron = { filteredAgentId, name, prompt, cron, recurring, tz ->
                                 val targetAgent = filteredAgentId
                                     ?: scheduleLibraryState.selectedAgentId
                                     ?: selectedAgentId
-                                if (cronApi != null && targetAgent != null) {
-                                    chatScope.launch {
-                                        runCatching {
-                                            cronApi.createCron(
-                                                agentId = targetAgent,
-                                                name = name,
-                                                description = name,
-                                                prompt = prompt,
-                                                cron = cron,
-                                                timezone = tz,
-                                                recurring = recurring,
-                                            )
-                                        }
-                                        allCrons = runCatching { cronApi.listCrons() }.getOrDefault(emptyList())
-                                    }
+                                if (targetAgent != null) {
+                                    cronPanel.create(
+                                        CronDraft(
+                                            agentId = targetAgent,
+                                            name = name,
+                                            prompt = prompt,
+                                            cron = cron,
+                                            recurring = recurring,
+                                            timezone = tz,
+                                        ),
+                                    )
                                 }
                             },
                             focusedAgentId = selectedAgentId,
-                            skills = allSkills,
-                            installedSkillNames = installedSkillNames,
-                            skillsLoading = skillsLoading,
-                            skillsError = skillsError,
-                            canManageSkills = skillApi != null && selectedAgentId != null,
+                            skills = skillsPanel.all,
+                            installedSkillNames = skillsPanel.installedNames,
+                            skillsLoading = skillsPanel.loading,
+                            skillsError = skillsPanel.error,
+                            canManageSkills = skillsPanel.available && selectedAgentId != null,
                             focusedAgentName = selectedAgentName,
-                            onRefreshSkills = { chatScope.launch { reloadSkills() } },
-                            onInstallSkill = { name ->
-                                val agent = selectedAgentId
-                                if (skillApi != null && agent != null) {
-                                    chatScope.launch {
-                                        runCatching { skillApi.installSkill(agent, name) }
-                                            .onFailure { skillsError = it.message ?: "Could not install skill." }
-                                        reloadSkills()
-                                    }
-                                }
-                            },
-                            onUninstallSkill = { name ->
-                                val agent = selectedAgentId
-                                if (skillApi != null && agent != null) {
-                                    chatScope.launch {
-                                        runCatching { skillApi.uninstallSkill(agent, name) }
-                                            .onFailure { skillsError = it.message ?: "Could not remove skill." }
-                                        reloadSkills()
-                                    }
-                                }
-                            },
+                            onRefreshSkills = { chatScope.launch { skillsPanel.reload(selectedAgentId) } },
+                            onInstallSkill = { name -> skillsPanel.install(selectedAgentId, name) },
+                            onUninstallSkill = { name -> skillsPanel.uninstall(selectedAgentId, name) },
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
@@ -1047,15 +1309,12 @@ fun LettaDesktopApp(
                     onDismiss = { showNewAgentDialog = false },
                     onCreate = { name, modelValue ->
                         showNewAgentDialog = false
-                        val template = selectedAgentId?.let {
-                            dataBindings.sessionGraphProvider.current.agentRepository.getCachedAgent(it)
-                        }
-                        val model = modelValue ?: template?.model
-                        chatController.createAgent(
-                            name = name,
-                            model = model,
-                            embedding = template?.embedding,
+                        val (model, embedding) = resolveNewAgentDefaults(
+                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                            templateAgentId = selectedAgentId,
+                            modelValue = modelValue,
                         )
+                        chatController.createAgent(name = name, model = model, embedding = embedding)
                         selectedDestination = DesktopDestination.Conversations
                     },
                 )

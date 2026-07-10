@@ -294,6 +294,54 @@ private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
 }
 
 private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEvent? = when (this) {
+    is ServerFrame.TurnStarted,
+    is ServerFrame.TurnDone,
+    is ServerFrame.StopReason,
+    is ServerFrame.UsageStatistics,
+    is ServerFrame.SubscribeDone,
+    -> turnLifecycleEvent()
+    is ServerFrame.Error,
+    is ServerFrame.GoalsUpdated,
+    is ServerFrame.AgentUpdated,
+    is ServerFrame.UserActionOutcome,
+    -> serverNoticeEvent()
+    is ServerFrame.ToolCallMessage,
+    is ServerFrame.UserMessage,
+    is ServerFrame.AssistantMessage,
+    is ServerFrame.ReasoningMessage,
+    is ServerFrame.ToolReturnMessage,
+    -> messageDeltaEvent(isReplay)
+    // Welcome carries connection metadata, not chat content; surface via state.
+    // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
+    // Cron frames (letta-mobile-d52f.1) are observed directly off
+    // ChannelTransport.events by the cron repository — not chat content.
+    is ServerFrame.Welcome,
+    is ServerFrame.A2ui,
+    is ServerFrame.A2uiCapabilities,
+    is ServerFrame.UserActionAck,
+    is ServerFrame.CronListResponse,
+    is ServerFrame.CronAddResponse,
+    is ServerFrame.CronGetResponse,
+    is ServerFrame.CronDeleteResponse,
+    is ServerFrame.CronDeleteAllResponse,
+    is ServerFrame.CronsUpdated,
+    // letta-mobile-73o2h: active-subagent frames route to the
+    // SubagentRepository (active-bar), not chat content.
+    is ServerFrame.SubagentListResponse,
+    is ServerFrame.SubagentTodosResponse,
+    is ServerFrame.SubagentsUpdated,
+    // letta-mobile-2rkdj: subscribe wrappers don't surface to chat
+    // directly — the inner BridgeFrame is unwrapped and re-routed
+    // through the normal handler upstream of this mapper, so by the
+    // time we'd see one here it's already been handled. SubscribeDone
+    // remains visible as a resume terminal fallback (mapped with the
+    // turn-lifecycle frames above) when no turn_done arrived in the replay.
+    is ServerFrame.SubscribeFrameMessage -> null
+    is ServerFrame.Unknown -> null
+}
+
+/** Turn-lifecycle bookends plus the bare stop/usage/subscribe envelopes. */
+private fun ServerFrame.turnLifecycleEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.TurnStarted -> WsTimelineEvent.TurnStarted(
         turnId = turnId,
         agentId = agentId,
@@ -319,6 +367,16 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
         cachedInputTokens = cachedInputTokens,
         reasoningTokens = reasoningTokens,
     )
+    is ServerFrame.SubscribeDone -> WsTimelineEvent.SubscribeDone(
+        runId = runId,
+        lastSeq = lastSeq,
+        status = status,
+    )
+    else -> null
+}
+
+/** Out-of-band server notices: errors and goal/agent/user-action updates. */
+private fun ServerFrame.serverNoticeEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.Error -> WsTimelineEvent.Error(
         code = code,
         message = message,
@@ -349,65 +407,32 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
         turnId = turnId,
         runId = runId,
     )
-    // letta-mobile-y70m0: the shim's self-todo synthesized frame
-    // (admin-shim buildSelfTodoFrame) is a `tool_call_message`
-    // (name=TodoWrite) carrying constant per-conversation sentinel ids
-    // (run_id/turn_id/tool_call_id all prefixed `selftodo-`). It is CHIP
-    // DATA ONLY — consumed by SelfTodoRepository off the raw
-    // `transport.events` stream for the self-todo chip — and must NOT
-    // enter the chat timeline. Because it is re-emitted on every
-    // TaskCreate/TaskUpdate and on resubscribe, folding it into the
-    // message list produced multiple run blocks sharing the identical
-    // constant run-key `run-selftodo-run-<conv>`, crashing the LazyColumn
-    // with a duplicate-key IllegalArgumentException. Skip it here (the
-    // single point where timeline messages are built) so the chip still
-    // updates but no timeline run block is created.
-    is ServerFrame.ToolCallMessage -> if (isSelfTodoChipFrame()) {
-        null
-    } else {
-        WsFrameMapper.toLettaMessage(this)?.let {
-            WsTimelineEvent.MessageDelta(it, isReplay = isReplay, conversationId = messageFrameConversationId())
-        }
-    }
-    is ServerFrame.UserMessage,
-    is ServerFrame.AssistantMessage,
-    is ServerFrame.ReasoningMessage,
-    is ServerFrame.ToolReturnMessage -> WsFrameMapper.toLettaMessage(this)?.let {
+    else -> null
+}
+
+/**
+ * Timeline message deltas (user / assistant / reasoning / tool_call /
+ * tool_return frames).
+ *
+ * letta-mobile-y70m0: the shim's self-todo synthesized frame
+ * (admin-shim buildSelfTodoFrame) is a `tool_call_message`
+ * (name=TodoWrite) carrying constant per-conversation sentinel ids
+ * (run_id/turn_id/tool_call_id all prefixed `selftodo-`). It is CHIP
+ * DATA ONLY — consumed by SelfTodoRepository off the raw
+ * `transport.events` stream for the self-todo chip — and must NOT
+ * enter the chat timeline. Because it is re-emitted on every
+ * TaskCreate/TaskUpdate and on resubscribe, folding it into the
+ * message list produced multiple run blocks sharing the identical
+ * constant run-key `run-selftodo-run-<conv>`, crashing the LazyColumn
+ * with a duplicate-key IllegalArgumentException. Skip it here (the
+ * single point where timeline messages are built) so the chip still
+ * updates but no timeline run block is created.
+ */
+private fun ServerFrame.messageDeltaEvent(isReplay: Boolean): WsTimelineEvent.MessageDelta? {
+    if (this is ServerFrame.ToolCallMessage && isSelfTodoChipFrame()) return null
+    return WsFrameMapper.toLettaMessage(this)?.let {
         WsTimelineEvent.MessageDelta(it, isReplay = isReplay, conversationId = messageFrameConversationId())
     }
-    // Welcome carries connection metadata, not chat content; surface via state.
-    // A2UI frames / capabilities / acks / Unknown are silent for chat consumers.
-    // Cron frames (letta-mobile-d52f.1) are observed directly off
-    // ChannelTransport.events by the cron repository — not chat content.
-    is ServerFrame.Welcome,
-    is ServerFrame.A2ui,
-    is ServerFrame.A2uiCapabilities,
-    is ServerFrame.UserActionAck,
-    is ServerFrame.CronListResponse,
-    is ServerFrame.CronAddResponse,
-    is ServerFrame.CronGetResponse,
-    is ServerFrame.CronDeleteResponse,
-    is ServerFrame.CronDeleteAllResponse,
-    is ServerFrame.CronsUpdated,
-    is ServerFrame.AgentUpdated,
-    // letta-mobile-73o2h: active-subagent frames route to the
-    // SubagentRepository (active-bar), not chat content.
-    is ServerFrame.SubagentListResponse,
-    is ServerFrame.SubagentTodosResponse,
-    is ServerFrame.SubagentsUpdated,
-    // letta-mobile-2rkdj: subscribe wrappers don't surface to chat
-    // directly — the inner BridgeFrame is unwrapped and re-routed
-    // through the normal handler upstream of this mapper, so by the
-    // time we'd see one here it's already been handled. SubscribeDone
-    // remains visible as a resume terminal fallback when no turn_done
-    // arrived in the replay.
-    is ServerFrame.SubscribeFrameMessage -> null
-    is ServerFrame.SubscribeDone -> WsTimelineEvent.SubscribeDone(
-        runId = runId,
-        lastSeq = lastSeq,
-        status = status,
-    )
-    is ServerFrame.Unknown -> null
 }
 
 /**
