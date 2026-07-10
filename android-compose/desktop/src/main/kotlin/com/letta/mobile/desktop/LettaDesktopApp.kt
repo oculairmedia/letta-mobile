@@ -175,6 +175,64 @@ import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 private const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
 private const val ARCHIVED_CONVERSATION_IDS_KEY = "conversations.archived_ids"
 
+/**
+ * Resolves agent id -> display name for the chat shell. Over iroh:// there is
+ * no HTTP agent repository, so names come from the admin_rpc agent directory;
+ * otherwise from the cached repository, fetching any still-unresolved id
+ * directly. [httpAgentRepository] is only evaluated on the HTTP path.
+ * Extracted from [LettaDesktopApp] to keep that composable flat.
+ */
+private suspend fun resolveDesktopAgentNames(
+    agentIds: Set<String>,
+    irohDirectory: IrohAdminRpcAgentDirectory?,
+    httpAgentRepository: () -> IAgentRepository,
+): Map<String, String> {
+    if (irohDirectory != null) {
+        return runCatching { irohDirectory.listAgents() }.getOrDefault(emptyList())
+            .mapNotNull { agent -> agent.name.takeIf { it.isNotBlank() }?.let { agent.id.value to it } }
+            .toMap()
+    }
+    val agentRepository = httpAgentRepository()
+    runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS) }
+    val resolved = mutableMapOf<String, String>()
+    // Seed from the cached list (fast path).
+    agentRepository.agents.value.forEach { agent ->
+        agent.name.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+    }
+    // For any conversation agent still unresolved, fetch it directly (robust
+    // against list pagination / partial caches).
+    agentIds.filter { it !in resolved }.forEach { id ->
+        val name = agentRepository.getCachedAgent(id)?.name
+            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.name
+        name?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
+    }
+    return resolved
+}
+
+/** Agent id -> model handle, mirroring [resolveDesktopAgentNames]. */
+private suspend fun resolveDesktopAgentModels(
+    agentIds: Set<String>,
+    irohDirectory: IrohAdminRpcAgentDirectory?,
+    httpAgentRepository: () -> IAgentRepository,
+): Map<String, String> {
+    if (irohDirectory != null) {
+        return runCatching { irohDirectory.listAgents() }.getOrDefault(emptyList())
+            .mapNotNull { agent -> agent.model?.takeIf { it.isNotBlank() }?.let { agent.id.value to it } }
+            .toMap()
+    }
+    val agentRepository = httpAgentRepository()
+    val resolved = mutableMapOf<String, String>()
+    agentRepository.agents.value.forEach { agent ->
+        agent.model?.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
+    }
+    agentIds.filter { it !in resolved }.forEach { id ->
+        val model = agentRepository.getCachedAgent(id)?.model
+            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.model
+        model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
+    }
+    return resolved
+}
+
 @Composable
 fun LettaDesktopApp(
     onActiveTitleChange: (String) -> Unit = {},
@@ -248,49 +306,13 @@ fun LettaDesktopApp(
                     ?: createDefaultDesktopChatGateway(bootstrapState.config)
             },
             agentNamesByIdProvider = { agentIds ->
-                val directory = irohAgentDirectory
-                if (directory != null) {
-                    runCatching { directory.listAgents() }.getOrDefault(emptyList())
-                        .mapNotNull { agent -> agent.name.takeIf { it.isNotBlank() }?.let { agent.id.value to it } }
-                        .toMap()
-                } else {
-                    val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
-                    runCatching {
-                        agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
-                    }
-                    val resolved = mutableMapOf<String, String>()
-                    // Seed from the cached list (fast path).
-                    agentRepository.agents.value.forEach { agent ->
-                        agent.name.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
-                    }
-                    // For any conversation agent still unresolved, fetch it directly
-                    // (robust against list pagination / partial caches).
-                    agentIds.filter { it !in resolved }.forEach { id ->
-                        val name = agentRepository.getCachedAgent(id)?.name
-                            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.name
-                        name?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
-                    }
-                    resolved
+                resolveDesktopAgentNames(agentIds, irohAgentDirectory) {
+                    dataBindings.sessionGraphProvider.current.agentRepository
                 }
             },
             agentModelByIdProvider = { agentIds ->
-                val directory = irohAgentDirectory
-                if (directory != null) {
-                    runCatching { directory.listAgents() }.getOrDefault(emptyList())
-                        .mapNotNull { agent -> agent.model?.takeIf { it.isNotBlank() }?.let { agent.id.value to it } }
-                        .toMap()
-                } else {
-                    val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
-                    val resolved = mutableMapOf<String, String>()
-                    agentRepository.agents.value.forEach { agent ->
-                        agent.model?.takeIf { it.isNotBlank() }?.let { resolved[agent.id.value] = it }
-                    }
-                    agentIds.filter { it !in resolved }.forEach { id ->
-                        val model = agentRepository.getCachedAgent(id)?.model
-                            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.model
-                        model?.takeIf { it.isNotBlank() }?.let { resolved[id] = it }
-                    }
-                    resolved
+                resolveDesktopAgentModels(agentIds, irohAgentDirectory) {
+                    dataBindings.sessionGraphProvider.current.agentRepository
                 }
             },
             loadArchivedConversationIds = {

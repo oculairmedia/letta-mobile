@@ -194,80 +194,39 @@ class IrohAdminRpcChatGateway(
         val agentId = agentIdFor(conversationId)
         val outbound = decodeOutbound(request)
         return channelFlow {
-            var turnId: String? = null
-            val terminal = CompletableDeferred<Unit>()
+            val turn = SendTurn(conversationId)
             // UNDISPATCHED so the frame subscription is live before send()
-            // dispatches the turn — otherwise a fast turn_started could race
-            // past us.
+            // dispatches the turn — otherwise a fast turn_started could race past us.
             val collector = launch(start = CoroutineStart.UNDISPATCHED) {
-                bridge.events.collect { event ->
-                    when (event) {
-                        is WsTimelineEvent.TurnStarted ->
-                            if (event.conversationId == conversationId && turnId == null) {
-                                turnId = event.turnId
-                            }
-                        is WsTimelineEvent.MessageDelta ->
-                            // r3i1z: with server-side fanout, frames for OTHER
-                            // conversations this client observes can arrive
-                            // mid-turn. A conversation-tagged delta must match
-                            // ours; untagged deltas keep the legacy own-turn
-                            // scoping (single-flight turn engine).
-                            if (turnId != null &&
-                                (event.conversationId == null || event.conversationId == conversationId)
-                            ) {
-                                send(event.message)
-                            }
-                        is WsTimelineEvent.TurnDone ->
-                            if (turnId != null && event.turnId == turnId) {
-                                if (event.status == "failed") {
-                                    terminal.completeExceptionally(
-                                        TimelineTransportHttpException(502, "Iroh turn failed (turnId=$turnId)"),
-                                    )
-                                } else {
-                                    terminal.complete(Unit)
-                                }
-                            }
-                        is WsTimelineEvent.Error ->
-                            if (event.conversationId == conversationId ||
-                                (turnId != null && event.turnId == turnId)
-                            ) {
-                                terminal.completeExceptionally(
-                                    TimelineTransportHttpException(502, "Iroh turn error ${event.code}: ${event.message}"),
-                                )
-                            }
-                        is WsTimelineEvent.Disconnected ->
-                            if (!event.willReconnect) {
-                                terminal.completeExceptionally(
-                                    TimelineTransportHttpException(0, "Iroh transport disconnected: ${event.reason}"),
-                                )
-                            }
-                        else -> Unit
-                    }
-                }
+                bridge.events.collect { event -> turn.route(event) { message -> send(message) } }
             }
             try {
-                val accepted = transport.send(
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    text = outbound.text,
-                    otid = outbound.otid,
-                    contentParts = outbound.contentParts,
-                )
-                if (!accepted) {
-                    throw TimelineTransportHttpException(409, "Iroh transport rejected send (turn already in flight?)")
-                }
-                Telemetry.event(
-                    "IrohChatGateway", "send.dispatched",
-                    "conversationId" to conversationId,
-                    "agentId" to agentId,
-                    "otid" to (outbound.otid ?: "<null>"),
-                    "device" to deviceLabel,
-                )
-                terminal.await()
+                dispatchSend(conversationId, agentId, outbound)
+                turn.awaitTerminal()
             } finally {
                 collector.cancel()
             }
         }
+    }
+
+    private suspend fun dispatchSend(conversationId: String, agentId: String, outbound: OutboundMessage) {
+        val accepted = transport.send(
+            agentId = agentId,
+            conversationId = conversationId,
+            text = outbound.text,
+            otid = outbound.otid,
+            contentParts = outbound.contentParts,
+        )
+        if (!accepted) {
+            throw TimelineTransportHttpException(409, "Iroh transport rejected send (turn already in flight?)")
+        }
+        Telemetry.event(
+            "IrohChatGateway", "send.dispatched",
+            "conversationId" to conversationId,
+            "agentId" to agentId,
+            "otid" to (outbound.otid ?: "<null>"),
+            "device" to deviceLabel,
+        )
     }
 
     override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
@@ -320,6 +279,75 @@ class IrohAdminRpcChatGateway(
             throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
         }
         return response.result
+    }
+
+    /**
+     * Tracks a single outbound turn over the shared frame stream: captures the
+     * turn id from the matching `turn_started`, forwards this conversation's
+     * message deltas to [emit], and completes [terminal] on turn_done / error /
+     * terminal disconnect. Extracted from [sendConversationMessage] so each
+     * frame case stays flat (one guarded statement per event).
+     */
+    private class SendTurn(private val conversationId: String) {
+        private var turnId: String? = null
+        private val terminal = CompletableDeferred<Unit>()
+
+        suspend fun route(event: WsTimelineEvent, emit: suspend (LettaMessage) -> Unit) {
+            when (event) {
+                is WsTimelineEvent.TurnStarted -> onTurnStarted(event)
+                is WsTimelineEvent.MessageDelta -> onMessageDelta(event, emit)
+                is WsTimelineEvent.TurnDone -> onTurnDone(event)
+                is WsTimelineEvent.Error -> onError(event)
+                is WsTimelineEvent.Disconnected -> onDisconnected(event)
+                else -> Unit
+            }
+        }
+
+        suspend fun awaitTerminal() = terminal.await()
+
+        private fun onTurnStarted(event: WsTimelineEvent.TurnStarted) {
+            if (event.conversationId == conversationId && turnId == null) {
+                turnId = event.turnId
+            }
+        }
+
+        // r3i1z: with server-side fanout, frames for OTHER conversations this
+        // client observes can arrive mid-turn. A conversation-tagged delta must
+        // match ours; untagged deltas keep the legacy own-turn scoping.
+        private suspend fun onMessageDelta(event: WsTimelineEvent.MessageDelta, emit: suspend (LettaMessage) -> Unit) {
+            val belongsToTurn = turnId != null &&
+                (event.conversationId == null || event.conversationId == conversationId)
+            if (belongsToTurn) emit(event.message)
+        }
+
+        private fun onTurnDone(event: WsTimelineEvent.TurnDone) {
+            if (turnId == null || event.turnId != turnId) return
+            if (event.status == "failed") {
+                terminal.completeExceptionally(
+                    TimelineTransportHttpException(502, "Iroh turn failed (turnId=$turnId)"),
+                )
+            } else {
+                terminal.complete(Unit)
+            }
+        }
+
+        private fun onError(event: WsTimelineEvent.Error) {
+            val forThisTurn = event.conversationId == conversationId ||
+                (turnId != null && event.turnId == turnId)
+            if (forThisTurn) {
+                terminal.completeExceptionally(
+                    TimelineTransportHttpException(502, "Iroh turn error ${event.code}: ${event.message}"),
+                )
+            }
+        }
+
+        private fun onDisconnected(event: WsTimelineEvent.Disconnected) {
+            if (!event.willReconnect) {
+                terminal.completeExceptionally(
+                    TimelineTransportHttpException(0, "Iroh transport disconnected: ${event.reason}"),
+                )
+            }
+        }
     }
 
     private data class OutboundMessage(
