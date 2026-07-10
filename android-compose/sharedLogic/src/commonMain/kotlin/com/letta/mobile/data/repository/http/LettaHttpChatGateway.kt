@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.http
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -54,7 +55,7 @@ import kotlinx.serialization.json.buildJsonObject
 open class LettaHttpChatGateway(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
-) : ChatGateway, AutoCloseable {
+) : ChatGateway, ChatGatewayExtras, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
@@ -163,7 +164,7 @@ open class LettaHttpChatGateway(
     }
 
     /** Create a new conversation for [agentId]; returns the created conversation. */
-    suspend fun createConversation(agentId: String, summary: String? = null): Conversation {
+    override suspend fun createConversation(agentId: String, summary: String?): Conversation {
         val response = httpClient.post("$baseUrl/v1/conversations") {
             applyAuth()
             contentType(ContentType.Application.Json)
@@ -180,7 +181,7 @@ open class LettaHttpChatGateway(
     }
 
     /** Create a new agent and return it. */
-    suspend fun createAgent(params: AgentCreateParams): Agent {
+    override suspend fun createAgent(params: AgentCreateParams): Agent {
         val response = httpClient.post("$baseUrl/v1/agents") {
             applyAuth()
             contentType(ContentType.Application.Json)
@@ -191,7 +192,7 @@ open class LettaHttpChatGateway(
     }
 
     /** List the LLM models available on this backend (for the model picker). */
-    suspend fun listLlmModels(): List<LlmModel> {
+    override suspend fun listLlmModels(): List<LlmModel> {
         val response = httpClient.get("$baseUrl/v1/models") {
             applyAuth()
         }
@@ -200,7 +201,7 @@ open class LettaHttpChatGateway(
     }
 
     /** Set the model override for an existing conversation. */
-    suspend fun setConversationModel(conversationId: String, model: String): Conversation {
+    override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
         val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
             applyAuth()
             contentType(ContentType.Application.Json)
@@ -211,7 +212,7 @@ open class LettaHttpChatGateway(
     }
 
     /** Archive or restore (un-archive) an existing conversation — non-destructive. */
-    suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {
+    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {
         val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
             applyAuth()
             contentType(ContentType.Application.Json)

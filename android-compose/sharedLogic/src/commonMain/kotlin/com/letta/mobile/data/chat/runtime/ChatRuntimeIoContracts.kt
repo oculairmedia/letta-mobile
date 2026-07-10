@@ -1,7 +1,10 @@
 package com.letta.mobile.data.chat.runtime
 
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.timeline.TimelineTransport
@@ -21,6 +24,21 @@ interface ChatGateway : TimelineTransport {
     companion object {
         const val DEFAULT_CONVERSATION_LIMIT = 40
     }
+}
+
+/**
+ * Management operations beyond the core [ChatGateway] contract (agent/
+ * conversation creation, model catalog, per-conversation overrides).
+ * Desktop reaches these through an interface check on its gateway, so any
+ * transport (HTTP, Iroh admin_rpc) can opt in without the controller
+ * depending on a concrete gateway class (letta-mobile-yh92w).
+ */
+interface ChatGatewayExtras {
+    suspend fun createConversation(agentId: String, summary: String? = null): Conversation
+    suspend fun createAgent(params: AgentCreateParams): Agent
+    suspend fun listLlmModels(): List<LlmModel>
+    suspend fun setConversationModel(conversationId: String, model: String): Conversation
+    suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation
 }
 
 interface ChatSessionGraph<out Repositories : SessionRepositoryGraph> {
