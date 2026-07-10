@@ -35,10 +35,11 @@ class SlashCommandRepository @Inject constructor(
     private val channelTransport: IChannelTransport,
 ) : ISlashCommandRepository {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    override suspend fun listGlobal(): Result<List<SlashCommand>> = fetch("/v1/slash-commands")
+    override suspend fun listGlobal(): Result<List<SlashCommand>> =
+        fetch("/v1/slash-commands", method = "slash_command.list", agentId = null)
 
     override suspend fun listForAgent(agentId: String): Result<List<SlashCommand>> =
-        fetch("/v1/agents/$agentId/slash-commands")
+        fetch("/v1/agents/$agentId/slash-commands", method = "slash_command.list_agent", agentId = agentId)
 
     override suspend fun installToAgent(agentId: String, skillName: String): Result<Unit> = runCatching {
         val (client, baseUrl) = apiClient.session()
@@ -145,7 +146,25 @@ class SlashCommandRepository @Inject constructor(
         }
     }
 
-    private suspend fun fetch(path: String): Result<List<SlashCommand>> = runCatching {
+    private suspend fun fetch(
+        path: String,
+        method: String,
+        agentId: String?,
+    ): Result<List<SlashCommand>> = runCatching {
+        // P4 iroh purity: the raw HTTP apiClient.session() hard-fails in iroh://
+        // mode, so the slash-command list never loaded over Iroh. Route over
+        // admin_rpc, mirroring getGoalStatus above.
+        if (shouldUseIroh()) {
+            ensureConnectedForAdminRpc()
+            val body = agentId?.let { JsonObject(mapOf("agent_id" to JsonPrimitive(it))).toString() } ?: "{}"
+            val response = channelTransport.adminRpc(method = method, path = path, body = body)
+            if (!response.success) {
+                throw IllegalStateException(response.error ?: "Iroh admin_rpc $method failed")
+            }
+            val result = response.result ?: throw IllegalStateException("Iroh admin_rpc $method returned no result")
+            return@runCatching json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
+        }
+
         val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl$path")
         if (response.status.value !in 200..299) {

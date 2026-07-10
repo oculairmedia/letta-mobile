@@ -38,6 +38,8 @@ class AdminRpcContractTest {
             "folder.list",
             "goal.command",
             "goal.get",
+            "slash_command.list",
+            "slash_command.list_agent",
             "group.list",
             "health.check",
             "identity.get",
