@@ -125,12 +125,31 @@ fun ConversationsScreen(
     viewModel: ConversationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showAgentPickerDialog by remember { mutableStateOf(false) }
+    var showNewChat by rememberSaveable { mutableStateOf(false) }
     var showOverflowMenu by remember { mutableStateOf(false) }
     var isSearchExpanded by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+    if (showNewChat) {
+        NewChatAgentScreen(
+            agents = uiState.agents,
+            onBack = { showNewChat = false },
+            onAgentSelected = { agent ->
+                viewModel.createConversation(agent.id) { conversationId ->
+                    showNewChat = false
+                    onNavigateToChat(
+                        agent.id.value,
+                        conversationId.value,
+                        agent.name.takeIf(String::isNotBlank),
+                    )
+                }
+            },
+            modifier = modifier,
+        )
+        return
+    }
 
     LaunchedEffect(uiState.createConversationError) {
         val message = uiState.createConversationError ?: return@LaunchedEffect
@@ -262,7 +281,7 @@ fun ConversationsScreen(
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAgentPickerDialog = true }) {
+            FloatingActionButton(onClick = { showNewChat = true }) {
                 Icon(LettaIcons.Add, stringResource(R.string.screen_conversations_new_action))
             }
         }
@@ -306,21 +325,6 @@ fun ConversationsScreen(
             )
             }
         }
-    }
-
-    if (showAgentPickerDialog) {
-        val agents = uiState.agents
-        AgentPickerDialog(
-            agents = agents,
-            onDismiss = { showAgentPickerDialog = false },
-            onAgentSelected = { agentId ->
-                val agentName = agents.firstOrNull { it.id.value == agentId }?.name?.takeIf { it.isNotBlank() }
-                viewModel.createConversation(AgentId(agentId)) { conversationId ->
-                    showAgentPickerDialog = false
-                    onNavigateToChat(agentId, conversationId.value, agentName)
-                }
-            }
-        )
     }
 
     uiState.selectedConversation?.let { display ->
@@ -957,50 +961,136 @@ private fun ErrorContent(
 }
 
 @Composable
-private fun AgentPickerDialog(
+private fun NewChatAgentScreen(
     agents: List<Agent>,
-    onDismiss: () -> Unit,
-    onAgentSelected: (String) -> Unit
+    onBack: () -> Unit,
+    onAgentSelected: (Agent) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.screen_conversations_dialog_select_agent_title)) },
-        text = {
-            if (agents.isEmpty()) {
-                Text(stringResource(R.string.screen_conversations_dialog_no_agents))
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.height(300.dp),
+    var query by rememberSaveable { mutableStateOf("") }
+    val filteredAgents = remember(agents, query) {
+        val needle = query.trim()
+        if (needle.isBlank()) agents else agents.filter { agent ->
+            agent.name.contains(needle, ignoreCase = true) ||
+                agent.description.orEmpty().contains(needle, ignoreCase = true) ||
+                agent.model.orEmpty().contains(needle, ignoreCase = true)
+        }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
+        topBar = {
+            TopAppBar(
+                title = { Text("New chat") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(LettaIcons.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.topAppBarColors(),
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                placeholder = { Text("Type an agent name or model") },
+                leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(28.dp),
+            )
+
+            when {
+                agents.isEmpty() -> EmptyState(
+                    icon = LettaIcons.AccountCircle,
+                    message = "Create an agent before starting a new chat.",
+                    modifier = Modifier.fillMaxSize(),
+                )
+                filteredAgents.isEmpty() -> EmptyState(
+                    icon = LettaIcons.Search,
+                    message = "No matching agents. Try another name, description, or model.",
+                    modifier = Modifier.fillMaxSize(),
+                )
+                else -> LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(agents, key = { it.id.value }) { agent ->
+                    item {
+                        Text(
+                            text = "Agents",
+                            style = MaterialTheme.typography.sectionTitle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
+                    items(filteredAgents, key = { it.id.value }) { agent ->
                         Card(
-                            onClick = { onAgentSelected(agent.id.value) },
+                            onClick = { onAgentSelected(agent) },
                             modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            ),
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    text = agent.name,
-                                    style = MaterialTheme.typography.listItemHeadline,
-                                )
-                                agent.model?.let { model ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                AgentInitialAvatar(agent.name)
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = model,
+                                        text = agent.name.ifBlank { "Unnamed agent" },
+                                        style = MaterialTheme.typography.listItemHeadline,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = agent.description?.takeIf(String::isNotBlank)
+                                            ?: agent.model?.takeIf(String::isNotBlank)
+                                            ?: agent.id.value,
                                         style = MaterialTheme.typography.listItemSupporting,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
+                                    val model = agent.model
+                                    if (!agent.description.isNullOrBlank() && !model.isNullOrBlank()) {
+                                        Text(
+                                            text = model,
+                                            style = MaterialTheme.typography.listItemMetadataMonospace,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_cancel))
-            }
-        },
-    )
+        }
+    }
+}
+
+@Composable
+private fun AgentInitialAvatar(name: String) {
+    val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    androidx.compose.material3.Surface(
+        modifier = Modifier.size(48.dp),
+        shape = androidx.compose.foundation.shape.CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(initial, style = MaterialTheme.typography.titleLarge)
+        }
+    }
 }
