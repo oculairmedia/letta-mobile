@@ -10,7 +10,7 @@ import com.letta.mobile.data.model.LettaConfig
  * App Server gateway can satisfy the same chat contract.
  */
 fun interface DesktopAppServerChatGatewayFactory {
-    fun create(
+    suspend fun create(
         lettaConfig: LettaConfig,
         appServerConfig: DesktopAppServerRuntimeConfig,
     ): DesktopChatGateway
@@ -56,7 +56,7 @@ class DesktopAppServerClientUnavailableException :
             "DesktopAppServerChatGatewayFactory backed by the shared App Server client.",
     )
 
-fun createDefaultDesktopChatGateway(
+suspend fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
     appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(),

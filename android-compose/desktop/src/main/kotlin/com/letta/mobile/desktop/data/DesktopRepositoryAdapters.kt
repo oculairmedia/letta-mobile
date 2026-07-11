@@ -190,9 +190,9 @@ class DesktopChatSessionGraph internal constructor(
 
 class DesktopChatSessionGraphFactory(
     private val repositoryGraphFactory: SessionRepositoryGraphFactory<DesktopSessionGraph>,
-    private val gatewayFactory: () -> ChatGateway,
+    private val gatewayFactory: suspend () -> ChatGateway,
 ) {
-    fun create(): DesktopChatSessionGraph =
+    suspend fun create(): DesktopChatSessionGraph =
         DesktopChatSessionGraph(
             repositories = repositoryGraphFactory.create(),
             gateway = gatewayFactory(),

@@ -139,18 +139,31 @@ class ChatTimelineProjector {
         val anyConfirmed = confirmedCount > 0
         val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
         val prefixToolCardCount = prefix.sumOf { it.toolCardCount() }
-        val result = TimelineProjection(
+        val previousSnapshot = lastProjectionSnapshot
+        val renderedNoChange = rendersIdenticallyToSnapshot(
+            previousSnapshot = previousSnapshot,
+            conversationId = timeline.conversationId,
             ui = ui,
+            a2uiMessages = a2uiMessages,
+            anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyConfirmed = anyConfirmed,
+            tailIsAssistant = tailIsAssistant,
+            totalToolCardCount = prefixToolCardCount + liveToolCardCount,
+        )
+        val reusedSnapshotUi = if (renderedNoChange) previousSnapshot?.uiSnapshot else null
+        val result = TimelineProjection(
+            ui = reusedSnapshotUi ?: ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
             anyConfirmed = anyConfirmed,
-            a2uiMessages = a2uiMessages,
+            a2uiMessages = if (renderedNoChange && previousSnapshot != null) previousSnapshot.a2uiMessages else a2uiMessages,
             toolCardCount = prefixToolCardCount + liveToolCardCount,
             eventsReused = eventsReused,
             eventsProjected = eventsProjected,
             prefixEventsChecked = 0,
             fastPath = false,
-            messageListChange = ChatMessageListChange.Full,
+            messageListChange = if (renderedNoChange) ChatMessageListChange.None else ChatMessageListChange.Full,
+            noChange = renderedNoChange,
         )
         lastProjectionSnapshot = CachedTimelineProjectionSnapshot(
             conversationId = timeline.conversationId,
@@ -176,6 +189,34 @@ class ChatTimelineProjector {
             startedAtMs = startedAtMs,
         )
         return result
+    }
+
+    /**
+     * g87l6 scope guard: full-path no-change suppression exists for
+     * high-frequency streaming churn whose rendered output is identical to the
+     * previous snapshot. Empty timelines (open/close heartbeats) are rare,
+     * carry lifecycle meaning (loading-clear), and stay contractual FULL
+     * projections, so they are excluded here.
+     */
+    private fun rendersIdenticallyToSnapshot(
+        previousSnapshot: CachedTimelineProjectionSnapshot?,
+        conversationId: String,
+        ui: ImmutableList<UiMessage>,
+        a2uiMessages: List<A2uiMessage>,
+        anyLettaServerLocalPending: Boolean,
+        anyConfirmed: Boolean,
+        tailIsAssistant: Boolean,
+        totalToolCardCount: Int,
+    ): Boolean {
+        if (ui.isEmpty() || previousSnapshot == null) return false
+        if (previousSnapshot.conversationId != conversationId) return false
+        val snapshotToolCards = previousSnapshot.prefixToolCardCount + previousSnapshot.toolCardCount
+        return previousSnapshot.uiSnapshot == ui &&
+            previousSnapshot.a2uiMessages == a2uiMessages &&
+            previousSnapshot.anyLettaServerLocalPending == anyLettaServerLocalPending &&
+            previousSnapshot.anyConfirmed == anyConfirmed &&
+            previousSnapshot.tailIsAssistant == tailIsAssistant &&
+            snapshotToolCards == totalToolCardCount
     }
 
     private fun tailProjectionFastPath(

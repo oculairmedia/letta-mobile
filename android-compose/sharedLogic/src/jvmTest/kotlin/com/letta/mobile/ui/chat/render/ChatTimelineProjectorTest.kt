@@ -134,6 +134,23 @@ class ChatTimelineProjectorTest {
     }
 
     @Test
+    fun fullPathSuppressesRawTimelineChurnWithIdenticalRenderedMessages() {
+        val projector = ChatTimelineProjector()
+        val events = listOf(confirmed(TimelineMessageType.ASSISTANT, "settled", "a1", 1.0))
+        val first = projector.projectLive(events, version = 1)
+
+        // Desktop token activity can churn raw timeline metadata/version while
+        // mobile has no renderable assistant delta yet. This deliberately misses
+        // the tail fast path; rendered output is still identical and must not
+        // trigger a fresh ChatUiState/Compose pass.
+        val next = projector.projectLive(events, version = 2)
+
+        assertTrue(next.noChange)
+        assertEquals(ChatMessageListChange.None, next.messageListChange)
+        assertTrue(first.ui === next.ui)
+    }
+
+    @Test
     fun nonTailMutationIsReprojectedNotSuppressed() {
         // A reconcile can change a NON-tail event (e.g. attach a tool return to
         // an earlier tool call) while size + tail stay the same. The reducers
@@ -191,10 +208,10 @@ class ChatTimelineProjectorTest {
     @Test
     fun zeroMessageOpenCloseCycle_limitation_heartbeatsDoNotMutateProjectorState() {
         val projector = ChatTimelineProjector()
-        
+
         // Simulating stream open with 0 messages
         val firstEmptyProjection = projector.projectLive(emptyList(), version = 1)
-        
+
         assertEquals(0, firstEmptyProjection.ui.size)
         assertEquals(ChatMessageListChange.Full, firstEmptyProjection.messageListChange)
         assertFalse(firstEmptyProjection.noChange)
@@ -203,9 +220,11 @@ class ChatTimelineProjectorTest {
         val secondEmptyProjection = projector.projectLive(emptyList(), version = 1)
 
         assertEquals(0, secondEmptyProjection.ui.size)
-        // Limitation: ChatTimelineProjector.tailProjectionFastPath explicitly bails on empty event lists,
-        // so it falls through to a full projection rather than taking the no-op fast path.
-        // The render model (UI list) remains unchanged (empty), but noChange is false.
+        // Contract: empty timelines (open/close heartbeats) stay FULL projections.
+        // The g87l6 full-path no-change suppression targets streaming churn only
+        // and explicitly excludes empty UI lists, because the empty emission
+        // carries lifecycle meaning (e.g. clearing the loading state).
         assertFalse(secondEmptyProjection.noChange)
+        assertEquals(ChatMessageListChange.Full, secondEmptyProjection.messageListChange)
     }
 }

@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.send.OutboundMessageCreate
+import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -9,7 +11,6 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
@@ -26,25 +27,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-
-// Server sends explicit nulls for optional fields (metadata: null etc.) —
-// explicitNulls=false + coerceInputValues=true coerce those to property
-// defaults instead of failing decode (same config as the Android sources).
-private val irohAdminJson = Json {
-    ignoreUnknownKeys = true
-    isLenient = true
-    explicitNulls = false
-    coerceInputValues = true
-}
 
 /**
  * One `admin_rpc` invocation: the registry method plus the HTTP-equivalent
@@ -81,7 +66,7 @@ class IrohAdminRpcChatGateway(
 ) : ChatGateway, ChatGatewayExtras {
 
     private val bridge = WsChatBridge(transport)
-    private val json = irohAdminJson
+    private val json = lettaWireJson
 
     /** conversationId -> agentId, learned from conversation.get/list. */
     private val agentIdByConversation = mutableMapOf<ConversationId, AgentId>()
@@ -207,7 +192,7 @@ class IrohAdminRpcChatGateway(
     ): Flow<LettaMessage> {
         val conversation = ConversationId(conversationId)
         val agentId = agentIdFor(conversation)
-        val outbound = decodeOutbound(request)
+        val outbound = OutboundMessageCreate.decode(request)
         return channelFlow {
             val turn = SendTurn(conversation)
             // UNDISPATCHED so the frame subscription is live before send()
@@ -224,7 +209,7 @@ class IrohAdminRpcChatGateway(
         }
     }
 
-    private suspend fun dispatchSend(conversationId: ConversationId, agentId: AgentId, outbound: OutboundMessage) {
+    private suspend fun dispatchSend(conversationId: ConversationId, agentId: AgentId, outbound: OutboundMessageCreate) {
         val accepted = transport.send(
             agentId = agentId.value,
             conversationId = conversationId.value,
@@ -365,36 +350,6 @@ class IrohAdminRpcChatGateway(
         }
     }
 
-    private data class OutboundMessage(
-        val text: String,
-        val otid: String?,
-        val contentParts: JsonArray?,
-    )
-
-    private fun decodeOutbound(request: MessageCreateRequest): OutboundMessage {
-        val element = request.messages?.firstOrNull()
-            ?: return OutboundMessage(text = request.input.orEmpty(), otid = null, contentParts = null)
-        val create = json.decodeFromJsonElement(MessageCreate.serializer(), element)
-        return when (val content = create.content) {
-            is JsonPrimitive -> OutboundMessage(
-                text = content.contentOrNull.orEmpty(),
-                otid = create.otid,
-                contentParts = null,
-            )
-            is JsonArray -> OutboundMessage(
-                text = content.firstTextPart().orEmpty(),
-                otid = create.otid,
-                contentParts = content,
-            )
-            else -> OutboundMessage(text = "", otid = create.otid, contentParts = null)
-        }
-    }
-
-    private fun JsonArray.firstTextPart(): String? = asSequence()
-        .filterIsInstance<JsonObject>()
-        .firstOrNull { (it["type"] as? JsonPrimitive)?.contentOrNull == "text" }
-        ?.let { (it["text"] as? JsonPrimitive)?.contentOrNull }
-
     companion object {
         /**
          * Iroh emits no idle pings; synthesize heartbeats under the timeline
@@ -412,7 +367,7 @@ class IrohAdminRpcChatGateway(
 class IrohAdminRpcAgentDirectory(
     private val transport: IChannelTransport,
 ) {
-    private val json = irohAdminJson
+    private val json = lettaWireJson
 
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
         val body = buildJsonObject {

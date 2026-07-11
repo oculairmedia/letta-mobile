@@ -581,7 +581,7 @@ class DesktopChatControllerTest {
         )
 
     private fun TestScope.testController(
-        gatewayFactory: () -> DesktopChatGateway,
+        gatewayFactory: suspend () -> DesktopChatGateway,
         agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
     ): DesktopChatController =
         DesktopChatController(

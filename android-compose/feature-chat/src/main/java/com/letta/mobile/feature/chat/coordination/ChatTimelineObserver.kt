@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.letta.mobile.ui.chat.render.ChatPresenceSignals
 import com.letta.mobile.ui.chat.render.ChatTimelinePresenter
+import com.letta.mobile.ui.chat.render.TimelineProjection
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.util.Telemetry
@@ -180,7 +181,8 @@ internal class ChatTimelineObserver(
                         val presentation = presenter.present(
                             projection = projection,
                             signals = ChatPresenceSignals(
-                                replyStreaming = activeReplyStreams.value.contains(conversationId),
+                                replyStreaming = activeReplyStreams.value.contains(conversationId) ||
+                                    projection.hasGrowingPassiveModelTail(prev),
                                 clientModeStreamInFlight = isClientModeStreamInFlight(),
                                 a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
                                 duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
@@ -226,7 +228,8 @@ internal class ChatTimelineObserver(
                     val presentation = presenter.present(
                         projection = projection,
                         signals = ChatPresenceSignals(
-                            replyStreaming = activeReplyStreams.value.contains(conversationId),
+                            replyStreaming = activeReplyStreams.value.contains(conversationId) ||
+                                projection.hasGrowingPassiveModelTail(prev),
                             clientModeStreamInFlight = isClientModeStreamInFlight(),
                             a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
                             duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
@@ -274,6 +277,29 @@ internal class ChatTimelineObserver(
         olderMessages: List<UiMessage>,
         existingMessages: List<UiMessage>,
     ): List<UiMessage> = presenter.mergeOlderPage(conversationId, olderMessages, existingMessages)
+
+    /**
+     * A desktop-origin observer turn is absent from Android's initiator-owned
+     * activeReplyStreams. Detect actual cumulative assistant growth instead:
+     * stable message identity + longer text on an incremental tail update.
+     * This cannot light up an old settled assistant merely because an unrelated
+     * user send toggled state, and it gives the smoother live cadence immediately.
+     */
+    private fun TimelineProjection.hasGrowingPassiveModelTail(previous: ChatUiState): Boolean {
+        // Only a REPLACE of the same tail row proves an existing model tail is
+        // still growing. AppendTail proves a new row arrived (it may already be
+        // a completed reply fanned out from another device), so it must not
+        // force streaming presence — the next growing replace will.
+        if (messageListChange != com.letta.mobile.data.chat.projection.ChatMessageListChange.ReplaceTail) return false
+        val current = ui.lastOrNull() ?: return false
+        if (!current.isModelOutputRow(tailIsAssistant)) return false
+        val prior = previous.messages.lastOrNull() ?: return false
+        return current.id == prior.id && current.content.length > prior.content.length
+    }
+
+    /** Assistant-role reasoning or final-answer row (the model-output tail). */
+    private fun com.letta.mobile.data.model.UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
+        role == "assistant" && (isReasoning || tailIsAssistant)
 
     private data class TimelineObserverBinding(
         val agentId: String?,
