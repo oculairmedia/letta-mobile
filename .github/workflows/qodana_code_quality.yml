@@ -31,6 +31,9 @@ jobs:
         uses: JetBrains/qodana-action@v2025.3.2
         with:
           pr-mode: false
+          # The Kotlin/Gradle application lives here. Restrict project discovery
+          # so Qodana does not import unrelated vendored Gradle samples.
+          args: --project-dir android-compose
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1897914872 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
