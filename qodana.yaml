@@ -3,7 +3,10 @@
 ####################################################################################################################
 
 version: "1.0"
-linter: qodana-jvm
+# This is an Android/Compose Gradle build. The JVM linter imports Android
+# models through an IntelliJ API that lacks AGP's PrivacySandboxSdkInfo method;
+# the Android linter ships the matching Android project-model support.
+linter: qodana-android
 profile:
   name: qodana.recommended
 include:
