@@ -36,11 +36,16 @@ jobs:
           from pathlib import Path
           build = Path('.qodana-android-compose/build.gradle.kts')
           source = build.read_text()
-          expected = 'id("com.android.application") version "9.2.0" apply false'
-          replacement = 'id("com.android.application") version "9.0.0" apply false'
-          if source.count(expected) != 1:
-              raise SystemExit('Expected exactly one AGP 9.2 declaration')
-          build.write_text(source.replace(expected, replacement))
+          declarations = (
+              'id("com.android.application") version "9.2.0" apply false',
+              'id("com.android.library") version "9.2.0" apply false',
+              'id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false',
+          )
+          for expected in declarations:
+              if source.count(expected) != 1:
+                  raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
+              source = source.replace(expected, expected.replace('9.2.0', '9.0.0'))
+          build.write_text(source)
           PY
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1.3
