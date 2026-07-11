@@ -157,7 +157,7 @@ class SubagentEntrySerializationCommonTest {
     }
 
     @Test
-    fun `missing parent provenance defaults to null (older shim compat)`() {
+    fun `missing parent provenance defaults to null for older shim compat`() {
         val raw = """{
             "toolCallId": "toolu_old_prov",
             "description": "legacy shim entry",
