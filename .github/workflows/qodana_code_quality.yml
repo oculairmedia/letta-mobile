@@ -33,7 +33,7 @@ jobs:
           pr-mode: false
           # The Kotlin/Gradle application lives here. Restrict project discovery
           # so Qodana does not import unrelated vendored Gradle samples.
-          args: --project-dir android-compose
+          args: --project-dir android-compose --config ../qodana.yaml
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1897914872 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
