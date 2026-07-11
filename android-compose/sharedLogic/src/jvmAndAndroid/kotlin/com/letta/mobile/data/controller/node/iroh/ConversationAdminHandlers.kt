@@ -29,8 +29,11 @@ object ConversationAdminHandlers {
             api.get("conversations", id)
         }
         router.register("conversation.create") { params ->
-            val agentId = param(params, "agent_id") ?: return@register adminError("agent_id required")
-            api.post("agents", agentId, "conversations", body = params.toString())
+            // Current App Server exposes the canonical create route at
+            // POST /v1/conversations with agent_id in the JSON body. The
+            // legacy agent-scoped route is not registered and returns 404.
+            param(params, "agent_id") ?: return@register adminError("agent_id required")
+            api.post("conversations", body = params.toString())
         }
         router.register("conversation.delete") { params ->
             val id = param(params, "conversation_id") ?: return@register adminError("conversation_id required")

@@ -152,7 +152,7 @@ class IrohAdminRpcChatGateway(
             put("agent_id", agentId)
             summary?.let { put("summary", it) }
         }.toString()
-        val result = rpc(AdminRpcCall("conversation.create", "/v1/agents/$agentId/conversations", body))
+        val result = rpc(AdminRpcCall("conversation.create", "/v1/conversations", body))
             ?: throw TimelineTransportHttpException(502, "conversation.create returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
             .also { agentIdByConversation[it.id] = it.agentId }
