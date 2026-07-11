@@ -73,7 +73,7 @@ class IrohAdminRpcConversationListSource(
         }
         val response = channelTransport.adminRpc(
             method = "conversation.create",
-            path = "/v1/agents/${agentId.value}/conversations",
+            path = "/v1/conversations",
             body = body.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.create failed")

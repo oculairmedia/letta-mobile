@@ -80,7 +80,7 @@ class AdminHandlerRefactorCharacterizationTest {
             check("archive.list", null, "GET", "http://test/v1/archives")
             
             // 4. ConversationAdminHandlers
-            check("conversation.create", buildJsonObject { put("agent_id", "ag-1") }, "POST", "http://test/v1/agents/ag-1/conversations")
+            check("conversation.create", buildJsonObject { put("agent_id", "ag-1") }, "POST", "http://test/v1/conversations")
             
             // 5. GoalAdminHandlers
             check("goal.get", buildJsonObject { put("agent_id", "ag-1") }, "GET", "http://test/v1/agents/ag-1/goal")
