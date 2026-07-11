@@ -9,7 +9,9 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - ".github/workflows/android-perf.yml"
+      # Broadened to all workflow files so a CI-only PR still triggers the
+      # required perf-gate check (see android.yml for the deadlock rationale).
+      - ".github/workflows/**"
       - "android-compose/**"
   workflow_dispatch:
     inputs:
