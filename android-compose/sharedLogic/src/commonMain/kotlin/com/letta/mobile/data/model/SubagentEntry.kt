@@ -16,6 +16,13 @@ import kotlinx.serialization.Serializable
  *  - [taskId] / [subagentAgentId] / [parentRunId] are derived from the
  *    background dispatch's return body; they are absent for synchronous
  *    dispatches that haven't returned identity yet.
+ *  - [parentAgentId] / [parentConversationId] (letta-mobile-m6oa1.2, §13.2)
+ *    are the INTERIM shim-emitted parent provenance so mobile can group
+ *    ephemeral subagents by authoritative parent identity WITHOUT inferring
+ *    from the display name. Both are optional + nullable: older shims omit
+ *    them, and the shim emits null when the parent identity is not in scope
+ *    at the ingesting call site. Origination moves to the Kotlin App Server
+ *    later in epic m6oa1.
  *
  * Status vocabulary (§13.2): `running` | `completed` | `failed` |
  * `cancelled`. `cancelled` (letta-mobile-drv4a) is the NON-CLEAN terminal
@@ -49,6 +56,10 @@ data class SubagentEntry(
     @SerialName("subagentAgentId") val subagentAgentId: String? = null,
     @SerialName("subagentConversationId") val subagentConversationId: String? = null,
     @SerialName("parentRunId") val parentRunId: String? = null,
+    // letta-mobile-m6oa1.2 (§13.2): interim shim-emitted parent provenance.
+    // Nullable defaults so older wire (which omits these) parses cleanly.
+    @SerialName("parentAgentId") val parentAgentId: String? = null,
+    @SerialName("parentConversationId") val parentConversationId: String? = null,
     @SerialName("startedAt") val startedAt: String? = null,
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
 )
