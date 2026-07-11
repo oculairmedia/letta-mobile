@@ -57,7 +57,7 @@ class IrohAdminRpcConversationSourceTest {
 
         val call = transport.adminRpcCalls.single()
         assertEquals("conversation.create", call.method)
-        assertEquals("/v1/agents/agent-1/conversations", call.path)
+        assertEquals("/v1/conversations", call.path)
         assertTrue(call.body.orEmpty().contains("\"agent_id\":\"agent-1\""))
         assertTrue(call.body.orEmpty().contains("\"summary\":\"new\""))
         assertEquals("conv-2", conv.id.value)
