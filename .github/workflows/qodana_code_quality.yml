@@ -15,12 +15,20 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
+          # pull_request has a head SHA; push/workflow_dispatch do not. Falling
+          # back to github.sha keeps this workflow valid on every declared trigger.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0  # a full history is required for pull request analysis
+      # Qodana 2026.1 bundles JBR 25. Its Gradle importer starts Gradle with that
+      # JVM, but this repository's Gradle/Groovy stack cannot parse Java 25
+      # classfiles (major version 69), so every scan fails before inspection.
+      # Pin the last JBR-21-compatible Qodana release until Gradle supports JDK 25.
+      # Dependabot will surface future upgrades; remove this pin only after the
+      # scanner can import `android-compose` successfully.
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.1
+        uses: JetBrains/qodana-action@v2025.3.2
         with:
           pr-mode: false
         env:
