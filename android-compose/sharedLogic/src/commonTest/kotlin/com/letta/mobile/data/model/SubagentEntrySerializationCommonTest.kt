@@ -124,6 +124,81 @@ class SubagentEntrySerializationCommonTest {
         assertEquals(4, decoded.todoProgress!!.total)
     }
 
+    // ── letta-mobile-m6oa1.2: interim parent provenance ───────────────────
+
+    @Test
+    fun `round-trips SubagentEntry with parent provenance present`() {
+        val entry = SubagentEntry(
+            toolCallId = "toolu_prov",
+            status = SubagentStatus.RUNNING,
+            parentAgentId = "agent-local-parent-1111",
+            parentConversationId = "conv-parent-abc",
+        )
+
+        val encoded = Json.encodeToString(entry)
+        val decoded = json.decodeFromString<SubagentEntry>(encoded)
+
+        assertEquals("agent-local-parent-1111", decoded.parentAgentId)
+        assertEquals("conv-parent-abc", decoded.parentConversationId)
+    }
+
+    @Test
+    fun `parent provenance uses camelCase wire keys`() {
+        val entry = SubagentEntry(
+            toolCallId = "toolu_prov_keys",
+            status = SubagentStatus.RUNNING,
+            parentAgentId = "agent-local-parent-2222",
+            parentConversationId = "conv-parent-def",
+        )
+
+        val encoded = Json.encodeToString(entry)
+        assertTrue("\"parentAgentId\"" in encoded, "Expected parentAgentId in: $encoded")
+        assertTrue("\"parentConversationId\"" in encoded, "Expected parentConversationId in: $encoded")
+    }
+
+    @Test
+    fun `missing parent provenance defaults to null for older shim compat`() {
+        val raw = """{
+            "toolCallId": "toolu_old_prov",
+            "description": "legacy shim entry",
+            "subagentType": "general",
+            "status": "running"
+        }""".trimIndent()
+
+        val decoded = json.decodeFromString<SubagentEntry>(raw)
+        assertEquals("toolu_old_prov", decoded.toolCallId)
+        assertNull(decoded.parentAgentId, "parentAgentId must be null when absent")
+        assertNull(decoded.parentConversationId, "parentConversationId must be null when absent")
+    }
+
+    @Test
+    fun `explicit null parent provenance parses cleanly`() {
+        val raw = """{
+            "toolCallId": "toolu_null_prov",
+            "status": "running",
+            "parentAgentId": null,
+            "parentConversationId": null
+        }""".trimIndent()
+
+        val decoded = json.decodeFromString<SubagentEntry>(raw)
+        assertNull(decoded.parentAgentId)
+        assertNull(decoded.parentConversationId)
+    }
+
+    @Test
+    fun `parent provenance survives round-trip within parent frame shape`() {
+        val raw = buildJsonObject {
+            put("toolCallId", "toolu_prov_frame")
+            put("status", "running")
+            put("parentAgentId", "agent-local-parent-3333")
+            put("parentConversationId", "conv-parent-ghi")
+        }
+
+        val decoded = json.decodeFromString<SubagentEntry>(raw.toString())
+        assertEquals("agent-local-parent-3333", decoded.parentAgentId)
+        assertEquals("conv-parent-ghi", decoded.parentConversationId)
+    }
+
     @Test
     fun `SubagentTodoProgressWire encodes with numeric values`() {
         val wire = SubagentTodoProgressWire(completed = 0, total = 5)
