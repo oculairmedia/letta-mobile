@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.components
 
+import com.letta.mobile.ui.markdown.repairIncompleteMarkdownForStreaming
+
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

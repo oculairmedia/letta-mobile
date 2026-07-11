@@ -91,6 +91,11 @@ kotlin {
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")
+                // Shared Android/Desktop Markdown paint layer. Semantic streaming
+                // structure lives alongside it in this source set; platform
+                // modules provide only optional image/clipboard adapters.
+                api("com.mikepenz:multiplatform-markdown-renderer-m3:0.41.0")
+                api("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
                 // Iroh QUIC transport binding (JNI-backed, Android + JVM only).
                 // NOT in commonMain — native lib doesn't work with Kotlin/Native.
                 // Use implementation (not api): iroh 1.0 requires JVM 21 and must

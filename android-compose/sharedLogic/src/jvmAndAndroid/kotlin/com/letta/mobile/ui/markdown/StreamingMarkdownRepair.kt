@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 /**
  * Render-only repair pass for incomplete Markdown at the streaming tail.
@@ -10,7 +10,7 @@ package com.letta.mobile.ui.components
  * truth untouched and produces a temporary, syntactically-closed string only
  * for rendering the active block.
  */
-internal fun repairIncompleteMarkdownForStreaming(text: String): String {
+fun repairIncompleteMarkdownForStreaming(text: String): String {
     if (text.isEmpty()) return text
 
     repairOpenCodeFence(text)?.let { return it }

@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.components
 
+import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentState
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface

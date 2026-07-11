@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 /**
  * Line-oriented markdown block parser for streaming chat output.
@@ -7,7 +7,7 @@ package com.letta.mobile.ui.components
  * implementation; it is a stable block opener. The rich inline/block rendering still goes through
  * [MarkdownText], while this layer owns block identity and early recognition of structural cues.
  */
-internal object StreamingMarkdownDocumentParser {
+object StreamingMarkdownDocumentParser {
     private val fenceRegex = Regex("""^(\s{0,3})(`{3,}|~{3,})\s*(.*?)\s*$""")
     private val headingRegex = Regex("""^\s{0,3}#{1,6}(?:\s+.*)?\s*$""")
     private val bulletRegex = Regex("""^(\s*)([-*+])(\s+)(.*)$""")

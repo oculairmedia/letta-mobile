@@ -1350,13 +1350,10 @@ private fun AgentText(text: String, isError: Boolean, isStreaming: Boolean = fal
     } else {
         text
     }
-    SelectionContainer {
-        Text(
-            text = displayText,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        )
-    }
+    com.letta.mobile.ui.markdown.SharedMarkdownText(
+        text = displayText,
+        textColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 /**
