@@ -127,6 +127,9 @@ class IrohChannelTransport(
     @Volatile
     private var activeTurn: ActiveTurn? = null
 
+    override val hasActiveChatTurn: Boolean
+        get() = activeTurn?.terminalReached?.isCompleted == false
+
     /**
      * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
      * correlation reducer — the Kotlin analogue of the shim's

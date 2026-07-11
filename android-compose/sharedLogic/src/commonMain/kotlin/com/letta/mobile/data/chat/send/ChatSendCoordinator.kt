@@ -129,6 +129,22 @@ class ChatSendCoordinator(
         targetConversationId: String?,
     ) {
         val timer = Telemetry.startTimer("AdminChatVM", "send.ws.enqueue")
+        // dir4k: presentation can miss/reject a terminal fanout and remain
+        // visually active after Iroh has already reached terminal. Before a
+        // sequential send, heal that impossible state from transport ownership
+        // so the new message is dispatched instead of queued behind a ghost turn.
+        if (!wsChatBridge.hasActiveChatTurn && (ui.isStreaming() || ui.isAgentTyping())) {
+            ui.onTurnVisuallyComplete()
+            activeWsOtid = null
+            activeWsLocalConversationId = null
+            activeWsTurnId = null
+            activeWsRunId = null
+            activeAssistantMessageRunIds.clear()
+            stopReasonForTurn = null
+            usageRecordedForTurn = false
+            bufferedErrorMessage = null
+            Telemetry.event("IrohTrace", "coordinator.send.stalePresenceHealed")
+        }
         Telemetry.event(
             "IrohTrace", "coordinator.send.begin",
             "agentId" to agentId,
