@@ -15,14 +15,44 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
+          # pull_request has a head SHA; push/workflow_dispatch do not. Falling
+          # back to github.sha keeps this workflow valid on every declared trigger.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0  # a full history is required for pull request analysis
+      # Scope discovery to android-compose below. Without that scope Qodana
+      # also imports the vendored Overmorrow Flutter root (old Gradle/Groovy),
+      # which produced the misleading JDK-25 classfile failure.
+      #
+      # Qodana 2026.1 supports AGP through 9.0, while production uses AGP 9.2.
+      # Prepare an ignored CI-only source copy with only the model-import plugin
+      # version rewritten. Real builds/tests and checked-in sources stay on 9.2.
+      # Remove this step as soon as Qodana advertises AGP 9.2 support.
+      - name: Prepare Qodana-compatible Android model
+        run: |
+          cp -a android-compose .qodana-android-compose
+          python3 - <<'PY'
+          from pathlib import Path
+          build = Path('.qodana-android-compose/build.gradle.kts')
+          source = build.read_text()
+          declarations = (
+              'id("com.android.application") version "9.2.0" apply false',
+              'id("com.android.library") version "9.2.0" apply false',
+              'id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false',
+          )
+          for expected in declarations:
+              if source.count(expected) != 1:
+                  raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
+              source = source.replace(expected, expected.replace('9.2.0', '9.0.0'))
+          build.write_text(source)
+          PY
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.1
+        uses: JetBrains/qodana-action@v2026.1.3
         with:
           pr-mode: false
+          # Restrict discovery to the app model copy and load the root config.
+          args: --project-dir .qodana-android-compose --config ../qodana.yaml
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1897914872 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
