@@ -21,14 +21,12 @@ jobs:
           # back to github.sha keeps this workflow valid on every declared trigger.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0  # a full history is required for pull request analysis
-      # Qodana 2026.1 bundles JBR 25. Its Gradle importer starts Gradle with that
-      # JVM, but this repository's Gradle/Groovy stack cannot parse Java 25
-      # classfiles (major version 69), so every scan fails before inspection.
-      # Pin the last JBR-21-compatible Qodana release until Gradle supports JDK 25.
-      # Dependabot will surface future upgrades; remove this pin only after the
-      # scanner can import `android-compose` successfully.
+      # Scope discovery to android-compose below. Without that scope Qodana
+      # also imports the vendored Overmorrow Flutter root (old Gradle/Groovy),
+      # which is what produced the misleading JDK-25 classfile failure.
+      # Qodana 2026.1 is required for this app's Gradle 9.4 / AGP 9.2 model.
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2025.3.2
+        uses: JetBrains/qodana-action@v2026.1.3
         with:
           pr-mode: false
           # The Kotlin/Gradle application lives here. Restrict project discovery

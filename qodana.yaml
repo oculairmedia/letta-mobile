@@ -3,9 +3,8 @@
 ####################################################################################################################
 
 version: "1.0"
-# This is an Android/Compose Gradle build. The JVM linter imports Android
-# models through an IntelliJ API that lacks AGP's PrivacySandboxSdkInfo method;
-# the Android linter ships the matching Android project-model support.
+# This is an Android/Compose Gradle 9.4 / AGP 9.2 build. Qodana 2026.1's
+# Android linter contains the matching Android project-model support.
 linter: qodana-android
 profile:
   name: qodana.recommended
