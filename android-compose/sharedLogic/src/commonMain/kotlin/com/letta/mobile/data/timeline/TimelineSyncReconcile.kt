@@ -427,7 +427,18 @@ private const val RECONCILE_MANGLED_SUPERSET_MIN_CHARS = 12
 
 private fun String.filterLettersAndDigits(): String = filter { it.isLetterOrDigit() }
 
-private fun String.isReconcileSyntheticRunId(): Boolean = startsWith("iroh-run-")
+// letta-mobile-j98r5.1: the Iroh transport stamps client-synthesized run-id
+// placeholders under TWO prefixes — the send/stream path uses `iroh-run-*`
+// (IrohChannelTransport.kt) and the OBSERVER path uses `iroh-observer-run-*`
+// (IrohChannelTransport.kt:414). Both are throwaway placeholders that the real
+// server run id later supersedes, so the reconcile machinery must classify
+// BOTH as synthetic. Defining the prefix set once keeps the rule in a single
+// place; this is a pure downstream CLASSIFICATION change (the stamped values
+// are left untouched at the transport).
+private val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", "iroh-observer-run-")
+
+private fun String.isReconcileSyntheticRunId(): Boolean =
+    IROH_SYNTHETIC_RUN_ID_PREFIXES.any { startsWith(it) }
 
 private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     incoming: TimelineEvent.Confirmed,
@@ -435,9 +446,9 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     val existingRunId = runId?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
     return messageType in setOf(TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING) &&
-        existingRunId?.startsWith("iroh-run-") == true &&
+        existingRunId?.isReconcileSyntheticRunId() == true &&
         incomingRunId != null &&
-        !incomingRunId.startsWith("iroh-run-")
+        !incomingRunId.isReconcileSyntheticRunId()
 }
 
 /**
