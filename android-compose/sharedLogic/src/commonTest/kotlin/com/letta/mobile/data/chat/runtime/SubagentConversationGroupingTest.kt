@@ -108,6 +108,36 @@ class SubagentConversationGroupingTest {
     }
 
     @Test
+    fun `partial parent identifiers key on precedence parentConversationId then parentAgentId then parentRunId`() {
+        // Two members carry ONLY parentAgentId (parentConversationId + parentRunId
+        // null) -> both key on that parentAgentId and group together.
+        // A third carries ONLY parentRunId -> keys on parentRunId, distinct stack.
+        // A fourth carries BOTH parentConversationId and parentAgentId -> the
+        // stronger parentConversationId wins the key.
+        val conversations = listOf(
+            convo(id = "c1", agentId = "sa1"),
+            convo(id = "c2", agentId = "sa2"),
+            convo(id = "c3", agentId = "sa3"),
+            convo(id = "c4", agentId = "sa4"),
+        )
+        val entries = listOf(
+            entry(toolCallId = "t1", subagentConversationId = "c1", parentAgentId = "pA"),
+            entry(toolCallId = "t2", subagentConversationId = "c2", parentAgentId = "pA"),
+            entry(toolCallId = "t3", subagentConversationId = "c3", parentRunId = "pRun"),
+            entry(toolCallId = "t4", subagentConversationId = "c4", parentConversationId = "pConv", parentAgentId = "pA"),
+        )
+
+        val result = groupSubagentConversations(conversations, entries)
+
+        // pA stack has c1 + c2; pRun stack has c3; pConv stack has c4 (conversationId wins over agentId).
+        val byKey = result.stacks.associateBy { it.stackKey }
+        assertEquals(setOf("known:pA", "known:pRun", "known:pConv"), byKey.keys)
+        assertEquals(listOf("c1", "c2"), byKey.getValue("known:pA").memberConversationIds)
+        assertEquals(listOf("c3"), byKey.getValue("known:pRun").memberConversationIds)
+        assertEquals(listOf("c4"), byKey.getValue("known:pConv").memberConversationIds)
+    }
+
+    @Test
     fun `unknown-provenance unrelated entries stay separate`() {
         val conversations = listOf(
             convo(id = "c1", agentId = "sa1"),
