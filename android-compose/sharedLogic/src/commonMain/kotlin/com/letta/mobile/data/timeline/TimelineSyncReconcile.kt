@@ -427,18 +427,16 @@ private const val RECONCILE_MANGLED_SUPERSET_MIN_CHARS = 12
 
 private fun String.filterLettersAndDigits(): String = filter { it.isLetterOrDigit() }
 
-// letta-mobile-j98r5.1: the Iroh transport stamps client-synthesized run-id
-// placeholders under TWO prefixes — the send/stream path uses `iroh-run-*`
-// (IrohChannelTransport.kt) and the OBSERVER path uses `iroh-observer-run-*`
-// (IrohChannelTransport.kt:414). Both are throwaway placeholders that the real
-// server run id later supersedes, so the reconcile machinery must classify
-// BOTH as synthetic. Defining the prefix set once keeps the rule in a single
-// place; this is a pure downstream CLASSIFICATION change (the stamped values
-// are left untouched at the transport).
-private val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", "iroh-observer-run-")
-
-private fun String.isReconcileSyntheticRunId(): Boolean =
-    IROH_SYNTHETIC_RUN_ID_PREFIXES.any { startsWith(it) }
+// letta-mobile-j98r5.1: reconcile classifies Iroh client-synthesized run-id
+// placeholders via the SINGLE canonical predicate shared with the stream
+// reducer ([isIrohSyntheticRunId] in TimelineStreamReducer.kt). Both the
+// send/stream path (`iroh-run-*`) and the passive OBSERVER path
+// (`iroh-observer-run-*`, IrohChannelTransport.kt:414) stamp throwaway
+// placeholders that the real server run id later supersedes, so both must be
+// classified as synthetic. Delegating to the one helper keeps reconcile and
+// stream reduction from drifting; this is a pure downstream CLASSIFICATION
+// change (the stamped values are left untouched at the transport).
+private fun String.isReconcileSyntheticRunId(): Boolean = isIrohSyntheticRunId()
 
 private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     incoming: TimelineEvent.Confirmed,

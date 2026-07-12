@@ -519,7 +519,26 @@ private fun TimelineEvent.Confirmed.canMergeStreamFrame(
 private fun TimelineEvent.Confirmed.hasIrohSyntheticRunId(): Boolean =
     runId?.takeIf { it.isNotBlank() }?.isIrohSyntheticRunId() == true
 
-private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")
+/**
+ * letta-mobile-j98r5.1: the single canonical predicate for "is this a
+ * client-synthesized Iroh run-id placeholder" shared by BOTH the stream reducer
+ * and the reconcile seam ([TimelineSyncReconcile]) so their classification can
+ * never drift. The Iroh transport stamps throwaway placeholders under TWO
+ * prefixes — the send/stream path uses `iroh-run-*`
+ * (IrohChannelTransport.kt:687) and the passive OBSERVER projection path uses
+ * `iroh-observer-run-*` (IrohChannelTransport.kt:414). Both are superseded by
+ * the real server run id, so both must classify as synthetic.
+ *
+ * This is a pure downstream CLASSIFICATION helper — it inspects already-stamped
+ * ids and never changes how or when they are stamped. The transport's own
+ * abort/promote predicate (IrohChannelTransport.kt, jvmAndAndroid) is
+ * intentionally kept separate: it only ever evaluates an `ActiveTurn` run id
+ * (always born `iroh-run-*` in `send()`), and observer ids can never reach it.
+ */
+internal val IROH_SYNTHETIC_RUN_ID_PREFIXES = listOf("iroh-run-", "iroh-observer-run-")
+
+internal fun String.isIrohSyntheticRunId(): Boolean =
+    IROH_SYNTHETIC_RUN_ID_PREFIXES.any { startsWith(it) }
 
 /**
  * When an otid-matched cumulative chunk arrives carrying the real server run
