@@ -2,6 +2,8 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.repository.subagent.ParentContext
+import com.letta.mobile.data.repository.subagent.SubagentCorrelator
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
@@ -41,6 +43,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
@@ -120,6 +126,17 @@ class IrohChannelTransport(
      */
     @Volatile
     private var activeTurn: ActiveTurn? = null
+
+    /**
+     * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
+     * correlation reducer — the Kotlin analogue of the shim's
+     * `ingestParentFrame`. Fed additively from [ingestObserverFrame] as the
+     * observer path decodes the parent run's frames. STRICTLY dispatch +
+     * return correlation; identity-from-body (m6oa1.3) and lifecycle/terminal
+     * nuance (m6oa1.4) are out of scope. Confined to the single-threaded
+     * observer collector, so the reducer's non-synchronized map is safe.
+     */
+    private val subagentCorrelator = SubagentCorrelator()
 
     /**
      * Per-turn client state shared between the streaming send job and [cancel].
@@ -362,6 +379,11 @@ class IrohChannelTransport(
             return
         }
 
+        // letta-mobile-m6oa1.1: ADDITIVE tap — correlate parent `Agent`
+        // tool_call dispatch/return frames into the subagent correlator. This
+        // does NOT consume or alter the projection below; it only observes.
+        correlateAgentFrame(streamDelta)
+
         // Project via the EXACT initiator chain: raw StreamDelta -> RuntimeEventDraft
         // (AppServerRuntimeEventMapper, the same mapper engine.collect uses) ->
         // ServerFrame(s) (payloadToServerFrames, shared with emitDraft). The
@@ -378,6 +400,57 @@ class IrohChannelTransport(
             frames.forEach { emitBoth(it) }
         }
     }
+
+    /**
+     * letta-mobile-m6oa1.1: decode ONE observer StreamDelta and, when it is a
+     * parent `Agent` tool_call dispatch or its matching tool_return, feed the
+     * [subagentCorrelator]. All other frames are ignored. Parsing is defensive
+     * (malformed deltas are skipped) so the correlation tap can never disturb
+     * the projection path.
+     *
+     * Frame shapes (mirrors [AppServerTurnEngine.extractToolCallId] / the
+     * mapper): the tool_call_id is `delta.tool_call.tool_call_id` (dispatch) or
+     * `delta.tool_call_id` (return); the tool name is `delta.tool_call.name`;
+     * the arguments are `delta.tool_call.arguments`; the parent runId is
+     * `delta.run_id`.
+     */
+    private fun correlateAgentFrame(streamDelta: AppServerInboundFrame.StreamDelta) {
+        runCatching {
+            val delta = streamDelta.delta as? JsonObject ?: return
+            val messageType = delta.string("message_type") ?: return
+            val toolCall = delta["tool_call"]?.jsonObject
+            val parent = ParentContext(
+                agentId = streamDelta.runtime.agentId,
+                conversationId = streamDelta.runtime.conversationId,
+                runId = delta.string("run_id"),
+            )
+            when (messageType) {
+                "tool_call_message", "approval_request_message" -> {
+                    // Only the parent `Agent` dispatch is in scope.
+                    val name = toolCall?.string("name") ?: return
+                    if (name != "Agent") return
+                    val toolCallId = toolCall.string("tool_call_id")
+                        ?: delta.string("tool_call_id") ?: return
+                    val arguments = toolCall["arguments"]?.toString()
+                        ?: delta["arguments"]?.toString()
+                    subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
+                }
+                "tool_return_message" -> {
+                    // Returns don't carry the tool name; correlate purely by id.
+                    // onAgentReturn ignores ids it never recorded as an Agent
+                    // dispatch, so passing every return id here is safe — a
+                    // non-Agent tool's return simply no-ops.
+                    val toolCallId = toolCall?.string("tool_call_id")
+                        ?: delta.string("tool_call_id") ?: return
+                    subagentCorrelator.onAgentReturn(toolCallId, parent)
+                }
+                else -> return
+            }
+        }
+    }
+
+    private fun JsonObject.string(key: String): String? =
+        this[key]?.jsonPrimitive?.contentOrNull
 
     private fun observerTurnCommand(agentId: String, conversationId: String): TurnCommand =
         TurnCommand(
