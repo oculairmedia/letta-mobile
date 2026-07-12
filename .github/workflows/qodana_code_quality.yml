@@ -15,44 +15,80 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
-          # pull_request has a head SHA; push/workflow_dispatch do not. Falling
-          # back to github.sha keeps this workflow valid on every declared trigger.
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
           fetch-depth: 0  # a full history is required for pull request analysis
-      # Scope discovery to android-compose below. Without that scope Qodana
-      # also imports the vendored Overmorrow Flutter root (old Gradle/Groovy),
-      # which produced the misleading JDK-25 classfile failure.
-      #
-      # Qodana 2026.1 supports AGP through 9.0, while production uses AGP 9.2.
-      # Prepare an ignored CI-only source copy with only the model-import plugin
-      # version rewritten. Real builds/tests and checked-in sources stay on 9.2.
-      # Remove this step as soon as Qodana advertises AGP 9.2 support.
-      - name: Prepare Qodana-compatible Android model
-        run: |
-          cp -a android-compose .qodana-android-compose
-          python3 - <<'PY'
-          from pathlib import Path
-          build = Path('.qodana-android-compose/build.gradle.kts')
-          source = build.read_text()
-          declarations = (
-              'id("com.android.application") version "9.2.0" apply false',
-              'id("com.android.library") version "9.2.0" apply false',
-              'id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false',
-          )
-          for expected in declarations:
-              if source.count(expected) != 1:
-                  raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
-              source = source.replace(expected, expected.replace('9.2.0', '9.0.0'))
-          build.write_text(source)
-          PY
       - name: 'Qodana Scan'
-        uses: JetBrains/qodana-action@v2026.1.3
+        uses: JetBrains/qodana-action@v2026.1
         with:
           pr-mode: false
-          # Restrict discovery to the app model copy and load the root config.
-          args: --project-dir .qodana-android-compose --config ../qodana.yaml
+          results-dir: ${{ runner.temp }}/qodana/results
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1897914872 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
+
+      # letta-mobile: publish a SANITIZED findings inventory as an artifact so the
+      # PM/automation can dedupe + partition remediation waves WITHOUT the Qodana
+      # Cloud token (which stays a repo secret). The CSV carries only rule id,
+      # severity, relative file path, line, and message — NO source snippets, NO
+      # secrets. Runs on main pushes only (the authoritative inventory), and
+      # always() so it publishes even when Qodana reports findings.
+      - name: 'Build sanitized Qodana findings inventory (CSV, no secrets)'
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          set -euo pipefail
+          SARIF="${{ runner.temp }}/qodana/results/qodana.sarif.json"
+          OUT_DIR="${{ runner.temp }}/qodana-inventory"
+          mkdir -p "$OUT_DIR"
+          if [ ! -f "$SARIF" ]; then
+            echo "No SARIF at $SARIF; skipping inventory."
+            echo "sarif_missing=1" > "$OUT_DIR/status.txt"
+            exit 0
+          fi
+          # Sanitized flat CSV: rule_id,level,file,line,message (message stripped
+          # of commas/newlines; no code text is emitted by qodana in message).
+          python3 - "$SARIF" "$OUT_DIR/qodana-findings.csv" "$OUT_DIR/qodana-summary.csv" <<'PY'
+          import json, sys, csv, collections
+          sarif_path, flat_path, summ_path = sys.argv[1], sys.argv[2], sys.argv[3]
+          data = json.load(open(sarif_path))
+          rows = []
+          for run in data.get("runs", []):
+              for r in run.get("results", []):
+                  rule = r.get("ruleId", "?")
+                  level = r.get("level", r.get("kind", "?"))
+                  msg = (r.get("message", {}) or {}).get("text", "") or ""
+                  msg = msg.replace("\n", " ").replace(",", ";")[:300]
+                  locs = r.get("locations", []) or []
+                  path = "?"; line = ""
+                  if locs:
+                      pl = (locs[0].get("physicalLocation", {}) or {})
+                      path = (pl.get("artifactLocation", {}) or {}).get("uri", "?")
+                      line = (pl.get("region", {}) or {}).get("startLine", "")
+                  rows.append((rule, level, path, line, msg))
+          with open(flat_path, "w", newline="") as f:
+              w = csv.writer(f); w.writerow(["rule_id","level","file","line","message"])
+              for r in rows: w.writerow(r)
+          # Aggregated summary by rule + top-level module + severity (dedupe-friendly).
+          agg = collections.Counter()
+          for rule, level, path, line, msg in rows:
+              parts = path.split("/")
+              module = "/".join(parts[:4]) if len(parts) >= 4 else path
+              agg[(rule, level, module)] += 1
+          with open(summ_path, "w", newline="") as f:
+              w = csv.writer(f); w.writerow(["rule_id","level","module","count"])
+              for (rule, level, module), n in sorted(agg.items(), key=lambda x:-x[1]):
+                  w.writerow([rule, level, module, n])
+          print(f"findings={len(rows)} summary_rows={len(agg)}")
+          PY
+          echo "Inventory written to $OUT_DIR"
+          head -20 "$OUT_DIR/qodana-summary.csv" || true
+
+      - name: 'Upload sanitized Qodana inventory artifact'
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qodana-inventory
+          path: ${{ runner.temp }}/qodana-inventory
+          if-no-files-found: warn
+          retention-days: 14
