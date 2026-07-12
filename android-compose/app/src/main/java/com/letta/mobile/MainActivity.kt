@@ -40,7 +40,6 @@ import com.letta.mobile.ui.navigation.AdaptiveScaffold
 import com.letta.mobile.ui.navigation.AppNavGraph
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.LettaTheme
-import androidx.core.app.ActivityCompat
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
