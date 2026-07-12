@@ -46,6 +46,10 @@ jobs:
                   raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
               source = source.replace(expected, expected.replace('9.2.0', '9.0.0'))
           build.write_text(source)
+          wrapper = Path('.qodana-android-compose/gradle/wrapper/gradle-wrapper.properties')
+          wrapper_source = wrapper.read_text()
+          wrapper_source = wrapper_source.replace('9.4.1', '9.3.0')
+          wrapper.write_text(wrapper_source)
           PY
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1.3
