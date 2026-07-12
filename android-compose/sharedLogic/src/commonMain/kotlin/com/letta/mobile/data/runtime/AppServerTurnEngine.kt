@@ -69,6 +69,24 @@ class AppServerTurnEngine(
     private var runtime: AppServerRuntimeScope? = null
 
     /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY owner identity for the currently held
+     * [activeTurn] lock. This holder is set STRICTLY adjacent to the existing
+     * `activeTurn.lock()`/`activeTurn.unlock()` calls and never participates in
+     * lock acquisition or the [isBusy] computation — it exists purely so a
+     * busy-rejected send can PROVE which run/agent/conversation owns the engine,
+     * when it acquired the lock, and its last-seen terminal. Backed by an
+     * atomicfu ref so the read accessor is safe from any thread with no locking.
+     */
+    private val activeTurnOwnerRef = kotlinx.atomicfu.atomic<ActiveTurnOwner?>(null)
+
+    /**
+     * Pure read accessor for the current active-turn owner (telemetry only).
+     * Null when idle. Does NOT touch [activeTurn]; reading it never affects lock
+     * semantics or [isBusy].
+     */
+    val activeTurnOwner: ActiveTurnOwner? get() = activeTurnOwnerRef.value
+
+    /**
      * true when a turn is actively running (activeTurn locked).
      * Check before calling runTurn to avoid "can't send while busy" errors.
      */
@@ -105,7 +123,44 @@ class AppServerTurnEngine(
             throw IllegalStateException("An App Server turn is already active for ${command.runtimeId.value}.")
         }
 
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Stamp owner identity immediately
+        // after the lock is acquired (the lock call itself is unchanged). The
+        // runId is server-assigned later, so it is null at acquire time; the
+        // runtimeId/agent/conversation are the acquiring turn's identity.
+        val acquiredAtMs = currentTimeMs()
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Resolve the permission/process role
+        // for this turn once (pure read of the same provider the turn already
+        // uses below) so the owner can be stamped with it. This does NOT change
+        // the value used by the turn — it is the identical provider result.
+        val ownerProcessRole = permissionModeProvider(command).name
+        activeTurnOwnerRef.value = ActiveTurnOwner(
+            runId = null,
+            runtimeId = command.runtimeId.value,
+            agentId = command.agentId.value,
+            conversationId = command.conversationId.value,
+            acquiredAtMs = acquiredAtMs,
+            lastTerminal = null,
+            processRole = ownerProcessRole,
+            settleDeadlineMs = terminalSettleQuietMs,
+            watchdogDeadlineMs = turnIdleTimeoutMs,
+        )
+        com.letta.mobile.util.Telemetry.event(
+            "AppServerTurnEngine", "activeTurn.acquired",
+            "runtimeId" to command.runtimeId.value,
+            "agentId" to command.agentId.value,
+            "conversationId" to command.conversationId.value,
+            "acquiredAtMs" to acquiredAtMs,
+            "processRole" to ownerProcessRole,
+            "settleDeadlineMs" to terminalSettleQuietMs,
+            "watchdogDeadlineMs" to turnIdleTimeoutMs,
+        )
+
         var collector: kotlinx.coroutines.Job? = null
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Track which path reached the
+        // finally so the released event carries a RELEASE REASON. Defaults to a
+        // normal completion; overwritten (pure write) if a distinct terminal
+        // path is observed. Never gates control flow.
+        var releaseReason: String = "normal_completion"
         try {
             val turnPermissionMode = permissionModeProvider(command)
             com.letta.mobile.util.Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
@@ -119,14 +174,28 @@ class AppServerTurnEngine(
                     collectTurnWithIdleWatchdog(scope, command, turnPermissionMode, collectorReady) { draft -> send(draft) }
                 } catch (completed: TurnCompletedMarker) {
                     // Flow completed after a terminal App Server lifecycle event.
+                    releaseReason = "normal_completion" // letta-mobile-kyqdt: telemetry-only
                 } catch (idle: TurnIdleTimedOutMarker) {
                     // No frames for turnIdleTimeoutMs: the App Server never produced a
                     // terminal stop_reason. Force a Failed lifecycle so the UI stops
                     // "Thinking..." and the activeTurn lock is released for the next send.
+                    releaseReason = "watchdog_timeout" // letta-mobile-kyqdt: telemetry-only
                     com.letta.mobile.util.Telemetry.event(
                         "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
                     )
+                    noteOwnerTerminal(RuntimeRunStatus.Failed, source = "idle_timeout") // letta-mobile-kyqdt: telemetry-only
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
+                } catch (cancellation: kotlinx.coroutines.CancellationException) {
+                    // letta-mobile-kyqdt: TELEMETRY-ONLY. The turn was cancelled/
+                    // preempted (e.g. abort/scope teardown) before a terminal.
+                    // Record the reason then rethrow unchanged — no behavior change.
+                    releaseReason = "cancellation"
+                    throw cancellation
+                } catch (error: Throwable) {
+                    // letta-mobile-kyqdt: TELEMETRY-ONLY. Collector failed with a
+                    // stream error. Record the reason then rethrow unchanged.
+                    releaseReason = "stream_error"
+                    throw error
                 }
             }
             collectorReady.await()
@@ -135,7 +204,41 @@ class AppServerTurnEngine(
             collector.join()
         } finally {
             collector?.cancelAndJoin()
-            activeTurn.unlock()
+            // letta-mobile-kyqdt: P1a RACE FIX (TELEMETRY-ONLY ordering).
+            // Snapshot the owner metadata for the release event, but do NOT clear
+            // it yet. The mutex must be unlocked FIRST; only AFTER unlock returns
+            // do we clear activeTurnOwnerRef. This removes the observable window
+            // where a concurrent isBusy pre-check could see the lock still held
+            // while the owner was already null ("busy but unknown owner"). The
+            // unlock call itself is unchanged and not reordered relative to the
+            // rest of the finally — only the pure metadata clear is sequenced to
+            // run strictly after it. The clear stays in finally so it still runs
+            // even if unlock() throws.
+            val releasedOwner = activeTurnOwnerRef.value
+            try {
+                activeTurn.unlock()
+            } finally {
+                // Clear STRICTLY after unlock returns (or throws). While the lock
+                // is still held-observable, the owner is never null.
+                activeTurnOwnerRef.value = null
+                com.letta.mobile.util.Telemetry.event(
+                    "AppServerTurnEngine", "activeTurn.released",
+                    "runtimeId" to command.runtimeId.value,
+                    "agentId" to command.agentId.value,
+                    "conversationId" to command.conversationId.value,
+                    "acquiredAtMs" to (releasedOwner?.acquiredAtMs),
+                    "heldMs" to (releasedOwner?.acquiredAtMs?.let { currentTimeMs() - it }),
+                    "lastTerminal" to (releasedOwner?.lastTerminal),
+                    "lastTerminalSource" to (releasedOwner?.lastTerminalSource),
+                    "lastTerminalAtMs" to (releasedOwner?.lastTerminalAtMs),
+                    "lastTerminalSeq" to (releasedOwner?.lastTerminalSeq),
+                    "lastTerminalScopeMatched" to (releasedOwner?.lastTerminalScopeMatched),
+                    "settleDeadlineMs" to (releasedOwner?.settleDeadlineMs),
+                    "watchdogDeadlineMs" to (releasedOwner?.watchdogDeadlineMs),
+                    "processRole" to (releasedOwner?.processRole),
+                    "releaseReason" to releaseReason,
+                )
+            }
         }
     }
 
@@ -173,6 +276,11 @@ class AppServerTurnEngine(
         var terminalSettleJob: Job? = null
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame currently being
+        // processed, and the seq of the frame that produced the pending
+        // completed terminal (so the delayed settle can record it). Pure reads.
+        var currentFrameSeq: Long? = null
+        var pendingCompletedSeq: Long? = null
         
         // letta-mobile-oqfbj: track emitted and returned tool_call_ids for settlement
         val emittedToolCallIds = mutableSetOf<String>()
@@ -194,6 +302,15 @@ class AppServerTurnEngine(
                 // completed terminal too.
                 settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                 flushTail()
+                // letta-mobile-kyqdt: telemetry-only. This terminal was accepted
+                // by matches(scope) (it reached the collect body); record the
+                // decision as passed along with its source + seq.
+                noteOwnerTerminal(
+                    RuntimeRunStatus.Completed,
+                    source = "completed_settle",
+                    seq = pendingCompletedSeq,
+                    scopeMatched = true,
+                )
                 emitDraft(terminal)
                 throw TurnCompleted
             }
@@ -203,9 +320,41 @@ class AppServerTurnEngine(
         try {
             collectorReady.complete(Unit)
             client.events.collect { received ->
-                if (!received.matches(scope)) return@collect
+                if (!received.matches(scope)) {
+                    // letta-mobile-kyqdt: P1c KEY PROBE (TELEMETRY-ONLY). A frame
+                    // was rejected by the scope filter. If it CARRIED a terminal
+                    // (stop_reason / terminal lifecycle), record the rejected
+                    // scope decision so the owner metadata proves the leading
+                    // hypothesis: "a terminal arrived but failed matches(scope)".
+                    // Pure read/write — the control-flow return below is
+                    // unchanged; we do NOT gate on this record.
+                    if (received.carriesTerminal()) {
+                        noteOwnerScopeDecision(
+                            scopeMatched = false,
+                            source = "scope_rejected_terminal",
+                            seq = received.eventSeqOrNull(),
+                        )
+                        com.letta.mobile.util.Telemetry.event(
+                            "AppServerTurnEngine", "terminal.scope_rejected",
+                            "expectedAgent" to scope.agentId,
+                            "expectedConv" to scope.conversationId,
+                            "frameAgent" to received.frame.runtime?.agentId,
+                            "frameConv" to received.frame.runtime?.conversationId,
+                            "eventSeq" to received.eventSeqOrNull(),
+                        )
+                    }
+                    return@collect
+                }
                 lastFrameAt.value = currentTimeMs()
+                // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
+                // Once the mapper reveals the server run id for this active turn,
+                // promote it into the owner via a pure copy(runId=…). This is the
+                // same place the engine learns the real run id (frames carry
+                // run_id → draft.runId); we do not alter that promotion flow.
+                val frameSeq = received.eventSeqOrNull()
+                currentFrameSeq = frameSeq
                 val drafts = mapper.map(command, received)
+                drafts.firstOrNull { it.runId != null }?.runId?.value?.let { promoteOwnerRunId(it) }
                 drafts.forEach { draft ->
                     val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
                     if (autoApproved != null) {
@@ -255,6 +404,14 @@ class AppServerTurnEngine(
                             // synthesized post-tool completion.
                             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                             flushTail()
+                            // letta-mobile-kyqdt: telemetry-only. Accepted-scope
+                            // terminal via the post-tool usage completion path.
+                            noteOwnerTerminal(
+                                RuntimeRunStatus.Completed,
+                                source = "post_tool_usage",
+                                seq = frameSeq,
+                                scopeMatched = true,
+                            )
                             emitDraft(command.completedDraft(draft.runId))
                             throw TurnCompleted
                         }
@@ -262,6 +419,7 @@ class AppServerTurnEngine(
                     }
                     if (draft.isCompletedLifecycle()) {
                         pendingCompleted = draft
+                        pendingCompletedSeq = currentFrameSeq // letta-mobile-kyqdt: telemetry-only
                         rescheduleCompletedTerminal()
                         return@forEach
                     }
@@ -271,6 +429,17 @@ class AppServerTurnEngine(
                     if (draft.isTerminalLifecycle()) {
                         settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn termination")
                         flushTail()
+                        // letta-mobile-kyqdt: telemetry-only. Record the terminal
+                        // status carried by this lifecycle draft. This frame was
+                        // accepted by matches(scope), so the scope decision passed.
+                        (draft.payload as? RuntimeEventPayload.RunLifecycleChanged)?.let {
+                            noteOwnerTerminal(
+                                it.status,
+                                source = "terminal_lifecycle",
+                                seq = frameSeq,
+                                scopeMatched = true,
+                            )
+                        }
                         emitDraft(draft)
                         throw TurnCompleted
                     }
@@ -566,6 +735,38 @@ class AppServerTurnEngine(
         return eventRuntime.agentId == scope.agentId &&
             eventRuntime.conversationId == scope.conversationId
     }
+
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort event_seq for a received
+     * frame, if the concrete frame type carries one. Pure read; null otherwise.
+     */
+    private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.eventSeqOrNull(): Long? =
+        when (val f = frame) {
+            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.StreamDelta -> f.eventSeq
+            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
+            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
+            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateQueue -> f.eventSeq
+            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
+            else -> null
+        }
+
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort check whether a received
+     * frame CARRIES a terminal signal (stop_reason / error / terminal
+     * lifecycle), used only to record the scope-match decision for
+     * terminal-bearing frames that were rejected by matches(scope). Pure read of
+     * the frame's delta message_type; never gates control flow.
+     */
+    private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.carriesTerminal(): Boolean {
+        val streamDelta = frame as? com.letta.mobile.data.transport.appserver.AppServerInboundFrame.StreamDelta
+            ?: return false
+        val messageType = runCatching {
+            val delta = streamDelta.delta.jsonObject
+            delta.string("message_type")
+        }.getOrNull() ?: return false
+        return messageType == "stop_reason" || messageType == "error_message"
+    }
+
     
     /**
      * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.
@@ -628,11 +829,121 @@ class AppServerTurnEngine(
         }
     }
 
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY snapshot of who owns the [activeTurn]
+     * lock. Pure metadata — never consulted for lock/[isBusy] decisions.
+     *
+     * @property runId server-assigned run id once observed, else null (unknown
+     *   at lock-acquire time; the run id is promoted from server frames later).
+     * @property runtimeId acquiring turn's runtime id.
+     * @property agentId acquiring turn's agent id.
+     * @property conversationId acquiring turn's conversation id.
+     * @property acquiredAtMs epoch-millis when the lock was acquired.
+     * @property lastTerminal last-seen terminal lifecycle status name, else null.
+     * @property processRole runtime/process role for the owning turn (e.g.
+     *   permission mode), else null. Purely descriptive.
+     * @property lastTerminalSource which code path/frame observed the last
+     *   terminal (e.g. "terminal_lifecycle", "post_tool_usage",
+     *   "completed_settle", "idle_timeout"), else null.
+     * @property lastTerminalAtMs epoch-millis when the last terminal was noted.
+     * @property lastTerminalSeq event_seq of the terminal-bearing frame if the
+     *   frame carried one, else null.
+     * @property lastTerminalScopeMatched whether the terminal-bearing frame
+     *   PASSED matches(scope) (true) or was rejected by the scope filter
+     *   (false). This is the key hypothesis probe: a terminal that arrived but
+     *   failed matches(scope) would be recorded here as false. Null when no
+     *   scope decision has been observed for a terminal-bearing frame.
+     * @property settleDeadlineMs the terminal-settle quiet window (ms) in force
+     *   for the owning turn, else null.
+     * @property watchdogDeadlineMs the idle watchdog window (ms) in force for
+     *   the owning turn, else null.
+     * @property releaseReason why the turn reached its finally/release (normal
+     *   completion, watchdog timeout, cancellation, preemption, stream error),
+     *   else null while still active.
+     */
+    data class ActiveTurnOwner(
+        val runId: String?,
+        val runtimeId: String?,
+        val agentId: String?,
+        val conversationId: String?,
+        val acquiredAtMs: Long,
+        val lastTerminal: String?,
+        val processRole: String? = null,
+        val lastTerminalSource: String? = null,
+        val lastTerminalAtMs: Long? = null,
+        val lastTerminalSeq: Long? = null,
+        val lastTerminalScopeMatched: Boolean? = null,
+        val settleDeadlineMs: Long? = null,
+        val watchdogDeadlineMs: Long? = null,
+        val releaseReason: String? = null,
+    )
+
     private object TurnCompleted : TurnCompletedMarker()
     private sealed class TurnCompletedMarker : Throwable()
 
     private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
     private sealed class TurnIdleTimedOutMarker : Throwable()
+
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the last-seen terminal
+     * lifecycle status on the active-turn owner (if one is set). Pure metadata
+     * write — no control-flow, no lock interaction, no effect on emitted drafts.
+     *
+     * @param status terminal lifecycle status carried by the draft.
+     * @param source which collect-loop path observed this terminal (e.g.
+     *   "terminal_lifecycle", "post_tool_usage", "completed_settle",
+     *   "idle_timeout"). Descriptive only.
+     * @param seq event_seq of the terminal-bearing frame if known, else null.
+     * @param scopeMatched whether the terminal-bearing frame PASSED
+     *   matches(scope). Null when not applicable (e.g. synthesized terminals).
+     */
+    private fun noteOwnerTerminal(
+        status: RuntimeRunStatus,
+        source: String? = null,
+        seq: Long? = null,
+        scopeMatched: Boolean? = null,
+    ) {
+        val current = activeTurnOwnerRef.value ?: return
+        activeTurnOwnerRef.value = current.copy(
+            lastTerminal = status.name,
+            lastTerminalSource = source ?: current.lastTerminalSource,
+            lastTerminalAtMs = currentTimeMs(),
+            lastTerminalSeq = seq ?: current.lastTerminalSeq,
+            lastTerminalScopeMatched = scopeMatched ?: current.lastTerminalScopeMatched,
+        )
+    }
+
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY. Promotes the server-assigned/promoted
+     * run id into the active-turn owner (if one is set and not yet stamped with
+     * a run id). Pure `copy(runId=…)` metadata write — no control-flow, no lock
+     * interaction, no effect on emitted drafts or the run-id promotion path.
+     */
+    private fun promoteOwnerRunId(runId: String) {
+        val current = activeTurnOwnerRef.value ?: return
+        if (current.runId == runId) return
+        activeTurnOwnerRef.value = current.copy(runId = runId)
+    }
+
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the accepted-vs-rejected
+     * matches(scope) decision for a terminal-bearing frame WITHOUT altering the
+     * owner's terminal status. This lets the release event prove the leading
+     * hypothesis: a terminal arrived but failed matches(scope). Pure metadata.
+     */
+    private fun noteOwnerScopeDecision(
+        scopeMatched: Boolean,
+        source: String,
+        seq: Long?,
+    ) {
+        val current = activeTurnOwnerRef.value ?: return
+        activeTurnOwnerRef.value = current.copy(
+            lastTerminalScopeMatched = scopeMatched,
+            lastTerminalSource = source,
+            lastTerminalAtMs = currentTimeMs(),
+            lastTerminalSeq = seq ?: current.lastTerminalSeq,
+        )
+    }
 
     private fun currentTimeMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 

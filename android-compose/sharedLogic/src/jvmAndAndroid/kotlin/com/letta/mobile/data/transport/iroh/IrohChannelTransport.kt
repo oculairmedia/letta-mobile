@@ -723,7 +723,39 @@ class IrohChannelTransport(
             }
             val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
             if (engine.isBusy) {
-                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.busy", "turnId" to turnId, "runId" to runId)
+                // letta-mobile-kyqdt: TELEMETRY-ONLY. Read the engine's owner
+                // metadata (pure getter, no lock) so this busy rejection can
+                // prove WHO holds the engine — the owning run/agent/conversation,
+                // when it acquired the lock (+ how long ago), and its last-seen
+                // terminal — alongside the incoming (rejected) send's identity.
+                val owner = engine.activeTurnOwner
+                val ownerAcquiredAtMs = owner?.acquiredAtMs
+                com.letta.mobile.util.Telemetry.event(
+                    "IrohTransport", "turn.busy",
+                    "turnId" to turnId,
+                    "runId" to runId,
+                    "sendAgentId" to agentId,
+                    "sendConversationId" to conversationId,
+                    "sendOtid" to otid,
+                    "ownerRunId" to owner?.runId,
+                    "ownerRuntimeId" to owner?.runtimeId,
+                    "ownerAgentId" to owner?.agentId,
+                    "ownerConversationId" to owner?.conversationId,
+                    "ownerAcquiredAtMs" to ownerAcquiredAtMs,
+                    "ownerHeldForMs" to ownerAcquiredAtMs?.let { System.currentTimeMillis() - it },
+                    "ownerLastTerminal" to owner?.lastTerminal,
+                    // letta-mobile-kyqdt: terminal DIAGNOSTICS so a busy rejection
+                    // can prove the leading hypothesis — a terminal arrived but
+                    // failed matches(scope). All pure reads of owner metadata.
+                    "ownerLastTerminalSource" to owner?.lastTerminalSource,
+                    "ownerLastTerminalAtMs" to owner?.lastTerminalAtMs,
+                    "ownerLastTerminalSeq" to owner?.lastTerminalSeq,
+                    "ownerLastTerminalScopeMatched" to owner?.lastTerminalScopeMatched,
+                    "ownerSettleDeadlineMs" to owner?.settleDeadlineMs,
+                    "ownerWatchdogDeadlineMs" to owner?.watchdogDeadlineMs,
+                    "ownerProcessRole" to owner?.processRole,
+                    "ownerReleaseReason" to owner?.releaseReason,
+                )
                 emitTurnFrame(
                     turn,
                     ServerFrame.Error(

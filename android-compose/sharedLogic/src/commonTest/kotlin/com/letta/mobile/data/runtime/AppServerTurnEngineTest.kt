@@ -23,6 +23,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
@@ -345,6 +347,189 @@ class AppServerTurnEngineTest {
             awaitItem()
             awaitComplete()
         }
+    }
+
+    @Test
+    fun activeTurnOwnerIsNullWhenIdle() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        // letta-mobile-kyqdt: no turn has run, so no owner metadata exists.
+        assertNull(engine.activeTurnOwner)
+    }
+
+    @Test
+    fun activeTurnOwnerIsPopulatedWhileActiveAndClearedOnCompletion() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            // letta-mobile-kyqdt: while the turn holds the lock, owner metadata
+            // identifies the acquiring run/agent/conversation. Presence + values
+            // only — no timing/behavior assertions.
+            val owner = engine.activeTurnOwner
+            assertNotNull(owner)
+            assertEquals("runtime-1", owner.runtimeId)
+            assertEquals("agent-1", owner.agentId)
+            assertEquals("conv-1", owner.conversationId)
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+
+        // letta-mobile-kyqdt: the finally block clears owner metadata when the
+        // lock is released, so the engine reports idle ownership again.
+        assertNull(engine.activeTurnOwner)
+    }
+
+    @Test
+    fun activeTurnOwnerRunIdIsPromotedWhenStreamFramesRevealServerRunId() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            // letta-mobile-kyqdt P1b: owner.runId is null until a server frame
+            // reveals the run id.
+            assertNull(engine.activeTurnOwner?.runId)
+
+            // A streamed frame carries the server-assigned run id; the engine
+            // promotes it into the owner metadata (pure copy).
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-8c7b6ac1"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            val owner = engine.activeTurnOwner
+            assertNotNull(owner)
+            assertEquals("run-8c7b6ac1", owner.runId)
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-8c7b6ac1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun activeTurnOwnerRecordsProcessRoleAndDeadlinesWhileActive() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            permissionMode = AppServerPermissionMode.Unrestricted,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            // letta-mobile-kyqdt P1c/P2: the owner captures the process/permission
+            // role plus the settle + watchdog deadlines in force for this turn.
+            val owner = engine.activeTurnOwner
+            assertNotNull(owner)
+            assertEquals(AppServerPermissionMode.Unrestricted.name, owner.processRole)
+            assertNotNull(owner.settleDeadlineMs)
+            assertNotNull(owner.watchdogDeadlineMs)
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun releasedTelemetryRecordsTerminalSourceScopeMatchAndReleaseReasonOnCompletion() = runTest {
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+
+        // letta-mobile-kyqdt P1c: the released telemetry event carries the
+        // terminal diagnostics (source, scope-match) plus the release reason.
+        // Presence/value assertions only — no timing assertions.
+        val released = com.letta.mobile.util.Telemetry.snapshot().first {
+            it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
+        }
+        assertEquals(RuntimeRunStatus.Completed.name, released.attrs["lastTerminal"])
+        assertEquals(true, released.attrs["lastTerminalScopeMatched"])
+        assertNotNull(released.attrs["lastTerminalSource"])
+        assertEquals("normal_completion", released.attrs["releaseReason"])
+    }
+
+    @Test
+    fun activeTurnOwnerRecordsScopeRejectedTerminalWhenTerminalFailsScopeMatch() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        val otherRuntime = AppServerRuntimeScope("agent-OTHER", "conv-OTHER")
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            // A terminal-bearing frame arrives scoped to a DIFFERENT runtime, so
+            // matches(scope) rejects it. The owner records the rejected scope
+            // decision (the leading hypothesis: terminal arrived but failed
+            // matches(scope)). This is pure logging: the turn is NOT terminated.
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1", runtime = otherRuntime))
+            runCurrent()
+            expectNoEvents()
+
+            val owner = engine.activeTurnOwner
+            assertNotNull(owner)
+            assertEquals(false, owner.lastTerminalScopeMatched)
+            assertEquals("scope_rejected_terminal", owner.lastTerminalSource)
+
+            // A correctly-scoped terminal still completes the turn normally
+            // (proving the rejected-terminal record did not change behavior).
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun activeTurnOwnerIsNonNullWheneverEngineIsBusy() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        val first = backgroundScope.async {
+            engine.runTurn(command).collect()
+        }
+        runCurrent()
+
+        // letta-mobile-kyqdt P1a: whenever the engine reports busy, the owner
+        // metadata MUST be present — there is no "busy but unknown owner" window.
+        // (The finally clears the owner strictly AFTER unlock, so busy implies a
+        // non-null owner.)
+        if (engine.isBusy) {
+            assertNotNull(engine.activeTurnOwner)
+        }
+
+        client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+        first.await()
+
+        // After release, idle again and owner is cleared.
+        assertNull(engine.activeTurnOwner)
     }
 
     @Test
