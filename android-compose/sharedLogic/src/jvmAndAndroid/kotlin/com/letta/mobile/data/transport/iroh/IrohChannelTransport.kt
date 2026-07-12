@@ -139,6 +139,16 @@ class IrohChannelTransport(
     private val subagentCorrelator = SubagentCorrelator()
 
     /**
+     * letta-mobile-m6oa1.3: the correlator revision last PUBLISHED as a
+     * [ServerFrame.SubagentsUpdated]. Emission is gated on this so idempotent
+     * re-observes (which the pure reducer already no-ops on, leaving
+     * [SubagentCorrelator.revision] unchanged) do NOT spam the event flow with
+     * duplicate snapshots. Only advanced by the single-threaded observer
+     * collector, so a plain field is safe (same confinement as the reducer).
+     */
+    private var lastEmittedSubagentRevision: Long = 0L
+
+    /**
      * Per-turn client state shared between the streaming send job and [cancel].
      * Guards are atomic because the send job (Dispatchers.IO) and a cancel
      * request race for the single terminal.
@@ -379,10 +389,16 @@ class IrohChannelTransport(
             return
         }
 
-        // letta-mobile-m6oa1.1: ADDITIVE tap — correlate parent `Agent`
-        // tool_call dispatch/return frames into the subagent correlator. This
-        // does NOT consume or alter the projection below; it only observes.
-        correlateAgentFrame(streamDelta)
+        // letta-mobile-m6oa1.1 / m6oa1.3: ADDITIVE tap — correlate parent
+        // `Agent` tool_call dispatch/return frames into the subagent correlator
+        // and, when the correlator's observable state advances, publish the
+        // resulting SubagentsUpdated frame(s) through the SAME emitBoth seam the
+        // repository's push-fold already consumes (observePushEvents). This does
+        // NOT consume or alter the projection below; it only observes and then
+        // publishes an additive push frame. The pure reducer decides WHAT to
+        // emit (correlateAgentFrame stays side-effect-light); this suspend
+        // caller does the actual emitBoth.
+        correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
 
         // Project via the EXACT initiator chain: raw StreamDelta -> RuntimeEventDraft
         // (AppServerRuntimeEventMapper, the same mapper engine.collect uses) ->
@@ -402,11 +418,27 @@ class IrohChannelTransport(
     }
 
     /**
-     * letta-mobile-m6oa1.1: decode ONE observer StreamDelta and, when it is a
-     * parent `Agent` tool_call dispatch or its matching tool_return, feed the
-     * [subagentCorrelator]. All other frames are ignored. Parsing is defensive
-     * (malformed deltas are skipped) so the correlation tap can never disturb
-     * the projection path.
+     * letta-mobile-m6oa1.1 / m6oa1.3: decode ONE observer StreamDelta and, when
+     * it is a parent `Agent` tool_call dispatch or its matching tool_return,
+     * feed the [subagentCorrelator]. All other frames are ignored. Parsing is
+     * defensive (the whole body is wrapped in [runCatching]) so the correlation
+     * tap can never disturb the projection path — on any failure it returns an
+     * empty list and the projection continues unaffected.
+     *
+     * m6oa1.3 (consumer wiring): this is where the previously WRITE-ONLY
+     * correlator becomes OBSERVABLE. After mutating the reducer, if the
+     * reducer's observable state advanced ([SubagentCorrelator.revision] moved
+     * past [lastEmittedSubagentRevision]), it RETURNS a
+     * [ServerFrame.SubagentsUpdated] carrying the changed [SubagentEntry], a
+     * fresh full snapshot, and the informational [reason] (`started` on
+     * dispatch, `completed` on return) — matching the exact frame shape the
+     * repository's `observePushEvents` fold already consumes via
+     * `mergeSnapshot(frame.subagentsActive, terminal = frame.subagent)`. It does
+     * NOT emit itself: the pure reducer decides WHAT to publish; the suspend
+     * caller [ingestObserverFrame] performs the [emitBoth]. When nothing
+     * observable changed (idempotent re-observe, unknown-id return, non-Agent
+     * tool_call) it returns an empty list — revision-gating suppresses any
+     * duplicate push.
      *
      * Frame shapes (mirrors [AppServerTurnEngine.extractToolCallId] / the
      * mapper): the tool_call_id is `delta.tool_call.tool_call_id` (dispatch) or
@@ -414,39 +446,77 @@ class IrohChannelTransport(
      * the arguments are `delta.tool_call.arguments`; the parent runId is
      * `delta.run_id`.
      */
-    private fun correlateAgentFrame(streamDelta: AppServerInboundFrame.StreamDelta) {
-        runCatching {
-            val delta = streamDelta.delta as? JsonObject ?: return
-            val messageType = delta.string("message_type") ?: return
-            val toolCall = delta["tool_call"]?.jsonObject
-            val parent = ParentContext(
-                agentId = streamDelta.runtime.agentId,
-                conversationId = streamDelta.runtime.conversationId,
-                runId = delta.string("run_id"),
-            )
-            when (messageType) {
-                "tool_call_message", "approval_request_message" -> {
-                    // Only the parent `Agent` dispatch is in scope.
-                    val name = toolCall?.string("name") ?: return
-                    if (name != "Agent") return
-                    val toolCallId = toolCall.string("tool_call_id")
-                        ?: delta.string("tool_call_id") ?: return
-                    val arguments = toolCall["arguments"]?.toString()
-                        ?: delta["arguments"]?.toString()
-                    subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
-                }
-                "tool_return_message" -> {
-                    // Returns don't carry the tool name; correlate purely by id.
-                    // onAgentReturn ignores ids it never recorded as an Agent
-                    // dispatch, so passing every return id here is safe — a
-                    // non-Agent tool's return simply no-ops.
-                    val toolCallId = toolCall?.string("tool_call_id")
-                        ?: delta.string("tool_call_id") ?: return
-                    subagentCorrelator.onAgentReturn(toolCallId, parent)
-                }
-                else -> return
+    private fun correlateAgentFrame(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+    ): List<ServerFrame> = runCatching {
+        val delta = streamDelta.delta as? JsonObject ?: return@runCatching emptyList()
+        val messageType = delta.string("message_type") ?: return@runCatching emptyList()
+        val toolCall = delta["tool_call"]?.jsonObject
+        val parent = ParentContext(
+            agentId = streamDelta.runtime.agentId,
+            conversationId = streamDelta.runtime.conversationId,
+            runId = delta.string("run_id"),
+        )
+        val changedToolCallId: String
+        val reason: String
+        when (messageType) {
+            "tool_call_message", "approval_request_message" -> {
+                // Only the parent `Agent` dispatch is in scope.
+                val name = toolCall?.string("name") ?: return@runCatching emptyList()
+                if (name != "Agent") return@runCatching emptyList()
+                val toolCallId = toolCall.string("tool_call_id")
+                    ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
+                val arguments = toolCall["arguments"]?.toString()
+                    ?: delta["arguments"]?.toString()
+                subagentCorrelator.onAgentDispatch(toolCallId, arguments, parent)
+                changedToolCallId = toolCallId
+                reason = SUBAGENT_REASON_STARTED
             }
+            "tool_return_message" -> {
+                // Returns don't carry the tool name; correlate purely by id.
+                // onAgentReturn ignores ids it never recorded as an Agent
+                // dispatch, so passing every return id here is safe — a
+                // non-Agent tool's return simply no-ops (revision unchanged).
+                val toolCallId = toolCall?.string("tool_call_id")
+                    ?: delta.string("tool_call_id") ?: return@runCatching emptyList()
+                subagentCorrelator.onAgentReturn(toolCallId, parent)
+                changedToolCallId = toolCallId
+                reason = SUBAGENT_REASON_COMPLETED
+            }
+            else -> return@runCatching emptyList()
         }
+        buildSubagentsUpdatedIfChanged(changedToolCallId, reason)
+    }.getOrElse { emptyList() }
+
+    /**
+     * letta-mobile-m6oa1.3: REVISION-GATED projection of the correlator into a
+     * [ServerFrame.SubagentsUpdated]. Returns the frame only when the reducer's
+     * [SubagentCorrelator.revision] advanced past the last published revision —
+     * so an idempotent re-observe (which leaves the revision untouched) yields
+     * NO frame and never spams the flow. The changed entry is looked up from
+     * the fresh snapshot by [changedToolCallId]; the snapshot is the same list
+     * the shim-shaped frame carried, so the repository fold reduces identically.
+     */
+    private fun buildSubagentsUpdatedIfChanged(
+        changedToolCallId: String,
+        reason: String,
+    ): List<ServerFrame> {
+        val revision = subagentCorrelator.revision
+        if (revision == lastEmittedSubagentRevision) return emptyList()
+        lastEmittedSubagentRevision = revision
+        val snapshot = subagentCorrelator.snapshot()
+        val changed = snapshot.firstOrNull { it.toolCallId == changedToolCallId }
+        val nowIso = nowIso()
+        return listOf(
+            ServerFrame.SubagentsUpdated(
+                id = frameId("subagents_updated"),
+                ts = nowIso,
+                reason = reason,
+                subagent = changed,
+                subagentsActive = snapshot,
+                at = nowIso,
+            ),
+        )
     }
 
     private fun JsonObject.string(key: String): String? =
@@ -1103,6 +1173,12 @@ class IrohChannelTransport(
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
+        // letta-mobile-m6oa1.3: informational `reason` vocabulary on the
+        // SubagentsUpdated push. Mirrors the shim's (§13.4) `started` / `completed`
+        // strings the repository fold treats as informational (it keys terminal
+        // detection off `subagent.status`, not this reason).
+        internal const val SUBAGENT_REASON_STARTED = "started"
+        internal const val SUBAGENT_REASON_COMPLETED = "completed"
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
