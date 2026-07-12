@@ -69,6 +69,24 @@ class AppServerTurnEngine(
     private var runtime: AppServerRuntimeScope? = null
 
     /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY owner identity for the currently held
+     * [activeTurn] lock. This holder is set STRICTLY adjacent to the existing
+     * `activeTurn.lock()`/`activeTurn.unlock()` calls and never participates in
+     * lock acquisition or the [isBusy] computation — it exists purely so a
+     * busy-rejected send can PROVE which run/agent/conversation owns the engine,
+     * when it acquired the lock, and its last-seen terminal. Backed by an
+     * atomicfu ref so the read accessor is safe from any thread with no locking.
+     */
+    private val activeTurnOwnerRef = kotlinx.atomicfu.atomic<ActiveTurnOwner?>(null)
+
+    /**
+     * Pure read accessor for the current active-turn owner (telemetry only).
+     * Null when idle. Does NOT touch [activeTurn]; reading it never affects lock
+     * semantics or [isBusy].
+     */
+    val activeTurnOwner: ActiveTurnOwner? get() = activeTurnOwnerRef.value
+
+    /**
      * true when a turn is actively running (activeTurn locked).
      * Check before calling runTurn to avoid "can't send while busy" errors.
      */
@@ -105,6 +123,27 @@ class AppServerTurnEngine(
             throw IllegalStateException("An App Server turn is already active for ${command.runtimeId.value}.")
         }
 
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Stamp owner identity immediately
+        // after the lock is acquired (the lock call itself is unchanged). The
+        // runId is server-assigned later, so it is null at acquire time; the
+        // runtimeId/agent/conversation are the acquiring turn's identity.
+        val acquiredAtMs = currentTimeMs()
+        activeTurnOwnerRef.value = ActiveTurnOwner(
+            runId = null,
+            runtimeId = command.runtimeId.value,
+            agentId = command.agentId.value,
+            conversationId = command.conversationId.value,
+            acquiredAtMs = acquiredAtMs,
+            lastTerminal = null,
+        )
+        com.letta.mobile.util.Telemetry.event(
+            "AppServerTurnEngine", "activeTurn.acquired",
+            "runtimeId" to command.runtimeId.value,
+            "agentId" to command.agentId.value,
+            "conversationId" to command.conversationId.value,
+            "acquiredAtMs" to acquiredAtMs,
+        )
+
         var collector: kotlinx.coroutines.Job? = null
         try {
             val turnPermissionMode = permissionModeProvider(command)
@@ -126,6 +165,7 @@ class AppServerTurnEngine(
                     com.letta.mobile.util.Telemetry.event(
                         "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
                     )
+                    noteOwnerTerminal(RuntimeRunStatus.Failed) // letta-mobile-kyqdt: telemetry-only
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
                 }
             }
@@ -135,6 +175,19 @@ class AppServerTurnEngine(
             collector.join()
         } finally {
             collector?.cancelAndJoin()
+            // letta-mobile-kyqdt: TELEMETRY-ONLY. Clear owner metadata and stamp
+            // a release event STRICTLY adjacent to the existing unlock (the
+            // unlock call itself is unchanged and not reordered).
+            val releasedOwner = activeTurnOwnerRef.getAndSet(null)
+            com.letta.mobile.util.Telemetry.event(
+                "AppServerTurnEngine", "activeTurn.released",
+                "runtimeId" to command.runtimeId.value,
+                "agentId" to command.agentId.value,
+                "conversationId" to command.conversationId.value,
+                "acquiredAtMs" to (releasedOwner?.acquiredAtMs),
+                "heldMs" to (releasedOwner?.acquiredAtMs?.let { currentTimeMs() - it }),
+                "lastTerminal" to (releasedOwner?.lastTerminal),
+            )
             activeTurn.unlock()
         }
     }
@@ -194,6 +247,7 @@ class AppServerTurnEngine(
                 // completed terminal too.
                 settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                 flushTail()
+                noteOwnerTerminal(RuntimeRunStatus.Completed) // letta-mobile-kyqdt: telemetry-only
                 emitDraft(terminal)
                 throw TurnCompleted
             }
@@ -255,6 +309,7 @@ class AppServerTurnEngine(
                             // synthesized post-tool completion.
                             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                             flushTail()
+                            noteOwnerTerminal(RuntimeRunStatus.Completed) // letta-mobile-kyqdt: telemetry-only
                             emitDraft(command.completedDraft(draft.runId))
                             throw TurnCompleted
                         }
@@ -271,6 +326,9 @@ class AppServerTurnEngine(
                     if (draft.isTerminalLifecycle()) {
                         settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn termination")
                         flushTail()
+                        // letta-mobile-kyqdt: telemetry-only. Record the terminal
+                        // status carried by this lifecycle draft.
+                        (draft.payload as? RuntimeEventPayload.RunLifecycleChanged)?.let { noteOwnerTerminal(it.status) }
                         emitDraft(draft)
                         throw TurnCompleted
                     }
@@ -628,11 +686,42 @@ class AppServerTurnEngine(
         }
     }
 
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY snapshot of who owns the [activeTurn]
+     * lock. Pure metadata — never consulted for lock/[isBusy] decisions.
+     *
+     * @property runId server-assigned run id once observed, else null (unknown
+     *   at lock-acquire time; the run id is promoted from server frames later).
+     * @property runtimeId acquiring turn's runtime id.
+     * @property agentId acquiring turn's agent id.
+     * @property conversationId acquiring turn's conversation id.
+     * @property acquiredAtMs epoch-millis when the lock was acquired.
+     * @property lastTerminal last-seen terminal lifecycle status name, else null.
+     */
+    data class ActiveTurnOwner(
+        val runId: String?,
+        val runtimeId: String?,
+        val agentId: String?,
+        val conversationId: String?,
+        val acquiredAtMs: Long,
+        val lastTerminal: String?,
+    )
+
     private object TurnCompleted : TurnCompletedMarker()
     private sealed class TurnCompletedMarker : Throwable()
 
     private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
     private sealed class TurnIdleTimedOutMarker : Throwable()
+
+    /**
+     * letta-mobile-kyqdt: TELEMETRY-ONLY. Records the last-seen terminal
+     * lifecycle status on the active-turn owner (if one is set). Pure metadata
+     * write — no control-flow, no lock interaction, no effect on emitted drafts.
+     */
+    private fun noteOwnerTerminal(status: RuntimeRunStatus) {
+        val current = activeTurnOwnerRef.value ?: return
+        activeTurnOwnerRef.value = current.copy(lastTerminal = status.name)
+    }
 
     private fun currentTimeMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 

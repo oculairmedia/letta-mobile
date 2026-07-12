@@ -23,6 +23,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
@@ -345,6 +347,45 @@ class AppServerTurnEngineTest {
             awaitItem()
             awaitComplete()
         }
+    }
+
+    @Test
+    fun activeTurnOwnerIsNullWhenIdle() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        // letta-mobile-kyqdt: no turn has run, so no owner metadata exists.
+        assertNull(engine.activeTurnOwner)
+    }
+
+    @Test
+    fun activeTurnOwnerIsPopulatedWhileActiveAndClearedOnCompletion() = runTest {
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            // letta-mobile-kyqdt: while the turn holds the lock, owner metadata
+            // identifies the acquiring run/agent/conversation. Presence + values
+            // only — no timing/behavior assertions.
+            val owner = engine.activeTurnOwner
+            assertNotNull(owner)
+            assertEquals("runtime-1", owner.runtimeId)
+            assertEquals("agent-1", owner.agentId)
+            assertEquals("conv-1", owner.conversationId)
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+
+        // letta-mobile-kyqdt: the finally block clears owner metadata when the
+        // lock is released, so the engine reports idle ownership again.
+        assertNull(engine.activeTurnOwner)
     }
 
     @Test
