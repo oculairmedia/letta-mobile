@@ -109,14 +109,32 @@ class ChatSendCoordinator(
     fun send(
         text: String,
         attachments: List<MessageContentPart.Image> = emptyList(),
-    ): Job = scope.launch {
+    ): Job {
+        // letta-mobile-dlbqq (Seam A): activeConversationId() is a LIVE getter
+        // backed by savedState that a conversation switch mutates. Reading it
+        // inside the launched coroutine let a switch landing between this
+        // synchronous call and the coroutine body executing rebind the message
+        // to the WRONG (newly-active) conversation. Seal the target id at the
+        // synchronous call site so a later switch cannot rebind it. agentId is
+        // already a construction-time constant and needs no capture.
+        val targetConversationId = activeConversationId()
+        return scope.launch {
+            sendInternal(text, attachments, targetConversationId)
+        }
+    }
+
+    private suspend fun sendInternal(
+        text: String,
+        attachments: List<MessageContentPart.Image>,
+        targetConversationId: String?,
+    ) {
         val timer = Telemetry.startTimer("AdminChatVM", "send.ws.enqueue")
         Telemetry.event(
             "IrohTrace", "coordinator.send.begin",
             "agentId" to agentId,
             "textLength" to text.length,
             "attachments" to attachments.size,
-            "activeConversationId" to activeConversationId(),
+            "activeConversationId" to targetConversationId,
         )
         val config = activeConfig()
         Telemetry.event(
@@ -128,11 +146,11 @@ class ChatSendCoordinator(
         )
         if (config == null) {
             ui.onSendFailed("No active backend is configured")
-            return@launch
+            return
         }
         if (config.accessToken.isNullOrBlank()) {
             ui.onSendFailed("Admin-shim WebSocket requires an API token")
-            return@launch
+            return
         }
         // lcp-dlj: multimodal sends now flow through content_parts. The
         // shim hard-caps the JSON-encoded payload at 10 MB; the client-
@@ -145,7 +163,7 @@ class ChatSendCoordinator(
         // The live shim requires every send_message to carry a concrete
         // conversation_id. Pre-create fresh conversations through REST instead
         // of sending a blank placeholder and relying on shim-side minting.
-        val currentConversationId = activeConversationId()?.takeIf { it.isNotBlank() }
+        val currentConversationId = targetConversationId?.takeIf { it.isNotBlank() }
         val startNewConversation = false
         val conversationId = when {
             currentConversationId != null -> currentConversationId
@@ -155,7 +173,7 @@ class ChatSendCoordinator(
                 Telemetry.error("AdminChatVM", "ws.send.createConversationFailed", err)
                 ui.onSendFailed("Failed to create a new conversation: ${err.message ?: "unknown"}")
                 timer.stop("accepted" to false, "reason" to "create_failed")
-                return@launch
+                return
             }
         }
         if (!startNewConversation) {
@@ -170,7 +188,7 @@ class ChatSendCoordinator(
         if (!connected) {
             ui.onSendFailed("Admin-shim WebSocket is not connected")
             timer.stop("accepted" to false, "reason" to "not_connected")
-            return@launch
+            return
         }
 
         val pending = PendingWsSend(
@@ -186,12 +204,12 @@ class ChatSendCoordinator(
         if (!accepted && startNewConversation) {
             ui.onError("WebSocket is busy; wait for the current turn to finish")
             timer.stop("accepted" to false, "reason" to "busy_start_new")
-            return@launch
+            return
         }
         if (!accepted && !enqueuePendingSend(pending)) {
             ui.onError("WebSocket send queue is full; wait for the current turn to finish")
             timer.stop("accepted" to false, "reason" to "busy")
-            return@launch
+            return
         }
         timer.stop(
             "accepted" to true,
