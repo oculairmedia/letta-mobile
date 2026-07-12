@@ -1232,7 +1232,18 @@ class IrohChannelTransport(
 
 /**
  * A client-synthesized run id placeholder used before the server's real run id
- * has streamed. Mirrors the reducer's own `iroh-run-` recognition so both sides
- * agree on which ids are promotable placeholders vs canonical server run ids.
+ * has streamed. This TRANSPORT-LOCAL predicate governs abort/promote behavior
+ * and is INTENTIONALLY kept narrow (`iroh-run-` only), separate from the shared
+ * reconcile/stream-reduction classifier ([isIrohSyntheticRunId] in
+ * TimelineStreamReducer.kt).
+ *
+ * letta-mobile-j98r5.1: it is only ever evaluated against an [ActiveTurn] run
+ * id, which is always born `iroh-run-${UUID}` in `send()` and only ever
+ * promoted to a REAL server run id — never to an observer id. The observer
+ * placeholder `iroh-observer-run-*` is stamped solely in the passive projection
+ * path (`ingestObserverFrame`, which is skipped while a turn is engine-owned)
+ * and is emitted straight to the timeline; it never enters an ActiveTurn nor
+ * this predicate. Broadening it here would be dead code and would risk coupling
+ * observer classification to transport abort timing, so it stays separate.
  */
 private fun String.isIrohSyntheticRunId(): Boolean = startsWith("iroh-run-")

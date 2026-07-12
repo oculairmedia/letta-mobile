@@ -427,7 +427,16 @@ private const val RECONCILE_MANGLED_SUPERSET_MIN_CHARS = 12
 
 private fun String.filterLettersAndDigits(): String = filter { it.isLetterOrDigit() }
 
-private fun String.isReconcileSyntheticRunId(): Boolean = startsWith("iroh-run-")
+// letta-mobile-j98r5.1: reconcile classifies Iroh client-synthesized run-id
+// placeholders via the SINGLE canonical predicate shared with the stream
+// reducer ([isIrohSyntheticRunId] in TimelineStreamReducer.kt). Both the
+// send/stream path (`iroh-run-*`) and the passive OBSERVER path
+// (`iroh-observer-run-*`, IrohChannelTransport.kt:414) stamp throwaway
+// placeholders that the real server run id later supersedes, so both must be
+// classified as synthetic. Delegating to the one helper keeps reconcile and
+// stream reduction from drifting; this is a pure downstream CLASSIFICATION
+// change (the stamped values are left untouched at the transport).
+private fun String.isReconcileSyntheticRunId(): Boolean = isIrohSyntheticRunId()
 
 private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     incoming: TimelineEvent.Confirmed,
@@ -435,9 +444,9 @@ private fun TimelineEvent.Confirmed.canReplaceIrohSyntheticLiveRow(
     val existingRunId = runId?.takeIf { it.isNotBlank() }
     val incomingRunId = incoming.runId?.takeIf { it.isNotBlank() }
     return messageType in setOf(TimelineMessageType.ASSISTANT, TimelineMessageType.REASONING) &&
-        existingRunId?.startsWith("iroh-run-") == true &&
+        existingRunId?.isReconcileSyntheticRunId() == true &&
         incomingRunId != null &&
-        !incomingRunId.startsWith("iroh-run-")
+        !incomingRunId.isReconcileSyntheticRunId()
 }
 
 /**
