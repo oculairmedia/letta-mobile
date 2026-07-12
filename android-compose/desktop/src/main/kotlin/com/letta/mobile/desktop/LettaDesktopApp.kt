@@ -101,6 +101,7 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
@@ -754,13 +755,56 @@ private fun buildRailAgents(
     return fromConversations + fromRoster
 }
 
-/** The selected stack's conversations under the archive filter, newest first. */
-private fun filterAgentConversations(
+/**
+ * The selected stack's conversations under the archive filter, newest first.
+ *
+ * letta-mobile-5172y.2: ephemeral "Letta Code" subagent conversations are now
+ * grouped by AUTHORITATIVE PARENT PROVENANCE (via the shared
+ * [groupSubagentConversations] model) instead of by display name. This fixes
+ * the defect where unrelated agents that merely SHARE a display name (e.g. two
+ * "Letta Code" spawns from different parents) were wrongly merged into one
+ * stack by the old `it.agentName == agentName` test.
+ *
+ * Membership resolution:
+ *  - If the SELECTED conversation is a subagent conversation (it appears in one
+ *    of the shared model's provenance [SubagentStack]s), the stack's members
+ *    are exactly that stack's [SubagentStack.memberConversationIds]. Two
+ *    same-name-but-different-parent stacks therefore stay distinct.
+ *  - Otherwise the agent is a NORMAL (non-subagent) agent — its conversations
+ *    are exactly the shared model's `ungrouped` list, and membership falls back
+ *    to the historical display-name equality test. Behaviour is UNCHANGED for
+ *    normal agents.
+ *
+ * The archive filter and newest-first sort are applied AFTER grouping, exactly
+ * as before (the shared model does not filter archived conversations — that is
+ * the consumer's job).
+ */
+internal fun filterStackConversations(
     conversations: List<DesktopConversationSummary>,
-    agentName: String,
+    activeSubagents: List<SubagentEntry>,
+    selectedAgentName: String,
+    selectedConversationId: String?,
     archiveFilter: ConversationArchiveFilter,
-): List<DesktopConversationSummary> = conversations
-    .filter { it.agentName == agentName }
+): List<DesktopConversationSummary> {
+    val grouping = groupSubagentConversations(conversations, activeSubagents)
+    val selectedStack = selectedConversationId?.let { convId ->
+        grouping.stacks.firstOrNull { convId in it.memberConversationIds }
+    }
+    val members: List<DesktopConversationSummary> = if (selectedStack != null) {
+        // Subagent stack: authoritative provenance membership (NOT name).
+        val memberIds = selectedStack.memberConversationIds.toSet()
+        conversations.filter { it.id in memberIds }
+    } else {
+        // Normal agent: unchanged display-name membership over ungrouped convs.
+        grouping.ungrouped.filter { it.agentName == selectedAgentName }
+    }
+    return members.applyArchiveFilterNewestFirst(archiveFilter)
+}
+
+/** Apply the active/archived/all filter and sort newest-first. */
+private fun List<DesktopConversationSummary>.applyArchiveFilterNewestFirst(
+    archiveFilter: ConversationArchiveFilter,
+): List<DesktopConversationSummary> = this
     .filter { c ->
         when (archiveFilter) {
             ConversationArchiveFilter.Active -> !c.archived
@@ -1031,12 +1075,27 @@ fun LettaDesktopApp(
         ?: railAgents.indexOfFirst { it.first == selectedAgentId }.coerceAtLeast(0)
     val selectedAgentName = railAgents.firstOrNull { it.first == selectedAgentId }?.second
         ?: chatState.selectedConversation?.agentName ?: "Letta"
-    // List every conversation across the selected stack (all agents sharing the
-    // display name), newest first — so the "Letta Code" stack shows all its
-    // spawns' conversations in one time-ordered list rather than just one agent's.
+    // List every conversation across the selected stack, newest first. For a
+    // "Letta Code" subagent stack this is its same-PROVENANCE spawns (grouped by
+    // authoritative parent identity via the shared model, so unrelated same-name
+    // agents are NOT merged); for a normal agent it is its display-name convs,
+    // unchanged. See [filterStackConversations].
     val archiveFilter by chatController.archiveFilter.collectAsState()
-    val agentConversations = remember(chatState.conversations, selectedAgentName, archiveFilter) {
-        filterAgentConversations(chatState.conversations, selectedAgentName, archiveFilter)
+    val selectedConversationId = chatState.selectedConversationId
+    val agentConversations = remember(
+        chatState.conversations,
+        activeSubagents,
+        selectedAgentName,
+        selectedConversationId,
+        archiveFilter,
+    ) {
+        filterStackConversations(
+            conversations = chatState.conversations,
+            activeSubagents = activeSubagents,
+            selectedAgentName = selectedAgentName,
+            selectedConversationId = selectedConversationId,
+            archiveFilter = archiveFilter,
+        )
     }
     val mentionables = remember(railAgents, memoryState) {
         buildMentionables(railAgents, memoryState)
