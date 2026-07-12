@@ -744,6 +744,17 @@ class IrohChannelTransport(
                     "ownerAcquiredAtMs" to ownerAcquiredAtMs,
                     "ownerHeldForMs" to ownerAcquiredAtMs?.let { System.currentTimeMillis() - it },
                     "ownerLastTerminal" to owner?.lastTerminal,
+                    // letta-mobile-kyqdt: terminal DIAGNOSTICS so a busy rejection
+                    // can prove the leading hypothesis — a terminal arrived but
+                    // failed matches(scope). All pure reads of owner metadata.
+                    "ownerLastTerminalSource" to owner?.lastTerminalSource,
+                    "ownerLastTerminalAtMs" to owner?.lastTerminalAtMs,
+                    "ownerLastTerminalSeq" to owner?.lastTerminalSeq,
+                    "ownerLastTerminalScopeMatched" to owner?.lastTerminalScopeMatched,
+                    "ownerSettleDeadlineMs" to owner?.settleDeadlineMs,
+                    "ownerWatchdogDeadlineMs" to owner?.watchdogDeadlineMs,
+                    "ownerProcessRole" to owner?.processRole,
+                    "ownerReleaseReason" to owner?.releaseReason,
                 )
                 emitTurnFrame(
                     turn,
