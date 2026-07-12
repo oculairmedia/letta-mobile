@@ -61,44 +61,77 @@ jobs:
       # letta-mobile (bead 1s4d5): publish a SANITIZED findings inventory as an
       # artifact so the PM/automation can dedupe + partition remediation waves
       # WITHOUT the Qodana Cloud token (which stays a repo secret). The CSVs carry
-      # only rule id, severity, relative file path, line, and message — NO source
-      # snippets, NO secrets. Runs on main pushes only (the authoritative
-      # inventory), and always() so it publishes even when Qodana reports findings.
-      - name: 'Build sanitized Qodana findings inventory (CSV, no secrets)'
+      # ONLY rule id, severity, repo-relative file path, and line — deliberately
+      # NO message/snippet/code-derived text (SARIF message.text can embed source
+      # expressions/literals/paths). Detailed messages stay in the Cloud report.
+      # Runs on main pushes only (the authoritative inventory); always() so it
+      # publishes a status even when the scan itself fails.
+      - name: 'Build sanitized Qodana findings inventory (CSV, no code text)'
         if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          ANALYZED_SHA: ${{ github.sha }}
+          QODANA_ACTION_REF: 'JetBrains/qodana-action@v2026.1.3'
         run: |
           set -euo pipefail
           SARIF="${{ runner.temp }}/qodana/results/qodana.sarif.json"
           OUT_DIR="${{ runner.temp }}/qodana-inventory"
+          CONFIG="qodana.yaml"
           mkdir -p "$OUT_DIR"
+          CONFIG_HASH="$( (sha256sum "$CONFIG" 2>/dev/null || echo 'na') | awk '{print $1}')"
           if [ ! -f "$SARIF" ]; then
-            echo "No SARIF at $SARIF; skipping inventory (scan likely failed)."
-            echo "sarif_missing=1" > "$OUT_DIR/status.txt"
+            echo "No SARIF at $SARIF; scan likely failed. Emitting status only."
+            {
+              echo "scan_status=sarif_missing"
+              echo "analyzed_sha=${ANALYZED_SHA}"
+              echo "qodana_action=${QODANA_ACTION_REF}"
+              echo "config_path=${CONFIG}"
+              echo "config_sha256=${CONFIG_HASH}"
+              echo "finding_count=0"
+            } > "$OUT_DIR/metadata.txt"
             exit 0
           fi
           python3 - "$SARIF" "$OUT_DIR/qodana-findings.csv" "$OUT_DIR/qodana-summary.csv" <<'PY'
-          import json, sys, csv, collections
+          import json, sys, csv, collections, posixpath
           sarif_path, flat_path, summ_path = sys.argv[1], sys.argv[2], sys.argv[3]
-          data = json.load(open(sarif_path))
+          # A malformed/unparseable SARIF that nonetheless EXISTS must fail the
+          # step (distinct from the scan-failure sarif_missing status above).
+          data = json.load(open(sarif_path))  # raises -> step fails (set -e)
+          SCOPE_PREFIX = ".qodana-android-compose/"
+          def norm(p):
+              if not p:
+                  return None
+              p = p.replace("\\", "/")
+              # strip the CI-only scoped model-copy prefix -> real repo path
+              if p.startswith(SCOPE_PREFIX):
+                  p = "android-compose/" + p[len(SCOPE_PREFIX):]
+              # reject absolute or escaping paths
+              if p.startswith("/") or p.startswith("../") or ".." in p.split("/"):
+                  return None
+              return posixpath.normpath(p)
           rows = []
           for run in data.get("runs", []):
               for r in run.get("results", []):
                   rule = r.get("ruleId", "?")
                   level = r.get("level", r.get("kind", "?"))
-                  msg = (r.get("message", {}) or {}).get("text", "") or ""
-                  msg = msg.replace("\n", " ").replace(",", ";")[:300]
+                  path = None; line = ""
                   locs = r.get("locations", []) or []
-                  path = "?"; line = ""
                   if locs:
                       pl = (locs[0].get("physicalLocation", {}) or {})
-                      path = (pl.get("artifactLocation", {}) or {}).get("uri", "?")
+                      raw = (pl.get("artifactLocation", {}) or {}).get("uri", "")
+                      path = norm(raw)
                       line = (pl.get("region", {}) or {}).get("startLine", "")
-                  rows.append((rule, level, path, line, msg))
+                  if path is None:
+                      # location-less or path escaping root: keep the finding but
+                      # with an explicit sentinel, never an absolute/escaping path.
+                      path = "(no-location)"
+                  rows.append((rule, level, path, line))
+          # Flat: rule_id,level,file,line ONLY. No message/code text.
           with open(flat_path, "w", newline="") as f:
-              w = csv.writer(f); w.writerow(["rule_id","level","file","line","message"])
+              w = csv.writer(f); w.writerow(["rule_id","level","file","line"])
               for r in rows: w.writerow(r)
+          # Aggregate by rule + top-level module + severity.
           agg = collections.Counter()
-          for rule, level, path, line, msg in rows:
+          for rule, level, path, line in rows:
               parts = path.split("/")
               module = "/".join(parts[:4]) if len(parts) >= 4 else path
               agg[(rule, level, module)] += 1
@@ -108,7 +141,16 @@ jobs:
                   w.writerow([rule, level, module, n])
           print(f"findings={len(rows)} summary_rows={len(agg)}")
           PY
-          echo "Inventory written to $OUT_DIR"
+          FINDINGS="$(tail -n +2 "$OUT_DIR/qodana-findings.csv" | wc -l | tr -d ' ')"
+          {
+            echo "scan_status=ok"
+            echo "analyzed_sha=${ANALYZED_SHA}"
+            echo "qodana_action=${QODANA_ACTION_REF}"
+            echo "config_path=${CONFIG}"
+            echo "config_sha256=${CONFIG_HASH}"
+            echo "finding_count=${FINDINGS}"
+          } > "$OUT_DIR/metadata.txt"
+          echo "Inventory written to $OUT_DIR"; cat "$OUT_DIR/metadata.txt"
           head -20 "$OUT_DIR/qodana-summary.csv" || true
 
       - name: 'Upload sanitized Qodana inventory artifact'
