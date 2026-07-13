@@ -140,18 +140,6 @@ private fun AttachmentImage(
     }
 }
 
-@Composable
-private fun Placeholder(modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(8.dp),
-    ) {
-        // empty placeholder body
-        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize()) {}
-    }
-}
-
 internal fun chatAttachmentImageDataUrl(base64: String, mediaType: String): String =
     "data:$mediaType;base64,$base64"
 
