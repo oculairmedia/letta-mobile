@@ -29,7 +29,7 @@ open class ProjectRepository @Inject constructor(
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
 
-    override open suspend fun refreshProjects(): ProjectCatalog = refreshMutex.withLock {
+    override suspend fun refreshProjects(): ProjectCatalog = refreshMutex.withLock {
         refreshProjectsLocked()
     }
 
@@ -40,7 +40,7 @@ open class ProjectRepository @Inject constructor(
         return catalog
     }
 
-    override open suspend fun getProject(identifier: String): ProjectSummary {
+    override suspend fun getProject(identifier: String): ProjectSummary {
         val cached = _projects.value.firstOrNull { it.identifier == identifier }
         if (cached != null) return cached
 
@@ -56,16 +56,16 @@ open class ProjectRepository @Inject constructor(
         return fresh
     }
 
-    override open suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
+    override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
         projectApi.getBeadsRemoteStatus(identifier).sanitize()
 
-    override open suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
+    override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
         projectApi.provisionBeadsRemote(identifier, push)
 
-    override open suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
+    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
         projectApi.triggerSync(identifier)
 
-    override open suspend fun createProject(
+    override suspend fun createProject(
         name: String?,
         filesystemPath: String,
         gitUrl: String?,
@@ -86,7 +86,7 @@ open class ProjectRepository @Inject constructor(
         return created
     }
 
-    override open suspend fun updateProject(
+    override suspend fun updateProject(
         identifier: String,
         filesystemPath: String?,
         gitUrl: String?,
@@ -110,7 +110,7 @@ open class ProjectRepository @Inject constructor(
         return updated
     }
 
-    override open suspend fun archiveProject(identifier: String): ProjectSummary {
+    override suspend fun archiveProject(identifier: String): ProjectSummary {
         val updated = projectApi.archiveProject(identifier).sanitize()
         _projects.update { current ->
             val index = current.indexOfFirst { it.identifier == updated.identifier }
@@ -124,17 +124,17 @@ open class ProjectRepository @Inject constructor(
         return updated
     }
 
-    override open suspend fun deleteProject(identifier: String) {
+    override suspend fun deleteProject(identifier: String) {
         projectApi.deleteProject(identifier)
         _projects.update { current -> current.filterNot { it.identifier == identifier } }
         lastRefreshAtMillis = System.currentTimeMillis()
     }
 
-    override open fun hasFreshProjects(maxAgeMs: Long): Boolean {
+    override fun hasFreshProjects(maxAgeMs: Long): Boolean {
         return _projects.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override open suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshProjectsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshProjects(maxAgeMs)) return@withLock false
         refreshProjectsLocked()
         true

@@ -25,15 +25,15 @@ open class ToolRepository @Inject constructor(
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
 
-    override open fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
+    override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
 
-    override open fun getAgentTools(agentId: String): Flow<List<Tool>> {
+    override fun getAgentTools(agentId: String): Flow<List<Tool>> {
         return _toolsByAgent.map { it[agentId] ?: emptyList() }
     }
 
-    override open suspend fun countTools(): Int = toolApi.countTools()
+    override suspend fun countTools(): Int = toolApi.countTools()
 
-    override open suspend fun refreshTools() = refreshMutex.withLock {
+    override suspend fun refreshTools() = refreshMutex.withLock {
         refreshToolsLocked()
     }
 
@@ -52,13 +52,13 @@ open class ToolRepository @Inject constructor(
         return _tools.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override open suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshTools(maxAgeMs)) return@withLock false
         refreshToolsLocked()
         true
     }
 
-    override open suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> {
+    override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> {
         return toolApi.listTools(limit = limit, offset = offset)
     }
 
@@ -68,7 +68,7 @@ open class ToolRepository @Inject constructor(
                 } }
     }
 
-    override open suspend fun attachTool(agentId: String, toolId: String) {
+    override suspend fun attachTool(agentId: String, toolId: String) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.attachTool(agentId, toolId)
@@ -84,7 +84,7 @@ open class ToolRepository @Inject constructor(
         }
     }
 
-    override open suspend fun detachTool(agentId: String, toolId: String) {
+    override suspend fun detachTool(agentId: String, toolId: String) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.detachTool(agentId, toolId)
@@ -97,7 +97,7 @@ open class ToolRepository @Inject constructor(
                 } }
     }
 
-    override open suspend fun upsertTool(params: ToolCreateParams): Tool {
+    override suspend fun upsertTool(params: ToolCreateParams): Tool {
         val irohSource = irohToolSource
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.createTool(params)
@@ -111,7 +111,7 @@ open class ToolRepository @Inject constructor(
         return tool
     }
 
-    override open suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
         val irohSource = irohToolSource
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.updateTool(toolId, params)
@@ -129,7 +129,7 @@ open class ToolRepository @Inject constructor(
         return tool
     }
 
-    override open suspend fun deleteTool(toolId: String) {
+    override suspend fun deleteTool(toolId: String) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteTool(toolId)

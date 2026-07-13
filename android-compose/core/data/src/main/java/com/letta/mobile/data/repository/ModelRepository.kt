@@ -23,15 +23,15 @@ open class ModelRepository(
     private val irohModelSource: IrohAdminRpcModelSource? = null,
 ) : IModelRepository {
     private val _llmModels = MutableStateFlow<List<LlmModel>>(emptyList())
-    override open val llmModels: StateFlow<List<LlmModel>> = _llmModels.asStateFlow()
+    override val llmModels: StateFlow<List<LlmModel>> = _llmModels.asStateFlow()
 
     private val _embeddingModels = MutableStateFlow<List<EmbeddingModel>>(emptyList())
-    override open val embeddingModels: StateFlow<List<EmbeddingModel>> = _embeddingModels.asStateFlow()
+    override val embeddingModels: StateFlow<List<EmbeddingModel>> = _embeddingModels.asStateFlow()
 
     private fun isLocalRuntimeActive(): Boolean =
         localModelSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
 
-    override open suspend fun refreshLlmModels() {
+    override suspend fun refreshLlmModels() {
         // Local-runtime mode: pickers list downloaded embedded models; the
         // remote model API is unreachable (and guarded) behind a local config.
         val localSource = localModelSource
@@ -47,7 +47,7 @@ open class ModelRepository(
         _llmModels.update { modelApi.listLlmModels() }
     }
 
-    override open suspend fun refreshEmbeddingModels() {
+    override suspend fun refreshEmbeddingModels() {
         if (isLocalRuntimeActive()) {
             // The embedded runtime has no embedding models.
             _embeddingModels.update { emptyList() }

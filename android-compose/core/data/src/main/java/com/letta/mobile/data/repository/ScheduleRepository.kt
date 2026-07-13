@@ -16,11 +16,11 @@ open class ScheduleRepository(
 ) : IScheduleRepository {
     private val _schedules = MutableStateFlow<Map<String, List<ScheduledMessage>>>(emptyMap())
 
-    override open fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> {
+    override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> {
         return _schedules.asStateFlow().map { current -> current[agentId] ?: emptyList() }
     }
 
-    override open suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
+    override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
         val irohSource = irohScheduleSource
         val schedules = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.listSchedules()
@@ -33,11 +33,11 @@ open class ScheduleRepository(
         }
     }
 
-    override open suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
+    override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
         return scheduleApi.retrieveSchedule(agentId, scheduledMessageId)
     }
 
-    override open suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
+    override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
         val irohSource = irohScheduleSource
         val schedule = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.createSchedule(params)
@@ -48,7 +48,7 @@ open class ScheduleRepository(
         return schedule
     }
 
-    override open suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
+    override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
         val irohSource = irohScheduleSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteSchedule(scheduledMessageId)
