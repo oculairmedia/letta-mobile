@@ -1,5 +1,5 @@
 {
-  "$description": "Letta / Meridian design tokens — generated from Kotlin by scripts/export-design-tokens.py. Code is the source of truth (docs/design-sync-with-penpot.md). DTCG shape for Penpot's design-tokens/v1 native catalog.",
+  "$description": "Letta / Meridian design tokens — generated from Kotlin by scripts/export-design-tokens.py. Kotlin is the runtime serialization of the approved Penpot design (docs/design-sync-with-penpot.md). DTCG shape for Penpot's design-tokens/v1 native catalog.",
   "color/default": {
     "light": {
       "primary": {
