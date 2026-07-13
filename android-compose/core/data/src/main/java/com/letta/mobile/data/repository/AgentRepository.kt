@@ -62,11 +62,11 @@ open class AgentRepository(
         },
 ) : IAgentRepository, BackendScopedCache {
     private val _agents = MutableStateFlow<List<Agent>>(emptyList())
-    override open val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+    override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
-    override open val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    override val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
     private val _refreshError = MutableStateFlow<Throwable?>(null)
-    override open val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
+    override val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
     private val refreshMutex = Mutex()
     private var lastRefreshAtMillis: Long = 0L
 
@@ -98,7 +98,7 @@ open class AgentRepository(
         ).flow
     }
 
-    override open suspend fun countAgents(): Int = agentApi.countAgents()
+    override suspend fun countAgents(): Int = agentApi.countAgents()
 
     /**
      * Slim agent list for picker UIs (Schedules dropdown). Hits the
@@ -140,7 +140,7 @@ open class AgentRepository(
         return merged
     }
 
-    override open suspend fun refreshAgents() = refreshMutex.withLock {
+    override suspend fun refreshAgents() = refreshMutex.withLock {
         _isRefreshing.value = true
         try {
             refreshAgentsLocked()
@@ -249,13 +249,13 @@ open class AgentRepository(
         return fullList
     }
 
-    override open fun getCachedAgent(id: AgentId): Agent? = _agents.value.find { it.id == id }
+    override fun getCachedAgent(id: AgentId): Agent? = _agents.value.find { it.id == id }
 
     fun hasFreshAgents(maxAgeMs: Long): Boolean {
         return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override open suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshAgents(maxAgeMs)) return@withLock false
         _isRefreshing.value = true
         try {
@@ -270,7 +270,7 @@ open class AgentRepository(
         true
     }
 
-    override open fun getAgent(id: AgentId): Flow<Agent> = flow {
+    override fun getAgent(id: AgentId): Flow<Agent> = flow {
         val cached = _agents.value.find { it.id == id }
         if (cached != null) {
             emit(cached)
@@ -357,7 +357,7 @@ open class AgentRepository(
     private fun isEphemeralSubagentId(id: AgentId): Boolean =
         id.value.startsWith(EPHEMERAL_SUBAGENT_ID_PREFIX)
 
-    override open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
         val localSource = localAgentSource
         if (localSource != null && isLocalRuntimeActive()) {
             // No remote API for local agents; estimate from the on-disk
@@ -380,7 +380,7 @@ open class AgentRepository(
         }
     }
 
-    override open suspend fun createAgent(params: AgentCreateParams): Agent {
+    override suspend fun createAgent(params: AgentCreateParams): Agent {
         val irohSource = irohAgentSource
         val agent = if (irohSource != null && irohSource.shouldUseIroh()) {
             val json = kotlinx.serialization.json.Json {
@@ -398,7 +398,7 @@ open class AgentRepository(
         return agent
     }
 
-    override open suspend fun createLocalAgent(params: AgentCreateParams): Agent {
+    override suspend fun createLocalAgent(params: AgentCreateParams): Agent {
         val agent = Agent(
             id = AgentId("local-agent-${UUID.randomUUID()}"),
             name = params.name?.takeIf { it.isNotBlank() } ?: "Local Agent",
@@ -430,7 +430,7 @@ open class AgentRepository(
         return agent
     }
 
-    override open suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
+    override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
         val cached = _agents.value.find { it.id == id }
         val preview = cached?.withUpdates(params)
         val localSource = localAgentSource
@@ -462,7 +462,7 @@ open class AgentRepository(
         return agent
     }
 
-    override open suspend fun deleteAgent(id: AgentId) {
+    override suspend fun deleteAgent(id: AgentId) {
         val irohSource = irohAgentSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deleteAgent(id)
@@ -477,11 +477,11 @@ open class AgentRepository(
         }
     }
 
-    override open suspend fun exportAgent(id: AgentId): String {
+    override suspend fun exportAgent(id: AgentId): String {
         return agentApi.exportAgent(id)
     }
 
-    override open suspend fun importAgent(
+    override suspend fun importAgent(
         fileName: String,
         fileBytes: ByteArray,
         overrideName: String?,
@@ -501,12 +501,12 @@ open class AgentRepository(
         return response
     }
 
-    override open suspend fun attachArchive(agentId: AgentId, archiveId: String) {
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         agentApi.attachArchive(agentId, archiveId)
         refreshAgents()
     }
 
-    override open suspend fun detachArchive(agentId: AgentId, archiveId: String) {
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         agentApi.detachArchive(agentId, archiveId)
         refreshAgents()
     }
@@ -534,7 +534,7 @@ open class AgentRepository(
         }
     }
 
-    override open suspend fun checkpointAndRestoreConfig(
+    override suspend fun checkpointAndRestoreConfig(
         agentId: AgentId,
         operation: suspend () -> Unit
     ) {
