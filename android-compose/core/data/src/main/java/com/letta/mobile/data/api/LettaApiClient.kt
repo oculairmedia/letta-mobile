@@ -5,7 +5,6 @@ import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
-import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryContext
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.*

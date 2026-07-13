@@ -1,7 +1,5 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
