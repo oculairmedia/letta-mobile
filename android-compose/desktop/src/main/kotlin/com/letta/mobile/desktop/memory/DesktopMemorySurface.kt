@@ -492,40 +492,6 @@ private fun EntityTypeFilterBar(
     }
 }
 
-@Composable
-private fun GraphLegend(
-    summaryLabel: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
-        modifier = modifier,
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-        ) {
-            Texty(
-                text = "Memory graph",
-                displayStyle = DisplayStyle.Basic(),
-                textStyle = MaterialTheme.typography.labelLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-            )
-            Text(
-                text = summaryLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-            )
-        }
-    }
-}
-
 /**
  * A graph node rendered the way Zep / Cosmograph do: a filled circle whose
  * radius grows with the node's [degree] (so hubs are visibly bigger), colored
@@ -632,87 +598,6 @@ private fun memoryNodeKindLabel(kind: MemoryGraphNodeKind): String = when (kind)
     MemoryGraphNodeKind.Memory -> "Memory"
     MemoryGraphNodeKind.Schedule -> "Schedule"
     MemoryGraphNodeKind.Channel -> "Channel"
-}
-
-@Composable
-private fun MemorySectionCard(
-    section: MemoryParitySection,
-    canEdit: Boolean = false,
-    onBlockClick: (MemoryParityItem.MemoryBlock) -> Unit = {},
-    onNewBlock: () -> Unit = {},
-) {
-    val isMemory = section.kind == MemoryParitySectionKind.Memory
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.54f),
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.secondaryContainer,
-                            shape = MaterialTheme.shapes.medium,
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = section.kind.icon(),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(
-                        text = section.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = section.subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (isMemory && canEdit) {
-                    DesktopDefaultButton(onClick = onNewBlock) {
-                        DesktopButtonContent(text = "New block")
-                    }
-                }
-            }
-
-            if (section.items.isEmpty()) {
-                Text(
-                    text = section.emptyMessage,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                section.items.forEach { item ->
-                    val clickable = isMemory && canEdit && item is MemoryParityItem.MemoryBlock
-                    MemoryItemRow(
-                        item = item,
-                        onClick = if (clickable) {
-                            { onBlockClick(item as MemoryParityItem.MemoryBlock) }
-                        } else {
-                            null
-                        },
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable
