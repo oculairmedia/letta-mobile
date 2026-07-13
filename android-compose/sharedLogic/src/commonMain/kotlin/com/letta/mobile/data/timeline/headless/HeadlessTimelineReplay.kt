@@ -980,11 +980,6 @@ private fun compareInterleavedEvents(
     return left.sourceIndex.compareTo(right.sourceIndex)
 }
 
-private fun String.toRecordedFrameJsonOrNull(): JsonObject? {
-    val element = runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull() ?: return null
-    return element.toRecordedFrameJsonOrNull()
-}
-
 private fun JsonObject.toRecordedFrameJsonOrNull(): JsonObject? {
     val raw = this["raw"]?.jsonPrimitive?.contentOrNull
     if (raw != null) {
