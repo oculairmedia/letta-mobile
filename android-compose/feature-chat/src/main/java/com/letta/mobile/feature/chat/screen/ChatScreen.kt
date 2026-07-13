@@ -110,7 +110,6 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
-import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch

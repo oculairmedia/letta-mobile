@@ -37,7 +37,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import com.letta.mobile.feature.chat.render.resolveRenderer
-import com.letta.mobile.feature.chat.render.MessageContentRenderer
 
 /**
  * A message renders bubble-less (just markdown on the page background) when
