@@ -3,9 +3,7 @@ package com.letta.mobile.desktop.chat
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.PointerMatcher
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -16,7 +14,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +41,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Check
@@ -59,7 +55,6 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
@@ -67,14 +62,11 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material.icons.outlined.Widgets
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -106,19 +98,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
-import com.letta.mobile.data.chat.projection.runStepDotIcon
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
@@ -145,7 +131,6 @@ import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
-import com.letta.mobile.desktop.DesktopIconButton
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.theme.customColors

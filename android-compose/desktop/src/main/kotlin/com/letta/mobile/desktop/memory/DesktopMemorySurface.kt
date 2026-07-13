@@ -22,7 +22,6 @@ import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.DpOffset
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -31,10 +30,7 @@ import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -57,19 +53,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.arjunjadeja.texty.DisplayStyle
-import com.arjunjadeja.texty.Texty
 import com.dk.kuiver.model.buildKuiver
 import com.dk.kuiver.model.edge
 import com.dk.kuiver.model.layout.LayoutConfig
-import com.dk.kuiver.model.layout.LayoutDirection
 import com.dk.kuiver.model.nodes
 import com.dk.kuiver.rememberKuiverViewerState
 import com.dk.kuiver.renderer.KuiverViewer
 import com.dk.kuiver.renderer.KuiverViewerConfig
-import com.dk.kuiver.ui.EdgeLabelStyle
-import com.dk.kuiver.ui.LabelPlacement
 import com.dk.kuiver.ui.StyledEdgeContent
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.components.DesktopRefreshAction
@@ -80,7 +70,6 @@ import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
 import com.letta.mobile.data.memory.MemoryParityItem
-import com.letta.mobile.data.memory.MemoryParitySection
 import com.letta.mobile.data.memory.MemoryParitySectionKind
 import com.letta.mobile.data.memory.MemoryParitySummary
 import com.letta.mobile.data.memory.MemorySummaryMetric
@@ -90,11 +79,9 @@ import com.letta.mobile.data.memory.MemoryTextLink
 import com.letta.mobile.data.memory.accentRole
 import com.letta.mobile.data.memory.validForText
 import com.letta.mobile.desktop.DesktopButtonContent
-import com.letta.mobile.desktop.DesktopControlText
 import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
-import com.letta.mobile.desktop.DesktopRadioChip
 import com.letta.mobile.desktop.DesktopTextArea
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
