@@ -141,62 +141,6 @@ private fun LettaNavigationRail(
 }
 
 /**
- * Slim bottom navigation row. Material3's NavigationBar enforces an 80dp
- * height and bulky internal padding around each NavigationBarItem; this
- * custom layout halves the vertical footprint by tightly stacking a
- * compact icon + small label inside a 56dp tall surface (plus the
- * system gesture inset).
- */
-@Composable
-private fun LettaBottomBar(
-    navController: NavController,
-    modifier: Modifier = Modifier,
-) {
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
-    val focusManager = LocalFocusManager.current
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    val visibleDestinations = visibleTopLevelDestinations()
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-    ) {
-        // Each item claims an equal slice of the bar width via Modifier.weight(1f)
-        // so the entire column under each label is a valid tap target — not
-        // just the area centered around the icon. The weight automatically
-        // adapts when an entry is filtered out (letta-mobile-2ixd: Projects
-        // hides on backends without project endpoints).
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .height(56.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            visibleDestinations.forEach { destination ->
-                LettaBottomBarItem(
-                    modifier = Modifier.weight(1f),
-                    icon = destination.icon,
-                    label = destination.label,
-                    selected = destination.isSelected(currentDestination),
-                    onClick = {
-                        HapticEffects.segmentTick(
-                            haptic = haptic,
-                            view = view,
-                            enabled = !destination.isSelected(currentDestination),
-                        )
-                        navController.navigateTopLevel(destination, focusManager)
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
  * letta-mobile-2ixd: filter [TopLevelDestination] entries against the
  * connected backend's capabilities. Today only the Projects entry is
  * conditional; future capability gates layer in here.
