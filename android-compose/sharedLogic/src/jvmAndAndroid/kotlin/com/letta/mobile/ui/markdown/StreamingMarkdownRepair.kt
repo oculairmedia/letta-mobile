@@ -355,15 +355,6 @@ private fun canCloseMarker(line: String, index: Int): Boolean {
     return index > 0 && !line[index - 1].isWhitespace()
 }
 
-private fun findLastUnescaped(text: String, target: Char): Int {
-    var i = text.lastIndex
-    while (i >= 0) {
-        if (text[i] == target && !text.isEscapedAt(i)) return i
-        i--
-    }
-    return -1
-}
-
 private fun findLastUnescapedOutsideInlineCode(text: String, target: Char): Int {
     var i = text.lastIndex
     while (i >= 0) {
