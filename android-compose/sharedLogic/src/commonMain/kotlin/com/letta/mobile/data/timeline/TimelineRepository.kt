@@ -1,10 +1,6 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ReasoningMessage
-import com.letta.mobile.data.model.ToolCallMessage
-import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
