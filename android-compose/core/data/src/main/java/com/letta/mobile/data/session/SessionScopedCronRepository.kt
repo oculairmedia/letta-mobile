@@ -13,9 +13,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 class SessionScopedCronRepository @Inject constructor(
     private val sessionManager: SessionManager,
 ) : ICronRepository {
-    private val current: ICronRepository
-        get() = sessionManager.current.cronRepository
-
     override fun schedulesFlow(agentId: String): Flow<List<CronTask>> =
         sessionManager.currentGraph.flatMapLatest { it.cronRepository.schedulesFlow(agentId) }
 

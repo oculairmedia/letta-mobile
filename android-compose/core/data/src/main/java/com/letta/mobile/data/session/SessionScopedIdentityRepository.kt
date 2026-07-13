@@ -49,9 +49,6 @@ class SessionScopedIdentityRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    private val current: IIdentityRepository
-        get() = sessionManager.current.identityRepository
-
     override suspend fun refreshIdentities() = sessionManager.withCurrentSession { it.identityRepository.refreshIdentities() }
 
     override suspend fun countIdentities(): Int = sessionManager.withCurrentSession { it.identityRepository.countIdentities() }
