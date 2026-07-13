@@ -468,7 +468,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
         put("text", JsonPrimitive("[image unavailable]"))
     }
 
-    private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
+    private fun base64Url(value: String): String = Base64.getUrlEncoder().withoutPadding()
         .encodeToString(value.toByteArray(Charsets.UTF_8))
 
     companion object {

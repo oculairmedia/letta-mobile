@@ -1204,7 +1204,7 @@ private fun CopyIconButton(
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
-            kotlinx.coroutines.delay(1200)
+            delay(1200)
             copied = false
         }
     }

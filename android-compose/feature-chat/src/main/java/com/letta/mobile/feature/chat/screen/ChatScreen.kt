@@ -1005,7 +1005,7 @@ private fun ChatContent(
         ).also { built ->
             // letta-mobile-x1xnl render diagnostics (flag-gated, no-op when off).
             com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderItemsBuilt(
-                conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
+                conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
                 path = state.messageListChange.toString(),
                 items = built,
             )
@@ -1133,10 +1133,10 @@ internal fun DismissibleA2uiSurface(
         content()
         androidx.compose.material3.IconButton(
             onClick = { onDismissSurface(surfaceId) },
-            modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
+            modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            androidx.compose.material3.Icon(
-                imageVector = com.letta.mobile.ui.icons.LettaIcons.Close,
+            Icon(
+                imageVector = LettaIcons.Close,
                 contentDescription = "Close A2UI surface",
                 tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
             )

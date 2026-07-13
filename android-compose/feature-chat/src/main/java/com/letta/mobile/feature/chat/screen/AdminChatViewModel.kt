@@ -579,7 +579,7 @@ internal class AdminChatViewModel @Inject constructor(
         scope = viewModelScope,
         timelineRepository = timelineRepository,
         currentConversationTracker = currentConversationTracker,
-        activeReplyStreams = kotlinx.coroutines.flow.MutableStateFlow(emptySet()),
+        activeReplyStreams = MutableStateFlow(emptySet()),
         uiState = _uiState,
         isClientModeStreamInFlight = { false },
         a2uiThinkingStartMessageCount = { adminChatA2uiCoordinator.getA2uiThinkingStartMessageCount() },

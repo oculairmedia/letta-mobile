@@ -102,7 +102,7 @@ fun MarkdownText(
             .any { containsLikelyInlineMath(it.content) }
 
         if (hasBlockSplit || hasAnyInline) {
-            androidx.compose.foundation.layout.Column(modifier = modifier) {
+            Column(modifier = modifier) {
                 blockSegments.forEach { seg ->
                     when (seg) {
                         is MathSegment.Text -> {

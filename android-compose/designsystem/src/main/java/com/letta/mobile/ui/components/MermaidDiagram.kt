@@ -155,7 +155,7 @@ private fun MermaidSvgDiagram(
         ImageRequest.Builder(context)
             .data(svg.toByteArray(Charsets.UTF_8))
             .decoderFactory(SvgDecoder.Factory())
-            .size(coil3.size.Size(2000, 2000))
+            .size(Size(2000, 2000))
             .build()
     }
 
