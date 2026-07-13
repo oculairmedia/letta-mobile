@@ -69,14 +69,10 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.LettaSearchBar
-import com.letta.mobile.ui.components.highlightSearchMatches
-import com.letta.mobile.ui.components.rememberSearchHighlightColors
-import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons

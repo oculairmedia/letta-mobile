@@ -88,7 +88,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
@@ -96,36 +95,22 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.saveable.rememberSaveable
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.util.formatRelativeTime
-import com.letta.mobile.ui.components.ConfirmDialog
-import com.letta.mobile.ui.components.ConnectionState
 import com.letta.mobile.ui.components.LettaSearchBar
-import com.letta.mobile.ui.components.ConnectionStatusBanner
-import com.letta.mobile.ui.components.LettaCardDefaults
-import com.letta.mobile.ui.components.MarkdownText
-import com.letta.mobile.ui.components.Accordions
-import com.letta.mobile.ui.components.ActionSheet
-import com.letta.mobile.ui.components.ActionSheetItem
-import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.haptics.HapticEffects
 
-import com.letta.mobile.util.ConnectivityMonitor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaTopBarDefaults
-import com.letta.mobile.ui.theme.customColors
-import com.letta.mobile.ui.theme.listItemHeadline
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.feature.chat.route.ProjectChatStartAction
 
