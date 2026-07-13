@@ -222,10 +222,6 @@ open class ProjectWorkApi @Inject constructor(
         it.client to it.baseUrl.trimEnd('/')
     }
 
-    private suspend fun client() = apiClient.getClient()
-
-    private fun baseUrl() = apiClient.getBaseUrl().trimEnd('/')
-
     private fun io.ktor.client.request.HttpRequestBuilder.mutationHeaders(headers: ProjectIssueMutationHeaders) {
         header(HttpHeaders.IfMatch, headers.ifMatch)
         header("Idempotency-Key", headers.idempotencyKey)

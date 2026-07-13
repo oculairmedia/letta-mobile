@@ -760,25 +760,6 @@ class ChannelTransport internal constructor(
         const val KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE = 4001
         private val AUTH_FAILURE_CLOSE_CODES = setOf(4003, 4401, 4403)
 
-        private val SKIP_CURSOR_TYPES: Set<String> = setOf(
-            "welcome",
-            "a2ui_capabilities",
-            "user_action_ack",
-            "user_action_outcome",
-            "error",
-            "cron_list_response",
-            "cron_add_response",
-            "cron_get_response",
-            "cron_delete_response",
-            "cron_delete_all_response",
-            "crons_updated",
-            "subagent_list_response",
-            "subagent_todos_response",
-            "subagents_updated",
-            "subscribe_frame",
-            "subscribe_done",
-        )
-
         const val DEFAULT_CRON_TIMEOUT_MS: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS
 
         internal fun nowIso(): String = Instant.now().toString()
