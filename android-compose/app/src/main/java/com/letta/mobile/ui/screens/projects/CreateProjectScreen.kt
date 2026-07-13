@@ -49,8 +49,6 @@ import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.icons.LettaIcons
 
-private const val PROJECT_CREATED_RESULT_KEY = "create_project.created"
-
 /**
  * letta-mobile-cygd: full-screen replacement for the conversational
  * project-creation `MultiFieldInputDialog` that used to live inside
