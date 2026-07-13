@@ -1,7 +1,6 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.runtime.RuntimeEventDraft
@@ -14,7 +13,6 @@ import com.letta.mobile.runtime.ToolCallId
 import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject

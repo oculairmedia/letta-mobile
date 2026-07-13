@@ -1,11 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.Telemetry
-import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ReasoningMessage
-import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
