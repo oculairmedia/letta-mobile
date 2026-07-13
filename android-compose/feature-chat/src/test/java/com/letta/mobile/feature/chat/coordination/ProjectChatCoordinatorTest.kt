@@ -79,7 +79,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = { sentMessage = it }
         )
 
@@ -111,7 +110,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -135,7 +133,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -182,7 +179,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = { sentMessage = it }
         )
 
@@ -220,7 +216,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -249,7 +244,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -288,7 +282,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -315,7 +308,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -338,7 +330,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -371,7 +362,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -404,7 +394,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -428,7 +417,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -458,7 +446,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -497,7 +484,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 
@@ -531,7 +517,6 @@ class ProjectChatCoordinatorTest {
             blockRepository = mockBlockRepository,
             bugReportRepository = mockBugReportRepository,
             conversationId = { testConversationId },
-            setComposerError = {},
             sendMessage = {}
         )
 

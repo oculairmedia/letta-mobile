@@ -356,7 +356,6 @@ internal class AdminChatViewModel @Inject constructor(
             composerController = composerController,
             chatSendStrategySelector = chatSendStrategySelector,
             chatBannerController = chatBannerController,
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
             uiState = _uiState,
             agentId = agentId,
             explicitConversationId = explicitConversationId,
@@ -370,7 +369,6 @@ internal class AdminChatViewModel @Inject constructor(
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
-            timelineChatSendStrategy = timelineChatSendStrategy,
             isStreaming = { _uiState.value.isStreaming },
             projectContextAvailable = projectContext != null,
         )
@@ -658,7 +656,6 @@ internal class AdminChatViewModel @Inject constructor(
         blockRepository = blockRepository,
         bugReportRepository = bugReportRepository,
         conversationId = { conversationId?.value },
-        setComposerError = chatBannerController::showComposerError,
         sendMessage = ::sendMessage,
     )
     val projectBindings: ChatProjectBindings = projectChatCoordinator
