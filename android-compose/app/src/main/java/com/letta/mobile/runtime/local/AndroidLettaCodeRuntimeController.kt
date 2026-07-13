@@ -427,8 +427,6 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
-    private class TerminalResultSeen : CancellationException()
-
     private class TurnTimeoutException(message: String) : CancellationException(message)
 
     private companion object {
