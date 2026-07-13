@@ -3,7 +3,6 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.api.ProjectCreateRequest
 import com.letta.mobile.data.api.ProjectUpdateRequest
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog

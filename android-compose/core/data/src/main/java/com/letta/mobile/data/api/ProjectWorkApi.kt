@@ -24,7 +24,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 class ProjectIssueConflictException(
