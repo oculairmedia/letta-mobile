@@ -310,7 +310,7 @@ class TimelineSyncLoop(
                     "messageId" to messageId,
                 )
             }
-            .getOrNull() as? com.letta.mobile.data.model.ToolReturnMessage ?: return false
+            .getOrNull() as? ToolReturnMessage ?: return false
         if (message.toolReturnTruncated == true) return false
         writeMutex.withLock {
             applyReturnsAndResponsesFromSnapshot(listOf(message), _state)

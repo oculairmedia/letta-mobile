@@ -308,7 +308,7 @@ open class TimelineRepository(
         message: LettaMessage,
         source: String,
     ) {
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "IrohGate", "gate4.repositoryIngest",
             "agentId" to agentId,
             "conversationId" to conversationId,

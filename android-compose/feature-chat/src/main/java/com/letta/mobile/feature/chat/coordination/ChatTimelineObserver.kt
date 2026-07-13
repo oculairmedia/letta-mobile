@@ -298,7 +298,7 @@ internal class ChatTimelineObserver(
     }
 
     /** Assistant-role reasoning or final-answer row (the model-output tail). */
-    private fun com.letta.mobile.data.model.UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
+    private fun UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
         role == "assistant" && (isReasoning || tailIsAssistant)
 
     private data class TimelineObserverBinding(

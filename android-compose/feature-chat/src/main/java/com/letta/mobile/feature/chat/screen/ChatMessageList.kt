@@ -851,7 +851,7 @@ internal fun ChatMessageList(
                         if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
                             androidx.compose.runtime.SideEffect {
                                 com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
-                                    conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
+                                    conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
                                     key = renderItem.key,
                                     contentType = when (renderItem) {
                                         is ChatRenderItem.Single -> "single"
