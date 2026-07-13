@@ -31,7 +31,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.Close
@@ -91,8 +90,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.composer.MentionKind
@@ -124,7 +121,6 @@ import com.letta.mobile.desktop.avatar.DesktopAvatarLibraryWindow
 import com.letta.mobile.desktop.avatar.defaultAvatarCatalogDir
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.components.DesktopChipTab
-import com.letta.mobile.desktop.chat.AgentSphere
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
@@ -165,7 +161,6 @@ import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillApi
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
-import com.letta.mobile.desktop.tools.DesktopToolLibrarySurface
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
