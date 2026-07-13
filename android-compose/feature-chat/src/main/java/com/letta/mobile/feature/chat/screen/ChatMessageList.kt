@@ -479,18 +479,6 @@ internal fun ChatMessageList(
         }
     }
 
-    val shouldLoadOlderMessages by remember {
-        derivedStateOf {
-            if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
-                return@derivedStateOf false
-            }
-
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
-            val totalItems = listState.layoutInfo.totalItemsCount
-            totalItems > 0 && lastVisible >= totalItems - 3
-        }
-    }
-
     val activeUserPromptState = remember(listState, renderItems, topPadding, density) {
         derivedStateOf {
             /*
@@ -600,10 +588,15 @@ internal fun ChatMessageList(
     }
 
     LaunchedEffect(listState, state.hasMoreOlderMessages, state.isLoadingOlderMessages, state.messages.size) {
-        snapshotFlow { shouldLoadOlderMessages }
+        snapshotFlow { listState.firstVisibleItemIndex }
             .distinctUntilChanged()
-            .collect { shouldLoad ->
-                if (shouldLoad) {
+            .collect { _ ->
+                if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
+                    return@collect
+                }
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
+                val totalItems = listState.layoutInfo.totalItemsCount
+                if (totalItems > 0 && lastVisible >= totalItems - 3) {
                     onLoadOlderMessages()
                 }
             }
