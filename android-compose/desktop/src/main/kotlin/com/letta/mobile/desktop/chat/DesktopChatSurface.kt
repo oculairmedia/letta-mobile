@@ -2242,33 +2242,6 @@ private fun DesktopAttachmentImage(
     }
 }
 
-@Composable
-private fun StatusChip(text: String) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun StatusDot(color: Color) {
-    Box(
-        modifier = Modifier
-            .size(9.dp)
-            .background(color, CircleShape),
-    )
-}
-
 // ---------------------------------------------------------------------------
 // Desktop-side UI mappings for ChatScreenStatus
 // Icon, colour, copy, and retry affordance are all platform concerns kept
