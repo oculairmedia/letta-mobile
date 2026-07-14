@@ -1,9 +1,7 @@
 package com.letta.mobile.data.timeline
 
 import androidx.compose.runtime.Immutable
-import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.MutableSharedFlow
