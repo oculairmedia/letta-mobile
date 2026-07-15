@@ -274,6 +274,17 @@ class AppServerTurnEngine(
         var pendingStop: RuntimeEventDraft? = null
         var pendingUsage: RuntimeEventDraft? = null
         var terminalSettleJob: Job? = null
+        // letta-mobile-kyqdt: once a completed lifecycle is observed and the
+        // settle timer is armed, it must NOT be re-armed by subsequent frames.
+        // The prior code cancel+rescheduled the quiet window on EVERY later
+        // matching frame, so on the shared server-side engine a steady trickle
+        // of matching frames (cross-device viewer traffic / late fanout deltas)
+        // deferred the completed terminal — and the activeTurn unlock that fires
+        // with it — indefinitely, leaving the run "busy" long after it was
+        // terminal and rejecting the next cross-device send. Arm-once makes the
+        // terminal release bounded and monotonic: the completed run always
+        // frees busy ownership within terminalSettleQuietMs of the completion.
+        var terminalArmed = false
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
         // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame currently being
@@ -293,11 +304,23 @@ class AppServerTurnEngine(
             pendingUsage = null
         }
 
-        fun rescheduleCompletedTerminal() {
-            val terminal = pendingCompleted ?: return
-            terminalSettleJob?.cancel()
+        // letta-mobile-kyqdt: arm the completed-terminal quiet timer AT MOST ONCE.
+        // Formerly this cancelled + rescheduled the settle job on every later
+        // matching frame, so any post-completion frame trickle deferred the
+        // terminal (and the activeTurn unlock) without bound. Arming once anchors
+        // the settle deadline to the first observed completion, so the terminal —
+        // and busy release — always fires within terminalSettleQuietMs. Later
+        // frames are still emitted downstream (below); they simply cannot push
+        // the terminal out. The settle body reads pendingCompleted at fire time,
+        // so a completion refined by an intervening frame still uses the latest
+        // terminal draft, just on the original, bounded deadline.
+        fun armCompletedTerminalOnce() {
+            if (terminalArmed) return
+            if (pendingCompleted == null) return
+            terminalArmed = true
             terminalSettleJob = launch {
                 delay(terminalSettleQuietMs)
+                val terminal = pendingCompleted ?: return@launch
                 // letta-mobile-oqfbj / fix(no-settle-on-clean-completion): do NOT
                 // synthesize Failed returns here. This is a CLEAN Completed
                 // terminal — with async/parallel tool execution a second tool's
@@ -387,7 +410,7 @@ class AppServerTurnEngine(
                                 payload = autoApproved,
                             ),
                         )
-                        rescheduleCompletedTerminal()
+                        armCompletedTerminalOnce()
                         return@forEach
                     }
                     
@@ -436,8 +459,7 @@ class AppServerTurnEngine(
                     }
                     if (draft.isCompletedLifecycle()) {
                         pendingCompleted = draft
-                        pendingCompletedSeq = currentFrameSeq // letta-mobile-kyqdt: telemetry-only
-                        rescheduleCompletedTerminal()
+                        armCompletedTerminalOnce()
                         return@forEach
                     }
                     // letta-mobile-oqfbj: settle dangling calls BEFORE the tail +
@@ -467,7 +489,7 @@ class AppServerTurnEngine(
                         throw TurnCompleted
                     }
                     emitDraft(draft)
-                    rescheduleCompletedTerminal()
+                    armCompletedTerminalOnce()
                 }
             }
         } catch (idle: TurnIdleTimedOutMarker) {
