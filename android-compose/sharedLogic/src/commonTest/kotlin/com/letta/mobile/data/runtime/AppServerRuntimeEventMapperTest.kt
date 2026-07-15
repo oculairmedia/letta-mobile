@@ -36,6 +36,78 @@ class AppServerRuntimeEventMapperTest {
     }
 
     @Test
+    fun mapsCancelledStopReasonToCancelledLifecycle() {
+        val drafts = mapper.map(
+            command = command,
+            received = received(
+                streamDelta(
+                    messageType = "stop_reason",
+                    runId = "run-1",
+                    body = buildJsonObject {
+                        put("message_type", "stop_reason")
+                        put("run_id", "run-1")
+                        put("stop_reason", "cancelled")
+                    },
+                ),
+            ),
+        )
+
+        val stop = assertIs<RuntimeEventPayload.RemoteStreamFrame>(drafts[0].payload)
+        assertEquals("stop_reason", stop.messageType)
+        val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload)
+        assertEquals(RuntimeRunStatus.Cancelled, payload.status)
+        assertEquals("run-1", drafts[1].runId?.value)
+    }
+
+    @Test
+    fun mapsErrorStopReasonToFailedLifecycleWithReason() {
+        val drafts = mapper.map(
+            command = command,
+            received = received(
+                streamDelta(
+                    messageType = "stop_reason",
+                    runId = "run-1",
+                    body = buildJsonObject {
+                        put("message_type", "stop_reason")
+                        put("run_id", "run-1")
+                        put("stop_reason", "error")
+                        put("message", "provider timed out")
+                    },
+                ),
+            ),
+        )
+
+        val stop = assertIs<RuntimeEventPayload.RemoteStreamFrame>(drafts[0].payload)
+        assertEquals("stop_reason", stop.messageType)
+        val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload)
+        assertEquals(RuntimeRunStatus.Failed, payload.status)
+        assertEquals("provider timed out", payload.reason)
+        assertEquals("run-1", drafts[1].runId?.value)
+    }
+
+    @Test
+    fun mapsErrorStopReasonWithoutMessageToFailedLifecycleWithFallbackReason() {
+        val drafts = mapper.map(
+            command = command,
+            received = received(
+                streamDelta(
+                    messageType = "stop_reason",
+                    runId = "run-1",
+                    body = buildJsonObject {
+                        put("message_type", "stop_reason")
+                        put("run_id", "run-1")
+                        put("stop_reason", "error")
+                    },
+                ),
+            ),
+        )
+
+        val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload)
+        assertEquals(RuntimeRunStatus.Failed, payload.status)
+        assertEquals("App Server turn stopped with error", payload.reason)
+    }
+
+    @Test
     fun mapsToolUseStopReasonToRemoteFrameSoTurnContinues() {
         val draft = mapper.map(
             command = command,

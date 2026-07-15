@@ -66,7 +66,17 @@ class AppServerRuntimeEventMapper {
                     ),
                 )
                 if (deltaObject.isTerminalStopReason()) {
-                    listOf(stopDraft, command.lifecycle(RuntimeRunStatus.Completed, runId = runId))
+                    val stopReason = deltaObject.string("stop_reason") ?: deltaObject.string("reason")
+                    val lifecycleDraft = when (stopReason) {
+                        "cancelled" -> command.lifecycle(RuntimeRunStatus.Cancelled, runId = runId)
+                        "error" -> command.lifecycle(
+                            RuntimeRunStatus.Failed,
+                            runId = runId,
+                            reason = deltaObject.errorMessage("App Server turn stopped with error"),
+                        )
+                        else -> command.lifecycle(RuntimeRunStatus.Completed, runId = runId)
+                    }
+                    listOf(stopDraft, lifecycleDraft)
                 } else {
                     listOf(stopDraft)
                 }
@@ -205,9 +215,9 @@ class AppServerRuntimeEventMapper {
         return reason == "end_turn" || reason == "stop_sequence" || reason == "max_tokens" || reason == "cancelled" || reason == "error"
     }
 
-    private fun JsonObject.errorMessage(): String =
+    private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
         string("message")
             ?: this["api_error"]?.jsonObject?.string("message")
             ?: this["api_error"]?.jsonObject?.string("detail")
-            ?: "App Server turn failed"
+            ?: fallback
 }
