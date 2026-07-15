@@ -45,8 +45,8 @@ class DanglingToolCallResolver(
     /**
      * Cancel any pending sweep. Called when a new turn starts on this
      * conversation — a fresh turn supersedes whatever the previous turn
-     * left dangling (the new turn's own clean-completion handling will
-     * schedule its own sweep if needed).
+     * left dangling (the new turn's own end-of-turn handling will schedule
+     * its own sweep if needed via [scheduleSweepIfUnresolved]).
      */
     fun cancelPendingSweep() {
         sweepJob?.cancel()
@@ -54,20 +54,36 @@ class DanglingToolCallResolver(
     }
 
     /**
-     * Called after a turn ends CLEANLY (a genuine terminal completion, not
-     * cancel/timeout/error — those paths already settle dangling calls
-     * synchronously in AppServerTurnEngine). If unresolved tool-call cards
+     * Called whenever a turn ends, on EVERY completion path — clean or
+     * abnormal (cancel/timeout/error). If unresolved tool-call cards
      * remain, launches a single bounded background sweep that re-asks the
      * canonical record at [backoffMs] intervals, stopping as soon as every
      * previously-unresolved call id has a return attached.
+     *
+     * This is intentionally unconditional on [clean] (kept only for
+     * telemetry) rather than gated to clean completions. The reason it's
+     * safe: the sweep is entirely canonical-record-driven and never
+     * guesses — an abnormal turn's OWN tool calls are already settled
+     * synchronously by AppServerTurnEngine before this fires, so they never
+     * show up in [Timeline.unresolvedToolCallIds]. What this guards against
+     * is a DIFFERENT, earlier turn's still-dangling card: `turnStarted()`
+     * calls [cancelPendingSweep] for every new turn (including one that
+     * later ends abnormally), so without rescheduling here on every
+     * `turnEnded`, that earlier card's sweep would be silently dropped with
+     * nothing left to ever reschedule it.
      *
      * No-op if nothing is unresolved. Exactly one sweep is active per
      * resolver instance (per conversation) at a time — calling this again
      * (or [cancelPendingSweep]) supersedes any job already in flight.
      */
-    fun scheduleAfterCleanTurn() {
+    fun scheduleSweepIfUnresolved(clean: Boolean = true) {
         cancelPendingSweep()
         if (state.value.unresolvedToolCallIds().isEmpty()) return
+        Telemetry.event(
+            "TimelineSync", "danglingToolResolve.sweepScheduled",
+            "conversationId" to conversationId,
+            "clean" to clean,
+        )
         sweepJob = scope.launch {
             for ((index, stepMs) in backoffMs.withIndex()) {
                 delay(stepMs)
@@ -109,12 +125,18 @@ class DanglingToolCallResolver(
     }
 
     /**
-     * Hydration guard: a single reconcile pass (no backoff loop, to avoid
-     * load on every conversation open) fired when a freshly-hydrated
-     * timeline still has unresolved tool-call cards and no turn is
-     * currently active for this conversation. Heals stale spinners that
-     * survived an app restart or a dropped stream. Live turns are handled
-     * by [scheduleAfterCleanTurn] instead.
+     * Hydration guard: an immediate reconcile pass fired when a
+     * freshly-hydrated timeline still has unresolved tool-call cards and no
+     * turn is currently active for this conversation. Heals stale spinners
+     * that survived an app restart or a dropped stream.
+     *
+     * That single pass is only the first ask, not the last: if the
+     * canonical record STILL shows no return afterward, this escalates to
+     * the same bounded backoff sweep used for live turns
+     * ([scheduleSweepIfUnresolved]) so a restart-survivor card always
+     * reaches a terminal outcome (resolved, or honestly settled "No tool
+     * result recorded") instead of spinning until some future turn happens
+     * to trigger a sweep.
      */
     suspend fun runHydrationGuardIfIdle(turnActive: Boolean) {
         if (turnActive) return
@@ -130,6 +152,9 @@ class DanglingToolCallResolver(
                     "conversationId" to conversationId,
                 )
             }
+        if (state.value.unresolvedToolCallIds().isNotEmpty()) {
+            scheduleSweepIfUnresolved(clean = true)
+        }
     }
 
     /**

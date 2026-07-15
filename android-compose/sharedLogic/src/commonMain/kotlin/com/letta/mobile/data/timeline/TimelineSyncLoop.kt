@@ -145,6 +145,13 @@ class TimelineSyncLoop(
         // never the reply. ChatSendCoordinator clears the same latch at turn end
         // on the WS/iroh coordinator path; this is the loop-owned send's mirror.
         onSendStreamEnded = { wsSubscription.clear() },
+        // letta-mobile-dangling-tool (Codex #902 finding 1): the REST/timeline-
+        // transport send path never went through ChatSendCoordinator's
+        // turnStarted/turnEnded hooks, so a dangling tool_call streamed here
+        // never got a sweep scheduled. Mirror the WS path's semantics directly
+        // around this loop-owned send stream.
+        onTurnStarted = ::turnStarted,
+        onTurnEnded = ::turnEnded,
     )
 
     private val stateTransitionHandler = TimelineStateTransitionHandler(
@@ -191,15 +198,16 @@ class TimelineSyncLoop(
         hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
         hasHydratedSuccessfully = true
         // letta-mobile-dangling-tool: heal stale spinners that survived an
-        // app restart or a dropped stream. Single pass only — the post-turn
-        // sweep (see turnEnded) handles live turns with backoff.
+        // app restart or a dropped stream. Escalates to the same bounded
+        // backoff sweep as turnEnded if the immediate reconcile alone
+        // doesn't resolve everything, so there's always a terminal outcome.
         danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
     }
 
     /**
      * Signals that a turn has started for this conversation. A new turn
-     * supersedes whatever the previous turn's clean-completion sweep left
-     * pending — see [DanglingToolCallResolver.cancelPendingSweep].
+     * supersedes whatever the previous turn's sweep left pending — see
+     * [DanglingToolCallResolver.cancelPendingSweep].
      */
     fun turnStarted() {
         turnActive = true
@@ -207,15 +215,24 @@ class TimelineSyncLoop(
     }
 
     /**
-     * Signals that a turn has ended for this conversation. When [clean] is
-     * true (a genuine terminal completion, not cancel/timeout/error — those
-     * already settle dangling calls synchronously in AppServerTurnEngine)
-     * and unresolved tool-call cards remain, schedules the bounded
-     * canonical-record-driven sweep.
+     * Signals that a turn has ended for this conversation. Schedules the
+     * bounded canonical-record-driven sweep whenever unresolved tool-call
+     * cards remain — on EVERY completion path, clean or abnormal.
+     *
+     * [clean] is passed through to the resolver for telemetry only; it does
+     * NOT gate whether the sweep is scheduled (Codex #902 finding 3). If it
+     * did, an abnormal (cancel/timeout/error) completion of turn N+1 would
+     * call [DanglingToolCallResolver.cancelPendingSweep] on `turnStarted()`
+     * for N+1 and then never reschedule anything on its own abnormal
+     * `turnEnded(clean = false)`, permanently dropping turn N's still-
+     * dangling sweep. Always scheduling is safe because the sweep only ever
+     * asks the canonical record — an abnormal turn's own calls are already
+     * settled synchronously by AppServerTurnEngine, so they never appear in
+     * [Timeline.unresolvedToolCallIds] to begin with.
      */
     fun turnEnded(clean: Boolean) {
         turnActive = false
-        if (clean) danglingToolCallResolver.scheduleAfterCleanTurn()
+        danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
 
     suspend fun send(content: String, attachments: List<MessageContentPart.Image> = emptyList()): String {

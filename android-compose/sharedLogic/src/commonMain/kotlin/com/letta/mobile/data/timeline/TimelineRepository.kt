@@ -363,8 +363,9 @@ open class TimelineRepository(
 
     // letta-mobile-dangling-tool: forward turn-lifecycle signals to the
     // per-conversation loop so DanglingToolCallResolver knows when to
-    // supersede a pending sweep (turnStarted) and when to schedule one
-    // (turnEnded(clean = true)).
+    // supersede a pending sweep (turnStarted) and when to (re)schedule one
+    // (turnEnded — unconditionally, regardless of clean; see Codex #902
+    // review finding 3 / DanglingToolCallResolver.scheduleSweepIfUnresolved).
     override suspend fun turnStarted(agentId: String?, conversationId: String) {
         getOrCreate(agentId, conversationId).turnStarted()
     }
