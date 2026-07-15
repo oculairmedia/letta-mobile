@@ -342,6 +342,20 @@ class AppServerTurnEngine(
                             "frameConv" to received.frame.runtime?.conversationId,
                             "eventSeq" to received.eventSeqOrNull(),
                         )
+                        // letta-mobile-kyqdt STEP 2: AUTHORITATIVE TERMINAL RELEASE.
+                        // If the rejected terminal-bearing frame is for the SAME
+                        // conversation, release the engine on the authoritative
+                        // terminal — no settle-window, no scope-match requirement.
+                        // Closes the passive-observer stuck-for-5-min gap.
+                        if (received.frame.runtime?.conversationId == scope.conversationId) {
+                            noteOwnerTerminal(
+                                RuntimeRunStatus.Completed,
+                                source = "authoritative_terminal_scope_mismatched",
+                                seq = received.eventSeqOrNull(),
+                                scopeMatched = false,
+                            )
+                            throw TurnCompleted
+                        }
                     }
                     return@collect
                 }
