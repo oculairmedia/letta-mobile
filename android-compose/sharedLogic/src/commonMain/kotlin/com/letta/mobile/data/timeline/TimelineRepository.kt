@@ -361,6 +361,18 @@ open class TimelineRepository(
         return getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
+    // letta-mobile-dangling-tool: forward turn-lifecycle signals to the
+    // per-conversation loop so DanglingToolCallResolver knows when to
+    // supersede a pending sweep (turnStarted) and when to schedule one
+    // (turnEnded(clean = true)).
+    override suspend fun turnStarted(agentId: String?, conversationId: String) {
+        getOrCreate(agentId, conversationId).turnStarted()
+    }
+
+    override suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {
+        getOrCreate(agentId, conversationId).turnEnded(clean)
+    }
+
     /**
      * letta-mobile-9hcg: flip the external-transport user-bubble Local
      * to SENT. Called from WsChatSendCoordinator on every TurnDone so

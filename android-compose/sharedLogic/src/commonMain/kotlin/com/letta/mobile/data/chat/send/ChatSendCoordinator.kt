@@ -515,6 +515,10 @@ class ChatSendCoordinator(
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
+                // letta-mobile-dangling-tool: a fresh turn on this conversation
+                // supersedes whatever the previous turn's post-turn dangling-
+                // tool-call sweep left pending.
+                runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
                 recordRuntimeEvent(event, activeWsConversationId)
                 setActiveConversationId(event.conversationId)
                 startTimelineObserver(event.conversationId)
@@ -894,6 +898,14 @@ class ChatSendCoordinator(
             "lossy" to lossy,
             "reason" to reason,
         )
+        // letta-mobile-dangling-tool: this is the seam that already observes
+        // clean turn-terminal for every turn-end path (turnDone,
+        // subscribeDone, redial-recovery all funnel through finishActiveTurn).
+        // "completed" is the CLEAN ending PR #900 stopped guess-settling on —
+        // schedule the canonical-record-driven sweep only there; failed/
+        // cancelled/other endings already settle dangling calls synchronously
+        // in AppServerTurnEngine and must not also schedule a sweep.
+        runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
         activeWsOtid = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
@@ -935,6 +947,11 @@ class ChatSendCoordinator(
                 )
             }
             timelineRepository.clearExternalTransportActive(conversationId)
+            // letta-mobile-dangling-tool: an abnormal end (not a clean
+            // completion) — clear the turn-active flag but do NOT schedule a
+            // sweep; AppServerTurnEngine already settles dangling calls
+            // synchronously on disconnect/cancel/error paths.
+            runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null

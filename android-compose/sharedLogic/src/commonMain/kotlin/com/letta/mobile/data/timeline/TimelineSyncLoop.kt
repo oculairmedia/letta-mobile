@@ -108,6 +108,22 @@ class TimelineSyncLoop(
         holderHydrationSeed = holderHydrationSeed
     )
 
+    // letta-mobile-dangling-tool: canonical-record-driven post-turn sweep +
+    // hydration guard for tool-call cards left unresolved after PR #900
+    // removed the guess-based settle-on-clean-completion behavior. See
+    // DanglingToolCallResolver's kdoc for the never-guess principle.
+    private val danglingToolCallResolver = DanglingToolCallResolver(
+        conversationId = conversationId,
+        state = _state,
+        writeMutex = writeMutex,
+        scope = loopScope,
+        reconcile = ::reconcileRecentMessages,
+    )
+
+    /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
+    @Volatile
+    private var turnActive: Boolean = false
+
     private val outboundSendProcessor = TimelineOutboundSendProcessor(
         conversationId = conversationId,
         messageApi = messageApi,
@@ -174,6 +190,32 @@ class TimelineSyncLoop(
     suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false, fallbackCursorSeq: Long? = null) {
         hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
         hasHydratedSuccessfully = true
+        // letta-mobile-dangling-tool: heal stale spinners that survived an
+        // app restart or a dropped stream. Single pass only — the post-turn
+        // sweep (see turnEnded) handles live turns with backoff.
+        danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
+    }
+
+    /**
+     * Signals that a turn has started for this conversation. A new turn
+     * supersedes whatever the previous turn's clean-completion sweep left
+     * pending — see [DanglingToolCallResolver.cancelPendingSweep].
+     */
+    fun turnStarted() {
+        turnActive = true
+        danglingToolCallResolver.cancelPendingSweep()
+    }
+
+    /**
+     * Signals that a turn has ended for this conversation. When [clean] is
+     * true (a genuine terminal completion, not cancel/timeout/error — those
+     * already settle dangling calls synchronously in AppServerTurnEngine)
+     * and unresolved tool-call cards remain, schedules the bounded
+     * canonical-record-driven sweep.
+     */
+    fun turnEnded(clean: Boolean) {
+        turnActive = false
+        if (clean) danglingToolCallResolver.scheduleAfterCleanTurn()
     }
 
     suspend fun send(content: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
