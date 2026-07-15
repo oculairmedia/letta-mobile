@@ -242,10 +242,11 @@ class AppServerTurnEngineTest {
             expectNoEvents()
 
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            // No tool return arrived before the terminal, so settlement
-            // synthesizes a failed return for the dangling call (oqfbj).
-            val settled = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
-            assertEquals("tool-call-1", settled.toolCallId.value)
+            // fix(no-settle-on-clean-completion): no tool return arrived before
+            // this CLEAN terminal, but a clean completion must never
+            // synthesize a Failed return for a still-dangling call — the
+            // real async return can legitimately still be coming from the
+            // server. See AppServerTurnEngine.settleDanglingToolCalls() KDoc.
             assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
