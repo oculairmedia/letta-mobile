@@ -17,6 +17,10 @@ data class ChatPresenceSignals(
     val clientModeStreamInFlight: Boolean,
     val a2uiThinkingActive: Boolean,
     val duplicateInitialMessageInFlight: Boolean,
+    // letta-mobile-c4igq.7: true while a chat turn is in flight on the transport
+    // (spans all tool rounds until the real terminal). Holds presence across
+    // inter-round gaps so a multi-tool turn does not flicker / look finished.
+    val turnInFlight: Boolean = false,
 )
 
 /**
@@ -84,6 +88,7 @@ class ChatTimelinePresenter {
             clientModeStreamInFlight = signals.clientModeStreamInFlight,
             a2uiThinkingActive = signals.a2uiThinkingActive,
             duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
+            turnInFlight = signals.turnInFlight,
         )
         return ChatPresentation(
             messages = projection.ui,
