@@ -285,6 +285,7 @@ class AppServerTurnEngine(
         // terminal release bounded and monotonic: the completed run always
         // frees busy ownership within terminalSettleQuietMs of the completion.
         var terminalArmed = false
+        var speculativeCompletionArmed = false
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
         // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame currently being
@@ -314,6 +315,23 @@ class AppServerTurnEngine(
         // the terminal out. The settle body reads pendingCompleted at fire time,
         // so a completion refined by an intervening frame still uses the latest
         // terminal draft, just on the original, bounded deadline.
+        // letta-mobile-c4igq.6: the post-tool usage-tail completion is SPECULATIVE —
+        // the turn may still continue into another tool round. If genuine activity
+        // arrives after arming (a new tool_call / assistant / tool_return), cancel
+        // the pending speculative completion and allow re-arming on the next
+        // post-tool usage tail. Real stop_reason / terminal-lifecycle frames still
+        // complete the turn via their own branches; this only unwinds a SPECULATIVE
+        // arm, never a real terminal. No-op when nothing is armed speculatively.
+        fun cancelSpeculativeCompletion() {
+            if (!speculativeCompletionArmed) return
+            terminalSettleJob?.cancel()
+            terminalSettleJob = null
+            terminalArmed = false
+            speculativeCompletionArmed = false
+            pendingCompleted = null
+            pendingCompletedSeq = null
+        }
+
         fun armCompletedTerminalOnce() {
             if (terminalArmed) return
             if (pendingCompleted == null) return
@@ -430,6 +448,16 @@ class AppServerTurnEngine(
                         else -> {}
                     }
                     
+                    // letta-mobile-c4igq.6: a tool_call / tool_return / assistant
+                    // frame arriving after we speculatively armed a post-tool usage
+                    // completion means the turn is genuinely continuing (another tool
+                    // round). Cancel the speculative completion so it cannot fire and
+                    // prematurely end the turn. Real terminals are unaffected.
+                    if (speculativeCompletionArmed &&
+                        (draft.isToolCallFrame() || draft.isToolReturnFrame() || draft.isAssistantFrame())
+                    ) {
+                        cancelSpeculativeCompletion()
+                    }
                     if (draft.isToolReturnFrame()) sawToolReturn = true
                     if (sawToolReturn && draft.isAssistantFrame()) sawAssistantAfterToolReturn = true
                     if (draft.isStopReasonFrame()) {
@@ -439,21 +467,28 @@ class AppServerTurnEngine(
                     if (draft.isUsageStatisticsFrame()) {
                         if (pendingUsage == null) pendingUsage = draft
                         if (sawAssistantAfterToolReturn) {
-                            // letta-mobile-oqfbj / fix(no-settle-on-clean-completion):
-                            // this is also a CLEAN completion path (post-tool usage
-                            // stats + assistant message already observed) — do NOT
-                            // synthesize Failed returns for any still-dangling call.
-                            flushTail()
-                            // letta-mobile-kyqdt: telemetry-only. Accepted-scope
-                            // terminal via the post-tool usage completion path.
-                            noteOwnerTerminal(
-                                RuntimeRunStatus.Completed,
-                                source = "post_tool_usage",
-                                seq = frameSeq,
-                                scopeMatched = true,
-                            )
-                            emitDraft(command.completedDraft(draft.runId))
-                            throw TurnCompleted
+                            // letta-mobile-c4igq.6: a usage_statistics frame after a
+                            // post-tool assistant message is the synthesized-completion
+                            // FALLBACK for turns whose real terminal never arrives — BUT
+                            // a multi-step agentic turn also emits a usage tail BETWEEN
+                            // tool rounds. Throwing here immediately killed the turn
+                            // before the next round (Iroh: "stops after a tool call,
+                            // needs a user nudge"). Instead, arm a SPECULATIVE deferred
+                            // completion on the same bounded quiet window the clean
+                            // Completed path uses. If another tool round follows within
+                            // the window, cancelSpeculativeCompletion() (above) unwinds
+                            // it and the turn proceeds; if the window elapses quietly,
+                            // the deferred completion fires — preserving the single-
+                            // round fallback. Reset the post-tool latch so a fresh round
+                            // must re-observe tool_return -> assistant before re-arming.
+                            if (pendingCompleted == null) {
+                                pendingCompleted = command.completedDraft(draft.runId)
+                                pendingCompletedSeq = frameSeq
+                            }
+                            sawAssistantAfterToolReturn = false
+                            sawToolReturn = false
+                            speculativeCompletionArmed = true
+                            armCompletedTerminalOnce()
                         }
                         return@forEach
                     }
@@ -776,6 +811,17 @@ class AppServerTurnEngine(
     private fun RuntimeEventDraft.isAssistantFrame(): Boolean = when (val event = payload) {
         is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "assistant_message" ||
             frameMessageType(event.body) == "assistant_message"
+        else -> false
+    }
+
+    // letta-mobile-c4igq.6: a tool_call announcement (used to detect a new tool
+    // round continuing after a speculative post-tool usage completion was armed).
+    private fun RuntimeEventDraft.isToolCallFrame(): Boolean = when (val event = payload) {
+        is RuntimeEventPayload.ToolCallObserved -> true
+        is RuntimeEventPayload.ApprovalRequested -> true
+        is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_start" ||
+            event.messageType == "tool_call_message" ||
+            frameMessageType(event.body) in setOf("client_tool_start", "tool_call_message")
         else -> false
     }
 
