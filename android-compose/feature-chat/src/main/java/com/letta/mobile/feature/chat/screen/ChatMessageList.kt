@@ -479,6 +479,26 @@ internal fun ChatMessageList(
         }
     }
 
+    // letta-mobile-perf: derive from firstVisibleItemIndex and renderItems.size
+    // to avoid reading listState.layoutInfo in derivedStateOf. Reading layoutInfo
+    // causes continuous lambda re-evaluations on every pixel scrolled because its
+    // internal offsets change constantly.
+    val renderItemsSize = renderItems.size
+
+    val shouldLoadOlderMessages by remember(renderItemsSize) {
+        derivedStateOf {
+            if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
+                return@derivedStateOf false
+            }
+
+            // In reverseLayout, index 0 is the bottom (newest) message.
+            // We want to load older messages when scrolling near the top (higher indices).
+            // We approximate "near the top" by checking if the bottom-most visible item
+            // is within ~15 items of the total size.
+            renderItemsSize > 0 && listState.firstVisibleItemIndex + 15 >= renderItemsSize
+        }
+    }
+
     val activeUserPromptState = remember(listState, renderItems, topPadding, density) {
         derivedStateOf {
             /*
