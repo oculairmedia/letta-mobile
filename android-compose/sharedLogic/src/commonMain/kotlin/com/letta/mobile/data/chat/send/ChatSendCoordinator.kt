@@ -515,6 +515,10 @@ class ChatSendCoordinator(
                 stopReasonForTurn = null
                 usageRecordedForTurn = false
                 bufferedErrorMessage = null
+                // letta-mobile-dangling-tool: a fresh turn on this conversation
+                // supersedes whatever the previous turn's post-turn dangling-
+                // tool-call sweep left pending.
+                runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
                 recordRuntimeEvent(event, activeWsConversationId)
                 setActiveConversationId(event.conversationId)
                 startTimelineObserver(event.conversationId)
@@ -894,6 +898,18 @@ class ChatSendCoordinator(
             "lossy" to lossy,
             "reason" to reason,
         )
+        // letta-mobile-dangling-tool: this is the seam that observes every
+        // turn-end path (turnDone, subscribeDone, redial-recovery all funnel
+        // through finishActiveTurn). `clean` (status == "completed") is
+        // passed through for telemetry only — per Codex #902 review finding
+        // 3, turnEnded schedules its sweep unconditionally, on clean AND
+        // abnormal endings alike. That's safe: THIS turn's own calls are
+        // already settled synchronously in AppServerTurnEngine on non-clean
+        // endings and so never show up as unresolved, but an EARLIER turn's
+        // still-dangling card (whose sweep this turn's own turnStarted()
+        // cancelled) needs exactly this unconditional reschedule or it would
+        // never resolve.
+        runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
         activeWsOtid = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
@@ -935,6 +951,15 @@ class ChatSendCoordinator(
                 )
             }
             timelineRepository.clearExternalTransportActive(conversationId)
+            // letta-mobile-dangling-tool: an abnormal end (not a clean
+            // completion) — this turn's OWN calls are already settled
+            // synchronously by AppServerTurnEngine on disconnect/cancel/error
+            // paths, so they won't show up as unresolved here. Still call
+            // turnEnded unconditionally (Codex #902 review finding 3): a
+            // DIFFERENT, earlier turn's dangling card may have had its sweep
+            // cancelled by this turn's turnStarted() and needs this call to
+            // reschedule it, or it would spin forever.
+            runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null
