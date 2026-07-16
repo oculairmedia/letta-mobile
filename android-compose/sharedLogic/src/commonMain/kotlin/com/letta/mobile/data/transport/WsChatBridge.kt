@@ -127,6 +127,9 @@ class WsChatBridge(
         )
     }
 
+    /** Authoritative transport ownership; UI presence must never outlive this. */
+    val hasActiveChatTurn: Boolean get() = transport.hasActiveChatTurn
+
     fun cancel(conversationId: String): Boolean = transport.cancel(conversationId)
     fun bye(): Boolean = transport.bye()
     fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = transport.sendA2uiAction(action)

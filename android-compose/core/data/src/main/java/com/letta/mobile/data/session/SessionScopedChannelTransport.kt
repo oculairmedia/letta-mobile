@@ -65,6 +65,9 @@ class SessionScopedChannelTransport internal constructor(
     private val current: IChannelTransport
         get() = sessionManager.current.channelTransport
 
+    override val hasActiveChatTurn: Boolean
+        get() = current.hasActiveChatTurn
+
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) =
         sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }
 
