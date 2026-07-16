@@ -623,6 +623,39 @@ class ChatSendCoordinator(
                 }
             }
             is WsTimelineEvent.TurnDone -> {
+                // dir4k (z5vfy PR-1): run/turn generation fence. A late TurnDone
+                // for an OLD turn can arrive after the user has already started a
+                // NEWER turn (activeWsTurnId now points at the newer turn). Without
+                // this fence, finishActiveTurn would finalize + clear the newer
+                // turn's presence (nulls activeWsTurnId/activeWsRunId, fires
+                // ui.onTurnFinished) — wrongly finalizing the new run and stopping
+                // its Thinking indicator. Detect the stale terminal (a non-blank
+                // incoming turnId that does not match the currently-active turnId
+                // while a turn IS active) and do only OLD-run-scoped cleanup, then
+                // return without touching the newer turn's state.
+                if (isStaleTerminalForOlderTurn(event.turnId)) {
+                    if (event.status == "failed" || event.status == "cancelled") {
+                        val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+                        cleanupAbandonedAssistantFragmentsSafely(
+                            conversationId = conversationId,
+                            runId = event.runId,
+                            turnId = event.turnId,
+                            reason = "turn_done_stale_${event.status}",
+                            // Scope cleanup to the OLD run only — do NOT fold in the
+                            // active (newer) run's candidate ids.
+                            candidateRunIds = event.runId.takeIf { it.isNotBlank() }?.let { setOf(it) } ?: emptySet(),
+                        )
+                    }
+                    Telemetry.event(
+                        "AdminChatVM", "ws.turnDone.staleIgnored",
+                        "incomingTurnId" to event.turnId,
+                        "incomingRunId" to event.runId,
+                        "activeTurnId" to (activeWsTurnId ?: ""),
+                        "activeRunId" to (activeWsRunId ?: ""),
+                        "status" to event.status,
+                    )
+                    return
+                }
                 finishActiveTurn(
                     status = event.status,
                     runId = event.runId,
@@ -847,6 +880,22 @@ class ChatSendCoordinator(
                 "reason" to reason,
             )
         }
+    }
+
+    /**
+     * dir4k (z5vfy PR-1): true when an incoming TurnDone is for an OLDER turn
+     * than the one currently active, i.e. a late/stale terminal that must not be
+     * allowed to finalize the newer active turn. Requires a non-blank incoming
+     * turnId, a currently-active turn (activeWsTurnId != null), and a mismatch
+     * between them. When no turn is active, or the incoming turn matches the
+     * active turn, or the incoming turnId is blank (identity unknown — treat as
+     * the current turn, matching the SubscribeDone path), this returns false so
+     * the terminal finalizes normally.
+     */
+    private fun isStaleTerminalForOlderTurn(incomingTurnId: String): Boolean {
+        val active = activeWsTurnId ?: return false
+        if (incomingTurnId.isBlank()) return false
+        return incomingTurnId != active
     }
 
     private suspend fun finishActiveTurn(
