@@ -575,6 +575,12 @@ internal class AdminChatViewModel @Inject constructor(
         activeReplyStreams = MutableStateFlow(emptySet()),
         uiState = _uiState,
         isClientModeStreamInFlight = { false },
+        // letta-mobile-c4igq.7: hold presence across inter-round gaps of a
+        // multi-tool turn. wsChatBridge.hasActiveChatTurn is true from turn start
+        // until the real terminal (spans all tool rounds), so the thinking/
+        // streaming indicator and send button stay steady instead of flickering
+        // / looking finished between rounds.
+        hasActiveChatTurn = { wsChatBridge.hasActiveChatTurn },
         a2uiThinkingStartMessageCount = { adminChatA2uiCoordinator.getA2uiThinkingStartMessageCount() },
         clearA2uiThinkingOnResponse = { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() },
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },

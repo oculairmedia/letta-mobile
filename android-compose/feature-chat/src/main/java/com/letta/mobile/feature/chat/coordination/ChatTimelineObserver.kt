@@ -44,6 +44,12 @@ internal class ChatTimelineObserver(
     private val activeReplyStreams: StateFlow<Set<String>>,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val isClientModeStreamInFlight: () -> Boolean,
+    // letta-mobile-c4igq.7: transport-owned "a chat turn is in flight" signal
+    // (true from turn start until the real terminal, across all tool rounds).
+    // Holds presence across inter-round gaps so a multi-tool turn stays "working"
+    // and does not flicker / look finished. Defaults to always-false so existing
+    // callers/tests are unaffected until wired.
+    private val hasActiveChatTurn: () -> Boolean = { false },
     private val a2uiThinkingStartMessageCount: () -> Int?,
     private val clearA2uiThinkingOnResponse: () -> Unit,
     private val isFollowingDuplicateInitialMessageInFlight: () -> Boolean,
@@ -185,6 +191,7 @@ internal class ChatTimelineObserver(
                                 clientModeStreamInFlight = isClientModeStreamInFlight(),
                                 a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
                                 duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
+                                turnInFlight = hasActiveChatTurn(),
                             ),
                             previousIsStreaming = prev.isStreaming,
                             previousIsAgentTyping = prev.isAgentTyping,
@@ -232,6 +239,7 @@ internal class ChatTimelineObserver(
                             clientModeStreamInFlight = isClientModeStreamInFlight(),
                             a2uiThinkingActive = a2uiStartMessageCount != null && !a2uiResponseArrived,
                             duplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight(),
+                            turnInFlight = hasActiveChatTurn(),
                         ),
                         previousIsStreaming = prev.isStreaming,
                         previousIsAgentTyping = prev.isAgentTyping,
