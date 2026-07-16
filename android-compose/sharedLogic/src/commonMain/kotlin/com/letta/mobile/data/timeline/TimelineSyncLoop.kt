@@ -29,6 +29,10 @@ import kotlinx.coroutines.sync.withLock
 class TimelineSyncLoop(
     private val messageApi: TimelineTransport,
     private val conversationId: String,
+    // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
+    // repository cache key). Threaded onto ingested Confirmed events for render
+    // scoping. Null when unknown/legacy.
+    private val agentId: String? = null,
     scope: CoroutineScope,
     logTag: String = "TimelineSync",
     ingestedListener: IngestedMessageListener? = null,
