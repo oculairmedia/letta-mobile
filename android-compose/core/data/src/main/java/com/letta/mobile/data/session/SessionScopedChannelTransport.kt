@@ -65,6 +65,13 @@ class SessionScopedChannelTransport internal constructor(
     private val current: IChannelTransport
         get() = sessionManager.current.channelTransport
 
+    // dir4k (z5vfy PR-2): authoritative active-turn ownership must pass THROUGH
+    // the session-scoped wrapper to the live transport. Without this override the
+    // wrapper inherited IChannelTransport's default (false), swallowing the real
+    // Iroh/WS ownership signal — so ChatSendCoordinator's stale-presence self-heal
+    // (`if (!hasActiveChatTurn && streaming)`) fired on EVERY send regardless of a
+    // genuinely active turn (the "legacy WS misclassification"). Delegate it like
+    // every other IChannelTransport member.
     override val hasActiveChatTurn: Boolean
         get() = current.hasActiveChatTurn
 
