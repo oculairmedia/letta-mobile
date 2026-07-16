@@ -201,6 +201,74 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun `stale TurnDone for older turn does not finalize newer active turn`() = runTest(UnconfinedTestDispatcher()) {
+        // dir4k (z5vfy PR-1) run/turn generation fence.
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = FakeChannelTransport(mutableListOf(true, true)), activeConversationId = { "conv-1" })
+
+        // Turn 1 starts, then the user starts a NEWER turn (turn-2) — turn-2 is
+        // now the active turn. A late TurnDone for the OLD turn-1 arrives.
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        advanceUntilIdle()
+
+        // The newer turn-2 must remain active and visually Thinking — the stale
+        // terminal must NOT finalize it.
+        assertTrue(ui.isStreaming())
+        assertTrue(ui.isAgentTyping())
+        // No finalization side effects for the newer turn: no active-conversation
+        // clear (finishActiveTurn would have cleared it).
+        assertTrue(timeline.clearedActiveConversations.isEmpty())
+    }
+
+    @Test
+    fun `stale failed TurnDone for older turn cleans only the old run and keeps newer turn active`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = FakeChannelTransport(mutableListOf(true, true)), activeConversationId = { "conv-1" })
+
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+        // A late FAILED TurnDone for the old turn-1: old-run-scoped fragment
+        // cleanup runs (scoped to run-1 only), but the newer turn stays active.
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        advanceUntilIdle()
+
+        assertTrue(ui.isStreaming())
+        assertTrue(ui.isAgentTyping())
+        assertEquals(
+            RecordingTimelineWriter.CleanupTail(
+                agentId = AGENT_ID,
+                conversationId = "conv-1",
+                activeRunId = "run-1",
+                activeTurnId = "turn-1",
+                candidateRunIds = setOf("run-1"),
+            ),
+            timeline.cleanupTails.single(),
+        )
+        // Newer turn not finalized.
+        assertTrue(timeline.clearedActiveConversations.isEmpty())
+    }
+
+    @Test
+    fun `matching TurnDone for the current turn finalizes normally`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline = timeline, ui = ui, transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
+
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        advanceUntilIdle()
+
+        // The matching terminal finishes the current turn: presence cleared.
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+    }
+
+    @Test
     fun postSendReconcileSkipsWhenLiveIngestArrivesAfterSend() = runTest(UnconfinedTestDispatcher()) {
         ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(10L)
         val timeline = RecordingTimelineWriter()
