@@ -14,7 +14,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.letta.mobile.ui.chat.render.ChatPresenceSignals
@@ -298,7 +297,7 @@ internal class ChatTimelineObserver(
     }
 
     /** Assistant-role reasoning or final-answer row (the model-output tail). */
-    private fun com.letta.mobile.data.model.UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
+    private fun UiMessage.isModelOutputRow(tailIsAssistant: Boolean): Boolean =
         role == "assistant" && (isReasoning || tailIsAssistant)
 
     private data class TimelineObserverBinding(

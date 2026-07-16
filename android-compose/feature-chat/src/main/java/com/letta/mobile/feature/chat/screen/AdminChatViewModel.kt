@@ -9,8 +9,6 @@ import androidx.lifecycle.viewModelScope
 import app.cash.molecule.RecompositionMode.Immediate
 import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.a2ui.A2uiMessage
-import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
@@ -37,7 +35,6 @@ import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
-import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
@@ -55,9 +52,6 @@ import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.persistentMapOf
-import kotlinx.collections.immutable.toImmutableList
-import kotlinx.collections.immutable.toPersistentMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -66,13 +60,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
@@ -359,7 +349,6 @@ internal class AdminChatViewModel @Inject constructor(
             composerController = composerController,
             chatSendStrategySelector = chatSendStrategySelector,
             chatBannerController = chatBannerController,
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
             uiState = _uiState,
             agentId = agentId,
             explicitConversationId = explicitConversationId,
@@ -373,7 +362,6 @@ internal class AdminChatViewModel @Inject constructor(
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
-            timelineChatSendStrategy = timelineChatSendStrategy,
             isStreaming = { _uiState.value.isStreaming },
             projectContextAvailable = projectContext != null,
         )
@@ -584,7 +572,7 @@ internal class AdminChatViewModel @Inject constructor(
         scope = viewModelScope,
         timelineRepository = timelineRepository,
         currentConversationTracker = currentConversationTracker,
-        activeReplyStreams = kotlinx.coroutines.flow.MutableStateFlow(emptySet()),
+        activeReplyStreams = MutableStateFlow(emptySet()),
         uiState = _uiState,
         isClientModeStreamInFlight = { false },
         a2uiThinkingStartMessageCount = { adminChatA2uiCoordinator.getA2uiThinkingStartMessageCount() },
@@ -661,7 +649,6 @@ internal class AdminChatViewModel @Inject constructor(
         blockRepository = blockRepository,
         bugReportRepository = bugReportRepository,
         conversationId = { conversationId?.value },
-        setComposerError = chatBannerController::showComposerError,
         sendMessage = ::sendMessage,
     )
     val projectBindings: ChatProjectBindings = projectChatCoordinator

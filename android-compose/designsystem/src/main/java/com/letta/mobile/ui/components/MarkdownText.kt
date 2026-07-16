@@ -33,7 +33,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -103,7 +102,7 @@ fun MarkdownText(
             .any { containsLikelyInlineMath(it.content) }
 
         if (hasBlockSplit || hasAnyInline) {
-            androidx.compose.foundation.layout.Column(modifier = modifier) {
+            Column(modifier = modifier) {
                 blockSegments.forEach { seg ->
                     when (seg) {
                         is MathSegment.Text -> {

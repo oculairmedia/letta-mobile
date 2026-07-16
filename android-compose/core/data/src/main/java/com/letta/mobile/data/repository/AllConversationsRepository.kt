@@ -86,7 +86,7 @@ open class AllConversationsRepository(
         }
     }
 
-    override open fun getConversationsPaged(
+    override fun getConversationsPaged(
         agentId: AgentId?,
         archiveStatus: String?,
         summarySearch: String?,
@@ -110,14 +110,14 @@ open class AllConversationsRepository(
         ).flow
     }
 
-    override open suspend fun loadNextPage() {
+    override suspend fun loadNextPage() {
         if (!_hasMore.value) return
 
         val newConversations = fetchPage(after = currentCursor)
         applyLoadedPage(newConversations)
     }
 
-    override open suspend fun refresh() = refreshMutex.withLock {
+    override suspend fun refresh() = refreshMutex.withLock {
         refreshLocked()
     }
 
@@ -161,17 +161,17 @@ open class AllConversationsRepository(
         lastRefreshAtMillis = System.currentTimeMillis()
     }
 
-    override open fun hasFreshConversations(maxAgeMs: Long): Boolean {
+    override fun hasFreshConversations(maxAgeMs: Long): Boolean {
         return hasLoadedAtLeastOnce && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
     }
 
-    override open suspend fun refreshIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
         if (hasFreshConversations(maxAgeMs)) return@withLock false
         refreshLocked()
         true
     }
 
-    override open fun handleOptimisticUpdate(conversation: Conversation) {
+    override fun handleOptimisticUpdate(conversation: Conversation) {
         _conversations.update { current ->
             val index = current.indexOfFirst { it.id == conversation.id }
             if (index >= 0) {
@@ -185,7 +185,7 @@ open class AllConversationsRepository(
         }
     }
 
-    override open fun handleOptimisticDelete(conversationId: ConversationId) {
+    override fun handleOptimisticDelete(conversationId: ConversationId) {
         _conversations.update { current -> current.filter { it.id != conversationId } }
         repositoryScope.launch {
             conversationDao?.delete(conversationId.value)
@@ -201,7 +201,7 @@ open class AllConversationsRepository(
      * exact count when [ConversationCountEstimate.isApproximate] is false or as a
      * lower bound (for example, "50+") when more pages are available.
      */
-    override open fun loadedCountEstimate(): ConversationCountEstimate? {
+    override fun loadedCountEstimate(): ConversationCountEstimate? {
         if (!hasLoadedAtLeastOnce && _conversations.value.isEmpty()) return null
         return ConversationCountEstimate(
             count = _conversations.value.size,
@@ -215,7 +215,7 @@ open class AllConversationsRepository(
      * performs no network I/O.
      */
     @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
-    override open suspend fun countConversations(): Int {
+    override suspend fun countConversations(): Int {
         return loadedCountEstimate()?.count ?: 0
     }
 

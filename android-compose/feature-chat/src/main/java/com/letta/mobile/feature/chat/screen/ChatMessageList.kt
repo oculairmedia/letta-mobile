@@ -39,8 +39,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -52,7 +50,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
@@ -851,7 +848,7 @@ internal fun ChatMessageList(
                         if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
                             androidx.compose.runtime.SideEffect {
                                 com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
-                                    conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
+                                    conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
                                     key = renderItem.key,
                                     contentType = when (renderItem) {
                                         is ChatRenderItem.Single -> "single"

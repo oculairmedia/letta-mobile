@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat.route
 import androidx.lifecycle.SavedStateHandle
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import javax.inject.Inject
-import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
 internal class ChatRouteArgs @Inject constructor(
     private val savedStateHandle: SavedStateHandle,

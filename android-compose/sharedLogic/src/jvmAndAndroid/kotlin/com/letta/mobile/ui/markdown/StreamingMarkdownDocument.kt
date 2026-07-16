@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 /**
  * Pure streaming markdown document model used by [StreamingMarkdownText].
@@ -8,7 +8,7 @@ package com.letta.mobile.ui.components
  * `streaming-markdown`: a syntax cue opens a typed node immediately, text appends to that node,
  * and existing completed nodes keep their identity.
  */
-internal data class StreamingMarkdownDocument(
+data class StreamingMarkdownDocument(
     val blocks: List<StreamingMarkdownDocumentBlock>,
 ) {
     fun stableHeightToken(
@@ -29,7 +29,7 @@ internal data class StreamingMarkdownDocument(
     }
 }
 
-internal enum class StreamingMarkdownBlockKind {
+enum class StreamingMarkdownBlockKind {
     Paragraph,
     Heading,
     CodeFence,
@@ -41,7 +41,7 @@ internal enum class StreamingMarkdownBlockKind {
     HorizontalRule,
 }
 
-internal data class StreamingMarkdownDocumentBlock(
+data class StreamingMarkdownDocumentBlock(
     val id: Long,
     val kind: StreamingMarkdownBlockKind,
     val source: String,
@@ -51,7 +51,7 @@ internal data class StreamingMarkdownDocumentBlock(
     val key: String = "smd-$id"
 }
 
-internal val StreamingMarkdownDocumentBlock.allowsInlineCursor: Boolean
+val StreamingMarkdownDocumentBlock.allowsInlineCursor: Boolean
     get() = when (kind) {
         StreamingMarkdownBlockKind.CodeFence,
         StreamingMarkdownBlockKind.DisplayMath,
@@ -59,11 +59,11 @@ internal val StreamingMarkdownDocumentBlock.allowsInlineCursor: Boolean
         else -> true
     }
 
-internal fun StreamingMarkdownDocumentBlock.renderMarkdownSource(sourceOverride: String = source): String {
+fun StreamingMarkdownDocumentBlock.renderMarkdownSource(sourceOverride: String = source): String {
     return repairIncompleteMarkdownForStreaming(sourceOverride)
 }
 
-internal fun StreamingMarkdownDocumentBlock.supportsPlainTextHeightPrediction(
+fun StreamingMarkdownDocumentBlock.supportsPlainTextHeightPrediction(
     sourceOverride: String = source,
 ): Boolean =
     kind == StreamingMarkdownBlockKind.Paragraph &&
@@ -93,7 +93,7 @@ private val markdownLayoutChangingChars = setOf(
  * preserve block ids and object identity for unchanged blocks; non-append edits reset identity so
  * hydrated or replaced messages do not accidentally inherit old keys.
  */
-internal class StreamingMarkdownDocumentState {
+class StreamingMarkdownDocumentState {
     private var previousRawText: String = ""
     private var previousBlocks: List<StreamingMarkdownDocumentBlock> = emptyList()
     private var nextId: Long = 1L
@@ -166,7 +166,7 @@ internal class StreamingMarkdownDocumentState {
     }
 }
 
-internal data class ParsedStreamingMarkdownBlock(
+data class ParsedStreamingMarkdownBlock(
     val kind: StreamingMarkdownBlockKind,
     val source: String,
     val startOffset: Int,

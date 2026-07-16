@@ -68,9 +68,6 @@ class SessionScopedMcpServerRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    private val current: IMcpServerRepository
-        get() = sessionManager.current.mcpServerRepository
-
     override fun getServers(): Flow<List<McpServer>> = servers
 
     override fun getServerTools(serverId: McpServerId): Flow<List<Tool>> = synchronized(cacheLock) {

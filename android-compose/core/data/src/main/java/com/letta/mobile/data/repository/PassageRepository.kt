@@ -17,7 +17,7 @@ open class PassageRepository(
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
     private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
 
-    override open fun getPassages(agentId: String): StateFlow<List<Passage>> {
+    override fun getPassages(agentId: String): StateFlow<List<Passage>> {
         return synchronized(cacheLock) {
             passageFlowsByAgent
                 .getOrPut(agentId) { MutableStateFlow(_passages.value[agentId].orEmpty()) }
@@ -25,7 +25,7 @@ open class PassageRepository(
         }
     }
 
-    override open suspend fun refreshPassages(agentId: String) {
+    override suspend fun refreshPassages(agentId: String) {
         val irohSource = irohPassageSource
         val passages = if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.listPassages(agentId)
@@ -43,7 +43,7 @@ open class PassageRepository(
         }
     }
 
-    override open suspend fun createPassage(agentId: String, text: String): Passage {
+    override suspend fun createPassage(agentId: String, text: String): Passage {
         val irohSource = irohPassageSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             val passage = irohSource.createPassage(agentId, text)
@@ -55,7 +55,7 @@ open class PassageRepository(
         return passage
     }
 
-    override open suspend fun deletePassage(agentId: String, passageId: String) {
+    override suspend fun deletePassage(agentId: String, passageId: String) {
         val irohSource = irohPassageSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             irohSource.deletePassage(agentId, passageId)
@@ -68,7 +68,7 @@ open class PassageRepository(
         )
     }
 
-    override open suspend fun searchArchival(agentId: String, query: String): List<Passage> {
+    override suspend fun searchArchival(agentId: String, query: String): List<Passage> {
         return passageApi.searchArchival(agentId, query, limit = 50)
     }
 

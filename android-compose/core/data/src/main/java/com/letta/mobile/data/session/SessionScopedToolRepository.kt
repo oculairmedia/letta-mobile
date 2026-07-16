@@ -60,9 +60,6 @@ class SessionScopedToolRepository internal constructor(
             .launchIn(proxyScope)
     }
 
-    private val current: IToolRepository
-        get() = sessionManager.current.toolRepository
-
     override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
 
     override fun getAgentTools(agentId: String): Flow<List<Tool>> = synchronized(cacheLock) {

@@ -5,7 +5,6 @@ import androidx.compose.animation.core.EaseInOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,14 +26,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -93,7 +89,6 @@ import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
-import com.letta.mobile.feature.chat.subagent.ActiveSubagentBar
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentRings
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
@@ -110,7 +105,6 @@ import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
-import com.letta.mobile.ui.theme.isExpandedWidth
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
@@ -1006,7 +1000,7 @@ private fun ChatContent(
         ).also { built ->
             // letta-mobile-x1xnl render diagnostics (flag-gated, no-op when off).
             com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderItemsBuilt(
-                conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
+                conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
                 path = state.messageListChange.toString(),
                 items = built,
             )
@@ -1134,10 +1128,10 @@ internal fun DismissibleA2uiSurface(
         content()
         androidx.compose.material3.IconButton(
             onClick = { onDismissSurface(surfaceId) },
-            modifier = Modifier.align(androidx.compose.ui.Alignment.TopEnd)
+            modifier = Modifier.align(Alignment.TopEnd)
         ) {
-            androidx.compose.material3.Icon(
-                imageVector = com.letta.mobile.ui.icons.LettaIcons.Close,
+            Icon(
+                imageVector = LettaIcons.Close,
                 contentDescription = "Close A2UI surface",
                 tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
             )

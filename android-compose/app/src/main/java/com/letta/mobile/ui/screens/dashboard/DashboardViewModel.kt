@@ -219,7 +219,7 @@ class DashboardViewModel @Inject constructor(
     private data class ResolutionSnapshot(
         val favId: String?,
         val items: List<String>,
-        val agents: List<com.letta.mobile.data.model.Agent>,
+        val agents: List<Agent>,
         val names: Map<String, String>,
         val refreshing: Boolean,
     )
@@ -259,7 +259,7 @@ class DashboardViewModel @Inject constructor(
 
     private fun syncPinnedAgentNamesIntoCache(
         itemKeys: List<String>,
-        agents: List<com.letta.mobile.data.model.Agent>,
+        agents: List<Agent>,
         currentNames: Map<String, String>,
     ) {
         val pinnedIds = itemKeys.mapNotNull(PinnedItem::parseAgentKey).toSet()

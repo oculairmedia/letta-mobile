@@ -1,8 +1,6 @@
 package com.letta.mobile.ui.chat.render
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 data class ToolDisplayInfo(
     val emoji: String,

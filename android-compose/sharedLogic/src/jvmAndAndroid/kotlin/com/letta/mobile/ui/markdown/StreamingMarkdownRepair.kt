@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.components
+package com.letta.mobile.ui.markdown
 
 /**
  * Render-only repair pass for incomplete Markdown at the streaming tail.
@@ -10,7 +10,7 @@ package com.letta.mobile.ui.components
  * truth untouched and produces a temporary, syntactically-closed string only
  * for rendering the active block.
  */
-internal fun repairIncompleteMarkdownForStreaming(text: String): String {
+fun repairIncompleteMarkdownForStreaming(text: String): String {
     if (text.isEmpty()) return text
 
     repairOpenCodeFence(text)?.let { return it }
@@ -353,15 +353,6 @@ private fun canOpenMarker(line: String, index: Int, marker: String): Boolean {
 
 private fun canCloseMarker(line: String, index: Int): Boolean {
     return index > 0 && !line[index - 1].isWhitespace()
-}
-
-private fun findLastUnescaped(text: String, target: Char): Int {
-    var i = text.lastIndex
-    while (i >= 0) {
-        if (text[i] == target && !text.isEscapedAt(i)) return i
-        i--
-    }
-    return -1
 }
 
 private fun findLastUnescapedOutsideInlineCode(text: String, target: Char): Int {

@@ -74,8 +74,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedChars
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
-import com.letta.mobile.ui.chat.render.ToolOutputMaxHighlightSpans
-import com.letta.mobile.ui.chat.render.ToolOutputDocumentMaxCacheableRawChars
 
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000

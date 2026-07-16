@@ -10,7 +10,6 @@ import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.send.LocalRuntimeRouting
-import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +26,6 @@ internal class AdminChatComposerCoordinator(
     private val composerController: ChatComposerController,
     private val chatSendStrategySelector: ChatSendStrategySelector,
     private val chatBannerController: ChatBannerController,
-    private val activeConversationId: () -> String?,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val agentId: AgentId,
     private val explicitConversationId: String?,
@@ -35,7 +33,6 @@ internal class AdminChatComposerCoordinator(
     private val sessionManager: SessionManager,
     private val messageRepository: MessageRepository,
     private val slashCommandRepository: ISlashCommandRepository,
-    private val timelineChatSendStrategy: TimelineChatSendStrategy,
     private val isStreaming: () -> Boolean,
     private val projectContextAvailable: Boolean,
 ) {
