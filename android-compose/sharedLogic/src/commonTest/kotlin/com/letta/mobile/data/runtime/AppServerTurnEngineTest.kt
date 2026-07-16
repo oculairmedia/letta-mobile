@@ -104,6 +104,60 @@ class AppServerTurnEngineTest {
 
 
     @Test
+    fun multiRoundToolTurnContinuesAfterPostToolUsageInterRoundTail() = runTest {
+        // letta-mobile-c4igq.6: a multi-step agentic turn emits a usage_statistics
+        // frame BETWEEN tool rounds (tool_return -> assistant -> usage -> ANOTHER
+        // tool_call -> ...). The post-tool usage-completion fallback must NOT treat
+        // that inter-round usage tail as terminal and kill the turn before round 2.
+        // Regression: on Iroh this manifested as "the turn stops after a tool call
+        // and waits for the user to send a message to continue".
+        //
+        // Telemetry is a global accumulator; clear it so this turn's
+        // activeTurn.released event does not pollute other tests that assert
+        // on Telemetry.snapshot() (they select with .first{}).
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerCommand.Input>(client.sentCommands.single())
+
+            // Round 1: tool return, assistant text, then an inter-round usage tail.
+            client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1", toolCallId = "call-1"))
+            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            // Inter-round usage tail — the model is NOT done; another tool call follows.
+            client.emit(streamDelta(messageType = "usage_statistics", runId = "run-1"))
+            runCurrent()
+
+            // Round 2: the model makes another tool call. If the engine prematurely
+            // completed on the inter-round usage tail, this frame is never delivered
+            // (the flow already terminated) and the awaitItem() below times out.
+            client.emit(streamDelta(messageType = "client_tool_start", runId = "run-1", toolCallId = "call-2"))
+            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
+
+            client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1", toolCallId = "call-2"))
+            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            // Real terminal now completes the turn. The KEY assertion of this test
+            // already passed: round 2's tool_call/return were delivered, proving the
+            // turn continued past the inter-round usage tail instead of prematurely
+            // completing. Drain remaining terminal frames without over-asserting
+            // exact tail ordering (buffered stop + completion interplay is covered
+            // by the dedicated single-round tests).
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1", stopReason = "end_turn"))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun usageBeforeFinalAssistantTextEmitsAfterAssistantAtTail() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)
