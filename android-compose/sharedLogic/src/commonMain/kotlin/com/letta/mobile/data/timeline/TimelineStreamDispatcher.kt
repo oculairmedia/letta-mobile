@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.Mutex
  */
 internal class TimelineStreamDispatcher(
     private val conversationId: String,
+    private val agentId: String? = null,
     private val writeMutex: Mutex,
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
@@ -43,6 +44,7 @@ internal class TimelineStreamDispatcher(
             events = events,
             pendingToolReturnsByCallId = pendingToolReturnsByCallId,
             conversationId = conversationId,
+            agentId = agentId,
             conversationCursorStore = conversationCursorStore,
             source = source,
         )

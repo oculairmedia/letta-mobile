@@ -29,6 +29,10 @@ import kotlinx.coroutines.sync.withLock
 class TimelineSyncLoop(
     private val messageApi: TimelineTransport,
     private val conversationId: String,
+    // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
+    // repository cache key). Threaded onto ingested Confirmed events for render
+    // scoping. Null when unknown/legacy.
+    private val agentId: String? = null,
     scope: CoroutineScope,
     logTag: String = "TimelineSync",
     ingestedListener: IngestedMessageListener? = null,
@@ -76,6 +80,7 @@ class TimelineSyncLoop(
 
     private val streamDispatcher = TimelineStreamDispatcher(
         conversationId = conversationId,
+        agentId = agentId,
         writeMutex = writeMutex,
         state = _state,
         events = _events,
@@ -431,6 +436,7 @@ class TimelineSyncLoop(
     }
 
     suspend fun ingestStreamEvent(message: LettaMessage, source: String = "external") {
+        // letta-mobile-c4igq.4: forward this loop owning agentId to the reducer.
         wsSubscription.markActive()
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack, source = "$source.loop${hashCode()}"))

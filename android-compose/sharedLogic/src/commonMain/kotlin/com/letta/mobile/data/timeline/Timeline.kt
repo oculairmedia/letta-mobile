@@ -90,6 +90,12 @@ sealed class TimelineEvent {
         val date: TimelineInstant,
         val runId: String?,
         val stepId: String?,
+        // letta-mobile-c4igq.4: owning agent of this event, populated from the
+        // frame runtime scope at ingest (null when unknown/legacy). RENDER-ONLY
+        // metadata — it never participates in dedup/merge identity (which stays
+        // runId/serverId/otid based), only in the (agentId, conversationId) render
+        // scope filter that keeps a foreign-agent run block out of a conversation.
+        val agentId: String? = null,
         override val attachments: PersistentList<MessageContentPart.Image> = persistentListOf(),
         // Populated for TOOL_CALL events (ToolCallMessage + ApprovalRequestMessage).
         // letta-mobile-mge5.14: without these the UI dropped tool calls entirely

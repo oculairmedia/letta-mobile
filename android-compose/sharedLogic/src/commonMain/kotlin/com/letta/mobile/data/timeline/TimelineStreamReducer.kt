@@ -14,6 +14,10 @@ data class TimelineReducerInput(
     val frame: LettaMessage,
     val pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage>,
     val source: String = "unknown",
+    // letta-mobile-c4igq.4: owning agent of the frame (from the runtime scope),
+    // threaded onto the produced Confirmed event for render scoping. Null-default
+    // keeps existing callers/tests unaffected.
+    val agentId: String? = null,
 )
 
 data class TimelineReducerOutput(
@@ -142,7 +146,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         return output()
     }
 
-    val confirmed = message.toTimelineEvent(position = timeline.nextLocalPosition())
+    val confirmed = message.toTimelineEvent(position = timeline.nextLocalPosition(), agentId = input.agentId)
     if (confirmed == null) {
         hotPathTelemetry(
             "streamSubscriber.toTimelineEventNull",

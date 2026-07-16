@@ -668,6 +668,58 @@ class ChatRenderModelBuilderTest {
     }
 
 
+    @Test
+    fun `foreign-agent run block is excluded when active agent is scoped c4igq4`() {
+        // Agent A conversation, but a foreign agent-B assistant run leaked into the list.
+        val model = buildChatRenderModel(
+            messages = listOf(
+                UiMessage(id = "u1", role = "user", content = "hi", timestamp = "2026-04-19T12:00:00Z", agentId = "agent-A"),
+                UiMessage(id = "a1", role = "assistant", content = "reply", timestamp = "2026-04-19T12:00:10Z", runId = "rA", agentId = "agent-A"),
+                // Foreign: agent-B run block that must never render in agent-A conversation.
+                UiMessage(id = "b1", role = "assistant", content = "Run · 2 steps", timestamp = "2026-04-19T12:00:20Z", runId = "rB", agentId = "agent-B"),
+                UiMessage(id = "b2", role = "assistant", content = "Fire #170", timestamp = "2026-04-19T12:00:30Z", runId = "rB", agentId = "agent-B"),
+            ),
+            mode = ChatDisplayMode.Interactive,
+            activeAgentId = "agent-A",
+        )
+
+        val renderedIds = model.renderItems.flatMap { item ->
+            when (item) {
+                is ChatRenderItem.Single -> listOf(item.message.id)
+                is ChatRenderItem.RunBlock -> item.messages.map { it.first.id }
+                else -> emptyList()
+            }
+        }
+        assertFalse(renderedIds.contains("b1"), "foreign agent-B run message must not render in agent-A conversation")
+        assertFalse(renderedIds.contains("b2"), "foreign agent-B run message must not render in agent-A conversation")
+        assertTrue(renderedIds.contains("u1"), "same-agent user message must render")
+        assertTrue(renderedIds.contains("a1"), "same-agent assistant run must render")
+    }
+
+    @Test
+    fun `same-agent and null-agentId messages are never dropped by scoping c4igq4`() {
+        val model = buildChatRenderModel(
+            messages = listOf(
+                UiMessage(id = "u1", role = "user", content = "hi", timestamp = "2026-04-19T12:00:00Z", agentId = "agent-A"),
+                // legacy/unknown agentId (null) must be kept, not treated as foreign.
+                UiMessage(id = "legacy", role = "assistant", content = "old", timestamp = "2026-04-19T12:00:10Z", runId = "r0", agentId = null),
+                UiMessage(id = "a1", role = "assistant", content = "reply", timestamp = "2026-04-19T12:00:20Z", runId = "rA", agentId = "agent-A"),
+            ),
+            mode = ChatDisplayMode.Interactive,
+            activeAgentId = "agent-A",
+        )
+        val renderedIds = model.renderItems.flatMap { item ->
+            when (item) {
+                is ChatRenderItem.Single -> listOf(item.message.id)
+                is ChatRenderItem.RunBlock -> item.messages.map { it.first.id }
+                else -> emptyList()
+            }
+        }
+        assertTrue(renderedIds.contains("legacy"), "null-agentId legacy message must not be dropped")
+        assertTrue(renderedIds.contains("u1"))
+        assertTrue(renderedIds.contains("a1"))
+    }
+
     private fun user(
         id: String,
         content: String = "u-$id",

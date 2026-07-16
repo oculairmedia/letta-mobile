@@ -233,6 +233,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     content = "",
                     timestamp = ev.date.toString(),
                     runId = ev.runId,
+                    agentId = ev.agentId,
                     stepId = ev.stepId,
                     subagentNotification = projectedSubagentNotification,
                 )
@@ -349,6 +350,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 content = confirmedContent,
                 timestamp = ev.date.toString(),
                 runId = ev.runId,
+                agentId = ev.agentId,
                 stepId = ev.stepId,
                 isPending = false,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,

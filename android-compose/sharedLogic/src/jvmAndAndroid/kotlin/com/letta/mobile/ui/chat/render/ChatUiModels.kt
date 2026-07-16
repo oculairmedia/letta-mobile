@@ -259,6 +259,9 @@ data class ChatUiState(
     val isAgentTyping: Boolean = false,
     val pendingTools: ImmutableList<PendingToolCall> = persistentListOf(),
     val agentName: String = "",
+    // letta-mobile-c4igq.4: active conversation agent id, forwarded to the render
+    // cache so foreign-agent messages are scoped out of this conversation.
+    val agentId: String? = null,
     val error: String? = null,
     val promptTokens: Int? = null,
     val completionTokens: Int? = null,

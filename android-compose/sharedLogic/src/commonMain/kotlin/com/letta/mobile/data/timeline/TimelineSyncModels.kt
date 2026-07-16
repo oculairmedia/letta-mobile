@@ -39,7 +39,7 @@ sealed class TimelineSyncEvent {
  *
  * Returns null for message types we don't display (pings, stop reasons, etc.).
  */
-fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confirmed? {
+fun LettaMessage.toTimelineEvent(position: Double, agentId: String? = null): TimelineEvent.Confirmed? {
     val (type, text) = when (this) {
         is UserMessage -> TimelineMessageType.USER to content
         is AssistantMessage -> TimelineMessageType.ASSISTANT to content
@@ -94,6 +94,7 @@ fun LettaMessage.toTimelineEvent(position: Double): TimelineEvent.Confirmed? {
         toolCalls = toolCallsList.toTimelinePersistentList(),
         approvalRequestId = approvalId,
         seqId = seqId,
+        agentId = agentId,
     )
 }
 
