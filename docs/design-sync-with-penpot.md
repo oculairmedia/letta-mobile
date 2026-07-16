@@ -1,78 +1,81 @@
 # Design sync with Penpot — plan & status
 
-**Status:** exploratory, but the core unknowns are now resolved (June 2026).
-The Penpot API + auth work (access token in vault), Penpot 2.14.5 has a native
-token catalog, and our `letta mobile` file has `design-tokens/v1` enabled but
-**empty** — so the immediate work is a one-way **code → Penpot push** via a
-DTCG-JSON exporter. See "Current status" for the verified ground truth; the
-older "shapes + plugin-data" architecture is struck through where superseded.
+**Status:** validated infrastructure; workflow authority corrected July 2026.
+The self-hosted Penpot API, access-token authentication, MCP server, native token
+catalog, canonical `letta mobile` file, and Kotlin-to-DTCG export path are all
+working. The mature, component-driven **App Mockups v2** page is the visual and
+interaction source of truth. Kotlin remains the canonical runtime serialization
+of approved tokens; it does not originate the product design. Historical
+code-first assumptions below are retained only where they explain the token
+transport implementation.
 
 ## Why this doc exists
 
-The repo already has a token-driven design system in Kotlin
-(`android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/`).
-`docs/DESIGN_SYSTEM.md` is the regeneratable spec for those tokens — code is the
-source of truth.
+The repo has a token-driven Compose implementation in Kotlin
+(`android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/theme/`)
+and a mature product design in the self-hosted Penpot file **`letta mobile`**.
+The canonical design page is **App Mockups v2** (`9ad9fa5c-d4f1-80b2-8008-321c1ee404a4`).
+`docs/DESIGN_SYSTEM.md` is the regeneratable code-side token reference; Penpot is
+the authority for visual language, component composition, variants, screen
+states, responsive layout intent, and linked journeys.
 
-The missing piece is a **design surface** for non-engineers (and for design review
-before implementation). I want to use **Penpot** (self-hosted at
-`http://192.168.50.80:9001` on the home-lab box) for that surface, and I want it
-to be **synchronized with the Kotlin tokens**, not a separate source of truth.
-
-This doc tracks the plan, the design constraints, the sync architecture, and the
-current blocker (auth).
+This doc describes how approved Penpot design decisions are serialized into the
+Kotlin token implementation and how code/design conformance is checked. API and
+authentication are no longer blockers.
 
 ## Goals
 
-1. **Code is the source of truth for tokens.** Colors, spacing, type, motion —
-   everything in `LettaColorTokens`, `LettaThemeTokens`, `DesignTokens`,
-   `CustomColors` — stays in Kotlin. Penpot reflects it, never replaces it.
-2. **Penpot is the design language reference.** Style, component shapes, screen
-   layout, spacing relationships, edge cases the type system doesn't capture —
-   those live in Penpot. The repo's design review happens against the Penpot
-   file, not against Figma exports or screenshots.
-3. **One bidirectional sync** between the repo and the Penpot file. A change in
-   either place propagates; conflicts resolve to "code wins" for tokens,
-   "Penpot wins" for layout, "the design system spec wins" for semantic names.
-4. **The design emerges from building screens, not the other way around.** We
-   build the screen first in Compose, find the pattern, promote it to a token
-   in Kotlin, then re-render it in Penpot. The classic design-first pipeline is
-   inverted on purpose — too much spec churn otherwise.
-5. **No Electron, no Figma, no Adobe lock-in.** Penpot is the only acceptable
-   design tool, and only the self-hosted instance. This is non-negotiable.
+1. **Penpot is the product-design authority.** Visual language, component
+   variants, hierarchy, screen composition, responsive intent, states, and
+   journeys are approved in `letta mobile` / App Mockups v2 before production
+   implementation.
+2. **Kotlin is the runtime token authority.** Approved design tokens are given
+   stable semantic names and serialized in `LettaColorTokens`,
+   `LettaThemeTokens`, `DesignTokens`, and `CustomColors`. Runtime constraints
+   and accessibility implementation remain code responsibilities.
+3. **The contract is bidirectional but not symmetric.** Penpot wins product
+   design; the shared manifest wins semantic IDs and deterministic fixtures;
+   Kotlin wins platform/runtime mechanics. A disagreement requires an explicit
+   design revision or an implementation correction, never silent drift.
+4. **Design precedes feature decomposition.** A design agent works inside the
+   existing component language, presents alternatives, links the journey, and
+   produces an approved redline/state contract. The PM then compiles that frozen
+   revision into dependency-ordered beads and objective verification gates.
+5. **No Figma or Adobe lock-in.** The self-hosted Penpot instance is the
+   canonical collaborative design environment.
 
 ## Non-goals
 
-- A pixel-perfect 1:1 between Compose and Penpot. M3 elevation, window
-  insets, and motion will always differ slightly. The sync covers tokens and
-  shared layout primitives, not full state.
-- A "designer workflow" with branching Penpot files, review queues, or sign-off
-  tooling. The design surface is a mirror, not a governance system.
-- Replacing `docs/DESIGN_SYSTEM.md`. The spec is regeneratable from Kotlin; the
-  Penpot mirror is regeneratable from the spec. The MD stays.
-- Touching the Letta Desktop / Letta Code repos. This is `letta-mobile` only.
+- Generating production Compose code directly from arbitrary Penpot shapes.
+  Agents implement approved contracts with maintainable shared composables.
+- Treating raw pixel equality as the only acceptance signal. Conformance also
+  covers structure, semantics, behavior, accessibility, real data, and platform
+  constraints.
+- Replacing `docs/DESIGN_SYSTEM.md`; it remains the code-side token reference.
+- Allowing unreviewed experimental boards to become production requirements.
+  Only explicitly approved/frozen design revisions are implementation inputs.
 
 ## The three reference layers
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Penpot file (self-hosted)                                          │
-│  - Visual style + component variants + screen mocks                 │
-│  - "Pencil | Penpot Design System" as design language reference     │
-│  - Token bindings via plugin data namespace                         │
+│  Penpot file `letta mobile` / App Mockups v2 (self-hosted)          │
+│  - Approved visual language, components, variants, states, journeys │
+│  - "Pencil | Penpot Design System" as supporting prior art          │
+│  - Native token bindings + stable semantic design metadata          │
 └──────────────────────────┬──────────────────────────────────────────┘
-                           │  bidirectional sync
-                           │  (Penpot wins on layout, code wins on tokens)
+                           │  approved revision + contract sync
+                           │  (Penpot wins product design)
 ┌──────────────────────────▼──────────────────────────────────────────┐
-│  docs/DESIGN_SYSTEM.md (regeneratable spec)                         │
-│  - Token names, hex values, M3 role mapping                         │
-│  - Spacing scale, motion durations, type roles                      │
-│  - Semantic color / type aliases                                    │
-│  - Pulled from Kotlin by the same script that pushes to Penpot      │
+│  Versioned design contract + docs/DESIGN_SYSTEM.md                  │
+│  - Penpot file/page/board IDs and approved revision                 │
+│  - Semantic token/component names, states, fixtures, viewports      │
+│  - Accessibility and interaction acceptance                         │
+│  - Kotlin token serialization exported as reviewable DTCG JSON      │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │  extracted by the sync script
 ┌──────────────────────────▼──────────────────────────────────────────┐
-│  Kotlin (code is source of truth)                                   │
+│  Kotlin/Compose production implementation                           │
 │  android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ │
 │    ui/theme/  (ThemeTokens.kt, DesignTokens.kt)                     │
 │  android-compose/designsystem/src/main/java/com/letta/mobile/       │
@@ -91,8 +94,11 @@ Three sync layers, run in this order by `scripts/sync-design-tokens.py`:
 > Target the native catalog, **not** shapes-with-plugin-data. The corrected
 > approach is below; the original text is struck through for history.
 
-### Layer 1 (CORRECTED): Code → DTCG JSON → Penpot native token catalog
+### Layer 1: Approved tokens → Kotlin → DTCG JSON → Penpot native catalog
 
+- After a Penpot design revision approves token changes, update the stable
+  semantic Kotlin representation in `LettaColorTokens.kt`, `LettaThemeTokens.kt`,
+  `DesignTokens.kt`, and `CustomColors.kt`.
 - Read `LettaColorTokens.kt`, `LettaThemeTokens.kt`, `DesignTokens.kt`,
   `CustomColors.kt`, `Type.kt` from the working tree.
 - Parse out: base palette colors (6 presets × 2 modes × 8 M3 roles), 10-step
@@ -116,46 +122,42 @@ Three sync layers, run in this order by `scripts/sync-design-tokens.py`:
   swatch per token and the token name as the shape's plugin-data name.~~
   *(Superseded: use the native token catalog, not swatch shapes.)*
 
-### Layer 2: Penpot → Spec (layout pull, manual)
+### Layer 2: Penpot approved revision → versioned design contract
 
-- On demand (not on every push), `sync-design-tokens.py pull` reads the
-  current Penpot file and:
-  - Lists every shape, its plugin-data token binding, and its bounding box.
-  - Compares against the snapshot. Anything that has moved or been added
-    since the last pull is exported as a layout delta to
-    `docs/.layout-delta.json`.
-- The layout delta is **advisory only** — it tells us "you moved the chat
-  bubble padding from 12dp to 16dp in the Penpot mock" so a human can decide
-  whether that should be promoted to a new spacing alias in
-  `DesignTokens.LettaSpacingTokens`.
-- This is how the design system grows: by noticing repeated patterns in
-  Penpot layouts and codifying them as tokens in Kotlin.
+- A design agent works in the existing App Mockups v2 component language,
+  creates alternatives and complete states, links the journey, and tags any
+  capability not yet implemented (the avatar brief's `[NEW-*]` convention is
+  the current proven example).
+- Approval freezes the Penpot file/page/board identifiers and revision in a
+  repository-tracked manifest with deterministic fixtures, viewports, states,
+  interactions, component keys, and accessibility requirements.
+- On-demand export records normalized board/component metadata and reference
+  renders. Experimental or deprecated boards are not implementation inputs.
+- The PM translates the approved contract into one-bead/one-PR implementation
+  slices. Every bead links the exact design revision and relevant states.
 
-### Layer 3: Plugin data as the contract
+### Layer 3: Semantic metadata and conformance
 
-- Every shape that represents a token-bound primitive in Penpot has a
-  plugin-data entry of the form:
-  - `letta.token.name` = `"chatBubbleSender"` (the token name from Kotlin)
-  - `letta.token.kind` = `"color" | "spacing" | "motion" | "type"`
-  - `letta.token.theme` = `"default" | "ocean" | "amoledBlack" | ...`
-  - `letta.token.mode` = `"light" | "dark"`
-- The sync script reads these on pull, writes them on push. Anything in
-  Penpot without a `letta.token.*` entry is **artwork** — decorative, not a
-  contract, not synced.
+- Native tokens carry stable semantic names. Approved components and boards
+  also need stable metadata such as `letta.component`, `letta.variant`,
+  `letta.state`, and `letta.status = approved|experimental|deprecated`.
+- Production verification uses the same fixture and viewport as the design
+  contract. Visual comparison is supplemented by structural, interaction,
+  accessibility, scrolling, large-text, and real-data checks.
+- Anything without approved status may be valid exploration or artwork, but it
+  cannot silently become a production requirement.
 
-## What I'm NOT going to do
+## Implementation boundaries
 
-- **Not going to build a custom Penpot plugin.** Plugin code lives in ClojureScript
-  and is shipped as a separate file inside the Penpot frontend. The cost of
-  authoring + maintaining + signing a custom plugin is way too high for a
-  one-project sync script. Use the REST API + plugin-data fields (which are
-  addressable via the standard `set-plugin-data` RPC) instead.
-- **Not going to add Penpot to the CI pipeline.** Token sync is a local
-  developer action (`./scripts/sync-design-tokens.py push`). CI is too slow
-  and the auth tokens are per-developer anyway.
-- **Not going to mirror screens in Penpot at the XML level.** The screen
-  mocks are for review and hand-off, not for code generation. If we ever want
-  Compose code generated from Penpot, that's a separate, much larger project.
+- Prefer the existing MCP and authenticated REST API. Add bridge/plugin
+  capability only when the current surface cannot expose stable revisions,
+  semantic metadata, interactions, or deterministic exports.
+- CI should not mutate Penpot. It may consume committed design manifests and
+  reference exports to verify Compose conformance without requiring design
+  credentials.
+- Do not generate Compose directly from Penpot's raw shape tree. Screens remain
+  maintainable production code built from shared components; Penpot supplies
+  the approved contract and verification baseline.
 
 ## Penpot box details
 
@@ -176,7 +178,7 @@ Three sync layers, run in this order by `scripts/sync-design-tokens.py`:
   pages, ~175 component boards, the source of design language conventions
   but **not** the source of Letta tokens).
 
-## Current blocker (June 2026)
+## Historical blocker (resolved June 2026)
 
 ~~The blocker is getting a working session token.~~ **RESOLVED (June 2026).**
 This whole section is kept for history but is no longer accurate.
