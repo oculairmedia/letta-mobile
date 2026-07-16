@@ -57,6 +57,27 @@ class ChatSendCoordinatorCleanupTest {
         }
 
     @Test
+    fun `new turn settles the previous turn unsettled optimistic-local otid`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+            val coordinator = coordinator(timeline, ui, transport)
+
+            // Turn 1 sends (sets activeWsOtid + appends an optimistic-local row)
+            // but never receives a terminal to settle it.
+            coordinator.send("first").join()
+            val staleOtid = timeline.externalLocals.last().otid
+
+            // A NEW server turn starts. Without PR-3 the old otid is orphaned and
+            // re-latches Thinking; with it, the stale otid is settled as sent.
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+            advanceUntilIdle()
+
+            assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", staleOtid)), timeline.sentLocals)
+        }
+
+    @Test
     fun `next send does not clear presence while transport still owns active turn`() =
         runTest(UnconfinedTestDispatcher()) {
             val timeline = RecordingTimelineWriter()

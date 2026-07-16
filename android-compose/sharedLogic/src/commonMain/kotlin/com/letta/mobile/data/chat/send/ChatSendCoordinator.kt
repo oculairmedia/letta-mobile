@@ -524,6 +524,28 @@ class ChatSendCoordinator(
                     activeWsRunId = event.runId
                     return
                 }
+                // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
+                // turn is starting while a PREVIOUS turn's optimistic-local user
+                // bubble may still be unsettled (activeWsOtid set, no terminal
+                // reconciled it). If we adopt the new turn without settling the
+                // old otid, the orphaned pending-local row keeps the coordinator
+                // believing a send is in flight and re-latches Thinking. Since a
+                // fresh server turn is proceeding, the prior local send did land:
+                // settle it as sent before adopting the new turn identity.
+                activeWsOtid?.let { staleOtid ->
+                    val staleLocalConv = activeWsLocalConversationId ?: activeWsConversationId ?: event.conversationId
+                    scope.launch {
+                        runCatching {
+                            timelineRepository.markExternalTransportLocalSent(agentId, staleLocalConv, staleOtid)
+                        }
+                    }
+                    Telemetry.event(
+                        "AdminChatVM", "ws.turnStarted.staleOtidSettled",
+                        "staleOtid" to staleOtid,
+                        "newTurnId" to event.turnId,
+                        "conversationId" to event.conversationId,
+                    )
+                }
                 activeWsConversationId = event.conversationId
                 activeWsTurnId = event.turnId
                 activeWsRunId = event.runId
