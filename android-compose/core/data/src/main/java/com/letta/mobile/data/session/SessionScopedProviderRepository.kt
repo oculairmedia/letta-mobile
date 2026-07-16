@@ -45,6 +45,9 @@ class SessionScopedProviderRepository internal constructor(
             .launchIn(proxyScope)
     }
 
+    private val current: IProviderRepository
+        get() = sessionManager.current.providerRepository
+
     override suspend fun refreshProviders(name: String?, providerType: String?) =
         sessionManager.withCurrentSession { it.providerRepository.refreshProviders(name, providerType) }
 

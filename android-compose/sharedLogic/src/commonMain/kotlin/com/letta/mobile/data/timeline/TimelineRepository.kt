@@ -1,6 +1,10 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
@@ -304,7 +308,7 @@ open class TimelineRepository(
         message: LettaMessage,
         source: String,
     ) {
-        Telemetry.event(
+        com.letta.mobile.util.Telemetry.event(
             "IrohGate", "gate4.repositoryIngest",
             "agentId" to agentId,
             "conversationId" to conversationId,
@@ -359,19 +363,6 @@ open class TimelineRepository(
         forceRefresh: Boolean,
     ): Int {
         return getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
-    }
-
-    // letta-mobile-dangling-tool: forward turn-lifecycle signals to the
-    // per-conversation loop so DanglingToolCallResolver knows when to
-    // supersede a pending sweep (turnStarted) and when to (re)schedule one
-    // (turnEnded — unconditionally, regardless of clean; see Codex #902
-    // review finding 3 / DanglingToolCallResolver.scheduleSweepIfUnresolved).
-    override suspend fun turnStarted(agentId: String?, conversationId: String) {
-        getOrCreate(agentId, conversationId).turnStarted()
-    }
-
-    override suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {
-        getOrCreate(agentId, conversationId).turnEnded(clean)
     }
 
     /**

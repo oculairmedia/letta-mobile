@@ -24,6 +24,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 class ProjectIssueConflictException(
@@ -220,6 +221,10 @@ open class ProjectWorkApi @Inject constructor(
     private suspend fun session() = apiClient.session().let {
         it.client to it.baseUrl.trimEnd('/')
     }
+
+    private suspend fun client() = apiClient.getClient()
+
+    private fun baseUrl() = apiClient.getBaseUrl().trimEnd('/')
 
     private fun io.ktor.client.request.HttpRequestBuilder.mutationHeaders(headers: ProjectIssueMutationHeaders) {
         header(HttpHeaders.IfMatch, headers.ifMatch)

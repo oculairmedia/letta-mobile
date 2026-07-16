@@ -46,10 +46,6 @@ jobs:
                   raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
               source = source.replace(expected, expected.replace('9.2.0', '9.0.0'))
           build.write_text(source)
-          wrapper = Path('.qodana-android-compose/gradle/wrapper/gradle-wrapper.properties')
-          wrapper_source = wrapper.read_text()
-          wrapper_source = wrapper_source.replace('9.4.1', '9.3.0')
-          wrapper.write_text(wrapper_source)
           PY
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1.3
@@ -57,111 +53,6 @@ jobs:
           pr-mode: false
           # Restrict discovery to the app model copy and load the root config.
           args: --project-dir .qodana-android-compose --config ../qodana.yaml
-          results-dir: ${{ runner.temp }}/qodana/results
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1897914872 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
-
-      # letta-mobile (bead 1s4d5): publish a SANITIZED findings inventory as an
-      # artifact so the PM/automation can dedupe + partition remediation waves
-      # WITHOUT the Qodana Cloud token (which stays a repo secret). The CSVs carry
-      # ONLY rule id, severity, repo-relative file path, and line — deliberately
-      # NO message/snippet/code-derived text (SARIF message.text can embed source
-      # expressions/literals/paths). Detailed messages stay in the Cloud report.
-      # Runs on main pushes only (the authoritative inventory); always() so it
-      # publishes a status even when the scan itself fails.
-      - name: 'Build sanitized Qodana findings inventory (CSV, no code text)'
-        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        env:
-          ANALYZED_SHA: ${{ github.sha }}
-          QODANA_ACTION_REF: 'JetBrains/qodana-action@v2026.1.3'
-        run: |
-          set -euo pipefail
-          SARIF="${{ runner.temp }}/qodana/results/qodana.sarif.json"
-          OUT_DIR="${{ runner.temp }}/qodana-inventory"
-          CONFIG="qodana.yaml"
-          mkdir -p "$OUT_DIR"
-          CONFIG_HASH="$( (sha256sum "$CONFIG" 2>/dev/null || echo 'na') | awk '{print $1}')"
-          if [ ! -f "$SARIF" ]; then
-            echo "No SARIF at $SARIF; scan likely failed. Emitting status only."
-            {
-              echo "scan_status=sarif_missing"
-              echo "analyzed_sha=${ANALYZED_SHA}"
-              echo "qodana_action=${QODANA_ACTION_REF}"
-              echo "config_path=${CONFIG}"
-              echo "config_sha256=${CONFIG_HASH}"
-              echo "finding_count=0"
-            } > "$OUT_DIR/metadata.txt"
-            exit 0
-          fi
-          python3 - "$SARIF" "$OUT_DIR/qodana-findings.csv" "$OUT_DIR/qodana-summary.csv" <<'PY'
-          import json, sys, csv, collections, posixpath
-          sarif_path, flat_path, summ_path = sys.argv[1], sys.argv[2], sys.argv[3]
-          # A malformed/unparseable SARIF that nonetheless EXISTS must fail the
-          # step (distinct from the scan-failure sarif_missing status above).
-          data = json.load(open(sarif_path))  # raises -> step fails (set -e)
-          SCOPE_PREFIX = ".qodana-android-compose/"
-          def norm(p):
-              if not p:
-                  return None
-              p = p.replace("\\", "/")
-              # strip the CI-only scoped model-copy prefix -> real repo path
-              if p.startswith(SCOPE_PREFIX):
-                  p = "android-compose/" + p[len(SCOPE_PREFIX):]
-              # reject absolute or escaping paths
-              if p.startswith("/") or p.startswith("../") or ".." in p.split("/"):
-                  return None
-              return posixpath.normpath(p)
-          rows = []
-          for run in data.get("runs", []):
-              for r in run.get("results", []):
-                  rule = r.get("ruleId", "?")
-                  level = r.get("level", r.get("kind", "?"))
-                  path = None; line = ""
-                  locs = r.get("locations", []) or []
-                  if locs:
-                      pl = (locs[0].get("physicalLocation", {}) or {})
-                      raw = (pl.get("artifactLocation", {}) or {}).get("uri", "")
-                      path = norm(raw)
-                      line = (pl.get("region", {}) or {}).get("startLine", "")
-                  if path is None:
-                      # location-less or path escaping root: keep the finding but
-                      # with an explicit sentinel, never an absolute/escaping path.
-                      path = "(no-location)"
-                  rows.append((rule, level, path, line))
-          # Flat: rule_id,level,file,line ONLY. No message/code text.
-          with open(flat_path, "w", newline="") as f:
-              w = csv.writer(f); w.writerow(["rule_id","level","file","line"])
-              for r in rows: w.writerow(r)
-          # Aggregate by rule + top-level module + severity.
-          agg = collections.Counter()
-          for rule, level, path, line in rows:
-              parts = path.split("/")
-              module = "/".join(parts[:4]) if len(parts) >= 4 else path
-              agg[(rule, level, module)] += 1
-          with open(summ_path, "w", newline="") as f:
-              w = csv.writer(f); w.writerow(["rule_id","level","module","count"])
-              for (rule, level, module), n in sorted(agg.items(), key=lambda x:-x[1]):
-                  w.writerow([rule, level, module, n])
-          print(f"findings={len(rows)} summary_rows={len(agg)}")
-          PY
-          FINDINGS="$(tail -n +2 "$OUT_DIR/qodana-findings.csv" | wc -l | tr -d ' ')"
-          {
-            echo "scan_status=ok"
-            echo "analyzed_sha=${ANALYZED_SHA}"
-            echo "qodana_action=${QODANA_ACTION_REF}"
-            echo "config_path=${CONFIG}"
-            echo "config_sha256=${CONFIG_HASH}"
-            echo "finding_count=${FINDINGS}"
-          } > "$OUT_DIR/metadata.txt"
-          echo "Inventory written to $OUT_DIR"; cat "$OUT_DIR/metadata.txt"
-          head -20 "$OUT_DIR/qodana-summary.csv" || true
-
-      - name: 'Upload sanitized Qodana inventory artifact'
-        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: qodana-inventory
-          path: ${{ runner.temp }}/qodana-inventory
-          if-no-files-found: warn
-          retention-days: 14

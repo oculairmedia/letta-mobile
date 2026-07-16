@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.subagent
 
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SubagentTodoProgressWire
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf

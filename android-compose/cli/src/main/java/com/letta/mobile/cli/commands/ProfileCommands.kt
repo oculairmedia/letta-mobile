@@ -14,6 +14,7 @@ import com.letta.mobile.cli.runtime.CliProfilePrefs
 import com.letta.mobile.cli.runtime.CliProfileStore
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 internal class ProfileCommand : CliktCommand(

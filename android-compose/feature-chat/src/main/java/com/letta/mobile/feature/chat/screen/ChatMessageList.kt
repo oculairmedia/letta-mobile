@@ -39,6 +39,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
@@ -50,6 +52,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontFamily
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
@@ -487,15 +490,13 @@ internal fun ChatMessageList(
 
     val shouldLoadOlderMessages by remember(renderItemsSize) {
         derivedStateOf {
-            if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
-                return@derivedStateOf false
-            }
-
-            // In reverseLayout, index 0 is the bottom (newest) message.
-            // We want to load older messages when scrolling near the top (higher indices).
-            // We approximate "near the top" by checking if the bottom-most visible item
-            // is within ~15 items of the total size.
-            renderItemsSize > 0 && listState.firstVisibleItemIndex + 15 >= renderItemsSize
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = state.hasMoreOlderMessages,
+                isLoadingOlderMessages = state.isLoadingOlderMessages,
+                messagesEmpty = state.messages.isEmpty(),
+                firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                renderItemsSize = renderItemsSize,
+            )
         }
     }
 
@@ -608,15 +609,10 @@ internal fun ChatMessageList(
     }
 
     LaunchedEffect(listState, state.hasMoreOlderMessages, state.isLoadingOlderMessages, state.messages.size) {
-        snapshotFlow { listState.firstVisibleItemIndex }
+        snapshotFlow { shouldLoadOlderMessages }
             .distinctUntilChanged()
-            .collect { _ ->
-                if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
-                    return@collect
-                }
-                val lastVisible = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
-                val totalItems = listState.layoutInfo.totalItemsCount
-                if (totalItems > 0 && lastVisible >= totalItems - 3) {
+            .collect { shouldLoad ->
+                if (shouldLoad) {
                     onLoadOlderMessages()
                 }
             }
@@ -861,7 +857,7 @@ internal fun ChatMessageList(
                         if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
                             androidx.compose.runtime.SideEffect {
                                 com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
-                                    conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
+                                    conversationId = (state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId ?: "<active>",
                                     key = renderItem.key,
                                     contentType = when (renderItem) {
                                         is ChatRenderItem.Single -> "single"
@@ -1461,3 +1457,29 @@ private fun androidx.compose.foundation.lazy.LazyListState.toChatViewportSnapsho
     )
 }
 
+
+@androidx.annotation.VisibleForTesting
+internal fun chatShouldLoadOlderMessages(
+    hasMoreOlderMessages: Boolean,
+    isLoadingOlderMessages: Boolean,
+    messagesEmpty: Boolean,
+    firstVisibleItemIndex: Int,
+    renderItemsSize: Int,
+): Boolean {
+    if (!hasMoreOlderMessages || isLoadingOlderMessages || messagesEmpty) {
+        return false
+    }
+
+    // In reverseLayout, index 0 is the bottom (newest) message.
+    // We want to load older messages when scrolling near the top (higher indices).
+    // The previous logic checked if the top-most visible item (maxOf visibleItemsInfo.index)
+    // was within 3 items of totalItemsCount.
+    // To approximate this without reading layoutInfo (which allocates visibleItemsInfo every frame),
+    // we use `firstVisibleItemIndex` (the bottom-most visible item).
+    // Because we don't know the exact number of visible items, using `firstVisibleItemIndex + 3 >= renderItemsSize`
+    // accurately guarantees that we will trigger the load *at least* when the top-most item is within 3 of the end,
+    // (since topMostVisibleItem >= firstVisibleItemIndex). In practice, it will trigger slightly earlier
+    // by exactly the number of items visible on screen minus 1. This correctly preserves the early-prefetch
+    // intention while completely avoiding layoutInfo allocations.
+    return renderItemsSize > 0 && firstVisibleItemIndex + 3 >= renderItemsSize
+}

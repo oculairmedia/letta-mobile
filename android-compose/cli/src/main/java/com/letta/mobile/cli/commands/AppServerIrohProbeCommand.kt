@@ -1230,7 +1230,7 @@ internal class ProbeAccumulator(private val turn: Int, private val dumpPath: Str
 
     fun record(frame: AppServerInboundFrame) {
         if (dumpPath != null && frame is AppServerInboundFrame.StreamDelta) {
-            runCatching { File(dumpPath).appendText(frame.delta.toString() + "\n") }
+            runCatching { java.io.File(dumpPath).appendText(frame.delta.toString() + "\n") }
         }
         recordedFrameCount += 1
         when (frame) {

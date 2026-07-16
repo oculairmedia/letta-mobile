@@ -42,11 +42,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
@@ -155,7 +157,7 @@ private fun MermaidSvgDiagram(
         ImageRequest.Builder(context)
             .data(svg.toByteArray(Charsets.UTF_8))
             .decoderFactory(SvgDecoder.Factory())
-            .size(Size(2000, 2000))
+            .size(coil3.size.Size(2000, 2000))
             .build()
     }
 

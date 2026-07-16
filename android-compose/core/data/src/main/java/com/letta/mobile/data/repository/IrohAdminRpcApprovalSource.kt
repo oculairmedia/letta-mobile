@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put

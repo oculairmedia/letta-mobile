@@ -18,7 +18,7 @@ object HctColorHarmonizer {
     fun harmonize(
         stateColor: Color,
         seedColor: Color,
-        strength: Float = DEFAULT_STRENGTH,
+        strength: Float = DefaultStrength,
     ): Color {
         val clampedStrength = strength.coerceIn(0f, 1f)
         if (clampedStrength == 0f) return stateColor
@@ -41,8 +41,8 @@ object HctColorHarmonizer {
         containerColor: Color,
         seedColor: Color,
         contentColor: Color,
-        minContrastRatio: Double = MIN_CONTENT_CONTRAST_RATIO,
-        strength: Float = DEFAULT_STRENGTH,
+        minContrastRatio: Double = MinContentContrastRatio,
+        strength: Float = DefaultStrength,
     ): Color {
         val harmonized = harmonize(
             stateColor = containerColor,
@@ -78,13 +78,13 @@ object HctColorHarmonizer {
     ): Double? {
         val direction = if (preferLighter) 1.0 else -1.0
         var tone = originalTone
-        repeat(MAX_TONE_SEARCH_STEPS) {
-            tone = (tone + direction).coerceIn(MIN_TONE, MAX_TONE)
+        repeat(MaxToneSearchSteps) {
+            tone = (tone + direction).coerceIn(MinTone, MaxTone)
             val candidate = Hct.from(hue, chroma, tone).toComposeColor()
             if (contrastRatio(contentColor, candidate) >= minContrastRatio) {
                 return tone
             }
-            if (tone == MIN_TONE || tone == MAX_TONE) return@repeat
+            if (tone == MinTone || tone == MaxTone) return@repeat
         }
         return null
     }
@@ -97,16 +97,16 @@ object HctColorHarmonizer {
     private fun Hct.toComposeColor(alpha: Float = 1f): Color = Color(toInt()).copy(alpha = alpha)
 
     private fun interpolateHue(from: Double, to: Double, fraction: Float): Double {
-        val delta = ((to - from + HALF_CIRCLE_DEGREES).mod(FULL_CIRCLE_DEGREES)) - HALF_CIRCLE_DEGREES
-        return (from + (delta * fraction)).mod(FULL_CIRCLE_DEGREES)
+        val delta = ((to - from + HalfCircleDegrees).mod(FullCircleDegrees)) - HalfCircleDegrees
+        return (from + (delta * fraction)).mod(FullCircleDegrees)
     }
 
-    private const val DEFAULT_STRENGTH = 0.15f
-    private const val MIN_CONTENT_CONTRAST_RATIO = 4.5
+    private const val DefaultStrength = 0.15f
+    private const val MinContentContrastRatio = 4.5
     private const val OpaqueAlpha = 255
-    private const val MIN_TONE = 0.0
-    private const val MAX_TONE = 100.0
-    private const val MAX_TONE_SEARCH_STEPS = 100
-    private const val HALF_CIRCLE_DEGREES = 180.0
-    private const val FULL_CIRCLE_DEGREES = 360.0
+    private const val MinTone = 0.0
+    private const val MaxTone = 100.0
+    private const val MaxToneSearchSteps = 100
+    private const val HalfCircleDegrees = 180.0
+    private const val FullCircleDegrees = 360.0
 }

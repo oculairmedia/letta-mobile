@@ -2,11 +2,10 @@
 """
 export-design-tokens.py — Kotlin design tokens → DTCG-style JSON for Penpot.
 
-Kotlin is the runtime serialization of design tokens approved in the canonical
-Penpot design (see docs/design-sync-with-penpot.md). This script extracts those
-stable semantic definitions from Kotlin `object` declarations and emits a
-Design-Tokens-Community-Group (DTCG) shaped JSON file that Penpot's native token
-catalog (design-tokens/v1) round-trips.
+Code is the source of truth (docs/design-sync-with-penpot.md goal #1). This
+script extracts the Letta token definitions from the Kotlin `object`
+declarations and emits a Design-Tokens-Community-Group (DTCG) shaped JSON file
+that Penpot's native token catalog (design-tokens/v1) round-trips.
 
 It does NOT push to Penpot — emitting the JSON is the contract; the push is a
 separate step (REST `update-file` change-ops, see the sync doc). Keeping export
@@ -163,9 +162,8 @@ def build_dtcg() -> dict:
     doc: dict = {
         "$description": (
             "Letta / Meridian design tokens — generated from Kotlin by "
-            "scripts/export-design-tokens.py. Kotlin is the runtime serialization "
-            "of the approved Penpot design (docs/design-sync-with-penpot.md). "
-            "DTCG shape for Penpot's "
+            "scripts/export-design-tokens.py. Code is the source of truth "
+            "(docs/design-sync-with-penpot.md). DTCG shape for Penpot's "
             "design-tokens/v1 native catalog."
         ),
     }

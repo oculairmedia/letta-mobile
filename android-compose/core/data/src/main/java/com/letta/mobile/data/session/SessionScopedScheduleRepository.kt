@@ -29,6 +29,9 @@ class SessionScopedScheduleRepository internal constructor(
         proxyScope = defaultSessionScopedScheduleRepositoryScope(),
     )
 
+    private val current: IScheduleRepository
+        get() = sessionManager.current.scheduleRepository
+
     override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> =
         sessionManager.currentGraph.flatMapLatest { it.scheduleRepository.getSchedules(agentId) }
 

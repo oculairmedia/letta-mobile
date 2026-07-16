@@ -39,15 +39,8 @@ import kotlinx.serialization.json.put
  * - cancel/abort mid-tool
  * - idle timeout mid-tool
  * - collector failure mid-tool
- * - a genuine Failed/Cancelled terminal lifecycle frame from the server
  *
- * fix(no-settle-on-clean-completion): a CLEAN completion (stop_reason +
- * Completed lifecycle, the post-tool usage_statistics path, or the delayed
- * terminal-settle quiet window) must NEVER synthesize a Failed return for a
- * still-dangling call, even when other calls in the same turn have already
- * returned — the real async return can legitimately arrive after the
- * terminal. Clean turns (all calls returned) and clean completions with
- * dangling calls are both strict no-ops for settlement.
+ * Clean turns (all calls returned) and clean completions are strict no-ops.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineToolSettlementTest {
@@ -180,82 +173,6 @@ class AppServerTurnEngineToolSettlementTest {
             // Expect synthetic return for call-1
             val syntheticReturn = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
             assertEquals(ToolCallId("call-1"), syntheticReturn.toolCallId)
-            assertEquals(ToolExecutionStatus.Failed, syntheticReturn.status)
-
-            val failed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            assertEquals(RuntimeRunStatus.Failed, failed.status)
-
-            awaitComplete()
-        }
-    }
-
-    @Test
-    fun cleanCompletionWithDanglingSecondCallNoSyntheticReturn() = runTest {
-        // fix(no-settle-on-clean-completion, letta-mobile-oqfbj): two tool calls
-        // fire, only the first returns before the turn's terminal stop_reason /
-        // Completed lifecycle arrives and the terminal-settle quiet window
-        // elapses. Since this is a CLEAN completion, the second (still
-        // in-flight) call must NOT get a synthetic Failed return — the real
-        // async return for it can legitimately still be coming from the server.
-        val client = SettlementTestClient()
-        val engine = AppServerTurnEngine(
-            client = client,
-            requestIdFactory = { "req" },
-            turnIdleTimeoutMs = 60_000L,
-        )
-
-        engine.runTurn(command).test {
-            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-
-            client.emitToolCall("call-1", "search")
-            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
-            client.emitToolCall("call-2", "fetch")
-            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
-
-            // Only call-1 returns before the terminal.
-            client.emitToolReturn("call-1", "success")
-            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
-
-            // Clean terminal: stop_reason + Completed lifecycle, then the
-            // terminal-settle quiet window elapses (virtual time via runTest).
-            client.emitStopReason()
-            val stop = assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
-            assertEquals("stop_reason", stop.messageType)
-            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            assertEquals(RuntimeRunStatus.Completed, completed.status)
-
-            // NO synthetic Failed return for the still-dangling call-2.
-            awaitComplete()
-        }
-    }
-
-    @Test
-    fun abnormalTerminalWithDanglingSecondCallStillSettles() = runTest {
-        // Same two-call/one-return setup as above, but this time the terminal
-        // is a genuine Failed lifecycle (server-reported error), not a clean
-        // completion. Existing settlement behavior must be preserved here.
-        val client = SettlementTestClient()
-        val engine = AppServerTurnEngine(
-            client = client,
-            requestIdFactory = { "req" },
-            turnIdleTimeoutMs = 60_000L,
-        )
-
-        engine.runTurn(command).test {
-            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-
-            client.emitToolCall("call-1", "search")
-            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
-            client.emitToolCall("call-2", "fetch")
-            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
-
-            client.emitToolReturn("call-1", "success")
-            assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
-
-            client.emitErrorMessage("server exploded")
-
-            val syntheticReturn = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
-            assertEquals(ToolCallId("call-2"), syntheticReturn.toolCallId)
             assertEquals(ToolExecutionStatus.Failed, syntheticReturn.status)
 
             val failed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
@@ -421,35 +338,6 @@ class AppServerTurnEngineToolSettlementTest {
                         eventSeq = 3,
                         emittedAt = "2026-07-01T00:00:02Z",
                         idempotencyKey = "stop",
-                        delta = delta,
-                    ),
-                ),
-            )
-        }
-
-        fun emitErrorMessage(message: String) {
-            val delta = buildJsonObject {
-                put("message_type", "error_message")
-                put("message", message)
-            }
-            val raw = buildJsonObject {
-                put("type", "stream_delta")
-                put("idempotency_key", "error")
-                put("delta", delta)
-                put("runtime", buildJsonObject {
-                    put("agent_id", runtime.agentId)
-                    put("conversation_id", runtime.conversationId)
-                })
-            }
-            eventFlow.tryEmit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    raw = raw,
-                    frame = AppServerInboundFrame.StreamDelta(
-                        runtime = runtime,
-                        eventSeq = 3,
-                        emittedAt = "2026-07-01T00:00:02Z",
-                        idempotencyKey = "error",
                         delta = delta,
                     ),
                 ),

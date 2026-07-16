@@ -74,7 +74,7 @@ data class ProjectBriefUiState(
     // ImmutableMap so Compose treats this whole state as stable — raw
     // kotlin.collections.Map is an unstable interface type to the
     // compiler (it could be a MutableMap at runtime). See o7ob.2.6.
-    val sections: ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
+    val sections: kotlinx.collections.immutable.ImmutableMap<ProjectBriefSectionKey, ProjectBriefSection> =
         kotlinx.collections.immutable.persistentMapOf(),
     val error: String? = null,
 )

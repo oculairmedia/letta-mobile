@@ -44,6 +44,9 @@ class SessionScopedArchiveRepository internal constructor(
             .launchIn(proxyScope)
     }
 
+    private val current: IArchiveRepository
+        get() = sessionManager.current.archiveRepository
+
     override suspend fun refreshArchives(name: String?, agentId: String?) =
         sessionManager.withCurrentSession { it.archiveRepository.refreshArchives(name, agentId) }
 

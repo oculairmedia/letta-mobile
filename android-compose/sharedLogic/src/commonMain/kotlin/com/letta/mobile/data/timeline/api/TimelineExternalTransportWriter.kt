@@ -61,27 +61,4 @@ interface TimelineExternalTransportWriter {
     suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String> = emptySet()): Int
 
     suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean = false): Int
-
-    /**
-     * letta-mobile-dangling-tool: signals that a turn started on
-     * [conversationId] so the timeline's post-turn dangling-tool-call sweep
-     * (see DanglingToolCallResolver) can supersede whatever the previous
-     * turn's sweep left pending. Default no-op so existing fakes compile
-     * unchanged.
-     */
-    suspend fun turnStarted(agentId: String?, conversationId: String) {}
-
-    /**
-     * letta-mobile-dangling-tool: signals that a turn ended on
-     * [conversationId]. Whenever unresolved tool-call cards remain, the
-     * timeline schedules a bounded canonical-record-driven resolve sweep —
-     * on EVERY completion, clean or abnormal (Codex #902 review finding 3).
-     * [clean] is telemetry-only: it does not gate whether the sweep is
-     * scheduled, since a non-clean turn's OWN calls are already settled
-     * synchronously elsewhere and never show up as unresolved; what this
-     * unconditional scheduling protects is an EARLIER turn's still-dangling
-     * card whose sweep this turn's `turnStarted()` superseded. Default
-     * no-op so existing fakes compile unchanged.
-     */
-    suspend fun turnEnded(agentId: String?, conversationId: String, clean: Boolean) {}
 }

@@ -48,6 +48,9 @@ class SessionScopedFolderRepository internal constructor(
             .launchIn(proxyScope)
     }
 
+    private val current: IFolderRepository
+        get() = sessionManager.current.folderRepository
+
     override suspend fun refreshFolders(name: String?) = sessionManager.withCurrentSession { it.folderRepository.refreshFolders(name) }
 
     override suspend fun countFolders(): Int = sessionManager.withCurrentSession { it.folderRepository.countFolders() }

@@ -129,23 +129,6 @@ echo "[iroh-2client-hermetic] address=${ADDRESS}" >&2
 
 PROBE_DEFAULT_ARGS=(--timeout-ms 90000)
 PROBE_USER_ARGS=("$@")
-
-# --- kyqdt-busy extension: parse --mode and --capture-wrapper-logs from user args ---
-MODE="live-sync"
-CAPTURE_LOG=""
-FILTERED_ARGS=()
-for a in "${PROBE_USER_ARGS[@]}"; do
-  case "$a" in
-    --mode=*) MODE="${a#--mode=}" ;;
-    --capture-wrapper-logs=*) CAPTURE_LOG="${a#--capture-wrapper-logs=}" ;;
-    *) FILTERED_ARGS+=("$a") ;;
-  esac
-done
-PROBE_USER_ARGS=("${FILTERED_ARGS[@]}")
-# Forward --mode to the probe.
-if [[ -n "${MODE}" ]]; then
-  PROBE_USER_ARGS+=("--mode=${MODE}")
-fi
 if [[ ${#PROBE_USER_ARGS[@]} -eq 0 ]]; then
   PROBE_USER_ARGS=("${PROBE_DEFAULT_ARGS[@]}")
 fi
@@ -162,20 +145,5 @@ PROBE_ARGS="$(quote_cli_args \
 ./gradlew --quiet :cli:run -PcliArgs="${PROBE_ARGS}" | tee "${PROBE_LOG}"
 PROBE_STATUS=${PIPESTATUS[0]}
 set -e
-
-# --- kyqdt-busy telemetry capture ---
-if [[ "${MODE}" == "kyqdt-busy" ]]; then
-  if [[ -s "${SERVE_LOG}" ]]; then
-    ACQ=$(grep -oE 'activeTurn.acquiredBy[^}]+}' "${SERVE_LOG}" 2>/dev/null | tail -1 || echo "")
-    echo "[kyqdt-busy] acquiredBy=${ACQ:-N/A}" >&2
-    echo "[kyqdt-busy] lastTerminal=$(grep -oE 'activeTurn.lastTerminal[^}]+}' "${SERVE_LOG}" 2>/dev/null | tail -1 || echo N/A)" >&2
-    echo "[kyqdt-busy] released=$(grep -oE 'activeTurn.released[^}]+}' "${SERVE_LOG}" 2>/dev/null | tail -1 || echo N/A)" >&2
-  fi
-  if [[ "${PROBE_STATUS}" -eq 0 ]]; then
-    echo "kyqdt-busy: PASS"
-  else
-    echo "kyqdt-busy: FAIL [reason=probe_status=${PROBE_STATUS}]"
-  fi
-fi
 
 exit "${PROBE_STATUS}"

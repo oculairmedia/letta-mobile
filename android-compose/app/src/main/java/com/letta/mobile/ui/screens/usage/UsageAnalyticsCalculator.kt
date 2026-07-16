@@ -55,6 +55,7 @@ internal object UsageAnalyticsCalculator {
 
     private const val FALLBACK_MODEL = "Unknown model"
     private const val FALLBACK_AGENT = "Unknown agent"
+    private const val MAX_BUCKETS = 12
 
     fun calculate(
         steps: List<Step>,

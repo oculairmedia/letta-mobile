@@ -12,6 +12,7 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.PlatformFile
 import com.letta.mobile.feature.chat.util.uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

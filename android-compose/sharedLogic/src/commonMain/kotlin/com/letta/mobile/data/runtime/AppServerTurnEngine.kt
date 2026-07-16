@@ -274,17 +274,6 @@ class AppServerTurnEngine(
         var pendingStop: RuntimeEventDraft? = null
         var pendingUsage: RuntimeEventDraft? = null
         var terminalSettleJob: Job? = null
-        // letta-mobile-kyqdt: once a completed lifecycle is observed and the
-        // settle timer is armed, it must NOT be re-armed by subsequent frames.
-        // The prior code cancel+rescheduled the quiet window on EVERY later
-        // matching frame, so on the shared server-side engine a steady trickle
-        // of matching frames (cross-device viewer traffic / late fanout deltas)
-        // deferred the completed terminal — and the activeTurn unlock that fires
-        // with it — indefinitely, leaving the run "busy" long after it was
-        // terminal and rejecting the next cross-device send. Arm-once makes the
-        // terminal release bounded and monotonic: the completed run always
-        // frees busy ownership within terminalSettleQuietMs of the completion.
-        var terminalArmed = false
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
         // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame currently being
@@ -304,28 +293,14 @@ class AppServerTurnEngine(
             pendingUsage = null
         }
 
-        // letta-mobile-kyqdt: arm the completed-terminal quiet timer AT MOST ONCE.
-        // Formerly this cancelled + rescheduled the settle job on every later
-        // matching frame, so any post-completion frame trickle deferred the
-        // terminal (and the activeTurn unlock) without bound. Arming once anchors
-        // the settle deadline to the first observed completion, so the terminal —
-        // and busy release — always fires within terminalSettleQuietMs. Later
-        // frames are still emitted downstream (below); they simply cannot push
-        // the terminal out. The settle body reads pendingCompleted at fire time,
-        // so a completion refined by an intervening frame still uses the latest
-        // terminal draft, just on the original, bounded deadline.
-        fun armCompletedTerminalOnce() {
-            if (terminalArmed) return
-            if (pendingCompleted == null) return
-            terminalArmed = true
+        fun rescheduleCompletedTerminal() {
+            val terminal = pendingCompleted ?: return
+            terminalSettleJob?.cancel()
             terminalSettleJob = launch {
                 delay(terminalSettleQuietMs)
-                val terminal = pendingCompleted ?: return@launch
-                // letta-mobile-oqfbj / fix(no-settle-on-clean-completion): do NOT
-                // synthesize Failed returns here. This is a CLEAN Completed
-                // terminal — with async/parallel tool execution a second tool's
-                // real return can legitimately arrive after this quiet window.
-                // See settleDanglingToolCalls() KDoc for the full rationale.
+                // letta-mobile-oqfbj: settle dangling calls before the delayed
+                // completed terminal too.
+                settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                 flushTail()
                 // letta-mobile-kyqdt: telemetry-only. This terminal was accepted
                 // by matches(scope) (it reached the collect body); record the
@@ -367,20 +342,6 @@ class AppServerTurnEngine(
                             "frameConv" to received.frame.runtime?.conversationId,
                             "eventSeq" to received.eventSeqOrNull(),
                         )
-                        // letta-mobile-kyqdt STEP 2: AUTHORITATIVE TERMINAL RELEASE.
-                        // If the rejected terminal-bearing frame is for the SAME
-                        // conversation, release the engine on the authoritative
-                        // terminal — no settle-window, no scope-match requirement.
-                        // Closes the passive-observer stuck-for-5-min gap.
-                        if (received.frame.runtime?.conversationId == scope.conversationId) {
-                            noteOwnerTerminal(
-                                RuntimeRunStatus.Completed,
-                                source = "authoritative_terminal_scope_mismatched",
-                                seq = received.eventSeqOrNull(),
-                                scopeMatched = false,
-                            )
-                            throw TurnCompleted
-                        }
                     }
                     return@collect
                 }
@@ -410,7 +371,7 @@ class AppServerTurnEngine(
                                 payload = autoApproved,
                             ),
                         )
-                        armCompletedTerminalOnce()
+                        rescheduleCompletedTerminal()
                         return@forEach
                     }
                     
@@ -439,10 +400,9 @@ class AppServerTurnEngine(
                     if (draft.isUsageStatisticsFrame()) {
                         if (pendingUsage == null) pendingUsage = draft
                         if (sawAssistantAfterToolReturn) {
-                            // letta-mobile-oqfbj / fix(no-settle-on-clean-completion):
-                            // this is also a CLEAN completion path (post-tool usage
-                            // stats + assistant message already observed) — do NOT
-                            // synthesize Failed returns for any still-dangling call.
+                            // letta-mobile-oqfbj: settle dangling calls before the
+                            // synthesized post-tool completion.
+                            settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn completion")
                             flushTail()
                             // letta-mobile-kyqdt: telemetry-only. Accepted-scope
                             // terminal via the post-tool usage completion path.
@@ -459,20 +419,15 @@ class AppServerTurnEngine(
                     }
                     if (draft.isCompletedLifecycle()) {
                         pendingCompleted = draft
-                        armCompletedTerminalOnce()
+                        pendingCompletedSeq = currentFrameSeq // letta-mobile-kyqdt: telemetry-only
+                        rescheduleCompletedTerminal()
                         return@forEach
                     }
                     // letta-mobile-oqfbj: settle dangling calls BEFORE the tail +
                     // terminal lifecycle so tool cards resolve to error instead of
                     // spinning and the transcript keeps matched call/return pairs.
-                    // fix(no-settle-on-clean-completion): only for ABNORMAL
-                    // terminals (Failed/Cancelled). A clean Completed terminal
-                    // must NOT synthesize Failed returns — see
-                    // settleDanglingToolCalls() KDoc.
                     if (draft.isTerminalLifecycle()) {
-                        if (draft.isAbnormalTerminal()) {
-                            settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn termination")
-                        }
+                        settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn termination")
                         flushTail()
                         // letta-mobile-kyqdt: telemetry-only. Record the terminal
                         // status carried by this lifecycle draft. This frame was
@@ -489,7 +444,7 @@ class AppServerTurnEngine(
                         throw TurnCompleted
                     }
                     emitDraft(draft)
-                    armCompletedTerminalOnce()
+                    rescheduleCompletedTerminal()
                 }
             }
         } catch (idle: TurnIdleTimedOutMarker) {
@@ -497,25 +452,12 @@ class AppServerTurnEngine(
             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
             throw idle
         } catch (e: kotlinx.coroutines.CancellationException) {
-            // letta-mobile-oqfbj: settle on cancellation/abort.
-            // fix(no-settle-on-clean-completion): structured concurrency can
-            // deliver a CLEAN completion's `throw TurnCompleted` (thrown from
-            // the delayed terminalSettleJob, a sibling coroutine of this
-            // collect loop) to this suspension point wrapped as a
-            // CancellationException whose cause chain includes the original
-            // TurnCompletedMarker. That is NOT an abnormal cancellation/abort —
-            // it is the clean-completion path — so it must not settle.
-            if (!e.isCausedByCleanCompletion()) {
-                turnEndReason = "Tool execution interrupted by cancellation"
-            }
+            // letta-mobile-oqfbj: settle on cancellation/abort
+            turnEndReason = "Tool execution interrupted by cancellation"
             throw e
         } catch (e: Throwable) {
-            // letta-mobile-oqfbj: settle on collector failure.
-            // fix(no-settle-on-clean-completion): same guard as above, in case
-            // the clean-completion marker surfaces here unwrapped instead.
-            if (!e.isCausedByCleanCompletion()) {
-                turnEndReason = "Tool execution interrupted by stream error"
-            }
+            // letta-mobile-oqfbj: settle on collector failure
+            turnEndReason = "Tool execution interrupted by stream error"
             throw e
         } finally {
             // letta-mobile-oqfbj: settle any remaining dangling calls before cleanup
@@ -751,20 +693,6 @@ class AppServerTurnEngine(
         return lifecycle.status == RuntimeRunStatus.Completed
     }
 
-    /**
-     * fix(no-settle-on-clean-completion): true only for Failed/Cancelled
-     * terminal lifecycles — i.e. an ABNORMAL end. [isTerminalLifecycle] is
-     * still used for flow control (both clean and abnormal terminals end the
-     * collect loop the same way); this narrower check gates whether dangling
-     * tool calls should be settled with a synthetic Failed return. See
-     * [settleDanglingToolCalls] for why Completed must never settle.
-     */
-    private fun RuntimeEventDraft.isAbnormalTerminal(): Boolean {
-        val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
-        return lifecycle.status == RuntimeRunStatus.Failed ||
-            lifecycle.status == RuntimeRunStatus.Cancelled
-    }
-
     private fun RuntimeEventDraft.isToolReturnFrame(): Boolean = when (val event = payload) {
         is RuntimeEventPayload.ToolReturnObserved -> true
         is RuntimeEventPayload.RemoteStreamFrame -> event.messageType == "client_tool_end" ||
@@ -857,33 +785,9 @@ class AppServerTurnEngine(
      * letta-mobile-oqfbj: emit synthetic ToolReturnObserved drafts for every tool_call_id
      * that was emitted but never returned. No-op when all emitted calls have returns.
      *
-     * fix(no-settle-on-clean-completion, letta-mobile-oqfbj): this must be called
-     * ONLY on ABNORMAL turn ends — cancellation, idle timeout, stream error, or a
-     * terminal lifecycle whose status is Failed/Cancelled. It must NEVER be
-     * called for a clean Completed terminal (delayed-settle quiet window,
-     * post-tool usage-statistics completion, or a Completed terminal lifecycle
-     * frame).
-     *
-     * Why: with async/parallel tool execution, a second (or later) tool call's
-     * real return can legitimately arrive from the server AFTER this turn's
-     * terminal frame. The synthetic Failed return produced here is a UI-layer
-     * DRAFT ONLY — it is never persisted to the server transcript. On a clean
-     * completion the server is authoritative and will still deliver the real
-     * return via a later snapshot
-     * (TimelineReturnsResponsesProcessor.applyReturnsAndResponsesFromSnapshot,
-     * last-wins). Settling early on clean completion therefore has no
-     * correctness benefit and one guaranteed cost: the tool card renders red
-     * ("Tool execution interrupted by turn completion") for a few seconds
-     * before the real success snapshot flips it back to green —
-     * a visible, confusing flicker for something that was never actually a
-     * failure. Live telemetry confirmed this: 34 settlements fired with reason
-     * "turn completion" against just 1 for genuine cancellation, and server
-     * transcripts showed real `toolResult isError=False` for the exact call ids
-     * that had been prematurely settled.
-     *
-     * Called from: the collector's finally block (idle timeout / cancellation /
-     * stream error) and the terminal-lifecycle path guarded by
-     * [RuntimeEventDraft.isAbnormalTerminal] (Failed/Cancelled only).
+     * Called from the collector's finally block (abnormal exit: cancel, timeout, collector
+     * error) AND from the terminal lifecycle path (when a TERMINAL failure arrives from the
+     * server with dangling calls still in flight).
      */
     private suspend fun settleDanglingToolCalls(
         command: TurnCommand,
@@ -976,19 +880,6 @@ class AppServerTurnEngine(
 
     private object TurnCompleted : TurnCompletedMarker()
     private sealed class TurnCompletedMarker : Throwable()
-
-    /**
-     * fix(no-settle-on-clean-completion): true when [this] (or anything in its
-     * `cause` chain) is [TurnCompletedMarker] — i.e. the exception is really
-     * the clean-completion signal propagated across a coroutine boundary
-     * (structured concurrency wraps a sibling's thrown [TurnCompleted] as a
-     * [kotlinx.coroutines.CancellationException] whose cause chain preserves
-     * the original marker). Used to make sure the abnormal-end catch clauses
-     * below never mistake a clean completion for a real cancellation/error and
-     * settle dangling tool calls with a synthetic Failed return.
-     */
-    private fun Throwable.isCausedByCleanCompletion(): Boolean =
-        generateSequence(this) { it.cause }.any { it is TurnCompletedMarker }
 
     private object TurnIdleTimedOut : TurnIdleTimedOutMarker()
     private sealed class TurnIdleTimedOutMarker : Throwable()

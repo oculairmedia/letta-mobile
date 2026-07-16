@@ -86,7 +86,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
      * emitting its frames, so the passive observer drops frames for that
      * conversation at the source instead of re-emitting a duplicate bubble.
      */
-    private val activeSendConversations = ConcurrentHashMap.newKeySet<String>()
+    private val activeSendConversations = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     /**
      * Projects passively-observed [AppServerInboundFrame.StreamDelta] frames the

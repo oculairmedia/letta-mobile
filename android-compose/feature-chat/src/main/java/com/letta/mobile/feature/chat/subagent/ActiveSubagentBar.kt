@@ -307,7 +307,7 @@ private fun ActiveSubagent.chipSemanticLabel(): String =
 @Composable
 private fun ViewConversationAction(
     description: String,
-    tint: Color,
+    tint: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
 ) {
     Icon(

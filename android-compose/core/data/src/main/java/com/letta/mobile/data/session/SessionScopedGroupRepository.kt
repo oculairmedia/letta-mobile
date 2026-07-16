@@ -50,6 +50,9 @@ class SessionScopedGroupRepository internal constructor(
             .launchIn(proxyScope)
     }
 
+    private val current: IGroupRepository
+        get() = sessionManager.current.groupRepository
+
     override suspend fun refreshGroups(managerType: String?, projectId: ProjectId?, showHiddenGroups: Boolean?) =
         sessionManager.withCurrentSession { it.groupRepository.refreshGroups(managerType, projectId, showHiddenGroups) }
 

@@ -9,6 +9,7 @@ import kotlinx.collections.immutable.persistentSetOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
+import com.letta.mobile.feature.chat.screen.chatShouldLoadOlderMessages
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.screen.ChatAutoScrollAction
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
@@ -50,6 +51,7 @@ class ChatMessageListScrollTest {
         assertEquals(ChatAutoScrollAction.Skip, action)
     }
 
+
     @Test
     fun `autoScrollAction snaps for streaming frames beyond throttle limit`() {
         val signature = makeSignature(role = "assistant", messageId = "m1")
@@ -67,6 +69,7 @@ class ChatMessageListScrollTest {
 
         assertEquals(ChatAutoScrollAction.Snap, action)
     }
+
 
     @Test
     fun `autoScrollAction animates when user has scrolled up index`() {
@@ -86,6 +89,7 @@ class ChatMessageListScrollTest {
         assertEquals(ChatAutoScrollAction.Animate, action)
     }
 
+
     @Test
     fun `autoScrollAction animates when user has scrolled up offset`() {
         val signature = makeSignature(role = "assistant", messageId = "m1")
@@ -103,6 +107,7 @@ class ChatMessageListScrollTest {
 
         assertEquals(ChatAutoScrollAction.Animate, action)
     }
+
 
     @Test
     fun `autoScrollAction animates for non-streaming messages`() {
@@ -122,6 +127,7 @@ class ChatMessageListScrollTest {
         assertEquals(ChatAutoScrollAction.Animate, action)
     }
 
+
     @Test
     fun `autoScrollAction animates for non-assistant roles`() {
         val signature = makeSignature(role = "user", messageId = "m1")
@@ -140,6 +146,7 @@ class ChatMessageListScrollTest {
         assertEquals(ChatAutoScrollAction.Animate, action)
     }
 
+
     @Test
     fun `first render item maps after persistent typing slot when not streaming`() {
         val items = listOf(single("m1", ts = "2026-04-20T12:00:00Z"))
@@ -153,6 +160,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `first render item maps after typing slot`() {
         val items = listOf(single("m1", ts = "2026-04-20T12:00:00Z"))
@@ -165,6 +173,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `target index includes typing slot and previous message rows`() {
@@ -182,6 +191,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `date separator before target adds lazy item offset after typing slot`() {
         val items = listOf(
@@ -197,6 +207,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `multiple date separators before target accumulate offsets`() {
@@ -215,6 +226,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `run block boundary timestamp participates in date separator offsets after typing slot`() {
         val items = listOf(
@@ -231,6 +243,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `auto-scroll signature changes when newest message content grows`() {
         val before = newestMessageAutoScrollSignature(
@@ -242,6 +255,7 @@ class ChatMessageListScrollTest {
 
         assertNotEquals(before, after)
     }
+
 
     @Test
     fun `auto-scroll signature ignores older page additions when newest message is unchanged`() {
@@ -257,6 +271,7 @@ class ChatMessageListScrollTest {
 
         assertEquals(before, after)
     }
+
 
     @Test
     fun `streaming assistant auto-scroll snaps when already pinned`() {
@@ -277,6 +292,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `streaming assistant auto-scroll throttles repeated pinned snaps`() {
         val signature = newestMessageAutoScrollSignature(
@@ -295,6 +311,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `auto-scroll keeps animation for unpinned or non-streaming updates`() {
@@ -326,6 +343,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `force scroll on user send brings new user bubble into view from any position`() {
         val signature = newestMessageAutoScrollSignature(
@@ -341,6 +359,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `force scroll on user send does not retrigger for same user message`() {
@@ -358,6 +377,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `force scroll on user send ignores assistant streaming updates`() {
         val signature = newestMessageAutoScrollSignature(
@@ -373,6 +393,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `streaming geometry floor follows render bucket across content growth`() {
@@ -390,6 +411,7 @@ class ChatMessageListScrollTest {
         assertEquals(148, state.heightFloorFor(longer, isStreaming = true))
     }
 
+
     @Test
     fun `streaming geometry floor does not constrain settled content`() {
         val state = ChatMessageGeometryState(maxEntries = 8)
@@ -400,6 +422,7 @@ class ChatMessageListScrollTest {
 
         assertEquals(0, state.heightFloorFor(longer, isStreaming = false))
     }
+
 
     @Test
     fun `clear streaming floors removes existing streaming bounds`() {
@@ -414,6 +437,7 @@ class ChatMessageListScrollTest {
 
         assertEquals(0, state.heightFloorFor(streamingItem, isStreaming = true))
     }
+
 
     @Test
     fun `streaming geometry measurement does not seed settled exact height for same content`() {
@@ -432,6 +456,7 @@ class ChatMessageListScrollTest {
         assertEquals(180, state.heightFloorFor(tableMessage, isStreaming = false))
     }
 
+
     @Test
     fun `inactive streaming geometry buckets are pruned`() {
         val state = ChatMessageGeometryState(maxEntries = 8)
@@ -447,6 +472,7 @@ class ChatMessageListScrollTest {
         assertEquals(0, state.heightFloorFor(firstGrown, isStreaming = true))
         assertEquals(80, state.heightFloorFor(secondGrown, isStreaming = true))
     }
+
 
     @Test
     fun `render item geometry signature changes for width scale direction expansion and content`() {
@@ -469,6 +495,7 @@ class ChatMessageListScrollTest {
         assertNotEquals(collapsed, expanded)
     }
 
+
     @Test
     fun `render item geometry signature samples long content changes without full text hash`() {
         val baseContent = "a".repeat(200)
@@ -480,6 +507,7 @@ class ChatMessageListScrollTest {
         assertEquals(base.contentLength, changed.contentLength)
         assertNotEquals(base.contentHash, changed.contentHash)
     }
+
 
     @Test
     fun `pinch live scale follows visible window regardless of expensive content`() {
@@ -503,6 +531,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     @Test
     fun `pinch live scale includes all items before visibility window is known`() {
         assertEquals(
@@ -514,6 +543,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `non-pinching items always see committed live scale path`() {
@@ -527,6 +557,7 @@ class ChatMessageListScrollTest {
         )
     }
 
+
     // letta-mobile-58qlr: fading-edge gating + target-color logic.
 
     @Test
@@ -536,12 +567,14 @@ class ChatMessageListScrollTest {
         assertFalse(chatFadeShowTop(canScrollForward = false))
     }
 
+
     @Test
     fun `bottom fade shows only when there is content scrolled off the bottom`() {
         // reverseLayout: visual bottom == canScrollBackward.
         assertTrue(chatFadeShowBottom(canScrollBackward = true))
         assertFalse(chatFadeShowBottom(canScrollBackward = false))
     }
+
 
     @Test
     fun `fade target uses solid chat background color so it blends exactly`() {
@@ -554,6 +587,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     @Test
     fun `fade target falls back to container color for default and gradient backgrounds`() {
@@ -576,6 +610,7 @@ class ChatMessageListScrollTest {
             ),
         )
     }
+
 
     private fun single(
         id: String,
@@ -657,6 +692,7 @@ class ChatMessageListScrollTest {
         assertEquals(0, state.heightFloorFor(smallerScale, isStreaming = true))
     }
 
+
     @Test
     fun `exact height is invalidated across chatFontScaleBucket changes`() {
         val state = ChatMessageGeometryState(maxEntries = 8)
@@ -670,4 +706,86 @@ class ChatMessageListScrollTest {
         assertEquals(150, state.heightFloorFor(baseScale, isStreaming = false))
         assertEquals(0, state.heightFloorFor(largerScale, isStreaming = false))
     }
+
 }
+
+
+    @Test
+    fun `shouldLoadOlderMessages returns false if no more older messages`() {
+        assertFalse(
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = false,
+                isLoadingOlderMessages = false,
+                messagesEmpty = false,
+                firstVisibleItemIndex = 10,
+                renderItemsSize = 10
+            )
+        )
+    }
+
+
+    @Test
+    fun `shouldLoadOlderMessages returns false if already loading`() {
+        assertFalse(
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = true,
+                isLoadingOlderMessages = true,
+                messagesEmpty = false,
+                firstVisibleItemIndex = 10,
+                renderItemsSize = 10
+            )
+        )
+    }
+
+
+    @Test
+    fun `shouldLoadOlderMessages returns false if empty`() {
+        assertFalse(
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = true,
+                isLoadingOlderMessages = false,
+                messagesEmpty = true,
+                firstVisibleItemIndex = 10,
+                renderItemsSize = 10
+            )
+        )
+    }
+
+
+    @Test
+    fun `shouldLoadOlderMessages triggers when scrolling near top`() {
+        val renderItemsSize = 50
+
+        // 50 items. Trigger distance is 3.
+        // firstVisibleItemIndex + 3 >= 50 => firstVisibleItemIndex >= 47
+
+        assertFalse(
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = true,
+                isLoadingOlderMessages = false,
+                messagesEmpty = false,
+                firstVisibleItemIndex = 40,
+                renderItemsSize = renderItemsSize
+            )
+        )
+
+        assertTrue(
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = true,
+                isLoadingOlderMessages = false,
+                messagesEmpty = false,
+                firstVisibleItemIndex = 47,
+                renderItemsSize = renderItemsSize
+            )
+        )
+
+        assertTrue(
+            chatShouldLoadOlderMessages(
+                hasMoreOlderMessages = true,
+                isLoadingOlderMessages = false,
+                messagesEmpty = false,
+                firstVisibleItemIndex = 49,
+                renderItemsSize = renderItemsSize
+            )
+        )
+    }

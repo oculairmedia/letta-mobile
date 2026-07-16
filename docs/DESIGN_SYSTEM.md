@@ -189,7 +189,7 @@ Beyond Material 3, the app defines its own semantic colors:
 
 ## What "regimented design" should add (gaps)
 
-- **Native Penpot token coverage** for all six theme presets. The canonical `letta mobile` / App Mockups v2 component library exists; remaining work is complete native-token binding and automated conformance.
+- **Figma/Penpot library** mirroring the six theme presets (none exists yet)
 - **A11y color contract** — every `LettaThemeTokens` preset should specify AA-contrast pairings explicitly. Currently implicit via Material 3 defaults.
 - **Motion spec sheet** — `LettaMotionTokens` are in code; no design surface documents the curves/easings (we use `Motion.kt` for that, but it's not human-readable).
 - **Icon naming spec** — Lucide icons are referenced by string; no design-side catalog of which icon is used where.

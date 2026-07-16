@@ -15,8 +15,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
-import com.letta.mobile.data.transport.ServerFrame
 
 /**
  * letta-mobile-r3i1z (B): HEADLESS TWO-CLIENT LIVE-SYNC PROBE.
@@ -90,10 +88,6 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
         help = "Skip round 3 (the redial + auto-re-subscribe case). Use to isolate the base two-way sync.",
     ).flag(default = false)
 
-    private val mode by option(
-        "--mode",
-        help = "Probe mode. 'live-sync' (default) asserts two-way sync + redial auto-resubscribe. 'kyqdt-busy' asserts a second send is busy-rejected while a first turn is still active (matches the live kyqdt gate).",
-    ).default("live-sync")
     private val jsonOutput by option("--json", help = "Also print the machine-readable JSON summary.").flag(default = false)
 
     override fun run() = runBlocking {
@@ -127,38 +121,6 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
                 sender = clientB, observer = clientA, conversationId = conv,
             )
 
-            // kyqdt-busy mode: BEFORE the default rounds complete, assert the second send
-            // (B) is busy-rejected while A's first turn is still active. The hermetic stub
-            // drops terminal frames for round 1 (SUPPRESS_TERMINAL=1), so the engine stays
-            // busy and B's send is deterministically rejected.
-            if (mode == "kyqdt-busy") {
-                // Send B's turn against the SAME conversation while A's first
-                // turn is in-flight (the stub completes turns normally; the
-                // real gate asserts busy-rejection on the LIVE WRAPPER).
-                // The hermetic stub currently completes terminals regardless
-                // of suppressTerminal, so the check PASSES even without
-                // busy-rejection — it records the terminal status for the
-                // caller to interpret (completed=engine-idle, failed=busy).
-                clientB.clearFrames()
-                val sentText = "kyqdt-busy-second-send payload"
-                clientB.send(conv, sentText)
-                val gotTerminal = withTimeoutOrNull(10_000L) {
-                    while (clientB.snapshot().none { it is ServerFrame.TurnDone }) delay(50)
-                    true
-                } == true
-                val result = TwoClientObservation.classify(clientB.snapshot(), sentText, gotTerminal)
-                val detail = buildString {
-                    append(result.detail)
-                    // Append the terminal frame type so the caller can see whether the
-                    // engine rejected (TurnDone/failed = busy) or completed (TurnDone/completed = idle).
-                    val td = clientB.snapshot().filterIsInstance<ServerFrame.TurnDone>().firstOrNull()
-                    if (td != null) {
-                        append(" kyqdtTerminalStatus=${td.status}")
-                    }
-                }
-                report.recordCheck("kyqdt_busy_B_send_rejected", true, detail)
-            }
-
             // 4. Redial: B drops + redials, then A sends -> B still observes,
             //    proving B auto-re-subscribed on the fresh Ready (deliverable A).
             if (!skipRedial) {
@@ -170,7 +132,6 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
                     redialCase = true,
                 )
             }
-
         } catch (error: Throwable) {
             report.fatal(error.message ?: error.toString())
         } finally {

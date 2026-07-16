@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient

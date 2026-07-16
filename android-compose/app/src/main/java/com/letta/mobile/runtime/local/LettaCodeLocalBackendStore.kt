@@ -25,6 +25,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -468,7 +469,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
         put("text", JsonPrimitive("[image unavailable]"))
     }
 
-    private fun base64Url(value: String): String = Base64.getUrlEncoder().withoutPadding()
+    private fun base64Url(value: String): String = java.util.Base64.getUrlEncoder().withoutPadding()
         .encodeToString(value.toByteArray(Charsets.UTF_8))
 
     companion object {

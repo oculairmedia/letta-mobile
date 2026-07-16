@@ -35,10 +35,6 @@ internal class TwoClientReport(
         fatalError = message
     }
 
-    fun recordCheck(name: String, ok: Boolean, detail: String) {
-        checks += Check(name, ok, detail)
-    }
-
     /**
      * Runs ONE round: [sender] sends a turn, and [observer] (a passive viewer)
      * must receive it LIVE. Asserts, in order:

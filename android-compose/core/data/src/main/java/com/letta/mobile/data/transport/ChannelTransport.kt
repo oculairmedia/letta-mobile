@@ -6,6 +6,7 @@ import com.letta.mobile.data.timeline.ConversationCursorStore
 import com.letta.mobile.data.timeline.NoOpConversationCursorStore
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +27,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import okhttp3.Response
@@ -757,6 +759,25 @@ class ChannelTransport internal constructor(
         private const val NEW_CONVERSATION_STATE_KEY = "__new_conversation__"
         const val KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE = 4001
         private val AUTH_FAILURE_CLOSE_CODES = setOf(4003, 4401, 4403)
+
+        private val SKIP_CURSOR_TYPES: Set<String> = setOf(
+            "welcome",
+            "a2ui_capabilities",
+            "user_action_ack",
+            "user_action_outcome",
+            "error",
+            "cron_list_response",
+            "cron_add_response",
+            "cron_get_response",
+            "cron_delete_response",
+            "cron_delete_all_response",
+            "crons_updated",
+            "subagent_list_response",
+            "subagent_todos_response",
+            "subagents_updated",
+            "subscribe_frame",
+            "subscribe_done",
+        )
 
         const val DEFAULT_CRON_TIMEOUT_MS: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS
 

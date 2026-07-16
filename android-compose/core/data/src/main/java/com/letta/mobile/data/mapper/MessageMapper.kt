@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.GeneratedUiPayload
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.SystemMessage
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -35,6 +36,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 internal data class ToolCallContext(
     val name: String,

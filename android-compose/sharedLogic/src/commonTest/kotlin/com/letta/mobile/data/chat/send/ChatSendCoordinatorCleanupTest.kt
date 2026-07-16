@@ -40,35 +40,6 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorCleanupTest {
     @Test
-    fun `next send heals stale presence when transport has no active turn`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val timeline = RecordingTimelineWriter()
-            val ui = RecordingUiSink(isStreaming = true, isAgentTyping = true)
-            val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = false)
-            val coordinator = coordinator(timeline, ui, transport)
-
-            coordinator.send("next turn").join()
-
-            assertEquals(listOf("next turn"), transport.sentTexts)
-            assertEquals(1, ui.visualCompletions)
-            // The new accepted send owns presence now; healing must not leave it settled.
-            assertTrue(ui.isStreaming())
-            assertTrue(ui.isAgentTyping())
-        }
-
-    @Test
-    fun `next send does not clear presence while transport still owns active turn`() =
-        runTest(UnconfinedTestDispatcher()) {
-            val timeline = RecordingTimelineWriter()
-            val ui = RecordingUiSink(isStreaming = true, isAgentTyping = true)
-            val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
-            val coordinator = coordinator(timeline, ui, transport)
-
-            coordinator.send("queued turn").join()
-
-            assertEquals(0, ui.visualCompletions)
-        }
-    @Test
     fun transientDisconnectDoesNotCleanupFailOrFinalizeActiveTurn() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val ui = RecordingUiSink()
@@ -260,7 +231,6 @@ class ChatSendCoordinatorCleanupTest {
         private var isAgentTyping: Boolean = false,
     ) : ChatSendUiSink {
         val transientDisconnects = mutableListOf<Boolean>()
-        var visualCompletions = 0
         override fun currentError(): String? = error
         override fun isStreaming(): Boolean = isStreaming
         override fun isAgentTyping(): Boolean = isAgentTyping
@@ -272,7 +242,7 @@ class ChatSendCoordinatorCleanupTest {
         override fun onMessageDelta(conversationId: String) { error = null; isStreaming = true; isAgentTyping = true }
         override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) = Unit
         override fun onTurnFinished(error: String?) { this.error = error; isStreaming = false; isAgentTyping = false }
-        override fun onTurnVisuallyComplete() { visualCompletions++; isStreaming = false; isAgentTyping = false }
+        override fun onTurnVisuallyComplete() { isStreaming = false; isAgentTyping = false }
         override fun onTransientDisconnect(hasActiveSend: Boolean) { transientDisconnects += hasActiveSend; error = null; isStreaming = hasActiveSend; isAgentTyping = hasActiveSend }
         override fun onDisconnectFailure(error: String) { this.error = error; isStreaming = false; isAgentTyping = false }
     }
@@ -307,14 +277,10 @@ class ChatSendCoordinatorCleanupTest {
         data class Reconcile(val conversationId: String, val reason: String, val forceRefresh: Boolean)
     }
 
-    private class FakeChannelTransport(
-        val sendResults: MutableList<Boolean>,
-        var activeChatTurn: Boolean = false,
-    ) : IChannelTransport {
+    private class FakeChannelTransport(val sendResults: MutableList<Boolean>) : IChannelTransport {
         override val state: StateFlow<ChannelTransportState> = MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
         override val events = MutableSharedFlow<ServerFrame>()
         override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
-        override val hasActiveChatTurn: Boolean get() = activeChatTurn
         val sentTexts = mutableListOf<String>()
         override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
         override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; return sendResults.removeFirstOrNull() ?: true }

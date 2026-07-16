@@ -32,6 +32,7 @@ internal class ProjectChatCoordinator(
     private val blockRepository: IBlockRepository,
     private val bugReportRepository: IBugReportRepository,
     private val conversationId: () -> String?,
+    private val setComposerError: (String) -> Unit,
     private val sendMessage: (String) -> Unit,
 ) : ChatProjectBindings {
     override fun refreshContextWindow() {

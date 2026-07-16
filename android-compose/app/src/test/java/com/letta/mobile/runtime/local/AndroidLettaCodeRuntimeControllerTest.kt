@@ -477,35 +477,6 @@ class AndroidLettaCodeRuntimeControllerTest {
     }
 
     @Test
-    fun `cancel mid-turn still settles dangling tool calls post-turn`() = runTest {
-        // lcp-im5q: the finally-block heal runs in an already-cancelled
-        // coroutine on user cancel. Without NonCancellable the store call
-        // would throw CancellationException on entry and the transcript
-        // would stay wedged (orphan toolCall with no toolResult) until the
-        // next turn. Pin that the heal ACTUALLY executes on cancel.
-        val nodeBridge = FakeNodeBridge(outputLines = MutableSharedFlow<String>())
-        val localBackendStore = mockk<LettaCodeLocalBackendStore>(relaxed = true)
-        val controller = controller(
-            nodeBridge,
-            turnSilenceMs = 120_000L,
-            turnAbsoluteMaxMs = 300_000L,
-            localBackendStore = localBackendStore,
-        )
-
-        val job = launch { controller.submit(command(), config(localModelPath = tempModelPath(), localModelHandle = "lmstudio/minimax-m3")).collect {} }
-        runCurrent()
-        job.cancel(CancellationException("stop"))
-        runCurrent()
-
-        assertTrue(job.isCancelled)
-        // Two heals: the pre-turn first-session belt ALWAYS fires; the
-        // second is the post-turn settle-on-interrupt — the one that only
-        // happens because the finally block shields it with NonCancellable.
-        // Without the shield this verifies 1, not 2.
-        coVerify(exactly = 2) { localBackendStore.healDanglingToolCalls(any()) }
-    }
-
-    @Test
     fun `model selection normalizes config defaults and handles`() {
         val selection = EmbeddedLettaCodeModelSelection.from(
             LettaConfig(
@@ -578,14 +549,13 @@ class AndroidLettaCodeRuntimeControllerTest {
         nodeBridge: FakeNodeBridge,
         turnSilenceMs: Long,
         turnAbsoluteMaxMs: Long,
-        localBackendStore: LettaCodeLocalBackendStore = mockk(relaxed = true),
     ): AndroidLettaCodeRuntimeController = AndroidLettaCodeRuntimeController(
         context = mockk<Context>(relaxed = true),
         assetExtractor = FakeAssetExtractor(File(System.getProperty("java.io.tmpdir"), "letta-timeout-${System.nanoTime()}").apply { mkdirs() }),
         nodeBridge = nodeBridge,
         runtimeStatusProvider = statusProvider(runnable = true),
         onDeviceOpenAiBridge = mockk(relaxed = true),
-        localBackendStore = localBackendStore,
+        localBackendStore = mockk(relaxed = true),
         androidNetworkBridge = FakeAndroidNetworkBridge(),
     ).apply {
         this.turnSilenceMs = turnSilenceMs

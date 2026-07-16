@@ -2,6 +2,7 @@ package com.letta.mobile.data.session
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
+import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
@@ -64,9 +65,6 @@ class SessionScopedChannelTransport internal constructor(
 
     private val current: IChannelTransport
         get() = sessionManager.current.channelTransport
-
-    override val hasActiveChatTurn: Boolean
-        get() = current.hasActiveChatTurn
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) =
         sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }

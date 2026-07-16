@@ -49,6 +49,9 @@ class SessionScopedModelRepository internal constructor(
             .launchIn(proxyScope)
     }
 
+    private val current: IModelRepository
+        get() = sessionManager.current.modelRepository
+
     override suspend fun refreshLlmModels() = sessionManager.withCurrentSession { it.modelRepository.refreshLlmModels() }
 
     override suspend fun refreshEmbeddingModels() = sessionManager.withCurrentSession { it.modelRepository.refreshEmbeddingModels() }

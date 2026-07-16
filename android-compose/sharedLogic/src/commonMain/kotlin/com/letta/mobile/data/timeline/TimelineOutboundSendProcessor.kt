@@ -43,23 +43,6 @@ internal class TimelineOutboundSendProcessor(
      * Mirrors mobile's ChatSendCoordinator, which clears the latch at turn end.
      */
     private val onSendStreamEnded: suspend () -> Unit = {},
-    /**
-     * letta-mobile-dangling-tool (Codex #902 finding 1): the REST/timeline-
-     * transport send path (this class) previously never signaled the
-     * dangling-tool-call resolver's turn lifecycle — only the WS/iroh
-     * ChatSendCoordinator path did, via TimelineRepository.turnStarted /
-     * turnEnded. That left a tool_call streamed through THIS path with no
-     * eventual return spinning forever, since no sweep was ever scheduled.
-     * Called when the outbound send stream begins; mirrors
-     * [TimelineSyncLoop.turnStarted].
-     */
-    private val onTurnStarted: () -> Unit = {},
-    /**
-     * Called when the outbound send stream ends, with [clean] reflecting
-     * whether it completed without throwing. Mirrors
-     * [TimelineSyncLoop.turnEnded].
-     */
-    private val onTurnEnded: (clean: Boolean) -> Unit = {},
 ) {
     val sendQueue = Channel<PendingSend>(Channel.UNLIMITED)
 
@@ -154,12 +137,6 @@ internal class TimelineOutboundSendProcessor(
         var firstEventLogged = false
         val firstEventTimer = Telemetry.startTimer("TimelineSync", "send.firstEvent")
 
-        // letta-mobile-dangling-tool (Codex #902 finding 1): signal the same
-        // turn-lifecycle hooks the WS/iroh coordinator path uses, scoped to
-        // exactly this stream so a dangling tool_call streamed here gets a
-        // sweep scheduled instead of spinning forever.
-        onTurnStarted()
-        var streamCompletedCleanly = false
         try {
             stream.collect { message ->
                 eventCount++
@@ -170,13 +147,11 @@ internal class TimelineOutboundSendProcessor(
                 ingestStreamEvent(message)
                 events.emit(TimelineSyncEvent.ServerEvent(message))
             }
-            streamCompletedCleanly = true
         } finally {
             // r3i1z: the turn's send stream is over (terminal or failure) — re-arm
             // the persistent stream subscriber so externally-initiated turns
             // (fanned-out observer frames) are ingested again.
             onSendStreamEnded()
-            onTurnEnded(streamCompletedCleanly)
         }
 
         streamTimer.stop("otid" to otid, "eventCount" to eventCount)

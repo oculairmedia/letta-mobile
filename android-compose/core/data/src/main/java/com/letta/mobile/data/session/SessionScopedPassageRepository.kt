@@ -47,6 +47,9 @@ class SessionScopedPassageRepository internal constructor(
             .launchIn(proxyScope)
     }
 
+    private val current: IPassageRepository
+        get() = sessionManager.current.passageRepository
+
     override fun getPassages(agentId: String): StateFlow<List<Passage>> = synchronized(cacheLock) {
         val flow = passageFlowsByAgent.getOrPut(agentId) {
             MutableStateFlow(sessionManager.current.passageRepository.getPassages(agentId).value)

@@ -8,6 +8,7 @@ import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
+import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -37,6 +38,7 @@ class AdminChatComposerCoordinatorTest {
     private val chatBannerController = mockk<ChatBannerController>(relaxed = true)
     private val messageRepository = mockk<MessageRepository>(relaxed = true)
     private val slashCommandRepository = mockk<ISlashCommandRepository>(relaxed = true)
+    private val timelineChatSendStrategy = mockk<TimelineChatSendStrategy>(relaxed = true)
     private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val uiState = MutableStateFlow(ChatUiState())
 
@@ -54,6 +56,7 @@ class AdminChatComposerCoordinatorTest {
             composerController = composerController,
             chatSendStrategySelector = chatSendStrategySelector,
             chatBannerController = chatBannerController,
+            activeConversationId = { "conv_123" },
             uiState = uiState,
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
@@ -61,6 +64,7 @@ class AdminChatComposerCoordinatorTest {
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
+            timelineChatSendStrategy = timelineChatSendStrategy,
             isStreaming = { false },
             projectContextAvailable = true,
         )
@@ -105,6 +109,7 @@ class AdminChatComposerCoordinatorTest {
             composerController = composerController,
             chatSendStrategySelector = chatSendStrategySelector,
             chatBannerController = chatBannerController,
+            activeConversationId = { "conv_123" },
             uiState = uiState,
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
@@ -112,6 +117,7 @@ class AdminChatComposerCoordinatorTest {
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
+            timelineChatSendStrategy = timelineChatSendStrategy,
             isStreaming = { true },
             projectContextAvailable = true,
         )

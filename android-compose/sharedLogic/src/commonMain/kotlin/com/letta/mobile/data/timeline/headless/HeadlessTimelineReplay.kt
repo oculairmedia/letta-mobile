@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -977,6 +978,11 @@ private fun compareInterleavedEvents(
         return leftTimestamp.compareTo(rightTimestamp)
     }
     return left.sourceIndex.compareTo(right.sourceIndex)
+}
+
+private fun String.toRecordedFrameJsonOrNull(): JsonObject? {
+    val element = runCatching { replayJson.parseToJsonElement(this).jsonObject }.getOrNull() ?: return null
+    return element.toRecordedFrameJsonOrNull()
 }
 
 private fun JsonObject.toRecordedFrameJsonOrNull(): JsonObject? {

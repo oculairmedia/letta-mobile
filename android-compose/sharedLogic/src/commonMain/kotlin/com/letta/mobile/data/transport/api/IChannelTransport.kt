@@ -21,9 +21,6 @@ interface IChannelTransport {
     val events: SharedFlow<ServerFrame>
     val frameEvents: SharedFlow<TransportFrameEvent>
 
-    /** True only while this transport owns a live, non-terminal chat turn. */
-    val hasActiveChatTurn: Boolean get() = false
-
     suspend fun connect(
         baseShimUrl: String,
         token: String,

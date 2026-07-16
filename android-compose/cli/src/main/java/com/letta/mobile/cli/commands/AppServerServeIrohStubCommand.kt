@@ -3,7 +3,6 @@ package com.letta.mobile.cli.commands
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.probe.ProbeStubAdminServer
@@ -59,11 +58,6 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
         help = "TCP port for the local stub HTTP admin API. 0 = random free port.",
     ).int().default(0)
 
-    private val suppressTerminal by option(
-        "--suppress-terminal",
-        help = "Drop terminal frames so the turn engine stays busy (for kyqdt-busy gate reproduction).",
-    ).flag(default = false)
-
     private val assistantDeltas by option(
         "--assistant-deltas",
         help = "Assistant deltas emitted per turn (spaced so cancel can land midstream).",
@@ -86,7 +80,7 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
         val scope = CoroutineScope(Dispatchers.IO)
         try {
             val store = ProbeStubStore()
-            val behavior = ProbeStubBehavior.fromEnv().copy(suppressTerminal = suppressTerminal || System.getProperty("letta.probe.stub.suppressTerminal") == "true",
+            val behavior = ProbeStubBehavior.fromEnv().copy(
                 assistantDeltas = assistantDeltas,
                 deltaDelayMs = deltaDelayMs.toLong(),
             )

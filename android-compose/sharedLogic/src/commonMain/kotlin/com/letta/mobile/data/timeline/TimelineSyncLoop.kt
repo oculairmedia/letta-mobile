@@ -1,8 +1,11 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
@@ -108,22 +111,6 @@ class TimelineSyncLoop(
         holderHydrationSeed = holderHydrationSeed
     )
 
-    // letta-mobile-dangling-tool: canonical-record-driven post-turn sweep +
-    // hydration guard for tool-call cards left unresolved after PR #900
-    // removed the guess-based settle-on-clean-completion behavior. See
-    // DanglingToolCallResolver's kdoc for the never-guess principle.
-    private val danglingToolCallResolver = DanglingToolCallResolver(
-        conversationId = conversationId,
-        state = _state,
-        writeMutex = writeMutex,
-        scope = loopScope,
-        reconcile = ::reconcileRecentMessages,
-    )
-
-    /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
-    @Volatile
-    private var turnActive: Boolean = false
-
     private val outboundSendProcessor = TimelineOutboundSendProcessor(
         conversationId = conversationId,
         messageApi = messageApi,
@@ -145,13 +132,6 @@ class TimelineSyncLoop(
         // never the reply. ChatSendCoordinator clears the same latch at turn end
         // on the WS/iroh coordinator path; this is the loop-owned send's mirror.
         onSendStreamEnded = { wsSubscription.clear() },
-        // letta-mobile-dangling-tool (Codex #902 finding 1): the REST/timeline-
-        // transport send path never went through ChatSendCoordinator's
-        // turnStarted/turnEnded hooks, so a dangling tool_call streamed here
-        // never got a sweep scheduled. Mirror the WS path's semantics directly
-        // around this loop-owned send stream.
-        onTurnStarted = ::turnStarted,
-        onTurnEnded = ::turnEnded,
     )
 
     private val stateTransitionHandler = TimelineStateTransitionHandler(
@@ -197,42 +177,6 @@ class TimelineSyncLoop(
     suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false, fallbackCursorSeq: Long? = null) {
         hydrator.hydrate(limit, recordConversationCursor, fallbackCursorSeq)
         hasHydratedSuccessfully = true
-        // letta-mobile-dangling-tool: heal stale spinners that survived an
-        // app restart or a dropped stream. Escalates to the same bounded
-        // backoff sweep as turnEnded if the immediate reconcile alone
-        // doesn't resolve everything, so there's always a terminal outcome.
-        danglingToolCallResolver.runHydrationGuardIfIdle(turnActive)
-    }
-
-    /**
-     * Signals that a turn has started for this conversation. A new turn
-     * supersedes whatever the previous turn's sweep left pending — see
-     * [DanglingToolCallResolver.cancelPendingSweep].
-     */
-    fun turnStarted() {
-        turnActive = true
-        danglingToolCallResolver.cancelPendingSweep()
-    }
-
-    /**
-     * Signals that a turn has ended for this conversation. Schedules the
-     * bounded canonical-record-driven sweep whenever unresolved tool-call
-     * cards remain — on EVERY completion path, clean or abnormal.
-     *
-     * [clean] is passed through to the resolver for telemetry only; it does
-     * NOT gate whether the sweep is scheduled (Codex #902 finding 3). If it
-     * did, an abnormal (cancel/timeout/error) completion of turn N+1 would
-     * call [DanglingToolCallResolver.cancelPendingSweep] on `turnStarted()`
-     * for N+1 and then never reschedule anything on its own abnormal
-     * `turnEnded(clean = false)`, permanently dropping turn N's still-
-     * dangling sweep. Always scheduling is safe because the sweep only ever
-     * asks the canonical record — an abnormal turn's own calls are already
-     * settled synchronously by AppServerTurnEngine, so they never appear in
-     * [Timeline.unresolvedToolCallIds] to begin with.
-     */
-    fun turnEnded(clean: Boolean) {
-        turnActive = false
-        danglingToolCallResolver.scheduleSweepIfUnresolved(clean)
     }
 
     suspend fun send(content: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
@@ -366,7 +310,7 @@ class TimelineSyncLoop(
                     "messageId" to messageId,
                 )
             }
-            .getOrNull() as? ToolReturnMessage ?: return false
+            .getOrNull() as? com.letta.mobile.data.model.ToolReturnMessage ?: return false
         if (message.toolReturnTruncated == true) return false
         writeMutex.withLock {
             applyReturnsAndResponsesFromSnapshot(listOf(message), _state)

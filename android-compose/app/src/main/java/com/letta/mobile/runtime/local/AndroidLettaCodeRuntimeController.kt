@@ -18,12 +18,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -119,17 +117,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                 // turn's Layer-1 check re-verifies before replay.
                 if (!endedCleanly) {
                     transcriptDirty = true
-                    // lcp-im5q: a USER CANCEL lands here with this coroutine
-                    // already cancelled — any plain suspend call (the heal's
-                    // withContext(Dispatchers.IO)) would throw
-                    // CancellationException on entry and the settle would
-                    // silently never run, deferring the repair to the next
-                    // turn's pre-turn check. NonCancellable lets the
-                    // bounded, disk-only heal complete now so the transcript
-                    // is clean the moment the turn dies.
-                    withContext(NonCancellable) {
-                        healDanglingToolCalls(command.agentId.value, phase = "post-turn")
-                    }
+                    healDanglingToolCalls(command.agentId.value, phase = "post-turn")
                 }
             }
         }
@@ -438,6 +426,8 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             else -> false
         }
     }
+
+    private class TerminalResultSeen : CancellationException()
 
     private class TurnTimeoutException(message: String) : CancellationException(message)
 

@@ -7,6 +7,9 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,9 +33,11 @@ import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import com.letta.mobile.feature.chat.render.resolveRenderer
+import com.letta.mobile.feature.chat.render.MessageContentRenderer
 
 /**
  * A message renders bubble-less (just markdown on the page background) when
