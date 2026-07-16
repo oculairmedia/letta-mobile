@@ -35,6 +35,10 @@ class FakeChannelTransport(
         extraBufferCapacity = 16,
     )
 
+    // dir4k (z5vfy PR-2): settable active-turn ownership so tests can assert the
+    // SessionScopedChannelTransport wrapper delegates it through to the live transport.
+    override var hasActiveChatTurn: Boolean = false
+
     val cronListCalls = mutableListOf<CronListCall>()
     val cronAddCalls = mutableListOf<CronAddCall>()
     val cronGetCalls = mutableListOf<String>()
