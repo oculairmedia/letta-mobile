@@ -106,7 +106,7 @@ class DanglingToolCallResolverTest {
     }
 
     @Test
-    fun `exhaustion settles an honest failed return, never guessing mid-sweep`() = runTest {
+    fun `exhaustion settles an honest failed return - never guessing mid-sweep`() = runTest {
         val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(
@@ -249,7 +249,7 @@ class DanglingToolCallResolverTest {
     }
 
     @Test
-    fun `hydration guard escalates to the bounded sweep and settles failed on exhaustion, not just one reconcile`() = runTest {
+    fun `hydration guard escalates to the bounded sweep and settles failed on exhaustion - not just one reconcile`() = runTest {
         val state = MutableStateFlow(Timeline("c1").append(toolCallEvent(callId = "call-1", returned = false)))
         var reconcileCalls = 0
         val resolver = DanglingToolCallResolver(

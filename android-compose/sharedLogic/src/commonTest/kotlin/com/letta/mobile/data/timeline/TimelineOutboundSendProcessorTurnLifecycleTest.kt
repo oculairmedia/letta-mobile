@@ -44,7 +44,7 @@ import kotlinx.coroutines.test.runTest
 class TimelineOutboundSendProcessorTurnLifecycleTest {
 
     @Test
-    fun `send stream completing cleanly signals turnStarted then turnEnded(clean = true)`() = runTest(UnconfinedTestDispatcher()) {
+    fun `send stream completing cleanly signals turnStarted then turnEnded clean true`() = runTest(UnconfinedTestDispatcher()) {
         val transport = SingleToolCallSendTransport(fail = false)
         val turnStartedCalls = mutableListOf<Unit>()
         val turnEndedCalls = mutableListOf<Boolean>()
@@ -63,7 +63,7 @@ class TimelineOutboundSendProcessorTurnLifecycleTest {
     }
 
     @Test
-    fun `send stream throwing signals turnEnded(clean = false)`() = runTest(UnconfinedTestDispatcher()) {
+    fun `send stream throwing signals turnEnded clean false`() = runTest(UnconfinedTestDispatcher()) {
         val transport = SingleToolCallSendTransport(fail = true)
         val turnStartedCalls = mutableListOf<Unit>()
         val turnEndedCalls = mutableListOf<Boolean>()
