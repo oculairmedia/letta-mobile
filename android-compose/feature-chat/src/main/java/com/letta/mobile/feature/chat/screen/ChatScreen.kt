@@ -1005,6 +1005,13 @@ private fun ChatContent(
                 path = state.messageListChange.toString(),
                 items = built,
             )
+            // letta-mobile-c4igq.5: greppable render-scope projection so a probe
+            // catches a foreign-agent item without a human looking at the screen.
+            com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderScopeProjection(
+                activeAgentId = state.agentId,
+                conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
+                items = built,
+            )
         }
     }
 
