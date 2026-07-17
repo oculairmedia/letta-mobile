@@ -29,6 +29,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -203,6 +204,15 @@ class AppServerTurnEngine(
             com.letta.mobile.util.Telemetry.event("IrohTurn", "input.sent")
             collector.join()
         } finally {
+            // letta-mobile-c4igq.1: the busy lock MUST release on every terminal,
+            // including stream-death/error. runTurn is a channelFlow; when the
+            // collector child throws (e.g. the QUIC/App Server stream dies mid-turn),
+            // the channelFlow producer scope is cancelled. cancelAndJoin() below is a
+            // SUSPEND call — on the already-cancelled scope it would throw
+            // CancellationException and SKIP activeTurn.unlock(), wedging the engine
+            // busy until a manual restart. Run the whole cleanup under NonCancellable
+            // so the unlock is guaranteed regardless of the terminal outcome.
+            withContext(kotlinx.coroutines.NonCancellable) {
             collector?.cancelAndJoin()
             // letta-mobile-kyqdt: P1a RACE FIX (TELEMETRY-ONLY ordering).
             // Snapshot the owner metadata for the release event, but do NOT clear
@@ -238,6 +248,7 @@ class AppServerTurnEngine(
                     "processRole" to (releasedOwner?.processRole),
                     "releaseReason" to releaseReason,
                 )
+            }
             }
         }
     }
