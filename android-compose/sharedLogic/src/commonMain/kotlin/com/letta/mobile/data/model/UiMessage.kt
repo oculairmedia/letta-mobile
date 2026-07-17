@@ -14,6 +14,11 @@ data class UiMessage(
      * and for older hydrated history that predates run tracking.
      */
     val runId: String? = null,
+    // letta-mobile-c4igq.4: the owning agent of this message. Used to scope chat
+    // render strictly by (agentId, conversationId) so a foreign-agent run block
+    // can never leak into another agent's conversation. Null = legacy/unknown
+    // (never dropped, to avoid false-dropping same-agent history).
+    val agentId: String? = null,
     /**
      * Server step id for assistant-side messages that belong to a run step.
      * Null for user messages and older history that predates step tracking.

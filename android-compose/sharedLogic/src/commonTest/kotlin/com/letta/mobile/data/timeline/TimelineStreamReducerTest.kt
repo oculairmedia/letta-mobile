@@ -1781,15 +1781,28 @@ class TimelineStreamReducerTest {
         assertEquals("Newer turn has already started", rows[1].content)
     }
 
+    @Test
+    fun `reducer stamps the input agentId onto the produced Confirmed event c4igq4`() {
+        val out = reduce(
+            frame = AssistantMessage(id = "assistant-agent-scoped", contentRaw = JsonPrimitive("hi from A")),
+            agentId = "agent-A",
+        )
+        val confirmed = out.next.events.filterIsInstance<TimelineEvent.Confirmed>()
+            .single { it.serverId == "assistant-agent-scoped" }
+        confirmed.agentId shouldBe "agent-A"
+    }
+
     private fun reduce(
         prev: Timeline = timeline(),
         frame: com.letta.mobile.data.model.LettaMessage,
         pendingToolReturnsByCallId: PersistentMap<String, ToolReturnMessage> = persistentMapOf(),
+        agentId: String? = null,
     ): TimelineReducerOutput = reduceStreamFrame(
         TimelineReducerInput(
             prev = prev,
             frame = frame,
             pendingToolReturnsByCallId = pendingToolReturnsByCallId,
+            agentId = agentId,
         )
     )
 

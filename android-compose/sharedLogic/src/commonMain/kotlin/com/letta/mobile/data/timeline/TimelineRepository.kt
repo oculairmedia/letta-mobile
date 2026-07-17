@@ -190,6 +190,7 @@ open class TimelineRepository(
             val created = TimelineSyncLoop(
                 messageApi = timelineTransport,
                 conversationId = key.conversationId,
+                agentId = key.agentId,
                 scope = scope,
                 ingestedListenerProvider = { ingestedListener },
                 pendingLocalStore = pendingLocalStore,

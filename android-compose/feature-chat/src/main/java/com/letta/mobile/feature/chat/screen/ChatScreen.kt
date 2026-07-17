@@ -997,6 +997,7 @@ private fun ChatContent(
             messages = state.messages,
             mode = chatDisplayMode,
             change = state.messageListChange,
+            activeAgentId = state.agentId,
         ).also { built ->
             // letta-mobile-x1xnl render diagnostics (flag-gated, no-op when off).
             com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderItemsBuilt(

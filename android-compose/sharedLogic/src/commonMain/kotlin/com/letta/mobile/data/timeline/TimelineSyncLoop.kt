@@ -37,6 +37,11 @@ class TimelineSyncLoop(
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
     private val startStreamSubscriber: Boolean = true,
+    // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
+    // repository cache key). Threaded onto ingested Confirmed events for render
+    // scoping. Null when unknown/legacy. LAST param so positional callers are
+    // unaffected.
+    private val agentId: String? = null,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
@@ -76,6 +81,7 @@ class TimelineSyncLoop(
 
     private val streamDispatcher = TimelineStreamDispatcher(
         conversationId = conversationId,
+        agentId = agentId,
         writeMutex = writeMutex,
         state = _state,
         events = _events,
@@ -431,6 +437,7 @@ class TimelineSyncLoop(
     }
 
     suspend fun ingestStreamEvent(message: LettaMessage, source: String = "external") {
+        // letta-mobile-c4igq.4: forward this loop owning agentId to the reducer.
         wsSubscription.markActive()
         val ack = CompletableDeferred<Unit>()
         eventQueue.send(TimelineGatewayEvent.StreamMessage(message, ack, source = "$source.loop${hashCode()}"))

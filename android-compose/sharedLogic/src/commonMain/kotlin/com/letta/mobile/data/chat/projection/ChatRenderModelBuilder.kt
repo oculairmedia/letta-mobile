@@ -40,8 +40,20 @@ data class ChatRenderModel(
 fun buildChatRenderModel(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
+    // letta-mobile-c4igq.4: when non-null, drop any message whose owning agentId
+    // differs from the active conversation agent BEFORE grouping, so a foreign-
+    // agent run block (e.g. a PM-agent run that landed in the list) can never
+    // render inside another agent conversation. A null message agentId (legacy/
+    // unknown) is kept — we only exclude a PROVEN foreign agent, never same-agent
+    // or unscoped history.
+    activeAgentId: String? = null,
 ): ChatRenderModel {
-    val afterReasoningDedup = dedupeReasoningAssistantEchoes(messages)
+    val agentScoped = if (activeAgentId == null) {
+        messages
+    } else {
+        messages.filter { it.agentId == null || it.agentId == activeAgentId }
+    }
+    val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
 
     val visibleMessages = attachLatencyMetadata(
         filterMessagesForMode(
@@ -91,6 +103,9 @@ class IncrementalChatRenderItemsCache {
         messages: List<UiMessage>,
         mode: ChatDisplayMode,
         change: ChatMessageListChange,
+        // letta-mobile-c4igq.4: active conversation agent; forwarded to
+        // buildChatRenderModel so foreign-agent messages are scoped out.
+        activeAgentId: String? = null,
     ): List<ChatRenderItem> {
         if (messages.isEmpty()) {
             cachedMode = mode
@@ -106,6 +121,7 @@ class IncrementalChatRenderItemsCache {
             val tailRenderItems = buildChatRenderModel(
                 messages = messages.subList(tailStartIndex, messages.size),
                 mode = mode,
+                activeAgentId = activeAgentId,
             ).renderItems
             // letta-mobile-vxase: the tail and the committed history are each
             // deduplicated WITHIN themselves by groupMessagesForRender, but
@@ -144,7 +160,7 @@ class IncrementalChatRenderItemsCache {
             return next
         }
 
-        return rebuildFull(messages, mode, tailStartIndex)
+        return rebuildFull(messages, mode, tailStartIndex, activeAgentId = activeAgentId)
     }
 
     private fun canReuseCommittedHistory(
@@ -178,14 +194,16 @@ class IncrementalChatRenderItemsCache {
         messages: List<UiMessage>,
         mode: ChatDisplayMode,
         tailStartIndex: Int,
+        activeAgentId: String?,
     ): List<ChatRenderItem> {
         // buildChatRenderModel already applies deduplicateRenderItemsByMessageId
         // internally (single chokepoint), so no extra wrap needed here.
-        val full = buildChatRenderModel(messages, mode).renderItems
+        val full = buildChatRenderModel(messages, mode, activeAgentId).renderItems
         committedRenderItems = if (tailStartIndex > 0) {
             buildChatRenderModel(
                 messages = messages.subList(0, tailStartIndex),
                 mode = mode,
+                activeAgentId = activeAgentId,
             ).renderItems
         } else {
             emptyList()

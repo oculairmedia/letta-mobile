@@ -22,6 +22,7 @@ internal suspend fun ingestStreamEvent(
     events: MutableSharedFlow<TimelineSyncEvent>,
     pendingToolReturnsByCallId: LinkedHashMap<String, ToolReturnMessage>,
     conversationId: String,
+    agentId: String? = null,
     conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     source: String = "unknown",
 ): PendingIngestNotification? {
@@ -34,6 +35,7 @@ internal suspend fun ingestStreamEvent(
             TimelineReducerInput(
                 prev = state.value,
                 frame = message,
+                agentId = agentId,
                 pendingToolReturnsByCallId = pendingToolReturnsByCallId.toTimelinePersistentMap(),
                 source = source,
             )
