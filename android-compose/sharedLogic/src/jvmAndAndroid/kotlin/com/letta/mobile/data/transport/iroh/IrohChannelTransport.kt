@@ -75,19 +75,10 @@ class IrohChannelTransport(
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    // letta-mobile-c4igq.8: replay = 1 so a frame emitted during a momentary
-    // no-collector window (e.g. a receive-collector handoff between the send flow
-    // and the persistent subscriber) is not silently lost. With replay = 0 an
-    // emit() to a SharedFlow with no active subscriber completes and the value is
-    // dropped — the "frames go dark until the next send re-attaches a collector"
-    // symptom. replay = 1 lets a re-attaching collector still see the most recent
-    // frame. Mirrors the h30cy first-fragment replay fix. The reducer already
-    // dedups by frame identity (shouldDropDuplicateStreamMessage), so a replayed
-    // frame to a live collector is idempotent for seq-identified frames.
-    private val _events = MutableSharedFlow<ServerFrame>(replay = 1, extraBufferCapacity = 64)
+    private val _events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 64)
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
-    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(replay = 1, extraBufferCapacity = 64)
+    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
     private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
@@ -270,6 +261,18 @@ class IrohChannelTransport(
             "generation" to generation.toString(),
         )
         observerJob = scope.launch {
+            // letta-mobile-c4igq.8: always-on keep-alive collectors, launched as
+            // CHILDREN of the observer job so they share its exact lifetime (started
+            // on Ready, cancelled by stopObserverIngest / on stream-end). They keep
+            // subscriptionCount >= 1 on the replay=0 receive flows so emit() SUSPENDS/
+            // buffers instead of DROPPING a frame during a momentary no-collector
+            // window (the real downstream collectors handing off between the send
+            // flow and the persistent subscriber). No replay is retained — a
+            // suppressed terminal is never masked (h30cy suppress-terminal guardrail
+            // stays intact, unlike replay=1). Binding to observerJob also means unit
+            // tests (whose fake stream terminates) never leak a coroutine.
+            launch { _events.collect { /* keep-alive drain-only */ } }
+            launch { _frameEvents.collect { /* keep-alive drain-only */ } }
             runCatching {
                 streamFrames.collect { received ->
                     // Guard against a stale collector that a redial has superseded.
