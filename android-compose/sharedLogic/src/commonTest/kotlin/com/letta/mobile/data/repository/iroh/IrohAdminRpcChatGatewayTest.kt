@@ -138,6 +138,46 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun streamConversationDeliversInitiatorTurnFramesLiveDuringSend() = runTest(UnconfinedTestDispatcher()) {
+        // c4igq.8: on the INITIATOR's own turn, the UI's continuous
+        // streamConversation collector must receive the turn's frames LIVE as
+        // they arrive — not buffered until a subsequent send. Reproduces the
+        // device symptom: a single-tool turn goes dark until the next send.
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { _ -> ok("""{"id":"conv-i","agent_id":"agent-i"}""") }
+        val gateway = IrohAdminRpcChatGateway(transport, heartbeatIntervalMs = 600_000)
+        val turn = TurnRef(conversationId = "conv-i", turnId = "turn-i")
+
+        // The UI's persistent stream subscriber: continuous, opened BEFORE the send.
+        val streamed = mutableListOf<TimelineStreamFrame>()
+        val streamCollector = launch {
+            gateway.streamConversation("conv-i").collect { streamed += it }
+        }
+        transport.frameEvents.subscriptionCount.first { it > 0 }
+
+        // The initiator send runs concurrently (its own bridge.events collector).
+        val send = launch {
+            gateway.sendConversationMessage("conv-i", request("go")).collect { /* drain the send flow */ }
+        }
+        // Wait until BOTH the stream and the send collectors are subscribed.
+        transport.frameEvents.subscriptionCount.first { it >= 2 }
+
+        // The turn's frames arrive. NO second send.
+        transport.emitFrame(turnStarted(turn))
+        transport.emitFrame(assistantDelta(turn, id = "cm-stream-i", content = "live text", tagged = true))
+        transport.emitFrame(turnDone(turn, status = "completed"))
+        send.join()
+        streamCollector.cancel()
+
+        // The streamConversation collector MUST have seen the assistant delta LIVE.
+        val streamedMessageIds = streamed.filterIsInstance<TimelineStreamFrame.Message>().map { it.message.id }
+        assertTrue(
+            streamedMessageIds.contains("cm-stream-i"),
+            "the UI streamConversation collector must receive the initiator turn's delta LIVE during the turn — got $streamedMessageIds",
+        )
+    }
+
+    @Test
     fun streamConversationEmitsFannedOutFramesForPassiveObserver() = runTest(UnconfinedTestDispatcher()) {
         // letta-mobile-r3i1z: a passive observer (conversation open, NO local
         // send) receives the fanned-out turn frames of another client's turn.

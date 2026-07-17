@@ -75,10 +75,19 @@ class IrohChannelTransport(
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
-    private val _events = MutableSharedFlow<ServerFrame>(extraBufferCapacity = 64)
+    // letta-mobile-c4igq.8: replay = 1 so a frame emitted during a momentary
+    // no-collector window (e.g. a receive-collector handoff between the send flow
+    // and the persistent subscriber) is not silently lost. With replay = 0 an
+    // emit() to a SharedFlow with no active subscriber completes and the value is
+    // dropped — the "frames go dark until the next send re-attaches a collector"
+    // symptom. replay = 1 lets a re-attaching collector still see the most recent
+    // frame. Mirrors the h30cy first-fragment replay fix. The reducer already
+    // dedups by frame identity (shouldDropDuplicateStreamMessage), so a replayed
+    // frame to a live collector is idempotent for seq-identified frames.
+    private val _events = MutableSharedFlow<ServerFrame>(replay = 1, extraBufferCapacity = 64)
     override val events: SharedFlow<ServerFrame> = _events.asSharedFlow()
 
-    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(extraBufferCapacity = 64)
+    private val _frameEvents = MutableSharedFlow<TransportFrameEvent>(replay = 1, extraBufferCapacity = 64)
     override val frameEvents: SharedFlow<TransportFrameEvent> = _frameEvents.asSharedFlow()
 
     private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 8)
