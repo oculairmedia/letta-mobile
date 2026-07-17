@@ -53,10 +53,16 @@ object AgentAdminHandlers {
         }
         router.register("agent.context") { params ->
             val id = param(params, "agent_id") ?: return@register adminError("agent_id required")
-            api.get(
-                adminProxyRequest("v1", "agents", id, "context")
-                    .query("conversation_id", param(params, "conversation_id"))
-                    .build()
+            // letta-mobile-c4igq.9: agent.context is normally KBs (counts + short
+            // memory strings), but a memory-heavy agent can carry large system_prompt/
+            // core_memory blocks that push a full response over the frame cap. Bound
+            // oversized string fields so context always hydrates.
+            MessageListPageGuard.boundObjectStringFields(
+                api.get(
+                    adminProxyRequest("v1", "agents", id, "context")
+                        .query("conversation_id", param(params, "conversation_id"))
+                        .build()
+                )
             )
         }
     }

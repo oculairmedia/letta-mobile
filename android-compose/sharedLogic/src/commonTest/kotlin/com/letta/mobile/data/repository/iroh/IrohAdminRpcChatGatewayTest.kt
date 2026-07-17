@@ -53,6 +53,23 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun listConversationMessagesDecodesGuardWrappedPage_c4igq9() = runTest(UnconfinedTestDispatcher()) {
+        // c4igq.9: when the serve-side page guard trims an oversized window it wraps
+        // the array as { messages: [...], has_more, next_before }. The client must
+        // still decode it (not only a bare array).
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            if (call.method == "message.list") {
+                ok("""{"messages":[{"id":"m-1","message_type":"assistant_message","otid":"m-1"}],"has_more":true,"next_before":"m-1"}""")
+            } else ok("""{"id":"conv-1","agent_id":"agent-1"}""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+        val messages = gateway.listConversationMessages("conv-1", limit = 50, after = null, order = "desc")
+        assertEquals(1, messages.size)
+        assertEquals("m-1", messages.single().id)
+    }
+
+    @Test
     fun listConversationMessagesBuildsQueryStringPath() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->

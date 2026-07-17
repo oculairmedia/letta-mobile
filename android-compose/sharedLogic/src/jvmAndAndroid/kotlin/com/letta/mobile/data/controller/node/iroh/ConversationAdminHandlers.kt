@@ -55,9 +55,16 @@ object ConversationAdminHandlers {
         }
         router.register("message.list") { params ->
             val convId = param(params, "conversation_id") ?: return@register adminError("conversation_id required")
+            // letta-mobile-c4igq.9: enforce a bounded newest-window even when the
+            // client sends no limit. An unbounded message.list on a ~60MB transcript
+            // built one giant admin_rpc response the frame layer rejects
+            // (response_too_large). Default to MessageListPageGuard.DEFAULT_PAGE_LIMIT
+            // so hydration always requests a bounded window; the guard below then
+            // shrinks-not-rejects if a page is still oversized.
+            val effectiveLimit = param(params, "limit") ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
             val response = api.get(
                 adminProxyRequest("v1", "conversations", convId, "messages")
-                    .query("limit", param(params, "limit"))
+                    .query("limit", effectiveLimit)
                     .query("after", param(params, "after"))
                     // letta-mobile-71orq: backward pagination (scroll up for
                     // history) cursors on `before`; the raw HTTP path
@@ -72,7 +79,13 @@ object ConversationAdminHandlers {
             // previews for heavy tool-return bodies; full bodies come via
             // tool_return.get on demand. Inline attachments ship unmodified
             // (clients have no refetch path for omitted attachment data).
-            MessageListWireProjection.projectMessageList(response, convId)
+            // letta-mobile-c4igq.9: final page-size guard — never emit a response
+            // over the frame cap. If the projected page is still too large, trim
+            // to the newest rows that fit + a continuation cursor (has_more,
+            // next_before) the existing -cursor pager can follow.
+            MessageListPageGuard.bound(
+                MessageListWireProjection.projectMessageList(response, convId),
+            )
         }
         router.register("message.get") { params ->
             val convId = param(params, "conversation_id") ?: return@register adminError("conversation_id required")
