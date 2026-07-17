@@ -115,7 +115,13 @@ class IrohAdminRpcChatGateway(
         val path = "/v1/conversations/$conversationId/messages" +
             (if (query.isEmpty()) "" else "?$query")
         val result = rpc(AdminRpcCall("message.list", path)) ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), result)
+        // letta-mobile-c4igq.9: the serve-side page guard returns a bare array when
+        // the page fits, or { messages: [...], has_more, next_before } when it had to
+        // trim an oversized window. Accept both so a bounded page still decodes and
+        // renders (older windows load via the existing before-cursor pager).
+        val messagesElement = (result as? kotlinx.serialization.json.JsonObject)
+            ?.get("messages") ?: result
+        return json.decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), messagesElement)
     }
 
     override suspend fun listAgentMessages(
