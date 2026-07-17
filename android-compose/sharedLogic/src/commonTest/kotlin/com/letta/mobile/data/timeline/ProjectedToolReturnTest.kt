@@ -95,6 +95,50 @@ class ProjectedToolReturnTest {
     }
 
     @Test
+    fun oversizedFullToolReturnBodyIsBoundedAtIngestWithMarker() {
+        // c4igq.2: a server that does NOT pre-project can deliver an arbitrarily
+        // large untruncated body. Folding it in full has wedged a turn mid-stream.
+        val cap = 1024
+        val hugeBody = "x".repeat(cap * 4) // 4 KiB, well over the 1 KiB test cap
+        val full = json.decodeFromString(
+            LettaMessage.serializer(),
+            """{"id":"msg-huge","message_type":"tool_return_message","tool_call_id":"call-h","status":"success","tool_return":"$hugeBody"}""",
+        ) as ToolReturnMessage
+
+        val fold = foldToolReturnBodies(
+            existingContent = emptyMap(),
+            existingTruncation = emptyMap(),
+            matchingReturns = listOf("call-h" to full),
+            maxInboundBodyBytes = cap,
+        )
+
+        val stored = fold.contentByCallId.getValue("call-h")
+        assertTrue(stored.length < hugeBody.length, "oversized body must be truncated at ingest, not stored whole")
+        assertTrue(stored.contains("truncated at ingest"), "truncation marker must be present")
+        val marker = fold.truncationByCallId["call-h"]
+        assertTrue(marker != null, "a ToolReturnTruncation marker must be attached so the full body stays fetchable")
+        assertEquals((cap * 4).toLong(), marker.byteLen, "marker must record the original byte length")
+    }
+
+    @Test
+    fun withinCapFullToolReturnBodyIsStoredWholeWithNoMarker() {
+        val full = json.decodeFromString(
+            LettaMessage.serializer(),
+            """{"id":"msg-ok","message_type":"tool_return_message","tool_call_id":"call-ok","status":"success","tool_return":"small body"}""",
+        ) as ToolReturnMessage
+
+        val fold = foldToolReturnBodies(
+            existingContent = emptyMap(),
+            existingTruncation = emptyMap(),
+            matchingReturns = listOf("call-ok" to full),
+            maxInboundBodyBytes = 1024,
+        )
+
+        assertEquals("small body", fold.contentByCallId.getValue("call-ok"))
+        assertTrue(fold.truncationByCallId.isEmpty(), "a within-cap body must not be marked truncated")
+    }
+
+    @Test
     fun projectedPreviewAppliesWhenNothingHeldAndFullBodyClearsMarker() {
         val preview = json.decodeFromString(LettaMessage.serializer(), projectedJson) as ToolReturnMessage
         val afterPreview = foldToolReturnBodies(
