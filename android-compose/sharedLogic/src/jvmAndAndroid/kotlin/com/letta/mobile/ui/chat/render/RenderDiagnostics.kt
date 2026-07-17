@@ -84,6 +84,44 @@ object RenderDiagnostics {
     }
 
     /**
+     * letta-mobile-c4igq.5: greppable render-SCOPE projection. Tags each visible
+     * timeline item with its (agentId, conversationId) + kind (message/run/
+     * subagent) so a headless probe can assert every rendered item is scoped to
+     * the active agent — flagging a FOREIGN item (agentId != active) without a
+     * human looking at pixels. Flag-gated like the rest of RenderDiagnostics.
+     * Returns the number of foreign items detected (0 = clean) so a test can
+     * assert on it directly without parsing logs.
+     */
+    fun onRenderScopeProjection(
+        activeAgentId: String?,
+        conversationId: String,
+        items: List<ChatRenderItem>,
+    ): Int {
+        if (!enabled()) return 0
+        var foreignCount = 0
+        for (item in items) {
+            val (kind, itemAgentId) = when (item) {
+                is ChatRenderItem.Single -> "message" to item.message.agentId
+                is ChatRenderItem.RunBlock -> "run" to item.messages.firstOrNull()?.first?.agentId
+                is ChatRenderItem.SkillEnvelopeChip -> "subagent" to null
+            }
+            // A foreign item = a proven agent mismatch (both non-null and differ).
+            val foreign = activeAgentId != null && itemAgentId != null && itemAgentId != activeAgentId
+            if (foreign) foreignCount++
+            Telemetry.event(
+                "RenderScope", if (foreign) "item.foreign" else "item.scoped",
+                "conversationId" to conversationId,
+                "activeAgentId" to (activeAgentId ?: "<null>"),
+                "itemAgentId" to (itemAgentId ?: "<null>"),
+                "kind" to kind,
+                "key" to item.key,
+                level = if (foreign) Telemetry.Level.WARN else Telemetry.Level.DEBUG,
+            )
+        }
+        return foreignCount
+    }
+
+    /**
      * Call inside each LazyColumn item() body. If [key] was already composed in
      * the current render generation, that is the phantom double-draw.
      */
