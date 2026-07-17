@@ -29,10 +29,6 @@ import kotlinx.coroutines.sync.withLock
 class TimelineSyncLoop(
     private val messageApi: TimelineTransport,
     private val conversationId: String,
-    // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
-    // repository cache key). Threaded onto ingested Confirmed events for render
-    // scoping. Null when unknown/legacy.
-    private val agentId: String? = null,
     scope: CoroutineScope,
     logTag: String = "TimelineSync",
     ingestedListener: IngestedMessageListener? = null,
@@ -41,6 +37,11 @@ class TimelineSyncLoop(
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
     private val startStreamSubscriber: Boolean = true,
+    // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
+    // repository cache key). Threaded onto ingested Confirmed events for render
+    // scoping. Null when unknown/legacy. LAST param so positional callers are
+    // unaffected.
+    private val agentId: String? = null,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
