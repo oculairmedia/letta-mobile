@@ -261,18 +261,6 @@ class IrohChannelTransport(
             "generation" to generation.toString(),
         )
         observerJob = scope.launch {
-            // letta-mobile-c4igq.8: always-on keep-alive collectors, launched as
-            // CHILDREN of the observer job so they share its exact lifetime (started
-            // on Ready, cancelled by stopObserverIngest / on stream-end). They keep
-            // subscriptionCount >= 1 on the replay=0 receive flows so emit() SUSPENDS/
-            // buffers instead of DROPPING a frame during a momentary no-collector
-            // window (the real downstream collectors handing off between the send
-            // flow and the persistent subscriber). No replay is retained — a
-            // suppressed terminal is never masked (h30cy suppress-terminal guardrail
-            // stays intact, unlike replay=1). Binding to observerJob also means unit
-            // tests (whose fake stream terminates) never leak a coroutine.
-            launch { _events.collect { /* keep-alive drain-only */ } }
-            launch { _frameEvents.collect { /* keep-alive drain-only */ } }
             runCatching {
                 streamFrames.collect { received ->
                     // Guard against a stale collector that a redial has superseded.
