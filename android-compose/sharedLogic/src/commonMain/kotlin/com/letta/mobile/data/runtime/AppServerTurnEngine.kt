@@ -34,6 +34,8 @@ import kotlinx.coroutines.Job
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -119,9 +121,88 @@ class AppServerTurnEngine(
         )
     }
 
+    /**
+     * letta-mobile-c4igq.3: causal liveness reconciler. When a send is rejected
+     * because [activeTurn] is held, PROVE whether the owning run is actually dead
+     * (via run.get) before giving up. Clears the stale lock ONLY on server-
+     * confirmed death (terminal status, completedAt set, or the run is gone). A
+     * run the server still reports active/in_progress is left ALONE — a silently-
+     * thinking multi-hour turn is never interrupted. No wall-clock: keyed purely
+     * on the run's causal lifecycle state. Returns true iff it released the lock.
+     */
+    private suspend fun reconcileOwnerLivenessAndMaybeRelease(): Boolean {
+        val owner = activeTurnOwnerRef.value ?: return false
+        val runId = owner.runId?.takeIf { it.isNotBlank() } ?: return false
+        val dead = try {
+            val resp = client.adminRpc(
+                AppServerCommand.AdminRpc(
+                    requestId = requestIdFactory(),
+                    method = "run.get",
+                    params = kotlinx.serialization.json.buildJsonObject { put("run_id", runId) },
+                ),
+            )
+            when {
+                // The server reports success with a run body: dead iff terminal.
+                resp.success -> runResultIsDead(resp.result)
+                // A failed run.get whose error indicates the run is gone/not-found
+                // is also proof of death.
+                resp.error?.let { it.contains("not found", ignoreCase = true) || it.contains("no such run", ignoreCase = true) } == true -> true
+                else -> false
+            }
+        } catch (t: Throwable) {
+            // Never clear the lock on an inconclusive/errored liveness check — that
+            // could interrupt a live run. Only server-CONFIRMED death releases.
+            com.letta.mobile.util.Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to runId)
+            return false
+        }
+        if (!dead) {
+            com.letta.mobile.util.Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to runId)
+            return false
+        }
+        // Confirmed dead: release the stale lock so the pending send can proceed.
+        val released = activeTurnOwnerRef.value
+        activeTurnOwnerRef.value = null
+        try {
+            activeTurn.unlock()
+        } catch (t: Throwable) {
+            // If it was already unlocked concurrently, treat as released.
+        }
+        com.letta.mobile.util.Telemetry.event(
+            "AppServerTurnEngine", "activeTurn.reconciledDead",
+            "runId" to runId,
+            "agentId" to (released?.agentId ?: ""),
+            "conversationId" to (released?.conversationId ?: ""),
+            "reason" to "run_provably_dead",
+        )
+        return true
+    }
+
+    /** True iff a run.get result body proves the run is terminal/dead. */
+    private fun runResultIsDead(result: kotlinx.serialization.json.JsonElement?): Boolean {
+        val obj = (result as? JsonObject) ?: return false
+        val status = obj["status"]?.jsonPrimitive?.contentOrNull?.lowercase()
+        if (status != null && (status == "completed" || status == "failed" || status == "cancelled" || status == "error" || status == "expired")) return true
+        // completed_at set is also terminal.
+        if (obj["completed_at"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true) return true
+        return false
+    }
+
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = channelFlow {
         if (!activeTurn.tryLock()) {
-            throw IllegalStateException("An App Server turn is already active for ${command.runtimeId.value}.")
+            // letta-mobile-c4igq.3: CAUSAL liveness reconciler (backstop for the
+            // residual no-terminal death — a run that vanished server-side with no
+            // terminal frame and no stream-death, so c4igq.1's terminal-release
+            // never fired). Before rejecting the send, PROVE the owning run is dead
+            // via run.get; clear the stale lock ONLY on confirmed death. A silently-
+            // thinking run reports active/in_progress → we do NOTHING and reject the
+            // send as before, so a legitimate multi-hour turn is never interrupted.
+            // No wall-clock: this runs only on a busy-rejected send and clears the
+            // lock solely on server-confirmed death.
+            if (reconcileOwnerLivenessAndMaybeRelease() && activeTurn.tryLock()) {
+                // Reconciled a dead run; the retry acquired the lock — proceed.
+            } else {
+                throw IllegalStateException("An App Server turn is already active for ${command.runtimeId.value}.")
+            }
         }
 
         // letta-mobile-kyqdt: TELEMETRY-ONLY. Stamp owner identity immediately
