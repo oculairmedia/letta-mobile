@@ -27,6 +27,8 @@ import com.letta.mobile.cli.commands.RestPutCommand
 import com.letta.mobile.cli.commands.ReplayCommand
 import com.letta.mobile.cli.commands.SendCommand
 import com.letta.mobile.cli.commands.AppServerServeCommand
+import com.letta.mobile.cli.commands.AgentMessageCommand
+import com.letta.mobile.cli.commands.AgentMessageSendCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohStubCommand
 import com.letta.mobile.cli.commands.AppServerIrohDeviceGateCommand
@@ -84,6 +86,7 @@ object Main {
                 *buildResourceCommands().toTypedArray(),
                 AppServerServeCommand(),
                 AppServerServeIrohCommand(),
+                AgentMessageCommand().subcommands(AgentMessageSendCommand()),
                 AppServerServeIrohStubCommand(),
                 AppServerIrohProbeCommand(),
                 AppServerIrohTwoClientProbeCommand(),
