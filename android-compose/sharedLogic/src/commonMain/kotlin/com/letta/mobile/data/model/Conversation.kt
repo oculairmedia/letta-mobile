@@ -3,6 +3,18 @@ package com.letta.mobile.data.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * letta-mobile-bn008.3: conversation routing class. Direct agent-to-agent inbound
+ * messages land ONLY in an INTERACTIVE conversation (human/peer-initiated) and are
+ * NEVER routed to an AUTONOMOUS one (heartbeat/goal/dispatch). Tagged at creation;
+ * defaults to INTERACTIVE so existing/untagged conversations route correctly.
+ */
+@Serializable
+enum class ConversationClass {
+    @SerialName("interactive") INTERACTIVE,
+    @SerialName("autonomous") AUTONOMOUS,
+}
+
 @Serializable
 data class Conversation(
     val id: ConversationId,
@@ -16,7 +28,12 @@ data class Conversation(
     @SerialName("archived_at") val archivedAt: String? = null,
     @SerialName("in_context_message_ids") val inContextMessageIds: List<String> = emptyList(),
     @SerialName("isolated_block_ids") val isolatedBlockIds: List<String> = emptyList(),
-)
+    // letta-mobile-bn008.3: routing class; null/absent = INTERACTIVE (see effectiveClass).
+    @SerialName("conversation_class") val conversationClass: ConversationClass? = null,
+) {
+    /** INTERACTIVE unless explicitly tagged AUTONOMOUS. */
+    val effectiveClass: ConversationClass get() = conversationClass ?: ConversationClass.INTERACTIVE
+}
 
 @Serializable
 data class ConversationCreateParams(
