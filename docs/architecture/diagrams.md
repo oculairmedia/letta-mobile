@@ -1,5 +1,13 @@
 # Letta Mobile Architecture Diagrams
 
+> **HISTORICAL / ASPIRATIONAL (as of 2026-07-18).**  
+> Sections 1–5 describe modules that do **not** exist in current Gradle
+> (`:feature-admin`, `:feature-home`, `:plugin-api`, `:bot`, …).  
+> For evidence-backed topology, contradictions, and remediation tracking, use  
+> **[logical-fallacy-boundary-audit.md](./logical-fallacy-boundary-audit.md)**.  
+> WebSocket flow diagrams in §§7–10 may still be useful but were not fully
+> re-validated in the 2026-07-18 audit pass (see Q5 there).
+
 ## 1. Overall Module Structure
 
 ```mermaid
