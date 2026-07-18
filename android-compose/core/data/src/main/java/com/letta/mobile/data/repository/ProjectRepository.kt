@@ -21,6 +21,7 @@ import javax.inject.Inject
 
 open class ProjectRepository @Inject constructor(
     private val projectApi: ProjectApi,
+    private val irohProjectSource: IrohAdminRpcProjectSource? = null,
 ) : IProjectRepository {
     private val _projects = MutableStateFlow<List<ProjectSummary>>(emptyList())
     override val projects: StateFlow<List<ProjectSummary>> = _projects.asStateFlow()
@@ -33,7 +34,12 @@ open class ProjectRepository @Inject constructor(
     }
 
     private suspend fun refreshProjectsLocked(): ProjectCatalog {
-        val catalog = projectApi.listProjects().sanitize()
+        val source = irohProjectSource
+        val catalog = if (source != null && source.shouldUseIroh()) {
+            source.refreshProjects()
+        } else {
+            projectApi.listProjects()
+        }.sanitize()
         _projects.value = catalog.projects
         lastRefreshAtMillis = System.currentTimeMillis()
         return catalog
@@ -43,7 +49,12 @@ open class ProjectRepository @Inject constructor(
         val cached = _projects.value.firstOrNull { it.identifier == identifier }
         if (cached != null) return cached
 
-        val fresh = projectApi.getProject(identifier).sanitize()
+        val source = irohProjectSource
+        val fresh = if (source != null && source.shouldUseIroh()) {
+            source.getProject(identifier)
+        } else {
+            projectApi.getProject(identifier)
+        }.sanitize()
         _projects.update { current ->
             val index = current.indexOfFirst { it.identifier == fresh.identifier }
             if (index >= 0) {
@@ -55,27 +66,50 @@ open class ProjectRepository @Inject constructor(
         return fresh
     }
 
-    override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
-        projectApi.getBeadsRemoteStatus(identifier).sanitize()
+    override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
+        val source = irohProjectSource
+        return if (source != null && source.shouldUseIroh()) {
+            source.getBeadsRemoteStatus(identifier)
+        } else {
+            projectApi.getBeadsRemoteStatus(identifier)
+        }.sanitize()
+    }
 
-    override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
-        projectApi.provisionBeadsRemote(identifier, push)
+    override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse {
+        val source = irohProjectSource
+        return if (source != null && source.shouldUseIroh()) {
+            source.provisionBeadsRemote(identifier, push)
+        } else {
+            projectApi.provisionBeadsRemote(identifier, push)
+        }
+    }
 
-    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
-        projectApi.triggerSync(identifier)
+    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
+        val source = irohProjectSource
+        return if (source != null && source.shouldUseIroh()) {
+            source.triggerSync(identifier)
+        } else {
+            projectApi.triggerSync(identifier)
+        }
+    }
 
     override suspend fun createProject(
         name: String?,
         filesystemPath: String,
         gitUrl: String?,
     ): ProjectSummary {
-        val created = projectApi.createProject(
-            ProjectCreateRequest(
-                name = name,
-                filesystemPath = filesystemPath,
-                gitUrl = gitUrl,
+        val source = irohProjectSource
+        val created = if (source != null && source.shouldUseIroh()) {
+            source.createProject(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl)
+        } else {
+            projectApi.createProject(
+                ProjectCreateRequest(
+                    name = name,
+                    filesystemPath = filesystemPath,
+                    gitUrl = gitUrl,
+                ),
             )
-        ).sanitize()
+        }.sanitize()
         _projects.update { current ->
             (current + created)
                 .distinctBy { it.identifier }
@@ -90,13 +124,18 @@ open class ProjectRepository @Inject constructor(
         filesystemPath: String?,
         gitUrl: String?,
     ): ProjectSummary {
-        val updated = projectApi.updateProject(
-            identifier = identifier,
-            request = ProjectUpdateRequest(
-                filesystemPath = filesystemPath,
-                gitUrl = gitUrl,
+        val source = irohProjectSource
+        val updated = if (source != null && source.shouldUseIroh()) {
+            source.updateProject(identifier = identifier, filesystemPath = filesystemPath, gitUrl = gitUrl)
+        } else {
+            projectApi.updateProject(
+                identifier = identifier,
+                request = ProjectUpdateRequest(
+                    filesystemPath = filesystemPath,
+                    gitUrl = gitUrl,
+                ),
             )
-        ).sanitize()
+        }.sanitize()
         _projects.update { current ->
             val index = current.indexOfFirst { it.identifier == updated.identifier }
             if (index >= 0) {
@@ -110,7 +149,12 @@ open class ProjectRepository @Inject constructor(
     }
 
     override suspend fun archiveProject(identifier: String): ProjectSummary {
-        val updated = projectApi.archiveProject(identifier).sanitize()
+        val source = irohProjectSource
+        val updated = if (source != null && source.shouldUseIroh()) {
+            source.archiveProject(identifier)
+        } else {
+            projectApi.archiveProject(identifier)
+        }.sanitize()
         _projects.update { current ->
             val index = current.indexOfFirst { it.identifier == updated.identifier }
             if (index >= 0) {
@@ -124,7 +168,12 @@ open class ProjectRepository @Inject constructor(
     }
 
     override suspend fun deleteProject(identifier: String) {
-        projectApi.deleteProject(identifier)
+        val source = irohProjectSource
+        if (source != null && source.shouldUseIroh()) {
+            source.deleteProject(identifier)
+        } else {
+            projectApi.deleteProject(identifier)
+        }
         _projects.update { current -> current.filterNot { it.identifier == identifier } }
         lastRefreshAtMillis = System.currentTimeMillis()
     }

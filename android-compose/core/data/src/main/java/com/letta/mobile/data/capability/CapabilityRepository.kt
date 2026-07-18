@@ -3,6 +3,7 @@ package com.letta.mobile.data.capability
 import android.util.Log
 import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
@@ -44,6 +45,7 @@ internal fun defaultCapabilityScope(): CoroutineScope =
 class CapabilityRepository(
     private val settingsRepository: ISettingsRepository,
     private val projectApi: ProjectApi,
+    private val irohProjectSource: IrohAdminRpcProjectSource?,
     private val scope: CoroutineScope,
 ) {
     /** Hilt-friendly constructor — uses [defaultCapabilityScope]. */
@@ -51,10 +53,17 @@ class CapabilityRepository(
         constructor(
             settingsRepository: ISettingsRepository,
             projectApi: ProjectApi,
-        ) : this(settingsRepository, projectApi, defaultCapabilityScope())
+            irohProjectSource: IrohAdminRpcProjectSource,
+        ) : this(settingsRepository, projectApi, irohProjectSource, defaultCapabilityScope())
 
     private val _projectsSupported = MutableStateFlow(true)
     val projectsSupported: StateFlow<Boolean> = _projectsSupported.asStateFlow()
+
+    constructor(
+        settingsRepository: ISettingsRepository,
+        projectApi: ProjectApi,
+        scope: CoroutineScope,
+    ) : this(settingsRepository, projectApi, null, scope)
 
     private var lastProbedConfigId: String? = null
 
@@ -86,7 +95,12 @@ class CapabilityRepository(
             "configId" to configId,
         )
         val supported = try {
-            projectApi.probeAvailability()
+            val source = irohProjectSource
+            if (source != null && source.shouldUseIroh()) {
+                source.probeAvailability()
+            } else {
+                projectApi.probeAvailability()
+            }
         } catch (ce: CancellationException) {
             throw ce
         } catch (e: Exception) {

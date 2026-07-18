@@ -15,6 +15,15 @@ object AdminRpcRegistry {
         "agent.list",
         "health.check",
         "approval.submit",
+        "project.list",
+        "project.get",
+        "project.beadsRemoteStatus",
+        "project.provisionBeadsRemote",
+        "project.triggerSync",
+        "project.create",
+        "project.update",
+        "project.archive",
+        "project.delete",
     )
 
     fun buildRouter(adminBaseUrl: String, controller: AppServerController? = null): AdminRpcRouter {
@@ -24,6 +33,7 @@ object AdminRpcRegistry {
         HealthAdminHandlers.register(router, rpcBase)
         AgentAdminHandlers.register(router, rpcBase, controller)
         ConversationAdminHandlers.register(router, rpcBase)
+        ProjectAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
         ArchiveAdminHandlers.register(router, rpcBase)
         IdentityAdminHandlers.register(router, rpcBase)
