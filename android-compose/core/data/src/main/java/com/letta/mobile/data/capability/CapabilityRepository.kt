@@ -4,6 +4,7 @@ import android.util.Log
 import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
+import com.letta.mobile.data.repository.ProjectListLimit
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -165,7 +166,7 @@ class CapabilityRepository(
             return ProbeOutcome.Inconclusive
         }
         return try {
-            source.refreshProjects(limit = 1)
+            source.refreshProjects(limit = ProjectListLimit(1))
             ProbeOutcome.Definitive(true)
         } catch (cancelled: CancellationException) {
             throw cancelled

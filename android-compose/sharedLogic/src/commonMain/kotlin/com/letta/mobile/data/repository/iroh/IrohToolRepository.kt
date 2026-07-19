@@ -10,136 +10,43 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.update
-import kotlin.time.Clock
 
 class IrohToolRepository(
-    private val directoryProvider: () -> IrohAdminRpcAgentDirectory?,
+    directoryProvider: () -> IrohAdminRpcAgentDirectory?,
 ) : IToolRepository {
     private val toolsFlow = MutableStateFlow<List<Tool>>(emptyList())
-    private var lastRefreshMs = 0L
+    private val ops = IrohToolRepositoryOps(directoryProvider, toolsFlow)
 
     override fun getTools(): StateFlow<List<Tool>> = toolsFlow
 
     override fun getAgentTools(agentId: String): Flow<List<Tool>> =
-        agentScopedTools(AgentId(agentId))
-
-    /** Agent-scoped tool listing is not yet exposed over admin_rpc. */
-    private fun agentScopedTools(@Suppress("UNUSED_PARAMETER") agentId: AgentId): Flow<List<Tool>> =
         flowOf(emptyList())
 
     override suspend fun countTools(): Int {
-        refreshToolsIfStale(CacheMaxAgeMs(DEFAULT_REFRESH_MAX_AGE_MS))
+        ops.refreshToolsIfStale(CacheMaxAgeMs(IrohToolRepositoryOps.DEFAULT_REFRESH_MAX_AGE_MS))
         return toolsFlow.value.size
     }
 
-    override suspend fun refreshTools() {
-        toolsFlow.value = fetchAllTools(directory())
-        lastRefreshMs = Clock.System.now().toEpochMilliseconds()
-    }
+    override suspend fun refreshTools() = ops.refreshTools()
 
     override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean =
-        refreshToolsIfStale(CacheMaxAgeMs(maxAgeMs))
-
-    private suspend fun refreshToolsIfStale(maxAge: CacheMaxAgeMs): Boolean {
-        val now = Clock.System.now().toEpochMilliseconds()
-        if (toolsFlow.value.isNotEmpty() && now - lastRefreshMs <= maxAge.value) return false
-        refreshTools()
-        return true
-    }
+        ops.refreshToolsIfStale(CacheMaxAgeMs(maxAgeMs))
 
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> =
-        fetchToolsPage(directory(), ToolPageRequest(ToolPageLimit(limit), ToolPageOffset(offset)))
+        ops.fetchToolsPage(ToolPageRequest(ToolPageLimit(limit), ToolPageOffset(offset)))
 
-    override suspend fun attachTool(agentId: String, toolId: String) {
-        setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = true))
-    }
+    override suspend fun attachTool(agentId: String, toolId: String) =
+        ops.setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = true))
 
-    override suspend fun detachTool(agentId: String, toolId: String) {
-        setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = false))
-    }
+    override suspend fun detachTool(agentId: String, toolId: String) =
+        ops.setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = false))
 
     override suspend fun upsertTool(params: ToolCreateParams): Tool =
-        directory().createTool(params).also(::upsertCache)
+        ops.upsertTool(params)
 
     override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool =
-        updateToolById(ToolId(toolId), params).also(::upsertCache)
+        ops.updateToolById(ToolUpdateByIdRequest(ToolId(toolId), params))
 
-    override suspend fun deleteTool(toolId: String) {
-        deleteToolById(ToolId(toolId))
-    }
-
-    private suspend fun fetchAllTools(directory: IrohAdminRpcAgentDirectory): List<Tool> {
-        val paging = ToolPagingState()
-        while (true) {
-            val page = fetchToolsPage(directory, paging.nextRequest())
-            val newTools = page.filterNot { candidate -> paging.merged.any { it.id == candidate.id } }
-            if (newTools.isEmpty()) break
-            paging.merged += newTools
-            if (page.size < PAGE_SIZE.value) break
-            paging.advanceBy(page.size)
-        }
-        return paging.merged
-    }
-
-    private suspend fun fetchToolsPage(
-        directory: IrohAdminRpcAgentDirectory,
-        request: ToolPageRequest,
-    ): List<Tool> = directory.listTools(request.limit.value, request.offset.value)
-
-    private suspend fun setToolAttachment(request: ToolAttachmentRequest) {
-        directory().setToolAttached(request.agentId.value, request.toolId.value, request.attached)
-    }
-
-    private suspend fun updateToolById(toolId: ToolId, params: ToolUpdateParams): Tool =
-        directory().updateTool(toolId.value, params)
-
-    private suspend fun deleteToolById(toolId: ToolId) {
-        directory().deleteTool(toolId.value)
-        removeFromCache(toolId)
-    }
-
-    private fun upsertCache(tool: Tool) {
-        toolsFlow.update { tools -> tools.filterNot { it.id == tool.id } + tool }
-    }
-
-    private fun removeFromCache(toolId: ToolId) {
-        toolsFlow.update { tools -> tools.filterNot { it.id == toolId } }
-    }
-
-    private fun directory(): IrohAdminRpcAgentDirectory =
-        directoryProvider() ?: error("Iroh admin RPC directory is unavailable for tools")
-
-    private data class ToolPageRequest(val limit: ToolPageLimit, val offset: ToolPageOffset)
-
-    private data class ToolPagingState(
-        val merged: MutableList<Tool> = mutableListOf(),
-        var offset: ToolPageOffset = ToolPageOffset(0),
-    ) {
-        fun nextRequest(): ToolPageRequest = ToolPageRequest(PAGE_SIZE, offset)
-
-        fun advanceBy(count: Int) {
-            offset = ToolPageOffset(offset.value + count)
-        }
-    }
-
-    private data class ToolAttachmentRequest(
-        val agentId: AgentId,
-        val toolId: ToolId,
-        val attached: Boolean,
-    )
-
-    @JvmInline
-    private value class CacheMaxAgeMs(val value: Long)
-
-    @JvmInline
-    private value class ToolPageLimit(val value: Int)
-
-    @JvmInline
-    private value class ToolPageOffset(val value: Int)
-
-    private companion object {
-        val PAGE_SIZE = ToolPageLimit(100)
-        const val DEFAULT_REFRESH_MAX_AGE_MS = 30_000L
-    }
+    override suspend fun deleteTool(toolId: String) =
+        ops.deleteToolById(ToolId(toolId))
 }

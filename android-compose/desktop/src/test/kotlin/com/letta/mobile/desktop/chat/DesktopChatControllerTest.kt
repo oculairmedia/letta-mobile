@@ -694,18 +694,15 @@ private class FakeDesktopTimelineLoop(
 
     private val hydrateGate = CompletableDeferred<Unit>()
 
-    override suspend fun hydrate(limit: Int, recordConversationCursor: Boolean) {
+    override suspend fun hydrate(request: DesktopTimelineHydrateRequest) {
         hydrateStarted.complete(Unit)
         hydrateGate.await()
     }
 
-    override suspend fun send(
-        content: String,
-        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
-    ): String {
+    override suspend fun send(request: DesktopTimelineSendRequest): String {
         sendFailure?.let { throw it }
-        sentMessages += content
-        sentAttachments += attachments
+        sentMessages += request.content.value
+        sentAttachments += request.attachments
         return "client-test"
     }
 
@@ -730,12 +727,9 @@ private class SuspendingSendDesktopLoop(conversationId: String) : DesktopTimelin
     var closeCount = 0
         private set
 
-    override suspend fun hydrate(limit: Int, recordConversationCursor: Boolean) = Unit
+    override suspend fun hydrate(request: DesktopTimelineHydrateRequest) = Unit
 
-    override suspend fun send(
-        content: String,
-        attachments: List<MessageContentPart.Image>,
-    ): String {
+    override suspend fun send(request: DesktopTimelineSendRequest): String {
         sendGate.await()
         return "client-suspending"
     }

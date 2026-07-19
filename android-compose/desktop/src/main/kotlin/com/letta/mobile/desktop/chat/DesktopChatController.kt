@@ -551,7 +551,12 @@ class DesktopChatController(
         sendJob?.cancel()
         sendJob = scope.launch {
             try {
-                loop.send(text, attachments = attachments)
+                loop.send(
+                    DesktopTimelineSendRequest(
+                        content = MessageBody(text),
+                        attachments = attachments,
+                    ),
+                )
                 if (closed) return@launch
                 _state.update {
                     it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
@@ -700,7 +705,12 @@ class DesktopChatController(
         }
 
         try {
-            loop.hydrate(limit = 50, recordConversationCursor = true)
+            loop.hydrate(
+                DesktopTimelineHydrateRequest(
+                    limit = TimelinePageLimit(50),
+                    recordConversationCursor = true,
+                ),
+            )
             if (!isActiveSelection(generation)) return
             _state.update {
                 it.withRuntimeState(ChatSessionReducer.hydrateCompleted(it.runtimeState, generation))

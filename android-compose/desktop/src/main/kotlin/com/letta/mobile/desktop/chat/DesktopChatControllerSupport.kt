@@ -23,10 +23,29 @@ internal fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): Strin
 
 interface DesktopTimelineLoop {
     val state: StateFlow<Timeline>
-    suspend fun hydrate(limit: Int = 50, recordConversationCursor: Boolean = false)
-    suspend fun send(content: String, attachments: List<MessageContentPart.Image> = emptyList()): String
+    suspend fun hydrate(request: DesktopTimelineHydrateRequest = DesktopTimelineHydrateRequest())
+    suspend fun send(request: DesktopTimelineSendRequest): String
     fun close()
 }
+
+data class DesktopTimelineHydrateRequest(
+    val limit: TimelinePageLimit = TimelinePageLimit(50),
+    val recordConversationCursor: Boolean = false,
+)
+
+data class DesktopTimelineSendRequest(
+    val content: MessageBody,
+    val attachments: List<MessageContentPart.Image> = emptyList(),
+)
+
+@JvmInline
+value class MessageBody(val value: String)
+
+@JvmInline
+value class MessageListOrder(val value: String)
+
+@JvmInline
+value class TimelinePageLimit(val value: Int)
 
 internal class RealDesktopTimelineLoop(
     gateway: DesktopChatGateway,
@@ -39,24 +58,30 @@ internal class RealDesktopTimelineLoop(
         messageApi = routing.transport,
         conversationId = routing.loopConversationId.value,
         scope = scope,
-        logTag = "DesktopChat",
+        logTag = DESKTOP_CHAT_LOG_TAG.value,
     )
 
     override val state: StateFlow<Timeline> = delegate.state
 
-    override suspend fun hydrate(limit: Int, recordConversationCursor: Boolean) {
-        delegate.hydrate(limit = limit, recordConversationCursor = recordConversationCursor)
+    override suspend fun hydrate(request: DesktopTimelineHydrateRequest) {
+        delegate.hydrate(
+            limit = request.limit.value,
+            recordConversationCursor = request.recordConversationCursor,
+        )
     }
 
-    override suspend fun send(
-        content: String,
-        attachments: List<MessageContentPart.Image>,
-    ): String = delegate.send(content, attachments)
+    override suspend fun send(request: DesktopTimelineSendRequest): String =
+        delegate.send(request.content.value, request.attachments)
 
     override fun close() {
         delegate.close()
     }
 }
+
+@JvmInline
+private value class DesktopChatLogTag(val value: String)
+
+private val DESKTOP_CHAT_LOG_TAG = DesktopChatLogTag("DesktopChat")
 
 internal data class DefaultShimTransportIds(
     val agentId: AgentId,
@@ -84,7 +109,13 @@ internal class DefaultShimDesktopTimelineTransport(
     ): List<LettaMessage> =
         // Default-shim conversations hydrate from the agent message stream
         // (there is no real conversation id on the backend yet).
-        listViaGateway(GatewayListParams(limit = limit, order = order, conversationId = null))
+        listViaGateway(
+            GatewayListParams(
+                limit = limit?.let(::TimelinePageLimit),
+                order = order?.let(::MessageListOrder),
+                conversationId = null,
+            ),
+        )
 
     override suspend fun listAgentMessages(
         agentId: String,
@@ -92,25 +123,34 @@ internal class DefaultShimDesktopTimelineTransport(
         order: String?,
         conversationId: String?,
     ): List<LettaMessage> =
-        listViaGateway(GatewayListParams(limit = limit, order = order, conversationId = conversationId))
+        listViaGateway(
+            GatewayListParams(
+                limit = limit?.let(::TimelinePageLimit),
+                order = order?.let(::MessageListOrder),
+                conversationId = conversationId?.let(::ConversationId),
+            ),
+        )
 
     private data class GatewayListParams(
-        val limit: Int?,
-        val order: String?,
-        val conversationId: String?,
+        val limit: TimelinePageLimit?,
+        val order: MessageListOrder?,
+        val conversationId: ConversationId?,
     )
 
     private suspend fun listViaGateway(params: GatewayListParams): List<LettaMessage> =
         gateway.listAgentMessages(
             agentId = ids.agentId.value,
-            limit = params.limit,
-            order = params.order,
-            conversationId = params.conversationId,
+            limit = params.limit?.value,
+            order = params.order?.value,
+            conversationId = params.conversationId?.value,
         )
 }
 
 internal fun String.isDefaultShimConversationId(): Boolean =
-    startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
+    startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX.value)
+
+@JvmInline
+private value class ConversationIdPrefix(val value: String)
 
 private data class DesktopTimelineRouting(
     val transport: TimelineTransport,
@@ -124,26 +164,32 @@ private fun resolveDesktopTimelineRouting(
     val conversationId = ConversationId(conversation.id)
     val agentId = conversation.agentId?.let(::AgentId)
     val usesDefaultShim = conversationId.value.isDefaultShimConversationId() && agentId != null
-    val transport: TimelineTransport = if (usesDefaultShim) {
-        DefaultShimDesktopTimelineTransport(
-            gateway = gateway,
-            ids = DefaultShimTransportIds(
-                agentId = agentId!!,
-                externalConversationId = conversationId,
-            ),
-        )
+    return if (usesDefaultShim) {
+        defaultShimRouting(gateway, conversationId, agentId!!)
     } else {
-        gateway
+        DesktopTimelineRouting(transport = gateway, loopConversationId = conversationId)
     }
-    val loopConversationId = if (usesDefaultShim) {
-        ConversationId("desktop-default-shim-${agentId!!.value}-${conversationId.value}")
-    } else {
-        conversationId
-    }
-    return DesktopTimelineRouting(transport = transport, loopConversationId = loopConversationId)
 }
 
-private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
+private fun defaultShimRouting(
+    gateway: DesktopChatGateway,
+    conversationId: ConversationId,
+    agentId: AgentId,
+): DesktopTimelineRouting =
+    DesktopTimelineRouting(
+        transport = DefaultShimDesktopTimelineTransport(
+            gateway = gateway,
+            ids = DefaultShimTransportIds(
+                agentId = agentId,
+                externalConversationId = conversationId,
+            ),
+        ),
+        loopConversationId = ConversationId(
+            "desktop-default-shim-${agentId.value}-${conversationId.value}",
+        ),
+    )
+
+private val DEFAULT_SHIM_CONVERSATION_PREFIX = ConversationIdPrefix("conv-default-")
 
 /** Safety cap so the thinking indicator can't get stuck if no reply arrives. */
 internal const val THINKING_TIMEOUT_MS = 180_000L

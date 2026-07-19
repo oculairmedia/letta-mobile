@@ -5,33 +5,19 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.SubagentRepository
-import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
-import com.letta.mobile.data.schedules.CronApi
-import com.letta.mobile.data.commands.SlashCommandApi
-import com.letta.mobile.data.commands.SlashCommandsApi
-import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
-import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
-import com.letta.mobile.desktop.commands.DesktopIrohSlashCommandApi
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
-import com.letta.mobile.desktop.memory.DesktopBlockApi
-import com.letta.mobile.desktop.memory.DesktopHttpBlockApi
-import com.letta.mobile.desktop.memory.DesktopIrohBlockApi
-import com.letta.mobile.desktop.skills.DesktopIrohSkillsApi
-import com.letta.mobile.data.skills.SkillApi
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 internal const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
@@ -46,76 +32,6 @@ private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
         clientVersion = "letta-desktop-iroh",
     )
 
-private data class DesktopAgentResolveSources(
-    val agentIds: Set<String>,
-    val irohDirectory: IrohAdminRpcAgentDirectory?,
-    val httpAgentRepository: () -> IAgentRepository,
-)
-
-private data class ResolveDesktopAgentFieldParams<T : Any>(
-    val sources: DesktopAgentResolveSources,
-    val fromAgent: (Agent) -> T?,
-    val refreshBeforeResolve: Boolean = false,
-)
-
-private suspend fun <T : Any> resolveDesktopAgentField(
-    params: ResolveDesktopAgentFieldParams<T>,
-): Map<String, T> {
-    val sources = params.sources
-    val irohDirectory = sources.irohDirectory
-    if (irohDirectory != null) {
-        return runCatching { irohDirectory.listAgents() }.getOrDefault(emptyList())
-            .mapNotNull { agent -> params.fromAgent(agent)?.let { agent.id.value to it } }
-            .toMap()
-    }
-    val agentRepository = sources.httpAgentRepository()
-    if (params.refreshBeforeResolve) {
-        runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS) }
-    }
-    val resolved = mutableMapOf<String, T>()
-    agentRepository.agents.value.forEach { agent ->
-        params.fromAgent(agent)?.let { resolved[agent.id.value] = it }
-    }
-    sources.agentIds.filter { it !in resolved }.forEach { id ->
-        val value = agentRepository.getCachedAgent(id)?.let(params.fromAgent)
-            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.let(params.fromAgent)
-        value?.let { resolved[id] = it }
-    }
-    return resolved
-}
-
-private fun nonBlank(value: String?): String? = value?.takeIf { it.isNotBlank() }
-
-/**
- * Resolves agent id -> display name for the chat shell. Over iroh:// there is
- * no HTTP agent repository, so names come from the admin_rpc agent directory;
- * otherwise from the cached repository, fetching any still-unresolved id
- * directly. [httpAgentRepository] is only evaluated on the HTTP path.
- */
-internal suspend fun resolveDesktopAgentNames(
-    agentIds: Set<String>,
-    irohDirectory: IrohAdminRpcAgentDirectory?,
-    httpAgentRepository: () -> IAgentRepository,
-): Map<String, String> = resolveDesktopAgentField(
-    ResolveDesktopAgentFieldParams(
-        sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
-        fromAgent = { agent -> nonBlank(agent.name) },
-        refreshBeforeResolve = true,
-    ),
-)
-
-/** Agent id -> model handle, mirroring [resolveDesktopAgentNames]. */
-internal suspend fun resolveDesktopAgentModels(
-    agentIds: Set<String>,
-    irohDirectory: IrohAdminRpcAgentDirectory?,
-    httpAgentRepository: () -> IAgentRepository,
-): Map<String, String> = resolveDesktopAgentField(
-    ResolveDesktopAgentFieldParams(
-        sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
-        fromAgent = { agent -> nonBlank(agent.model) },
-    ),
-)
-
 /**
  * iroh:// backend: one QUIC channel transport shared by the chat gateway,
  * admin_rpc reads, and (once implemented server-side) registries. Selected
@@ -125,31 +41,46 @@ internal suspend fun resolveDesktopAgentModels(
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
     IrohChannelTransport(activeConfigProvider = { desktopIrohConnectConfig(config) })
 
-private data class DesktopConnectParams(
+internal data class DesktopConnectParams(
     val baseShimUrl: String,
     val token: String,
     val deviceId: String,
     val clientVersion: String,
 )
 
-private suspend fun connectWithParams(
+internal suspend fun connectWithParams(
     connect: suspend (String, String, String, String) -> Unit,
     params: DesktopConnectParams,
 ) {
     connect(params.baseShimUrl, params.token, params.deviceId, params.clientVersion)
 }
 
-private suspend fun connectIrohTransport(transport: IrohChannelTransport, config: LettaConfig) {
+private fun connectParamsFromIroh(config: LettaConfig): DesktopConnectParams {
     val connectConfig = desktopIrohConnectConfig(config)
-    connectWithParams(
-        connect = transport::connect,
-        params = DesktopConnectParams(
-            baseShimUrl = connectConfig.baseShimUrl,
-            token = connectConfig.token,
-            deviceId = connectConfig.deviceId,
-            clientVersion = connectConfig.clientVersion,
-        ),
+    return DesktopConnectParams(
+        baseShimUrl = connectConfig.baseShimUrl,
+        token = connectConfig.token,
+        deviceId = connectConfig.deviceId,
+        clientVersion = connectConfig.clientVersion,
     )
+}
+
+private fun connectParamsFromWs(config: LettaConfig): DesktopConnectParams =
+    DesktopConnectParams(
+        baseShimUrl = config.serverUrl,
+        token = config.accessToken.orEmpty(),
+        deviceId = DESKTOP_DEVICE_ID,
+        clientVersion = DESKTOP_DEVICE_ID,
+    )
+
+private suspend fun connectIrohTransport(transport: IrohChannelTransport, config: LettaConfig) {
+    connectWithParams(transport::connect, connectParamsFromIroh(config))
+}
+
+private suspend fun connectSubagentTransport(transport: DesktopWsChannelTransport, config: LettaConfig) {
+    // WS side-channel keeps the shorter clientVersion label used historically
+    // for mobile-shim subagent registry dials (distinct from iroh's label).
+    connectWithParams(transport::connect, connectParamsFromWs(config))
 }
 
 @Composable
@@ -212,99 +143,36 @@ internal fun rememberDesktopChatController(
         runtime.dataBindings.sessionGraphProvider,
         bindings.irohTransport,
     ) {
-        DesktopChatController(
-            bootstrapState = runtime.bootstrapState,
-            scope = runtime.chatScope,
-            gatewayFactory = {
-                bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = DESKTOP_DEVICE_ID) }
-                    ?: createDefaultDesktopChatGateway(runtime.bootstrapState.config)
-            },
-            agentNamesByIdProvider = { agentIds ->
-                resolveDesktopAgentNames(agentIds, bindings.irohAgentDirectory) {
-                    runtime.dataBindings.sessionGraphProvider.current.agentRepository
-                }
-            },
-            agentModelByIdProvider = { agentIds ->
-                resolveDesktopAgentModels(agentIds, bindings.irohAgentDirectory) {
-                    runtime.dataBindings.sessionGraphProvider.current.agentRepository
-                }
-            },
-            loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
-            persistArchivedConversationIds = { ids ->
-                persistArchivedConversationIds(bindings.secureSettingsStore, ids)
-            },
-        )
+        buildDesktopChatController(bindings)
     }
 }
 
-/**
- * HTTP-only management APIs — an iroh:// backend has no HTTP base URL, so
- * their panels degrade to empty instead of dialing iroh:// as HTTP.
- */
-internal class DesktopHttpApis(
-    val blockApi: DesktopBlockApi?,
-    val cronApi: CronApi?,
-    val skillApi: SkillsApi?,
-    val slashCommandApi: SlashCommandsApi?,
-)
-
-private data class DesktopApiBackend(
-    val irohMode: Boolean,
-    val irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-    val httpConfig: LettaConfig?,
-)
-
-private fun <T> createDesktopBackendApi(
-    backend: DesktopApiBackend,
-    irohFactory: (IrohAdminRpcAgentDirectory) -> T,
-    httpFactory: (LettaConfig) -> T,
-): T? = when {
-    backend.irohMode -> backend.irohAgentDirectory?.let(irohFactory)
-    else -> backend.httpConfig?.let(httpFactory)
-}
-
-private fun createDesktopHttpApis(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
-    irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-): DesktopHttpApis {
-    val httpConfig = activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }
-    val backend = DesktopApiBackend(irohMode, irohAgentDirectory, httpConfig)
-    val httpClient = createDesktopLettaHttpClient()
-    return DesktopHttpApis(
-        blockApi = createDesktopBackendApi(backend, ::DesktopIrohBlockApi, ::DesktopHttpBlockApi),
-        cronApi = httpConfig?.let { CronApi(it, httpClient) },
-        skillApi = createDesktopBackendApi(backend, ::DesktopIrohSkillsApi) { SkillApi(it, httpClient) },
-        slashCommandApi = createDesktopBackendApi(backend, ::DesktopIrohSlashCommandApi) {
-            SlashCommandApi(it, httpClient)
+private fun buildDesktopChatController(
+    bindings: DesktopChatControllerBindings,
+): DesktopChatController {
+    val runtime = bindings.runtime
+    val httpRepo = {
+        runtime.dataBindings.sessionGraphProvider.current.agentRepository
+    }
+    return DesktopChatController(
+        bootstrapState = runtime.bootstrapState,
+        scope = runtime.chatScope,
+        gatewayFactory = {
+            bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = DESKTOP_DEVICE_ID) }
+                ?: createDefaultDesktopChatGateway(runtime.bootstrapState.config)
+        },
+        agentNamesByIdProvider = { agentIds ->
+            resolveDesktopAgentNames(agentIds, bindings.irohAgentDirectory, httpRepo)
+        },
+        agentModelByIdProvider = { agentIds ->
+            resolveDesktopAgentModels(agentIds, bindings.irohAgentDirectory, httpRepo)
+        },
+        loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
+        persistArchivedConversationIds = { ids ->
+            persistArchivedConversationIds(bindings.secureSettingsStore, ids)
         },
     )
 }
-
-private fun loadArchivedConversationIds(store: DesktopFileSecureSettingsStore): Set<String> =
-    store.getString(ARCHIVED_CONVERSATION_IDS_KEY)
-        ?.split(',')
-        ?.map { it.trim() }
-        ?.filter { it.isNotEmpty() }
-        ?.toSet()
-        ?: emptySet()
-
-private fun persistArchivedConversationIds(
-    store: DesktopFileSecureSettingsStore,
-    ids: Set<String>,
-) {
-    store.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
-}
-
-@Composable
-internal fun rememberDesktopHttpApis(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
-    irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-): DesktopHttpApis =
-    remember(activeConfig, irohMode, irohAgentDirectory) {
-        createDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
-    }
 
 /** The subagent side-channel plus the live active-subagent list it feeds. */
 internal class DesktopSubagentRegistry(
@@ -326,20 +194,6 @@ private fun createSubagentTransport(
 ): DesktopWsChannelTransport? =
     activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
         ?.let { DesktopWsChannelTransport(chatScope) }
-
-private suspend fun connectSubagentTransport(transport: DesktopWsChannelTransport, config: LettaConfig) {
-    // WS side-channel keeps the shorter clientVersion label used historically
-    // for mobile-shim subagent registry dials (distinct from iroh's label).
-    connectWithParams(
-        connect = transport::connect,
-        params = DesktopConnectParams(
-            baseShimUrl = config.serverUrl,
-            token = config.accessToken.orEmpty(),
-            deviceId = DESKTOP_DEVICE_ID,
-            clientVersion = DESKTOP_DEVICE_ID,
-        ),
-    )
-}
 
 @Composable
 internal fun rememberSubagentRegistry(

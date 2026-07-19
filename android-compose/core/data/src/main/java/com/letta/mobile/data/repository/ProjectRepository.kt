@@ -6,6 +6,7 @@ import com.letta.mobile.data.api.ProjectUpdateRequest
 import com.letta.mobile.data.model.BeadsRemoteProvisionResponse
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.ProjectCatalog
+import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.api.IProjectRepository
@@ -48,7 +49,7 @@ open class ProjectRepository @Inject constructor(
         if (cached != null) return cached
 
         val fresh = fromActiveSource(
-            iroh = { it.getProject(identifier) },
+            iroh = { it.getProject(ProjectId(identifier)) },
             http = { projectApi.getProject(identifier) },
         ).sanitize()
         upsertProject(fresh)
@@ -57,21 +58,21 @@ open class ProjectRepository @Inject constructor(
 
     override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
         return fromActiveSource(
-            iroh = { it.getBeadsRemoteStatus(identifier) },
+            iroh = { it.getBeadsRemoteStatus(ProjectId(identifier)) },
             http = { projectApi.getBeadsRemoteStatus(identifier) },
         ).sanitize()
     }
 
     override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse {
         return fromActiveSource(
-            iroh = { it.provisionBeadsRemote(identifier, push) },
+            iroh = { it.provisionBeadsRemote(ProjectId(identifier), push) },
             http = { projectApi.provisionBeadsRemote(identifier, push) },
         )
     }
 
     override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
         return fromActiveSource(
-            iroh = { it.triggerSync(identifier) },
+            iroh = { it.triggerSync(ProjectId(identifier)) },
             http = { projectApi.triggerSync(identifier) },
         )
     }
@@ -82,7 +83,15 @@ open class ProjectRepository @Inject constructor(
         gitUrl: String?,
     ): ProjectSummary {
         val created = fromActiveSource(
-            iroh = { it.createProject(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl) },
+            iroh = {
+                it.createProject(
+                    ProjectCreateRpcParams(
+                        name = name?.let(::ProjectDisplayName),
+                        filesystemPath = ProjectFilesystemPath(filesystemPath),
+                        gitUrl = gitUrl?.let(::ProjectGitUrl),
+                    ),
+                )
+            },
             http = {
                 projectApi.createProject(
                     ProjectCreateRequest(
@@ -110,9 +119,11 @@ open class ProjectRepository @Inject constructor(
         val updated = fromActiveSource(
             iroh = {
                 it.updateProject(
-                    identifier = identifier,
-                    filesystemPath = filesystemPath,
-                    gitUrl = gitUrl,
+                    ProjectUpdateRpcParams(
+                        projectId = ProjectId(identifier),
+                        filesystemPath = filesystemPath?.let(::ProjectFilesystemPath),
+                        gitUrl = gitUrl?.let(::ProjectGitUrl),
+                    ),
                 )
             },
             http = {
@@ -132,7 +143,7 @@ open class ProjectRepository @Inject constructor(
 
     override suspend fun archiveProject(identifier: String): ProjectSummary {
         val updated = fromActiveSource(
-            iroh = { it.archiveProject(identifier) },
+            iroh = { it.archiveProject(ProjectId(identifier)) },
             http = { projectApi.archiveProject(identifier) },
         ).sanitize()
         upsertProject(updated)
@@ -142,7 +153,7 @@ open class ProjectRepository @Inject constructor(
 
     override suspend fun deleteProject(identifier: String) {
         fromActiveSource(
-            iroh = { it.deleteProject(identifier) },
+            iroh = { it.deleteProject(ProjectId(identifier)) },
             http = { projectApi.deleteProject(identifier) },
         )
         _projects.update { current -> current.filterNot { it.identifier == identifier } }

@@ -6,6 +6,7 @@ import com.letta.mobile.data.api.ProjectApi
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ProjectCatalog
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
+import com.letta.mobile.data.repository.ProjectListLimit
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionGraph
 import com.letta.mobile.data.session.SessionManager
@@ -197,7 +198,7 @@ class CapabilityRepositoryTest {
     ) {
         var probeCount = 0
 
-        override suspend fun refreshProjects(limit: Int?): ProjectCatalog {
+        override suspend fun refreshProjects(limit: ProjectListLimit?): ProjectCatalog {
             probeCount += 1
             return probeResult()
         }

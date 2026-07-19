@@ -50,20 +50,26 @@ internal fun SidebarConversationRow(
     ContextMenuArea(
         items = {
             sidebarConversationContextMenuItems(
-                deleting = model.deleting,
-                archived = model.archived,
-                onArchiveToggle = actions.onArchiveToggle,
-                onDeleteRequest = { confirmDelete = true },
+                SidebarConversationMenuParams(
+                    deleting = model.deleting,
+                    archived = model.archived,
+                    onArchiveToggle = actions.onArchiveToggle,
+                    onDeleteRequest = { confirmDelete = true },
+                ),
             )
         },
     ) {
         SidebarConversationRowSurface(
-            model = model,
-            appearance = appearance,
-            hovered = hovered,
-            interactionSource = interactionSource,
-            onClick = actions.onClick,
-            onArchiveToggle = actions.onArchiveToggle,
+            SidebarConversationRowSurfaceParams(
+                model = model,
+                appearance = appearance,
+                interaction = SidebarConversationRowInteraction(
+                    hovered = hovered,
+                    interactionSource = interactionSource,
+                    onClick = actions.onClick,
+                    onArchiveToggle = actions.onArchiveToggle,
+                ),
+            ),
         )
     }
 
@@ -89,6 +95,26 @@ private data class SidebarConversationAppearance(
     val iconColor: Color,
 )
 
+private data class SidebarConversationRowInteraction(
+    val hovered: Boolean,
+    val interactionSource: MutableInteractionSource,
+    val onClick: () -> Unit,
+    val onArchiveToggle: () -> Unit,
+)
+
+private data class SidebarConversationRowSurfaceParams(
+    val model: SidebarConversationRowModel,
+    val appearance: SidebarConversationAppearance,
+    val interaction: SidebarConversationRowInteraction,
+)
+
+private data class SidebarConversationMenuParams(
+    val deleting: Boolean,
+    val archived: Boolean,
+    val onArchiveToggle: () -> Unit,
+    val onDeleteRequest: () -> Unit,
+)
+
 @Composable
 private fun sidebarConversationAppearance(model: SidebarConversationRowModel): SidebarConversationAppearance {
     val pulseAlpha = conversationPulseAlpha(thinking = model.thinking)
@@ -108,16 +134,12 @@ private fun sidebarConversationAppearance(model: SidebarConversationRowModel): S
 }
 
 @Composable
-private fun SidebarConversationRowSurface(
-    model: SidebarConversationRowModel,
-    appearance: SidebarConversationAppearance,
-    hovered: Boolean,
-    interactionSource: MutableInteractionSource,
-    onClick: () -> Unit,
-    onArchiveToggle: () -> Unit,
-) {
+private fun SidebarConversationRowSurface(params: SidebarConversationRowSurfaceParams) {
+    val model = params.model
+    val appearance = params.appearance
+    val interaction = params.interaction
     Surface(
-        onClick = onClick,
+        onClick = interaction.onClick,
         enabled = !model.deleting,
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.small,
@@ -125,7 +147,7 @@ private fun SidebarConversationRowSurface(
         contentColor = MaterialTheme.colorScheme.onSurface,
         // Drives both the click ripple (now clipped to the rounded shape) and the
         // `hovered` state below, so no separate .hoverable is needed.
-        interactionSource = interactionSource,
+        interactionSource = interaction.interactionSource,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
@@ -135,12 +157,12 @@ private fun SidebarConversationRowSurface(
             SidebarConversationLeadingIcon(
                 model = SidebarConversationLeadingIconModel(
                     deleting = model.deleting,
-                    hovered = hovered,
+                    hovered = interaction.hovered,
                     archived = model.archived,
                     thinking = model.thinking,
                     iconColor = appearance.iconColor,
                 ),
-                onArchiveToggle = onArchiveToggle,
+                onArchiveToggle = interaction.onArchiveToggle,
             )
             Text(
                 text = model.title,
@@ -194,15 +216,15 @@ private fun conversationTitleColor(deleting: Boolean): Color =
     }
 
 private fun sidebarConversationContextMenuItems(
-    deleting: Boolean,
-    archived: Boolean,
-    onArchiveToggle: () -> Unit,
-    onDeleteRequest: () -> Unit,
+    params: SidebarConversationMenuParams,
 ): List<ContextMenuItem> {
-    if (deleting) return emptyList()
+    if (params.deleting) return emptyList()
     return listOf(
-        ContextMenuItem(if (archived) "Restore chat" else "Archive chat", onArchiveToggle),
-        ContextMenuItem("Delete chat", onDeleteRequest),
+        ContextMenuItem(
+            if (params.archived) "Restore chat" else "Archive chat",
+            params.onArchiveToggle,
+        ),
+        ContextMenuItem("Delete chat", params.onDeleteRequest),
     )
 }
 

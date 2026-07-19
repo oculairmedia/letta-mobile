@@ -15,6 +15,7 @@ import com.letta.mobile.data.repository.iroh.AdminRpcCall
 import com.letta.mobile.data.repository.iroh.AdminRpcMethod
 import com.letta.mobile.data.repository.iroh.AdminRpcPath
 import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -31,7 +32,7 @@ import kotlinx.serialization.json.put
  * and sync trigger all go through the same Iroh stream as the rest of the admin
  * reads/writes.
  */
-class IrohAdminRpcProjectSource(
+open class IrohAdminRpcProjectSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
     private val json: Json = Json {
@@ -44,7 +45,7 @@ class IrohAdminRpcProjectSource(
     fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
 
     suspend fun probeAvailability(): Boolean = try {
-        refreshProjects(limit = 1)
+        refreshProjects(ProjectListLimit(1))
         true
     } catch (cancelled: CancellationException) {
         throw cancelled
@@ -52,135 +53,143 @@ class IrohAdminRpcProjectSource(
         false
     }
 
-    suspend fun refreshProjects(limit: Int? = null): ProjectCatalog {
-        val path = "/api/projects" + (limit?.let { "?limit=$it" } ?: "")
-        val body = buildJsonObject {
-            limit?.let { put("limit", it) }
-        }.toString()
-        val result = rpc(projectRpc("project.list", path, body)) ?: return ProjectCatalog(projects = emptyList())
+    open suspend fun refreshProjects(limit: ProjectListLimit? = null): ProjectCatalog {
+        val path = ProjectRpcPaths.list(limit)
+        val body = ProjectRpcBodies.listLimit(limit)
+        val result = rpc(projectRpc(ProjectRpcMethods.List, path, body))
+            ?: return ProjectCatalog(projects = emptyList())
         return json.decodeFromJsonElement(ProjectCatalog.serializer(), result)
     }
 
-    suspend fun getProject(identifier: String): ProjectSummary =
-        getProject(ProjectId(identifier))
-
     suspend fun getProject(projectId: ProjectId): ProjectSummary {
         val project = ProjectRpcRef(projectId)
-        val result = rpc(projectRpc("project.get", project.apiPath(), project.idBody()))
+        val result = rpc(projectRpc(ProjectRpcMethods.Get, project.apiPath(), project.idBody()))
             ?: error("Iroh admin_rpc project.get returned no result")
         return json.decodeFromJsonElement(ProjectDetailResponse.serializer(), result).project
     }
 
-    suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
-        getBeadsRemoteStatus(ProjectId(identifier))
-
     suspend fun getBeadsRemoteStatus(projectId: ProjectId): BeadsRemoteStatus {
         val project = ProjectRpcRef(projectId)
         val result = rpc(
-            projectRpc("project.beadsRemoteStatus", project.apiPath("/beads-remote"), project.idBody()),
+            projectRpc(
+                ProjectRpcMethods.BeadsRemoteStatus,
+                project.apiPath(ProjectRpcPaths.BeadsRemoteSuffix),
+                project.idBody(),
+            ),
         ) ?: error("Iroh admin_rpc project.beadsRemoteStatus returned no result")
         return json.decodeFromJsonElement(BeadsRemoteStatus.serializer(), result)
     }
 
-    suspend fun provisionBeadsRemote(identifier: String, push: Boolean = true): BeadsRemoteProvisionResponse =
-        provisionBeadsRemote(ProjectId(identifier), push)
-
-    suspend fun provisionBeadsRemote(projectId: ProjectId, push: Boolean = true): BeadsRemoteProvisionResponse {
+    suspend fun provisionBeadsRemote(
+        projectId: ProjectId,
+        push: Boolean = true,
+    ): BeadsRemoteProvisionResponse {
         val project = ProjectRpcRef(projectId)
-        val body = json.encodeToString(BeadsRemoteProvisionRequest.serializer(), BeadsRemoteProvisionRequest(push = push))
+        val body = json.encodeToString(
+            BeadsRemoteProvisionRequest.serializer(),
+            BeadsRemoteProvisionRequest(push = push),
+        )
         val result = rpc(
             projectRpc(
-                "project.provisionBeadsRemote",
-                project.apiPath("/beads-remote/provision"),
-                project.mergeIdBody(body),
+                ProjectRpcMethods.ProvisionBeadsRemote,
+                project.apiPath(ProjectRpcPaths.BeadsRemoteProvisionSuffix),
+                project.mergeIdBody(AdminRpcJsonBody(body)),
             ),
         ) ?: error("Iroh admin_rpc project.provisionBeadsRemote returned no result")
         return json.decodeFromJsonElement(BeadsRemoteProvisionResponse.serializer(), result)
     }
-
-    suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
-        triggerSync(ProjectId(identifier))
 
     suspend fun triggerSync(projectId: ProjectId): ProjectSyncTriggerResponse {
         val body = json.encodeToString(
             ProjectSyncTriggerRequest.serializer(),
             ProjectSyncTriggerRequest(projectId = projectId),
         )
-        val result = rpc(projectRpc("project.triggerSync", "/api/sync/trigger", body))
-            ?: error("Iroh admin_rpc project.triggerSync returned no result")
+        val result = rpc(
+            projectRpc(ProjectRpcMethods.TriggerSync, ProjectRpcPaths.SyncTrigger, AdminRpcJsonBody(body)),
+        ) ?: error("Iroh admin_rpc project.triggerSync returned no result")
         return json.decodeFromJsonElement(ProjectSyncTriggerResponse.serializer(), result)
     }
-
-    suspend fun createProject(name: String?, filesystemPath: String, gitUrl: String?): ProjectSummary =
-        createProject(ProjectCreateRpcParams(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl))
 
     suspend fun createProject(params: ProjectCreateRpcParams): ProjectSummary {
         val body = json.encodeToString(
             ProjectCreateRequest.serializer(),
             ProjectCreateRequest(
-                name = params.name,
-                filesystemPath = params.filesystemPath,
-                gitUrl = params.gitUrl,
+                name = params.name?.value,
+                filesystemPath = params.filesystemPath.value,
+                gitUrl = params.gitUrl?.value,
             ),
         )
-        val result = rpc(projectRpc("project.create", "/api/registry/projects", body))
-            ?: error("Iroh admin_rpc project.create returned no result")
+        val result = rpc(
+            projectRpc(ProjectRpcMethods.Create, ProjectRpcPaths.RegistryProjects, AdminRpcJsonBody(body)),
+        ) ?: error("Iroh admin_rpc project.create returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
-
-    suspend fun updateProject(identifier: String, filesystemPath: String?, gitUrl: String?): ProjectSummary =
-        updateProject(
-            ProjectUpdateRpcParams(
-                projectId = ProjectId(identifier),
-                filesystemPath = filesystemPath,
-                gitUrl = gitUrl,
-            ),
-        )
 
     suspend fun updateProject(params: ProjectUpdateRpcParams): ProjectSummary {
         val body = json.encodeToString(
             ProjectUpdateRequest.serializer(),
-            ProjectUpdateRequest(filesystemPath = params.filesystemPath, gitUrl = params.gitUrl),
+            ProjectUpdateRequest(
+                filesystemPath = params.filesystemPath?.value,
+                gitUrl = params.gitUrl?.value,
+            ),
         )
-        return mutateProject(params.projectId, "project.update", body)
+        return mutateProject(
+            ProjectMutationRpcParams(
+                projectId = params.projectId,
+                method = ProjectRpcMethods.Update,
+                body = AdminRpcJsonBody(body),
+            ),
+        )
     }
-
-    suspend fun archiveProject(identifier: String): ProjectSummary =
-        archiveProject(ProjectId(identifier))
 
     suspend fun archiveProject(projectId: ProjectId): ProjectSummary {
-        val body = json.encodeToString(ProjectUpdateRequest.serializer(), ProjectUpdateRequest(status = "archived"))
-        return mutateProject(projectId, "project.archive", body)
+        val body = json.encodeToString(
+            ProjectUpdateRequest.serializer(),
+            ProjectUpdateRequest(status = ProjectStatusTokens.Archived.value),
+        )
+        return mutateProject(
+            ProjectMutationRpcParams(
+                projectId = projectId,
+                method = ProjectRpcMethods.Archive,
+                body = AdminRpcJsonBody(body),
+            ),
+        )
     }
-
-    suspend fun deleteProject(identifier: String) = deleteProject(ProjectId(identifier))
 
     suspend fun deleteProject(projectId: ProjectId) {
         val project = ProjectRpcRef(projectId)
-        rpc(projectRpc("project.delete", project.registryPath(), project.idBody()))
+        rpc(projectRpc(ProjectRpcMethods.Delete, project.registryPath(), project.idBody()))
     }
 
-    private suspend fun mutateProject(projectId: ProjectId, method: String, body: String): ProjectSummary {
-        val project = ProjectRpcRef(projectId)
-        val result = rpc(projectRpc(method, project.registryPath(), project.mergeIdBody(body)))
-            ?: error("Iroh admin_rpc $method returned no result")
+    private suspend fun mutateProject(params: ProjectMutationRpcParams): ProjectSummary {
+        val project = ProjectRpcRef(params.projectId)
+        val result = rpc(
+            projectRpc(params.method, project.registryPath(), project.mergeIdBody(params.body)),
+        ) ?: error("Iroh admin_rpc ${params.method.value} returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
 
-    private fun ProjectRpcRef.idBody(): String = buildJsonObject {
-        put("identifier", id.value)
-    }.toString()
+    private fun ProjectRpcRef.idBody(): AdminRpcJsonBody = AdminRpcJsonBody(
+        buildJsonObject {
+            put(ProjectRpcJsonKeys.Identifier.value, id.value)
+        }.toString(),
+    )
 
-    private fun ProjectRpcRef.mergeIdBody(body: String): String {
-        val payload = json.parseToJsonElement(body).jsonObject
-        return buildJsonObject {
-            put("identifier", id.value)
-            payload.forEach { (key, value) -> put(key, value) }
-        }.toString()
+    private fun ProjectRpcRef.mergeIdBody(body: AdminRpcJsonBody): AdminRpcJsonBody {
+        val payload = json.parseToJsonElement(body.value).jsonObject
+        return AdminRpcJsonBody(
+            buildJsonObject {
+                put(ProjectRpcJsonKeys.Identifier.value, id.value)
+                payload.forEach { (key, value) -> put(key, value) }
+            }.toString(),
+        )
     }
 
-    private fun projectRpc(method: String, path: String, body: String? = null): AdminRpcCall =
-        AdminRpcCall.of(AdminRpcMethod(method), AdminRpcPath(path), body)
+    private fun projectRpc(
+        method: AdminRpcMethod,
+        path: AdminRpcPath,
+        body: AdminRpcJsonBody? = null,
+    ): AdminRpcCall = AdminRpcCall.of(method, path, body?.value)
 
     private suspend fun rpc(call: AdminRpcCall): JsonElement? {
         val response = channelTransport.adminRpc(method = call.method, path = call.path, body = call.body)
@@ -189,24 +198,104 @@ class IrohAdminRpcProjectSource(
     }
 
     private data class ProjectRpcRef(val id: ProjectId) {
-        fun apiPath(suffix: String = ""): String = "/api/projects/${id.value}$suffix"
-        fun registryPath(): String = "/api/registry/projects/${id.value}"
+        fun apiPath(suffix: ProjectPathSuffix = ProjectPathSuffix.None): AdminRpcPath =
+            AdminRpcPath("/api/projects/${id.value}${suffix.value}")
+
+        fun registryPath(): AdminRpcPath = AdminRpcPath("/api/registry/projects/${id.value}")
     }
 }
 
+@JvmInline
+value class ProjectFilesystemPath(val value: String)
+
+@JvmInline
+value class ProjectGitUrl(val value: String)
+
+@JvmInline
+value class ProjectDisplayName(val value: String)
+
 /** Param bag for project.create admin_rpc. */
 data class ProjectCreateRpcParams(
-    val name: String?,
-    val filesystemPath: String,
-    val gitUrl: String?,
+    val name: ProjectDisplayName?,
+    val filesystemPath: ProjectFilesystemPath,
+    val gitUrl: ProjectGitUrl?,
 )
 
 /** Param bag for project.update admin_rpc. */
 data class ProjectUpdateRpcParams(
     val projectId: ProjectId,
-    val filesystemPath: String?,
-    val gitUrl: String?,
+    val filesystemPath: ProjectFilesystemPath?,
+    val gitUrl: ProjectGitUrl?,
 )
+
+@JvmInline
+value class ProjectListLimit(val value: Int)
+
+@JvmInline
+value class AdminRpcJsonBody(val value: String)
+
+@JvmInline
+value class ProjectPathSuffix(val value: String) {
+    companion object {
+        val None = ProjectPathSuffix("")
+    }
+}
+
+@JvmInline
+value class ProjectStatusToken(val value: String)
+
+@JvmInline
+value class ProjectRpcJsonKey(val value: String)
+
+private data class ProjectMutationRpcParams(
+    val projectId: ProjectId,
+    val method: AdminRpcMethod,
+    val body: AdminRpcJsonBody,
+)
+
+private object ProjectRpcMethods {
+    val List = AdminRpcMethod("project.list")
+    val Get = AdminRpcMethod("project.get")
+    val BeadsRemoteStatus = AdminRpcMethod("project.beadsRemoteStatus")
+    val ProvisionBeadsRemote = AdminRpcMethod("project.provisionBeadsRemote")
+    val TriggerSync = AdminRpcMethod("project.triggerSync")
+    val Create = AdminRpcMethod("project.create")
+    val Update = AdminRpcMethod("project.update")
+    val Archive = AdminRpcMethod("project.archive")
+    val Delete = AdminRpcMethod("project.delete")
+}
+
+private object ProjectRpcPaths {
+    val SyncTrigger = AdminRpcPath("/api/sync/trigger")
+    val RegistryProjects = AdminRpcPath("/api/registry/projects")
+    val BeadsRemoteSuffix = ProjectPathSuffix("/beads-remote")
+    val BeadsRemoteProvisionSuffix = ProjectPathSuffix("/beads-remote/provision")
+
+    fun list(limit: ProjectListLimit?): AdminRpcPath {
+        val query = limit?.let { "?limit=${it.value}" }.orEmpty()
+        return AdminRpcPath("/api/projects$query")
+    }
+}
+
+private object ProjectRpcBodies {
+    fun listLimit(limit: ProjectListLimit?): AdminRpcJsonBody? =
+        limit?.let {
+            AdminRpcJsonBody(
+                buildJsonObject {
+                    put(ProjectRpcJsonKeys.Limit.value, it.value)
+                }.toString(),
+            )
+        }
+}
+
+private object ProjectStatusTokens {
+    val Archived = ProjectStatusToken("archived")
+}
+
+private object ProjectRpcJsonKeys {
+    val Identifier = ProjectRpcJsonKey("identifier")
+    val Limit = ProjectRpcJsonKey("limit")
+}
 
 @kotlinx.serialization.Serializable
 private data class BeadsRemoteProvisionRequest(val push: Boolean = true)

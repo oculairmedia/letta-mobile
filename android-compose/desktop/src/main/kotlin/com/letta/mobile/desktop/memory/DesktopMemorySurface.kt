@@ -102,90 +102,31 @@ fun DesktopMemorySurface(
 ) {
     var editorTarget by remember { mutableStateOf<BlockEditorTarget?>(null) }
     val agentId = state.memory.selectedAgentId
+    val chrome = MemorySurfaceChrome(state, onRefresh, onAgentSelected, blockApi)
 
     Row(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
-        // A fixed (non-scrolling) column: the header/agent/stats are fixed
-        // height and the graph takes the rest, so the page never scrolls.
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-        ) {
-            // Header / selector / summary keep their inset; the graph below runs
-            // edge-to-edge so it doesn't waste space.
-            Column(
-                modifier = Modifier.padding(start = 28.dp, end = 28.dp, top = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-            MemoryHeader(
-                state = state,
-                onRefresh = onRefresh,
-                // Re-expose block creation: the graph-only redesign dropped the
-                // only entry point for adding a memory block (Codex review #7).
-                // The editor panel needs both an agent and a block API, so gate
-                // the action on the same preconditions.
-                onNewBlock = if (agentId != null && blockApi != null) {
-                    { editorTarget = BlockEditorTarget.New }
-                } else {
-                    null
+        MemoryMainColumn(
+            chrome = chrome,
+            agentId = agentId,
+            onEditorTargetChange = { editorTarget = it },
+        )
+        MemoryBlockEditorSlot(
+            MemoryBlockEditorSlotParams(
+                target = editorTarget,
+                agentId = agentId,
+                blockApi = blockApi,
+                onDismiss = { editorTarget = null },
+                onChanged = {
+                    editorTarget = null
+                    onBlockChanged()
                 },
-            )
-            state.errorMessage?.let { errorMessage ->
-                DesktopInlineError(
-                    message = errorMessage,
-                    onRetry = onRefresh,
-                    retrying = state.isLoading,
-                )
-            }
-            if (state.agents.isNotEmpty()) {
-                AgentSelector(
-                    agents = state.agents,
-                    selectedAgentId = state.memory.selectedAgentId,
-                    onAgentSelected = onAgentSelected,
-                )
-            }
-            MemorySummaryCard(state.memory.summary)
-            }
-            Spacer(Modifier.height(12.dp))
-            // The graph is the focus — it takes the remaining height, flush to the
-            // pane edges. Blocks stay editable by clicking their graph nodes.
-            MemoryGraphPanel(
-                graph = state.memory.graph,
-                onBlockNodeClick = { node ->
-                    if (agentId != null) {
-                        editorTarget = BlockEditorTarget.Existing(node.title, node.sourceItemId)
-                    }
-                },
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
-        }
-
-        val target = editorTarget
-        if (target != null && agentId != null && blockApi != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(1.dp)
-                    .background(MaterialTheme.colorScheme.outlineVariant),
-            )
-            BlockEditorPanel(
-                request = BlockEditorRequest(
-                    target = target,
-                    agentId = agentId,
-                    blockApi = blockApi,
-                    onDismiss = { editorTarget = null },
-                    onChanged = {
-                        editorTarget = null
-                        onBlockChanged()
-                    },
-                ),
-            )
-        }
+            ),
+        )
     }
 }
 
 @Composable
-private fun MemoryHeader(
+internal fun MemoryHeader(
     state: DesktopMemorySurfaceState,
     onRefresh: () -> Unit,
     onNewBlock: (() -> Unit)? = null,
@@ -212,7 +153,7 @@ private fun MemoryHeader(
 }
 
 @Composable
-private fun AgentSelector(
+internal fun AgentSelector(
     agents: List<DesktopMemoryAgentOption>,
     selectedAgentId: String?,
     onAgentSelected: (String) -> Unit,
@@ -246,7 +187,7 @@ private fun AgentSelector(
 }
 
 @Composable
-private fun MemorySummaryCard(summary: MemoryParitySummary) {
+internal fun MemorySummaryCard(summary: MemoryParitySummary) {
     // Neutral stats strip — these are reference counts, not a status to flag,
     // so no colour highlight.
     Surface(
