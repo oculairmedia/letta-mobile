@@ -15,7 +15,7 @@ object ScheduleAdminHandlers {
             if (agentId != null) api.get("agents", agentId, "schedule") else api.get("schedules")
         }
         router.register("schedule.get") { p ->
-            val scheduleId = param(p, "schedule_id") ?: return@register adminError("schedule_id required")
+            val scheduleId = p.requireParam("schedule_id")
             val agentId = param(p, "agent_id")
             if (agentId != null) api.get("agents", agentId, "schedule", scheduleId) else api.get("schedules", scheduleId)
         }
@@ -24,7 +24,7 @@ object ScheduleAdminHandlers {
             if (agentId != null) api.post("agents", agentId, "schedule", body = p?.toString() ?: "{}") else api.post("schedules", body = p?.toString() ?: "{}")
         }
         router.register("schedule.delete") { p ->
-            val scheduleId = param(p, "schedule_id") ?: return@register adminError("schedule_id required")
+            val scheduleId = p.requireParam("schedule_id")
             val agentId = param(p, "agent_id")
             if (agentId != null) api.delete("agents", agentId, "schedule", scheduleId) else api.delete("schedules", scheduleId)
         }
