@@ -1026,6 +1026,81 @@ The implementation looks solid. One actionable issue: handle the null case.</res
         }
     }
 
+    "MessageMapper facade parity" should {
+        "golden-map API message directions and ignore unsupported system messages" {
+            val messages = listOf<com.letta.mobile.data.model.LettaMessage>(
+                com.letta.mobile.data.model.UserMessage(
+                    id = "user-1",
+                    contentRaw = kotlinx.serialization.json.JsonPrimitive("hello"),
+                    date = "2024-03-15T10:00:00Z",
+                ),
+                AssistantMessage(
+                    id = "assistant-1",
+                    contentRaw = kotlinx.serialization.json.JsonPrimitive("hi"),
+                    date = "2024-03-15T10:00:01Z",
+                ),
+                com.letta.mobile.data.model.ReasoningMessage(
+                    id = "reasoning-1",
+                    reasoning = "thinking",
+                    date = "2024-03-15T10:00:02Z",
+                ),
+                com.letta.mobile.data.model.ToolCallMessage(
+                    id = "call-1",
+                    toolCall = ToolCall(id = "tc-1", name = "Bash", arguments = "{malformed"),
+                    date = "2024-03-15T10:00:03Z",
+                ),
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "return-1",
+                    toolCallId = "tc-1",
+                    status = "success",
+                    toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("done"),
+                    date = "2024-03-15T10:00:04Z",
+                ),
+                com.letta.mobile.data.model.SystemMessage(
+                    id = "system-1",
+                    contentRaw = kotlinx.serialization.json.JsonPrimitive("internal"),
+                ),
+            )
+
+            val app = messages.toAppMessages()
+
+            app.map { it.messageType } shouldBe listOf(
+                MessageType.USER,
+                MessageType.ASSISTANT,
+                MessageType.REASONING,
+                MessageType.TOOL_CALL,
+                MessageType.TOOL_RETURN,
+            )
+            app.map { it.id } shouldBe listOf("user-1", "assistant-1", "reasoning-1", "call-1", "return-1")
+            app[3].content shouldBe "{malformed"
+            app[4].toolName shouldBe "Bash"
+            app[4].content shouldBe "done"
+            app.map { it.date.toString() } shouldBe listOf(
+                "2024-03-15T10:00:00Z",
+                "2024-03-15T10:00:01Z",
+                "2024-03-15T10:00:02Z",
+                "2024-03-15T10:00:03Z",
+                "2024-03-15T10:00:04Z",
+            )
+        }
+
+        "preserve missing tool ids and tolerate invalid optional payloads" {
+            val before = Instant.now()
+            val app = com.letta.mobile.data.model.ToolCallMessage(
+                id = "call-without-id",
+                toolCall = ToolCall(name = "Agent", arguments = "not-json"),
+                date = "not-a-timestamp",
+            ).toAppMessage().shouldNotBeNull()
+            val after = Instant.now()
+
+            app.toolCallId shouldBe ""
+            app.date.isBefore(before) shouldBe false
+            app.date.isAfter(after) shouldBe false
+            val ui = listOf(app).toUiMessages().single()
+            ui.toolCalls.shouldNotBeNull().single().subagentDispatch.shouldBeNull()
+        }
+    }
+
     "AppMessage.toUiMessage" should {
         "carry generated ui payloads into chat messages" {
             val uiMsg = TestData.appMessage(
