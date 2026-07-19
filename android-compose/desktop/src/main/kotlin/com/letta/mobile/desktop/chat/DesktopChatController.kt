@@ -4,6 +4,7 @@ import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
+import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
@@ -526,9 +527,6 @@ class DesktopChatController(
     fun send() {
         if (closed) return
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
-        val text = draft.text
-        val attachments = draft.attachments
-
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {
@@ -540,17 +538,15 @@ class DesktopChatController(
             }
             return
         }
+        launchRemoteSend(loop, draft)
+    }
 
+    private fun launchRemoteSend(loop: DesktopTimelineLoop, draft: ChatComposerSendDraft) {
+        val text = draft.text
+        val attachments = draft.attachments
         val sendingConversationId = _state.value.selectedConversationId
-        val titleToPersist = sendingConversationId?.let { conversationId ->
-            _state.value.conversations
-                .firstOrNull { it.id == conversationId }
-                ?.persistedTitleCandidate(text)
-        }
-        // This conversation now has content — it's no longer a throwaway.
-        if (sendingConversationId != null && sendingConversationId == unsentConversationId) {
-            unsentConversationId = null
-        }
+        val titleToPersist = titleCandidateForSend(sendingConversationId, text)
+        clearUnsentIfMatching(sendingConversationId)
         _state.update {
             it.withRuntimeState(ChatSessionReducer.beginSend(it.runtimeState, draft))
         }
@@ -562,48 +558,87 @@ class DesktopChatController(
         val streamGen = ++streamingGeneration
         sendJob?.cancel()
         sendJob = scope.launch {
-            try {
-                loop.send(
-                    DesktopTimelineSendRequest(
-                        content = MessageBody(text),
-                        attachments = attachments,
+            runRemoteSendAttempt(
+                RemoteSendAttempt(
+                    loop = loop,
+                    text = text,
+                    attachments = attachments,
+                    conversationId = sendingConversationId,
+                    titleToPersist = titleToPersist,
+                    streamGen = streamGen,
+                ),
+            )
+        }
+    }
+
+    private fun titleCandidateForSend(conversationId: String?, text: String): String? {
+        if (conversationId == null) return null
+        return _state.value.conversations
+            .firstOrNull { it.id == conversationId }
+            ?.persistedTitleCandidate(text)
+    }
+
+    private fun clearUnsentIfMatching(conversationId: String?) {
+        if (conversationId != null && conversationId == unsentConversationId) {
+            unsentConversationId = null
+        }
+    }
+
+    private data class RemoteSendAttempt(
+        val loop: DesktopTimelineLoop,
+        val text: String,
+        val attachments: List<MessageContentPart.Image>,
+        val conversationId: String?,
+        val titleToPersist: String?,
+        val streamGen: Int,
+    )
+
+    private suspend fun runRemoteSendAttempt(attempt: RemoteSendAttempt) {
+        try {
+            attempt.loop.send(
+                DesktopTimelineSendRequest(
+                    content = MessageBody(attempt.text),
+                    attachments = attempt.attachments,
+                ),
+            )
+            if (closed) return
+            // Only rename after the send actually lands — avoid PATCHing a
+            // draft title when the stream rejects/disconnects. Candidate was
+            // computed before send so a hydrated last-message preview cannot
+            // suppress auto-title for brand-new chats.
+            val conversationId = attempt.conversationId
+            val title = attempt.titleToPersist
+            if (conversationId != null && title != null) {
+                persistConversationTitle(conversationId, title)
+            }
+            _state.update {
+                it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (t: Throwable) {
+            if (closed) return
+            if (_thinkingConversationId.value == attempt.conversationId) {
+                _thinkingConversationId.value = null
+            }
+            _state.update {
+                it.withRuntimeState(
+                    ChatSessionReducer.sendFailed(
+                        state = it.runtimeState,
+                        text = attempt.text,
+                        attachments = attempt.attachments,
+                        errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
                     ),
                 )
-                if (closed) return@launch
-                // Only rename after the send actually lands — avoid PATCHing a
-                // draft title when the stream rejects/disconnects. Candidate was
-                // computed before send so a hydrated last-message preview cannot
-                // suppress auto-title for brand-new chats.
-                if (sendingConversationId != null && titleToPersist != null) {
-                    persistConversationTitle(sendingConversationId, titleToPersist)
-                }
-                _state.update {
-                    it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (t: Throwable) {
-                if (closed) return@launch
-                if (_thinkingConversationId.value == sendingConversationId) {
-                    _thinkingConversationId.value = null
-                }
-                _state.update {
-                    it.withRuntimeState(
-                        ChatSessionReducer.sendFailed(
-                            state = it.runtimeState,
-                            text = text,
-                            attachments = attachments,
-                            errorMessage = t.message ?: t::class.simpleName ?: "Send failed",
-                        ),
-                    )
-                }
-            } finally {
-                // Clears on normal completion, failure, and cancellation. The
-                // generation guard prevents a cancelled prior send from clearing
-                // a newer same-conversation send's streaming flag.
-                if (streamGen == streamingGeneration && _streamingConversationId.value == sendingConversationId) {
-                    _streamingConversationId.value = null
-                }
+            }
+        } finally {
+            // Clears on normal completion, failure, and cancellation. The
+            // generation guard prevents a cancelled prior send from clearing
+            // a newer same-conversation send's streaming flag.
+            if (attempt.streamGen == streamingGeneration &&
+                _streamingConversationId.value == attempt.conversationId
+            ) {
+                _streamingConversationId.value = null
             }
         }
     }

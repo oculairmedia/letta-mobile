@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
@@ -552,6 +554,47 @@ class DesktopChatControllerTest {
         controller.close()
     }
 
+    @Test
+    fun firstSubstantiveSendPersistsStableConversationTitle() = runTest {
+        val gateway = TitleSummaryGateway()
+        val loop = FakeDesktopTimelineLoop("conv-1").also { it.completeHydrate() }
+        val controller = testController(gateway = gateway, loopFactory = { _, _, _ -> loop })
+        val prompt = "Plan the Windows release\nwith a checklist"
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText(prompt)
+        controller.send()
+        runCurrent()
+        runCurrent()
+
+        assertEquals("Plan the Windows release", gateway.lastUpdate?.summary?.value)
+        assertEquals("Plan the Windows release", controller.state.value.conversations.single().title)
+        controller.close()
+    }
+
+    @Test
+    fun failedSendDoesNotPersistConversationTitle() = runTest {
+        val gateway = TitleSummaryGateway()
+        val loop = FakeDesktopTimelineLoop(
+            "conv-1",
+            sendFailure = IllegalStateException("stream rejected"),
+        ).also { it.completeHydrate() }
+        val controller = testController(gateway = gateway, loopFactory = { _, _, _ -> loop })
+
+        controller.start()
+        runCurrent()
+        val originalTitle = controller.state.value.conversations.single().title
+        controller.updateComposerText("Plan the Windows release")
+        controller.send()
+        runCurrent()
+        runCurrent()
+
+        assertNull(gateway.lastUpdate)
+        assertEquals(originalTitle, controller.state.value.conversations.single().title)
+        controller.close()
+    }
+
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
         agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
@@ -678,6 +721,32 @@ private class CloseTrackingGateway(
 
     override fun close() {
         closeCount++
+    }
+}
+
+private class TitleSummaryGateway : FakeDesktopChatGateway(), ConversationSummaryGateway {
+    var lastUpdate: ConversationSummaryUpdate? = null
+
+    override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
+        super.listConversations(limit, archiveStatus).map { it.copy(summary = "") }
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = emptyList()
+
+    override suspend fun listAgentMessages(
+        agentId: String,
+        limit: Int?,
+        order: String?,
+        conversationId: String?,
+    ): List<LettaMessage> = emptyList()
+
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
+        lastUpdate = update
+        return getConversation(update.conversationId.value).copy(summary = update.summary.value)
     }
 }
 
