@@ -1,4 +1,4 @@
-package com.letta.mobile.desktop.data
+package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 
-class DesktopIrohToolRepository(
+class IrohToolRepository(
     private val directoryProvider: () -> IrohAdminRpcAgentDirectory?,
 ) : IToolRepository {
     private val toolsFlow = MutableStateFlow<List<Tool>>(emptyList())
@@ -34,7 +34,9 @@ class DesktopIrohToolRepository(
         var offset = 0
         while (true) {
             val page = directory.listTools(PAGE_SIZE, offset)
-            merged += page.filterNot { candidate -> merged.any { it.id == candidate.id } }
+            val newTools = page.filterNot { candidate -> merged.any { it.id == candidate.id } }
+            if (newTools.isEmpty()) break
+            merged += newTools
             if (page.size < PAGE_SIZE) break
             offset += page.size
         }
@@ -76,7 +78,7 @@ class DesktopIrohToolRepository(
     }
 
     private fun directory(): IrohAdminRpcAgentDirectory =
-        directoryProvider() ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "tools")
+        directoryProvider() ?: error("Iroh admin RPC directory is unavailable for tools")
 
     private companion object {
         const val PAGE_SIZE = 100

@@ -31,6 +31,7 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.IrohToolRepository
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -221,7 +222,7 @@ class DesktopRepositoryAdapters(
         ?.let(::DesktopLettaHttpAdminRepositories)
     private val irohAgentRepository = if (irohMode) DesktopIrohAgentRepository(irohAgentDirectoryProvider) else null
     private val irohScheduleRepository = if (irohMode) DesktopIrohScheduleRepository(irohAgentDirectoryProvider) else null
-    private val irohToolRepository = if (irohMode) DesktopIrohToolRepository(irohAgentDirectoryProvider) else null
+    private val irohToolRepository = if (irohMode) IrohToolRepository(irohAgentDirectoryProvider) else null
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 

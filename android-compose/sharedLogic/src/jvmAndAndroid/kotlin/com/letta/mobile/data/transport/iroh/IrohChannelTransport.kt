@@ -1241,6 +1241,13 @@ class IrohChannelTransport(
             // which they must stay OFF (see isLegacyFallbackSafeAdminRpcMethod).
             "agent.get",
             "agent.list",
+            "agent.context",
+            "schedule.get",
+            "schedule.list",
+            "skill.list",
+            "skill.list_agent",
+            "tool.get",
+            "tool.list",
         )
 
         fun isIrohUrl(url: String?): Boolean {

@@ -76,6 +76,7 @@ class AdminProxyClient(
 
     fun get(request: AdminProxyRequest): JsonElement = execute("GET", request)
     fun post(request: AdminProxyRequest, body: String = "{}"): JsonElement = execute("POST", request, body)
+    fun put(request: AdminProxyRequest, body: String): JsonElement = execute("PUT", request, body)
     fun patch(request: AdminProxyRequest, body: String): JsonElement = execute("PATCH", request, body)
     fun delete(request: AdminProxyRequest): JsonElement = execute("DELETE", request)
 

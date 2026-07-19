@@ -54,8 +54,10 @@ private fun DesktopClipboardImagePasteEffect(
                 ?: return@KeyEventDispatcher false
             when {
                 transferable.isDataFlavorSupported(DataFlavor.imageFlavor) -> {
-                    val image = transferable.getTransferData(DataFlavor.imageFlavor) as? BufferedImage
-                        ?: return@KeyEventDispatcher false
+                    val rawImage = runCatching {
+                        transferable.getTransferData(DataFlavor.imageFlavor) as? java.awt.Image
+                    }.getOrNull() ?: return@KeyEventDispatcher false
+                    val image = rawImage.toBufferedImage() ?: return@KeyEventDispatcher false
                     scope.launchLoadImage(loader, onImage, onError) { load(image) }
                     true
                 }
@@ -82,7 +84,7 @@ private fun DesktopImageFileDropEffect(
 ) {
     DisposableEffect(enabled, loader) {
         if (!enabled) return@DisposableEffect onDispose { }
-        val installed = mutableMapOf<Component, DropTarget?>()
+        val installed = java.util.WeakHashMap<Component, DropTarget?>()
         val target = object : DropTargetAdapter() {
             override fun drop(event: DropTargetDropEvent) {
                 val transferable = event.transferable
@@ -134,6 +136,23 @@ private fun CoroutineScope.launchLoadImage(
 }
 
 private fun KeyEvent.isShortcutPaste(): Boolean = isControlDown || isMetaDown
+
+private fun java.awt.Image.toBufferedImage(): BufferedImage? {
+    if (this is BufferedImage) return this
+    val imageWidth = getWidth(null).takeIf { it > 0 } ?: return null
+    val imageHeight = getHeight(null).takeIf { it > 0 } ?: return null
+    return BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB).also { target ->
+        target.createGraphics().use { graphics -> graphics.drawImage(this, 0, 0, null) }
+    }
+}
+
+private inline fun <T : java.awt.Graphics> T.use(block: (T) -> Unit) {
+    try {
+        block(this)
+    } finally {
+        dispose()
+    }
+}
 
 @Suppress("UNCHECKED_CAST")
 private fun java.awt.datatransfer.Transferable.imageFiles(): List<File> =

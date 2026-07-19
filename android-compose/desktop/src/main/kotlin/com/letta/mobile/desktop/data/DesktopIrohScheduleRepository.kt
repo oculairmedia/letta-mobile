@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -22,8 +23,8 @@ class DesktopIrohScheduleRepository(
             ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "refreshSchedules")
         val schedules = try {
             directory.listSchedules(agentId)
-        } catch (t: Throwable) {
-            if (t.message.orEmpty().contains("GET /v1/schedules")) emptyList() else throw t
+        } catch (t: TimelineTransportHttpException) {
+            if (t.code == 502 && "HTTP 404" in t.message.orEmpty()) emptyList() else throw t
         }
         schedulesByAgentFlow.update { current ->
             current.toMutableMap().apply { put(agentId, schedules) }

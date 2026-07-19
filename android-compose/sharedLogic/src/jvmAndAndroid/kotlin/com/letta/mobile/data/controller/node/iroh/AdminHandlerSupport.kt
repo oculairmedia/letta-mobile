@@ -12,6 +12,8 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
     fun get(request: AdminProxyRequest): JsonElement = proxy.get(request)
     fun post(vararg segments: String, body: String): JsonElement = proxy.post(adminProxyRequest("v1", *segments).build(), body)
     fun post(request: AdminProxyRequest, body: String): JsonElement = proxy.post(request, body)
+    fun put(vararg segments: String, body: String): JsonElement = proxy.put(adminProxyRequest("v1", *segments).build(), body)
+    fun put(request: AdminProxyRequest, body: String): JsonElement = proxy.put(request, body)
     fun patch(vararg segments: String, body: String): JsonElement = proxy.patch(adminProxyRequest("v1", *segments).build(), body)
     fun patch(request: AdminProxyRequest, body: String): JsonElement = proxy.patch(request, body)
     fun delete(vararg segments: String): JsonElement = proxy.delete(adminProxyRequest("v1", *segments).build())

@@ -19,7 +19,7 @@ object ToolAdminHandlers {
             )
         }
         router.register("tool.get") { p -> param(p, "tool_id")?.let { api.get("tools", it) } ?: adminError("tool_id required") }
-        router.register("tool.create") { p -> api.post("tools", body = p?.toString() ?: "{}") }
+        router.register("tool.create") { p -> api.put("tools", body = p?.toString() ?: "{}") }
         router.register("tool.update") { p -> param(p, "tool_id")?.let { api.patch("tools", it, body = p.toString()) } ?: adminError("tool_id required") }
         router.register("tool.delete") { p -> param(p, "tool_id")?.let { api.delete("tools", it) } ?: adminError("tool_id required") }
         router.register("tool.attach") { p ->
