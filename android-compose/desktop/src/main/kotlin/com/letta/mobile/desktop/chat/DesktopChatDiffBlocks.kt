@@ -53,90 +53,119 @@ internal fun ToolOutputBlock(text: String, isError: Boolean = false) =
 
 @Composable
 internal fun ToolOutputBlock(params: ToolOutputBlockParams) {
-    val text = params.text
-    val isError = params.isError
     // Unified diffs (file-edit tool output) render as a reviewable diff block
     // (Penpot "Diff review") rather than plain monospace lines.
-    if (!isError && UnifiedDiff.looksLikeDiff(text)) {
-        DiffBlock(text)
+    if (!params.isError && UnifiedDiff.looksLikeDiff(params.text)) {
+        DiffBlock(params.text)
         return
     }
+    PlainToolOutputBlock(params)
+}
+
+@Composable
+private fun PlainToolOutputBlock(params: ToolOutputBlockParams) {
     // The "Tool error + retry" board renders failed output on a dark-red inset
     // instead of the neutral surface, so the failure reads at a glance.
-    val blockColor = if (isError) {
+    val blockColor = if (params.isError) {
         MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
-    val outputLines = remember(text) { text.trim().lines() }
+    val outputLines = remember(params.text) { params.text.trim().lines() }
     val visibleLines = remember(outputLines) { outputLines.take(TOOL_OUTPUT_VISIBLE_LINE_LIMIT) }
     val horizontalScrollState = rememberScrollState()
-    val scrollScope = rememberCoroutineScope()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
         color = blockColor,
     ) {
-        Column {
-            Box {
-                SelectionContainer {
-                    Column(
-                        modifier = Modifier
-                            .semantics {
-                                contentDescription = "Tool output. Use left and right arrow keys to scroll horizontally."
-                            }
-                            .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                                val delta = when (event.key) {
-                                    Key.DirectionLeft -> -TOOL_OUTPUT_KEYBOARD_SCROLL_PX
-                                    Key.DirectionRight -> TOOL_OUTPUT_KEYBOARD_SCROLL_PX
-                                    else -> return@onPreviewKeyEvent false
-                                }
-                                scrollScope.launch {
-                                    horizontalScrollState.scrollTo(
-                                        (horizontalScrollState.value + delta.toInt())
-                                            .coerceIn(0, horizontalScrollState.maxValue),
-                                    )
-                                }
-                                true
-                            }
-                            .focusable()
-                            .horizontalScroll(horizontalScrollState)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                    ) {
-                        visibleLines.forEach { line ->
-                            Text(
-                                text = line,
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(OutputLine(line)),
-                                maxLines = 1,
-                            )
-                        }
-                    }
-                }
-                HorizontalScrollbar(
-                    adapter = rememberScrollbarAdapter(horizontalScrollState),
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .testTag("tool-output-scrollbar"),
-                )
-            }
-            if (outputLines.size > visibleLines.size) {
-                Text(
-                    text = "Showing ${visibleLines.size} of ${outputLines.size} lines · Copy includes all output",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                )
-            }
-        }
+        ToolOutputContents(visibleLines, outputLines.size, params.isError, horizontalScrollState)
     }
 }
 
+@Composable
+private fun ToolOutputContents(
+    visibleLines: List<String>,
+    totalLineCount: Int,
+    isError: Boolean,
+    horizontalScrollState: androidx.compose.foundation.ScrollState,
+) {
+    Column {
+        ToolOutputViewport(visibleLines, isError, horizontalScrollState)
+        if (totalLineCount > visibleLines.size) ToolOutputTruncationLabel(visibleLines.size, totalLineCount)
+    }
+}
+
+@Composable
+private fun ToolOutputViewport(
+    visibleLines: List<String>,
+    isError: Boolean,
+    horizontalScrollState: androidx.compose.foundation.ScrollState,
+) {
+    val scrollScope = rememberCoroutineScope()
+    Box {
+        SelectionContainer {
+            Column(
+                modifier = Modifier
+                    .toolOutputKeyboardScroll(horizontalScrollState) { destination ->
+                        scrollScope.launch { horizontalScrollState.scrollTo(destination) }
+                    }
+                    .focusable()
+                    .horizontalScroll(horizontalScrollState)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                visibleLines.forEach { line -> ToolOutputLine(line, isError) }
+            }
+        }
+        HorizontalScrollbar(
+            adapter = rememberScrollbarAdapter(horizontalScrollState),
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().height(10.dp).testTag("tool-output-scrollbar"),
+        )
+    }
+}
+
+private fun Modifier.toolOutputKeyboardScroll(
+    state: androidx.compose.foundation.ScrollState,
+    scrollTo: (Int) -> Unit,
+): Modifier = semantics {
+    contentDescription = "Tool output. Use left and right arrow keys to scroll horizontally."
+}.onPreviewKeyEvent { event ->
+    val delta = event.toolOutputScrollDelta() ?: return@onPreviewKeyEvent false
+    scrollTo((state.value + delta).coerceIn(0, state.maxValue))
+    true
+}
+
+private fun androidx.compose.ui.input.key.KeyEvent.toolOutputScrollDelta(): Int? {
+    if (type != KeyEventType.KeyDown) return null
+    return when (key) {
+        Key.DirectionLeft -> -TOOL_OUTPUT_KEYBOARD_SCROLL_PX
+        Key.DirectionRight -> TOOL_OUTPUT_KEYBOARD_SCROLL_PX
+        else -> null
+    }
+}
+
+@Composable
+private fun ToolOutputLine(line: String, isError: Boolean) {
+    Text(
+        text = line,
+        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(OutputLine(line)),
+        maxLines = 1,
+    )
+}
+
+@Composable
+private fun ToolOutputTruncationLabel(visibleLineCount: Int, totalLineCount: Int) {
+    Text(
+        text = "Showing $visibleLineCount of $totalLineCount lines · Copy includes all output",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+    )
+}
+
 private const val TOOL_OUTPUT_VISIBLE_LINE_LIMIT = 40
-private const val TOOL_OUTPUT_KEYBOARD_SCROLL_PX = 64f
+private const val TOOL_OUTPUT_KEYBOARD_SCROLL_PX = 64
 
 /**
  * Renders a unified diff (Penpot "Diff review"): a line-numbered gutter (old |

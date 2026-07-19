@@ -123,8 +123,7 @@ internal fun CopyIconButton(
     text: String,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    contentDescription: String = "Copy",
-    emphasized: Boolean = true,
+    config: CopyActionConfig = CopyActionConfig(),
 ) {
     val clipboard = LocalClipboardManager.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -138,43 +137,76 @@ internal fun CopyIconButton(
         }
     }
     val visualAlpha by animateFloatAsState(
-        targetValue = if (emphasized || focused || hovered || copied) 1f else 0.58f,
+        targetValue = if (config.emphasized or focused or hovered or copied) 1f else 0.58f,
         animationSpec = tween(durationMillis = 120),
         label = "copyActionAlpha",
     )
-    val resolvedDescription = if (copied) "Copied" else contentDescription
+    val resolvedDescription = if (copied) "Copied" else config.contentDescription
     DesktopTooltip(text = resolvedDescription) {
-        Box(
-            modifier = modifier
-                .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
-                .graphicsLayer { alpha = visualAlpha }
-                .clip(CircleShape)
-                .border(
-                    width = 1.dp,
-                    color = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    shape = CircleShape,
-                )
-                .semantics { this.contentDescription = resolvedDescription }
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = LocalIndication.current,
-                    role = Role.Button,
-                ) {
-                    clipboard.setText(AnnotatedString(text))
-                    copied = true
-                }
-                .focusable(interactionSource = interactionSource),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
-                contentDescription = null,
-                tint = if (copied) Color(0xFF34C759) else tint,
-                modifier = Modifier.size(14.dp),
-            )
-        }
+        CopyButtonVisual(
+            state = CopyButtonVisualState(copied, focused, visualAlpha),
+            style = CopyButtonVisualStyle(tint, resolvedDescription),
+            interaction = CopyButtonInteraction(interactionSource) {
+                clipboard.setText(AnnotatedString(text))
+                copied = true
+            },
+            modifier = modifier,
+        )
     }
 }
+
+internal data class CopyActionConfig(
+    val contentDescription: String = "Copy",
+    val emphasized: Boolean = true,
+)
+
+@Composable
+private fun CopyButtonVisual(
+    state: CopyButtonVisualState,
+    style: CopyButtonVisualStyle,
+    interaction: CopyButtonInteraction,
+    modifier: Modifier,
+) {
+    Box(
+        modifier = modifier
+            .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
+            .graphicsLayer { alpha = state.visualAlpha }
+            .clip(CircleShape)
+            .border(1.dp, state.focusBorderColor(), CircleShape)
+            .semantics { contentDescription = style.description }
+            .clickable(
+                interactionSource = interaction.source,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = interaction.onCopy,
+            )
+            .focusable(interactionSource = interaction.source),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (state.copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+            contentDescription = null,
+            tint = if (state.copied) Color(0xFF34C759) else style.tint,
+            modifier = Modifier.size(14.dp),
+        )
+    }
+}
+
+private data class CopyButtonVisualState(
+    val copied: Boolean,
+    val focused: Boolean,
+    val visualAlpha: Float,
+) {
+    @Composable
+    fun focusBorderColor(): Color = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+}
+
+private data class CopyButtonVisualStyle(val tint: Color, val description: String)
+
+private data class CopyButtonInteraction(
+    val source: MutableInteractionSource,
+    val onCopy: () -> Unit,
+)
 
 /** User prompt — teal bubble, right-aligned, with a copy affordance. */
 @Composable
@@ -212,7 +244,7 @@ internal fun UserPrompt(message: UiMessage) {
             CopyIconButton(
                 text = message.content,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                contentDescription = "Copy message",
+                config = CopyActionConfig(contentDescription = "Copy message"),
             )
         }
     }
@@ -354,8 +386,7 @@ internal fun AgentText(params: AgentTextParams) {
         ) {
             CopyIconButton(
                 text = params.text,
-                contentDescription = "Copy response",
-                emphasized = isHovered,
+                config = CopyActionConfig(contentDescription = "Copy response", emphasized = isHovered),
             )
         }
     }

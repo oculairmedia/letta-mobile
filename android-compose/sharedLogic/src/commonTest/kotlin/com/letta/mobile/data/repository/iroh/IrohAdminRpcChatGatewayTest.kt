@@ -1,7 +1,10 @@
 package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
@@ -48,7 +51,9 @@ class IrohAdminRpcChatGatewayTest {
         }
         val gateway = IrohAdminRpcChatGateway(transport)
 
-        val updated = gateway.setConversationSummary("conv-1", "Plan the release")
+        val updated = gateway.setConversationSummary(
+            ConversationSummaryUpdate(ConversationId("conv-1"), ConversationSummary("Plan the release")),
+        )
 
         assertEquals("Plan the release", updated.summary)
     }

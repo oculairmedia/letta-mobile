@@ -2,6 +2,7 @@ package com.letta.mobile.data.repository.http
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -201,11 +202,11 @@ open class LettaHttpChatGateway(
     }
 
     /** Set the model override for an existing conversation. */
-    override suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
-        val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
+        val response = httpClient.patch("$baseUrl/v1/conversations/${update.conversationId.value}") {
             applyAuth()
             contentType(ContentType.Application.Json)
-            setBody(ConversationUpdateParams(summary = summary))
+            setBody(ConversationUpdateParams(summary = update.summary.value))
         }
         response.requireSuccess()
         return response.body()

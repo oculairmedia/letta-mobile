@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -614,9 +615,6 @@ class DesktopChatControllerTest {
 
 open class FakeDesktopChatGateway(
     private val conversationIds: List<String> = listOf("conv-1"),
-    private val conversationSummary: (Int) -> String? = { index ->
-        if (index == 0) "Remote planning" else "Remote planning $index"
-    },
 ) : DesktopChatGateway {
     val sentRequests = mutableListOf<MessageCreateRequest>()
     val conversationMessageRequests = mutableListOf<String>()
@@ -688,16 +686,19 @@ open class FakeDesktopChatGateway(
             ),
         )
     }
+
+    protected open fun conversationSummary(index: Int): String? =
+        if (index == 0) "Remote planning" else "Remote planning $index"
 }
 
-private class FakeExtrasDesktopChatGateway : FakeDesktopChatGateway(
-    conversationSummary = { "" },
-), ChatGatewayExtras {
+private class FakeExtrasDesktopChatGateway : FakeDesktopChatGateway(), ChatGatewayExtras {
     val summaryUpdates = mutableListOf<Pair<String, String>>()
 
-    override suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
-        summaryUpdates += conversationId to summary
-        return getConversation(conversationId).copy(summary = summary)
+    override fun conversationSummary(index: Int): String = ""
+
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
+        summaryUpdates += update.conversationId.value to update.summary.value
+        return getConversation(update.conversationId.value).copy(summary = update.summary.value)
     }
 
     override suspend fun createConversation(agentId: String, summary: String?): Conversation =

@@ -123,7 +123,7 @@ private fun ToolCardHeader(
         if (expanded) Spacer(Modifier.weight(1f))
         CopyIconButton(
             text = toolCall.copyPayload(),
-            contentDescription = "Copy tool call",
+            config = CopyActionConfig(contentDescription = "Copy tool call"),
         )
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
@@ -170,7 +170,7 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
                 Spacer(Modifier.weight(1f))
                 CopyIconButton(
                     text = result,
-                    contentDescription = "Copy output",
+                    config = CopyActionConfig(contentDescription = "Copy output"),
                 )
             }
             ToolOutputBlock(result, isError = isError)

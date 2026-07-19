@@ -7,10 +7,13 @@ import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -535,10 +538,7 @@ class DesktopChatController(
             return
         }
 
-        val sendingConversationId = _state.value.selectedConversationId
-        if (sendingConversationId != null) {
-            persistConversationTitleIfNeeded(sendingConversationId, text)
-        }
+        val sendingConversationId = prepareConversationForSend(text)
         // This conversation now has content — it's no longer a throwaway.
         if (sendingConversationId != null && sendingConversationId == unsentConversationId) {
             unsentConversationId = null
@@ -593,6 +593,9 @@ class DesktopChatController(
         }
     }
 
+    private fun prepareConversationForSend(text: String): String? =
+        _state.value.selectedConversationId?.also { persistConversationTitleIfNeeded(it, text) }
+
     private fun persistConversationTitleIfNeeded(conversationId: String, firstUserMessage: String) {
         val extras = gatewayExtras ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
@@ -608,7 +611,8 @@ class DesktopChatController(
             )
         }
         scope.launch {
-            runCatching { extras.setConversationSummary(conversationId, candidate) }
+            val update = ConversationSummaryUpdate(ConversationId(conversationId), ConversationSummary(candidate))
+            runCatching { extras.setConversationSummary(update) }
                 .onFailure {
                     _state.update { current ->
                         current.withRuntimeState(

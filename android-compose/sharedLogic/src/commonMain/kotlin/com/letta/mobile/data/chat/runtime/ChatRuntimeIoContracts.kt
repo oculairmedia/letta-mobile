@@ -3,6 +3,7 @@ package com.letta.mobile.data.chat.runtime
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -37,12 +38,20 @@ interface ChatGatewayExtras {
     suspend fun createConversation(agentId: String, summary: String? = null): Conversation
     suspend fun createAgent(params: AgentCreateParams): Agent
     suspend fun listLlmModels(): List<LlmModel>
-    suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
+    suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
         throw UnsupportedOperationException("Conversation summaries are not writable through this gateway")
     }
     suspend fun setConversationModel(conversationId: String, model: String): Conversation
     suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation
 }
+
+data class ConversationSummaryUpdate(
+    val conversationId: ConversationId,
+    val summary: ConversationSummary,
+)
+
+@JvmInline
+value class ConversationSummary(val value: String)
 
 interface ChatSessionGraph<out Repositories : SessionRepositoryGraph> {
     val repositories: Repositories
