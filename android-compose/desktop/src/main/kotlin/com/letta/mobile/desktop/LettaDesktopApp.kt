@@ -123,6 +123,8 @@ import com.letta.mobile.desktop.avatar.defaultAvatarCatalogDir
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.chat.ChatDetailPane
+import com.letta.mobile.desktop.chat.ChatDetailPaneActions
+import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.data.search.PaletteItem
@@ -204,9 +206,11 @@ fun LettaDesktopApp(
     }
     val chatController = rememberDesktopChatController(
         DesktopChatControllerBindings(
-            bootstrapState = bootstrapState,
-            chatScope = chatScope,
-            dataBindings = dataBindings,
+            runtime = DesktopChatRuntime(
+                bootstrapState = bootstrapState,
+                chatScope = chatScope,
+                dataBindings = dataBindings,
+            ),
             irohTransport = irohTransport,
             irohAgentDirectory = irohAgentDirectory,
             secureSettingsStore = secureSettingsStore,
@@ -275,8 +279,10 @@ fun LettaDesktopApp(
         DesktopControllerLifecycleParams(
             chatController = chatController,
             libraries = libraries,
-            selectedDestination = selectedDestination,
-            selectedConversationAgentId = chatState.selectedConversation?.agentId,
+            selection = DesktopDestinationSelection(
+                selectedDestination = selectedDestination,
+                selectedConversationAgentId = chatState.selectedConversation?.agentId,
+            ),
             cronPanel = cronPanel,
         ),
     )
@@ -415,9 +421,11 @@ fun LettaDesktopApp(
                 DesktopAgentRail(
                     state = DesktopAgentRailState(
                         agents = railAgents,
-                        avatarStyleByAgentId = avatarStyleByAgentId,
-                        selectedAgentId = selectedAgentId,
-                        thinkingAgentId = thinkingAgentId,
+                        focus = DesktopAgentRailFocus(
+                            selectedAgentId = selectedAgentId,
+                            thinkingAgentId = thinkingAgentId,
+                            avatarStyleByAgentId = avatarStyleByAgentId,
+                        ),
                         avatarCompanionActive = avatar.isActive,
                     ),
                     actions = DesktopAgentRailActions(
@@ -496,29 +504,36 @@ fun LettaDesktopApp(
                             onNavigate = { selectedDestination = it },
                         )
                         ChatDetailPane(
-                            state = chatState,
-                            isThinking = isThinkingSelected,
-                            isStreamingReply = isStreamingReplySelected,
-                            composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
-                            onOpenModelPicker = { showModelPicker = true },
-                            onOnboardingTask = { kind ->
-                                when (kind) {
-                                    OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
-                                    OnboardingTaskKind.ConnectChannel ->
-                                        selectedDestination = DesktopDestination.Channels
-                                    OnboardingTaskKind.AddSkills ->
-                                        selectedDestination = DesktopDestination.Agents
-                                }
-                            },
-                            modelOptions = modelOptions,
-                            onComposerTextChanged = chatController::updateComposerText,
-                            onSend = chatController::send,
-                            onAttachImage = { pickerLauncher.launch() },
-                            onRemoveImageAttachment = chatController::removeImageAttachment,
-                            onRetryConnection = chatController::retryConnection,
-                            onModelSelected = chatController::setConversationModel,
-                            commands = composerCommands,
-                            mentionables = mentionables,
+                            state = ChatDetailPaneState(
+                                surface = chatState,
+                                isThinking = isThinkingSelected,
+                                isStreamingReply = isStreamingReplySelected,
+                                modelOptions = modelOptions,
+                                commands = composerCommands,
+                                mentionables = mentionables,
+                                composerPlaceholder = WorkPlayLens.composerPlaceholder(
+                                    workPlayMode,
+                                    selectedAgentName,
+                                ),
+                            ),
+                            actions = ChatDetailPaneActions(
+                                onComposerTextChanged = chatController::updateComposerText,
+                                onSend = chatController::send,
+                                onAttachImage = { pickerLauncher.launch() },
+                                onRemoveImageAttachment = chatController::removeImageAttachment,
+                                onRetryConnection = chatController::retryConnection,
+                                onModelSelected = chatController::setConversationModel,
+                                onOpenModelPicker = { showModelPicker = true },
+                                onOnboardingTask = { kind ->
+                                    when (kind) {
+                                        OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
+                                        OnboardingTaskKind.ConnectChannel ->
+                                            selectedDestination = DesktopDestination.Channels
+                                        OnboardingTaskKind.AddSkills ->
+                                            selectedDestination = DesktopDestination.Agents
+                                    }
+                                },
+                            ),
                             modifier = Modifier.fillMaxSize(),
                         )
                     } else {

@@ -71,10 +71,12 @@ internal fun NewAgentDialog(params: NewAgentDialogParams) {
                 NewAgentNameField(name = name, onNameChange = { name = it })
                 NewAgentModelPicker(
                     NewAgentModelPickerParams(
-                        modelLabel = modelLabel,
-                        modelValue = modelValue,
+                        selection = NewAgentModelSelection(
+                            label = modelLabel,
+                            value = modelValue,
+                            menuOpen = modelMenuOpen,
+                        ),
                         modelOptions = params.modelOptions,
-                        modelMenuOpen = modelMenuOpen,
                         onMenuOpenChange = { modelMenuOpen = it },
                         onModelSelected = { modelValue = it },
                     ),
@@ -105,11 +107,15 @@ private fun NewAgentNameField(
     )
 }
 
+private data class NewAgentModelSelection(
+    val label: String,
+    val value: String?,
+    val menuOpen: Boolean,
+)
+
 private data class NewAgentModelPickerParams(
-    val modelLabel: String,
-    val modelValue: String?,
+    val selection: NewAgentModelSelection,
     val modelOptions: List<Pair<String, String>>,
-    val modelMenuOpen: Boolean,
     val onMenuOpenChange: (Boolean) -> Unit,
     val onModelSelected: (String?) -> Unit,
 )
@@ -122,51 +128,78 @@ private fun NewAgentModelPicker(params: NewAgentModelPickerParams) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Box {
-        Surface(
-            onClick = { params.onMenuOpenChange(true) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(params.modelLabel, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Icon(
-                    Icons.Outlined.KeyboardArrowDown,
-                    null,
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        NewAgentModelTrigger(
+            label = params.selection.label,
+            onOpen = { params.onMenuOpenChange(true) },
+        )
+        if (params.selection.menuOpen) {
+            NewAgentModelMenu(
+                NewAgentModelMenuParams(
+                    selectedValue = params.selection.value,
+                    modelOptions = params.modelOptions,
+                    onMenuOpenChange = params.onMenuOpenChange,
+                    onModelSelected = params.onModelSelected,
+                ),
+            )
         }
-        if (params.modelMenuOpen) {
-            JewelPopupMenu(
-                onDismissRequest = { params.onMenuOpenChange(false); true },
-                horizontalAlignment = Alignment.Start,
+    }
+}
+
+@Composable
+private fun NewAgentModelTrigger(label: String, onOpen: () -> Unit) {
+    Surface(
+        onClick = onOpen,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Icon(
+                Icons.Outlined.KeyboardArrowDown,
+                null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private data class NewAgentModelMenuParams(
+    val selectedValue: String?,
+    val modelOptions: List<Pair<String, String>>,
+    val onMenuOpenChange: (Boolean) -> Unit,
+    val onModelSelected: (String?) -> Unit,
+)
+
+@Composable
+private fun NewAgentModelMenu(params: NewAgentModelMenuParams) {
+    JewelPopupMenu(
+        onDismissRequest = { params.onMenuOpenChange(false); true },
+        horizontalAlignment = Alignment.Start,
+    ) {
+        selectableItem(
+            selected = params.selectedValue == null,
+            onClick = {
+                params.onMenuOpenChange(false)
+                params.onModelSelected(null)
+            },
+        ) {
+            DesktopControlText("Same as current")
+        }
+        params.modelOptions.forEach { (label, value) ->
+            selectableItem(
+                selected = params.selectedValue == value,
+                onClick = {
+                    params.onMenuOpenChange(false)
+                    params.onModelSelected(value)
+                },
             ) {
-                selectableItem(
-                    selected = params.modelValue == null,
-                    onClick = {
-                        params.onMenuOpenChange(false)
-                        params.onModelSelected(null)
-                    },
-                ) {
-                    DesktopControlText("Same as current")
-                }
-                params.modelOptions.forEach { (label, value) ->
-                    selectableItem(
-                        selected = params.modelValue == value,
-                        onClick = {
-                            params.onMenuOpenChange(false)
-                            params.onModelSelected(value)
-                        },
-                    ) {
-                        DesktopControlText(label)
-                    }
-                }
+                DesktopControlText(label)
             }
         }
     }

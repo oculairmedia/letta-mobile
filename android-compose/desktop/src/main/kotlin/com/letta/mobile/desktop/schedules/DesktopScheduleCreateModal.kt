@@ -53,9 +53,13 @@ import kotlin.time.Instant
 
 // --- Create modal -----------------------------------------------------------
 
-internal data class CreateScheduleModalParams(
+internal data class CreateScheduleClock(
     val now: Instant,
     val zone: TimeZone,
+)
+
+internal data class CreateScheduleModalParams(
+    val clock: CreateScheduleClock,
     val canCreate: Boolean,
     val onDismiss: () -> Unit,
     val onCreate: (name: String, prompt: String, cron: String) -> Unit,
@@ -86,16 +90,13 @@ internal fun CreateScheduleModal(params: CreateScheduleModalParams) {
                 CreateScheduleWhenParams(
                     draft = draft,
                     onDraftChange = { draft = it },
-                    now = params.now,
-                    zone = params.zone,
+                    clock = params.clock,
                 ),
             )
             Spacer(Modifier.height(20.dp))
             CreateScheduleModalActions(
                 CreateScheduleModalActionsParams(
-                    name = name,
-                    prompt = prompt,
-                    draft = draft,
+                    form = CreateScheduleFormState(name = name, prompt = prompt, draft = draft),
                     canCreate = params.canCreate,
                     onDismiss = params.onDismiss,
                     onCreate = params.onCreate,
@@ -147,8 +148,7 @@ private fun CreateSchedulePromptField(prompt: String, onPromptChange: (String) -
 private data class CreateScheduleWhenParams(
     val draft: CronBuilderState,
     val onDraftChange: (CronBuilderState) -> Unit,
-    val now: Instant,
-    val zone: TimeZone,
+    val clock: CreateScheduleClock,
 )
 
 @Composable
@@ -157,17 +157,22 @@ private fun CreateScheduleWhenSection(params: CreateScheduleWhenParams) {
     Spacer(Modifier.height(6.dp))
     CadencePicker(params.draft, params.onDraftChange)
     Spacer(Modifier.height(10.dp))
+    CreateSchedulePreviewBox(draft = params.draft, clock = params.clock)
+}
+
+@Composable
+private fun CreateSchedulePreviewBox(draft: CronBuilderState, clock: CreateScheduleClock) {
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp)) {
         Column {
             Text(
-                CronBuilder.preview(params.draft),
+                CronBuilder.preview(draft),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            CronBuilder.previewRuns(params.draft, params.now, params.zone, 3).forEach {
+            CronBuilder.previewRuns(draft, clock.now, clock.zone, 3).forEach {
                 Text(
-                    "• ${ScheduleFormat.dateLabel(it, params.zone)} · ${ScheduleFormat.timeOfDay(it, params.zone)}",
+                    "• ${ScheduleFormat.dateLabel(it, clock.zone)} · ${ScheduleFormat.timeOfDay(it, clock.zone)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,10 +181,14 @@ private fun CreateScheduleWhenSection(params: CreateScheduleWhenParams) {
     }
 }
 
-private data class CreateScheduleModalActionsParams(
+private data class CreateScheduleFormState(
     val name: String,
     val prompt: String,
     val draft: CronBuilderState,
+)
+
+private data class CreateScheduleModalActionsParams(
+    val form: CreateScheduleFormState,
     val canCreate: Boolean,
     val onDismiss: () -> Unit,
     val onCreate: (name: String, prompt: String, cron: String) -> Unit,
@@ -187,17 +196,18 @@ private data class CreateScheduleModalActionsParams(
 
 @Composable
 private fun CreateScheduleModalActions(params: CreateScheduleModalActionsParams) {
-    val expression = CronBuilder.toExpression(params.draft)
+    val form = params.form
+    val expression = CronBuilder.toExpression(form.draft)
     val valid = expression != null &&
-        params.name.isNotBlank() &&
-        params.prompt.isNotBlank() &&
+        form.name.isNotBlank() &&
+        form.prompt.isNotBlank() &&
         params.canCreate
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
         DesktopOutlinedButton(onClick = params.onDismiss) { DesktopButtonContent("Cancel") }
         Spacer(Modifier.width(10.dp))
         DesktopDefaultButton(
             onClick = {
-                expression?.let { params.onCreate(params.name.trim(), params.prompt.trim(), it) }
+                expression?.let { params.onCreate(form.name.trim(), form.prompt.trim(), it) }
             },
             enabled = valid,
         ) {
@@ -217,40 +227,42 @@ private fun CreateScheduleModalActions(params: CreateScheduleModalActionsParams)
 @Composable
 internal fun CadencePicker(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
     Column {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            cadenceChip("Every N min", draft.cadence == CronCadence.EveryNMinutes) { onChange(draft.copy(cadence = CronCadence.EveryNMinutes)) }
-            cadenceChip("Hourly", draft.cadence == CronCadence.Hourly) { onChange(draft.copy(cadence = CronCadence.Hourly)) }
-            cadenceChip("Daily", draft.cadence == CronCadence.Daily) { onChange(draft.copy(cadence = CronCadence.Daily)) }
-            cadenceChip("Weekly", draft.cadence == CronCadence.Weekly) { onChange(draft.copy(cadence = CronCadence.Weekly)) }
-            cadenceChip("Custom", draft.cadence == CronCadence.Custom) { onChange(draft.copy(cadence = CronCadence.Custom)) }
-        }
+        CadenceTypeRow(draft = draft, onChange = onChange)
         Spacer(Modifier.height(10.dp))
         CadenceDetails(draft = draft, onChange = onChange)
     }
 }
 
 @Composable
+private fun CadenceTypeRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        cadenceChip("Every N min", draft.cadence == CronCadence.EveryNMinutes) {
+            onChange(draft.copy(cadence = CronCadence.EveryNMinutes))
+        }
+        cadenceChip("Hourly", draft.cadence == CronCadence.Hourly) {
+            onChange(draft.copy(cadence = CronCadence.Hourly))
+        }
+        cadenceChip("Daily", draft.cadence == CronCadence.Daily) {
+            onChange(draft.copy(cadence = CronCadence.Daily))
+        }
+        cadenceChip("Weekly", draft.cadence == CronCadence.Weekly) {
+            onChange(draft.copy(cadence = CronCadence.Weekly))
+        }
+        cadenceChip("Custom", draft.cadence == CronCadence.Custom) {
+            onChange(draft.copy(cadence = CronCadence.Custom))
+        }
+    }
+}
+
+@Composable
 private fun CadenceDetails(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
     when (draft.cadence) {
-        CronCadence.EveryNMinutes -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf(5, 10, 15, 30).forEach { n ->
-                cadenceChip("$n", draft.intervalMinutes == n) { onChange(draft.copy(intervalMinutes = n)) }
-            }
-        }
-        CronCadence.Hourly -> TimeRow(TimeRowParams("Minute", draft.minute, 0, 59) { onChange(draft.copy(minute = it)) })
+        CronCadence.EveryNMinutes -> EveryNMinutesRow(draft = draft, onChange = onChange)
+        CronCadence.Hourly -> TimeRow(
+            TimeRowParams("Minute", draft.minute, 0..59) { onChange(draft.copy(minute = it)) },
+        )
         CronCadence.Daily -> TimeOfDayRow(draft) { onChange(it) }
-        CronCadence.Weekly -> Column {
-            TimeOfDayRow(draft) { onChange(it) }
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                (1..7).forEach { iso ->
-                    val on = iso in draft.daysOfWeek
-                    cadenceChip(ScheduleFormat.weekdayShort(iso).take(1), on) {
-                        onChange(draft.copy(daysOfWeek = if (on) draft.daysOfWeek - iso else draft.daysOfWeek + iso))
-                    }
-                }
-            }
-        }
+        CronCadence.Weekly -> WeeklyCadenceDetails(draft = draft, onChange = onChange)
         CronCadence.Custom -> DesktopTextField(
             value = draft.customExpression,
             onValueChange = { onChange(draft.copy(customExpression = it)) },
@@ -261,10 +273,35 @@ private fun CadenceDetails(draft: CronBuilderState, onChange: (CronBuilderState)
 }
 
 @Composable
+private fun EveryNMinutesRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(5, 10, 15, 30).forEach { n ->
+            cadenceChip("$n", draft.intervalMinutes == n) { onChange(draft.copy(intervalMinutes = n)) }
+        }
+    }
+}
+
+@Composable
+private fun WeeklyCadenceDetails(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
+    Column {
+        TimeOfDayRow(draft) { onChange(it) }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            (1..7).forEach { iso ->
+                val on = iso in draft.daysOfWeek
+                cadenceChip(ScheduleFormat.weekdayShort(iso).take(1), on) {
+                    onChange(draft.copy(daysOfWeek = if (on) draft.daysOfWeek - iso else draft.daysOfWeek + iso))
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun TimeOfDayRow(draft: CronBuilderState, onChange: (CronBuilderState) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TimeRow(TimeRowParams("Hour", draft.hour, 0, 23) { onChange(draft.copy(hour = it)) })
-        TimeRow(TimeRowParams("Minute", draft.minute, 0, 59) { onChange(draft.copy(minute = it)) })
+        TimeRow(TimeRowParams("Hour", draft.hour, 0..23) { onChange(draft.copy(hour = it)) })
+        TimeRow(TimeRowParams("Minute", draft.minute, 0..59) { onChange(draft.copy(minute = it)) })
         Text(
             ScheduleFormat.clockLabel(draft.hour, draft.minute),
             style = MaterialTheme.typography.bodySmall,
@@ -276,21 +313,20 @@ internal fun TimeOfDayRow(draft: CronBuilderState, onChange: (CronBuilderState) 
 internal data class TimeRowParams(
     val label: String,
     val value: Int,
-    val min: Int,
-    val max: Int,
+    val range: IntRange,
     val onChange: (Int) -> Unit,
 )
 
 @Composable
 internal fun TimeRow(params: TimeRowParams) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        IconBtn(Icons.Outlined.ChevronLeft, "−", { params.onChange((params.value - 1).coerceAtLeast(params.min)) })
+        IconBtn(Icons.Outlined.ChevronLeft, "−", { params.onChange((params.value - 1).coerceAtLeast(params.range.first)) })
         Text(
             ScheduleFormat.pad2(params.value),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        IconBtn(Icons.Outlined.ChevronRight, "+", { params.onChange((params.value + 1).coerceAtMost(params.max)) })
+        IconBtn(Icons.Outlined.ChevronRight, "+", { params.onChange((params.value + 1).coerceAtMost(params.range.last)) })
     }
 }
 

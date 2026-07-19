@@ -54,6 +54,8 @@ import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
 import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
+import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceActions
+import com.letta.mobile.desktop.skills.DesktopSkillsSurfaceState
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
@@ -257,21 +259,25 @@ private fun AgentsDestinationContent(
 ) {
     val skills = inputs.skills
     DesktopSkillsSurface(
-        skills = skills.skills,
-        installedSkillNames = skills.installedSkillNames,
-        skillsLoading = skills.skillsLoading,
-        skillsError = skills.skillsError,
-        canManageSkills = skills.canManageSkills,
-        focusedAgentName = skills.focusedAgentName,
-        onRefreshSkills = actions.skills.onRefresh,
-        onInstallSkill = actions.skills.onInstall,
-        onUninstallSkill = actions.skills.onUninstall,
-        toolState = inputs.toolLibraryState,
-        onToolsRefresh = actions.tools.onRefresh,
-        onToolsSearchQueryChanged = actions.tools.onSearchQueryChanged,
-        onToolsTagToggled = actions.tools.onTagToggled,
-        onToolsClearTags = actions.tools.onClearTags,
-        onToolsLoadMore = actions.tools.onLoadMore,
+        state = DesktopSkillsSurfaceState(
+            skills = skills.skills,
+            installedSkillNames = skills.installedSkillNames,
+            skillsLoading = skills.skillsLoading,
+            skillsError = skills.skillsError,
+            canManageSkills = skills.canManageSkills,
+            focusedAgentName = skills.focusedAgentName,
+            toolState = inputs.toolLibraryState,
+        ),
+        actions = DesktopSkillsSurfaceActions(
+            onRefreshSkills = actions.skills.onRefresh,
+            onInstallSkill = actions.skills.onInstall,
+            onUninstallSkill = actions.skills.onUninstall,
+            onToolsRefresh = actions.tools.onRefresh,
+            onToolsSearchQueryChanged = actions.tools.onSearchQueryChanged,
+            onToolsTagToggled = actions.tools.onTagToggled,
+            onToolsClearTags = actions.tools.onClearTags,
+            onToolsLoadMore = actions.tools.onLoadMore,
+        ),
         modifier = modifier,
     )
 }

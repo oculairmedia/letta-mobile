@@ -6,21 +6,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudQueue
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Forum
-import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -36,26 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.schedules.CronTask
-import com.letta.mobile.data.skills.Skill
-import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
-import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
-import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.data.desktopConfigIdFor
-import com.letta.mobile.desktop.memory.DesktopBlockApi
-import com.letta.mobile.desktop.memory.DesktopMemorySurface
-import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
-import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryState
-import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
-import com.letta.mobile.desktop.skills.DesktopSkillsSurface
-import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
@@ -71,44 +48,65 @@ internal fun BackendCard(config: LettaConfig) {
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CloudQueue,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Column {
-                    Text(
-                        text = "Default backend",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Text(
-                        text = config.serverUrl,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                }
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val pillColors = StatusPillColors(
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
-                )
-                StatusPill(text = config.mode.label, colors = pillColors)
-                StatusPill(text = "Shared model layer", colors = pillColors)
-                StatusPill(text = "Windows JVM", colors = pillColors)
-            }
+            BackendCardHeader(config = config)
+            BackendCardStatusPills(modeLabel = config.mode.label)
         }
     }
 }
+
+@Composable
+private fun BackendCardHeader(config: LettaConfig) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.CloudQueue,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Column {
+            Text(
+                text = "Default backend",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Text(
+                text = config.serverUrl,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BackendCardStatusPills(modeLabel: String) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val pillColors = StatusPillColors(
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
+        )
+        StatusPill(text = modeLabel, colors = pillColors)
+        StatusPill(text = "Shared model layer", colors = pillColors)
+        StatusPill(text = "Windows JVM", colors = pillColors)
+    }
+}
+
+private data class BackendSettingsFormState(
+    val serverUrl: TextFieldValue,
+    val tokenInput: TextFieldValue,
+    val mode: LettaConfig.Mode,
+)
+
+private data class BackendSettingsCallbacks(
+    val onConfigSaved: (LettaConfig) -> Unit,
+    val onTokenCleared: () -> Unit,
+)
 
 @Composable
 internal fun BackendSettingsCard(
@@ -119,6 +117,7 @@ internal fun BackendSettingsCard(
     var serverUrl by remember(config.id, config.serverUrl) { mutableStateOf(TextFieldValue(config.serverUrl)) }
     var tokenInput by remember(config.id) { mutableStateOf(TextFieldValue("")) }
     var mode by remember(config.id) { mutableStateOf(config.mode) }
+    val callbacks = BackendSettingsCallbacks(onConfigSaved = onConfigSaved, onTokenCleared = onTokenCleared)
 
     Card(
         colors = CardDefaults.cardColors(
@@ -141,11 +140,8 @@ internal fun BackendSettingsCard(
             BackendSettingsActions(
                 BackendSettingsActionsParams(
                     config = config,
-                    serverUrl = serverUrl,
-                    tokenInput = tokenInput,
-                    mode = mode,
-                    onConfigSaved = onConfigSaved,
-                    onTokenCleared = onTokenCleared,
+                    form = BackendSettingsFormState(serverUrl = serverUrl, tokenInput = tokenInput, mode = mode),
+                    callbacks = callbacks,
                     onTokenInputChange = { tokenInput = it },
                 ),
             )
@@ -206,29 +202,27 @@ private fun BackendTokenField(
 
 private data class BackendSettingsActionsParams(
     val config: LettaConfig,
-    val serverUrl: TextFieldValue,
-    val tokenInput: TextFieldValue,
-    val mode: LettaConfig.Mode,
-    val onConfigSaved: (LettaConfig) -> Unit,
-    val onTokenCleared: () -> Unit,
+    val form: BackendSettingsFormState,
+    val callbacks: BackendSettingsCallbacks,
     val onTokenInputChange: (TextFieldValue) -> Unit,
 )
 
 @Composable
 private fun BackendSettingsActions(params: BackendSettingsActionsParams) {
+    val form = params.form
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DesktopDefaultButton(
             onClick = {
-                val normalizedUrl = params.serverUrl.text.trim()
-                params.onConfigSaved(
+                val normalizedUrl = form.serverUrl.text.trim()
+                params.callbacks.onConfigSaved(
                     LettaConfig(
                         id = desktopConfigIdFor(normalizedUrl),
-                        mode = params.mode,
+                        mode = form.mode,
                         serverUrl = normalizedUrl,
-                        accessToken = params.tokenInput.text.trim().takeIf { it.isNotBlank() }
+                        accessToken = form.tokenInput.text.trim().takeIf { it.isNotBlank() }
                             ?: params.config.accessToken,
                     ),
                 )
@@ -241,7 +235,7 @@ private fun BackendSettingsActions(params: BackendSettingsActionsParams) {
             DesktopOutlinedButton(
                 onClick = {
                     params.onTokenInputChange(TextFieldValue(""))
-                    params.onTokenCleared()
+                    params.callbacks.onTokenCleared()
                 },
             ) {
                 DesktopButtonContent("Clear token")
@@ -308,30 +302,35 @@ internal fun ReadinessRow(feature: DesktopFeatureReadiness) {
             verticalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.weight(1f),
         ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = feature.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                StatusPill(
-                    text = feature.state.label,
-                    colors = StatusPillColors(
-                        containerColor = feature.state.color().copy(alpha = 0.12f),
-                        contentColor = feature.state.color(),
-                        borderColor = Color.Transparent,
-                    ),
-                )
-            }
+            ReadinessRowTitle(feature = feature)
             Text(
                 text = feature.description,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun ReadinessRowTitle(feature: DesktopFeatureReadiness) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = feature.title,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        StatusPill(
+            text = feature.state.label,
+            colors = StatusPillColors(
+                containerColor = feature.state.color().copy(alpha = 0.12f),
+                contentColor = feature.state.color(),
+                borderColor = Color.Transparent,
+            ),
+        )
     }
 }
 

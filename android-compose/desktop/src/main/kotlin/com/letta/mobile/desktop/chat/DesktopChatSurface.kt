@@ -148,33 +148,44 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
+/** Surface + composer catalog inputs for [ChatDetailPane]. */
+internal data class ChatDetailPaneState(
+    val surface: DesktopChatSurfaceState,
+    val isThinking: Boolean,
+    val isStreamingReply: Boolean = false,
+    val modelOptions: List<Pair<String, String>>,
+    val commands: List<ComposerCommand>,
+    val mentionables: List<Mentionable> = emptyList(),
+    val composerPlaceholder: String = "Message…",
+)
+
+/** Interaction callbacks for [ChatDetailPane]. */
+internal data class ChatDetailPaneActions(
+    val onComposerTextChanged: (String) -> Unit,
+    val onSend: () -> Unit,
+    val onAttachImage: () -> Unit,
+    val onRemoveImageAttachment: (Int) -> Unit,
+    val onRetryConnection: () -> Unit,
+    val onModelSelected: (String) -> Unit,
+    val onOpenModelPicker: (() -> Unit)? = null,
+    val onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
+)
+
 @Composable
 internal fun ChatDetailPane(
-    state: DesktopChatSurfaceState,
-    isThinking: Boolean,
-    isStreamingReply: Boolean = false,
-    onComposerTextChanged: (String) -> Unit,
-    onSend: () -> Unit,
-    onAttachImage: () -> Unit,
-    onRemoveImageAttachment: (Int) -> Unit,
-    onRetryConnection: () -> Unit,
-    modelOptions: List<Pair<String, String>>,
-    onModelSelected: (String) -> Unit,
-    commands: List<ComposerCommand>,
-    mentionables: List<Mentionable> = emptyList(),
-    composerPlaceholder: String = "Message…",
-    onOpenModelPicker: (() -> Unit)? = null,
-    onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
+    state: ChatDetailPaneState,
+    actions: ChatDetailPaneActions,
     modifier: Modifier = Modifier,
 ) {
+    val surface = state.surface
     // Drive the ambient glow off the thinking state: a teal breath while the
     // agent works, a brief "completed" settle afterward, error tint on failure.
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
     var hadActiveRun by remember { mutableStateOf(false) }
-    LaunchedEffect(isThinking, state.errorMessage) {
+    LaunchedEffect(state.isThinking, surface.errorMessage) {
         when {
-            state.errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
-            isThinking -> {
+            surface.errorMessage != null -> ambientStatus = DesktopAmbientStatus.Failed
+            state.isThinking -> {
                 hadActiveRun = true
                 ambientStatus = DesktopAmbientStatus.Running
             }
@@ -194,48 +205,48 @@ internal fun ChatDetailPane(
             .background(MaterialTheme.colorScheme.background),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (state.shouldShowStatePanel) {
+            if (surface.shouldShowStatePanel) {
                 ChatStatePanel(
-                    state = state,
-                    onRetryConnection = onRetryConnection,
+                    state = surface,
+                    onRetryConnection = actions.onRetryConnection,
                     modifier = Modifier.weight(1f),
                 )
-            } else if (state.renderItems.isEmpty() && !isThinking) {
+            } else if (surface.renderItems.isEmpty() && !state.isThinking) {
                 NewConversationWelcome(
-                    agentName = state.selectedConversation?.agentName,
-                    onStarterPrompt = onComposerTextChanged,
-                    onOnboardingTask = onOnboardingTask,
+                    agentName = surface.selectedConversation?.agentName,
+                    onStarterPrompt = actions.onComposerTextChanged,
+                    onOnboardingTask = actions.onOnboardingTask,
                     modifier = Modifier.weight(1f),
                 )
             } else {
                 MessageList(
                     params = MessageListParams(
-                        conversationId = state.selectedConversationId,
-                        renderItems = state.renderItems,
-                        isSending = isThinking,
-                        isStreamingReply = isStreamingReply,
+                        conversationId = surface.selectedConversationId,
+                        renderItems = surface.renderItems,
+                        isSending = state.isThinking,
+                        isStreamingReply = state.isStreamingReply,
                     ),
                     modifier = Modifier.weight(1f),
                 )
             }
             ComposerBar(
                 state = ComposerBarState(
-                    text = state.composerText,
-                    pendingImageAttachments = state.pendingImageAttachments,
-                    enabled = state.canSend,
-                    modelLabel = state.composerModelLabel,
-                    modelOptions = modelOptions,
-                    commands = commands,
-                    mentionables = mentionables,
-                    placeholder = composerPlaceholder,
+                    text = surface.composerText,
+                    pendingImageAttachments = surface.pendingImageAttachments,
+                    enabled = surface.canSend,
+                    modelLabel = surface.composerModelLabel,
+                    modelOptions = state.modelOptions,
+                    commands = state.commands,
+                    mentionables = state.mentionables,
+                    placeholder = state.composerPlaceholder,
                 ),
                 actions = ComposerBarActions(
-                    onModelSelected = onModelSelected,
-                    onOpenModelPicker = onOpenModelPicker,
-                    onTextChanged = onComposerTextChanged,
-                    onSend = onSend,
-                    onAttachImage = onAttachImage,
-                    onRemoveImageAttachment = onRemoveImageAttachment,
+                    onModelSelected = actions.onModelSelected,
+                    onOpenModelPicker = actions.onOpenModelPicker,
+                    onTextChanged = actions.onComposerTextChanged,
+                    onSend = actions.onSend,
+                    onAttachImage = actions.onAttachImage,
+                    onRemoveImageAttachment = actions.onRemoveImageAttachment,
                 ),
             )
         }

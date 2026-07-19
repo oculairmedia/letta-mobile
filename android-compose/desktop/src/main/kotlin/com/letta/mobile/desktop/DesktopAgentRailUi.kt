@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -91,11 +92,15 @@ private fun ThinkingRing(
     )
 }
 
-internal data class DesktopAgentRailState(
-    val agents: List<Pair<String, String>>,
-    val avatarStyleByAgentId: Map<String, Int>,
+internal data class DesktopAgentRailFocus(
     val selectedAgentId: String?,
     val thinkingAgentId: String?,
+    val avatarStyleByAgentId: Map<String, Int>,
+)
+
+internal data class DesktopAgentRailState(
+    val agents: List<Pair<String, String>>,
+    val focus: DesktopAgentRailFocus,
     val avatarCompanionActive: Boolean = false,
 )
 
@@ -135,31 +140,51 @@ internal fun DesktopAgentRail(
     ) {
         NewSessionButton(onNewSession = actions.onNewSession)
         Spacer(Modifier.height(8.dp))
-        // The agent list scrolls so a long roster never pushes the bottom
-        // actions (search/settings/account) off-screen.
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            groups.forEachIndexed { index, group ->
-                AgentRailOrb(
-                    AgentRailOrbParams(
-                        group = group,
-                        index = index,
-                        selectedAgentId = state.selectedAgentId,
-                        thinkingAgentId = state.thinkingAgentId,
-                        avatarStyleByAgentId = state.avatarStyleByAgentId,
-                        onAgentSelected = actions.onAgentSelected,
-                    ),
-                )
-            }
-        }
+        AgentRailOrbList(
+            groups = groups,
+            focus = state.focus,
+            onAgentSelected = actions.onAgentSelected,
+        )
+        AgentRailBottomActions(state = state, actions = actions)
+    }
+}
 
-        RailActionIcon(
+@Composable
+private fun ColumnScope.AgentRailOrbList(
+    groups: List<AgentRailGroup>,
+    focus: DesktopAgentRailFocus,
+    onAgentSelected: (String) -> Unit,
+) {
+    // The agent list scrolls so a long roster never pushes the bottom
+    // actions (search/settings/account) off-screen.
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        groups.forEachIndexed { index, group ->
+            AgentRailOrb(
+                AgentRailOrbParams(
+                    group = group,
+                    index = index,
+                    focus = focus,
+                    onAgentSelected = onAgentSelected,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgentRailBottomActions(
+    state: DesktopAgentRailState,
+    actions: DesktopAgentRailActions,
+) {
+    RailActionIcon(
+        RailActionIconModel(
             icon = Icons.Outlined.Face,
             description = if (state.avatarCompanionActive) "Stop avatar companion" else "Avatar companion",
             onClick = actions.onAvatarCompanion,
@@ -168,9 +193,15 @@ internal fun DesktopAgentRail(
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
-        )
-        RailActionIcon(Icons.Outlined.Search, "Search", actions.onSearch)
-    }
+        ),
+    )
+    RailActionIcon(
+        RailActionIconModel(
+            icon = Icons.Outlined.Search,
+            description = "Search",
+            onClick = actions.onSearch,
+        ),
+    )
 }
 
 @Composable
@@ -197,68 +228,94 @@ private fun NewSessionButton(onNewSession: () -> Unit) {
 private data class AgentRailOrbParams(
     val group: AgentRailGroup,
     val index: Int,
-    val selectedAgentId: String?,
-    val thinkingAgentId: String?,
-    val avatarStyleByAgentId: Map<String, Int>,
+    val focus: DesktopAgentRailFocus,
     val onAgentSelected: (String) -> Unit,
 )
 
-@Composable
-private fun AgentRailOrb(params: AgentRailOrbParams) {
-    val group = params.group
-    val selected = params.selectedAgentId != null && params.selectedAgentId in group.agentIds
-    val thinking = params.thinkingAgentId != null && params.thinkingAgentId in group.agentIds
-    val count = group.agentIds.size
+private data class AgentRailOrbFlags(
+    val selected: Boolean,
+    val thinking: Boolean,
+    val count: Int,
+)
+
+private data class AgentRailOrbTarget(
+    val agentId: String,
+    val orbStyle: Int,
+    val tooltip: String,
+)
+
+private fun AgentRailOrbParams.toFlags(): AgentRailOrbFlags {
+    val group = group
+    return AgentRailOrbFlags(
+        selected = focus.selectedAgentId != null && focus.selectedAgentId in group.agentIds,
+        thinking = focus.thinkingAgentId != null && focus.thinkingAgentId in group.agentIds,
+        count = group.agentIds.size,
+    )
+}
+
+private fun AgentRailOrbParams.toTarget(flags: AgentRailOrbFlags): AgentRailOrbTarget {
+    val group = group
     // Clicking a stack opens its already-selected member if one is
     // selected, otherwise its first (most-recent) member.
-    val targetAgentId = group.agentIds.firstOrNull { it == params.selectedAgentId } ?: group.agentIds.first()
+    val targetAgentId = group.agentIds.firstOrNull { it == focus.selectedAgentId } ?: group.agentIds.first()
     // Use the stack member's saved avatar style if any set one,
     // otherwise the position-derived colour.
-    val orbStyle = group.agentIds.firstNotNullOfOrNull { params.avatarStyleByAgentId[it] } ?: params.index
+    val orbStyle = group.agentIds.firstNotNullOfOrNull { focus.avatarStyleByAgentId[it] } ?: index
     val tooltip = buildString {
         append(group.name)
-        if (count > 1) append(" · $count agents")
-        if (thinking) append(" · thinking…")
+        if (flags.count > 1) append(" · ${flags.count} agents")
+        if (flags.thinking) append(" · thinking…")
     }
-    DesktopTooltip(text = tooltip) {
+    return AgentRailOrbTarget(agentId = targetAgentId, orbStyle = orbStyle, tooltip = tooltip)
+}
+
+@Composable
+private fun AgentRailOrb(params: AgentRailOrbParams) {
+    val flags = params.toFlags()
+    val target = params.toTarget(flags)
+    DesktopTooltip(text = target.tooltip) {
         Box(
             modifier = Modifier.size(width = 46.dp, height = 40.dp),
             contentAlignment = Alignment.Center,
         ) {
-            if (selected) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .size(width = 3.dp, height = 28.dp)
-                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
-                )
+            if (flags.selected) {
+                SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
             }
-            if (thinking) {
+            if (flags.thinking) {
                 // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
                 // and sized to fit the 40dp slot so it doesn't crowd
                 // neighbouring orbs.
                 ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
             }
             AgentOrb(
-                index = orbStyle,
+                index = target.orbStyle,
                 size = 36.dp,
-                onClick = { params.onAgentSelected(targetAgentId) },
+                onClick = { params.onAgentSelected(target.agentId) },
             ) {
                 Text(
-                    text = group.name.firstOrNull()?.uppercase() ?: "?",
+                    text = params.group.name.firstOrNull()?.uppercase() ?: "?",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.White,
                 )
             }
-            if (count > 1) {
+            if (flags.count > 1) {
                 AgentCountChip(
-                    count = count,
+                    count = flags.count,
                     modifier = Modifier.align(Alignment.TopEnd),
                 )
             }
         }
     }
+}
+
+@Composable
+private fun SelectedAgentRailMarker(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(width = 3.dp, height = 28.dp)
+            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+    )
 }
 
 @Composable
@@ -286,25 +343,27 @@ private data class AgentRailGroup(
     val agentIds: List<String>,
 )
 
+private data class RailActionIconModel(
+    val icon: ImageVector,
+    val description: String,
+    val onClick: () -> Unit,
+    val tint: Color = Color.Unspecified,
+)
+
 @Composable
-private fun RailActionIcon(
-    icon: ImageVector,
-    description: String,
-    onClick: () -> Unit,
-    tint: Color = Color.Unspecified,
-) {
-    DesktopTooltip(text = description) {
+private fun RailActionIcon(model: RailActionIconModel) {
+    DesktopTooltip(text = model.description) {
         Box(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
-                .clickable(onClick = onClick),
+                .clickable(onClick = model.onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                imageVector = icon,
-                contentDescription = description,
-                tint = tint.takeIf { it != Color.Unspecified }
+                imageVector = model.icon,
+                contentDescription = model.description,
+                tint = model.tint.takeIf { it != Color.Unspecified }
                     ?: MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )

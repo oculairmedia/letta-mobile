@@ -281,8 +281,7 @@ fun DesktopScheduleSurface(
         if (showCreate) {
             CreateScheduleModal(
                 CreateScheduleModalParams(
-                    now = now,
-                    zone = zone,
+                    clock = CreateScheduleClock(now = now, zone = zone),
                     canCreate = canCreate,
                     onDismiss = { showCreate = false },
                     onCreate = { name, prompt, cron ->

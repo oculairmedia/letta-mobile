@@ -36,19 +36,24 @@ import kotlinx.coroutines.launch
 
 internal const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
 internal const val ARCHIVED_CONVERSATION_IDS_KEY = "conversations.archived_ids"
+private const val DESKTOP_DEVICE_ID = "letta-desktop"
 
 private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
     IrohConnectConfig(
         baseShimUrl = config.serverUrl,
         token = config.accessToken.orEmpty(),
-        deviceId = "letta-desktop",
+        deviceId = DESKTOP_DEVICE_ID,
         clientVersion = "letta-desktop-iroh",
     )
 
-private data class ResolveDesktopAgentFieldParams<T : Any>(
+private data class DesktopAgentResolveSources(
     val agentIds: Set<String>,
     val irohDirectory: IrohAdminRpcAgentDirectory?,
     val httpAgentRepository: () -> IAgentRepository,
+)
+
+private data class ResolveDesktopAgentFieldParams<T : Any>(
+    val sources: DesktopAgentResolveSources,
     val fromAgent: (Agent) -> T?,
     val refreshBeforeResolve: Boolean = false,
 )
@@ -56,13 +61,14 @@ private data class ResolveDesktopAgentFieldParams<T : Any>(
 private suspend fun <T : Any> resolveDesktopAgentField(
     params: ResolveDesktopAgentFieldParams<T>,
 ): Map<String, T> {
-    val irohDirectory = params.irohDirectory
+    val sources = params.sources
+    val irohDirectory = sources.irohDirectory
     if (irohDirectory != null) {
         return runCatching { irohDirectory.listAgents() }.getOrDefault(emptyList())
             .mapNotNull { agent -> params.fromAgent(agent)?.let { agent.id.value to it } }
             .toMap()
     }
-    val agentRepository = params.httpAgentRepository()
+    val agentRepository = sources.httpAgentRepository()
     if (params.refreshBeforeResolve) {
         runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS) }
     }
@@ -70,7 +76,7 @@ private suspend fun <T : Any> resolveDesktopAgentField(
     agentRepository.agents.value.forEach { agent ->
         params.fromAgent(agent)?.let { resolved[agent.id.value] = it }
     }
-    params.agentIds.filter { it !in resolved }.forEach { id ->
+    sources.agentIds.filter { it !in resolved }.forEach { id ->
         val value = agentRepository.getCachedAgent(id)?.let(params.fromAgent)
             ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.let(params.fromAgent)
         value?.let { resolved[id] = it }
@@ -92,9 +98,7 @@ internal suspend fun resolveDesktopAgentNames(
     httpAgentRepository: () -> IAgentRepository,
 ): Map<String, String> = resolveDesktopAgentField(
     ResolveDesktopAgentFieldParams(
-        agentIds = agentIds,
-        irohDirectory = irohDirectory,
-        httpAgentRepository = httpAgentRepository,
+        sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
         fromAgent = { agent -> nonBlank(agent.name) },
         refreshBeforeResolve = true,
     ),
@@ -107,9 +111,7 @@ internal suspend fun resolveDesktopAgentModels(
     httpAgentRepository: () -> IAgentRepository,
 ): Map<String, String> = resolveDesktopAgentField(
     ResolveDesktopAgentFieldParams(
-        agentIds = agentIds,
-        irohDirectory = irohDirectory,
-        httpAgentRepository = httpAgentRepository,
+        sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
         fromAgent = { agent -> nonBlank(agent.model) },
     ),
 )
@@ -153,10 +155,14 @@ internal fun rememberIrohTransport(
     return irohTransport
 }
 
-internal data class DesktopChatControllerBindings(
+internal data class DesktopChatRuntime(
     val bootstrapState: DesktopBootstrapState,
     val chatScope: CoroutineScope,
     val dataBindings: DesktopDataBindings,
+)
+
+internal data class DesktopChatControllerBindings(
+    val runtime: DesktopChatRuntime,
     val irohTransport: IrohChannelTransport?,
     val irohAgentDirectory: IrohAdminRpcAgentDirectory?,
     val secureSettingsStore: DesktopFileSecureSettingsStore,
@@ -166,34 +172,37 @@ internal data class DesktopChatControllerBindings(
 @Composable
 internal fun rememberDesktopChatController(
     bindings: DesktopChatControllerBindings,
-): DesktopChatController = remember(
-    bindings.bootstrapState,
-    bindings.chatScope,
-    bindings.dataBindings.sessionGraphProvider,
-    bindings.irohTransport,
-) {
-    DesktopChatController(
-        bootstrapState = bindings.bootstrapState,
-        scope = bindings.chatScope,
-        gatewayFactory = {
-            bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = "letta-desktop") }
-                ?: createDefaultDesktopChatGateway(bindings.bootstrapState.config)
-        },
-        agentNamesByIdProvider = { agentIds ->
-            resolveDesktopAgentNames(agentIds, bindings.irohAgentDirectory) {
-                bindings.dataBindings.sessionGraphProvider.current.agentRepository
-            }
-        },
-        agentModelByIdProvider = { agentIds ->
-            resolveDesktopAgentModels(agentIds, bindings.irohAgentDirectory) {
-                bindings.dataBindings.sessionGraphProvider.current.agentRepository
-            }
-        },
-        loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
-        persistArchivedConversationIds = { ids ->
-            persistArchivedConversationIds(bindings.secureSettingsStore, ids)
-        },
-    )
+): DesktopChatController {
+    val runtime = bindings.runtime
+    return remember(
+        runtime.bootstrapState,
+        runtime.chatScope,
+        runtime.dataBindings.sessionGraphProvider,
+        bindings.irohTransport,
+    ) {
+        DesktopChatController(
+            bootstrapState = runtime.bootstrapState,
+            scope = runtime.chatScope,
+            gatewayFactory = {
+                bindings.irohTransport?.let { IrohAdminRpcChatGateway(it, deviceLabel = DESKTOP_DEVICE_ID) }
+                    ?: createDefaultDesktopChatGateway(runtime.bootstrapState.config)
+            },
+            agentNamesByIdProvider = { agentIds ->
+                resolveDesktopAgentNames(agentIds, bindings.irohAgentDirectory) {
+                    runtime.dataBindings.sessionGraphProvider.current.agentRepository
+                }
+            },
+            agentModelByIdProvider = { agentIds ->
+                resolveDesktopAgentModels(agentIds, bindings.irohAgentDirectory) {
+                    runtime.dataBindings.sessionGraphProvider.current.agentRepository
+                }
+            },
+            loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
+            persistArchivedConversationIds = { ids ->
+                persistArchivedConversationIds(bindings.secureSettingsStore, ids)
+            },
+        )
+    }
 }
 
 /**
@@ -233,14 +242,10 @@ private fun createDesktopHttpApis(
     return DesktopHttpApis(
         blockApi = createDesktopBackendApi(backend, ::DesktopIrohBlockApi, ::DesktopHttpBlockApi),
         cronApi = httpConfig?.let { CronApi(it, httpClient) },
-        skillApi = createDesktopBackendApi(
-            backend,
-            ::DesktopIrohSkillsApi,
-        ) { SkillApi(it, createDesktopLettaHttpClient()) },
-        slashCommandApi = createDesktopBackendApi(
-            backend,
-            ::DesktopIrohSlashCommandApi,
-        ) { SlashCommandApi(it, createDesktopLettaHttpClient()) },
+        skillApi = createDesktopBackendApi(backend, ::DesktopIrohSkillsApi) { SkillApi(it, httpClient) },
+        slashCommandApi = createDesktopBackendApi(backend, ::DesktopIrohSlashCommandApi) {
+            SlashCommandApi(it, httpClient)
+        },
     )
 }
 
@@ -291,11 +296,13 @@ private fun createSubagentTransport(
         ?.let { DesktopWsChannelTransport(chatScope) }
 
 private suspend fun connectSubagentTransport(transport: DesktopWsChannelTransport, config: LettaConfig) {
+    // WS side-channel keeps the shorter clientVersion label used historically
+    // for mobile-shim subagent registry dials (distinct from iroh's label).
     transport.connect(
         baseShimUrl = config.serverUrl,
         token = config.accessToken.orEmpty(),
-        deviceId = "letta-desktop",
-        clientVersion = "letta-desktop",
+        deviceId = DESKTOP_DEVICE_ID,
+        clientVersion = DESKTOP_DEVICE_ID,
     )
 }
 

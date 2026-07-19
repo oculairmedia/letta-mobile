@@ -106,11 +106,15 @@ internal fun rememberDesktopLibraryControllers(
     return DesktopLibraryControllers(memory, schedules, channels, tools)
 }
 
+internal data class DesktopDestinationSelection(
+    val selectedDestination: DesktopDestination,
+    val selectedConversationAgentId: String?,
+)
+
 internal data class DesktopControllerLifecycleParams(
     val chatController: DesktopChatController,
     val libraries: DesktopLibraryControllers,
-    val selectedDestination: DesktopDestination,
-    val selectedConversationAgentId: String?,
+    val selection: DesktopDestinationSelection,
     val cronPanel: DesktopCronPanelState,
 )
 
@@ -121,8 +125,37 @@ internal data class DesktopControllerLifecycleParams(
 @Composable
 internal fun DesktopControllerLifecycles(params: DesktopControllerLifecycleParams) {
     val libraries = params.libraries
+    LibraryControllerLifecycles(chatController = params.chatController, libraries = libraries)
+    DestinationAgentSelectionEffect(
+        DestinationAgentSelectionParams(
+            selection = params.selection,
+            targetDestination = DesktopDestination.Memory,
+            onSelectAgent = libraries.memory::selectAgent,
+        ),
+    )
+    DestinationAgentSelectionEffect(
+        DestinationAgentSelectionParams(
+            selection = params.selection,
+            targetDestination = DesktopDestination.Schedules,
+            onSelectAgent = libraries.schedules::selectAgent,
+        ),
+    )
+    DestinationRefreshEffect(
+        DestinationRefreshParams(
+            selectedDestination = params.selection.selectedDestination,
+            targetDestination = DesktopDestination.Schedules,
+            onRefresh = params.cronPanel::refresh,
+        ),
+    )
+}
+
+@Composable
+private fun LibraryControllerLifecycles(
+    chatController: DesktopChatController,
+    libraries: DesktopLibraryControllers,
+) {
     ControllerLifecycleEffect(
-        controller = params.chatController,
+        controller = chatController,
         onStart = { start() },
         onClose = { close() },
     )
@@ -146,27 +179,6 @@ internal fun DesktopControllerLifecycles(params: DesktopControllerLifecycleParam
         onStart = { start() },
         onClose = { close() },
     )
-    DestinationAgentSelectionEffect(
-        DestinationAgentSelectionParams(
-            selectedDestination = params.selectedDestination,
-            targetDestination = DesktopDestination.Memory,
-            selectedConversationAgentId = params.selectedConversationAgentId,
-            onSelectAgent = libraries.memory::selectAgent,
-        ),
-    )
-    DestinationAgentSelectionEffect(
-        DestinationAgentSelectionParams(
-            selectedDestination = params.selectedDestination,
-            targetDestination = DesktopDestination.Schedules,
-            selectedConversationAgentId = params.selectedConversationAgentId,
-            onSelectAgent = libraries.schedules::selectAgent,
-        ),
-    )
-    DestinationRefreshEffect(
-        selectedDestination = params.selectedDestination,
-        targetDestination = DesktopDestination.Schedules,
-        onRefresh = params.cronPanel::refresh,
-    )
 }
 
 @Composable
@@ -182,30 +194,32 @@ private inline fun <T> ControllerLifecycleEffect(
 }
 
 private data class DestinationAgentSelectionParams(
-    val selectedDestination: DesktopDestination,
+    val selection: DesktopDestinationSelection,
     val targetDestination: DesktopDestination,
-    val selectedConversationAgentId: String?,
     val onSelectAgent: (String) -> Unit,
 )
 
 @Composable
 private fun DestinationAgentSelectionEffect(params: DestinationAgentSelectionParams) {
-    LaunchedEffect(params.selectedDestination, params.selectedConversationAgentId) {
-        if (params.selectedDestination == params.targetDestination) {
-            params.selectedConversationAgentId?.let(params.onSelectAgent)
+    val selection = params.selection
+    LaunchedEffect(selection.selectedDestination, selection.selectedConversationAgentId) {
+        if (selection.selectedDestination == params.targetDestination) {
+            selection.selectedConversationAgentId?.let(params.onSelectAgent)
         }
     }
 }
 
+private data class DestinationRefreshParams(
+    val selectedDestination: DesktopDestination,
+    val targetDestination: DesktopDestination,
+    val onRefresh: suspend () -> Unit,
+)
+
 @Composable
-private fun DestinationRefreshEffect(
-    selectedDestination: DesktopDestination,
-    targetDestination: DesktopDestination,
-    onRefresh: suspend () -> Unit,
-) {
-    LaunchedEffect(selectedDestination) {
-        if (selectedDestination == targetDestination) {
-            onRefresh()
+private fun DestinationRefreshEffect(params: DestinationRefreshParams) {
+    LaunchedEffect(params.selectedDestination) {
+        if (params.selectedDestination == params.targetDestination) {
+            params.onRefresh()
         }
     }
 }
