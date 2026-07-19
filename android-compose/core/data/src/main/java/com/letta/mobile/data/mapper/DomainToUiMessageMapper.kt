@@ -3,400 +3,82 @@ package com.letta.mobile.data.mapper
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.GeneratedUiPayload
 import com.letta.mobile.data.model.MessageType
-import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiApprovalDecision
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiGeneratedComponent
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
-import java.time.Duration
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-private val generatedUiToolNames = setOf(
+internal val generatedUiToolNames = setOf(
     "render_summary_card",
     "render_metric_card",
     "render_suggestion_chips",
 )
 
-/**
- * Folded approval decision resolved from an `APPROVAL_RESPONSE` payload that
- * targets a specific tool call. Emitted by [buildFoldedApprovalIndex] and
- * consumed by [toUiMessages] when attaching a chip to the tool-call card.
- *
- * `carriedReason` is true when the underlying response also supplied a reason
- * string — in that case we still keep the standalone approval card around so
- * the note is visible (letta-mobile-23h5).
- */
-private data class FoldedToolApproval(
-    val decision: UiToolApprovalDecision,
-    val carriedReason: Boolean,
-    val sourceMessageId: String,
-)
-
-/**
- * Pre-scan the flat message list for `APPROVAL_RESPONSE` events and index any
- * per-call decisions by `toolCallId`. Only top-level-explicit or per-call
- * decisions are returned — bare `approve=null` bookkeeping echoes are left
- * alone (those are dropped entirely by the existing APPROVAL_RESPONSE branch).
- */
-private fun List<AppMessage>.buildFoldedApprovalIndex(): Map<String, FoldedToolApproval> {
-    val index = mutableMapOf<String, FoldedToolApproval>()
-    for (msg in this) {
-        if (msg.messageType != MessageType.APPROVAL_RESPONSE) continue
-        val response = msg.approvalResponse ?: continue
-        val topLevelReason = response.reason?.takeIf { it.isNotBlank() }
-        // When the response only carries a top-level approve=true/false (no
-        // per-call breakdown), fold it onto whatever tool calls the matching
-        // request was about. We don't have that linkage here without walking
-        // the APPROVAL_REQUEST, so leave those as standalone cards for now —
-        // the common Letta Code case populates per-call `approvals[]`.
-        for (decision in response.approvals) {
-            val toolCallId = decision.toolCallId.takeIf { it.isNotBlank() } ?: continue
-            val decided = decision.approved ?: continue
-            val reasonBlank = decision.reason.isNullOrBlank() && topLevelReason == null
-            index[toolCallId] = FoldedToolApproval(
-                decision = if (decided) UiToolApprovalDecision.Approved else UiToolApprovalDecision.Rejected,
-                carriedReason = !reasonBlank,
-                sourceMessageId = msg.id,
-            )
-        }
-    }
-    return index
-}
-
 internal fun List<AppMessage>.mapToUiMessages(): List<UiMessage> {
-    val returnsByCallId = mutableMapOf<String, AppMessage>()
-    for (msg in this) {
-        val callId = msg.toolCallId
-        if (msg.messageType == MessageType.TOOL_RETURN && !callId.isNullOrBlank()) {
-            returnsByCallId[callId] = msg
-        }
-    }
-    val subagentToolCallByTaskId = mutableMapOf<String, String>()
-    for (msg in this) {
-        if (msg.messageType != MessageType.TOOL_CALL || msg.toolName != "Agent") continue
-        val callId = msg.toolCallId?.takeIf { it.isNotBlank() } ?: continue
-        val dispatch = extractSubagentDispatch(
-            toolCallId = callId,
-            arguments = msg.content,
-            returnContent = returnsByCallId[callId]?.content,
-        ) ?: continue
-        dispatch.taskId?.takeIf { it.isNotBlank() }?.let { taskId ->
-            // Deterministic on taskId collision: keep the FIRST dispatch in
-            // conversation order as the owner of that taskId, rather than
-            // last-write-wins (which could mis-correlate a later notification
-            // to the wrong tool call). Server taskIds are normally unique per
-            // conversation; this only guards the collision edge case.
-            subagentToolCallByTaskId.putIfAbsent(taskId, callId)
-        }
-    }
-
-    // The set of tool-call ids that will actually produce a visible bubble in
-    // this render. A folded approval decision can only silently replace its
-    // standalone card if the target tool call is going to be present — if it
-    // never arrived (e.g. a rogue approval_response with no matching
-    // tool_call_message) the decision would be invisible, which would regress
-    // the legacy behaviour.
-    val renderedToolCallIds = buildSet {
-        for (msg in this@mapToUiMessages) {
-            if (msg.messageType == MessageType.TOOL_CALL || msg.messageType == MessageType.TOOL_RETURN) {
-                msg.toolCallId?.takeIf { it.isNotBlank() }?.let { add(it) }
-            }
-        }
-    }
-
-    val foldedApprovals = buildFoldedApprovalIndex()
-        .filterKeys { it in renderedToolCallIds }
-    // APPROVAL_RESPONSE source messages whose per-call decisions were ALL
-    // absorbed (and which carried no user-written reason) can be suppressed
-    // entirely. Anything else — a reason, a rejection, or decisions that
-    // didn't match any tool call — falls through to the standalone card.
-    val fullyAbsorbedResponseIds = mutableSetOf<String>()
-    run {
-        val responsesToDecisions = mutableMapOf<String, MutableList<FoldedToolApproval>>()
-        for ((_, folded) in foldedApprovals) {
-            responsesToDecisions.getOrPut(folded.sourceMessageId) { mutableListOf() }.add(folded)
-        }
-        for (msg in this) {
-            if (msg.messageType != MessageType.APPROVAL_RESPONSE) continue
-            val response = msg.approvalResponse ?: continue
-            val folded = responsesToDecisions[msg.id].orEmpty()
-            if (folded.isEmpty()) continue
-            // Every per-call decision in the response must be (a) explicit
-            // (approve != null), (b) target a tool call that will actually
-            // render, and (c) be the Approved kind with no reason. Anything
-            // else falls through to the standalone card so the user can still
-            // see the outcome.
-            val explicitPerCall = response.approvals.filter {
-                !it.toolCallId.isNullOrBlank() && it.approved != null
-            }
-            if (explicitPerCall.isEmpty()) continue
-            if (explicitPerCall.any { it.toolCallId !in renderedToolCallIds }) continue
-            if (folded.size != explicitPerCall.size) continue
-            if (folded.any { it.carriedReason }) continue
-            if (!response.reason.isNullOrBlank()) continue
-            // Only absorb Approved decisions silently. A Rejected outcome is
-            // consequential enough on its own that we keep the standalone
-            // card even without a reason — users should always see a
-            // rejection spelled out.
-            if (folded.any { it.decision == UiToolApprovalDecision.Rejected }) continue
-            fullyAbsorbedResponseIds.add(msg.id)
-        }
-    }
-
+    val returnsByCallId = associateToolReturns()
+    val subagentCallsByTaskId = associateSubagentCalls(returnsByCallId)
+    val renderedToolCallIds = renderedToolCallIds()
+    val foldedApprovals = foldedApprovals(renderedToolCallIds)
+    val absorbedResponses = fullyAbsorbedApprovalResponseIds(foldedApprovals, renderedToolCallIds)
     val consumedReturnIds = mutableSetOf<String>()
 
-    val result = mutableListOf<UiMessage>()
-    for (msg in this) {
-        when (msg.messageType) {
-            MessageType.TOOL_CALL -> {
-                val matchedReturn = msg.toolCallId?.let(returnsByCallId::get)
-                if (matchedReturn != null) {
-                    consumedReturnIds.add(matchedReturn.id)
+    return buildList {
+        for (message in this@mapToUiMessages) {
+            when (message.messageType) {
+                MessageType.TOOL_CALL -> {
+                    val mapped = message.mapToolCall(message.toolCallId?.let(returnsByCallId::get), foldedApprovals)
+                    mapped.consumedReturnId?.let(consumedReturnIds::add)
+                    add(mapped.message)
                 }
-                val name = msg.toolName
-                val arguments = msg.content
-                val returnContent = matchedReturn?.content
-                val returnStatus = matchedReturn?.toolReturnStatus
-                val executionTimeMs = matchedReturn?.let { toolReturn ->
-                    Duration.between(msg.date, toolReturn.date).toMillis().takeIf { it >= 0L }
+                MessageType.TOOL_RETURN -> if (message.id !in consumedReturnIds) {
+                    add(message.mapUnmatchedToolReturn(foldedApprovals))
                 }
-
-                if (name in generatedUiToolNames && returnContent != null) {
-                    val generatedUi = extractGeneratedUiFromString(returnContent)
-                    if (generatedUi != null) {
-                        result.add(
-                            UiMessage(
-                                id = msg.id,
-                                role = "assistant",
-                                content = generatedUi.fallbackText.orEmpty(),
-                                timestamp = msg.date.toString(),
-                                runId = msg.runId,
-                                stepId = msg.stepId,
-                                generatedUi = UiGeneratedComponent(
-                                    name = generatedUi.component,
-                                    propsJson = generatedUi.propsJson,
-                                    fallbackText = generatedUi.fallbackText,
-                                ),
-                            )
-                        )
-                        continue
-                    }
+                MessageType.USER, MessageType.ASSISTANT ->
+                    add(message.mapToUiMessage().correlateSubagentNotification(subagentCallsByTaskId))
+                MessageType.REASONING, MessageType.APPROVAL_REQUEST -> add(message.mapToUiMessage())
+                MessageType.APPROVAL_RESPONSE -> if (
+                    message.id !in absorbedResponses && message.hasExplicitApprovalDecision()
+                ) {
+                    add(message.mapToUiMessage())
                 }
-
-                // send_message is Letta's reply tool — promote to assistant bubble
-                if (name == "send_message" && returnContent != null) {
-                    val visibleText = extractSendMessageText(arguments, returnContent)
-                    if (visibleText.isNotBlank()) {
-                        result.add(UiMessage(
-                            id = msg.id,
-                            role = "assistant",
-                            content = visibleText,
-                            timestamp = msg.date.toString(),
-                            runId = msg.runId,
-                            stepId = msg.stepId,
-                        ))
-                        continue
-                    }
-                }
-
-                val subagentDispatch = if (name == "Agent") {
-                    extractSubagentDispatch(
-                        toolCallId = msg.toolCallId,
-                        arguments = arguments,
-                        returnContent = returnContent,
-                    )
-                } else {
-                    null
-                }
-                val toolCall = UiToolCall(
-                    name = name ?: "tool",
-                    arguments = arguments,
-                    result = returnContent,
-                    status = returnStatus,
-                    generatedImageAttachments = if (name == "generate_image") {
-                        matchedReturn?.attachments.orEmpty().map {
-                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                        }
-                    } else {
-                        emptyList()
-                    },
-                    executionTimeMs = executionTimeMs,
-                    toolCallId = msg.toolCallId,
-                    approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
-                    subagentDispatch = subagentDispatch,
-                )
-                result.add(UiMessage(
-                    id = msg.id,
-                    role = "tool",
-                    content = "",
-                    timestamp = msg.date.toString(),
-                    runId = msg.runId,
-                    stepId = msg.stepId,
-                    toolCalls = listOf(toolCall),
-                    attachments = if (name == "generate_image") {
-                        emptyList()
-                    } else {
-                        matchedReturn?.attachments.orEmpty().map {
-                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                        }
-                    },
-                ))
-            }
-
-            MessageType.TOOL_RETURN -> {
-                if (msg.id in consumedReturnIds) continue
-                val name = msg.toolName ?: "tool"
-
-                if (name in generatedUiToolNames && msg.content.isNotBlank()) {
-                    val generatedUi = extractGeneratedUiFromString(msg.content)
-                    if (generatedUi != null) {
-                        result.add(
-                            UiMessage(
-                                id = msg.id,
-                                role = "assistant",
-                                content = generatedUi.fallbackText.orEmpty(),
-                                timestamp = msg.date.toString(),
-                                runId = msg.runId,
-                                stepId = msg.stepId,
-                                generatedUi = UiGeneratedComponent(
-                                    name = generatedUi.component,
-                                    propsJson = generatedUi.propsJson,
-                                    fallbackText = generatedUi.fallbackText,
-                                ),
-                            )
-                        )
-                        continue
-                    }
-                }
-
-                if (name == "send_message" && msg.content.isNotBlank()) {
-                    result.add(UiMessage(
-                        id = msg.id,
-                        role = "assistant",
-                        content = msg.content,
-                        timestamp = msg.date.toString(),
-                        runId = msg.runId,
-                        stepId = msg.stepId,
-                    ))
-                    continue
-                }
-
-                val subagentDispatch = if (name == "Agent") {
-                    extractSubagentDispatch(
-                        toolCallId = msg.toolCallId,
-                        arguments = "",
-                        returnContent = msg.content,
-                    )
-                } else {
-                    null
-                }
-                val toolCall = UiToolCall(
-                    name = name,
-                    arguments = "",
-                    result = msg.content.ifBlank { null },
-                    status = msg.toolReturnStatus,
-                    generatedImageAttachments = if (name == "generate_image") {
-                        msg.attachments.map {
-                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                        }
-                    } else {
-                        emptyList()
-                    },
-                    toolCallId = msg.toolCallId,
-                    approvalDecision = msg.toolCallId?.let { foldedApprovals[it]?.decision },
-                    subagentDispatch = subagentDispatch,
-                )
-                result.add(UiMessage(
-                    id = msg.id,
-                    role = "tool",
-                    content = "",
-                    timestamp = msg.date.toString(),
-                    runId = msg.runId,
-                    stepId = msg.stepId,
-                    toolCalls = listOf(toolCall),
-                    attachments = if (name == "generate_image") {
-                        emptyList()
-                    } else {
-                        msg.attachments.map {
-                            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-                        }
-                    },
-                ))
-            }
-
-            // letta-mobile-rnocg: USER-role messages can carry an injected
-            // `<task-notification>` agent-return (background subagent finishing).
-            // `toUiMessage` already reclassifies those to role="assistant" with a
-            // populated subagentNotification; route them through the SAME
-            // task-id -> Agent tool-call correlation as the ASSISTANT path so the
-            // return card links back to its dispatch chip / todo sheet.
-            MessageType.USER, MessageType.ASSISTANT ->
-                result.add(msg.mapToUiMessage().correlateSubagentNotification(subagentToolCallByTaskId))
-            MessageType.REASONING -> result.add(msg.mapToUiMessage())
-            MessageType.APPROVAL_REQUEST -> result.add(msg.mapToUiMessage())
-            MessageType.APPROVAL_RESPONSE -> {
-                // Suppress auto-approval response cards: in bypassPermissions sessions
-                // the Letta server emits approval_response_message entries with
-                // approve=null (and per-call approvals[].approve=null). These are
-                // NOT user-facing rejections — they are bookkeeping echoes of the
-                // tool_return. Rendering them as "Rejected" cards (the legacy
-                // behaviour) misled operators on every yolo session.
-                //
-                // Only render the card when SOMEONE actually made an explicit
-                // decision (approve == true OR approve == false at either the
-                // top-level or any per-call entry).
-                val response = msg.approvalResponse
-                val hasExplicitDecision = response != null && (
-                    response.approved != null ||
-                    response.approvals.any { it.approved != null }
-                )
-                // letta-mobile-23h5: if every per-call decision was silently
-                // absorbed onto its tool-call card (approve=true, no reason),
-                // skip the standalone "Approved" bubble altogether — the chip
-                // on the tool card carries the same info without polluting
-                // the timeline with redundant pills.
-                if (msg.id in fullyAbsorbedResponseIds) {
-                    continue
-                }
-                if (hasExplicitDecision) {
-                    result.add(msg.mapToUiMessage())
-                }
-                // else: silently drop — the linked tool_return already carries
-                // the actual outcome and is rendered by the TOOL_CALL/TOOL_RETURN
-                // branches above.
             }
         }
     }
-    return result
 }
 
-/**
- * letta-mobile-rnocg: correlate a subagent-return notification back to the
- * `Agent` tool call that dispatched it. The notification may carry its own
- * `tool_call_id`; if not, we resolve it from the `task_id` -> Agent tool-call
- * id index built upstream. With the tool-call id attached, the return card can
- * open the dispatch's todo sheet / subagent conversation (same correlation seam
- * as the dispatch chip, pbnxa #343). No-op when the message carries no
- * notification.
- */
+private fun List<AppMessage>.associateToolReturns(): Map<String, AppMessage> = buildMap {
+    for (message in this@associateToolReturns) {
+        val callId = message.toolCallId
+        if (message.messageType == MessageType.TOOL_RETURN && !callId.isNullOrBlank()) put(callId, message)
+    }
+}
+
+private fun List<AppMessage>.associateSubagentCalls(
+    returnsByCallId: Map<String, AppMessage>,
+): Map<String, String> = buildMap {
+    for (message in this@associateSubagentCalls) {
+        if (message.messageType != MessageType.TOOL_CALL || message.toolName != "Agent") continue
+        val callId = message.toolCallId?.takeIf(String::isNotBlank) ?: continue
+        val dispatch = extractSubagentDispatch(callId, message.content, returnsByCallId[callId]?.content) ?: continue
+        dispatch.taskId?.takeIf(String::isNotBlank)?.let { putIfAbsent(it, callId) }
+    }
+}
+
 private fun UiMessage.correlateSubagentNotification(
     subagentToolCallByTaskId: Map<String, String>,
 ): UiMessage {
     val notification = subagentNotification ?: return this
-    val taskId = notification.taskId
-    val correlatedToolCallId = when {
-        !notification.toolCallId.isNullOrBlank() -> notification.toolCallId
-        !taskId.isNullOrBlank() -> subagentToolCallByTaskId[taskId]
-        else -> null
-    }
+    val correlatedToolCallId = notification.toolCallId?.takeIf(String::isNotBlank)
+        ?: notification.taskId?.takeIf(String::isNotBlank)?.let(subagentToolCallByTaskId::get)
     return if (correlatedToolCallId != notification.toolCallId) {
         copy(subagentNotification = notification.copy(toolCallId = correlatedToolCallId))
     } else {
@@ -404,199 +86,123 @@ private fun UiMessage.correlateSubagentNotification(
     }
 }
 
-private fun extractSendMessageText(arguments: String, returnContent: String): String {
+internal fun extractSendMessageText(arguments: String, returnContent: String): String {
     return try {
-        val msgStart = arguments.indexOf("\"message\"")
-        if (msgStart < 0) return returnContent
-        val colonIdx = arguments.indexOf(':', msgStart)
-        if (colonIdx < 0) return returnContent
-        val valStart = arguments.indexOf('"', colonIdx + 1)
-        if (valStart < 0) return returnContent
-        var i = valStart + 1
-        val sb = StringBuilder()
-        while (i < arguments.length) {
-            val c = arguments[i]
-            if (c == '\\' && i + 1 < arguments.length) {
-                val next = arguments[i + 1]
-                when (next) {
-                    '"' -> sb.append('"')
-                    '\\' -> sb.append('\\')
-                    'n' -> sb.append('\n')
-                    't' -> sb.append('\t')
-                    else -> { sb.append('\\'); sb.append(next) }
+        val messageStart = arguments.indexOf("\"message\"")
+        if (messageStart < 0) return returnContent
+        val colon = arguments.indexOf(':', messageStart)
+        if (colon < 0) return returnContent
+        val valueStart = arguments.indexOf('"', colon + 1)
+        if (valueStart < 0) return returnContent
+        buildString {
+            var index = valueStart + 1
+            while (index < arguments.length) {
+                val char = arguments[index]
+                if (char == '\\' && index + 1 < arguments.length) {
+                    when (val escaped = arguments[index + 1]) {
+                        '"' -> append('"')
+                        '\\' -> append('\\')
+                        'n' -> append('\n')
+                        't' -> append('\t')
+                        else -> { append('\\'); append(escaped) }
+                    }
+                    index += 2
+                } else if (char == '"') {
+                    break
+                } else {
+                    append(char)
+                    index++
                 }
-                i += 2
-            } else if (c == '"') {
-                break
-            } else {
-                sb.append(c)
-                i++
             }
-        }
-        sb.toString().ifBlank { returnContent }
+        }.ifBlank { returnContent }
     } catch (_: Exception) {
         returnContent
     }
 }
 
 internal fun AppMessage.mapToUiMessage(): UiMessage {
-    // letta-mobile-rnocg: a completed background subagent surfaces its return
-    // by INJECTING a `<task-notification>` envelope into the conversation as a
-    // USER-role message (the server's async-tool-return convention). Rendered
-    // naively that paints a giant green right-aligned user bubble full of raw
-    // XML + the subagent's markdown report — reading as if the operator sent a
-    // wall of XML. Detect that envelope on EITHER a USER or ASSISTANT inbound
-    // message and reclassify it as an agent-return so it routes to the
-    // left-aligned, recede-by-default SubagentNotificationCard instead of the
-    // user bubble. Note: ASSISTANT was already parsed below; here we also catch
-    // the USER injection path (the actual on-device bug).
-    val subagentNotification = when (messageType) {
+    val notification = when (messageType) {
         MessageType.ASSISTANT, MessageType.USER -> extractSubagentNotification(content)
         else -> null
     }
-    val role = when {
-        // A task-notification is an agent-return, never user input — flip the
-        // role so alignment, bubble shape, avatar, and renderer all treat it as
-        // an agent-side message.
-        subagentNotification != null -> "assistant"
-        else -> when (messageType) {
-            MessageType.USER -> "user"
-            MessageType.ASSISTANT -> "assistant"
-            MessageType.REASONING -> "assistant"
-            MessageType.TOOL_CALL -> "tool"
-            MessageType.TOOL_RETURN -> "tool"
-            MessageType.APPROVAL_REQUEST -> "approval"
-            MessageType.APPROVAL_RESPONSE -> "approval"
-        }
-    }
-    val toolCalls = when {
-        messageType == MessageType.TOOL_CALL -> {
-            val subagentDispatch = if (toolName == "Agent") {
-                extractSubagentDispatch(
-                    toolCallId = toolCallId,
-                    arguments = content,
-                    returnContent = null,
-                )
-            } else {
-                null
-            }
-            listOf(
-                UiToolCall(
-                    name = toolName ?: "tool",
-                    arguments = content,
-                    result = null,
-                    toolCallId = toolCallId,
-                    subagentDispatch = subagentDispatch,
-                )
-            )
-        }
-        messageType == MessageType.TOOL_RETURN -> {
-            val subagentDispatch = if (toolName == "Agent") {
-                extractSubagentDispatch(
-                    toolCallId = toolCallId,
-                    arguments = "",
-                    returnContent = content,
-                )
-            } else {
-                null
-            }
-            listOf(
-                UiToolCall(
-                    name = toolName ?: "tool",
-                    arguments = "",
-                    result = content.ifBlank { null },
-                    toolCallId = toolCallId,
-                    subagentDispatch = subagentDispatch,
-                )
-            )
-        }
-        else -> null
-    }
-    val displayContent = when {
-        messageType == MessageType.TOOL_CALL -> ""
-        messageType == MessageType.TOOL_RETURN -> ""
-        subagentNotification != null -> ""
-        else -> content
-    }
-
+    val role = if (notification != null) "assistant" else messageType.uiRole()
+    val toolCalls = mapStandaloneToolCalls()
     return UiMessage(
         id = id,
         role = role,
-        content = displayContent,
+        content = if (toolCalls != null || notification != null) "" else content,
         timestamp = date.toString(),
         runId = runId,
         stepId = stepId,
         isPending = isPending,
         isReasoning = messageType == MessageType.REASONING,
         toolCalls = toolCalls,
-        generatedUi = generatedUi?.let {
-            UiGeneratedComponent(
-                name = it.component,
-                propsJson = it.propsJson,
-                fallbackText = it.fallbackText,
-            )
-        },
-        approvalRequest = approvalRequest?.let {
+        generatedUi = generatedUi?.let { UiGeneratedComponent(it.component, it.propsJson, it.fallbackText) },
+        approvalRequest = approvalRequest?.let { request ->
             UiApprovalRequest(
-                requestId = it.requestId,
-                toolCalls = it.toolCalls.map { toolCall ->
-                    UiApprovalToolCall(
-                        toolCallId = toolCall.toolCallId,
-                        name = toolCall.name,
-                        arguments = toolCall.arguments,
-                    )
+                requestId = request.requestId,
+                toolCalls = request.toolCalls.map {
+                    UiApprovalToolCall(it.toolCallId, it.name, it.arguments)
                 },
             )
         },
-        approvalResponse = approvalResponse?.let {
+        approvalResponse = approvalResponse?.let { response ->
             UiApprovalResponse(
-                requestId = it.requestId,
-                approved = it.approved,
-                reason = it.reason,
-                approvals = it.approvals.map { approval ->
-                    UiApprovalDecision(
-                        toolCallId = approval.toolCallId,
-                        approved = approval.approved,
-                        status = approval.status,
-                        reason = approval.reason,
-                    )
+                requestId = response.requestId,
+                approved = response.approved,
+                reason = response.reason,
+                approvals = response.approvals.map {
+                    UiApprovalDecision(it.toolCallId, it.approved, it.status, it.reason)
                 },
             )
         },
-        subagentNotification = subagentNotification,
-        // letta-mobile-mge5.24: surface inline image parts extracted during
-        // AppMessage mapping. USER/ASSISTANT bubbles will render a
-        // MessageAttachmentsGrid alongside the text content.
-        attachments = attachments.map {
-            UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
-        },
+        subagentNotification = notification,
+        attachments = attachments.map { UiImageAttachment(it.base64, it.mediaType) },
     )
+}
+
+private fun MessageType.uiRole(): String = when (this) {
+    MessageType.USER -> "user"
+    MessageType.ASSISTANT, MessageType.REASONING -> "assistant"
+    MessageType.TOOL_CALL, MessageType.TOOL_RETURN -> "tool"
+    MessageType.APPROVAL_REQUEST, MessageType.APPROVAL_RESPONSE -> "approval"
+}
+
+private fun AppMessage.mapStandaloneToolCalls(): List<UiToolCall>? = when (messageType) {
+    MessageType.TOOL_CALL -> listOf(
+        UiToolCall(
+            name = toolName ?: "tool",
+            arguments = content,
+            result = null,
+            toolCallId = toolCallId,
+            subagentDispatch = if (toolName == "Agent") extractSubagentDispatch(toolCallId, content, null) else null,
+        ),
+    )
+    MessageType.TOOL_RETURN -> listOf(
+        UiToolCall(
+            name = toolName ?: "tool",
+            arguments = "",
+            result = content.ifBlank { null },
+            toolCallId = toolCallId,
+            subagentDispatch = if (toolName == "Agent") extractSubagentDispatch(toolCallId, "", content) else null,
+        ),
+    )
+    else -> null
 }
 
 internal fun extractGeneratedUi(raw: kotlinx.serialization.json.JsonElement?): GeneratedUiPayload? {
     val obj = raw as? JsonObject ?: return null
-    val type = obj["type"]?.jsonPrimitive?.contentOrNull ?: return null
-    if (type != "generated_ui") return null
-
-    val component = obj["component"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return null
-    val props = obj["props"]
-    val propsJson = when (props) {
-        null -> buildJsonObject {}.toString()
-        else -> props.toString()
-    }
-    val fallbackText = obj["text"]?.jsonPrimitive?.contentOrNull
-        ?: obj["fallback_text"]?.jsonPrimitive?.contentOrNull
-
+    if (obj["type"]?.jsonPrimitive?.contentOrNull != "generated_ui") return null
+    val component = obj["component"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
     return GeneratedUiPayload(
         component = component,
-        propsJson = propsJson,
-        fallbackText = fallbackText,
+        propsJson = obj["props"]?.toString() ?: buildJsonObject {}.toString(),
+        fallbackText = obj["text"]?.jsonPrimitive?.contentOrNull
+            ?: obj["fallback_text"]?.jsonPrimitive?.contentOrNull,
     )
 }
 
-private fun extractGeneratedUiFromString(raw: String): GeneratedUiPayload? {
+internal fun extractGeneratedUiFromString(raw: String): GeneratedUiPayload? {
     if (raw.isBlank()) return null
-    return runCatching {
-        extractGeneratedUi(Json.parseToJsonElement(raw))
-    }.getOrNull()
+    return runCatching { extractGeneratedUi(Json.parseToJsonElement(raw)) }.getOrNull()
 }

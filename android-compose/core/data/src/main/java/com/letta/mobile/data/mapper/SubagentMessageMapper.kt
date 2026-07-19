@@ -41,14 +41,7 @@ internal fun extractSubagentDispatch(
 }
 
 internal fun extractSubagentNotification(raw: String): UiSubagentNotification? {
-    if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
-    val blockStart = raw.indexOf("<task-notification", ignoreCase = true)
-    val blockEnd = raw.indexOf("</task-notification>", startIndex = blockStart, ignoreCase = true)
-    val block = if (blockEnd >= 0) {
-        raw.substring(blockStart, blockEnd + "</task-notification>".length)
-    } else {
-        raw.substring(blockStart)
-    }
+    val block = raw.taskNotificationBlock() ?: return null
     return UiSubagentNotification(
         toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
         status = block.xmlTag("status") ?: block.xmlTag("state") ?: "completed",
@@ -68,23 +61,3 @@ private fun parseJsonObject(raw: String): JsonObject? =
 
 private fun JsonObject.stringField(name: String): String? =
     this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-
-private fun String.xmlTag(name: String): String? {
-    val content = Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
-        .find(this)?.groupValues?.getOrNull(1) ?: return null
-    return content.removePrefix("<![CDATA[").removeSuffix("]]>")
-        .decodeXmlEntities().trim().takeIf { it.isNotBlank() }
-}
-
-private fun String.lineAfter(marker: String): String? {
-    val index = indexOf(marker, ignoreCase = true)
-    if (index < 0) return null
-    val start = index + marker.length
-    val end = indexOf('\n', start).let { if (it < 0) length else it }
-    return substring(start, end).trim().trimStart(':').trim()
-        .decodeXmlEntities().takeIf { it.isNotBlank() }
-}
-
-private fun String.decodeXmlEntities(): String =
-    replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-        .replace("&apos;", "'").replace("&amp;", "&")
