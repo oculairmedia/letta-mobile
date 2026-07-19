@@ -7,23 +7,11 @@ import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import java.awt.Component
-import java.awt.Container
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
-import java.awt.Window
 import java.awt.datatransfer.DataFlavor
-import java.awt.dnd.DnDConstants
-import java.awt.dnd.DropTarget
-import java.awt.dnd.DropTargetAdapter
-import java.awt.dnd.DropTargetDropEvent
 import java.awt.event.KeyEvent
-import java.awt.event.WindowEvent
-import java.awt.event.WindowListener
-import java.awt.image.BufferedImage
-import java.io.File
-import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun DesktopImageIngressEffect(
@@ -58,19 +46,10 @@ private fun DesktopClipboardImagePasteEffect(
             val transferable = runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull()
                 ?: return@KeyEventDispatcher false
             when {
-                transferable.isDataFlavorSupported(DataFlavor.imageFlavor) -> {
-                    val rawImage = runCatching {
-                        transferable.getTransferData(DataFlavor.imageFlavor) as? java.awt.Image
-                    }.getOrNull() ?: return@KeyEventDispatcher false
-                    val image = rawImage.toBufferedImage() ?: return@KeyEventDispatcher false
-                    currentScope.launchLoadImage(loader, currentOnImage, currentOnError) { load(image) }
-                    true
-                }
-                transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) -> {
-                    val path = transferable.imageFiles().firstOrNull()?.toPath() ?: return@KeyEventDispatcher false
-                    currentScope.launchLoadImage(loader, currentOnImage, currentOnError) { load(path) }
-                    true
-                }
+                transferable.isDataFlavorSupported(DataFlavor.imageFlavor) ->
+                    handleClipboardImagePaste(transferable, currentScope, loader, currentOnImage, currentOnError)
+                transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ->
+                    handleClipboardImageFilePaste(transferable, currentScope, loader, currentOnImage, currentOnError)
                 else -> false
             }
         }
@@ -92,81 +71,14 @@ private fun DesktopImageFileDropEffect(
     val currentScope by rememberUpdatedState(scope)
     DisposableEffect(enabled, loader) {
         if (!enabled) return@DisposableEffect onDispose { }
-        val installed = java.util.WeakHashMap<Component, DropTarget?>()
-        val target = object : DropTargetAdapter() {
-            override fun drop(event: DropTargetDropEvent) {
-                val transferable = event.transferable
-                val path = transferable.imageFiles().firstOrNull()?.toPath()
-                if (path == null) {
-                    event.rejectDrop()
-                    return
-                }
-                event.acceptDrop(DnDConstants.ACTION_COPY)
-                currentScope.launchLoadImage(loader, currentOnImage, currentOnError) { load(path) }
-                event.dropComplete(true)
-            }
-        }
-        fun install(component: Component) {
-            if (!component.isDisplayable || component in installed) return
-            installed[component] = component.dropTarget
-            runCatching { component.dropTarget = DropTarget(component, DnDConstants.ACTION_COPY, target, true) }
-            if (component is Container) component.components.forEach(::install)
-        }
-        Window.getWindows().forEach(::install)
-        val listener = object : java.awt.event.AWTEventListener {
-            override fun eventDispatched(event: java.awt.AWTEvent) {
-                if (event is WindowEvent && event.id == WindowEvent.WINDOW_OPENED) {
-                    (event.window as? Window)?.let(::install)
-                }
-            }
-        }
+        val installed = java.util.WeakHashMap<Component, java.awt.dnd.DropTarget?>()
+        val target = createImageFileDropTarget(currentScope, loader, currentOnImage, currentOnError)
+        installDropTargetsOnWindows(target, installed)
+        val listener = createWindowOpenedDropTargetInstaller(target, installed)
         Toolkit.getDefaultToolkit().addAWTEventListener(listener, java.awt.AWTEvent.WINDOW_EVENT_MASK)
         onDispose {
             Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
-            installed.forEach { (component, previous) ->
-                runCatching { component.dropTarget = previous }
-            }
+            restoreDropTargets(installed)
         }
     }
 }
-
-private fun CoroutineScope.launchLoadImage(
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
-    block: suspend DesktopImageAttachmentLoader.() -> MessageContentPart.Image,
-) {
-    launch {
-        runCatching { loader.block() }
-            .onSuccess(onImage)
-            .onFailure { onError(it.message ?: it::class.simpleName ?: "Could not attach image") }
-    }
-}
-
-private fun KeyEvent.isShortcutPaste(): Boolean = isControlDown || isMetaDown
-
-private fun java.awt.Image.toBufferedImage(): BufferedImage? {
-    if (this is BufferedImage) return this
-    val imageWidth = getWidth(null).takeIf { it > 0 } ?: return null
-    val imageHeight = getHeight(null).takeIf { it > 0 } ?: return null
-    return BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_ARGB).also { target ->
-        target.createGraphics().use { graphics -> graphics.drawImage(this, 0, 0, null) }
-    }
-}
-
-private inline fun <T : java.awt.Graphics> T.use(block: (T) -> Unit) {
-    try {
-        block(this)
-    } finally {
-        dispose()
-    }
-}
-
-@Suppress("UNCHECKED_CAST")
-private fun java.awt.datatransfer.Transferable.imageFiles(): List<File> =
-    runCatching { getTransferData(DataFlavor.javaFileListFlavor) as? List<File> }
-        .getOrNull()
-        .orEmpty()
-        .filter { it.isFile && it.extension.lowercase() in IMAGE_EXTENSIONS }
-
-private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")
