@@ -1,16 +1,10 @@
 package com.letta.mobile.ui.navigation
 
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.ui.screens.projects.CreateProjectScreen
-import com.letta.mobile.ui.screens.projects.ProjectHomeScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssueDetailScreen
 import com.letta.mobile.ui.screens.projects.ProjectIssuesScreen
 
@@ -20,50 +14,14 @@ fun NavGraphBuilder.projectsGraph(
     openBackendSwitcher: () -> Unit,
 ) {
     composable<HomeRoute> {
-        val capabilities: CapabilityViewModel = hiltViewModel()
-        val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
-        val projectWorkSupported by capabilities.projectWorkSupported.collectAsStateWithLifecycle()
-        val snackbar = com.letta.mobile.ui.common.LocalSnackbarDispatcher.current
-        val unavailableMessage = androidx.compose.ui.res.stringResource(com.letta.mobile.R.string.screen_projects_unavailable_message)
-        if (!projectsSupported) {
-            LaunchedEffect(Unit) {
-                navController.navigate(ConversationsRoute) {
-                    popUpTo<HomeRoute> { inclusive = true }
-                    launchSingleTop = true
-                }
-                snackbar.dispatch(unavailableMessage)
-            }
+        val capabilities = rememberProjectsCapabilities<HomeRoute>(navController)
+        if (!capabilities.projectsSupported) {
             return@composable
         }
-        ProjectHomeScreen(
+        ProjectHomeRouteScreen(
+            navController = navController,
+            projectWorkSupported = capabilities.projectWorkSupported,
             onNavigateBack = null,
-            onNavigateToProjectChat = { project, projectStartAction ->
-                navController.navigate(
-                    AgentChatRoute(
-                        agentId = project.lettaAgentId?.value.orEmpty(),
-                        projectIdentifier = project.identifier,
-                        projectName = project.name,
-                        projectLettaFolderId = project.lettaFolderId,
-                        projectFilesystemPath = project.filesystemPath,
-                        projectGitUrl = project.gitUrl,
-                        projectLastSyncAt = project.lastSyncAt,
-                        projectActiveCodingAgents = project.techStack,
-                        projectStartAction = projectStartAction,
-                    )
-                )
-            },
-            onNavigateToProjectIssues = { project ->
-                navController.navigate(
-                    ProjectIssuesRoute(
-                        projectId = project.identifier,
-                        projectName = project.name,
-                    )
-                )
-            },
-            onNavigateToPmAgentChat = { agentId -> navController.navigate(AgentChatRoute(agentId = agentId)) },
-            onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-            onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
-            projectWorkSupported = projectWorkSupported,
             activeBackendLabel = activeBackendLabel,
             onNavigateToBackendSwitcher = openBackendSwitcher,
         )
@@ -75,12 +33,7 @@ fun NavGraphBuilder.projectsGraph(
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) { backStackEntry ->
-        val capabilities: CapabilityViewModel = hiltViewModel()
-        val projectWorkSupported by capabilities.projectWorkSupported.collectAsStateWithLifecycle()
-        if (!projectWorkSupported) {
-            LaunchedEffect(Unit) {
-                navController.popBackStack()
-            }
+        if (!rememberProjectWorkSupportedOrPopBack(navController)) {
             return@composable
         }
         val route = backStackEntry.toRoute<ProjectIssuesRoute>()
@@ -104,12 +57,7 @@ fun NavGraphBuilder.projectsGraph(
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) {
-        val capabilities: CapabilityViewModel = hiltViewModel()
-        val projectWorkSupported by capabilities.projectWorkSupported.collectAsStateWithLifecycle()
-        if (!projectWorkSupported) {
-            LaunchedEffect(Unit) {
-                navController.popBackStack()
-            }
+        if (!rememberProjectWorkSupportedOrPopBack(navController)) {
             return@composable
         }
         ProjectIssueDetailScreen(onNavigateBack = { navController.popBackStack() })
@@ -121,52 +69,17 @@ fun NavGraphBuilder.projectsGraph(
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) {
-        val capabilities: CapabilityViewModel = hiltViewModel()
-        val projectsSupported by capabilities.projectsSupported.collectAsStateWithLifecycle()
-        val projectWorkSupported by capabilities.projectWorkSupported.collectAsStateWithLifecycle()
-        val snackbar = com.letta.mobile.ui.common.LocalSnackbarDispatcher.current
-        val unavailableMessage = androidx.compose.ui.res.stringResource(com.letta.mobile.R.string.screen_projects_unavailable_message)
-        if (!projectsSupported) {
-            LaunchedEffect(Unit) {
-                if (!navController.popBackStack()) {
-                    navController.navigate(ConversationsRoute) {
-                        popUpTo<ProjectsRoute> { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-                snackbar.dispatch(unavailableMessage)
-            }
+        val capabilities = rememberProjectsCapabilities<ProjectsRoute>(
+            navController = navController,
+            tryPopBackFirst = true,
+        )
+        if (!capabilities.projectsSupported) {
             return@composable
         }
-        ProjectHomeScreen(
+        ProjectHomeRouteScreen(
+            navController = navController,
+            projectWorkSupported = capabilities.projectWorkSupported,
             onNavigateBack = { navController.popBackStack() },
-            onNavigateToProjectChat = { project, projectStartAction ->
-                navController.navigate(
-                    AgentChatRoute(
-                        agentId = project.lettaAgentId?.value.orEmpty(),
-                        projectIdentifier = project.identifier,
-                        projectName = project.name,
-                        projectLettaFolderId = project.lettaFolderId,
-                        projectFilesystemPath = project.filesystemPath,
-                        projectGitUrl = project.gitUrl,
-                        projectLastSyncAt = project.lastSyncAt,
-                        projectActiveCodingAgents = project.techStack,
-                        projectStartAction = projectStartAction,
-                    )
-                )
-            },
-            onNavigateToProjectIssues = { project ->
-                navController.navigate(
-                    ProjectIssuesRoute(
-                        projectId = project.identifier,
-                        projectName = project.name,
-                    )
-                )
-            },
-            onNavigateToPmAgentChat = { agentId -> navController.navigate(AgentChatRoute(agentId = agentId)) },
-            onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-            onNavigateToCreateProject = { navController.navigate(CreateProjectRoute) },
-            projectWorkSupported = projectWorkSupported,
         )
     }
 
