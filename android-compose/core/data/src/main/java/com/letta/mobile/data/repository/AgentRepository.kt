@@ -15,6 +15,7 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.paging.AgentPagingSource
@@ -481,22 +482,8 @@ open class AgentRepository(
         return agentApi.exportAgent(id)
     }
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse {
-        val response = agentApi.importAgent(
-            fileName = fileName,
-            fileBytes = fileBytes,
-            overrideName = overrideName,
-            overrideExistingTools = overrideExistingTools,
-            projectId = projectId,
-            stripMessages = stripMessages,
-        )
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
+        val response = agentApi.importAgent(params)
         refreshAgents()
         return response
     }

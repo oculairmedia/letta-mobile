@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -124,17 +125,13 @@ class FakeAgentRepository(
         return "{\"agents\":[{\"id\":\"${id.value}\"}]}"
     }
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse {
-        calls += "importAgent:$fileName"
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
+        calls += "importAgent:${params.fileName}"
         val importedId = "imported-${agentsState.value.size + 1}"
-        agentsState.value = agentsState.value + TestData.agent(id = importedId, name = overrideName ?: "Imported Agent")
+        agentsState.value = agentsState.value + TestData.agent(
+            id = importedId,
+            name = params.overrideName ?: "Imported Agent",
+        )
         return ImportedAgentsResponse(agentIds = listOf(importedId))
     }
 

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.ToolApi
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolCreateParams
@@ -27,8 +28,8 @@ open class ToolRepository @Inject constructor(
 
     override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
 
-    override fun getAgentTools(agentId: String): Flow<List<Tool>> {
-        return _toolsByAgent.map { it[agentId] ?: emptyList() }
+    override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> {
+        return _toolsByAgent.map { it[agentId.value] ?: emptyList() }
     }
 
     override suspend fun countTools(): Int = toolApi.countTools()
@@ -68,32 +69,32 @@ open class ToolRepository @Inject constructor(
                 } }
     }
 
-    override suspend fun attachTool(agentId: String, toolId: String) {
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.attachTool(agentId, toolId)
+            irohSource.attachTool(agentId.value, toolId.value)
         } else {
-            toolApi.attachTool(agentId, toolId)
+            toolApi.attachTool(agentId.value, toolId.value)
         }
-        val tool = _tools.value.find { it.id == ToolId(toolId) }
+        val tool = _tools.value.find { it.id == toolId }
         if (tool != null) {
             _toolsByAgent.update { current -> current.toMutableMap().apply {
-                        val existing = get(agentId) ?: emptyList()
-                        put(agentId, existing + tool)
+                        val existing = get(agentId.value) ?: emptyList()
+                        put(agentId.value, existing + tool)
                     } }
         }
     }
 
-    override suspend fun detachTool(agentId: String, toolId: String) {
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.detachTool(agentId, toolId)
+            irohSource.detachTool(agentId.value, toolId.value)
         } else {
-            toolApi.detachTool(agentId, toolId)
+            toolApi.detachTool(agentId.value, toolId.value)
         }
         _toolsByAgent.update { current -> current.toMutableMap().apply {
-                    val existing = get(agentId) ?: emptyList()
-                    put(agentId, existing.filter { it.id != ToolId(toolId) })
+                    val existing = get(agentId.value) ?: emptyList()
+                    put(agentId.value, existing.filter { it.id != toolId })
                 } }
     }
 
@@ -111,12 +112,12 @@ open class ToolRepository @Inject constructor(
         return tool
     }
 
-    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
         val irohSource = irohToolSource
         val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.updateTool(toolId, params)
+            irohSource.updateTool(toolId.value, params)
         } else {
-            toolApi.updateTool(toolId, params)
+            toolApi.updateTool(toolId.value, params)
         }
         _tools.update { current ->
             current.map { existing -> if (existing.id == tool.id) tool else existing }
@@ -129,16 +130,16 @@ open class ToolRepository @Inject constructor(
         return tool
     }
 
-    override suspend fun deleteTool(toolId: String) {
+    override suspend fun deleteTool(toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deleteTool(toolId)
+            irohSource.deleteTool(toolId.value)
         } else {
-            toolApi.deleteTool(toolId)
+            toolApi.deleteTool(toolId.value)
         }
-        _tools.update { current -> current.filterNot { it.id == ToolId(toolId) } }
+        _tools.update { current -> current.filterNot { it.id == toolId } }
         _toolsByAgent.update { current ->
-            current.mapValues { (_, tools) -> tools.filterNot { it.id == ToolId(toolId) } }
+            current.mapValues { (_, tools) -> tools.filterNot { it.id == toolId } }
         }
     }
 }

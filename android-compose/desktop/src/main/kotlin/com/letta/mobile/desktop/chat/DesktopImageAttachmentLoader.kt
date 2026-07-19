@@ -19,9 +19,17 @@ class DesktopImageAttachmentLoader(
 ) {
     suspend fun load(path: Path): MessageContentPart.Image = withContext(Dispatchers.IO) {
         val source = ImageIO.read(path.toFile()) ?: error("Could not decode image")
+        encode(source)
+    }
+
+    suspend fun load(image: BufferedImage): MessageContentPart.Image = withContext(Dispatchers.IO) {
+        encode(image)
+    }
+
+    private fun encode(source: BufferedImage): MessageContentPart.Image {
         val scaled = source.scaleToMaxEdge(limits.maxLongestEdgePx)
         val encoded = scaled.encodeJpegUnderByteCap(limits)
-        MessageContentPart.Image(
+        return MessageContentPart.Image(
             base64 = Base64.getEncoder().encodeToString(encoded),
             mediaType = "image/jpeg",
         )

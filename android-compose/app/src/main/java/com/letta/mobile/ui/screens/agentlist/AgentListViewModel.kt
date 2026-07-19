@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.EmbeddingModel
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
@@ -428,11 +429,13 @@ class AgentListViewModel @Inject constructor(
             _transient.update { it.copy(isImporting = true, error = null) }
             try {
                 val response = agentRepository.importAgent(
-                    fileName = fileName,
-                    fileBytes = fileBytes,
-                    overrideName = overrideName?.takeIf { it.isNotBlank() },
-                    overrideExistingTools = overrideExistingTools,
-                    stripMessages = stripMessages,
+                    AgentImportParams(
+                        fileName = fileName,
+                        fileBytes = fileBytes,
+                        overrideName = overrideName?.takeIf { it.isNotBlank() },
+                        overrideExistingTools = overrideExistingTools,
+                        stripMessages = stripMessages,
+                    ),
                 )
                 _transient.update { it.copy(isImporting = false) }
                 onSuccess(response)

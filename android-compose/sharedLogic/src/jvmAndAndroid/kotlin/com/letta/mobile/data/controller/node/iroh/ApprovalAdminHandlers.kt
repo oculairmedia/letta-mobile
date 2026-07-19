@@ -34,10 +34,9 @@ object ApprovalAdminHandlers {
         params: JsonObject?,
         controller: AppServerController?,
     ): JsonElement {
-        val agentId = params?.get("agent_id")?.jsonPrimitive?.contentOrNull
-            ?: throw IllegalArgumentException("agent_id required")
-        val conversationId = params["conversation_id"]?.jsonPrimitive?.contentOrNull
-        val payload = params["payload"]?.jsonObject
+        val agentId = params.requireParam(AdminParamKey("agent_id"))
+        val conversationId = param(params, AdminParamKey("conversation_id"))
+        val payload = params?.get("payload")?.jsonObject
             ?: throw IllegalArgumentException("payload required")
         val approval = payload["messages"]?.jsonArray?.firstOrNull()?.jsonObject
             ?: throw IllegalArgumentException("approval message required")
@@ -68,11 +67,9 @@ object ApprovalAdminHandlers {
         }
 
         if (toolCallIds.isEmpty()) throw IllegalArgumentException("tool_call_id required")
-        val pending = api.get(
-            adminProxyRequest("shim", "v1", "approvals", "pending")
-                .query("agent_id", agentId)
-                .build(),
-        ).jsonObject["pending"]?.jsonArray.orEmpty()
+        val pending = api.get(AdminPath.shim("v1", "approvals", "pending")) {
+            query("agent_id", agentId)
+        }.jsonObject["pending"]?.jsonArray.orEmpty()
 
         val pendingApproval = pending.firstOrNull { item ->
             val obj = item.jsonObject
@@ -87,9 +84,6 @@ object ApprovalAdminHandlers {
             put("scope", if (approve) "Once" else "Deny")
             reason?.let { put("reason", it) }
         }
-        return api.proxy.post(
-            adminProxyRequest("shim", "v1", "approvals", runId, "decision").build(),
-            decisionBody.toString(),
-        )
+        return api.post(AdminPath.shim("v1", "approvals", runId, "decision"), body = decisionBody.toString())
     }
 }

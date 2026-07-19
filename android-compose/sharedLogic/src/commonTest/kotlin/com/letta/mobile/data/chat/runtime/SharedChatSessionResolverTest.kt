@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -165,14 +166,7 @@ private class FakeAgentRepository(
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = unsupported()
     override suspend fun deleteAgent(id: AgentId) = unsupported()
     override suspend fun exportAgent(id: AgentId): String = unsupported()
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse = unsupported()
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse = unsupported()
     override suspend fun attachArchive(agentId: AgentId, archiveId: String) = unsupported()
     override suspend fun detachArchive(agentId: AgentId, archiveId: String) = unsupported()
 

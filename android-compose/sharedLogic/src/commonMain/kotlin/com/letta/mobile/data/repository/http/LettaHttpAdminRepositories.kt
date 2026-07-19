@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ProjectId
@@ -194,14 +195,7 @@ open class LettaHttpAdminRepositories(
     override suspend fun exportAgent(id: AgentId): String =
         getJson("/v1/agents/${id.value}/export")
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse =
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse =
         throw UnsupportedOperationException("Desktop agent import is not implemented yet.")
 
     override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
@@ -217,8 +211,8 @@ open class LettaHttpAdminRepositories(
     override fun getTools(): StateFlow<List<Tool>> =
         toolsFlow.asStateFlow()
 
-    override fun getAgentTools(agentId: String): Flow<List<Tool>> =
-        agentsFlow.map { agents -> agents.firstOrNull { it.id.value == agentId }?.tools.orEmpty() }
+    override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> =
+        agentsFlow.map { agents -> agents.firstOrNull { it.id == agentId }?.tools.orEmpty() }
 
     override suspend fun countTools(): Int =
         getJson("/v1/tools/count")
@@ -243,13 +237,13 @@ open class LettaHttpAdminRepositories(
             parameter("offset", offset)
         }
 
-    override suspend fun attachTool(agentId: String, toolId: String) {
-        patchEmpty("/v1/agents/$agentId/tools/attach/$toolId")
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
+        patchEmpty("/v1/agents/${agentId.value}/tools/attach/${toolId.value}")
         refreshAgentsIfStale(0L)
     }
 
-    override suspend fun detachTool(agentId: String, toolId: String) {
-        patchEmpty("/v1/agents/$agentId/tools/detach/$toolId")
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
+        patchEmpty("/v1/agents/${agentId.value}/tools/detach/${toolId.value}")
         refreshAgentsIfStale(0L)
     }
 
@@ -259,15 +253,15 @@ open class LettaHttpAdminRepositories(
         return tool
     }
 
-    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
-        val tool: Tool = patchJson("/v1/tools/$toolId", params)
+    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
+        val tool: Tool = patchJson("/v1/tools/${toolId.value}", params)
         upsertToolInCache(tool)
         return tool
     }
 
-    override suspend fun deleteTool(toolId: String) {
-        deletePath("/v1/tools/$toolId")
-        toolsFlow.update { current -> current.filterNot { it.id == ToolId(toolId) } }
+    override suspend fun deleteTool(toolId: ToolId) {
+        deletePath("/v1/tools/${toolId.value}")
+        toolsFlow.update { current -> current.filterNot { it.id == toolId } }
     }
 
     override fun getSchedules(agentId: String): Flow<List<ScheduledMessage>> =

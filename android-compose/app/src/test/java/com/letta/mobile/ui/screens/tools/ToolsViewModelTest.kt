@@ -2,7 +2,9 @@ package com.letta.mobile.ui.screens.tools
 
 import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.repository.ToolRepository
 import com.letta.mobile.testutil.FakeToolApi
@@ -84,8 +86,8 @@ class ToolsViewModelTest {
         fun setTools(list: List<Tool>) { _tools.value = list }
         override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
         override suspend fun refreshTools() { if (shouldFail) throw Exception("Failed") }
-        override suspend fun attachTool(agentId: String, toolId: String) { attachCalls.add("$agentId:$toolId") }
-        override suspend fun detachTool(agentId: String, toolId: String) { detachCalls.add("$agentId:$toolId") }
+        override suspend fun attachTool(agentId: AgentId, toolId: ToolId) { attachCalls.add("${agentId.value}:${toolId.value}") }
+        override suspend fun detachTool(agentId: AgentId, toolId: ToolId) { detachCalls.add("${agentId.value}:${toolId.value}") }
         override suspend fun upsertTool(params: ToolCreateParams): Tool = TestData.tool()
     }
 }

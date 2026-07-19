@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import io.mockk.mockk
@@ -68,29 +69,22 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
             ?: "{\"agents\":[{\"id\":\"${agentId.value}\",\"name\":\"${agents.find { it.id == agentId }?.name ?: "Agent"}\"}]}"
     }
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse {
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
         calls.add(
             buildString {
                 append("importAgent:")
-                append(fileName)
+                append(params.fileName)
                 append(":")
-                append(overrideName ?: "")
+                append(params.overrideName ?: "")
                 append(":")
-                append(overrideExistingTools?.toString() ?: "")
+                append(params.overrideExistingTools?.toString() ?: "")
                 append(":")
-                append(stripMessages?.toString() ?: "")
+                append(params.stripMessages?.toString() ?: "")
             }
         )
         if (shouldFail) throw ApiException(failCode, failMessage)
         val importedId = "imported-${agents.size}"
-        val importedName = overrideName ?: "Imported Agent"
+        val importedName = params.overrideName ?: "Imported Agent"
         agents.add(TestData.agent(id = importedId, name = importedName))
         return ImportedAgentsResponse(agentIds = listOf(importedId))
     }

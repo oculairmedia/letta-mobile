@@ -1,6 +1,8 @@
 package com.letta.mobile.data.session
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.IToolRepository
@@ -62,11 +64,11 @@ class SessionScopedToolRepository internal constructor(
 
     override fun getTools(): StateFlow<List<Tool>> = _tools.asStateFlow()
 
-    override fun getAgentTools(agentId: String): Flow<List<Tool>> = synchronized(cacheLock) {
-        val flow = agentToolFlows.getOrPut(agentId) {
+    override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> = synchronized(cacheLock) {
+        val flow = agentToolFlows.getOrPut(agentId.value) {
             MutableStateFlow(emptyList())
         }
-        agentToolJobs.getOrPut(agentId) {
+        agentToolJobs.getOrPut(agentId.value) {
             sessionManager.currentGraph
                 .flatMapLatest { it.toolRepository.getAgentTools(agentId) }
                 .onEach { flow.value = it }
@@ -80,11 +82,11 @@ class SessionScopedToolRepository internal constructor(
     override suspend fun refreshTools() = sessionManager.withCurrentSession { it.toolRepository.refreshTools() }
     override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean = sessionManager.withCurrentSession { it.toolRepository.refreshToolsIfStale(maxAgeMs) }
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> = sessionManager.withCurrentSession { it.toolRepository.fetchToolsPage(limit, offset) }
-    override suspend fun attachTool(agentId: String, toolId: String) = sessionManager.withCurrentSession { it.toolRepository.attachTool(agentId, toolId) }
-    override suspend fun detachTool(agentId: String, toolId: String) = sessionManager.withCurrentSession { it.toolRepository.detachTool(agentId, toolId) }
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) = sessionManager.withCurrentSession { it.toolRepository.attachTool(agentId, toolId) }
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = sessionManager.withCurrentSession { it.toolRepository.detachTool(agentId, toolId) }
     override suspend fun upsertTool(params: ToolCreateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.upsertTool(params) }
-    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.updateTool(toolId, params) }
-    override suspend fun deleteTool(toolId: String) = sessionManager.withCurrentSession { it.toolRepository.deleteTool(toolId) }
+    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool = sessionManager.withCurrentSession { it.toolRepository.updateTool(toolId, params) }
+    override suspend fun deleteTool(toolId: ToolId) = sessionManager.withCurrentSession { it.toolRepository.deleteTool(toolId) }
 
     fun close() { proxyScope.cancel() }
 }

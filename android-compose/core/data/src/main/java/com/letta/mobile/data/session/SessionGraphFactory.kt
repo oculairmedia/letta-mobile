@@ -35,6 +35,7 @@ import com.letta.mobile.data.repository.IrohAdminRpcJobSource
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
+import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
 import com.letta.mobile.data.repository.IrohAdminRpcRunSource
 import com.letta.mobile.data.repository.IrohAdminRpcScheduleSource
@@ -351,7 +352,15 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            projectRepository = ProjectRepository(projectApi),
+            projectRepository = ProjectRepository(
+                projectApi = projectApi,
+                irohProjectSource = settingsRepository?.let { settings ->
+                    IrohAdminRpcProjectSource(
+                        channelTransport = channelTransport,
+                        settingsRepository = settings,
+                    )
+                },
+            ),
             projectWorkRepository = ProjectWorkRepository(projectWorkApi),
             runRepository = RunRepository(
                 runApi = runApi,

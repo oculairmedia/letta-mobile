@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.CompactionSettings
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.modelvalidation.ModelHandleValidator
@@ -337,11 +338,13 @@ internal class EditAgentUseCases(
         try {
             val exportData = agentRepository.exportAgent(AgentId(agentId))
             val response = agentRepository.importAgent(
-                fileName = "${state.name.ifBlank { "agent" }}.json",
-                fileBytes = exportData.encodeToByteArray(),
-                overrideName = cloneName?.takeIf { it.isNotBlank() },
-                overrideExistingTools = overrideExistingTools,
-                stripMessages = stripMessages,
+                AgentImportParams(
+                    fileName = "${state.name.ifBlank { "agent" }}.json",
+                    fileBytes = exportData.encodeToByteArray(),
+                    overrideName = cloneName?.takeIf { it.isNotBlank() },
+                    overrideExistingTools = overrideExistingTools,
+                    stripMessages = stripMessages,
+                ),
             )
             uiState.value = UiState.Success(state.copy(isCloning = false))
             onSuccess(response)

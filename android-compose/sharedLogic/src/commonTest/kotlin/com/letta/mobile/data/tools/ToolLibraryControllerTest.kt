@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
@@ -122,7 +123,7 @@ class ToolLibraryControllerTest {
 
         override fun getTools(): StateFlow<List<Tool>> = toolsFlow
 
-        override fun getAgentTools(agentId: String): Flow<List<Tool>> = emptyFlow()
+        override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> = emptyFlow()
 
         override suspend fun countTools(): Int = tools.size
 
@@ -135,15 +136,15 @@ class ToolLibraryControllerTest {
         override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> =
             tools.drop(offset).take(limit)
 
-        override suspend fun attachTool(agentId: String, toolId: String) = Unit
+        override suspend fun attachTool(agentId: AgentId, toolId: ToolId) = Unit
 
-        override suspend fun detachTool(agentId: String, toolId: String) = Unit
+        override suspend fun detachTool(agentId: AgentId, toolId: ToolId) = Unit
 
         override suspend fun upsertTool(params: ToolCreateParams): Tool = error("unused")
 
-        override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = error("unused")
+        override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool = error("unused")
 
-        override suspend fun deleteTool(toolId: String) = Unit
+        override suspend fun deleteTool(toolId: ToolId) = Unit
     }
 
     private class FakeMcpServerRepository(

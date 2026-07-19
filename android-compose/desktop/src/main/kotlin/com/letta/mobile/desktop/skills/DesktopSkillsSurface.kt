@@ -58,6 +58,49 @@ import com.letta.mobile.ui.theme.customColors
 
 private enum class SkillsTab(val label: String) { Skills("Skills"), Tools("Tools") }
 
+/** Catalog + tool-library inputs for [DesktopSkillsSurface]. */
+data class DesktopSkillsSurfaceState(
+    val skills: List<Skill>,
+    val installedSkillNames: Set<String>,
+    val skillsLoading: Boolean,
+    val skillsError: String?,
+    val canManageSkills: Boolean,
+    val focusedAgentName: String?,
+    val toolState: DesktopToolLibraryState,
+)
+
+/** Skills and tools callbacks for [DesktopSkillsSurface]. */
+data class DesktopSkillsSurfaceActions(
+    val onRefreshSkills: () -> Unit,
+    val onInstallSkill: (String) -> Unit,
+    val onUninstallSkill: (String) -> Unit,
+    val onToolsRefresh: () -> Unit,
+    val onToolsSearchQueryChanged: (String) -> Unit,
+    val onToolsTagToggled: (String) -> Unit,
+    val onToolsClearTags: () -> Unit,
+    val onToolsLoadMore: () -> Unit,
+)
+
+private data class SkillsContentState(
+    val skills: List<Skill>,
+    val installedSkillNames: Set<String>,
+    val skillsLoading: Boolean,
+    val skillsError: String?,
+    val canManage: Boolean,
+    val focusedAgentName: String?,
+    val assignedOnly: Boolean,
+    val query: String,
+    val selectedSkill: Skill?,
+)
+
+private data class SkillsContentActions(
+    val onSelect: (Skill) -> Unit,
+    val onClose: () -> Unit,
+    val onInstall: (String) -> Unit,
+    val onUninstall: (String) -> Unit,
+    val onRetry: () -> Unit,
+)
+
 /**
  * Unified Skills & Tools surface. A single header carries the title with the
  * Skills/Tools toggle (and the skills sub-filters) UNDERNEATH it, and both tabs
@@ -67,21 +110,8 @@ private enum class SkillsTab(val label: String) { Skills("Skills"), Tools("Tools
  */
 @Composable
 fun DesktopSkillsSurface(
-    skills: List<Skill>,
-    installedSkillNames: Set<String>,
-    skillsLoading: Boolean,
-    skillsError: String?,
-    canManageSkills: Boolean,
-    focusedAgentName: String?,
-    onRefreshSkills: () -> Unit,
-    onInstallSkill: (String) -> Unit,
-    onUninstallSkill: (String) -> Unit,
-    toolState: DesktopToolLibraryState,
-    onToolsRefresh: () -> Unit,
-    onToolsSearchQueryChanged: (String) -> Unit,
-    onToolsTagToggled: (String) -> Unit,
-    onToolsClearTags: () -> Unit,
-    onToolsLoadMore: () -> Unit,
+    state: DesktopSkillsSurfaceState,
+    actions: DesktopSkillsSurfaceActions,
     modifier: Modifier = Modifier,
 ) {
     var tab by remember { mutableStateOf(SkillsTab.Skills) }
@@ -90,15 +120,17 @@ fun DesktopSkillsSurface(
     var selectedSkill by remember { mutableStateOf<Skill?>(null) }
 
     Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
-        val loading = if (tab == SkillsTab.Skills) skillsLoading else toolState.isLoading
+        val loading = if (tab == SkillsTab.Skills) state.skillsLoading else state.toolState.isLoading
         DesktopCatalogHeader(
             title = "Skills & Tools",
-            query = if (tab == SkillsTab.Skills) skillQuery else toolState.searchQuery,
-            onQuery = { q -> if (tab == SkillsTab.Skills) skillQuery = q else onToolsSearchQueryChanged(q) },
+            query = if (tab == SkillsTab.Skills) skillQuery else state.toolState.searchQuery,
+            onQuery = { q -> if (tab == SkillsTab.Skills) skillQuery = q else actions.onToolsSearchQueryChanged(q) },
             searchPlaceholder = if (tab == SkillsTab.Skills) "Search skills" else "Search tools",
             actions = {
                 DesktopRefreshAction(
-                    onRefresh = { if (tab == SkillsTab.Skills) onRefreshSkills() else onToolsRefresh() },
+                    onRefresh = {
+                        if (tab == SkillsTab.Skills) actions.onRefreshSkills() else actions.onToolsRefresh()
+                    },
                     enabled = !loading,
                 )
             },
@@ -108,33 +140,37 @@ fun DesktopSkillsSurface(
                 if (tab == SkillsTab.Skills) {
                     DesktopChipDivider()
                     DesktopChipTab("All skills", !assignedOnly) { assignedOnly = false }
-                    DesktopChipTab("Assigned · ${installedSkillNames.size}", assignedOnly) { assignedOnly = true }
+                    DesktopChipTab("Assigned · ${state.installedSkillNames.size}", assignedOnly) { assignedOnly = true }
                 }
             },
         )
         when (tab) {
             SkillsTab.Skills -> SkillsContent(
-                skills = skills,
-                installedSkillNames = installedSkillNames,
-                skillsLoading = skillsLoading,
-                skillsError = skillsError,
-                canManage = canManageSkills,
-                focusedAgentName = focusedAgentName,
-                assignedOnly = assignedOnly,
-                query = skillQuery,
-                selectedSkill = selectedSkill,
-                onSelect = { selectedSkill = it },
-                onClose = { selectedSkill = null },
-                onInstall = onInstallSkill,
-                onUninstall = onUninstallSkill,
-                onRetry = onRefreshSkills,
+                state = SkillsContentState(
+                    skills = state.skills,
+                    installedSkillNames = state.installedSkillNames,
+                    skillsLoading = state.skillsLoading,
+                    skillsError = state.skillsError,
+                    canManage = state.canManageSkills,
+                    focusedAgentName = state.focusedAgentName,
+                    assignedOnly = assignedOnly,
+                    query = skillQuery,
+                    selectedSkill = selectedSkill,
+                ),
+                actions = SkillsContentActions(
+                    onSelect = { selectedSkill = it },
+                    onClose = { selectedSkill = null },
+                    onInstall = actions.onInstallSkill,
+                    onUninstall = actions.onUninstallSkill,
+                    onRetry = actions.onRefreshSkills,
+                ),
             )
             SkillsTab.Tools -> ToolsContent(
-                toolState = toolState,
-                onRefresh = onToolsRefresh,
-                onLoadMore = onToolsLoadMore,
-                onTagToggled = onToolsTagToggled,
-                onClearTags = onToolsClearTags,
+                toolState = state.toolState,
+                onRefresh = actions.onToolsRefresh,
+                onLoadMore = actions.onToolsLoadMore,
+                onTagToggled = actions.onToolsTagToggled,
+                onClearTags = actions.onToolsClearTags,
             )
         }
     }
@@ -144,44 +180,38 @@ fun DesktopSkillsSurface(
 
 @Composable
 private fun SkillsContent(
-    skills: List<Skill>,
-    installedSkillNames: Set<String>,
-    skillsLoading: Boolean,
-    skillsError: String?,
-    canManage: Boolean,
-    focusedAgentName: String?,
-    assignedOnly: Boolean,
-    query: String,
-    selectedSkill: Skill?,
-    onSelect: (Skill) -> Unit,
-    onClose: () -> Unit,
-    onInstall: (String) -> Unit,
-    onUninstall: (String) -> Unit,
-    onRetry: () -> Unit,
+    state: SkillsContentState,
+    actions: SkillsContentActions,
 ) {
-    val installedExtras = remember(installedSkillNames, skills) {
-        val known = skills.map { it.name }.toSet()
-        installedSkillNames.filter { it !in known }.map { Skill(name = it) }
+    val installedExtras = remember(state.installedSkillNames, state.skills) {
+        val known = state.skills.map { it.name }.toSet()
+        state.installedSkillNames.filter { it !in known }.map { Skill(name = it) }
     }
-    val all = remember(skills, installedExtras) { skills + installedExtras }
-    val base = if (assignedOnly) all.filter { it.name in installedSkillNames } else all
-    val filtered = remember(base, query) {
-        if (query.isBlank()) base
-        else base.filter { it.name.contains(query, true) || it.description?.contains(query, true) == true }
+    val all = remember(state.skills, installedExtras) { state.skills + installedExtras }
+    val base = if (state.assignedOnly) all.filter { it.name in state.installedSkillNames } else all
+    val filtered = remember(base, state.query) {
+        if (state.query.isBlank()) base
+        else base.filter {
+            it.name.contains(state.query, true) || it.description?.contains(state.query, true) == true
+        }
     }
     val grouped = remember(filtered) { SkillCategories.grouped(filtered, nameOf = { it.name }, tagsOf = { it.tags }) }
 
     Row(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
-            skillsError?.let {
+            state.skillsError?.let {
                 Box(Modifier.padding(horizontal = 32.dp, vertical = 4.dp)) {
-                    DesktopInlineError(message = it, onRetry = onRetry, retrying = skillsLoading)
+                    DesktopInlineError(message = it, onRetry = actions.onRetry, retrying = state.skillsLoading)
                 }
             }
             when {
-                skillsLoading && skills.isEmpty() -> DesktopInfoBox("Loading skills from the active backend.")
+                state.skillsLoading && state.skills.isEmpty() -> DesktopInfoBox("Loading skills from the active backend.")
                 filtered.isEmpty() -> DesktopInfoBox(
-                    if (assignedOnly) "No skills assigned to ${focusedAgentName ?: "this agent"} yet." else "No skills match your search.",
+                    if (state.assignedOnly) {
+                        "No skills assigned to ${state.focusedAgentName ?: "this agent"} yet."
+                    } else {
+                        "No skills match your search."
+                    },
                 )
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -193,28 +223,28 @@ private fun SkillsContent(
                             title = skill.name,
                             description = skill.description,
                             accent = SkillCategories.categorize(skill.name, skill.tags).accentColor(),
-                            onClick = { onSelect(skill) },
+                            onClick = { actions.onSelect(skill) },
                             modifier = cardModifier,
                         ) {
                             SkillAddButton(
-                                installed = skill.name in installedSkillNames,
-                                canManage = canManage,
-                                onInstall = { onInstall(skill.name) },
-                                onUninstall = { onUninstall(skill.name) },
+                                installed = skill.name in state.installedSkillNames,
+                                canManage = state.canManage,
+                                onInstall = { actions.onInstall(skill.name) },
+                                onUninstall = { actions.onUninstall(skill.name) },
                             )
                         }
                     }
                 }
             }
         }
-        selectedSkill?.let { skill ->
+        state.selectedSkill?.let { skill ->
             SkillDetailPanel(
                 skill = skill,
-                installed = skill.name in installedSkillNames,
-                canManage = canManage,
-                onInstall = { onInstall(skill.name) },
-                onUninstall = { onUninstall(skill.name) },
-                onClose = onClose,
+                installed = skill.name in state.installedSkillNames,
+                canManage = state.canManage,
+                onInstall = { actions.onInstall(skill.name) },
+                onUninstall = { actions.onUninstall(skill.name) },
+                onClose = actions.onClose,
             )
         }
     }

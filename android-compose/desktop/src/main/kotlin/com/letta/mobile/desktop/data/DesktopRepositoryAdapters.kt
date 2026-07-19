@@ -29,6 +29,8 @@ import com.letta.mobile.data.session.SessionRepositoryGraphFactory
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -36,18 +38,11 @@ import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.emptyFlow
 
 private const val DEFAULT_REMOTE_LETTA_URL = "https://api.letta.com"
 
@@ -209,14 +204,20 @@ fun defaultDesktopChatSessionGraphFactory(
         gatewayFactory = { createDefaultDesktopChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
     )
 
-class DesktopRepositoryAdapters(config: LettaConfig? = null) {
-    private val adminRepositories = config
-        ?.takeIf { it.serverUrl.isNotBlank() }
-        ?.let(::DesktopLettaHttpAdminRepositories)
+class DesktopRepositoryAdapters(
+    config: LettaConfig? = null,
+    irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+) {
+    private val irohMode = IrohChannelTransport.isIrohUrl(config?.serverUrl)
+    private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
+    private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 
-    val agentRepository: IAgentRepository = adminRepositories ?: unavailableRepository()
+    val agentRepository: IAgentRepository = selectIrohOrHttp(
+        irohRepositories?.agentRepository,
+        adminRepositories,
+    )
     val archiveRepository: IArchiveRepository = unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = unavailableRepository()
@@ -231,11 +232,17 @@ class DesktopRepositoryAdapters(config: LettaConfig? = null) {
     val projectWorkRepository: IProjectWorkRepository = unavailableRepository()
     val providerRepository: IProviderRepository = unavailableRepository()
     val runRepository: IRunRepository = unavailableRepository()
-    val scheduleRepository: IScheduleRepository = adminRepositories ?: unavailableRepository()
+    val scheduleRepository: IScheduleRepository = selectIrohOrHttp(
+        irohRepositories?.scheduleRepository,
+        adminRepositories,
+    )
     val selfTodoRepository: ISelfTodoRepository = unavailableRepository()
     val stepRepository: IStepRepository = unavailableRepository()
     val subagentRepository: ISubagentRepository = unavailableRepository()
-    val toolRepository: IToolRepository = adminRepositories ?: unavailableRepository()
+    val toolRepository: IToolRepository = selectIrohOrHttp(
+        irohRepositories?.toolRepository,
+        adminRepositories,
+    )
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailableRepository()
 }
 
@@ -259,68 +266,3 @@ fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
     )
 }
 
-private inline fun <reified T : Any> unavailableRepository(): T {
-    val contract = T::class.java
-    val handler = UnavailableRepositoryInvocationHandler(contract.simpleName)
-    return Proxy.newProxyInstance(
-        contract.classLoader,
-        arrayOf(contract),
-        handler,
-    ) as T
-}
-
-private class UnavailableRepositoryInvocationHandler(
-    private val contractName: String,
-) : InvocationHandler {
-    private val stateFlows = mutableMapOf<String, StateFlow<*>>()
-    private val sharedFlows = mutableMapOf<String, SharedFlow<*>>()
-
-    override fun invoke(proxy: Any, method: Method, args: Array<out Any?>?): Any? {
-        if (method.declaringClass == Any::class.java) {
-            return when (method.name) {
-                "toString" -> "UnavailableDesktopRepository($contractName)"
-                "hashCode" -> System.identityHashCode(proxy)
-                "equals" -> proxy === args?.firstOrNull()
-                else -> null
-            }
-        }
-
-        return when {
-            StateFlow::class.java.isAssignableFrom(method.returnType) -> {
-                val propertyName = method.propertyName()
-                stateFlows.getOrPut(propertyName) { defaultStateFlow(propertyName) }
-            }
-            SharedFlow::class.java.isAssignableFrom(method.returnType) -> {
-                val propertyName = method.propertyName()
-                sharedFlows.getOrPut(propertyName) { MutableSharedFlow<Any?>() }
-            }
-            Flow::class.java.isAssignableFrom(method.returnType) -> emptyFlow<Any?>()
-            method.returnType == Boolean::class.javaPrimitiveType -> false
-            method.returnType == Int::class.javaPrimitiveType -> 0
-            method.returnType == Long::class.javaPrimitiveType -> 0L
-            method.returnType == Void.TYPE -> null
-            method.returnType == List::class.java -> emptyList<Any?>()
-            method.returnType == Set::class.java -> emptySet<Any?>()
-            method.returnType == Map::class.java -> emptyMap<Any?, Any?>()
-            method.name.startsWith("getCached") -> null
-            else -> throw DesktopRepositoryUnavailableException(contractName, method.name)
-        }
-    }
-
-    private fun defaultStateFlow(name: String): StateFlow<*> = when (name) {
-        "isRefreshing" -> MutableStateFlow(false)
-        "refreshError" -> MutableStateFlow<Throwable?>(null)
-        "readyWorkByProject",
-        "issuesByProject",
-        "issueDetails",
-        "issueAnalyticsByProject",
-        -> MutableStateFlow(emptyMap<String, Any?>())
-        else -> MutableStateFlow(emptyList<Any?>())
-    }
-
-    private fun Method.propertyName(): String = when {
-        name.startsWith("get") && name.length > 3 -> name.substring(3).replaceFirstChar { it.lowercase() }
-        name.startsWith("is") && name.length > 2 -> name.replaceFirstChar { it.lowercase() }
-        else -> name
-    }
-}

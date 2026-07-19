@@ -111,13 +111,20 @@ case "${SELF_CHECK}" in
     ;;
 esac
 
-SERVE_ARGS="$(quote_cli_args \
-  app-server-serve-iroh-stub \
-  --iroh-port "${PORT}" \
-  --iroh-secret-key-file "${SECRET_KEY_FILE}" \
-  --auth-token "${AUTH_TOKEN}" \
-  --admin-port 0 \
-)"
+SERVE_COMMAND=(
+  app-server-serve-iroh-stub
+  --iroh-port "${PORT}"
+  --iroh-secret-key-file "${SECRET_KEY_FILE}"
+  --auth-token "${AUTH_TOKEN}"
+  --admin-port 0
+)
+# The pre-build above may leave a Gradle daemon whose process environment
+# predates STUB_ENV. Pass this mutation as a CLI option so the JavaExec child
+# always receives it, even when Gradle reuses that daemon.
+if [[ "${SELF_CHECK}" == "suppress-terminal" ]]; then
+  SERVE_COMMAND+=(--suppress-terminal)
+fi
+SERVE_ARGS="$(quote_cli_args "${SERVE_COMMAND[@]}")"
 env "${STUB_ENV[@]}" ./gradlew --quiet :cli:run -PcliArgs="${SERVE_ARGS}" >"${SERVE_LOG}" 2>&1 &
 SERVE_PID=$!
 

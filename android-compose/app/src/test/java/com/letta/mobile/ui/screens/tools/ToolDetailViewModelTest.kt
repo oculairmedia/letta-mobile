@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import app.cash.turbine.test
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.ToolRepository
@@ -150,12 +151,12 @@ class ToolDetailViewModelTest {
         val attachedAgents = mutableListOf<String>()
         val detachedAgents = mutableListOf<String>()
 
-        override suspend fun attachTool(agentId: String, toolId: String) {
-            attachedAgents.add(agentId)
+        override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
+            attachedAgents.add(agentId.value)
         }
 
-        override suspend fun detachTool(agentId: String, toolId: String) {
-            detachedAgents.add(agentId)
+        override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
+            detachedAgents.add(agentId.value)
         }
     }
 
