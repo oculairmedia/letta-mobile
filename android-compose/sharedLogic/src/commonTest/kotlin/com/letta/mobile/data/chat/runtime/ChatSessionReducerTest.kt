@@ -108,6 +108,15 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun persistedTitleCandidateUsesOnlyGenericConversationAndSubstantiveText() {
+        val generic = conversation("conversation-abcdef").copy(title = "Conversation abcdef")
+
+        assertEquals("Plan the Windows release", generic.persistedTitleCandidate("Plan the Windows release\nMore"))
+        assertEquals(null, generic.persistedTitleCandidate("  \n  "))
+        assertEquals(null, generic.copy(title = "Pinned title").persistedTitleCandidate("New message"))
+    }
+
+    @Test
     fun mapsConversationSummaryWithApiProvidedAgentNameWhenCacheMisses() {
         val summary = Conversation(
             id = ConversationId("conversation-abcdef"),

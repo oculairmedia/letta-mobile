@@ -34,6 +34,15 @@ object ConversationAdminHandlers {
             val id = params.requireParam(AdminParamKey("conversation_id"))
             api.delete(AdminPath.v1("conversations", id))
         }
+        router.register("conversation.update") { params ->
+            val id = params.requireParam(AdminParamKey("conversation_id"))
+            val body = kotlinx.serialization.json.buildJsonObject {
+                params?.forEach { (key, value) ->
+                    if (key != "conversation_id") put(key, value)
+                }
+            }
+            api.patch(AdminPath.v1("conversations", id), body = body.toString())
+        }
         router.register("conversation.archive") { params ->
             // Letta has no /conversations/{id}/archive|/unarchive sub-resource; archive
             // state is a field on the conversation, toggled via PATCH /v1/conversations/{id}

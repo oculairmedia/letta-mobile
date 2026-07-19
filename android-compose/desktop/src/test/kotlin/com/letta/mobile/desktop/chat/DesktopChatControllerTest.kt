@@ -1,11 +1,15 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
@@ -138,6 +142,22 @@ class DesktopChatControllerTest {
         assertEquals("Ship live desktop chat", sentMessage["content"]?.jsonPrimitive?.content)
         assertTrue(state.selectedMessages.any { it.role == "assistant" && it.content == "Remote response" })
 
+        controller.close()
+    }
+
+    @Test
+    fun firstSubstantiveSendPersistsStableConversationTitle() = runTest {
+        val gateway = FakeExtrasDesktopChatGateway()
+        val controller = testController(gateway)
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText("Plan the Windows release\nwith a checklist")
+        controller.send()
+        runCurrent()
+
+        assertEquals(listOf("conv-1" to "Plan the Windows release"), gateway.summaryUpdates)
+        assertEquals("Plan the Windows release", controller.state.value.conversations.single().title)
         controller.close()
     }
 
@@ -594,6 +614,9 @@ class DesktopChatControllerTest {
 
 open class FakeDesktopChatGateway(
     private val conversationIds: List<String> = listOf("conv-1"),
+    private val conversationSummary: (Int) -> String? = { index ->
+        if (index == 0) "Remote planning" else "Remote planning $index"
+    },
 ) : DesktopChatGateway {
     val sentRequests = mutableListOf<MessageCreateRequest>()
     val conversationMessageRequests = mutableListOf<String>()
@@ -604,7 +627,7 @@ open class FakeDesktopChatGateway(
             Conversation(
                 id = ConversationId(conversationId),
                 agentId = AgentId("agent-$index"),
-                summary = if (index == 0) "Remote planning" else "Remote planning $index",
+                summary = conversationSummary(index),
                 createdAt = "2026-06-07T01:00:00Z",
                 updatedAt = "2026-06-07T01:01:00Z",
                 lastMessageAt = "2026-06-07T01:02:00Z",
@@ -665,6 +688,30 @@ open class FakeDesktopChatGateway(
             ),
         )
     }
+}
+
+private class FakeExtrasDesktopChatGateway : FakeDesktopChatGateway(
+    conversationSummary = { "" },
+), ChatGatewayExtras {
+    val summaryUpdates = mutableListOf<Pair<String, String>>()
+
+    override suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
+        summaryUpdates += conversationId to summary
+        return getConversation(conversationId).copy(summary = summary)
+    }
+
+    override suspend fun createConversation(agentId: String, summary: String?): Conversation =
+        getConversation("conv-1")
+
+    override suspend fun createAgent(params: AgentCreateParams): Agent = error("not used")
+
+    override suspend fun listLlmModels(): List<LlmModel> = emptyList()
+
+    override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
+        getConversation(conversationId)
+
+    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
+        getConversation(conversationId).copy(archived = archived)
 }
 
 private class CloseTrackingGateway(

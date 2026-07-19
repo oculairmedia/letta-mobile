@@ -42,6 +42,7 @@ class AdminRpcContractTest {
                 "conversation.get",
                 "conversation.list",
                 "conversation.restore",
+                "conversation.update",
                 "folder.list",
                 "goal.command",
                 "goal.get",

@@ -3,13 +3,18 @@ package com.letta.mobile.desktop.chat
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +23,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,8 +49,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -52,6 +63,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
@@ -89,7 +101,12 @@ private fun AssistantMessageColumn(
             attachments = message.attachments,
             modifier = Modifier.fillMaxWidth(),
         )
-        message.toolCalls.orEmpty().forEach { toolCall -> ToolCard(toolCall) }
+        message.toolCalls.orEmpty().forEachIndexed { index, toolCall ->
+            ToolCard(
+                toolCall = toolCall,
+                disclosureKey = toolCall.toolCallId ?: "${message.id}:$index",
+            )
+        }
         message.generatedUi?.let { GeneratedUiCard(it) }
         message.approvalRequest?.let { ApprovalRequestCard(it) }
         message.approvalResponse?.let { ApprovalResponseCard(it) }
@@ -106,8 +123,13 @@ internal fun CopyIconButton(
     text: String,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    contentDescription: String = "Copy",
+    emphasized: Boolean = true,
 ) {
     val clipboard = LocalClipboardManager.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val hovered by interactionSource.collectIsHoveredAsState()
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
@@ -115,21 +137,43 @@ internal fun CopyIconButton(
             copied = false
         }
     }
-    Icon(
-        imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
-        contentDescription = if (copied) "Copied" else "Copy",
-        tint = if (copied) Color(0xFF34C759) else tint,
-        modifier = modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) {
-                clipboard.setText(AnnotatedString(text))
-                copied = true
-            }
-            .padding(2.dp)
-            .size(14.dp),
+    val visualAlpha by animateFloatAsState(
+        targetValue = if (emphasized || focused || hovered || copied) 1f else 0.58f,
+        animationSpec = tween(durationMillis = 120),
+        label = "copyActionAlpha",
     )
+    val resolvedDescription = if (copied) "Copied" else contentDescription
+    DesktopTooltip(text = resolvedDescription) {
+        Box(
+            modifier = modifier
+                .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
+                .graphicsLayer { alpha = visualAlpha }
+                .clip(CircleShape)
+                .border(
+                    width = 1.dp,
+                    color = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = CircleShape,
+                )
+                .semantics { this.contentDescription = resolvedDescription }
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = LocalIndication.current,
+                    role = Role.Button,
+                ) {
+                    clipboard.setText(AnnotatedString(text))
+                    copied = true
+                }
+                .focusable(interactionSource = interactionSource),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+                contentDescription = null,
+                tint = if (copied) Color(0xFF34C759) else tint,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+    }
 }
 
 /** User prompt — teal bubble, right-aligned, with a copy affordance. */
@@ -168,6 +212,7 @@ internal fun UserPrompt(message: UiMessage) {
             CopyIconButton(
                 text = message.content,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                contentDescription = "Copy message",
             )
         }
     }
@@ -301,18 +346,17 @@ internal fun AgentText(params: AgentTextParams) {
                 },
             )
         }
-        if (isHovered) {
-            Surface(
-                modifier = Modifier.align(Alignment.TopEnd),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ) {
-                CopyIconButton(
-                    text = params.text,
-                    modifier = Modifier.padding(4.dp),
-                )
-            }
+        Surface(
+            modifier = Modifier.align(Alignment.TopEnd),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (isHovered) 0.94f else 0.35f),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            CopyIconButton(
+                text = params.text,
+                contentDescription = "Copy response",
+                emphasized = isHovered,
+            )
         }
     }
 }

@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
+import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
@@ -535,6 +536,9 @@ class DesktopChatController(
         }
 
         val sendingConversationId = _state.value.selectedConversationId
+        if (sendingConversationId != null) {
+            persistConversationTitleIfNeeded(sendingConversationId, text)
+        }
         // This conversation now has content — it's no longer a throwaway.
         if (sendingConversationId != null && sendingConversationId == unsentConversationId) {
             unsentConversationId = null
@@ -586,6 +590,40 @@ class DesktopChatController(
                     _streamingConversationId.value = null
                 }
             }
+        }
+    }
+
+    private fun persistConversationTitleIfNeeded(conversationId: String, firstUserMessage: String) {
+        val extras = gatewayExtras ?: return
+        val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
+        val candidate = conversation.persistedTitleCandidate(firstUserMessage) ?: return
+        val originalTitle = conversation.title
+        _state.update { current ->
+            current.withRuntimeState(
+                current.runtimeState.copy(
+                    conversations = current.conversations.map { conversation ->
+                        if (conversation.id == conversationId) conversation.copy(title = candidate) else conversation
+                    },
+                ),
+            )
+        }
+        scope.launch {
+            runCatching { extras.setConversationSummary(conversationId, candidate) }
+                .onFailure {
+                    _state.update { current ->
+                        current.withRuntimeState(
+                            current.runtimeState.copy(
+                                conversations = current.conversations.map { item ->
+                                    if (item.id == conversationId && item.title == candidate) {
+                                        item.copy(title = originalTitle)
+                                    } else {
+                                        item
+                                    }
+                                },
+                            ),
+                        )
+                    }
+                }
         }
     }
 

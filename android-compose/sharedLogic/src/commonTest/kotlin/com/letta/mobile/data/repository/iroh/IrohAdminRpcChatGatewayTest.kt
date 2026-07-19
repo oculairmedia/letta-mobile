@@ -38,6 +38,22 @@ import kotlin.test.assertTrue
 class IrohAdminRpcChatGatewayTest {
 
     @Test
+    fun setConversationSummaryUsesConversationUpdateRpc() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("conversation.update", call.method)
+            assertEquals("/v1/conversations/conv-1", call.path)
+            assertTrue(call.body.orEmpty().contains("\"summary\":\"Plan the release\""))
+            ok("""{"id":"conv-1","agent_id":"agent-1","summary":"Plan the release"}""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val updated = gateway.setConversationSummary("conv-1", "Plan the release")
+
+        assertEquals("Plan the release", updated.summary)
+    }
+
+    @Test
     fun listConversationsDecodesAdminRpcResult() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->

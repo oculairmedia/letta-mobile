@@ -32,21 +32,35 @@ data class ChatConversationSummary(
 
 fun ChatConversationSummary.displayTitle(maxLength: Int = 56): String {
     val cleanTitle = title.trim()
-    if (cleanTitle.isNotBlank() && !cleanTitle.startsWith("Conversation ", ignoreCase = true)) {
+    if (!hasGenericTitle()) {
         return cleanTitle
     }
-    val previewTitle = lastMessagePreview
+    val previewTitle = conversationTitleFromText(lastMessagePreview, maxLength)
+        ?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) }
+        .orEmpty()
+    return previewTitle.ifBlank { cleanTitle.ifBlank { "New conversation" } }
+}
+
+fun ChatConversationSummary.persistedTitleCandidate(firstUserMessage: String, maxLength: Int = 56): String? =
+    if (hasGenericTitle()) conversationTitleFromText(firstUserMessage, maxLength) else null
+
+private fun ChatConversationSummary.hasGenericTitle(): Boolean {
+    val cleanTitle = title.trim()
+    return cleanTitle.isBlank() || cleanTitle.startsWith("Conversation ", ignoreCase = true)
+}
+
+private fun conversationTitleFromText(text: String, maxLength: Int): String? {
+    val clean = text
         .lineSequence()
         .firstOrNull { it.isNotBlank() }
         ?.trim()
         ?.removePrefix("#")
         ?.trim()
-        ?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) }
         .orEmpty()
+    if (clean.isBlank()) return null
     return when {
-        previewTitle.isBlank() -> cleanTitle.ifBlank { "New conversation" }
-        previewTitle.length <= maxLength -> previewTitle
-        else -> previewTitle.take((maxLength - 1).coerceAtLeast(1)).trimEnd() + "…"
+        clean.length <= maxLength -> clean
+        else -> clean.take((maxLength - 1).coerceAtLeast(1)).trimEnd() + "…"
     }
 }
 

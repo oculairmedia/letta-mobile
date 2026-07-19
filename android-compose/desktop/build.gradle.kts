@@ -140,6 +140,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     testImplementation(kotlin("test"))
+    testImplementation("org.jetbrains.compose.ui:ui-test:1.10.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
     testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
 }

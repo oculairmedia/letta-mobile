@@ -181,6 +181,13 @@ class IrohAdminRpcChatGateway(
         return json.decodeFromJsonElement(ListSerializer(LlmModel.serializer()), result)
     }
 
+    override suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
+        val body = buildJsonObject { put("summary", summary) }.toString()
+        val result = rpc(AdminRpcCall("conversation.update", "/v1/conversations/$conversationId", body))
+            ?: throw TimelineTransportHttpException(502, "conversation.update returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
+    }
+
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
         // No conversation-update admin_rpc handler is registered yet.
         throw UnsupportedOperationException("Per-conversation model override is not available over iroh:// yet")

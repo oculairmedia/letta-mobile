@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -49,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.composer.ActiveToken
 import com.letta.mobile.data.composer.AutocompleteTrigger
@@ -145,7 +147,7 @@ internal fun ComposerHintRow() {
             .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
     ) {
         Text(
-            text = "@ to add files   ·   / for commands   ·   ⏎ to send",
+            text = "@ add files   ·   / commands   ·   Enter or Ctrl+Enter send   ·   Shift+Enter newline",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
         )
@@ -205,14 +207,16 @@ private fun ComposerPendingAttachmentsRow(
 
 @Composable
 private fun ComposerTextField(params: ComposerInputSurfaceParams) {
-    var fieldValue by remember { mutableStateOf(TextFieldValue(params.state.text)) }
-    LaunchedEffect(params.state.text) {
-        if (params.state.text != fieldValue.text) {
-            fieldValue = TextFieldValue(
+    var fieldValue by remember {
+        mutableStateOf(
+            TextFieldValue(
                 text = params.state.text,
                 selection = TextRange(params.state.text.length),
-            )
-        }
+            ),
+        )
+    }
+    LaunchedEffect(params.state.text) {
+        fieldValue = reconcileComposerFieldValue(fieldValue, params.state.text)
     }
     val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = MaterialTheme.colorScheme.onSurface,
@@ -230,12 +234,14 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 24.dp, max = 120.dp)
+            .testTag("composer-input")
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(
                         eventKey = event.key,
                         eventType = event.type,
                         shiftPressed = event.isShiftPressed,
+                        ctrlPressed = event.isCtrlPressed,
                         matchedCommands = params.matchedCommands,
                         canSend = params.canSend,
                         onTextChanged = params.actions.onTextChanged,
@@ -261,20 +267,36 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
     )
 }
 
-private data class ComposerEnterKeyParams(
+internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: String): TextFieldValue =
+    if (current.text == externalText) {
+        current
+    } else {
+        TextFieldValue(
+            text = externalText,
+            selection = TextRange(externalText.length),
+        )
+    }
+
+internal data class ComposerEnterKeyParams(
     val eventKey: Key,
     val eventType: KeyEventType,
     val shiftPressed: Boolean,
+    val ctrlPressed: Boolean,
     val matchedCommands: List<ComposerCommand>,
     val canSend: Boolean,
     val onTextChanged: (String) -> Unit,
     val onSend: () -> Unit,
 )
 
-private fun composerEnterKeyHandled(params: ComposerEnterKeyParams): Boolean {
+internal fun composerEnterKeyHandled(params: ComposerEnterKeyParams): Boolean {
+    val sendChord = when {
+        params.shiftPressed -> false
+        params.ctrlPressed -> true
+        else -> true
+    }
     val isEnter = params.eventType == KeyEventType.KeyDown &&
         (params.eventKey == Key.Enter || params.eventKey == Key.NumPadEnter) &&
-        !params.shiftPressed
+        sendChord
     if (!isEnter) return false
     val actionCommand = params.matchedCommands.firstOrNull { !it.fillsComposer }
     return when {
@@ -297,7 +319,7 @@ internal fun ComposerControlRow(
     actions: ComposerBarActions,
     canSend: Boolean,
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().testTag("composer-controls")) {
         if (maxWidth < 540.dp) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
@@ -311,7 +333,7 @@ internal fun ComposerControlRow(
                     ComposerSendButton(canSend = canSend, onSend = actions.onSend)
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag("composer-controls-secondary"),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -438,6 +460,7 @@ private fun ComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
         enabled = canSend,
         modifier = Modifier
             .size(38.dp)
+            .testTag("composer-send")
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale

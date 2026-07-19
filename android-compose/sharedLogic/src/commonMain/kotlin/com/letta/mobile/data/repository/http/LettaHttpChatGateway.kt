@@ -201,6 +201,17 @@ open class LettaHttpChatGateway(
     }
 
     /** Set the model override for an existing conversation. */
+    override suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
+        val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
+            applyAuth()
+            contentType(ContentType.Application.Json)
+            setBody(ConversationUpdateParams(summary = summary))
+        }
+        response.requireSuccess()
+        return response.body()
+    }
+
+    /** Set the model override for an existing conversation. */
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation {
         val response = httpClient.patch("$baseUrl/v1/conversations/$conversationId") {
             applyAuth()

@@ -37,6 +37,9 @@ interface ChatGatewayExtras {
     suspend fun createConversation(agentId: String, summary: String? = null): Conversation
     suspend fun createAgent(params: AgentCreateParams): Agent
     suspend fun listLlmModels(): List<LlmModel>
+    suspend fun setConversationSummary(conversationId: String, summary: String): Conversation {
+        throw UnsupportedOperationException("Conversation summaries are not writable through this gateway")
+    }
     suspend fun setConversationModel(conversationId: String, model: String): Conversation
     suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation
 }

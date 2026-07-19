@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
@@ -51,9 +52,11 @@ import com.letta.mobile.ui.theme.customColors
  * the command, an inset output block, and an exit-code footer.
  */
 @Composable
-internal fun ToolCard(toolCall: UiToolCall) {
-    val completed = toolCall.status?.let(::ToolStatusToken)?.isDoneStatus() == true
-    var expanded by remember(toolCall.status, toolCall.result) { mutableStateOf(!completed) }
+internal fun ToolCard(
+    toolCall: UiToolCall,
+    disclosureKey: String = toolCall.disclosureKey(),
+) {
+    var expanded by remember(disclosureKey) { mutableStateOf(toolCall.shouldInitiallyExpand()) }
     val isError = toolCall.isErrorStatus()
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -89,6 +92,7 @@ private fun ToolCardHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("tool-card-toggle")
             .clickable(onClick = onToggle)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -117,7 +121,10 @@ private fun ToolCardHeader(
         }
         ToolStatusBadge(ToolStatusToken(toolCall.status ?: "tool call"))
         if (expanded) Spacer(Modifier.weight(1f))
-        CopyIconButton(text = toolCall.copyPayload())
+        CopyIconButton(
+            text = toolCall.copyPayload(),
+            contentDescription = "Copy tool call",
+        )
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
@@ -136,7 +143,9 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
             .background(MaterialTheme.colorScheme.outlineVariant),
     )
     Column(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier = Modifier
+            .testTag("tool-card-body")
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
@@ -159,7 +168,10 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.weight(1f))
-                CopyIconButton(text = result)
+                CopyIconButton(
+                    text = result,
+                    contentDescription = "Copy output",
+                )
             }
             ToolOutputBlock(result, isError = isError)
         }
