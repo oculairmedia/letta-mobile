@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
@@ -29,18 +30,7 @@ class IrohToolRepository(
     }
 
     override suspend fun refreshTools() {
-        val directory = directory()
-        val merged = mutableListOf<Tool>()
-        var offset = 0
-        while (true) {
-            val page = directory.listTools(PAGE_SIZE, offset)
-            val newTools = page.filterNot { candidate -> merged.any { it.id == candidate.id } }
-            if (newTools.isEmpty()) break
-            merged += newTools
-            if (page.size < PAGE_SIZE) break
-            offset += page.size
-        }
-        toolsFlow.value = merged
+        toolsFlow.value = fetchAllTools(directory())
         lastRefreshMs = System.currentTimeMillis()
     }
 
@@ -52,33 +42,85 @@ class IrohToolRepository(
     }
 
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> =
-        directory().listTools(limit, offset)
+        fetchToolsPage(directory(), ToolPageRequest(limit, offset))
 
     override suspend fun attachTool(agentId: String, toolId: String) {
-        directory().setToolAttached(agentId, toolId, attached = true)
+        setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = true))
     }
 
     override suspend fun detachTool(agentId: String, toolId: String) {
-        directory().setToolAttached(agentId, toolId, attached = false)
+        setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = false))
     }
 
     override suspend fun upsertTool(params: ToolCreateParams): Tool =
         directory().createTool(params).also(::upsertCache)
 
     override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool =
-        directory().updateTool(toolId, params).also(::upsertCache)
+        updateToolById(ToolId(toolId), params).also(::upsertCache)
 
     override suspend fun deleteTool(toolId: String) {
-        directory().deleteTool(toolId)
-        toolsFlow.update { tools -> tools.filterNot { it.id == ToolId(toolId) } }
+        deleteToolById(ToolId(toolId))
+    }
+
+    private suspend fun fetchAllTools(directory: IrohAdminRpcAgentDirectory): List<Tool> {
+        val paging = ToolPagingState()
+        while (true) {
+            val page = fetchToolsPage(directory, paging.nextRequest())
+            val newTools = page.filterNot { candidate -> paging.merged.any { it.id == candidate.id } }
+            if (newTools.isEmpty()) break
+            paging.merged += newTools
+            if (page.size < PAGE_SIZE) break
+            paging.advanceBy(page.size)
+        }
+        return paging.merged
+    }
+
+    private suspend fun fetchToolsPage(
+        directory: IrohAdminRpcAgentDirectory,
+        request: ToolPageRequest,
+    ): List<Tool> = directory.listTools(request.limit, request.offset)
+
+    private suspend fun setToolAttachment(request: ToolAttachmentRequest) {
+        directory().setToolAttached(request.agentId.value, request.toolId.value, request.attached)
+    }
+
+    private suspend fun updateToolById(toolId: ToolId, params: ToolUpdateParams): Tool =
+        directory().updateTool(toolId.value, params)
+
+    private suspend fun deleteToolById(toolId: ToolId) {
+        directory().deleteTool(toolId.value)
+        removeFromCache(toolId)
     }
 
     private fun upsertCache(tool: Tool) {
         toolsFlow.update { tools -> tools.filterNot { it.id == tool.id } + tool }
     }
 
+    private fun removeFromCache(toolId: ToolId) {
+        toolsFlow.update { tools -> tools.filterNot { it.id == toolId } }
+    }
+
     private fun directory(): IrohAdminRpcAgentDirectory =
         directoryProvider() ?: error("Iroh admin RPC directory is unavailable for tools")
+
+    private data class ToolPageRequest(val limit: Int, val offset: Int)
+
+    private data class ToolPagingState(
+        val merged: MutableList<Tool> = mutableListOf(),
+        var offset: Int = 0,
+    ) {
+        fun nextRequest(): ToolPageRequest = ToolPageRequest(PAGE_SIZE, offset)
+
+        fun advanceBy(count: Int) {
+            offset += count
+        }
+    }
+
+    private data class ToolAttachmentRequest(
+        val agentId: AgentId,
+        val toolId: ToolId,
+        val attached: Boolean,
+    )
 
     private companion object {
         const val PAGE_SIZE = 100
