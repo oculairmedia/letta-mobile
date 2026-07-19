@@ -4,6 +4,14 @@ import android.annotation.SuppressLint
 import android.util.Log
 import androidx.tracing.Trace
 
+/** Typed Android systrace / Perfetto section name. */
+@JvmInline
+value class TraceSectionName(val value: String)
+
+/** Typed cookie pairing begin/end async trace sections. */
+@JvmInline
+value class TraceCookie(val value: Int)
+
 class AndroidTelemetryDelegate : TelemetryDelegate {
     override fun logToLogcat(level: Telemetry.Level, tag: String, body: String, throwable: Throwable?) {
         when (level) {
@@ -38,7 +46,7 @@ class AndroidTelemetryDelegate : TelemetryDelegate {
 
     @SuppressLint("UnclosedTrace") // Telemetry.measure owns the matching endSection call.
     override fun beginSection(name: String) {
-        AndroidTraceCalls.beginSection(name)
+        AndroidTraceCalls.beginSection(TraceSectionName(name))
     }
 
     override fun endSection() {
@@ -46,11 +54,11 @@ class AndroidTelemetryDelegate : TelemetryDelegate {
     }
 
     override fun beginAsyncSection(name: String, cookie: Int) {
-        AndroidTraceCalls.beginAsyncSection(name, cookie)
+        AndroidTraceCalls.beginAsyncSection(TraceSectionName(name), TraceCookie(cookie))
     }
 
     override fun endAsyncSection(name: String, cookie: Int) {
-        AndroidTraceCalls.endAsyncSection(name, cookie)
+        AndroidTraceCalls.endAsyncSection(TraceSectionName(name), TraceCookie(cookie))
     }
 }
 
@@ -65,28 +73,30 @@ class AndroidTelemetryDelegate : TelemetryDelegate {
  */
 private object AndroidTraceCalls {
     private val traceClass = runCatching { Trace::class.java }.getOrNull()
-    private val beginSection = runCatching { traceClass?.getMethod("beginSection", String::class.java) }.getOrNull()
-    private val endSection = runCatching { traceClass?.getMethod("endSection") }.getOrNull()
-    private val beginAsyncSection = runCatching {
+    private val beginSectionMethod = runCatching {
+        traceClass?.getMethod("beginSection", String::class.java)
+    }.getOrNull()
+    private val endSectionMethod = runCatching { traceClass?.getMethod("endSection") }.getOrNull()
+    private val beginAsyncSectionMethod = runCatching {
         traceClass?.getMethod("beginAsyncSection", String::class.java, Int::class.javaPrimitiveType)
     }.getOrNull()
-    private val endAsyncSection = runCatching {
+    private val endAsyncSectionMethod = runCatching {
         traceClass?.getMethod("endAsyncSection", String::class.java, Int::class.javaPrimitiveType)
     }.getOrNull()
 
-    fun beginSection(name: String) {
-        runCatching { beginSection?.invoke(null, name) }
+    fun beginSection(name: TraceSectionName) {
+        runCatching { beginSectionMethod?.invoke(null, name.value) }
     }
 
     fun endSection() {
-        runCatching { endSection?.invoke(null) }
+        runCatching { endSectionMethod?.invoke(null) }
     }
 
-    fun beginAsyncSection(name: String, cookie: Int) {
-        runCatching { beginAsyncSection?.invoke(null, name, cookie) }
+    fun beginAsyncSection(name: TraceSectionName, cookie: TraceCookie) {
+        runCatching { beginAsyncSectionMethod?.invoke(null, name.value, cookie.value) }
     }
 
-    fun endAsyncSection(name: String, cookie: Int) {
-        runCatching { endAsyncSection?.invoke(null, name, cookie) }
+    fun endAsyncSection(name: TraceSectionName, cookie: TraceCookie) {
+        runCatching { endAsyncSectionMethod?.invoke(null, name.value, cookie.value) }
     }
 }
