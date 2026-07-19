@@ -1248,6 +1248,11 @@ class IrohChannelTransport(
             "skill.list_agent",
             "tool.get",
             "tool.list",
+            "block.get",
+            "block.list",
+            "project.beadsRemoteStatus",
+            "project.get",
+            "project.list",
         )
 
         fun isIrohUrl(url: String?): Boolean {
