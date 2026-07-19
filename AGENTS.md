@@ -402,6 +402,19 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   **Save**. With no token, `https://api.letta.com` returns HTTP 401 (expected). The client makes a
   real HTTP call to `<url>/v1/…` on save, so an unconfigured/unreachable server shows
   "Connection refused" / "Couldn't load this view".
+- An `iroh://<nodeId>@<host>:<port>` ticket in the Server URL field switches the client to the
+  Iroh QUIC P2P transport automatically (scheme-detected — Mode does not matter); admin/agent
+  traffic then flows over QUIC instead of HTTP.
+
+### Persisting the desktop backend config (without committing the URL)
+
+- On **Save**, the desktop client writes its config to `~/.letta-mobile/desktop-settings.properties`
+  (outside the git repo — never commit this or paste backend URLs into tracked files / the PR).
+- The backend URL is treated as a **secret**. To auto-restore it on a fresh VM, set the
+  `LETTA_DESKTOP_SERVER_URL` secret (its value is the full `iroh://…` or `https://…` URL) in the
+  Secrets panel. The startup update script recreates
+  `~/.letta-mobile/desktop-settings.properties` from that env var when the file is missing, so the
+  URL stays encrypted in Cursor Secrets and out of the repo.
 
 ### Lint (detekt)
 
