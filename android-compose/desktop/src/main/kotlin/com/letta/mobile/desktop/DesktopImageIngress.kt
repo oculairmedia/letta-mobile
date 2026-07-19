@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
+import java.awt.Component
+import java.awt.Container
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.Window
@@ -80,24 +82,25 @@ private fun DesktopImageFileDropEffect(
 ) {
     DisposableEffect(enabled, loader) {
         if (!enabled) return@DisposableEffect onDispose { }
-        val installed = mutableMapOf<Window, DropTarget?>()
-        lateinit var dropTarget: DropTarget
-        fun install(window: Window) {
-            if (!window.isDisplayable || window in installed) return
-            installed[window] = window.dropTarget
-            dropTarget = DropTarget(window, object : DropTargetAdapter() {
-                override fun drop(event: DropTargetDropEvent) {
-                    val transferable = event.transferable
-                    val path = transferable.imageFiles().firstOrNull()?.toPath()
-                    if (path == null) {
-                        event.rejectDrop()
-                        return
-                    }
-                    event.acceptDrop(DnDConstants.ACTION_COPY)
-                    scope.launchLoadImage(loader, onImage, onError) { load(path) }
-                    event.dropComplete(true)
+        val installed = mutableMapOf<Component, DropTarget?>()
+        val target = object : DropTargetAdapter() {
+            override fun drop(event: DropTargetDropEvent) {
+                val transferable = event.transferable
+                val path = transferable.imageFiles().firstOrNull()?.toPath()
+                if (path == null) {
+                    event.rejectDrop()
+                    return
                 }
-            })
+                event.acceptDrop(DnDConstants.ACTION_COPY)
+                scope.launchLoadImage(loader, onImage, onError) { load(path) }
+                event.dropComplete(true)
+            }
+        }
+        fun install(component: Component) {
+            if (!component.isDisplayable || component in installed) return
+            installed[component] = component.dropTarget
+            runCatching { component.dropTarget = DropTarget(component, DnDConstants.ACTION_COPY, target, true) }
+            if (component is Container) component.components.forEach(::install)
         }
         Window.getWindows().forEach(::install)
         val listener = object : java.awt.event.AWTEventListener {
@@ -110,8 +113,8 @@ private fun DesktopImageFileDropEffect(
         Toolkit.getDefaultToolkit().addAWTEventListener(listener, java.awt.AWTEvent.WINDOW_EVENT_MASK)
         onDispose {
             Toolkit.getDefaultToolkit().removeAWTEventListener(listener)
-            installed.forEach { (window, previous) ->
-                runCatching { window.dropTarget = previous }
+            installed.forEach { (component, previous) ->
+                runCatching { component.dropTarget = previous }
             }
         }
     }

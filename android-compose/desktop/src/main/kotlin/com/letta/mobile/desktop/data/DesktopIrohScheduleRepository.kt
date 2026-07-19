@@ -20,8 +20,13 @@ class DesktopIrohScheduleRepository(
     override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
         val directory = directoryProvider()
             ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "refreshSchedules")
+        val schedules = try {
+            directory.listSchedules(agentId)
+        } catch (t: Throwable) {
+            if (t.message.orEmpty().contains("GET /v1/schedules")) emptyList() else throw t
+        }
         schedulesByAgentFlow.update { current ->
-            current.toMutableMap().apply { put(agentId, directory.listSchedules(agentId)) }
+            current.toMutableMap().apply { put(agentId, schedules) }
         }
     }
 
