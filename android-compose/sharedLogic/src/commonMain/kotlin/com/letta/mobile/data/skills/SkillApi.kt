@@ -26,28 +26,36 @@ import kotlinx.serialization.Serializable
  * Lives in commonMain so every host shares one implementation; the platform
  * supplies the Ktor [HttpClient] (with content negotiation installed).
  */
+interface SkillsApi : AutoCloseable {
+    suspend fun listSkills(): List<Skill>
+    suspend fun listAgentSkills(agentId: String): List<Skill>
+    suspend fun installSkill(agentId: String, skillName: String)
+    suspend fun uninstallSkill(agentId: String, skillName: String)
+    override fun close() = Unit
+}
+
 class SkillApi(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
-) : AutoCloseable {
+) : SkillsApi {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     /** Every skill in the server registry. */
-    suspend fun listSkills(): List<Skill> {
+    override suspend fun listSkills(): List<Skill> {
         val response = httpClient.get("$baseUrl/v1/skills") { applyAuth() }
         response.requireSuccess()
         return response.body<SkillsResponse>().skills
     }
 
     /** Skills installed on [agentId]. */
-    suspend fun listAgentSkills(agentId: String): List<Skill> {
+    override suspend fun listAgentSkills(agentId: String): List<Skill> {
         val response = httpClient.get("$baseUrl/v1/agents/$agentId/skills") { applyAuth() }
         response.requireSuccess()
         return response.body<SkillsResponse>().skills
     }
 
     /** Install [skillName] onto [agentId]. */
-    suspend fun installSkill(agentId: String, skillName: String) {
+    override suspend fun installSkill(agentId: String, skillName: String) {
         val response = httpClient.post("$baseUrl/v1/agents/$agentId/skills") {
             applyAuth()
             contentType(ContentType.Application.Json)
@@ -57,7 +65,7 @@ class SkillApi(
     }
 
     /** Remove [skillName] from [agentId]. */
-    suspend fun uninstallSkill(agentId: String, skillName: String) {
+    override suspend fun uninstallSkill(agentId: String, skillName: String) {
         val encoded = skillName.encodeURLPathPart()
         val response = httpClient.delete("$baseUrl/v1/agents/$agentId/skills/$encoded") { applyAuth() }
         response.requireSuccess()

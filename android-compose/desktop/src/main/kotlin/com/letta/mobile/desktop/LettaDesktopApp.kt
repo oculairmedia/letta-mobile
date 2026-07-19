@@ -161,8 +161,10 @@ import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.commands.SlashCommandApi
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillApi
+import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import com.letta.mobile.desktop.skills.DesktopSkillsSurface
+import com.letta.mobile.desktop.skills.DesktopIrohSkillsApi
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -332,7 +334,7 @@ private fun rememberDesktopChatController(
 private class DesktopHttpApis(
     val blockApi: DesktopBlockApi?,
     val cronApi: CronApi?,
-    val skillApi: SkillApi?,
+    val skillApi: SkillsApi?,
     val slashCommandApi: SlashCommandApi?,
 )
 
@@ -351,7 +353,11 @@ private fun rememberDesktopHttpApis(
                 httpConfig?.let { DesktopHttpBlockApi(it) }
             },
             cronApi = httpConfig?.let { CronApi(it, createDesktopLettaHttpClient()) },
-            skillApi = httpConfig?.let { SkillApi(it, createDesktopLettaHttpClient()) },
+            skillApi = if (irohMode) {
+                irohAgentDirectory?.let { DesktopIrohSkillsApi(it) }
+            } else {
+                httpConfig?.let { SkillApi(it, createDesktopLettaHttpClient()) }
+            },
             slashCommandApi = httpConfig?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) },
         )
     }
@@ -666,10 +672,10 @@ private class DesktopCronPanelState(
 /**
  * Snapshot-backed state + actions for the Skills page: the registry list,
  * the focused agent's installed set, and install/remove with reload. All
- * actions no-op when the backend has no HTTP skill API (iroh mode).
+ * actions no-op when the active backend exposes no skill API.
  */
 private class DesktopSkillsPanelState(
-    private val skillApi: SkillApi?,
+    private val skillApi: SkillsApi?,
     private val scope: CoroutineScope,
 ) {
     var all by mutableStateOf<List<Skill>>(emptyList())

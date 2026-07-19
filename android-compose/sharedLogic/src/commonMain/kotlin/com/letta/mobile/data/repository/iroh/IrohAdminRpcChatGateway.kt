@@ -17,6 +17,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
@@ -421,6 +422,43 @@ class IrohAdminRpcAgentDirectory(
         }
         val result = response.result ?: throw TimelineTransportHttpException(502, "agent.context returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
+    }
+
+    suspend fun listSkills(agentId: String? = null): List<Skill> {
+        val body = buildJsonObject {
+            agentId?.let { put("agent_id", it) }
+        }.toString()
+        val method = if (agentId == null) "skill.list" else "skill.list_agent"
+        val path = agentId?.let { "/v1/agents/$it/skills" } ?: "/v1/skills"
+        val response = transport.adminRpc(method, path, body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
+        }
+        val result = response.result ?: return emptyList()
+        val skillsElement = (result as? kotlinx.serialization.json.JsonObject)?.get("skills") ?: result
+        return json.decodeFromJsonElement(ListSerializer(Skill.serializer()), skillsElement)
+    }
+
+    suspend fun installSkill(agentId: String, skillName: String) {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("name", skillName)
+        }.toString()
+        val response = transport.adminRpc("skill.install", "/v1/agents/$agentId/skills", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "skill.install failed over iroh admin_rpc")
+        }
+    }
+
+    suspend fun uninstallSkill(agentId: String, skillName: String) {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("name", skillName)
+        }.toString()
+        val response = transport.adminRpc("skill.uninstall", "/v1/agents/$agentId/skills/$skillName", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "skill.uninstall failed over iroh admin_rpc")
+        }
     }
 
     suspend fun getBlock(blockId: String): Block? {
