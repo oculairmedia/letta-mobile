@@ -220,6 +220,7 @@ class DesktopRepositoryAdapters(
         ?.takeIf { it.serverUrl.isNotBlank() && !irohMode }
         ?.let(::DesktopLettaHttpAdminRepositories)
     private val irohAgentRepository = if (irohMode) DesktopIrohAgentRepository(irohAgentDirectoryProvider) else null
+    private val irohScheduleRepository = if (irohMode) DesktopIrohScheduleRepository(irohAgentDirectoryProvider) else null
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 
@@ -238,7 +239,7 @@ class DesktopRepositoryAdapters(
     val projectWorkRepository: IProjectWorkRepository = unavailableRepository()
     val providerRepository: IProviderRepository = unavailableRepository()
     val runRepository: IRunRepository = unavailableRepository()
-    val scheduleRepository: IScheduleRepository = adminRepositories ?: unavailableRepository()
+    val scheduleRepository: IScheduleRepository = irohScheduleRepository ?: adminRepositories ?: unavailableRepository()
     val selfTodoRepository: ISelfTodoRepository = unavailableRepository()
     val stepRepository: IStepRepository = unavailableRepository()
     val subagentRepository: ISubagentRepository = unavailableRepository()

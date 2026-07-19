@@ -12,6 +12,8 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ScheduleListResponse
+import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
@@ -416,6 +418,32 @@ class IrohAdminRpcAgentDirectory(
         }
         val result = response.result ?: throw TimelineTransportHttpException(502, "agent.context returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
+    }
+
+    suspend fun listSchedules(agentId: String? = null): List<ScheduledMessage> {
+        val response = transport.adminRpc("schedule.list", "/v1/schedules", "{}")
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "schedule.list failed over iroh admin_rpc")
+        }
+        val result = response.result ?: return emptyList()
+        val schedules = json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
+        return agentId?.let { id -> schedules.filter { it.agentId == id } } ?: schedules
+    }
+
+    suspend fun getSchedule(scheduleId: String): ScheduledMessage? {
+        val body = buildJsonObject { put("schedule_id", scheduleId) }.toString()
+        val response = transport.adminRpc("schedule.get", "/v1/schedules/$scheduleId", body)
+        if (!response.success) return null
+        val result = response.result ?: return null
+        return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
+    }
+
+    suspend fun deleteSchedule(scheduleId: String) {
+        val body = buildJsonObject { put("schedule_id", scheduleId) }.toString()
+        val response = transport.adminRpc("schedule.delete", "/v1/schedules/$scheduleId", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "schedule.delete failed over iroh admin_rpc")
+        }
     }
 
     companion object {
