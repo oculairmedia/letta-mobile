@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -25,21 +26,29 @@ import io.ktor.http.contentType
  * `/v1/blocks/{id}` (the per-label agent path 404s here), so reads/updates/
  * deletes go through the global block-by-id endpoints.
  */
-class DesktopBlockApi(
+interface DesktopBlockApi : AutoCloseable {
+    suspend fun getBlockById(blockId: String): Block
+    suspend fun updateBlockById(blockId: String, value: String, limit: Int? = null): Block
+    suspend fun deleteBlockById(blockId: String)
+    suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int? = null): Block
+    override fun close() = Unit
+}
+
+class DesktopHttpBlockApi(
     private val config: LettaConfig,
     private val httpClient: HttpClient = createDesktopLettaHttpClient(),
-) : AutoCloseable {
+) : DesktopBlockApi {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     /** Fetch a block (full value) by its id. */
-    suspend fun getBlockById(blockId: String): Block {
+    override suspend fun getBlockById(blockId: String): Block {
         val response = httpClient.get("$baseUrl/v1/blocks/$blockId") { applyAuth() }
         response.requireSuccess()
         return response.body()
     }
 
     /** Update a block's value (and optionally limit) by its id. */
-    suspend fun updateBlockById(blockId: String, value: String, limit: Int? = null): Block {
+    override suspend fun updateBlockById(blockId: String, value: String, limit: Int?): Block {
         val response = httpClient.patch("$baseUrl/v1/blocks/$blockId") {
             applyAuth()
             contentType(ContentType.Application.Json)
@@ -50,13 +59,13 @@ class DesktopBlockApi(
     }
 
     /** Delete a block by its id. */
-    suspend fun deleteBlockById(blockId: String) {
+    override suspend fun deleteBlockById(blockId: String) {
         val response = httpClient.delete("$baseUrl/v1/blocks/$blockId") { applyAuth() }
         response.requireSuccess()
     }
 
     /** Create a new block and attach it to the agent's core memory. */
-    suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int? = null): Block {
+    override suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int?): Block {
         val createResponse = httpClient.post("$baseUrl/v1/blocks") {
             applyAuth()
             contentType(ContentType.Application.Json)
@@ -87,6 +96,32 @@ class DesktopBlockApi(
     private suspend fun HttpResponse.requireSuccess() {
         if (status.value !in 200..299) {
             throw IllegalStateException("Block API ${status.value}: ${bodyAsText()}")
+        }
+    }
+}
+
+
+class DesktopIrohBlockApi(
+    private val directory: IrohAdminRpcAgentDirectory,
+) : DesktopBlockApi {
+    override suspend fun getBlockById(blockId: String): Block =
+        directory.getBlock(blockId) ?: throw NoSuchElementException("Block $blockId not found over iroh admin_rpc")
+
+    override suspend fun updateBlockById(blockId: String, value: String, limit: Int?): Block =
+        directory.updateBlock(blockId, BlockUpdateParams(value = value, limit = limit))
+
+    override suspend fun deleteBlockById(blockId: String) {
+        directory.deleteBlock(blockId)
+    }
+
+    override suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int?): Block {
+        val block = directory.createBlock(BlockCreateParams(label = label, value = value, limit = limit))
+        return try {
+            directory.attachBlock(agentId, block.id.value)
+            block
+        } catch (t: Throwable) {
+            runCatching { directory.deleteBlock(block.id.value) }
+            throw t
         }
     }
 }

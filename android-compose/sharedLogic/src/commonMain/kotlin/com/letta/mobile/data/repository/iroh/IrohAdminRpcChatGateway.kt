@@ -7,6 +7,9 @@ import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -418,6 +421,58 @@ class IrohAdminRpcAgentDirectory(
         }
         val result = response.result ?: throw TimelineTransportHttpException(502, "agent.context returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
+    }
+
+    suspend fun getBlock(blockId: String): Block? {
+        val body = buildJsonObject { put("block_id", blockId) }.toString()
+        val response = transport.adminRpc("block.get", "/v1/blocks/$blockId", body)
+        if (!response.success) return null
+        val result = response.result ?: return null
+        return json.decodeFromJsonElement(Block.serializer(), result)
+    }
+
+    suspend fun createBlock(params: BlockCreateParams): Block {
+        val body = json.encodeToString(BlockCreateParams.serializer(), params)
+        val response = transport.adminRpc("block.create", "/v1/blocks", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "block.create failed over iroh admin_rpc")
+        }
+        val result = response.result ?: throw TimelineTransportHttpException(502, "block.create returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Block.serializer(), result)
+    }
+
+    suspend fun updateBlock(blockId: String, params: BlockUpdateParams): Block {
+        val body = buildJsonObject {
+            put("block_id", blockId)
+            params.value?.let { put("value", it) }
+            params.limit?.let { put("limit", it) }
+            params.description?.let { put("description", it) }
+        }.toString()
+        val response = transport.adminRpc("block.update", "/v1/blocks/$blockId", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "block.update failed over iroh admin_rpc")
+        }
+        val result = response.result ?: throw TimelineTransportHttpException(502, "block.update returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Block.serializer(), result)
+    }
+
+    suspend fun deleteBlock(blockId: String) {
+        val body = buildJsonObject { put("block_id", blockId) }.toString()
+        val response = transport.adminRpc("block.delete", "/v1/blocks/$blockId", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "block.delete failed over iroh admin_rpc")
+        }
+    }
+
+    suspend fun attachBlock(agentId: String, blockId: String) {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("block_id", blockId)
+        }.toString()
+        val response = transport.adminRpc("block.attach", "/v1/agents/$agentId/core-memory/blocks/attach/$blockId", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "block.attach failed over iroh admin_rpc")
+        }
     }
 
     suspend fun listSchedules(agentId: String? = null): List<ScheduledMessage> {

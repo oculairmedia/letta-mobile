@@ -146,6 +146,8 @@ import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.memory.DesktopMemoryController
 import com.letta.mobile.desktop.memory.DesktopBlockApi
+import com.letta.mobile.desktop.memory.DesktopHttpBlockApi
+import com.letta.mobile.desktop.memory.DesktopIrohBlockApi
 import com.letta.mobile.desktop.memory.DesktopMemorySurface
 import com.letta.mobile.desktop.memory.DesktopMemorySurfaceState
 import com.letta.mobile.data.schedules.CronApi
@@ -335,11 +337,19 @@ private class DesktopHttpApis(
 )
 
 @Composable
-private fun rememberDesktopHttpApis(activeConfig: LettaConfig, irohMode: Boolean): DesktopHttpApis =
-    remember(activeConfig, irohMode) {
+private fun rememberDesktopHttpApis(
+    activeConfig: LettaConfig,
+    irohMode: Boolean,
+    irohAgentDirectory: IrohAdminRpcAgentDirectory?,
+): DesktopHttpApis =
+    remember(activeConfig, irohMode, irohAgentDirectory) {
         val httpConfig = activeConfig.takeIf { it.serverUrl.isNotBlank() && !irohMode }
         DesktopHttpApis(
-            blockApi = httpConfig?.let { DesktopBlockApi(it) },
+            blockApi = if (irohMode) {
+                irohAgentDirectory?.let { DesktopIrohBlockApi(it) }
+            } else {
+                httpConfig?.let { DesktopHttpBlockApi(it) }
+            },
             cronApi = httpConfig?.let { CronApi(it, createDesktopLettaHttpClient()) },
             skillApi = httpConfig?.let { SkillApi(it, createDesktopLettaHttpClient()) },
             slashCommandApi = httpConfig?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) },
@@ -963,7 +973,7 @@ fun LettaDesktopApp(
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val modelOptions = remember(availableModels) { buildModelOptions(availableModels) }
-    val httpApis = rememberDesktopHttpApis(activeConfig, irohMode)
+    val httpApis = rememberDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
     val blockApi = httpApis.blockApi
     val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
     val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
