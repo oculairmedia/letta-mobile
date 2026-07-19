@@ -371,6 +371,56 @@ Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor
   - `EditAgentScreen`, `ScheduleListScreen`, `McpScreen`, `AgentListScreen` — continue migrating multi-field forms toward `FormItem` and reusable dialog structure.
 - When auditing a screen now, prioritize: (1) raw `AlertDialog` replacement, (2) grouped detail surfaces, (3) semantic typography, and only then shell-level chrome changes.
 
+## Cursor Cloud specific instructions
+
+This section covers non-obvious caveats for the Cursor Cloud VM. Standard build/test/run
+commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md` — use those.
+
+### Toolchain layout (already provisioned in the VM snapshot)
+
+- JDK 26 (Temurin, CI parity + desktop runtime): `/usr/lib/jvm/jdk-26`. JDK 21 also exists at
+  `/usr/lib/jvm/java-21-openjdk-amd64` (needed by detekt — see below).
+- Android SDK: `$HOME/Android/Sdk` (platform 36, build-tools 36, platform-tools).
+- `JAVA_HOME`, `ANDROID_HOME`, and `PATH` are exported for interactive shells from `~/.bashrc`.
+  Non-interactive scripts should set `JAVA_HOME=/usr/lib/jvm/jdk-26` explicitly.
+- `android-compose/local.properties` (`sdk.dir=…`, gitignored) is auto-created by the startup
+  update script; recreate it if missing.
+
+### Running the app on this VM
+
+- Only the **Compose Desktop** client (`:desktop:run`) is runnable here — there is no Android
+  emulator (no nested KVM), so the Android `:app` can be built/tested but not launched.
+- The desktop app renders through Skiko, which **cannot create a GL context on the VNC X server**
+  (`RenderException: Cannot create Linux GL context`). Force software rendering and target the
+  VNC display:
+  ```bash
+  DISPLAY=:1 JAVA_TOOL_OPTIONS="-Dskiko.renderApi=SOFTWARE" ./gradlew :desktop:run
+  ```
+- `:desktop:run` needs JDK 25+ at runtime (Jewel ships class-file v69); JDK 26 satisfies this.
+- To connect to a backend: in the running app click **Settings** → set **Server URL**, pick a
+  **Mode** (Cloud / Self-hosted / Local runtime), and paste an **Access token** if required, then
+  **Save**. With no token, `https://api.letta.com` returns HTTP 401 (expected). The client makes a
+  real HTTP call to `<url>/v1/…` on save, so an unconfigured/unreachable server shows
+  "Connection refused" / "Couldn't load this view".
+
+### Lint (detekt)
+
+- Detekt (`1.23.8`) rejects `--jvm-target 26`, so `./gradlew detekt` fails on JDK 26 with
+  "Invalid value (26) passed to --jvm-target". Run it on JDK 21 instead:
+  ```bash
+  JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew detekt
+  ```
+  Detekt is **not** a required CI gate (CI static analysis is Qodana) and `detekt.yml` sets
+  `maxIssues: 0`, so it currently reports pre-existing findings on `main`.
+
+### Flaky unit tests
+
+- Under cold-VM CPU contention a few timing-sensitive tests can spuriously fail
+  (`AndroidNetworkBridgeStreamingTest` → `SocketTimeoutException`,
+  `LettaDatabaseCharacterizationTest` / `MessageRepositoryE2eTest` → `UncompletedCoroutinesError`).
+  They pass on an isolated re-run (`--tests`); treat these specific failures as flakiness, not a
+  regression.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 
 ## Beads Issue Tracker
