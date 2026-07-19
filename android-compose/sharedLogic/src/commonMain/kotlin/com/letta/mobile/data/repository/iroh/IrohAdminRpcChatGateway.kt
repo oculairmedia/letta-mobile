@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
@@ -15,6 +16,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.Tool
@@ -409,6 +411,20 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
+    suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent {
+        val paramsJson = json.encodeToJsonElement(AgentUpdateParams.serializer(), params).jsonObject
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            paramsJson.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        val response = transport.adminRpc("agent.update", "/v1/agents/$agentId", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "agent.update failed over iroh admin_rpc")
+        }
+        val result = response.result ?: throw TimelineTransportHttpException(502, "agent.update returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
     suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
         val body = buildJsonObject {
             put("agent_id", agentId)
@@ -590,6 +606,20 @@ class IrohAdminRpcAgentDirectory(
         val response = transport.adminRpc("schedule.get", path, body)
         if (!response.success) return null
         val result = response.result ?: return null
+        return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
+    }
+
+    suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
+        val paramsJson = json.encodeToJsonElement(ScheduleCreateParams.serializer(), params).jsonObject
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            paramsJson.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        val response = transport.adminRpc("schedule.create", "/v1/agents/$agentId/schedule", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "schedule.create failed over iroh admin_rpc")
+        }
+        val result = response.result ?: throw TimelineTransportHttpException(502, "schedule.create returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
     }
 

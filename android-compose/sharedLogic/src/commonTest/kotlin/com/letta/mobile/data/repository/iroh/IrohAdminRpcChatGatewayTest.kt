@@ -1,7 +1,11 @@
 package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.MessageCreate
+import com.letta.mobile.data.model.ScheduleCreateParams
+import com.letta.mobile.data.model.ScheduleDefinition
+import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
@@ -255,6 +259,45 @@ class IrohAdminRpcChatGatewayTest {
         // throwing a load error.
         val gateway = IrohAdminRpcChatGateway(FakeIrohTransport())
         assertEquals(emptyList(), gateway.listAgentMessages("agent-1"))
+    }
+
+    @Test
+    fun directoryUpdateAgentRoutesAgentUpdateWithMergedBody() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("agent.update", call.method)
+            assertEquals("/v1/agents/agent-1", call.path)
+            assertTrue(call.body.orEmpty().contains("\"agent_id\":\"agent-1\""))
+            assertTrue(call.body.orEmpty().contains("\"name\":\"Renamed\""))
+            ok("""{"id":"agent-1","name":"Renamed"}""")
+        }
+        val directory = IrohAdminRpcAgentDirectory(transport)
+        val agent = directory.updateAgent("agent-1", AgentUpdateParams(name = "Renamed"))
+        assertEquals("agent-1", agent.id.value)
+        assertEquals("Renamed", agent.name)
+    }
+
+    @Test
+    fun directoryCreateScheduleRoutesAgentScopedScheduleCreate() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("schedule.create", call.method)
+            assertEquals("/v1/agents/agent-1/schedule", call.path)
+            assertTrue(call.body.orEmpty().contains("\"agent_id\":\"agent-1\""))
+            ok(
+                """{"id":"sched-1","agent_id":"agent-1","message":{"messages":[{"content":"hi","role":"user"}]},"schedule":{"type":"once","scheduled_at":1.0}}""",
+            )
+        }
+        val directory = IrohAdminRpcAgentDirectory(transport)
+        val schedule = directory.createSchedule(
+            agentId = "agent-1",
+            params = ScheduleCreateParams(
+                messages = listOf(ScheduleMessage(content = "hi", role = "user")),
+                schedule = ScheduleDefinition(type = "once", scheduledAt = 1.0),
+            ),
+        )
+        assertEquals("sched-1", schedule.id)
+        assertEquals("agent-1", schedule.agentId)
     }
 
     // ------------------------------------------------------------------

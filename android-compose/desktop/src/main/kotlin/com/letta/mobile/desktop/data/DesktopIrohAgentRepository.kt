@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
 
 class DesktopIrohAgentRepository(
     private val directoryProvider: () -> IrohAdminRpcAgentDirectory?,
@@ -64,15 +65,24 @@ class DesktopIrohAgentRepository(
     override fun getCachedAgent(id: AgentId): Agent? = agentsFlow.value.firstOrNull { it.id == id }
 
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
-        val cached = getCachedAgent(id)
-        if (cached != null) {
-            emit(cached)
-            return@flow
-        }
         val directory = directoryProvider()
             ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "getAgent")
-        val agent = directory.getAgent(id.value)
-            ?: throw NoSuchElementException("Agent ${id.value} not found over iroh admin_rpc")
+        val agent = try {
+            directory.getAgent(id.value)
+        } catch (t: Throwable) {
+            getCachedAgent(id)?.let { cached ->
+                emit(cached)
+                return@flow
+            }
+            throw t
+        } ?: run {
+            getCachedAgent(id)?.let { cached ->
+                emit(cached)
+                return@flow
+            }
+            throw NoSuchElementException("Agent ${id.value} not found over iroh admin_rpc")
+        }
+        updateAgentInCache(agent)
         emit(agent)
     }
 
@@ -87,7 +97,14 @@ class DesktopIrohAgentRepository(
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent = unsupported("createAgent")
-    override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = unsupported("updateAgent")
+
+    override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
+        val directory = directoryProvider()
+            ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "updateAgent")
+        val agent = directory.updateAgent(id.value, params)
+        updateAgentInCache(agent)
+        return agent
+    }
     override suspend fun deleteAgent(id: AgentId): Unit = unsupported("deleteAgent")
     override suspend fun exportAgent(id: AgentId): String = unsupported("exportAgent")
     override suspend fun importAgent(
@@ -100,6 +117,13 @@ class DesktopIrohAgentRepository(
     ): ImportedAgentsResponse = unsupported("importAgent")
     override suspend fun attachArchive(agentId: AgentId, archiveId: String): Unit = unsupported("attachArchive")
     override suspend fun detachArchive(agentId: AgentId, archiveId: String): Unit = unsupported("detachArchive")
+
+    private fun updateAgentInCache(agent: Agent) {
+        agentsFlow.update { current ->
+            val index = current.indexOfFirst { it.id == agent.id }
+            if (index >= 0) current.toMutableList().apply { this[index] = agent } else current + agent
+        }
+    }
 
     private fun unsupported(operation: String): Nothing =
         throw DesktopRepositoryUnavailableException("DesktopIrohAgentRepository", operation)
