@@ -1,27 +1,16 @@
 package com.letta.mobile.data.repository.iroh
 
-import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
-import com.letta.mobile.data.transport.A2uiActionDispatchResult
-import com.letta.mobile.data.transport.ChannelTransportState
-import com.letta.mobile.data.transport.ServerFrame
-import com.letta.mobile.data.transport.TransportFrameEvent
-import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -31,7 +20,7 @@ class IrohAgentAndScheduleRepositoryTest {
 
     @Test
     fun refreshSchedulesFallsBackToEmptyListOn404() = runTest(UnconfinedTestDispatcher()) {
-        val transport = FakeIrohTransport()
+        val transport = FakeIrohAdminTransport()
         transport.rpcResponder = { call ->
             assertEquals("schedule.list", call.method)
             fail("HTTP 404: agent schedule endpoint not found")
@@ -45,7 +34,7 @@ class IrohAgentAndScheduleRepositoryTest {
 
     @Test
     fun createScheduleAppendsToCachedSchedules() = runTest(UnconfinedTestDispatcher()) {
-        val transport = FakeIrohTransport()
+        val transport = FakeIrohAdminTransport()
         transport.rpcResponder = { call ->
             when (call.method) {
                 "schedule.list" -> ok(
@@ -94,7 +83,7 @@ class IrohAgentAndScheduleRepositoryTest {
 
     @Test
     fun getAgentUpdatesCache() = runTest(UnconfinedTestDispatcher()) {
-        val transport = FakeIrohTransport()
+        val transport = FakeIrohAdminTransport()
         transport.rpcResponder = { call ->
             assertEquals("agent.get", call.method)
             assertEquals("/v1/agents/agent-1", call.path)
@@ -112,7 +101,7 @@ class IrohAgentAndScheduleRepositoryTest {
 
     @Test
     fun updateAgentUpsertsCache() = runTest(UnconfinedTestDispatcher()) {
-        val transport = FakeIrohTransport()
+        val transport = FakeIrohAdminTransport()
         transport.rpcResponder = { call ->
             when (call.method) {
                 "agent.list" -> ok("""[{"id":"agent-1","name":"Original"}]""")
@@ -155,63 +144,4 @@ class IrohAgentAndScheduleRepositoryTest {
         error = error,
     )
 
-    private class FakeIrohTransport : IChannelTransport {
-        data class RpcCall(val method: String, val path: String, val body: String?)
-
-        val rpcCalls = mutableListOf<RpcCall>()
-        var rpcResponder: (RpcCall) -> AppServerInboundFrame.AdminRpcResponse = { call ->
-            AppServerInboundFrame.AdminRpcResponse(
-                requestId = "req",
-                success = false,
-                error = "${call.method} has no responder",
-            )
-        }
-
-        override val state: StateFlow<ChannelTransportState> =
-            MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
-        override val events = MutableSharedFlow<ServerFrame>()
-        override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
-
-        override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
-        override fun send(
-            agentId: String,
-            conversationId: String,
-            text: String,
-            otid: String?,
-            contentParts: JsonArray?,
-            startNewConversation: Boolean,
-        ): Boolean = true
-
-        override fun cancel(conversationId: String): Boolean = true
-        override fun bye(): Boolean = true
-        override suspend fun disconnect() = Unit
-        override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Sent("frame-1")
-        override fun subscribe(runId: String, cursor: Long): Boolean = false
-        override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
-            val call = RpcCall(method, path, body)
-            rpcCalls += call
-            return rpcResponder(call)
-        }
-
-        override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long) = error("unused")
-        override suspend fun sendCronAdd(
-            agentId: String,
-            name: String,
-            description: String,
-            prompt: String,
-            recurring: Boolean,
-            cron: String?,
-            every: String?,
-            at: String?,
-            timezone: String?,
-            conversationId: String?,
-            timeoutMs: Long,
-        ) = error("unused")
-
-        override suspend fun sendCronGet(taskId: String, timeoutMs: Long) = error("unused")
-        override suspend fun sendCronDelete(taskId: String, timeoutMs: Long) = error("unused")
-        override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long) = error("unused")
-        override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long) = error("unused")
-        override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long) = error("unused")
-    }
 }
