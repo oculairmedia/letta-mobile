@@ -405,7 +405,7 @@ private fun MessageListItem(
             Text(
                 text = clock,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
                 textAlign = if (isUser) TextAlign.End else TextAlign.Start,
                 modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
             )

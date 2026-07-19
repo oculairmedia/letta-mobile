@@ -1,6 +1,11 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,23 +56,33 @@ internal fun ToolOutputBlock(params: ToolOutputBlockParams) {
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
+    val horizontalScrollState = rememberScrollState()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
         color = blockColor,
     ) {
-        SelectionContainer {
-            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                text.trim().lineSequence().take(40).forEach { line ->
-                    Text(
-                        text = line,
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(OutputLine(line)),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+        Box {
+            SelectionContainer {
+                Column(
+                    modifier = Modifier
+                        .horizontalScroll(horizontalScrollState)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    text.trim().lineSequence().take(40).forEach { line ->
+                        Text(
+                            text = line,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(OutputLine(line)),
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
+            HorizontalScrollbar(
+                adapter = rememberScrollbarAdapter(horizontalScrollState),
+                modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+            )
         }
     }
 }

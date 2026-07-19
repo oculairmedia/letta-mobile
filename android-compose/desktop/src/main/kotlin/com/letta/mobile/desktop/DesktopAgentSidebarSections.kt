@@ -32,6 +32,7 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.desktop.components.DesktopChipTab
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
@@ -241,7 +242,11 @@ private fun SidebarConversationListItem(
 ) {
     SidebarConversationRow(
         model = SidebarConversationRowModel(
-            title = conversation.title,
+            title = conversation.displayTitle(),
+            preview = conversation.lastMessagePreview
+                .trim()
+                .takeUnless { it.equals("Loaded from backend", ignoreCase = true) }
+                .orEmpty(),
             timeLabel = formatRelativeTimestamp(conversation.updatedAtLabel),
             selected = state.selectedDestination == DesktopDestination.Conversations &&
                 conversation.id == state.selectedConversationId,

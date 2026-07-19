@@ -30,6 +30,26 @@ data class ChatConversationSummary(
     val archived: Boolean = false,
 )
 
+fun ChatConversationSummary.displayTitle(maxLength: Int = 56): String {
+    val cleanTitle = title.trim()
+    if (cleanTitle.isNotBlank() && !cleanTitle.startsWith("Conversation ", ignoreCase = true)) {
+        return cleanTitle
+    }
+    val previewTitle = lastMessagePreview
+        .lineSequence()
+        .firstOrNull { it.isNotBlank() }
+        ?.trim()
+        ?.removePrefix("#")
+        ?.trim()
+        ?.takeUnless { it.equals("Loaded from backend", ignoreCase = true) }
+        .orEmpty()
+    return when {
+        previewTitle.isBlank() -> cleanTitle.ifBlank { "New conversation" }
+        previewTitle.length <= maxLength -> previewTitle
+        else -> previewTitle.take((maxLength - 1).coerceAtLeast(1)).trimEnd() + "…"
+    }
+}
+
 @Immutable
 data class ChatConversationGroup(
     val key: String,

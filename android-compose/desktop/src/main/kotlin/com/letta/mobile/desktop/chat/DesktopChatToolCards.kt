@@ -52,7 +52,8 @@ import com.letta.mobile.ui.theme.customColors
  */
 @Composable
 internal fun ToolCard(toolCall: UiToolCall) {
-    var expanded by remember { mutableStateOf(true) }
+    val completed = toolCall.status?.let(::ToolStatusToken)?.isDoneStatus() == true
+    var expanded by remember(toolCall.status, toolCall.result) { mutableStateOf(!completed) }
     val isError = toolCall.isErrorStatus()
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -82,6 +83,9 @@ private fun ToolCardHeader(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
+    val collapsedSummary = toolCall.stepLabel()
+        .takeUnless { it == toolCall.name }
+        ?: toolCall.stepSummary()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -101,8 +105,18 @@ private fun ToolCardHeader(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
         )
+        if (!expanded && collapsedSummary.isNotBlank()) {
+            Text(
+                text = collapsedSummary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
         ToolStatusBadge(ToolStatusToken(toolCall.status ?: "tool call"))
-        Spacer(Modifier.weight(1f))
+        if (expanded) Spacer(Modifier.weight(1f))
         CopyIconButton(text = toolCall.copyPayload())
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
@@ -134,7 +148,21 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
                 )
             }
         }
-        toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it, isError = isError) }
+        toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Output",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                CopyIconButton(text = result)
+            }
+            ToolOutputBlock(result, isError = isError)
+        }
         DesktopImageAttachmentsGrid(
             attachments = toolCall.generatedImageAttachments,
             modifier = Modifier.fillMaxWidth(),

@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -59,18 +60,20 @@ internal fun SidebarConversationRow(
             )
         },
     ) {
-        SidebarConversationRowSurface(
-            SidebarConversationRowSurfaceParams(
-                model = model,
-                appearance = appearance,
-                interaction = SidebarConversationRowInteraction(
-                    hovered = hovered,
-                    interactionSource = interactionSource,
-                    onClick = actions.onClick,
-                    onArchiveToggle = actions.onArchiveToggle,
+        DesktopTooltip(text = model.title) {
+            SidebarConversationRowSurface(
+                SidebarConversationRowSurfaceParams(
+                    model = model,
+                    appearance = appearance,
+                    interaction = SidebarConversationRowInteraction(
+                        hovered = hovered,
+                        interactionSource = interactionSource,
+                        onClick = actions.onClick,
+                        onArchiveToggle = actions.onArchiveToggle,
+                    ),
                 ),
-            ),
-        )
+            )
+        }
     }
 
     if (confirmDelete) {
@@ -164,15 +167,25 @@ private fun SidebarConversationRowSurface(params: SidebarConversationRowSurfaceP
                 ),
                 onArchiveToggle = interaction.onArchiveToggle,
             )
-            Text(
-                text = model.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = conversationTitleColor(deleting = model.deleting),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = model.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = conversationTitleColor(deleting = model.deleting),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (model.preview.isNotBlank() && model.preview != model.title) {
+                    Text(
+                        text = model.preview,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Text(
                 text = if (model.deleting) "Deleting…" else model.timeLabel,
                 style = MaterialTheme.typography.labelSmall,

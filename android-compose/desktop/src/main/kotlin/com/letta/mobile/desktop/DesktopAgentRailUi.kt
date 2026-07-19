@@ -335,17 +335,17 @@ private fun SelectedAgentRailMarker(modifier: Modifier = Modifier) {
 private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .defaultMinSize(minWidth = 19.dp, minHeight = 19.dp)
-            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .defaultMinSize(minWidth = 17.dp, minHeight = 17.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
             .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = 5.dp, vertical = 1.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = if (count > 99) "99+" else count.toString(),
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimary,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

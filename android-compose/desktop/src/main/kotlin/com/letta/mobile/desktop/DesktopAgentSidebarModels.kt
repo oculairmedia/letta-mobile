@@ -34,6 +34,7 @@ internal data class DesktopAgentSidebarActions(
 @Immutable
 internal data class SidebarConversationRowModel(
     val title: String,
+    val preview: String,
     val timeLabel: String,
     val selected: Boolean,
     val thinking: Boolean,

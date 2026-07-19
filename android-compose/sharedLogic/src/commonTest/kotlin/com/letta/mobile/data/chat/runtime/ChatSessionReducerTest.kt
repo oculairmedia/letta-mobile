@@ -83,6 +83,31 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun displayTitleUsesPreviewForGenericConversationNames() {
+        val summary = conversation("conversation-abcdef").copy(
+            title = "Conversation abcdef",
+            lastMessagePreview = "  Investigate the Windows desktop layout regression  ",
+        )
+
+        assertEquals("Investigate the Windows desktop layout regression", summary.displayTitle())
+        assertEquals("Named conversation", summary.copy(title = "Named conversation").displayTitle())
+    }
+
+    @Test
+    fun displayTitleTruncatesLongPreviewsAndIgnoresLoadingPlaceholder() {
+        val summary = conversation("conversation-abcdef").copy(
+            title = "Conversation abcdef",
+            lastMessagePreview = "A long preview that should be shortened",
+        )
+
+        assertEquals("A long pre…", summary.displayTitle(maxLength = 11))
+        assertEquals(
+            "Conversation abcdef",
+            summary.copy(lastMessagePreview = "Loaded from backend").displayTitle(),
+        )
+    }
+
+    @Test
     fun mapsConversationSummaryWithApiProvidedAgentNameWhenCacheMisses() {
         val summary = Conversation(
             id = ConversationId("conversation-abcdef"),
