@@ -67,6 +67,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -966,7 +967,9 @@ fun LettaDesktopApp(
     val irohAgentDirectory = remember(irohTransport) {
         irohTransport?.let { IrohAdminRpcAgentDirectory(it) }
     }
-    currentIrohAgentDirectory = irohAgentDirectory
+    SideEffect {
+        currentIrohAgentDirectory = irohAgentDirectory
+    }
     val chatController = rememberDesktopChatController(
         bootstrapState = bootstrapState,
         chatScope = chatScope,
