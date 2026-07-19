@@ -31,7 +31,7 @@ class DesktopIrohScheduleRepository(
             ?.let { return it }
         val directory = directoryProvider()
             ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "getSchedule")
-        return directory.getSchedule(scheduledMessageId)
+        return directory.getSchedule(scheduledMessageId, agentId)
             ?: throw NoSuchElementException("Schedule $scheduledMessageId not found over iroh admin_rpc")
     }
 
@@ -41,7 +41,7 @@ class DesktopIrohScheduleRepository(
     override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
         val directory = directoryProvider()
             ?: throw DesktopRepositoryUnavailableException("IrohAdminRpcAgentDirectory", "deleteSchedule")
-        directory.deleteSchedule(scheduledMessageId)
+        directory.deleteSchedule(scheduledMessageId, agentId)
         schedulesByAgentFlow.update { current ->
             current.toMutableMap().apply {
                 put(agentId, get(agentId).orEmpty().filterNot { it.id == scheduledMessageId })

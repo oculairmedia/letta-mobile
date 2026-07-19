@@ -476,7 +476,11 @@ class IrohAdminRpcAgentDirectory(
     }
 
     suspend fun listSchedules(agentId: String? = null): List<ScheduledMessage> {
-        val response = transport.adminRpc("schedule.list", "/v1/schedules", "{}")
+        val body = buildJsonObject {
+            agentId?.let { put("agent_id", it) }
+        }.toString()
+        val path = agentId?.let { "/v1/agents/$it/schedule" } ?: "/v1/schedules"
+        val response = transport.adminRpc("schedule.list", path, body)
         if (!response.success) {
             throw TimelineTransportHttpException(502, response.error ?: "schedule.list failed over iroh admin_rpc")
         }
@@ -485,17 +489,25 @@ class IrohAdminRpcAgentDirectory(
         return agentId?.let { id -> schedules.filter { it.agentId == id } } ?: schedules
     }
 
-    suspend fun getSchedule(scheduleId: String): ScheduledMessage? {
-        val body = buildJsonObject { put("schedule_id", scheduleId) }.toString()
-        val response = transport.adminRpc("schedule.get", "/v1/schedules/$scheduleId", body)
+    suspend fun getSchedule(scheduleId: String, agentId: String? = null): ScheduledMessage? {
+        val body = buildJsonObject {
+            put("schedule_id", scheduleId)
+            agentId?.let { put("agent_id", it) }
+        }.toString()
+        val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
+        val response = transport.adminRpc("schedule.get", path, body)
         if (!response.success) return null
         val result = response.result ?: return null
         return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
     }
 
-    suspend fun deleteSchedule(scheduleId: String) {
-        val body = buildJsonObject { put("schedule_id", scheduleId) }.toString()
-        val response = transport.adminRpc("schedule.delete", "/v1/schedules/$scheduleId", body)
+    suspend fun deleteSchedule(scheduleId: String, agentId: String? = null) {
+        val body = buildJsonObject {
+            put("schedule_id", scheduleId)
+            agentId?.let { put("agent_id", it) }
+        }.toString()
+        val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
+        val response = transport.adminRpc("schedule.delete", path, body)
         if (!response.success) {
             throw TimelineTransportHttpException(502, response.error ?: "schedule.delete failed over iroh admin_rpc")
         }
