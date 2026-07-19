@@ -10,7 +10,14 @@ import kotlinx.serialization.json.jsonPrimitive
 object ToolAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        router.register("tool.list") { api.get("tools") }
+        router.register("tool.list") { p ->
+            api.get(
+                adminProxyRequest("v1", "tools")
+                    .query("limit", param(p, "limit"))
+                    .query("offset", param(p, "offset"))
+                    .build()
+            )
+        }
         router.register("tool.get") { p -> param(p, "tool_id")?.let { api.get("tools", it) } ?: adminError("tool_id required") }
         router.register("tool.create") { p -> api.post("tools", body = p?.toString() ?: "{}") }
         router.register("tool.update") { p -> param(p, "tool_id")?.let { api.patch("tools", it, body = p.toString()) } ?: adminError("tool_id required") }

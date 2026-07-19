@@ -17,6 +17,9 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
+import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolCreateParams
+import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
@@ -35,6 +38,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -422,6 +426,56 @@ class IrohAdminRpcAgentDirectory(
         }
         val result = response.result ?: throw TimelineTransportHttpException(502, "agent.context returned no result over iroh admin_rpc")
         return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
+    }
+
+    suspend fun listTools(limit: Int, offset: Int): List<Tool> {
+        val body = buildJsonObject {
+            put("limit", limit)
+            put("offset", offset)
+        }.toString()
+        val response = transport.adminRpc("tool.list", "/v1/tools?limit=$limit&offset=$offset", body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "tool.list failed over iroh admin_rpc")
+        }
+        val result = response.result ?: return emptyList()
+        return json.decodeFromJsonElement(ListSerializer(Tool.serializer()), result)
+    }
+
+    suspend fun createTool(params: ToolCreateParams): Tool {
+        val body = json.encodeToString(ToolCreateParams.serializer(), params)
+        val response = transport.adminRpc("tool.create", "/v1/tools", body)
+        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "tool.create failed over iroh admin_rpc")
+        val result = response.result ?: throw TimelineTransportHttpException(502, "tool.create returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Tool.serializer(), result)
+    }
+
+    suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+        val paramsJson = json.encodeToJsonElement(ToolUpdateParams.serializer(), params).jsonObject
+        val body = buildJsonObject {
+            put("tool_id", toolId)
+            paramsJson.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        val response = transport.adminRpc("tool.update", "/v1/tools/$toolId", body)
+        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "tool.update failed over iroh admin_rpc")
+        val result = response.result ?: throw TimelineTransportHttpException(502, "tool.update returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Tool.serializer(), result)
+    }
+
+    suspend fun deleteTool(toolId: String) {
+        val body = buildJsonObject { put("tool_id", toolId) }.toString()
+        val response = transport.adminRpc("tool.delete", "/v1/tools/$toolId", body)
+        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "tool.delete failed over iroh admin_rpc")
+    }
+
+    suspend fun setToolAttached(agentId: String, toolId: String, attached: Boolean) {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("tool_id", toolId)
+        }.toString()
+        val method = if (attached) "tool.attach" else "tool.detach"
+        val action = if (attached) "attach" else "detach"
+        val response = transport.adminRpc(method, "/v1/agents/$agentId/tools/$action/$toolId", body)
+        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
     }
 
     suspend fun listSkills(agentId: String? = null): List<Skill> {

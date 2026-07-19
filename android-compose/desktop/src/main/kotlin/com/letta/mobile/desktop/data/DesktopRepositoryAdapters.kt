@@ -221,6 +221,7 @@ class DesktopRepositoryAdapters(
         ?.let(::DesktopLettaHttpAdminRepositories)
     private val irohAgentRepository = if (irohMode) DesktopIrohAgentRepository(irohAgentDirectoryProvider) else null
     private val irohScheduleRepository = if (irohMode) DesktopIrohScheduleRepository(irohAgentDirectoryProvider) else null
+    private val irohToolRepository = if (irohMode) DesktopIrohToolRepository(irohAgentDirectoryProvider) else null
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 
@@ -243,7 +244,7 @@ class DesktopRepositoryAdapters(
     val selfTodoRepository: ISelfTodoRepository = unavailableRepository()
     val stepRepository: IStepRepository = unavailableRepository()
     val subagentRepository: ISubagentRepository = unavailableRepository()
-    val toolRepository: IToolRepository = adminRepositories ?: unavailableRepository()
+    val toolRepository: IToolRepository = irohToolRepository ?: adminRepositories ?: unavailableRepository()
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailableRepository()
 }
 
