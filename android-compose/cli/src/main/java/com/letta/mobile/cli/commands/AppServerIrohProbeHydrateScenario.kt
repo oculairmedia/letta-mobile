@@ -120,7 +120,15 @@ internal class HydrateHeavyProbeScenario(
         val maxPages = (seeded / pageLimit) + 5
         while (page < maxPages) {
             page += 1
-            val pageResult = fetchHydratePage(established, conversationId, pageLimit, after, page)
+            val pageResult = fetchHydratePage(
+                HydratePageRequest(
+                    session = established,
+                    conversationId = conversationId,
+                    pageLimit = pageLimit,
+                    after = after,
+                    page = page,
+                ),
+            )
             val failure = pageResult.failure
             if (failure != null) {
                 failures += failure
@@ -137,6 +145,14 @@ internal class HydrateHeavyProbeScenario(
         return HydratePageResult(listed = listed, pageLimit = pageLimit, failures = failures)
     }
 
+    private data class HydratePageRequest(
+        val session: ProbeSession,
+        val conversationId: ProbeConversationId,
+        val pageLimit: Int,
+        val after: String?,
+        val page: Int,
+    )
+
     private data class PageFetch(
         val itemCount: Int = 0,
         val nextAfter: String? = null,
@@ -144,29 +160,23 @@ internal class HydrateHeavyProbeScenario(
         val failure: String? = null,
     )
 
-    private suspend fun fetchHydratePage(
-        established: ProbeSession,
-        conversationId: ProbeConversationId,
-        pageLimit: Int,
-        after: String?,
-        page: Int,
-    ): PageFetch {
-        val response = established.client.adminRpc(
+    private suspend fun fetchHydratePage(request: HydratePageRequest): PageFetch {
+        val response = request.session.client.adminRpc(
             AppServerCommand.AdminRpc(
-                requestId = "probe-hydrate-$page-${UUID.randomUUID()}",
+                requestId = "probe-hydrate-${request.page}-${UUID.randomUUID()}",
                 method = "message.list",
                 params = buildJsonObject {
-                    put("conversation_id", conversationId.value)
-                    put("limit", pageLimit.toString())
-                    after?.let { put("after", it) }
+                    put("conversation_id", request.conversationId.value)
+                    put("limit", request.pageLimit.toString())
+                    request.after?.let { put("after", it) }
                 },
             ),
         )
         val items = response.result as? JsonArray
         if (!response.success || items == null) {
-            return PageFetch(failure = "page-$page: ${response.error ?: "non-array result"}")
+            return PageFetch(failure = "page-${request.page}: ${response.error ?: "non-array result"}")
         }
-        if (items.isEmpty() || items.size < pageLimit) {
+        if (items.isEmpty() || items.size < request.pageLimit) {
             return PageFetch(itemCount = items.size, done = true)
         }
         val nextAfter = items.last().jsonObject["id"]?.jsonPrimitive?.contentOrNull

@@ -15,9 +15,7 @@ internal class LegacyProbeScenarios(
     private val fixture: ProbeSessionFixture,
 ) {
     suspend fun run(scenarioSet: Set<String>, target: ProbeTarget): List<IrohProbeTurnMetrics> {
-        val legacyOnly = scenarioSet intersect setOf("admin-rpc", "idle-send", "restart-send")
-        val newOnly = scenarioSet - legacyOnly
-        if (scenarioSet.isNotEmpty() && legacyOnly.isEmpty() && newOnly.isNotEmpty()) return emptyList()
+        if (scenarioSet.skipsLegacyProbeTurns()) return emptyList()
 
         val turns = mutableListOf<IrohProbeTurnMetrics>()
         if ("idle-send" in scenarioSet) {
@@ -25,7 +23,7 @@ internal class LegacyProbeScenarios(
         } else {
             turns += runDefaultTurns(target, scenarioSet)
         }
-        if ("restart-send" in scenarioSet && "idle-send" in scenarioSet) {
+        if (scenarioSet.includesPostIdleRestart()) {
             turns += runPostIdleRestart(target, turns.size + 1)
         }
         return turns
@@ -149,6 +147,21 @@ internal class LegacyProbeScenarios(
         notes = listOf(note),
         skipped = true,
     )
+}
+
+private val legacyProbeScenarios = setOf("admin-rpc", "idle-send", "restart-send")
+
+/** True when the caller only asked for non-legacy scenarios (hydrate/cancel/etc.). */
+private fun Set<String>.skipsLegacyProbeTurns(): Boolean {
+    if (isEmpty()) return false
+    val legacy = this intersect legacyProbeScenarios
+    if (legacy.isNotEmpty()) return false
+    return (this - legacy).isNotEmpty()
+}
+
+private fun Set<String>.includesPostIdleRestart(): Boolean {
+    if ("restart-send" !in this) return false
+    return "idle-send" in this
 }
 
 internal class NoHttpProbeScenario(
