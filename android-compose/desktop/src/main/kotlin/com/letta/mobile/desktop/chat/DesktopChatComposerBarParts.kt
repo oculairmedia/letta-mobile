@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -38,6 +41,8 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.composer.ActiveToken
@@ -47,7 +52,6 @@ import com.letta.mobile.data.composer.ComposerEffort
 import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
-import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.theme.customColors
 
@@ -196,9 +200,27 @@ private fun ComposerPendingAttachmentsRow(
 
 @Composable
 private fun ComposerTextField(params: ComposerInputSurfaceParams) {
-    DesktopTextArea(
-        value = params.state.text,
-        onValueChange = params.actions.onTextChanged,
+    var fieldValue by remember { mutableStateOf(TextFieldValue(params.state.text)) }
+    LaunchedEffect(params.state.text) {
+        if (params.state.text != fieldValue.text) {
+            fieldValue = TextFieldValue(
+                text = params.state.text,
+                selection = TextRange(params.state.text.length),
+            )
+        }
+    }
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+
+    BasicTextField(
+        value = fieldValue,
+        onValueChange = { nextValue ->
+            fieldValue = nextValue
+            if (nextValue.text != params.state.text) {
+                params.actions.onTextChanged(nextValue.text)
+            }
+        },
         enabled = params.state.enabled,
         modifier = Modifier
             .fillMaxWidth()
@@ -216,9 +238,21 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
                     ),
                 )
             },
+        textStyle = textStyle,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         maxLines = 5,
-        placeholder = params.state.placeholder,
-        undecorated = true,
+        decorationBox = { innerTextField ->
+            Box(modifier = Modifier.fillMaxWidth()) {
+                if (fieldValue.text.isEmpty()) {
+                    Text(
+                        text = params.state.placeholder,
+                        style = textStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                innerTextField()
+            }
+        },
     )
 }
 

@@ -281,14 +281,16 @@ internal fun AgentText(params: AgentTextParams) {
     } else {
         params.text
     }
-    com.letta.mobile.ui.markdown.SharedMarkdownText(
-        text = displayText,
-        textColor = if (params.isError) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        },
-    )
+    SelectionContainer {
+        com.letta.mobile.ui.markdown.SharedMarkdownText(
+            text = displayText,
+            textColor = if (params.isError) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+        )
+    }
 }
 
 @Composable
