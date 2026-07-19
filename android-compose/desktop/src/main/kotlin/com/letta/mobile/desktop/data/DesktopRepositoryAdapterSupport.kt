@@ -54,7 +54,7 @@ internal inline fun <reified T : Any> unavailableRepository(): T {
     ) as T
 }
 
-private class UnavailableRepositoryInvocationHandler(
+internal class UnavailableRepositoryInvocationHandler(
     private val contractName: String,
 ) : InvocationHandler {
     private val stateFlows = mutableMapOf<String, StateFlow<*>>()

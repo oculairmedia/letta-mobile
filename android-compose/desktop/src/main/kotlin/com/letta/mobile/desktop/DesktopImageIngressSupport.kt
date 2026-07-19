@@ -4,7 +4,6 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import java.awt.Component
 import java.awt.Container
-import java.awt.KeyEvent
 import java.awt.Window
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.Transferable
@@ -12,6 +11,7 @@ import java.awt.dnd.DnDConstants
 import java.awt.dnd.DropTarget
 import java.awt.dnd.DropTargetAdapter
 import java.awt.dnd.DropTargetDropEvent
+import java.awt.event.KeyEvent
 import java.awt.event.WindowEvent
 import java.awt.image.BufferedImage
 import java.io.File
