@@ -159,7 +159,6 @@ import com.letta.mobile.desktop.schedules.DesktopScheduleSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.commands.SlashCommandApi
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.skills.SkillApi
 import com.letta.mobile.data.skills.SkillsApi

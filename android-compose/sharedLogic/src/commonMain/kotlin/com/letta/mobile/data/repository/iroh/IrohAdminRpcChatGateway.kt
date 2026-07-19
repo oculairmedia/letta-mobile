@@ -22,6 +22,8 @@ import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolUpdateParams
+import com.letta.mobile.data.commands.AgentSlashCommand
+import com.letta.mobile.data.commands.SlashCommandsResponse
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
@@ -494,6 +496,17 @@ class IrohAdminRpcAgentDirectory(
         val result = adminRpcResult(method, path, body) ?: return emptyList()
         val skillsElement = (result as? kotlinx.serialization.json.JsonObject)?.get("skills") ?: result
         return json.decodeFromJsonElement(ListSerializer(Skill.serializer()), skillsElement)
+    }
+
+    /** Per-agent slash commands (builtins + installed skills) over admin_rpc. */
+    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
+        val body = buildJsonObject { put("agent_id", agentId) }.toString()
+        val result = adminRpcResult(
+            "slash_command.list_agent",
+            "/v1/agents/$agentId/slash-commands",
+            body,
+        ) ?: return emptyList()
+        return json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
     }
 
     suspend fun installSkill(agentId: String, skillName: String) {

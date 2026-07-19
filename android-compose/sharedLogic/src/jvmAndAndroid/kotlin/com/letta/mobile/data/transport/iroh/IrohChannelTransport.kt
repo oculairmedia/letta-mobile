@@ -1246,6 +1246,8 @@ class IrohChannelTransport(
             "schedule.list",
             "skill.list",
             "skill.list_agent",
+            "slash_command.list",
+            "slash_command.list_agent",
             "tool.get",
             "tool.list",
             "block.get",

@@ -14,12 +14,14 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.schedules.CronApi
 import com.letta.mobile.data.commands.SlashCommandApi
+import com.letta.mobile.data.commands.SlashCommandsApi
 import com.letta.mobile.data.skills.SkillsApi
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohConnectConfig
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
+import com.letta.mobile.desktop.commands.DesktopIrohSlashCommandApi
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
@@ -184,7 +186,7 @@ internal class DesktopHttpApis(
     val blockApi: DesktopBlockApi?,
     val cronApi: CronApi?,
     val skillApi: SkillsApi?,
-    val slashCommandApi: SlashCommandApi?,
+    val slashCommandApi: SlashCommandsApi?,
 )
 
 private fun createDesktopBlockApi(
@@ -205,6 +207,15 @@ private fun createDesktopSkillApi(
     else -> httpConfig?.let { SkillApi(it, createDesktopLettaHttpClient()) }
 }
 
+private fun createDesktopSlashCommandApi(
+    irohMode: Boolean,
+    irohAgentDirectory: IrohAdminRpcAgentDirectory?,
+    httpConfig: LettaConfig?,
+): SlashCommandsApi? = when {
+    irohMode -> irohAgentDirectory?.let(::DesktopIrohSlashCommandApi)
+    else -> httpConfig?.let { SlashCommandApi(it, createDesktopLettaHttpClient()) }
+}
+
 private fun createDesktopHttpApis(
     activeConfig: LettaConfig,
     irohMode: Boolean,
@@ -216,7 +227,7 @@ private fun createDesktopHttpApis(
         blockApi = createDesktopBlockApi(irohMode, irohAgentDirectory, httpConfig),
         cronApi = httpConfig?.let { CronApi(it, httpClient) },
         skillApi = createDesktopSkillApi(irohMode, irohAgentDirectory, httpConfig),
-        slashCommandApi = httpConfig?.let { SlashCommandApi(it, httpClient) },
+        slashCommandApi = createDesktopSlashCommandApi(irohMode, irohAgentDirectory, httpConfig),
     )
 }
 

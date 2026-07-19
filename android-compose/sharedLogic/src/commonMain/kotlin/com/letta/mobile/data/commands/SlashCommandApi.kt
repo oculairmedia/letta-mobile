@@ -17,15 +17,21 @@ import kotlinx.serialization.Serializable
  * any installed skill's commands). Selecting one fills the composer with its
  * command text so the user can add args and send.
  *
- * Lives in commonMain; the platform supplies the Ktor [HttpClient].
+ * Lives in commonMain; HTTP hosts use [SlashCommandApi], iroh:// hosts use
+ * [com.letta.mobile.data.repository.iroh.IrohSlashCommandApi].
  */
+interface SlashCommandsApi : AutoCloseable {
+    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand>
+    override fun close() = Unit
+}
+
 class SlashCommandApi(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
-) : AutoCloseable {
+) : SlashCommandsApi {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
-    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
+    override suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> {
         val response = httpClient.get("$baseUrl/v1/agents/$agentId/slash-commands") { applyAuth() }
         response.requireSuccess()
         return response.body<SlashCommandsResponse>().commands
@@ -60,6 +66,6 @@ data class AgentSlashCommand(
 }
 
 @Serializable
-private data class SlashCommandsResponse(
+internal data class SlashCommandsResponse(
     val commands: List<AgentSlashCommand> = emptyList(),
 )

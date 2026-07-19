@@ -34,12 +34,10 @@ open class ProjectRepository @Inject constructor(
     }
 
     private suspend fun refreshProjectsLocked(): ProjectCatalog {
-        val source = irohProjectSource
-        val catalog = if (source != null && source.shouldUseIroh()) {
-            source.refreshProjects()
-        } else {
-            projectApi.listProjects()
-        }.sanitize()
+        val catalog = fromActiveSource(
+            iroh = { it.refreshProjects() },
+            http = { projectApi.listProjects() },
+        ).sanitize()
         _projects.value = catalog.projects
         lastRefreshAtMillis = System.currentTimeMillis()
         return catalog
@@ -49,48 +47,33 @@ open class ProjectRepository @Inject constructor(
         val cached = _projects.value.firstOrNull { it.identifier == identifier }
         if (cached != null) return cached
 
-        val source = irohProjectSource
-        val fresh = if (source != null && source.shouldUseIroh()) {
-            source.getProject(identifier)
-        } else {
-            projectApi.getProject(identifier)
-        }.sanitize()
-        _projects.update { current ->
-            val index = current.indexOfFirst { it.identifier == fresh.identifier }
-            if (index >= 0) {
-                current.toMutableList().apply { this[index] = fresh }
-            } else {
-                current + fresh
-            }
-        }
+        val fresh = fromActiveSource(
+            iroh = { it.getProject(identifier) },
+            http = { projectApi.getProject(identifier) },
+        ).sanitize()
+        upsertProject(fresh)
         return fresh
     }
 
     override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
-        val source = irohProjectSource
-        return if (source != null && source.shouldUseIroh()) {
-            source.getBeadsRemoteStatus(identifier)
-        } else {
-            projectApi.getBeadsRemoteStatus(identifier)
-        }.sanitize()
+        return fromActiveSource(
+            iroh = { it.getBeadsRemoteStatus(identifier) },
+            http = { projectApi.getBeadsRemoteStatus(identifier) },
+        ).sanitize()
     }
 
     override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse {
-        val source = irohProjectSource
-        return if (source != null && source.shouldUseIroh()) {
-            source.provisionBeadsRemote(identifier, push)
-        } else {
-            projectApi.provisionBeadsRemote(identifier, push)
-        }
+        return fromActiveSource(
+            iroh = { it.provisionBeadsRemote(identifier, push) },
+            http = { projectApi.provisionBeadsRemote(identifier, push) },
+        )
     }
 
     override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
-        val source = irohProjectSource
-        return if (source != null && source.shouldUseIroh()) {
-            source.triggerSync(identifier)
-        } else {
-            projectApi.triggerSync(identifier)
-        }
+        return fromActiveSource(
+            iroh = { it.triggerSync(identifier) },
+            http = { projectApi.triggerSync(identifier) },
+        )
     }
 
     override suspend fun createProject(
@@ -98,18 +81,18 @@ open class ProjectRepository @Inject constructor(
         filesystemPath: String,
         gitUrl: String?,
     ): ProjectSummary {
-        val source = irohProjectSource
-        val created = if (source != null && source.shouldUseIroh()) {
-            source.createProject(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl)
-        } else {
-            projectApi.createProject(
-                ProjectCreateRequest(
-                    name = name,
-                    filesystemPath = filesystemPath,
-                    gitUrl = gitUrl,
-                ),
-            )
-        }.sanitize()
+        val created = fromActiveSource(
+            iroh = { it.createProject(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl) },
+            http = {
+                projectApi.createProject(
+                    ProjectCreateRequest(
+                        name = name,
+                        filesystemPath = filesystemPath,
+                        gitUrl = gitUrl,
+                    ),
+                )
+            },
+        ).sanitize()
         _projects.update { current ->
             (current + created)
                 .distinctBy { it.identifier }
@@ -124,56 +107,44 @@ open class ProjectRepository @Inject constructor(
         filesystemPath: String?,
         gitUrl: String?,
     ): ProjectSummary {
-        val source = irohProjectSource
-        val updated = if (source != null && source.shouldUseIroh()) {
-            source.updateProject(identifier = identifier, filesystemPath = filesystemPath, gitUrl = gitUrl)
-        } else {
-            projectApi.updateProject(
-                identifier = identifier,
-                request = ProjectUpdateRequest(
+        val updated = fromActiveSource(
+            iroh = {
+                it.updateProject(
+                    identifier = identifier,
                     filesystemPath = filesystemPath,
                     gitUrl = gitUrl,
-                ),
-            )
-        }.sanitize()
-        _projects.update { current ->
-            val index = current.indexOfFirst { it.identifier == updated.identifier }
-            if (index >= 0) {
-                current.toMutableList().apply { this[index] = updated }
-            } else {
-                current + updated
-            }
-        }
+                )
+            },
+            http = {
+                projectApi.updateProject(
+                    identifier = identifier,
+                    request = ProjectUpdateRequest(
+                        filesystemPath = filesystemPath,
+                        gitUrl = gitUrl,
+                    ),
+                )
+            },
+        ).sanitize()
+        upsertProject(updated)
         lastRefreshAtMillis = System.currentTimeMillis()
         return updated
     }
 
     override suspend fun archiveProject(identifier: String): ProjectSummary {
-        val source = irohProjectSource
-        val updated = if (source != null && source.shouldUseIroh()) {
-            source.archiveProject(identifier)
-        } else {
-            projectApi.archiveProject(identifier)
-        }.sanitize()
-        _projects.update { current ->
-            val index = current.indexOfFirst { it.identifier == updated.identifier }
-            if (index >= 0) {
-                current.toMutableList().apply { this[index] = updated }
-            } else {
-                current + updated
-            }
-        }
+        val updated = fromActiveSource(
+            iroh = { it.archiveProject(identifier) },
+            http = { projectApi.archiveProject(identifier) },
+        ).sanitize()
+        upsertProject(updated)
         lastRefreshAtMillis = System.currentTimeMillis()
         return updated
     }
 
     override suspend fun deleteProject(identifier: String) {
-        val source = irohProjectSource
-        if (source != null && source.shouldUseIroh()) {
-            source.deleteProject(identifier)
-        } else {
-            projectApi.deleteProject(identifier)
-        }
+        fromActiveSource(
+            iroh = { it.deleteProject(identifier) },
+            http = { projectApi.deleteProject(identifier) },
+        )
         _projects.update { current -> current.filterNot { it.identifier == identifier } }
         lastRefreshAtMillis = System.currentTimeMillis()
     }
@@ -186,6 +157,25 @@ open class ProjectRepository @Inject constructor(
         if (hasFreshProjects(maxAgeMs)) return@withLock false
         refreshProjectsLocked()
         true
+    }
+
+    private suspend fun <T> fromActiveSource(
+        iroh: suspend (IrohAdminRpcProjectSource) -> T,
+        http: suspend () -> T,
+    ): T {
+        val source = irohProjectSource
+        return if (source != null && source.shouldUseIroh()) iroh(source) else http()
+    }
+
+    private fun upsertProject(project: ProjectSummary) {
+        _projects.update { current ->
+            val index = current.indexOfFirst { it.identifier == project.identifier }
+            if (index >= 0) {
+                current.toMutableList().apply { this[index] = project }
+            } else {
+                current + project
+            }
+        }
     }
 
     private fun ProjectCatalog.sanitize(): ProjectCatalog = copy(

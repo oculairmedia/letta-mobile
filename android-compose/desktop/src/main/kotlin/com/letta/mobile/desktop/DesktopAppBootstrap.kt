@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.commands.AgentSlashCommand
-import com.letta.mobile.data.commands.SlashCommandApi
+import com.letta.mobile.data.commands.SlashCommandsApi
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.schedules.CronApi
@@ -357,7 +357,7 @@ private suspend fun loadSkillsSnapshot(
 
 /** The focused agent's server slash commands for the composer palette. */
 internal suspend fun loadAgentSlashCommands(
-    api: SlashCommandApi?,
+    api: SlashCommandsApi?,
     agentId: String?,
 ): List<AgentSlashCommand> = if (api != null && agentId != null) {
     runCatching { api.listAgentSlashCommands(agentId) }.getOrDefault(emptyList())
