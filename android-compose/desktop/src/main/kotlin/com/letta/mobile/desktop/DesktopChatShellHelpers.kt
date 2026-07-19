@@ -318,13 +318,22 @@ internal fun buildRailAgents(
  * as before (the shared model does not filter archived conversations — that is
  * the consumer's job).
  */
+internal data class FilterStackConversationsParams(
+    val conversations: List<DesktopConversationSummary>,
+    val activeSubagents: List<SubagentEntry>,
+    val selectedAgentName: String,
+    val selectedConversationId: String?,
+    val archiveFilter: ConversationArchiveFilter,
+)
+
 internal fun filterStackConversations(
-    conversations: List<DesktopConversationSummary>,
-    activeSubagents: List<SubagentEntry>,
-    selectedAgentName: String,
-    selectedConversationId: String?,
-    archiveFilter: ConversationArchiveFilter,
+    params: FilterStackConversationsParams,
 ): List<DesktopConversationSummary> {
+    val conversations = params.conversations
+    val activeSubagents = params.activeSubagents
+    val selectedAgentName = params.selectedAgentName
+    val selectedConversationId = params.selectedConversationId
+    val archiveFilter = params.archiveFilter
     val grouping = groupSubagentConversations(conversations, activeSubagents)
     val selectedStack = selectedConversationId?.let { convId ->
         grouping.stacks.firstOrNull { convId in it.memberConversationIds }
@@ -357,14 +366,16 @@ private fun List<DesktopConversationSummary>.applyArchiveFilterNewestFirst(
  * @mention candidates: other agents + the focused agent's memory blocks.
  * (Files need a client-side index — tracked as a follow-up.)
  */
-internal fun buildMentionables(
-    railAgents: List<Pair<String, String>>,
-    memoryState: DesktopMemorySurfaceState,
-): List<Mentionable> = buildList {
-    railAgents.forEach { (id, name) ->
+internal data class BuildMentionablesParams(
+    val railAgents: List<Pair<String, String>>,
+    val memoryState: DesktopMemorySurfaceState,
+)
+
+internal fun buildMentionables(params: BuildMentionablesParams): List<Mentionable> = buildList {
+    params.railAgents.forEach { (id, name) ->
         add(Mentionable(id = id, label = name, sublabel = "agent", kind = MentionKind.Agent, insertText = name))
     }
-    memoryState.memory.sections
+    params.memoryState.memory.sections
         .flatMap { it.items }
         .filterIsInstance<MemoryParityItem.MemoryBlock>()
         .forEach { block ->

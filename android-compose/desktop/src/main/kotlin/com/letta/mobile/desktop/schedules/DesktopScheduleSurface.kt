@@ -211,9 +211,38 @@ fun DesktopScheduleSurface(
                         // Show data as soon as anything projects, even while a
                         // parallel source is still loading.
                         defs.isNotEmpty() -> when (view) {
-                            ScheduleView.Week -> WeekView(defs, weekStart, today, now, zone, selectedId) { rail = RailState.Run(it) }
-                            ScheduleView.Agenda -> AgendaView(defs, selectedDate, today, now, zone, { selectedDate = it }) { rail = RailState.Run(it) }
-                            ScheduleView.Timeline -> TimelineView(defs, weekStart, today, now, zone) { rail = RailState.Detail(it) }
+                            ScheduleView.Week -> WeekView(
+                                WeekViewParams(
+                                    defs = defs,
+                                    weekStart = weekStart,
+                                    today = today,
+                                    now = now,
+                                    zone = zone,
+                                    selectedId = selectedId,
+                                    onRunClick = { rail = RailState.Run(it) },
+                                ),
+                            )
+                            ScheduleView.Agenda -> AgendaView(
+                                AgendaViewParams(
+                                    defs = defs,
+                                    selectedDate = selectedDate,
+                                    today = today,
+                                    now = now,
+                                    zone = zone,
+                                    onSelectDate = { selectedDate = it },
+                                    onRunClick = { rail = RailState.Run(it) },
+                                ),
+                            )
+                            ScheduleView.Timeline -> TimelineView(
+                                TimelineViewParams(
+                                    defs = defs,
+                                    weekStart = weekStart,
+                                    today = today,
+                                    now = now,
+                                    zone = zone,
+                                    onLaneClick = { rail = RailState.Detail(it) },
+                                ),
+                            )
                             ScheduleView.History -> HistoryView(historySummary)
                         }
                         // Surface backend failures with a retry instead of
@@ -233,15 +262,17 @@ fun DesktopScheduleSurface(
                 val showRail = rail !is RailState.Overview || view == ScheduleView.Week || view == ScheduleView.Agenda
                 if (showRail) {
                     ScheduleRail(
-                        rail = rail,
-                        defs = defs,
-                        defsById = defsById,
-                        history = historySummary,
-                        now = now,
-                        zone = zone,
-                        onSelectSchedule = { rail = RailState.Detail(it) },
-                        onBackToOverview = { rail = RailState.Overview },
-                        onDelete = { onDeleteCron(it); rail = RailState.Overview },
+                        ScheduleRailParams(
+                            rail = rail,
+                            defs = defs,
+                            defsById = defsById,
+                            history = historySummary,
+                            now = now,
+                            zone = zone,
+                            onSelectSchedule = { rail = RailState.Detail(it) },
+                            onBackToOverview = { rail = RailState.Overview },
+                            onDelete = { onDeleteCron(it); rail = RailState.Overview },
+                        ),
                     )
                 }
             }
@@ -249,14 +280,16 @@ fun DesktopScheduleSurface(
 
         if (showCreate) {
             CreateScheduleModal(
-                now = now,
-                zone = zone,
-                canCreate = canCreate,
-                onDismiss = { showCreate = false },
-                onCreate = { name, prompt, cron ->
-                    onCreateCron(filterAgentId, name, prompt, cron, true, zone.id)
-                    showCreate = false
-                },
+                CreateScheduleModalParams(
+                    now = now,
+                    zone = zone,
+                    canCreate = canCreate,
+                    onDismiss = { showCreate = false },
+                    onCreate = { name, prompt, cron ->
+                        onCreateCron(filterAgentId, name, prompt, cron, true, zone.id)
+                        showCreate = false
+                    },
+                ),
             )
         }
     }

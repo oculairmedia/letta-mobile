@@ -7,8 +7,8 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.model.ProjectId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -73,14 +73,7 @@ interface IAgentRepository {
     suspend fun deleteAgent(id: String) = deleteAgent(AgentId(id))
     suspend fun exportAgent(id: AgentId): String
     suspend fun exportAgent(id: String): String = exportAgent(AgentId(id))
-    suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String? = null,
-        overrideExistingTools: Boolean? = null,
-        projectId: ProjectId? = null,
-        stripMessages: Boolean? = null,
-    ): ImportedAgentsResponse
+    suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse
     suspend fun attachArchive(agentId: AgentId, archiveId: String)
     suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
     suspend fun detachArchive(agentId: AgentId, archiveId: String)

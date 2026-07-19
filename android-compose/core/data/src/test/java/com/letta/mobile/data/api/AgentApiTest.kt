@@ -2,6 +2,7 @@ package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
@@ -307,11 +308,13 @@ class AgentApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
         val api = createApi(client)
 
         val response = api.importAgent(
-            fileName = "agent.json",
-            fileBytes = "{}".toByteArray(),
-            overrideName = "Clone Name",
-            overrideExistingTools = false,
-            stripMessages = true,
+            AgentImportParams(
+                fileName = "agent.json",
+                fileBytes = "{}".toByteArray(),
+                overrideName = "Clone Name",
+                overrideExistingTools = false,
+                stripMessages = true,
+            ),
         )
 
         assertEquals(HttpMethod.Post, capturedMethod)

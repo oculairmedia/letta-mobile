@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ProjectId
@@ -194,14 +195,7 @@ open class LettaHttpAdminRepositories(
     override suspend fun exportAgent(id: AgentId): String =
         getJson("/v1/agents/${id.value}/export")
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse =
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse =
         throw UnsupportedOperationException("Desktop agent import is not implemented yet.")
 
     override suspend fun attachArchive(agentId: AgentId, archiveId: String) {

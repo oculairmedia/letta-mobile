@@ -71,11 +71,13 @@ class DesktopSubagentStackFilteringTest {
         )
 
         val selectingA = filterStackConversations(
-            conversations = conversations,
-            activeSubagents = activeSubagents,
-            selectedAgentName = "Letta Code",
-            selectedConversationId = "conv-a",
-            archiveFilter = ConversationArchiveFilter.All,
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = activeSubagents,
+                selectedAgentName = "Letta Code",
+                selectedConversationId = "conv-a",
+                archiveFilter = ConversationArchiveFilter.All,
+            ),
         )
 
         assertEquals(
@@ -105,11 +107,13 @@ class DesktopSubagentStackFilteringTest {
         )
 
         val result = filterStackConversations(
-            conversations = conversations,
-            activeSubagents = activeSubagents,
-            selectedAgentName = "Letta Code",
-            selectedConversationId = "conv-2",
-            archiveFilter = ConversationArchiveFilter.All,
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = activeSubagents,
+                selectedAgentName = "Letta Code",
+                selectedConversationId = "conv-2",
+                archiveFilter = ConversationArchiveFilter.All,
+            ),
         )
 
         assertEquals(
@@ -130,11 +134,13 @@ class DesktopSubagentStackFilteringTest {
         )
 
         val result = filterStackConversations(
-            conversations = conversations,
-            activeSubagents = emptyList(),
-            selectedAgentName = "Ada",
-            selectedConversationId = "n1",
-            archiveFilter = ConversationArchiveFilter.All,
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = emptyList(),
+                selectedAgentName = "Ada",
+                selectedConversationId = "n1",
+                archiveFilter = ConversationArchiveFilter.All,
+            ),
         )
 
         assertEquals(
@@ -155,11 +161,13 @@ class DesktopSubagentStackFilteringTest {
         )
 
         val result = filterStackConversations(
-            conversations = conversations,
-            activeSubagents = emptyList(),
-            selectedAgentName = "Ada",
-            selectedConversationId = "a1",
-            archiveFilter = ConversationArchiveFilter.All,
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = emptyList(),
+                selectedAgentName = "Ada",
+                selectedConversationId = "a1",
+                archiveFilter = ConversationArchiveFilter.All,
+            ),
         )
 
         assertEquals(
@@ -181,18 +189,22 @@ class DesktopSubagentStackFilteringTest {
         )
 
         val activeOnly = filterStackConversations(
-            conversations = conversations,
-            activeSubagents = activeSubagents,
-            selectedAgentName = "Letta Code",
-            selectedConversationId = "live",
-            archiveFilter = ConversationArchiveFilter.Active,
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = activeSubagents,
+                selectedAgentName = "Letta Code",
+                selectedConversationId = "live",
+                archiveFilter = ConversationArchiveFilter.Active,
+            ),
         )
         val archivedOnly = filterStackConversations(
-            conversations = conversations,
-            activeSubagents = activeSubagents,
-            selectedAgentName = "Letta Code",
-            selectedConversationId = "live",
-            archiveFilter = ConversationArchiveFilter.Archived,
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = activeSubagents,
+                selectedAgentName = "Letta Code",
+                selectedConversationId = "live",
+                archiveFilter = ConversationArchiveFilter.Archived,
+            ),
         )
 
         assertEquals(listOf("live"), activeOnly.map { it.id }, "Active filter drops archived members")

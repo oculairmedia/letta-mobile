@@ -347,9 +347,7 @@ internal fun AgentText(text: String, isError: Boolean, isStreaming: Boolean = fa
 @Composable
 internal fun ToolCard(toolCall: UiToolCall) {
     var expanded by remember { mutableStateOf(true) }
-    val isError = toolCall.status?.let {
-        it.equals("error", ignoreCase = true) || it.equals("failed", ignoreCase = true)
-    } == true
+    val isError = toolCall.isErrorStatus()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -360,77 +358,101 @@ internal fun ToolCard(toolCall: UiToolCall) {
         ),
     ) {
         Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Terminal,
-                    contentDescription = null,
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = toolCall.name,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                ToolStatusBadge(toolCall.status ?: "tool call")
-                Spacer(Modifier.weight(1f))
-                CopyIconButton(
-                    text = listOfNotNull(
-                        toolCall.arguments.takeIf { it.isNotBlank() },
-                        toolCall.result?.takeIf { it.isNotBlank() },
-                    ).joinToString("\n\n").ifBlank { toolCall.name },
-                )
-                Icon(
-                    imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse" else "Expand",
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            ToolCardHeader(
+                toolCall = toolCall,
+                expanded = expanded,
+                onToggle = { expanded = !expanded },
+            )
             if (expanded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
-                )
-                Column(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
-                        SelectionContainer {
-                            Text(
-                                text = "$ ${primaryToolArgument(args)}",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
-                    }
-                    toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it, isError = isError) }
-                    DesktopImageAttachmentsGrid(
-                        attachments = toolCall.generatedImageAttachments,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    toolCall.executionTimeMs?.let { ms ->
-                        Text(
-                            text = "${toolCall.status?.replaceFirstChar { it.uppercase() } ?: "Done"} · ${ms} ms",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
+                ToolCardBody(toolCall = toolCall, isError = isError)
             }
         }
     }
 }
+
+@Composable
+private fun ToolCardHeader(
+    toolCall: UiToolCall,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Terminal,
+            contentDescription = null,
+            modifier = Modifier.size(15.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = toolCall.name,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+        ToolStatusBadge(toolCall.status ?: "tool call")
+        Spacer(Modifier.weight(1f))
+        CopyIconButton(text = toolCall.copyPayload())
+        Icon(
+            imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+            contentDescription = if (expanded) "Collapse" else "Expand",
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+    Column(
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
+            SelectionContainer {
+                Text(
+                    text = "$ ${primaryToolArgument(args)}",
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+        toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it, isError = isError) }
+        DesktopImageAttachmentsGrid(
+            attachments = toolCall.generatedImageAttachments,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        toolCall.executionTimeMs?.let { ms ->
+            Text(
+                text = "${toolCall.status?.replaceFirstChar { it.uppercase() } ?: "Done"} · ${ms} ms",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+private fun UiToolCall.isErrorStatus(): Boolean =
+    status?.let {
+        it.equals("error", ignoreCase = true) || it.equals("failed", ignoreCase = true)
+    } == true
+
+private fun UiToolCall.copyPayload(): String =
+    listOfNotNull(
+        arguments.takeIf { it.isNotBlank() },
+        result?.takeIf { it.isNotBlank() },
+    ).joinToString("\n\n").ifBlank { name }
 
 /**
  * Pull the human-meaningful payload out of a tool-call arguments JSON object
@@ -439,17 +461,27 @@ internal fun ToolCard(toolCall: UiToolCall) {
  * string.
  */
 internal fun primaryToolArgument(raw: String): String {
-    val obj = runCatching { desktopChatJson.parseToJsonElement(raw) as? JsonObject }.getOrNull()
-        ?: return raw
-    val preferredKeys = listOf("command", "code", "query", "input", "text", "content", "cmd", "script", "expression")
-    for (key in preferredKeys) {
-        val value = obj[key]
-        if (value is JsonPrimitive && value.isString && value.content.isNotBlank()) {
-            return value.content
-        }
-    }
-    return runCatching { prettyDesktopJson.encodeToString(JsonObject.serializer(), obj) }.getOrDefault(raw)
+    val obj = parseToolArgumentsObject(raw) ?: return raw
+    return preferredToolArgument(obj) ?: prettyToolArguments(obj, fallback = raw)
 }
+
+private fun parseToolArgumentsObject(raw: String): JsonObject? =
+    runCatching { desktopChatJson.parseToJsonElement(raw) as? JsonObject }.getOrNull()
+
+private fun preferredToolArgument(obj: JsonObject): String? {
+    for (key in PREFERRED_TOOL_ARGUMENT_KEYS) {
+        val value = obj[key] as? JsonPrimitive ?: continue
+        if (value.isString && value.content.isNotBlank()) return value.content
+    }
+    return null
+}
+
+private fun prettyToolArguments(obj: JsonObject, fallback: String): String =
+    runCatching { prettyDesktopJson.encodeToString(JsonObject.serializer(), obj) }.getOrDefault(fallback)
+
+private val PREFERRED_TOOL_ARGUMENT_KEYS = listOf(
+    "command", "code", "query", "input", "text", "content", "cmd", "script", "expression",
+)
 
 private val prettyDesktopJson = Json {
     prettyPrint = true

@@ -25,7 +25,7 @@ class IrohToolRepository(
         flowOf(emptyList())
 
     override suspend fun countTools(): Int {
-        refreshToolsIfStale(DEFAULT_REFRESH_MAX_AGE_MS)
+        refreshToolsIfStale(CacheMaxAgeMs(DEFAULT_REFRESH_MAX_AGE_MS))
         return toolsFlow.value.size
     }
 
@@ -34,9 +34,12 @@ class IrohToolRepository(
         lastRefreshMs = Clock.System.now().toEpochMilliseconds()
     }
 
-    override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean {
+    override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean =
+        refreshToolsIfStale(CacheMaxAgeMs(maxAgeMs))
+
+    private suspend fun refreshToolsIfStale(maxAge: CacheMaxAgeMs): Boolean {
         val now = Clock.System.now().toEpochMilliseconds()
-        if (toolsFlow.value.isNotEmpty() && now - lastRefreshMs <= maxAgeMs) return false
+        if (toolsFlow.value.isNotEmpty() && now - lastRefreshMs <= maxAge.value) return false
         refreshTools()
         return true
     }
@@ -121,6 +124,9 @@ class IrohToolRepository(
         val toolId: ToolId,
         val attached: Boolean,
     )
+
+    @JvmInline
+    private value class CacheMaxAgeMs(val value: Long)
 
     private companion object {
         const val PAGE_SIZE = 100

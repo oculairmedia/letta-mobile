@@ -53,6 +53,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.dk.kuiver.KuiverViewerState
+import com.dk.kuiver.model.Kuiver
 import com.dk.kuiver.model.buildKuiver
 import com.dk.kuiver.model.edge
 import com.dk.kuiver.model.layout.LayoutConfig
@@ -103,16 +105,7 @@ internal fun MemoryGraphPanel(
         modifier = modifier.fillMaxWidth(),
     ) {
         if (graph.isEmpty) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "No memory graph available.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            EmptyMemoryGraph()
             return@Surface
         }
 
@@ -121,103 +114,33 @@ internal fun MemoryGraphPanel(
             MemoryGraphNodeKind.entries.filter { kind -> graph.nodes.any { it.kind == kind } }
         }
         var enabledKinds by remember(graph) { mutableStateOf(kindsPresent.toSet()) }
-        val visibleNodes = remember(graph.nodes, enabledKinds) { graph.nodes.filter { it.kind in enabledKinds } }
-        val visibleIds = remember(visibleNodes) { visibleNodes.map { it.id }.toSet() }
-        val visibleEdges = remember(graph.edges, visibleIds) {
-            graph.edges.filter { it.fromId in visibleIds && it.toId in visibleIds }
+        val visibility = remember(graph.nodes, graph.edges, enabledKinds) {
+            computeMemoryGraphVisibility(graph, enabledKinds)
         }
-
-        val nodesById = remember(visibleNodes) { visibleNodes.associateBy { it.id } }
-        // Node degree drives circle size + which nodes get labels (hubs), so the
-        // graph reads like Zep's: a few large labeled hubs, many small leaves.
-        val degreeById = remember(visibleEdges) {
-            val degrees = HashMap<String, Int>()
-            visibleEdges.forEach { edge ->
-                degrees[edge.fromId] = (degrees[edge.fromId] ?: 0) + 1
-                degrees[edge.toId] = (degrees[edge.toId] ?: 0) + 1
-            }
-            degrees
-        }
-        val kuiver = remember(visibleNodes, visibleEdges) {
-            buildKuiver {
-                nodes(visibleNodes.map { it.id })
-                visibleEdges.forEach { edge ->
-                    edge(edge.fromId, edge.toId)
-                }
-            }
-        }
-        // Organic force-directed layout (like Zep / Cosmograph), not a tree:
-        // nodes repel, edges pull, so hubs settle in the middle.
-        val layoutConfig = remember {
-            // Tuned softer than the default: lower repulsion + higher attraction
-            // so clusters stay compact instead of flinging apart.
-            LayoutConfig.ForceDirected(
-                iterations = 420,
-                repulsionStrength = 3200f,
-                attractionStrength = 0.14f,
-                damping = 0.82f,
-                width = 1000f,
-                height = 680f,
-            )
-        }
+        val layoutConfig = remember { memoryGraphForceLayout() }
         val viewerState = rememberKuiverViewerState(
-            initialKuiver = kuiver,
+            initialKuiver = visibility.kuiver,
             layoutConfig = layoutConfig,
         )
-        LaunchedEffect(kuiver) {
-            viewerState.updateKuiver(kuiver)
+        LaunchedEffect(visibility.kuiver) {
+            viewerState.updateKuiver(visibility.kuiver)
         }
 
-        Box(Modifier.fillMaxSize()) {
-            KuiverViewer(
-                state = viewerState,
-                config = KuiverViewerConfig(
-                    fitToContent = true,
-                    contentPadding = 0.72f,
-                    animateInitialPlacement = false,
-                ),
-                modifier = Modifier.fillMaxSize(),
-                nodeContent = { node ->
-                    val resolved = nodesById[node.id]
-                    val clickable = resolved?.kind == MemoryGraphNodeKind.Memory
-                    MemoryGraphNodeDot(
-                        node = resolved,
-                        degree = degreeById[node.id] ?: 0,
-                        onClick = if (clickable && resolved != null) {
-                            { onBlockNodeClick(resolved) }
-                        } else {
-                            null
-                        },
-                    )
-                },
-                edgeContent = { edge, from, to ->
-                    // Thin, unlabeled links — Zep keeps the graph clean and lets
-                    // the node clusters carry the meaning.
-                    StyledEdgeContent(
-                        edge = edge,
-                        from = from,
-                        to = to,
-                        baseColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
-                        backEdgeColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
-                        strokeWidth = 1.2f,
-                        // No arrowheads — Zep draws plain links.
-                        arrowDrawer = { _, _, _ -> },
-                        label = null,
-                    )
-                },
+        Box(modifier.fillMaxSize()) {
+            MemoryGraphViewer(
+                viewerState = viewerState,
+                visibility = visibility,
+                onBlockNodeClick = onBlockNodeClick,
             )
-
             EntityTypeFilterBar(
-                kinds = kindsPresent,
-                enabled = enabledKinds,
-                summaryLabel = graph.summaryLabel,
-                onToggle = { kind ->
-                    enabledKinds = if (kind in enabledKinds && enabledKinds.size > 1) {
-                        enabledKinds - kind
-                    } else {
-                        enabledKinds + kind
-                    }
-                },
+                params = EntityTypeFilterBarParams(
+                    kinds = kindsPresent,
+                    enabled = enabledKinds,
+                    summaryLabel = graph.summaryLabel,
+                    onToggle = { kind ->
+                        enabledKinds = toggleMemoryGraphKind(enabledKinds, kind)
+                    },
+                ),
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(14.dp),
@@ -226,6 +149,121 @@ internal fun MemoryGraphPanel(
     }
 }
 
+@Composable
+private fun EmptyMemoryGraph() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = "No memory graph available.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private data class MemoryGraphVisibility(
+    val nodesById: Map<String, MemoryGraphNode>,
+    val degreeById: Map<String, Int>,
+    val kuiver: Kuiver,
+)
+
+private fun computeMemoryGraphVisibility(
+    graph: MemoryParityGraph,
+    enabledKinds: Set<MemoryGraphNodeKind>,
+): MemoryGraphVisibility {
+    val visibleNodes = graph.nodes.filter { it.kind in enabledKinds }
+    val visibleIds = visibleNodes.map { it.id }.toSet()
+    val visibleEdges = graph.edges.filter { it.fromId in visibleIds && it.toId in visibleIds }
+    val degreeById = HashMap<String, Int>()
+    visibleEdges.forEach { edge ->
+        degreeById[edge.fromId] = (degreeById[edge.fromId] ?: 0) + 1
+        degreeById[edge.toId] = (degreeById[edge.toId] ?: 0) + 1
+    }
+    val kuiver = buildKuiver {
+        nodes(visibleNodes.map { it.id })
+        visibleEdges.forEach { edge -> edge(edge.fromId, edge.toId) }
+    }
+    return MemoryGraphVisibility(
+        nodesById = visibleNodes.associateBy { it.id },
+        degreeById = degreeById,
+        kuiver = kuiver,
+    )
+}
+
+private fun memoryGraphForceLayout(): LayoutConfig.ForceDirected =
+    // Organic force-directed layout (like Zep / Cosmograph), not a tree:
+    // nodes repel, edges pull, so hubs settle in the middle.
+    // Tuned softer than the default: lower repulsion + higher attraction
+    // so clusters stay compact instead of flinging apart.
+    LayoutConfig.ForceDirected(
+        iterations = 420,
+        repulsionStrength = 3200f,
+        attractionStrength = 0.14f,
+        damping = 0.82f,
+        width = 1000f,
+        height = 680f,
+    )
+
+private fun toggleMemoryGraphKind(
+    enabled: Set<MemoryGraphNodeKind>,
+    kind: MemoryGraphNodeKind,
+): Set<MemoryGraphNodeKind> =
+    if (kind in enabled && enabled.size > 1) enabled - kind else enabled + kind
+
+@Composable
+private fun MemoryGraphViewer(
+    viewerState: KuiverViewerState,
+    visibility: MemoryGraphVisibility,
+    onBlockNodeClick: (MemoryGraphNode) -> Unit,
+) {
+    KuiverViewer(
+        state = viewerState,
+        config = KuiverViewerConfig(
+            fitToContent = true,
+            contentPadding = 0.72f,
+            animateInitialPlacement = false,
+        ),
+        modifier = Modifier.fillMaxSize(),
+        nodeContent = { node ->
+            val resolved = visibility.nodesById[node.id]
+            val clickable = resolved?.kind == MemoryGraphNodeKind.Memory
+            MemoryGraphNodeDot(
+                node = resolved,
+                degree = visibility.degreeById[node.id] ?: 0,
+                onClick = if (clickable && resolved != null) {
+                    { onBlockNodeClick(resolved) }
+                } else {
+                    null
+                },
+            )
+        },
+        edgeContent = { edge, from, to ->
+            // Thin, unlabeled links — Zep keeps the graph clean and lets
+            // the node clusters carry the meaning.
+            StyledEdgeContent(
+                edge = edge,
+                from = from,
+                to = to,
+                baseColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
+                backEdgeColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.38f),
+                strokeWidth = 1.2f,
+                // No arrowheads — Zep draws plain links.
+                arrowDrawer = { _, _, _ -> },
+                label = null,
+            )
+        },
+    )
+}
+
+internal data class EntityTypeFilterBarParams(
+    val kinds: List<MemoryGraphNodeKind>,
+    val enabled: Set<MemoryGraphNodeKind>,
+    val summaryLabel: String,
+    val onToggle: (MemoryGraphNodeKind) -> Unit,
+)
+
 /**
  * Zep-style "Entity Types" filter bar: a toggle chip per node kind present in
  * the graph (color dot + label). Tapping a chip hides/shows that kind; the last
@@ -233,10 +271,7 @@ internal fun MemoryGraphPanel(
  */
 @Composable
 internal fun EntityTypeFilterBar(
-    kinds: List<MemoryGraphNodeKind>,
-    enabled: Set<MemoryGraphNodeKind>,
-    summaryLabel: String,
-    onToggle: (MemoryGraphNodeKind) -> Unit,
+    params: EntityTypeFilterBarParams,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -249,17 +284,17 @@ internal fun EntityTypeFilterBar(
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Entity Types", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(summaryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+                Text(params.summaryLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                kinds.forEach { kind ->
-                    val on = kind in enabled
+                params.kinds.forEach { kind ->
+                    val on = kind in params.enabled
                     val color = kind.accentRole(null).color()
                     Row(
                         modifier = Modifier
                             .clip(MaterialTheme.shapes.small)
                             .background(if (on) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
-                            .clickable { onToggle(kind) }
+                            .clickable { params.onToggle(kind) }
                             .padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         verticalAlignment = Alignment.CenterVertically,

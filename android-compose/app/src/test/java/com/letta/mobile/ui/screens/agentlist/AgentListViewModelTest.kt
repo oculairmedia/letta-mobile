@@ -316,12 +316,13 @@ class AgentListViewModelTest {
     fun `importAgent forwards safety flags and returns imported ids`() = runTest {
         coEvery {
             agentRepository.importAgent(
-                fileName = "agent.json",
-                fileBytes = any(),
-                overrideName = "Cloned Agent",
-                overrideExistingTools = false,
-                projectId = null as ProjectId?,
-                stripMessages = true,
+                match {
+                    it.fileName == "agent.json" &&
+                        it.overrideName == "Cloned Agent" &&
+                        it.overrideExistingTools == false &&
+                        it.projectId == null &&
+                        it.stripMessages == true
+                },
             )
         } returns ImportedAgentsResponse(agentIds = listOf("a2"))
 
@@ -337,12 +338,13 @@ class AgentListViewModelTest {
         assertEquals(listOf("a2"), importedIds)
         coVerify(exactly = 1) {
             agentRepository.importAgent(
-                fileName = "agent.json",
-                fileBytes = any(),
-                overrideName = "Cloned Agent",
-                overrideExistingTools = false,
-                projectId = null as ProjectId?,
-                stripMessages = true,
+                match {
+                    it.fileName == "agent.json" &&
+                        it.overrideName == "Cloned Agent" &&
+                        it.overrideExistingTools == false &&
+                        it.projectId == null &&
+                        it.stripMessages == true
+                },
             )
         }
     }

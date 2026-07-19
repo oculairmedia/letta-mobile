@@ -169,14 +169,16 @@ fun DesktopMemorySurface(
                     .background(MaterialTheme.colorScheme.outlineVariant),
             )
             BlockEditorPanel(
-                target = target,
-                agentId = agentId,
-                blockApi = blockApi,
-                onDismiss = { editorTarget = null },
-                onChanged = {
-                    editorTarget = null
-                    onBlockChanged()
-                },
+                request = BlockEditorRequest(
+                    target = target,
+                    agentId = agentId,
+                    blockApi = blockApi,
+                    onDismiss = { editorTarget = null },
+                    onChanged = {
+                        editorTarget = null
+                        onBlockChanged()
+                    },
+                ),
             )
         }
     }

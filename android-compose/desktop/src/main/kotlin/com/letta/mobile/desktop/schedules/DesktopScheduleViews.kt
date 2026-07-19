@@ -83,16 +83,25 @@ import kotlin.time.Instant
 
 // --- Week time-grid ---------------------------------------------------------
 
+internal data class WeekViewParams(
+    val defs: List<ScheduleDef>,
+    val weekStart: LocalDate,
+    val today: LocalDate,
+    val now: Instant,
+    val zone: TimeZone,
+    val selectedId: String?,
+    val onRunClick: (ScheduleRun) -> Unit,
+)
+
 @Composable
-internal fun WeekView(
-    defs: List<ScheduleDef>,
-    weekStart: LocalDate,
-    today: LocalDate,
-    now: Instant,
-    zone: TimeZone,
-    selectedId: String?,
-    onRunClick: (ScheduleRun) -> Unit,
-) {
+internal fun WeekView(params: WeekViewParams) {
+    val defs = params.defs
+    val weekStart = params.weekStart
+    val today = params.today
+    val now = params.now
+    val zone = params.zone
+    val selectedId = params.selectedId
+    val onRunClick = params.onRunClick
     val grid = remember(defs, weekStart, now) { ScheduleProjection.week(defs, weekStart, now, zone) }
     val nowMinutes = remember(now, zone) { now.toLocalDateTime(zone).let { it.hour * 60 + it.minute } }
     val todayInWeek = today in grid.days
@@ -239,16 +248,25 @@ internal fun WeekRunBar(run: ScheduleRun, minuteOfDay: Int, emphasized: Boolean,
 
 // --- Agenda -----------------------------------------------------------------
 
+internal data class AgendaViewParams(
+    val defs: List<ScheduleDef>,
+    val selectedDate: LocalDate,
+    val today: LocalDate,
+    val now: Instant,
+    val zone: TimeZone,
+    val onSelectDate: (LocalDate) -> Unit,
+    val onRunClick: (ScheduleRun) -> Unit,
+)
+
 @Composable
-internal fun AgendaView(
-    defs: List<ScheduleDef>,
-    selectedDate: LocalDate,
-    today: LocalDate,
-    now: Instant,
-    zone: TimeZone,
-    onSelectDate: (LocalDate) -> Unit,
-    onRunClick: (ScheduleRun) -> Unit,
-) {
+internal fun AgendaView(params: AgendaViewParams) {
+    val defs = params.defs
+    val selectedDate = params.selectedDate
+    val today = params.today
+    val now = params.now
+    val zone = params.zone
+    val onSelectDate = params.onSelectDate
+    val onRunClick = params.onRunClick
     val agenda = remember(defs, selectedDate, now) { ScheduleProjection.agenda(defs, selectedDate, now, zone) }
     val completed = agenda.runs.count { it.status == RunStatus.Done }
     val cadenceById = remember(defs) {
@@ -278,7 +296,15 @@ internal fun AgendaView(
         } else {
             LazyColumn {
                 items(items = agenda.runs, key = { it.scheduleId + it.instant.toString() }) { run ->
-                    AgendaRow(run, cadenceById[run.scheduleId], now, zone, onClick = { onRunClick(run) })
+                    AgendaRow(
+                        AgendaRowParams(
+                            run = run,
+                            subtitle = cadenceById[run.scheduleId],
+                            now = now,
+                            zone = zone,
+                            onClick = { onRunClick(run) },
+                        ),
+                    )
                 }
             }
         }
@@ -324,8 +350,21 @@ internal fun AgendaDayCell(date: LocalDate, selectedDate: LocalDate, today: Loca
     }
 }
 
+internal data class AgendaRowParams(
+    val run: ScheduleRun,
+    val subtitle: String?,
+    val now: Instant,
+    val zone: TimeZone,
+    val onClick: () -> Unit,
+)
+
 @Composable
-internal fun AgendaRow(run: ScheduleRun, subtitle: String?, now: Instant, zone: TimeZone, onClick: () -> Unit) {
+internal fun AgendaRow(params: AgendaRowParams) {
+    val run = params.run
+    val subtitle = params.subtitle
+    val now = params.now
+    val zone = params.zone
+    val onClick = params.onClick
     val ldt = run.instant.toLocalDateTime(zone)
     val time = "${ScheduleFormat.pad2(ldt.hour)}:${ScheduleFormat.pad2(ldt.minute)}"
     Row(
@@ -351,15 +390,23 @@ internal fun AgendaRow(run: ScheduleRun, subtitle: String?, now: Instant, zone: 
 
 // --- Timeline swimlanes -----------------------------------------------------
 
+internal data class TimelineViewParams(
+    val defs: List<ScheduleDef>,
+    val weekStart: LocalDate,
+    val today: LocalDate,
+    val now: Instant,
+    val zone: TimeZone,
+    val onLaneClick: (String) -> Unit,
+)
+
 @Composable
-internal fun TimelineView(
-    defs: List<ScheduleDef>,
-    weekStart: LocalDate,
-    today: LocalDate,
-    now: Instant,
-    zone: TimeZone,
-    onLaneClick: (String) -> Unit,
-) {
+internal fun TimelineView(params: TimelineViewParams) {
+    val defs = params.defs
+    val weekStart = params.weekStart
+    val today = params.today
+    val now = params.now
+    val zone = params.zone
+    val onLaneClick = params.onLaneClick
     val timeline = remember(defs, weekStart, now) {
         ScheduleProjection.timeline(defs, now, zone, startDate = weekStart, days = 7)
     }
@@ -396,11 +443,13 @@ internal fun TimelineView(
                     }
                     days.forEach { date ->
                         TimelineDayCell(
-                            date = date,
-                            today = today,
-                            highFreq = highFreq,
-                            nowFrac = nowFrac,
-                            ticks = lane.ticks.filter { it.instant.toLocalDateTime(zone).date == date },
+                            params = TimelineDayCellParams(
+                                date = date,
+                                today = today,
+                                highFreq = highFreq,
+                                nowFrac = nowFrac,
+                                ticks = lane.ticks.filter { it.instant.toLocalDateTime(zone).date == date },
+                            ),
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -411,15 +460,24 @@ internal fun TimelineView(
     }
 }
 
+internal data class TimelineDayCellParams(
+    val date: LocalDate,
+    val today: LocalDate,
+    val highFreq: Boolean,
+    val nowFrac: Float,
+    val ticks: List<com.letta.mobile.data.schedules.TimelineTick>,
+)
+
 @Composable
 internal fun TimelineDayCell(
-    date: LocalDate,
-    today: LocalDate,
-    highFreq: Boolean,
-    nowFrac: Float,
-    ticks: List<com.letta.mobile.data.schedules.TimelineTick>,
+    params: TimelineDayCellParams,
     modifier: Modifier = Modifier,
 ) {
+    val date = params.date
+    val today = params.today
+    val highFreq = params.highFreq
+    val nowFrac = params.nowFrac
+    val ticks = params.ticks
     val success = MaterialTheme.customColors.successColor
     val upcoming = MaterialTheme.colorScheme.outline
     val isToday = date == today

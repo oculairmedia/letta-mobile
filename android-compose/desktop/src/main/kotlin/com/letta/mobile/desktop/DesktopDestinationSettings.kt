@@ -98,21 +98,13 @@ internal fun BackendCard(config: LettaConfig) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                StatusPill(
-                    text = config.mode.label,
+                val pillColors = StatusPillColors(
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
                 )
-                StatusPill(
-                    text = "Shared model layer",
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
-                )
-                StatusPill(
-                    text = "Windows JVM",
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    borderColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.24f),
-                )
+                StatusPill(text = config.mode.label, colors = pillColors)
+                StatusPill(text = "Shared model layer", colors = pillColors)
+                StatusPill(text = "Windows JVM", colors = pillColors)
             }
         }
     }
@@ -143,66 +135,116 @@ internal fun BackendSettingsCard(
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
-            DesktopSettingsFieldLabel("Server URL")
-            JewelTextField(
-                value = serverUrl,
-                onValueChange = { serverUrl = it },
-                placeholder = { JewelText("https://app.letta.com") },
-                modifier = Modifier.fillMaxWidth(),
+            BackendServerUrlField(serverUrl = serverUrl, onServerUrlChange = { serverUrl = it })
+            BackendModeSelector(mode = mode, onModeChange = { mode = it })
+            BackendTokenField(config = config, tokenInput = tokenInput, onTokenInputChange = { tokenInput = it })
+            BackendSettingsActions(
+                BackendSettingsActionsParams(
+                    config = config,
+                    serverUrl = serverUrl,
+                    tokenInput = tokenInput,
+                    mode = mode,
+                    onConfigSaved = onConfigSaved,
+                    onTokenCleared = onTokenCleared,
+                    onTokenInputChange = { tokenInput = it },
+                ),
             )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                DesktopSettingsFieldLabel("Mode")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LettaConfig.Mode.entries.forEach { option ->
-                        DesktopChipTab(
-                            text = option.label,
-                            active = mode == option,
-                            onClick = { mode = option },
-                        )
-                    }
-                }
+        }
+    }
+}
+
+@Composable
+private fun BackendServerUrlField(
+    serverUrl: TextFieldValue,
+    onServerUrlChange: (TextFieldValue) -> Unit,
+) {
+    DesktopSettingsFieldLabel("Server URL")
+    JewelTextField(
+        value = serverUrl,
+        onValueChange = onServerUrlChange,
+        placeholder = { JewelText("https://app.letta.com") },
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun BackendModeSelector(
+    mode: LettaConfig.Mode,
+    onModeChange: (LettaConfig.Mode) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DesktopSettingsFieldLabel("Mode")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LettaConfig.Mode.entries.forEach { option ->
+                DesktopChipTab(
+                    text = option.label,
+                    active = mode == option,
+                    onClick = { onModeChange(option) },
+                )
             }
-            DesktopSettingsFieldLabel("Access token")
-            JewelTextField(
-                value = tokenInput,
-                onValueChange = { tokenInput = it },
-                placeholder = {
-                    JewelText(if (config.accessToken == null) "Optional" else "Saved token hidden")
+        }
+    }
+}
+
+@Composable
+private fun BackendTokenField(
+    config: LettaConfig,
+    tokenInput: TextFieldValue,
+    onTokenInputChange: (TextFieldValue) -> Unit,
+) {
+    DesktopSettingsFieldLabel("Access token")
+    JewelTextField(
+        value = tokenInput,
+        onValueChange = onTokenInputChange,
+        placeholder = {
+            JewelText(if (config.accessToken == null) "Optional" else "Saved token hidden")
+        },
+        visualTransformation = PasswordVisualTransformation(),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+private data class BackendSettingsActionsParams(
+    val config: LettaConfig,
+    val serverUrl: TextFieldValue,
+    val tokenInput: TextFieldValue,
+    val mode: LettaConfig.Mode,
+    val onConfigSaved: (LettaConfig) -> Unit,
+    val onTokenCleared: () -> Unit,
+    val onTokenInputChange: (TextFieldValue) -> Unit,
+)
+
+@Composable
+private fun BackendSettingsActions(params: BackendSettingsActionsParams) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DesktopDefaultButton(
+            onClick = {
+                val normalizedUrl = params.serverUrl.text.trim()
+                params.onConfigSaved(
+                    LettaConfig(
+                        id = desktopConfigIdFor(normalizedUrl),
+                        mode = params.mode,
+                        serverUrl = normalizedUrl,
+                        accessToken = params.tokenInput.text.trim().takeIf { it.isNotBlank() }
+                            ?: params.config.accessToken,
+                    ),
+                )
+                params.onTokenInputChange(TextFieldValue(""))
+            },
+        ) {
+            DesktopButtonContent("Save")
+        }
+        if (params.config.accessToken != null) {
+            DesktopOutlinedButton(
+                onClick = {
+                    params.onTokenInputChange(TextFieldValue(""))
+                    params.onTokenCleared()
                 },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
             ) {
-                DesktopDefaultButton(
-                    onClick = {
-                        val normalizedUrl = serverUrl.text.trim()
-                        onConfigSaved(
-                            LettaConfig(
-                                id = desktopConfigIdFor(normalizedUrl),
-                                mode = mode,
-                                serverUrl = normalizedUrl,
-                                accessToken = tokenInput.text.trim().takeIf { it.isNotBlank() }
-                                    ?: config.accessToken,
-                            ),
-                        )
-                        tokenInput = TextFieldValue("")
-                    },
-                ) {
-                    DesktopButtonContent("Save")
-                }
-                if (config.accessToken != null) {
-                    DesktopOutlinedButton(
-                        onClick = {
-                            tokenInput = TextFieldValue("")
-                            onTokenCleared()
-                        },
-                    ) {
-                        DesktopButtonContent("Clear token")
-                    }
-                }
+                DesktopButtonContent("Clear token")
             }
         }
     }
@@ -277,9 +319,11 @@ internal fun ReadinessRow(feature: DesktopFeatureReadiness) {
                 )
                 StatusPill(
                     text = feature.state.label,
-                    containerColor = feature.state.color().copy(alpha = 0.12f),
-                    contentColor = feature.state.color(),
-                    borderColor = Color.Transparent,
+                    colors = StatusPillColors(
+                        containerColor = feature.state.color().copy(alpha = 0.12f),
+                        contentColor = feature.state.color(),
+                        borderColor = Color.Transparent,
+                    ),
                 )
             }
             Text(
@@ -305,18 +349,26 @@ private val DesktopFeatureState.label: String
         DesktopFeatureState.AndroidOnly -> "Android only"
     }
 
+internal data class StatusPillColors(
+    val containerColor: Color = Color.Transparent,
+    val contentColor: Color = Color.Unspecified,
+    val borderColor: Color = Color.Unspecified,
+)
+
 @Composable
 internal fun StatusPill(
     text: String,
     modifier: Modifier = Modifier,
-    containerColor: Color = Color.Transparent,
-    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    colors: StatusPillColors = StatusPillColors(),
 ) {
+    val contentColor = colors.contentColor.takeUnless { it == Color.Unspecified }
+        ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val borderColor = colors.borderColor.takeUnless { it == Color.Unspecified }
+        ?: MaterialTheme.colorScheme.outlineVariant
     Surface(
         modifier = modifier,
         shape = MaterialTheme.shapes.small,
-        color = containerColor,
+        color = colors.containerColor,
         contentColor = contentColor,
         border = BorderStroke(1.dp, borderColor),
     ) {

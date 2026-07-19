@@ -7,8 +7,8 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,14 +101,8 @@ class IrohAgentRepository(
 
     override suspend fun exportAgent(id: AgentId): String = unsupported("exportAgent")
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse = unsupported("importAgent")
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse =
+        unsupported("importAgent")
 
     override suspend fun attachArchive(agentId: AgentId, archiveId: String): Unit = unsupported("attachArchive")
 

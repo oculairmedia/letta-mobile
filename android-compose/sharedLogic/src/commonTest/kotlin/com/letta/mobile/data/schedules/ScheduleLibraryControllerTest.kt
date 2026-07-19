@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.model.ScheduleCreateParams
@@ -424,14 +425,7 @@ class ScheduleLibraryControllerTest {
         override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent = error("unused")
         override suspend fun deleteAgent(id: AgentId) = Unit
         override suspend fun exportAgent(id: AgentId): String = error("unused")
-        override suspend fun importAgent(
-            fileName: String,
-            fileBytes: ByteArray,
-            overrideName: String?,
-            overrideExistingTools: Boolean?,
-            projectId: ProjectId?,
-            stripMessages: Boolean?,
-        ): ImportedAgentsResponse = error("unused")
+        override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse = error("unused")
         override suspend fun attachArchive(agentId: AgentId, archiveId: String) = Unit
         override suspend fun detachArchive(agentId: AgentId, archiveId: String) = Unit
     }

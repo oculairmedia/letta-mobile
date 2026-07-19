@@ -112,31 +112,27 @@ class IrohAdminRpcProjectSource(
     }
 
     suspend fun updateProject(identifier: String, filesystemPath: String?, gitUrl: String?): ProjectSummary {
-        val project = ProjectRpcRef(identifier)
         val body = json.encodeToString(
             ProjectUpdateRequest.serializer(),
             ProjectUpdateRequest(filesystemPath = filesystemPath, gitUrl = gitUrl),
         )
-        val result = rpc(
-            AdminRpcCall(
-                "project.update",
-                project.registryPath(),
-                project.mergeIdBody(body),
-            ),
-        ) ?: error("Iroh admin_rpc project.update returned no result")
-        return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
+        return mutateProject(identifier, "project.update", body)
     }
 
     suspend fun archiveProject(identifier: String): ProjectSummary {
-        val project = ProjectRpcRef(identifier)
         val body = json.encodeToString(ProjectUpdateRequest.serializer(), ProjectUpdateRequest(status = "archived"))
+        return mutateProject(identifier, "project.archive", body)
+    }
+
+    private suspend fun mutateProject(identifier: String, method: String, body: String): ProjectSummary {
+        val project = ProjectRpcRef(identifier)
         val result = rpc(
             AdminRpcCall(
-                "project.archive",
+                method,
                 project.registryPath(),
                 project.mergeIdBody(body),
             ),
-        ) ?: error("Iroh admin_rpc project.archive returned no result")
+        ) ?: error("Iroh admin_rpc $method returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
 

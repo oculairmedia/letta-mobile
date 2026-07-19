@@ -106,20 +106,23 @@ internal fun rememberDesktopLibraryControllers(
     return DesktopLibraryControllers(memory, schedules, channels, tools)
 }
 
+internal data class DesktopControllerLifecycleParams(
+    val chatController: DesktopChatController,
+    val libraries: DesktopLibraryControllers,
+    val selectedDestination: DesktopDestination,
+    val selectedConversationAgentId: String?,
+    val cronPanel: DesktopCronPanelState,
+)
+
 /**
  * Start/stop lifecycles for the chat + library controllers, plus the
  * destination-driven agent selection and cron refresh.
  */
 @Composable
-internal fun DesktopControllerLifecycles(
-    chatController: DesktopChatController,
-    libraries: DesktopLibraryControllers,
-    selectedDestination: DesktopDestination,
-    selectedConversationAgentId: String?,
-    cronPanel: DesktopCronPanelState,
-) {
+internal fun DesktopControllerLifecycles(params: DesktopControllerLifecycleParams) {
+    val libraries = params.libraries
     ControllerLifecycleEffect(
-        controller = chatController,
+        controller = params.chatController,
         onStart = { start() },
         onClose = { close() },
     )
@@ -144,21 +147,25 @@ internal fun DesktopControllerLifecycles(
         onClose = { close() },
     )
     DestinationAgentSelectionEffect(
-        selectedDestination = selectedDestination,
-        targetDestination = DesktopDestination.Memory,
-        selectedConversationAgentId = selectedConversationAgentId,
-        onSelectAgent = libraries.memory::selectAgent,
+        DestinationAgentSelectionParams(
+            selectedDestination = params.selectedDestination,
+            targetDestination = DesktopDestination.Memory,
+            selectedConversationAgentId = params.selectedConversationAgentId,
+            onSelectAgent = libraries.memory::selectAgent,
+        ),
     )
     DestinationAgentSelectionEffect(
-        selectedDestination = selectedDestination,
-        targetDestination = DesktopDestination.Schedules,
-        selectedConversationAgentId = selectedConversationAgentId,
-        onSelectAgent = libraries.schedules::selectAgent,
+        DestinationAgentSelectionParams(
+            selectedDestination = params.selectedDestination,
+            targetDestination = DesktopDestination.Schedules,
+            selectedConversationAgentId = params.selectedConversationAgentId,
+            onSelectAgent = libraries.schedules::selectAgent,
+        ),
     )
     DestinationRefreshEffect(
-        selectedDestination = selectedDestination,
+        selectedDestination = params.selectedDestination,
         targetDestination = DesktopDestination.Schedules,
-        onRefresh = cronPanel::refresh,
+        onRefresh = params.cronPanel::refresh,
     )
 }
 
@@ -174,16 +181,18 @@ private inline fun <T> ControllerLifecycleEffect(
     }
 }
 
+private data class DestinationAgentSelectionParams(
+    val selectedDestination: DesktopDestination,
+    val targetDestination: DesktopDestination,
+    val selectedConversationAgentId: String?,
+    val onSelectAgent: (String) -> Unit,
+)
+
 @Composable
-private fun DestinationAgentSelectionEffect(
-    selectedDestination: DesktopDestination,
-    targetDestination: DesktopDestination,
-    selectedConversationAgentId: String?,
-    onSelectAgent: (String) -> Unit,
-) {
-    LaunchedEffect(selectedDestination, selectedConversationAgentId) {
-        if (selectedDestination == targetDestination) {
-            selectedConversationAgentId?.let(onSelectAgent)
+private fun DestinationAgentSelectionEffect(params: DestinationAgentSelectionParams) {
+    LaunchedEffect(params.selectedDestination, params.selectedConversationAgentId) {
+        if (params.selectedDestination == params.targetDestination) {
+            params.selectedConversationAgentId?.let(params.onSelectAgent)
         }
     }
 }
@@ -230,9 +239,17 @@ private fun isCommandPaletteKey(event: java.awt.event.KeyEvent): Boolean =
         event.keyCode == java.awt.event.KeyEvent.VK_K &&
         (event.isControlDown || event.isMetaDown)
 
+/** Typed agent id for desktop library/panel operations. */
+@JvmInline
+internal value class DesktopAgentId(val value: String)
+
+/** Typed skill name for install/uninstall panel actions. */
+@JvmInline
+internal value class DesktopSkillName(val value: String)
+
 /** A cron creation request from the schedules surface. */
 internal data class CronDraft(
-    val agentId: String,
+    val agentId: DesktopAgentId,
     val name: String,
     val prompt: String,
     val cron: String,
@@ -278,7 +295,7 @@ internal class DesktopCronPanelState(
 
 private suspend fun CronApi.createCronFromDraft(draft: CronDraft) {
     createCron(
-        agentId = draft.agentId,
+        agentId = draft.agentId.value,
         name = draft.name,
         description = draft.name,
         prompt = draft.prompt,

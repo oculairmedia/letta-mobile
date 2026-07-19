@@ -148,36 +148,57 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
+/** Read-only composer inputs (text, attachments, model catalog, autocomplete sources). */
+internal data class ComposerBarState(
+    val text: String,
+    val pendingImageAttachments: List<MessageContentPart.Image>,
+    val enabled: Boolean,
+    val modelLabel: String,
+    val modelOptions: List<Pair<String, String>>,
+    val commands: List<ComposerCommand>,
+    val mentionables: List<Mentionable>,
+    val placeholder: String,
+)
+
+/** Callbacks for [ComposerBar] interactions. */
+internal data class ComposerBarActions(
+    val onModelSelected: (String) -> Unit,
+    val onTextChanged: (String) -> Unit,
+    val onSend: () -> Unit,
+    val onAttachImage: () -> Unit,
+    val onRemoveImageAttachment: (Int) -> Unit,
+    val onOpenModelPicker: (() -> Unit)? = null,
+)
+
+/** Bundled label/options/select for [ComposerDropdownChip]. */
+internal data class ComposerDropdownChipModel(
+    val label: String,
+    val options: List<String>,
+    val onSelect: (String) -> Unit,
+    val leadingIcon: ImageVector? = null,
+    val contentColor: Color? = null,
+    val emptyHint: String? = null,
+)
+
 @Composable
 internal fun ComposerBar(
-    text: String,
-    pendingImageAttachments: List<MessageContentPart.Image>,
-    enabled: Boolean,
-    modelLabel: String,
-    modelOptions: List<Pair<String, String>>,
-    onModelSelected: (String) -> Unit,
-    commands: List<ComposerCommand>,
-    mentionables: List<Mentionable>,
-    placeholder: String,
-    onOpenModelPicker: (() -> Unit)? = null,
-    onTextChanged: (String) -> Unit,
-    onSend: () -> Unit,
-    onAttachImage: () -> Unit,
-    onRemoveImageAttachment: (Int) -> Unit,
+    state: ComposerBarState,
+    actions: ComposerBarActions,
 ) {
-    val canSend = enabled && (text.isNotBlank() || pendingImageAttachments.isNotEmpty())
+    val canSend = state.enabled &&
+        (state.text.isNotBlank() || state.pendingImageAttachments.isNotEmpty())
     // Trigger detection (/, @) is shared in commonMain so desktop and mobile
     // resolve autocomplete identically (ComposerAutocomplete).
-    val activeToken = ComposerAutocomplete.activeToken(text)
+    val activeToken = ComposerAutocomplete.activeToken(state.text)
     val commandToken = activeToken?.takeIf { it.trigger == AutocompleteTrigger.Command }
     val mentionToken = activeToken?.takeIf { it.trigger == AutocompleteTrigger.Mention }
-    val matchedCommands = if (commandToken != null && commands.isNotEmpty()) {
-        commands.filter { it.label.contains(commandToken.query, ignoreCase = true) }
+    val matchedCommands = if (commandToken != null && state.commands.isNotEmpty()) {
+        state.commands.filter { it.label.contains(commandToken.query, ignoreCase = true) }
     } else {
         emptyList()
     }
-    val mentionGroups = if (mentionToken != null && mentionables.isNotEmpty()) {
-        MentionCatalog.grouped(mentionables, mentionToken.query)
+    val mentionGroups = if (mentionToken != null && state.mentionables.isNotEmpty()) {
+        MentionCatalog.grouped(state.mentionables, mentionToken.query)
     } else {
         emptyList()
     }
@@ -188,196 +209,33 @@ internal fun ComposerBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        if (matchedCommands.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            ) {
-                Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                    matchedCommands.take(8).forEach { command ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    onTextChanged("")
-                                    command.run()
-                                }
-                                .padding(horizontal = 14.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "/${command.label}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = command.description,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        ComposerCommandSuggestions(
+            matchedCommands = matchedCommands,
+            onCommandRun = { command ->
+                actions.onTextChanged("")
+                command.run()
+            },
+        )
         if (mentionGroups.isNotEmpty() && mentionToken != null) {
             MentionPopup(
                 groups = mentionGroups,
                 onSelect = { mention ->
-                    onTextChanged(
-                        ComposerAutocomplete.replaceToken(text, mentionToken, "@${mention.insertText} "),
+                    actions.onTextChanged(
+                        ComposerAutocomplete.replaceToken(
+                            state.text,
+                            mentionToken,
+                            "@${mention.insertText} ",
+                        ),
                     )
                 },
             )
         }
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 760.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (pendingImageAttachments.isNotEmpty()) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        pendingImageAttachments.forEachIndexed { index, image ->
-                            ComposerAttachmentChip(
-                                image = image,
-                                onRemove = { onRemoveImageAttachment(index) },
-                            )
-                        }
-                    }
-                }
-                DesktopTextArea(
-                    value = text,
-                    onValueChange = onTextChanged,
-                    enabled = enabled,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 28.dp, max = 120.dp)
-                        .onPreviewKeyEvent { event ->
-                            // Enter sends; Shift+Enter inserts a newline. Only an
-                            // app-action command intercepts Enter — server slash
-                            // commands (fillsComposer) let the message send.
-                            if (event.type == KeyEventType.KeyDown &&
-                                (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
-                                !event.isShiftPressed
-                            ) {
-                                val actionCommand = matchedCommands.firstOrNull { !it.fillsComposer }
-                                if (actionCommand != null) {
-                                    onTextChanged("")
-                                    actionCommand.run()
-                                    true
-                                } else if (canSend) {
-                                    onSend()
-                                    true
-                                } else {
-                                    false
-                                }
-                            } else {
-                                false
-                            }
-                        },
-                    maxLines = 5,
-                    placeholder = placeholder,
-                    undecorated = true,
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Plain Box button (not Jewel's IconButton, whose own height
-                    // metrics left it misaligned with the Surface chips beside it).
-                    DesktopTooltip(text = "Attach") {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .clickable(enabled = enabled, onClick = onAttachImage),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Add,
-                                contentDescription = "Attach",
-                                modifier = Modifier.size(18.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    val modelDisplay = modelOptions.firstOrNull { it.second == modelLabel }?.first
-                        ?: modelLabel.ifBlank { "Model" }
-                    if (onOpenModelPicker != null) {
-                        // Rich, searchable, provider-grouped picker sheet.
-                        ComposerActionChip(label = modelDisplay, onClick = onOpenModelPicker)
-                    } else {
-                        ComposerDropdownChip(
-                            label = modelDisplay,
-                            options = modelOptions.map { it.first },
-                            emptyHint = "No models available",
-                            onSelect = { selected ->
-                                modelOptions.firstOrNull { it.first == selected }?.let { onModelSelected(it.second) }
-                            },
-                        )
-                    }
-                    var safety by remember { mutableStateOf("Unrestricted") }
-                    ComposerDropdownChip(
-                        label = safety,
-                        options = listOf("Unrestricted", "Standard", "Strict"),
-                        onSelect = { safety = it },
-                        leadingIcon = Icons.Outlined.Security,
-                        contentColor = MaterialTheme.customColors.runningColor
-                            .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary,
-                    )
-                    var effort by remember { mutableStateOf(ComposerEffort.Medium) }
-                    var thinking by remember { mutableStateOf(true) }
-                    ComposerEffortChip(
-                        effort = effort,
-                        thinking = thinking,
-                        onEffortChange = { effort = it },
-                        onThinkingChange = { thinking = it },
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Surface(
-                        onClick = onSend,
-                        enabled = canSend,
-                        modifier = Modifier.size(38.dp),
-                        shape = CircleShape,
-                        color = if (canSend) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceContainerHigh
-                        },
-                        contentColor = if (canSend) {
-                            MaterialTheme.colorScheme.onPrimary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        },
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Outlined.ArrowUpward,
-                                contentDescription = "Send message",
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        ComposerInputSurface(
+            state = state,
+            actions = actions,
+            canSend = canSend,
+            matchedCommands = matchedCommands,
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -389,6 +247,217 @@ internal fun ComposerBar(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
             )
+        }
+    }
+}
+
+@Composable
+private fun ComposerCommandSuggestions(
+    matchedCommands: List<ComposerCommand>,
+    onCommandRun: (ComposerCommand) -> Unit,
+) {
+    if (matchedCommands.isEmpty()) return
+    Surface(
+        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+            matchedCommands.take(8).forEach { command ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onCommandRun(command) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "/${command.label}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = command.description,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComposerInputSurface(
+    state: ComposerBarState,
+    actions: ComposerBarActions,
+    canSend: Boolean,
+    matchedCommands: List<ComposerCommand>,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 760.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (state.pendingImageAttachments.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    state.pendingImageAttachments.forEachIndexed { index, image ->
+                        ComposerAttachmentChip(
+                            image = image,
+                            onRemove = { actions.onRemoveImageAttachment(index) },
+                        )
+                    }
+                }
+            }
+            DesktopTextArea(
+                value = state.text,
+                onValueChange = actions.onTextChanged,
+                enabled = state.enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 28.dp, max = 120.dp)
+                    .onPreviewKeyEvent { event ->
+                        // Enter sends; Shift+Enter inserts a newline. Only an
+                        // app-action command intercepts Enter — server slash
+                        // commands (fillsComposer) let the message send.
+                        if (event.type == KeyEventType.KeyDown &&
+                            (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
+                            !event.isShiftPressed
+                        ) {
+                            val actionCommand = matchedCommands.firstOrNull { !it.fillsComposer }
+                            if (actionCommand != null) {
+                                actions.onTextChanged("")
+                                actionCommand.run()
+                                true
+                            } else if (canSend) {
+                                actions.onSend()
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    },
+                maxLines = 5,
+                placeholder = state.placeholder,
+                undecorated = true,
+            )
+            ComposerControlRow(
+                state = state,
+                actions = actions,
+                canSend = canSend,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComposerControlRow(
+    state: ComposerBarState,
+    actions: ComposerBarActions,
+    canSend: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Plain Box button (not Jewel's IconButton, whose own height
+        // metrics left it misaligned with the Surface chips beside it).
+        DesktopTooltip(text = "Attach") {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .clickable(enabled = state.enabled, onClick = actions.onAttachImage),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = "Attach",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        val modelDisplay = state.modelOptions.firstOrNull { it.second == state.modelLabel }?.first
+            ?: state.modelLabel.ifBlank { "Model" }
+        if (actions.onOpenModelPicker != null) {
+            // Rich, searchable, provider-grouped picker sheet.
+            ComposerActionChip(label = modelDisplay, onClick = actions.onOpenModelPicker)
+        } else {
+            ComposerDropdownChip(
+                model = ComposerDropdownChipModel(
+                    label = modelDisplay,
+                    options = state.modelOptions.map { it.first },
+                    emptyHint = "No models available",
+                    onSelect = { selected ->
+                        state.modelOptions.firstOrNull { it.first == selected }
+                            ?.let { actions.onModelSelected(it.second) }
+                    },
+                ),
+            )
+        }
+        var safety by remember { mutableStateOf("Unrestricted") }
+        ComposerDropdownChip(
+            model = ComposerDropdownChipModel(
+                label = safety,
+                options = listOf("Unrestricted", "Standard", "Strict"),
+                onSelect = { safety = it },
+                leadingIcon = Icons.Outlined.Security,
+                contentColor = MaterialTheme.customColors.runningColor
+                    .takeIf { it != Color.Unspecified } ?: MaterialTheme.colorScheme.tertiary,
+            ),
+        )
+        var effort by remember { mutableStateOf(ComposerEffort.Medium) }
+        var thinking by remember { mutableStateOf(true) }
+        ComposerEffortChip(
+            state = ComposerEffortChipState(effort = effort, thinking = thinking),
+            actions = ComposerEffortChipActions(
+                onEffortChange = { effort = it },
+                onThinkingChange = { thinking = it },
+            ),
+        )
+        Spacer(Modifier.weight(1f))
+        Surface(
+            onClick = actions.onSend,
+            enabled = canSend,
+            modifier = Modifier.size(38.dp),
+            shape = CircleShape,
+            color = if (canSend) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.surfaceContainerHigh
+            },
+            contentColor = if (canSend) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            },
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.ArrowUpward,
+                    contentDescription = "Send message",
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
     }
 }
@@ -471,82 +540,143 @@ internal fun MentionPopup(
  * with a Thinking toggle and an EFFORT section (Minimal … Max) with the selected
  * level checked. Effort levels come from the shared [ComposerEffort].
  */
+internal data class ComposerEffortChipState(
+    val effort: ComposerEffort,
+    val thinking: Boolean,
+)
+
+internal data class ComposerEffortChipActions(
+    val onEffortChange: (ComposerEffort) -> Unit,
+    val onThinkingChange: (Boolean) -> Unit,
+)
+
 @Composable
 internal fun ComposerEffortChip(
-    effort: ComposerEffort,
-    thinking: Boolean,
-    onEffortChange: (ComposerEffort) -> Unit,
-    onThinkingChange: (Boolean) -> Unit,
+    state: ComposerEffortChipState,
+    actions: ComposerEffortChipActions,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
-        ComposerActionChip(label = effort.label, onClick = { open = !open })
+        ComposerActionChip(label = state.effort.label, onClick = { open = !open })
         if (open) {
-            val positionProvider = ViewportClampedPopupPositionProvider(yOffsetPx = -6)
-            Popup(
-                popupPositionProvider = positionProvider,
-                onDismissRequest = { open = false },
-                properties = PopupProperties(focusable = true),
-            ) {
-                Surface(
-                    modifier = Modifier.width(230.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    shadowElevation = 8.dp,
-                ) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        EffortSectionHeader("Options")
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = "Thinking",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Switch(checked = thinking, onCheckedChange = onThinkingChange)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        )
-                        EffortSectionHeader("Effort")
-                        ComposerEffort.entries.forEach { level ->
-                            val selected = level == effort
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onEffortChange(level); open = false }
-                                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = level.label,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (selected) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Check,
-                                        contentDescription = "Selected",
-                                        tint = Color(0xFF00BFA5),
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+            EffortPopover(
+                state = state,
+                actions = ComposerEffortChipActions(
+                    onEffortChange = { level ->
+                        actions.onEffortChange(level)
+                        open = false
+                    },
+                    onThinkingChange = actions.onThinkingChange,
+                ),
+                onDismiss = { open = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun EffortPopover(
+    state: ComposerEffortChipState,
+    actions: ComposerEffortChipActions,
+    onDismiss: () -> Unit,
+) {
+    val positionProvider = ViewportClampedPopupPositionProvider(yOffsetPx = -6)
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Surface(
+            modifier = Modifier.width(230.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 8.dp,
+        ) {
+            Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                EffortThinkingSection(
+                    thinking = state.thinking,
+                    onThinkingChange = actions.onThinkingChange,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                )
+                EffortLevelsSection(
+                    effort = state.effort,
+                    onEffortChange = actions.onEffortChange,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun EffortThinkingSection(
+    thinking: Boolean,
+    onThinkingChange: (Boolean) -> Unit,
+) {
+    EffortSectionHeader("Options")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Thinking",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(checked = thinking, onCheckedChange = onThinkingChange)
+    }
+}
+
+@Composable
+private fun EffortLevelsSection(
+    effort: ComposerEffort,
+    onEffortChange: (ComposerEffort) -> Unit,
+) {
+    EffortSectionHeader("Effort")
+    ComposerEffort.entries.forEach { level ->
+        EffortLevelRow(
+            level = level,
+            selected = level == effort,
+            onClick = { onEffortChange(level) },
+        )
+    }
+}
+
+@Composable
+private fun EffortLevelRow(
+    level: ComposerEffort,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = level.label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Icon(
+                imageVector = Icons.Outlined.Check,
+                contentDescription = "Selected",
+                tint = Color(0xFF00BFA5),
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
@@ -600,14 +730,8 @@ internal fun ComposerActionChip(
 }
 
 @Composable
-internal fun ComposerDropdownChip(
-    label: String,
-    options: List<String>,
-    onSelect: (String) -> Unit,
-    leadingIcon: ImageVector? = null,
-    contentColor: Color = MaterialTheme.colorScheme.onSurface,
-    emptyHint: String? = null,
-) {
+internal fun ComposerDropdownChip(model: ComposerDropdownChipModel) {
+    val contentColor = model.contentColor ?: MaterialTheme.colorScheme.onSurface
     var open by remember { mutableStateOf(false) }
     Box {
         Surface(
@@ -621,16 +745,16 @@ internal fun ComposerDropdownChip(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (leadingIcon != null) {
+                if (model.leadingIcon != null) {
                     Icon(
-                        imageVector = leadingIcon,
+                        imageVector = model.leadingIcon,
                         contentDescription = null,
                         modifier = Modifier.size(13.dp),
                         tint = contentColor,
                     )
                 }
                 Text(
-                    text = label,
+                    text = model.label,
                     style = MaterialTheme.typography.labelMedium,
                     maxLines = 1,
                 )
@@ -650,17 +774,17 @@ internal fun ComposerDropdownChip(
                 },
                 horizontalAlignment = Alignment.Start,
             ) {
-                if (options.isEmpty() && emptyHint != null) {
+                if (model.options.isEmpty() && model.emptyHint != null) {
                     selectableItem(selected = false, onClick = { open = false }) {
-                        DesktopControlText(emptyHint)
+                        DesktopControlText(model.emptyHint)
                     }
                 }
-                options.forEach { option ->
+                model.options.forEach { option ->
                     selectableItem(
-                        selected = option == label,
+                        selected = option == model.label,
                         onClick = {
                             open = false
-                            onSelect(option)
+                            model.onSelect(option)
                         },
                     ) {
                         DesktopControlText(option)

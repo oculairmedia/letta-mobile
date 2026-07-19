@@ -46,7 +46,6 @@ import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
-import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.components.DesktopChipTab
 import com.letta.mobile.desktop.data.desktopConfigIdFor
 import com.letta.mobile.desktop.memory.DesktopBlockApi
@@ -58,6 +57,90 @@ import com.letta.mobile.desktop.skills.DesktopSkillsSurface
 import com.letta.mobile.desktop.tools.DesktopToolLibraryState
 import org.jetbrains.jewel.ui.component.Text as JewelText
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+
+internal data class DestinationMemoryActions(
+    val onRefresh: () -> Unit,
+    val onAgentSelected: (String) -> Unit,
+)
+
+internal data class DestinationScheduleInputs(
+    val scheduleLibraryState: DesktopScheduleLibraryState,
+    val crons: List<CronTask>,
+    val focusedAgentId: String?,
+    val canCreateCron: Boolean,
+)
+
+internal data class DestinationScheduleActions(
+    val onRefresh: () -> Unit,
+    val onAgentSelected: (String) -> Unit,
+    val onDeleteCron: (String) -> Unit,
+    val onCreateCron: (
+        agentId: String?,
+        name: String,
+        prompt: String,
+        cron: String,
+        recurring: Boolean,
+        timezone: String,
+    ) -> Unit,
+)
+
+internal data class DestinationSkillsInputs(
+    val skills: List<Skill>,
+    val installedSkillNames: Set<String>,
+    val skillsLoading: Boolean,
+    val skillsError: String?,
+    val canManageSkills: Boolean,
+    val focusedAgentName: String?,
+)
+
+internal data class DestinationSkillsActions(
+    val onRefresh: () -> Unit,
+    val onInstall: (String) -> Unit,
+    val onUninstall: (String) -> Unit,
+)
+
+internal data class DestinationToolsActions(
+    val onRefresh: () -> Unit,
+    val onSearchQueryChanged: (String) -> Unit,
+    val onTagToggled: (String) -> Unit,
+    val onClearTags: () -> Unit,
+    val onLoadMore: () -> Unit,
+)
+
+private data class DestinationAgentsInputs(
+    val skills: DestinationSkillsInputs,
+    val toolLibraryState: DesktopToolLibraryState,
+)
+
+private data class DestinationAgentsActions(
+    val skills: DestinationSkillsActions,
+    val tools: DestinationToolsActions,
+)
+
+internal data class DestinationContentInputs(
+    val state: DesktopBootstrapState,
+    val memoryState: DesktopMemorySurfaceState,
+    val schedule: DestinationScheduleInputs,
+    val channelLibraryState: DesktopChannelLibraryState,
+    val toolLibraryState: DesktopToolLibraryState,
+    val blockApi: DesktopBlockApi?,
+    val skills: DestinationSkillsInputs,
+)
+
+internal data class DestinationContentActions(
+    val memory: DestinationMemoryActions,
+    val schedules: DestinationScheduleActions,
+    val onChannelsRefresh: () -> Unit,
+    val tools: DestinationToolsActions,
+    val skills: DestinationSkillsActions,
+    val onConfigSaved: (LettaConfig) -> Unit,
+    val onTokenCleared: () -> Unit,
+)
+
+private data class DestinationSettingsActions(
+    val onConfigSaved: (LettaConfig) -> Unit,
+    val onTokenCleared: () -> Unit,
+)
 
 private val DesktopDestination.icon: ImageVector
     get() = when (this) {
@@ -73,95 +156,45 @@ private val DesktopDestination.icon: ImageVector
 @Composable
 internal fun DestinationContent(
     destination: DesktopDestination,
-    state: DesktopBootstrapState,
-    chatState: DesktopChatSurfaceState,
-    memoryState: DesktopMemorySurfaceState,
-    scheduleLibraryState: DesktopScheduleLibraryState,
-    channelLibraryState: DesktopChannelLibraryState,
-    toolLibraryState: DesktopToolLibraryState,
-    onChatConversationSelected: (String) -> Unit,
-    onChatConversationDeleted: (String) -> Unit,
-    onChatComposerTextChanged: (String) -> Unit,
-    onChatSend: () -> Unit,
-    onChatAttachImage: () -> Unit,
-    onChatRemoveImageAttachment: (Int) -> Unit,
-    onChatRetryConnection: () -> Unit,
-    onMemoryRefresh: () -> Unit,
-    onMemoryAgentSelected: (String) -> Unit,
-    onSchedulesRefresh: () -> Unit,
-    onScheduleAgentSelected: (String) -> Unit,
-    onChannelsRefresh: () -> Unit,
-    onToolsRefresh: () -> Unit,
-    onToolsSearchQueryChanged: (String) -> Unit,
-    onToolsTagToggled: (String) -> Unit,
-    onToolsClearTags: () -> Unit,
-    onToolsLoadMore: () -> Unit,
-    onConfigSaved: (LettaConfig) -> Unit,
-    onTokenCleared: () -> Unit,
-    blockApi: DesktopBlockApi?,
-    crons: List<CronTask>,
-    onDeleteCron: (String) -> Unit,
-    canCreateCron: Boolean,
-    onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
-    focusedAgentId: String?,
-    skills: List<Skill>,
-    installedSkillNames: Set<String>,
-    skillsLoading: Boolean,
-    skillsError: String?,
-    canManageSkills: Boolean,
-    focusedAgentName: String?,
-    onRefreshSkills: () -> Unit,
-    onInstallSkill: (String) -> Unit,
-    onUninstallSkill: (String) -> Unit,
+    inputs: DestinationContentInputs,
+    actions: DestinationContentActions,
     modifier: Modifier = Modifier,
 ) {
     when (destination) {
         DesktopDestination.Memory -> MemoryDestinationContent(
-            memoryState = memoryState,
-            onMemoryRefresh = onMemoryRefresh,
-            onMemoryAgentSelected = onMemoryAgentSelected,
-            blockApi = blockApi,
+            memoryState = inputs.memoryState,
+            blockApi = inputs.blockApi,
+            actions = actions.memory,
             modifier = modifier,
         )
         DesktopDestination.Schedules -> SchedulesDestinationContent(
-            scheduleLibraryState = scheduleLibraryState,
-            onSchedulesRefresh = onSchedulesRefresh,
-            onScheduleAgentSelected = onScheduleAgentSelected,
-            crons = crons,
-            focusedAgentId = focusedAgentId,
-            onDeleteCron = onDeleteCron,
-            canCreateCron = canCreateCron,
-            onCreateCron = onCreateCron,
+            inputs = inputs.schedule,
+            actions = actions.schedules,
             modifier = modifier,
         )
         DesktopDestination.Channels -> ChannelsDestinationContent(
-            channelLibraryState = channelLibraryState,
-            onChannelsRefresh = onChannelsRefresh,
+            channelLibraryState = inputs.channelLibraryState,
+            onChannelsRefresh = actions.onChannelsRefresh,
             modifier = modifier,
         )
         DesktopDestination.Agents -> AgentsDestinationContent(
-            skills = skills,
-            installedSkillNames = installedSkillNames,
-            skillsLoading = skillsLoading,
-            skillsError = skillsError,
-            canManageSkills = canManageSkills,
-            focusedAgentName = focusedAgentName,
-            onRefreshSkills = onRefreshSkills,
-            onInstallSkill = onInstallSkill,
-            onUninstallSkill = onUninstallSkill,
-            toolLibraryState = toolLibraryState,
-            onToolsRefresh = onToolsRefresh,
-            onToolsSearchQueryChanged = onToolsSearchQueryChanged,
-            onToolsTagToggled = onToolsTagToggled,
-            onToolsClearTags = onToolsClearTags,
-            onToolsLoadMore = onToolsLoadMore,
+            inputs = DestinationAgentsInputs(
+                skills = inputs.skills,
+                toolLibraryState = inputs.toolLibraryState,
+            ),
+            actions = DestinationAgentsActions(
+                skills = actions.skills,
+                tools = actions.tools,
+            ),
             modifier = modifier,
         )
         else -> ScrollableDestinationContent(
             destination = destination,
-            state = state,
-            onConfigSaved = onConfigSaved,
-            onTokenCleared = onTokenCleared,
+            state = inputs.state,
+            settings = DestinationSettingsActions(
+                onConfigSaved = actions.onConfigSaved,
+                onTokenCleared = actions.onTokenCleared,
+            ),
             modifier = modifier,
         )
     }
@@ -170,43 +203,36 @@ internal fun DestinationContent(
 @Composable
 private fun MemoryDestinationContent(
     memoryState: DesktopMemorySurfaceState,
-    onMemoryRefresh: () -> Unit,
-    onMemoryAgentSelected: (String) -> Unit,
     blockApi: DesktopBlockApi?,
+    actions: DestinationMemoryActions,
     modifier: Modifier = Modifier,
 ) {
     DesktopMemorySurface(
         state = memoryState,
-        onRefresh = onMemoryRefresh,
-        onAgentSelected = onMemoryAgentSelected,
+        onRefresh = actions.onRefresh,
+        onAgentSelected = actions.onAgentSelected,
         modifier = modifier,
         blockApi = blockApi,
-        onBlockChanged = onMemoryRefresh,
+        onBlockChanged = actions.onRefresh,
     )
 }
 
 @Composable
 private fun SchedulesDestinationContent(
-    scheduleLibraryState: DesktopScheduleLibraryState,
-    onSchedulesRefresh: () -> Unit,
-    onScheduleAgentSelected: (String) -> Unit,
-    crons: List<CronTask>,
-    focusedAgentId: String?,
-    onDeleteCron: (String) -> Unit,
-    canCreateCron: Boolean,
-    onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
+    inputs: DestinationScheduleInputs,
+    actions: DestinationScheduleActions,
     modifier: Modifier = Modifier,
 ) {
     DesktopScheduleSurface(
-        state = scheduleLibraryState,
-        onRefresh = onSchedulesRefresh,
-        onAgentSelected = onScheduleAgentSelected,
+        state = inputs.scheduleLibraryState,
+        onRefresh = actions.onRefresh,
+        onAgentSelected = actions.onAgentSelected,
         modifier = modifier,
-        crons = crons,
-        focusedAgentId = focusedAgentId,
-        onDeleteCron = onDeleteCron,
-        canCreate = canCreateCron,
-        onCreateCron = onCreateCron,
+        crons = inputs.crons,
+        focusedAgentId = inputs.focusedAgentId,
+        onDeleteCron = actions.onDeleteCron,
+        canCreate = inputs.canCreateCron,
+        onCreateCron = actions.onCreateCron,
     )
 }
 
@@ -225,39 +251,27 @@ private fun ChannelsDestinationContent(
 
 @Composable
 private fun AgentsDestinationContent(
-    skills: List<Skill>,
-    installedSkillNames: Set<String>,
-    skillsLoading: Boolean,
-    skillsError: String?,
-    canManageSkills: Boolean,
-    focusedAgentName: String?,
-    onRefreshSkills: () -> Unit,
-    onInstallSkill: (String) -> Unit,
-    onUninstallSkill: (String) -> Unit,
-    toolLibraryState: DesktopToolLibraryState,
-    onToolsRefresh: () -> Unit,
-    onToolsSearchQueryChanged: (String) -> Unit,
-    onToolsTagToggled: (String) -> Unit,
-    onToolsClearTags: () -> Unit,
-    onToolsLoadMore: () -> Unit,
+    inputs: DestinationAgentsInputs,
+    actions: DestinationAgentsActions,
     modifier: Modifier = Modifier,
 ) {
+    val skills = inputs.skills
     DesktopSkillsSurface(
-        skills = skills,
-        installedSkillNames = installedSkillNames,
-        skillsLoading = skillsLoading,
-        skillsError = skillsError,
-        canManageSkills = canManageSkills,
-        focusedAgentName = focusedAgentName,
-        onRefreshSkills = onRefreshSkills,
-        onInstallSkill = onInstallSkill,
-        onUninstallSkill = onUninstallSkill,
-        toolState = toolLibraryState,
-        onToolsRefresh = onToolsRefresh,
-        onToolsSearchQueryChanged = onToolsSearchQueryChanged,
-        onToolsTagToggled = onToolsTagToggled,
-        onToolsClearTags = onToolsClearTags,
-        onToolsLoadMore = onToolsLoadMore,
+        skills = skills.skills,
+        installedSkillNames = skills.installedSkillNames,
+        skillsLoading = skills.skillsLoading,
+        skillsError = skills.skillsError,
+        canManageSkills = skills.canManageSkills,
+        focusedAgentName = skills.focusedAgentName,
+        onRefreshSkills = actions.skills.onRefresh,
+        onInstallSkill = actions.skills.onInstall,
+        onUninstallSkill = actions.skills.onUninstall,
+        toolState = inputs.toolLibraryState,
+        onToolsRefresh = actions.tools.onRefresh,
+        onToolsSearchQueryChanged = actions.tools.onSearchQueryChanged,
+        onToolsTagToggled = actions.tools.onTagToggled,
+        onToolsClearTags = actions.tools.onClearTags,
+        onToolsLoadMore = actions.tools.onLoadMore,
         modifier = modifier,
     )
 }
@@ -266,8 +280,7 @@ private fun AgentsDestinationContent(
 private fun ScrollableDestinationContent(
     destination: DesktopDestination,
     state: DesktopBootstrapState,
-    onConfigSaved: (LettaConfig) -> Unit,
-    onTokenCleared: () -> Unit,
+    settings: DestinationSettingsActions,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -281,8 +294,7 @@ private fun ScrollableDestinationContent(
         scrollableDestinationItems(
             destination = destination,
             state = state,
-            onConfigSaved = onConfigSaved,
-            onTokenCleared = onTokenCleared,
+            settings = settings,
         )
     }
 }
@@ -306,8 +318,7 @@ private fun DestinationHeader(destination: DesktopDestination) {
 private fun LazyListScope.scrollableDestinationItems(
     destination: DesktopDestination,
     state: DesktopBootstrapState,
-    onConfigSaved: (LettaConfig) -> Unit,
-    onTokenCleared: () -> Unit,
+    settings: DestinationSettingsActions,
 ) {
     when (destination) {
         DesktopDestination.Overview -> {
@@ -318,8 +329,8 @@ private fun LazyListScope.scrollableDestinationItems(
             item {
                 BackendSettingsCard(
                     config = state.config,
-                    onConfigSaved = onConfigSaved,
-                    onTokenCleared = onTokenCleared,
+                    onConfigSaved = settings.onConfigSaved,
+                    onTokenCleared = settings.onTokenCleared,
                 )
             }
         }

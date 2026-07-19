@@ -168,27 +168,20 @@ open class AgentApi @Inject constructor(
 
     open suspend fun exportAgent(agentId: String): String = exportAgent(AgentId(agentId))
 
-    open suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String? = null,
-        overrideExistingTools: Boolean? = null,
-        projectId: ProjectId? = null,
-        stripMessages: Boolean? = null,
-    ): ImportedAgentsResponse {
+    open suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.submitFormWithBinaryData(
             url = "$baseUrl/v1/agents/import",
             formData = formData {
-                append("file", fileBytes, Headers.build {
-                    append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
+                append("file", params.fileBytes, Headers.build {
+                    append(HttpHeaders.ContentDisposition, "filename=\"${params.fileName}\"")
                     append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 })
-                overrideName?.let { append("override_name", it) }
-                overrideExistingTools?.let { append("override_existing_tools", it.toString()) }
-                projectId?.let { append("project_id", it.value) }
-                stripMessages?.let { append("strip_messages", it.toString()) }
+                params.overrideName?.let { append("override_name", it) }
+                params.overrideExistingTools?.let { append("override_existing_tools", it.toString()) }
+                params.projectId?.let { append("project_id", it.value) }
+                params.stripMessages?.let { append("strip_messages", it.toString()) }
             }
         )
         if (response.status.value !in 200..299) {

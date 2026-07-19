@@ -29,6 +29,18 @@ internal class AdminPath private constructor(private val segments: List<String>)
     }
 }
 
+/** Typed JSON body payload for admin proxy write methods. */
+@JvmInline
+internal value class AdminJsonBody(val value: String) {
+    companion object {
+        val Empty = AdminJsonBody("{}")
+    }
+}
+
+/** Typed admin query/path parameter key. */
+@JvmInline
+internal value class AdminParamKey(val value: String)
+
 internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
     fun request(path: AdminPath): AdminProxyRequest.Builder = path.builder()
 
@@ -39,24 +51,48 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
 
     fun get(vararg segments: String): JsonElement = get(AdminPath.v1(*segments))
 
-    fun post(path: AdminPath, body: String, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
-        post(path.builder().apply(configure).build(), body)
+    fun post(
+        path: AdminPath,
+        body: AdminJsonBody,
+        configure: AdminProxyRequest.Builder.() -> Unit = {},
+    ): JsonElement = post(path.builder().apply(configure).build(), body)
 
-    fun post(request: AdminProxyRequest, body: String): JsonElement = proxy.post(request, body)
+    fun post(path: AdminPath, body: String, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
+        post(path, AdminJsonBody(body), configure)
+
+    fun post(request: AdminProxyRequest, body: AdminJsonBody): JsonElement = proxy.post(request, body.value)
+
+    fun post(request: AdminProxyRequest, body: String): JsonElement = post(request, AdminJsonBody(body))
 
     fun post(vararg segments: String, body: String): JsonElement = post(AdminPath.v1(*segments), body)
 
-    fun put(path: AdminPath, body: String, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
-        put(path.builder().apply(configure).build(), body)
+    fun put(
+        path: AdminPath,
+        body: AdminJsonBody,
+        configure: AdminProxyRequest.Builder.() -> Unit = {},
+    ): JsonElement = put(path.builder().apply(configure).build(), body)
 
-    fun put(request: AdminProxyRequest, body: String): JsonElement = proxy.put(request, body)
+    fun put(path: AdminPath, body: String, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
+        put(path, AdminJsonBody(body), configure)
+
+    fun put(request: AdminProxyRequest, body: AdminJsonBody): JsonElement = proxy.put(request, body.value)
+
+    fun put(request: AdminProxyRequest, body: String): JsonElement = put(request, AdminJsonBody(body))
 
     fun put(vararg segments: String, body: String): JsonElement = put(AdminPath.v1(*segments), body)
 
-    fun patch(path: AdminPath, body: String, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
-        patch(path.builder().apply(configure).build(), body)
+    fun patch(
+        path: AdminPath,
+        body: AdminJsonBody,
+        configure: AdminProxyRequest.Builder.() -> Unit = {},
+    ): JsonElement = patch(path.builder().apply(configure).build(), body)
 
-    fun patch(request: AdminProxyRequest, body: String): JsonElement = proxy.patch(request, body)
+    fun patch(path: AdminPath, body: String, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
+        patch(path, AdminJsonBody(body), configure)
+
+    fun patch(request: AdminProxyRequest, body: AdminJsonBody): JsonElement = proxy.patch(request, body.value)
+
+    fun patch(request: AdminProxyRequest, body: String): JsonElement = patch(request, AdminJsonBody(body))
 
     fun patch(vararg segments: String, body: String): JsonElement = patch(AdminPath.v1(*segments), body)
 
@@ -68,12 +104,21 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
     fun delete(vararg segments: String): JsonElement = delete(AdminPath.v1(*segments))
 }
 
-internal fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
+internal fun param(params: JsonObject?, key: AdminParamKey): String? =
+    params?.get(key.value)?.jsonPrimitive?.contentOrNull
 
-internal fun JsonObject?.requireParam(key: String): String = param(this, key) ?: adminError("$key required")
+internal fun param(params: JsonObject?, key: String): String? = param(params, AdminParamKey(key))
+
+internal fun JsonObject?.requireParam(key: AdminParamKey): String =
+    param(this, key) ?: adminError("${key.value} required")
+
+internal fun JsonObject?.requireParam(key: String): String = requireParam(AdminParamKey(key))
+
+internal fun JsonObject?.requireParam(key: AdminParamKey, message: String): String =
+    param(this, key) ?: adminError(message)
 
 internal fun JsonObject?.requireParam(key: String, message: String): String =
-    param(this, key) ?: adminError(message)
+    requireParam(AdminParamKey(key), message)
 
 /** Prefer `identifier` when both alias keys are present (back-compat with legacy `project_id`). */
 internal fun projectIdentifierParam(params: JsonObject?): String? =

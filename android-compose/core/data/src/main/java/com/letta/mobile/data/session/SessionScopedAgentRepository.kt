@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -112,21 +113,8 @@ class SessionScopedAgentRepository internal constructor(
 
     override suspend fun exportAgent(id: AgentId): String = sessionManager.withCurrentSession { it.agentRepository.exportAgent(id) }
 
-    override suspend fun importAgent(
-        fileName: String,
-        fileBytes: ByteArray,
-        overrideName: String?,
-        overrideExistingTools: Boolean?,
-        projectId: ProjectId?,
-        stripMessages: Boolean?,
-    ): ImportedAgentsResponse = sessionManager.withCurrentSession { it.agentRepository.importAgent(
-        fileName = fileName,
-        fileBytes = fileBytes,
-        overrideName = overrideName,
-        overrideExistingTools = overrideExistingTools,
-        projectId = projectId,
-        stripMessages = stripMessages,
-    ) }
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse =
+        sessionManager.withCurrentSession { it.agentRepository.importAgent(params) }
 
     override suspend fun attachArchive(agentId: AgentId, archiveId: String) = sessionManager.withCurrentSession { it.agentRepository.attachArchive(agentId, archiveId) }
 

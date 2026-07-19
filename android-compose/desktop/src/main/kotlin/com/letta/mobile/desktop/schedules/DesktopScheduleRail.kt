@@ -83,52 +83,85 @@ import kotlin.time.Instant
 
 // --- Right rail -------------------------------------------------------------
 
+internal data class ScheduleRailParams(
+    val rail: RailState,
+    val defs: List<ScheduleDef>,
+    val defsById: Map<String, ScheduleDef>,
+    val history: com.letta.mobile.data.schedules.HistorySummary,
+    val now: Instant,
+    val zone: TimeZone,
+    val onSelectSchedule: (String) -> Unit,
+    val onBackToOverview: () -> Unit,
+    val onDelete: (String) -> Unit,
+)
+
 @Composable
-internal fun ScheduleRail(
-    rail: RailState,
-    defs: List<ScheduleDef>,
-    defsById: Map<String, ScheduleDef>,
-    history: com.letta.mobile.data.schedules.HistorySummary,
-    now: Instant,
-    zone: TimeZone,
-    onSelectSchedule: (String) -> Unit,
-    onBackToOverview: () -> Unit,
-    onDelete: (String) -> Unit,
-) {
+internal fun ScheduleRail(params: ScheduleRailParams) {
     Box(
         Modifier.width(RAIL_WIDTH).fillMaxHeight()
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
             .background(MaterialTheme.colorScheme.surface)
             .padding(20.dp),
     ) {
-        when (rail) {
-            RailState.Overview -> OverviewRail(defs, history, now, zone, onSelectSchedule)
-            is RailState.Detail -> defsById[rail.scheduleId]?.let { def ->
-                DetailRail(
-                    def = def,
-                    reliability = history.schedules.firstOrNull { it.scheduleId == def.id },
-                    now = now,
-                    zone = zone,
-                    // Delete is routed by the host: cron ids → CronApi, native
-                    // schedule ids → scheduleRepository.deleteSchedule.
-                    canDelete = true,
-                    onBack = onBackToOverview,
-                    onDelete = onDelete,
-                )
-            } ?: OverviewRail(defs, history, now, zone, onSelectSchedule)
-            is RailState.Run -> RunDetailRail(rail.run, zone, onBackToOverview)
-        }
+        ScheduleRailContent(params)
     }
 }
 
 @Composable
-internal fun OverviewRail(
-    defs: List<ScheduleDef>,
-    history: com.letta.mobile.data.schedules.HistorySummary,
-    now: Instant,
-    zone: TimeZone,
-    onSelectSchedule: (String) -> Unit,
-) {
+private fun ScheduleRailContent(params: ScheduleRailParams) {
+    when (val rail = params.rail) {
+        RailState.Overview -> OverviewRail(
+            OverviewRailParams(
+                defs = params.defs,
+                history = params.history,
+                now = params.now,
+                zone = params.zone,
+                onSelectSchedule = params.onSelectSchedule,
+            ),
+        )
+        is RailState.Detail -> {
+            val def = params.defsById[rail.scheduleId]
+            if (def != null) {
+                DetailRail(
+                    DetailRailParams(
+                        def = def,
+                        reliability = params.history.schedules.firstOrNull { it.scheduleId == def.id },
+                        now = params.now,
+                        zone = params.zone,
+                        // Delete is routed by the host: cron ids → CronApi, native
+                        // schedule ids → scheduleRepository.deleteSchedule.
+                        canDelete = true,
+                        onBack = params.onBackToOverview,
+                        onDelete = params.onDelete,
+                    ),
+                )
+            } else {
+                OverviewRail(
+                    OverviewRailParams(
+                        defs = params.defs,
+                        history = params.history,
+                        now = params.now,
+                        zone = params.zone,
+                        onSelectSchedule = params.onSelectSchedule,
+                    ),
+                )
+            }
+        }
+        is RailState.Run -> RunDetailRail(rail.run, params.zone, params.onBackToOverview)
+    }
+}
+
+internal data class OverviewRailParams(
+    val defs: List<ScheduleDef>,
+    val history: com.letta.mobile.data.schedules.HistorySummary,
+    val now: Instant,
+    val zone: TimeZone,
+    val onSelectSchedule: (String) -> Unit,
+)
+
+@Composable
+internal fun OverviewRail(params: OverviewRailParams) {
+    val history = params.history
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Text("OVERVIEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
         Spacer(Modifier.height(10.dp))
@@ -140,47 +173,86 @@ internal fun OverviewRail(
         Spacer(Modifier.height(20.dp))
         Text("ACTIVE SCHEDULES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
         Spacer(Modifier.height(10.dp))
-        val globalNext = defs.mapNotNull { ScheduleProjection.nextRun(it, now) }.minOrNull()
-        defs.forEach { def ->
-            ActiveScheduleRow(def, now, zone, isNext = ScheduleProjection.nextRun(def, now) == globalNext && globalNext != null) { onSelectSchedule(def.id) }
+        val globalNext = params.defs.mapNotNull { ScheduleProjection.nextRun(it, params.now) }.minOrNull()
+        params.defs.forEach { def ->
+            val next = ScheduleProjection.nextRun(def, params.now)
+            ActiveScheduleRow(
+                ActiveScheduleRowParams(
+                    def = def,
+                    now = params.now,
+                    zone = params.zone,
+                    isNext = next == globalNext && globalNext != null,
+                    onClick = { params.onSelectSchedule(def.id) },
+                ),
+            )
             Spacer(Modifier.height(8.dp))
         }
     }
 }
 
+internal data class ActiveScheduleRowParams(
+    val def: ScheduleDef,
+    val now: Instant,
+    val zone: TimeZone,
+    val isNext: Boolean,
+    val onClick: () -> Unit,
+)
+
+internal fun cadenceLabel(def: ScheduleDef): String =
+    def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time"
+
+internal fun relativeOrDash(now: Instant, next: Instant?): String =
+    if (next != null) ScheduleFormat.relative(now, next) else "—"
+
+internal fun activeStatusLabel(active: Boolean): String = if (active) "Active" else "Paused"
+
+internal fun nextRunHeadline(now: Instant, next: Instant?): String =
+    if (next != null) "Runs ${ScheduleFormat.relative(now, next)}" else "No upcoming run"
+
+internal fun detailControlNote(canDelete: Boolean): String =
+    if (canDelete) {
+        "Run now / Pause need a backend control endpoint (not available yet)."
+    } else {
+        "Run now / Pause / Delete need the native schedule control endpoints (not available yet)."
+    }
+
 @Composable
-internal fun ActiveScheduleRow(def: ScheduleDef, now: Instant, zone: TimeZone, isNext: Boolean, onClick: () -> Unit) {
-    val next = ScheduleProjection.nextRun(def, now)
+internal fun ActiveScheduleRow(params: ActiveScheduleRowParams) {
+    val next = ScheduleProjection.nextRun(params.def, params.now)
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-            .background(if (isNext) MaterialTheme.customColors.runningColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer)
-            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+            .background(if (params.isNext) MaterialTheme.customColors.runningColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(onClick = params.onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(def.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(params.def.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(cadenceLabel(params.def), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Text(
-            if (next != null) ScheduleFormat.relative(now, next) else "—",
+            relativeOrDash(params.now, next),
             style = MaterialTheme.typography.labelMedium,
-            color = if (isNext) MaterialTheme.customColors.runningColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (params.isNext) MaterialTheme.customColors.runningColor else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
+internal data class DetailRailParams(
+    val def: ScheduleDef,
+    val reliability: com.letta.mobile.data.schedules.ScheduleReliability?,
+    val now: Instant,
+    val zone: TimeZone,
+    val canDelete: Boolean,
+    val onBack: () -> Unit,
+    val onDelete: (String) -> Unit,
+)
+
 @Composable
-internal fun DetailRail(
-    def: ScheduleDef,
-    reliability: com.letta.mobile.data.schedules.ScheduleReliability?,
-    now: Instant,
-    zone: TimeZone,
-    canDelete: Boolean,
-    onBack: () -> Unit,
-    onDelete: (String) -> Unit,
-) {
+internal fun DetailRail(params: DetailRailParams) {
+    val def = params.def
+    val reliability = params.reliability
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = onBack)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(onClick = params.onBack)) {
             Icon(Icons.Outlined.ArrowBack, "Overview", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
             Text("Overview", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -189,10 +261,10 @@ internal fun DetailRail(
         Text(def.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(6.dp))
         Box(Modifier.clip(RoundedCornerShape(6.dp)).border(1.dp, MaterialTheme.customColors.successColor, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 3.dp)) {
-            Text(if (def.active) "Active" else "Paused", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.successColor)
+            Text(activeStatusLabel(def.active), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.successColor)
         }
         Spacer(Modifier.height(14.dp))
-        val next = ScheduleProjection.nextRun(def, now)
+        val next = ScheduleProjection.nextRun(def, params.now)
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceContainer).padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -200,14 +272,14 @@ internal fun DetailRail(
             Icon(Icons.Outlined.Schedule, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(10.dp))
             Column {
-                Text(if (next != null) "Runs ${ScheduleFormat.relative(now, next)}" else "No upcoming run", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(nextRunHeadline(params.now, next), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 if (next != null) {
-                    Text("${ScheduleFormat.dateLabel(next, zone)} ${ScheduleFormat.timeOfDay(next, zone)} · ${def.zone.id}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${ScheduleFormat.dateLabel(next, params.zone)} ${ScheduleFormat.timeOfDay(next, params.zone)} · ${def.zone.id}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
-        DefRow("Cadence", def.cron?.let { CronSchedule.parse(it)?.let(CronSchedule::describe) ?: it } ?: "One-time")
+        DefRow("Cadence", cadenceLabel(def))
         DefRow("Agent", def.name)
         DefRow("If missed", "Skip — don't catch up")
         Spacer(Modifier.height(14.dp))
@@ -228,17 +300,12 @@ internal fun DetailRail(
             DesktopOutlinedButton(onClick = {}, enabled = false) { DesktopButtonContent("Pause") }
             // Delete only for cron-backed schedules — the wired callback hits
             // the cron API, which can't delete native schedule-admin schedules.
-            if (canDelete) {
-                DesktopOutlinedButton(onClick = { onDelete(def.id) }) { DesktopButtonContent("Delete") }
+            if (params.canDelete) {
+                DesktopOutlinedButton(onClick = { params.onDelete(def.id) }) { DesktopButtonContent("Delete") }
             }
         }
         Spacer(Modifier.height(8.dp))
-        val controlNote = if (canDelete) {
-            "Run now / Pause need a backend control endpoint (not available yet)."
-        } else {
-            "Run now / Pause / Delete need the native schedule control endpoints (not available yet)."
-        }
-        Text(controlNote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
+        Text(detailControlNote(params.canDelete), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     }
 }
 

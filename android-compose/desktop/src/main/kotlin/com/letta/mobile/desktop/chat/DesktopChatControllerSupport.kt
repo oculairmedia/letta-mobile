@@ -51,26 +51,11 @@ internal class RealDesktopTimelineLoop(
     conversation: DesktopConversationSummary,
     scope: CoroutineScope,
 ) : DesktopTimelineLoop {
-    private val conversationId = conversation.id
-    private val agentId = conversation.agentId
-    private val transport = if (conversationId.isDefaultShimConversationId() && agentId != null) {
-        DefaultShimDesktopTimelineTransport(
-            gateway = gateway,
-            agentId = agentId,
-            externalConversationId = conversationId,
-        )
-    } else {
-        gateway
-    }
-    private val loopConversationId = if (conversationId.isDefaultShimConversationId() && agentId != null) {
-        "desktop-default-shim-$agentId-$conversationId"
-    } else {
-        conversationId
-    }
+    private val routing = resolveDesktopTimelineRouting(gateway, conversation)
 
     private val delegate = TimelineSyncLoop(
-        messageApi = transport,
-        conversationId = loopConversationId,
+        messageApi = routing.transport,
+        conversationId = routing.loopConversationId,
         scope = scope,
         logTag = "DesktopChat",
     )
@@ -111,15 +96,19 @@ internal class DefaultShimDesktopTimelineTransport(
         after: String?,
         order: String?,
     ): List<LettaMessage> =
-        gateway.listAgentMessages(
-            agentId = agentId,
-            limit = limit,
-            order = order,
-            conversationId = null,
-        )
+        // Default-shim conversations hydrate from the agent message stream
+        // (there is no real conversation id on the backend yet).
+        listViaGateway(limit = limit, order = order, conversationId = null)
 
     override suspend fun listAgentMessages(
         agentId: String,
+        limit: Int?,
+        order: String?,
+        conversationId: String?,
+    ): List<LettaMessage> =
+        listViaGateway(limit = limit, order = order, conversationId = conversationId)
+
+    private suspend fun listViaGateway(
         limit: Int?,
         order: String?,
         conversationId: String?,
@@ -134,6 +123,35 @@ internal class DefaultShimDesktopTimelineTransport(
 
 internal fun String.isDefaultShimConversationId(): Boolean =
     startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
+
+private data class DesktopTimelineRouting(
+    val transport: TimelineTransport,
+    val loopConversationId: String,
+)
+
+private fun resolveDesktopTimelineRouting(
+    gateway: DesktopChatGateway,
+    conversation: DesktopConversationSummary,
+): DesktopTimelineRouting {
+    val conversationId = conversation.id
+    val agentId = conversation.agentId
+    val usesDefaultShim = conversationId.isDefaultShimConversationId() && agentId != null
+    val transport: TimelineTransport = if (usesDefaultShim) {
+        DefaultShimDesktopTimelineTransport(
+            gateway = gateway,
+            agentId = agentId!!,
+            externalConversationId = conversationId,
+        )
+    } else {
+        gateway
+    }
+    val loopConversationId = if (usesDefaultShim) {
+        "desktop-default-shim-$agentId-$conversationId"
+    } else {
+        conversationId
+    }
+    return DesktopTimelineRouting(transport = transport, loopConversationId = loopConversationId)
+}
 
 private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
 

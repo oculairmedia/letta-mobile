@@ -13,31 +13,27 @@ import java.awt.datatransfer.DataFlavor
 import java.awt.event.KeyEvent
 import kotlinx.coroutines.CoroutineScope
 
+internal data class DesktopImageIngressConfig(
+    val enabled: Boolean,
+    val scope: CoroutineScope,
+    val loader: DesktopImageAttachmentLoader,
+    val onImage: (MessageContentPart.Image) -> Unit,
+    val onError: (String) -> Unit,
+)
+
 @Composable
-internal fun DesktopImageIngressEffect(
-    enabled: Boolean,
-    scope: CoroutineScope,
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
-) {
-    DesktopClipboardImagePasteEffect(enabled, scope, loader, onImage, onError)
-    DesktopImageFileDropEffect(enabled, scope, loader, onImage, onError)
+internal fun DesktopImageIngressEffect(config: DesktopImageIngressConfig) {
+    DesktopClipboardImagePasteEffect(config)
+    DesktopImageFileDropEffect(config)
 }
 
 @Composable
-private fun DesktopClipboardImagePasteEffect(
-    enabled: Boolean,
-    scope: CoroutineScope,
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
-) {
-    val currentOnImage by rememberUpdatedState(onImage)
-    val currentOnError by rememberUpdatedState(onError)
-    val currentScope by rememberUpdatedState(scope)
-    DisposableEffect(enabled, loader) {
-        if (!enabled) return@DisposableEffect onDispose { }
+private fun DesktopClipboardImagePasteEffect(config: DesktopImageIngressConfig) {
+    val currentOnImage by rememberUpdatedState(config.onImage)
+    val currentOnError by rememberUpdatedState(config.onError)
+    val currentScope by rememberUpdatedState(config.scope)
+    DisposableEffect(config.enabled, config.loader) {
+        if (!config.enabled) return@DisposableEffect onDispose { }
         val manager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
         val dispatcher = java.awt.KeyEventDispatcher { event ->
             if (event.id != KeyEvent.KEY_PRESSED || event.keyCode != KeyEvent.VK_V || !event.isShortcutPaste()) {
@@ -45,7 +41,7 @@ private fun DesktopClipboardImagePasteEffect(
             }
             val transferable = runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull()
                 ?: return@KeyEventDispatcher false
-            val sink = DesktopImageIngressSink(currentScope, loader, currentOnImage, currentOnError)
+            val sink = DesktopImageIngressSink(currentScope, config.loader, currentOnImage, currentOnError)
             when {
                 transferable.isDataFlavorSupported(DataFlavor.imageFlavor) ->
                     handleClipboardImagePaste(transferable, sink)
@@ -60,20 +56,14 @@ private fun DesktopClipboardImagePasteEffect(
 }
 
 @Composable
-private fun DesktopImageFileDropEffect(
-    enabled: Boolean,
-    scope: CoroutineScope,
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
-) {
-    val currentOnImage by rememberUpdatedState(onImage)
-    val currentOnError by rememberUpdatedState(onError)
-    val currentScope by rememberUpdatedState(scope)
-    DisposableEffect(enabled, loader) {
-        if (!enabled) return@DisposableEffect onDispose { }
+private fun DesktopImageFileDropEffect(config: DesktopImageIngressConfig) {
+    val currentOnImage by rememberUpdatedState(config.onImage)
+    val currentOnError by rememberUpdatedState(config.onError)
+    val currentScope by rememberUpdatedState(config.scope)
+    DisposableEffect(config.enabled, config.loader) {
+        if (!config.enabled) return@DisposableEffect onDispose { }
         val installed = java.util.WeakHashMap<Component, java.awt.dnd.DropTarget?>()
-        val sink = DesktopImageIngressSink(currentScope, loader, currentOnImage, currentOnError)
+        val sink = DesktopImageIngressSink(currentScope, config.loader, currentOnImage, currentOnError)
         val target = createImageFileDropTarget(sink)
         installDropTargetsOnWindows(target, installed)
         val listener = createWindowOpenedDropTargetInstaller(target, installed)

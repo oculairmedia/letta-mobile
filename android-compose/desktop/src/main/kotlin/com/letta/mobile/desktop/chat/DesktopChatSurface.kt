@@ -209,28 +209,34 @@ internal fun ChatDetailPane(
                 )
             } else {
                 MessageList(
-                    conversationId = state.selectedConversationId,
-                    renderItems = state.renderItems,
-                    isSending = isThinking,
-                    isStreamingReply = isStreamingReply,
+                    params = MessageListParams(
+                        conversationId = state.selectedConversationId,
+                        renderItems = state.renderItems,
+                        isSending = isThinking,
+                        isStreamingReply = isStreamingReply,
+                    ),
                     modifier = Modifier.weight(1f),
                 )
             }
             ComposerBar(
-                text = state.composerText,
-                pendingImageAttachments = state.pendingImageAttachments,
-                enabled = state.canSend,
-                modelLabel = state.composerModelLabel,
-                modelOptions = modelOptions,
-                onModelSelected = onModelSelected,
-                commands = commands,
-                mentionables = mentionables,
-                placeholder = composerPlaceholder,
-                onOpenModelPicker = onOpenModelPicker,
-                onTextChanged = onComposerTextChanged,
-                onSend = onSend,
-                onAttachImage = onAttachImage,
-                onRemoveImageAttachment = onRemoveImageAttachment,
+                state = ComposerBarState(
+                    text = state.composerText,
+                    pendingImageAttachments = state.pendingImageAttachments,
+                    enabled = state.canSend,
+                    modelLabel = state.composerModelLabel,
+                    modelOptions = modelOptions,
+                    commands = commands,
+                    mentionables = mentionables,
+                    placeholder = composerPlaceholder,
+                ),
+                actions = ComposerBarActions(
+                    onModelSelected = onModelSelected,
+                    onOpenModelPicker = onOpenModelPicker,
+                    onTextChanged = onComposerTextChanged,
+                    onSend = onSend,
+                    onAttachImage = onAttachImage,
+                    onRemoveImageAttachment = onRemoveImageAttachment,
+                ),
             )
         }
     }

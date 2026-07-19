@@ -522,17 +522,38 @@ internal fun DiffGutter(lineNumber: Int?) {
 internal fun outputLineColor(line: String): Color {
     val success = MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.primary
-    val trimmed = line.trimStart()
-    val l = line.lowercase()
+    val error = MaterialTheme.colorScheme.error
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
     return when {
-        // Unified-diff lines: + added (green), - removed (red). Ignore +++/--- headers.
-        trimmed.startsWith("+") && !trimmed.startsWith("+++") -> success
-        trimmed.startsWith("-") && !trimmed.startsWith("---") -> MaterialTheme.colorScheme.error
-        l.contains("build successful") || l.contains("success") || l.contains("passed") -> success
-        l.contains("error") || l.contains("failed") || l.contains("exception") || l.contains("fatal") ->
-            MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        isUnifiedDiffAddedLine(line) -> success
+        isUnifiedDiffRemovedLine(line) -> error
+        isSuccessOutputLine(line) -> success
+        isFailureOutputLine(line) -> error
+        else -> muted
     }
+}
+
+private fun isUnifiedDiffAddedLine(line: String): Boolean {
+    val trimmed = line.trimStart()
+    return trimmed.startsWith("+") && !trimmed.startsWith("+++")
+}
+
+private fun isUnifiedDiffRemovedLine(line: String): Boolean {
+    val trimmed = line.trimStart()
+    return trimmed.startsWith("-") && !trimmed.startsWith("---")
+}
+
+private fun isSuccessOutputLine(line: String): Boolean {
+    val lower = line.lowercase()
+    return lower.contains("build successful") || lower.contains("success") || lower.contains("passed")
+}
+
+private fun isFailureOutputLine(line: String): Boolean {
+    val lower = line.lowercase()
+    return lower.contains("error") ||
+        lower.contains("failed") ||
+        lower.contains("exception") ||
+        lower.contains("fatal")
 }
 
 internal val ChatColumnMaxWidth = 760.dp
