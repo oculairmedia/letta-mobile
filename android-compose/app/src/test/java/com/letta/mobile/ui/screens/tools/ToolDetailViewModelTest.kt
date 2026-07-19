@@ -150,11 +150,11 @@ class ToolDetailViewModelTest {
         val attachedAgents = mutableListOf<String>()
         val detachedAgents = mutableListOf<String>()
 
-        override suspend fun attachTool(agentId: String, toolId: String) {
+        override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
             attachedAgents.add(agentId)
         }
 
-        override suspend fun detachTool(agentId: String, toolId: String) {
+        override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
             detachedAgents.add(agentId)
         }
     }

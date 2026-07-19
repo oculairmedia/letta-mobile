@@ -62,7 +62,7 @@ internal fun ToolOutputBlock(params: ToolOutputBlockParams) {
                     Text(
                         text = line,
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                        color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(line),
+                        color = if (isError) MaterialTheme.colorScheme.error else outputLineColor(OutputLine(line)),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -153,7 +153,7 @@ internal fun DiffGutter(lineNumber: Int?) {
 }
 
 @Composable
-internal fun outputLineColor(line: String): Color {
+internal fun outputLineColor(line: OutputLine): Color {
     val success = MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
         ?: MaterialTheme.colorScheme.primary
     val error = MaterialTheme.colorScheme.error

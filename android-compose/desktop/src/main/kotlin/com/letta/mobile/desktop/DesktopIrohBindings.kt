@@ -83,20 +83,26 @@ private suspend fun connectSubagentTransport(transport: DesktopWsChannelTranspor
     connectWithParams(transport::connect, connectParamsFromWs(config))
 }
 
+private data class DesktopTransportLifecycleHooks<T>(
+    val onConnect: suspend (T, LettaConfig) -> Unit,
+    val onDisposeTransport: (T) -> Unit,
+)
+
+private data class DesktopTransportLifecycleRequest<T>(
+    val transport: T?,
+    val activeConfig: LettaConfig,
+    val chatScope: CoroutineScope,
+    val hooks: DesktopTransportLifecycleHooks<T>,
+)
+
 @Composable
-private fun <T> DesktopTransportLifecycleEffect(
-    transport: T?,
-    activeConfig: LettaConfig,
-    chatScope: CoroutineScope,
-    onConnect: suspend (T, LettaConfig) -> Unit,
-    onDisposeTransport: (T) -> Unit,
-) {
-    DisposableEffect(transport, activeConfig) {
-        val active = transport
+private fun <T> DesktopTransportLifecycleEffect(request: DesktopTransportLifecycleRequest<T>) {
+    DisposableEffect(request.transport, request.activeConfig) {
+        val active = request.transport
         if (active != null) {
-            chatScope.launch { runCatching { onConnect(active, activeConfig) } }
+            request.chatScope.launch { runCatching { request.hooks.onConnect(active, request.activeConfig) } }
         }
-        onDispose { active?.let(onDisposeTransport) }
+        onDispose { active?.let(request.hooks.onDisposeTransport) }
     }
 }
 
@@ -109,11 +115,15 @@ internal fun rememberIrohTransport(
         activeConfig.takeIf { IrohChannelTransport.isIrohUrl(it.serverUrl) }?.let(::createIrohTransport)
     }
     DesktopTransportLifecycleEffect(
-        transport = irohTransport,
-        activeConfig = activeConfig,
-        chatScope = chatScope,
-        onConnect = ::connectIrohTransport,
-        onDisposeTransport = { t -> chatScope.launch { runCatching { t.disconnect() } } },
+        DesktopTransportLifecycleRequest(
+            transport = irohTransport,
+            activeConfig = activeConfig,
+            chatScope = chatScope,
+            hooks = DesktopTransportLifecycleHooks(
+                onConnect = ::connectIrohTransport,
+                onDisposeTransport = { t -> chatScope.launch { runCatching { t.disconnect() } } },
+            ),
+        ),
     )
     return irohTransport
 }
@@ -208,11 +218,15 @@ internal fun rememberSubagentRegistry(
         subagentTransport?.let { SubagentRepository(it, includeAll = true) }
     }
     DesktopTransportLifecycleEffect(
-        transport = subagentTransport,
-        activeConfig = activeConfig,
-        chatScope = chatScope,
-        onConnect = ::connectSubagentTransport,
-        onDisposeTransport = { it.close() },
+        DesktopTransportLifecycleRequest(
+            transport = subagentTransport,
+            activeConfig = activeConfig,
+            chatScope = chatScope,
+            hooks = DesktopTransportLifecycleHooks(
+                onConnect = ::connectSubagentTransport,
+                onDisposeTransport = { it.close() },
+            ),
+        ),
     )
     val activeSubagents = produceState(emptyList<SubagentEntry>(), subagentRepository) {
         subagentRepository?.activeSubagentsFlow()?.collect { value = it } ?: run { value = emptyList() }

@@ -19,8 +19,7 @@ class IrohToolRepository(
 
     override fun getTools(): StateFlow<List<Tool>> = toolsFlow
 
-    override fun getAgentTools(agentId: String): Flow<List<Tool>> =
-        flowOf(emptyList())
+    override fun getAgentTools(agentId: AgentId): Flow<List<Tool>> = flowOf(emptyList())
 
     override suspend fun countTools(): Int {
         ops.refreshToolsIfStale(CacheMaxAgeMs(IrohToolRepositoryOps.DEFAULT_REFRESH_MAX_AGE_MS))
@@ -35,18 +34,16 @@ class IrohToolRepository(
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> =
         ops.fetchToolsPage(ToolPageRequest(ToolPageLimit(limit), ToolPageOffset(offset)))
 
-    override suspend fun attachTool(agentId: String, toolId: String) =
-        ops.setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = true))
+    override suspend fun attachTool(agentId: AgentId, toolId: ToolId) =
+        ops.setToolAttachment(ToolAttachmentRequest(agentId, toolId, attached = true))
 
-    override suspend fun detachTool(agentId: String, toolId: String) =
-        ops.setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = false))
+    override suspend fun detachTool(agentId: AgentId, toolId: ToolId) =
+        ops.setToolAttachment(ToolAttachmentRequest(agentId, toolId, attached = false))
 
-    override suspend fun upsertTool(params: ToolCreateParams): Tool =
-        ops.upsertTool(params)
+    override suspend fun upsertTool(params: ToolCreateParams): Tool = ops.upsertTool(params)
 
-    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool =
-        ops.updateToolById(ToolUpdateByIdRequest(ToolId(toolId), params))
+    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool =
+        ops.updateToolById(ToolUpdateByIdRequest(toolId, params))
 
-    override suspend fun deleteTool(toolId: String) =
-        ops.deleteToolById(ToolId(toolId))
+    override suspend fun deleteTool(toolId: ToolId) = ops.deleteToolById(toolId)
 }

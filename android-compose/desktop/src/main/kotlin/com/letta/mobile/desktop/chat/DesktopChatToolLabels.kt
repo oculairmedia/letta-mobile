@@ -88,9 +88,6 @@ internal fun UiToolCall.copyPayload(): String =
  * raw `{"command":"…"}` dump. Falls back to pretty-printed JSON, then the raw
  * string.
  */
-internal fun primaryToolArgument(raw: String): String =
-    primaryToolArgument(ToolArgumentPayload(raw))
-
 internal fun primaryToolArgument(payload: ToolArgumentPayload): String {
     val obj = parseToolArgumentsObject(payload) ?: return payload.value
     return preferredToolArgument(obj) ?: prettyToolArguments(obj, fallback = payload.value)
@@ -144,23 +141,26 @@ private val prettyDesktopJson = Json {
     prettyPrintIndent = "  "
 }
 
-internal fun isUnifiedDiffAddedLine(line: String): Boolean {
-    val trimmed = line.trimStart()
+@JvmInline
+internal value class OutputLine(val value: String)
+
+internal fun isUnifiedDiffAddedLine(line: OutputLine): Boolean {
+    val trimmed = line.value.trimStart()
     return trimmed.startsWith("+") && !trimmed.startsWith("+++")
 }
 
-internal fun isUnifiedDiffRemovedLine(line: String): Boolean {
-    val trimmed = line.trimStart()
+internal fun isUnifiedDiffRemovedLine(line: OutputLine): Boolean {
+    val trimmed = line.value.trimStart()
     return trimmed.startsWith("-") && !trimmed.startsWith("---")
 }
 
-internal fun isSuccessOutputLine(line: String): Boolean {
-    val lower = line.lowercase()
+internal fun isSuccessOutputLine(line: OutputLine): Boolean {
+    val lower = line.value.lowercase()
     return lower.contains("build successful") || lower.contains("success") || lower.contains("passed")
 }
 
-internal fun isFailureOutputLine(line: String): Boolean {
-    val lower = line.lowercase()
+internal fun isFailureOutputLine(line: OutputLine): Boolean {
+    val lower = line.value.lowercase()
     return lower.contains("error") ||
         lower.contains("failed") ||
         lower.contains("exception") ||

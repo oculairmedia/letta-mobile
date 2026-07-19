@@ -128,7 +128,7 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
             SelectionContainer {
                 Text(
-                    text = "$ ${primaryToolArgument(args)}",
+                    text = "$ ${primaryToolArgument(ToolArgumentPayload(args))}",
                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                     color = MaterialTheme.colorScheme.onSurface,
                 )

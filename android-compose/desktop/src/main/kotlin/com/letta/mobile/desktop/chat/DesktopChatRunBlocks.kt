@@ -261,7 +261,7 @@ internal fun ToolStepRow(toolCall: UiToolCall) {
                 modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                toolCall.arguments.takeIf { it.isNotBlank() }?.let { CodeBlock(primaryToolArgument(it)) }
+                toolCall.arguments.takeIf { it.isNotBlank() }?.let { CodeBlock(primaryToolArgument(ToolArgumentPayload(it))) }
                 toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it) }
                 DesktopImageAttachmentsGrid(
                     attachments = toolCall.generatedImageAttachments,

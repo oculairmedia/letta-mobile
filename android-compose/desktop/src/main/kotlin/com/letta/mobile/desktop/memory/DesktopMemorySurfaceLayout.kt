@@ -104,23 +104,38 @@ internal data class MemoryBlockEditorSlotParams(
     val onChanged: () -> Unit,
 )
 
+private data class ReadyMemoryBlockEditor(
+    val target: BlockEditorTarget,
+    val agentId: String,
+    val blockApi: DesktopBlockApi,
+)
+
+private fun MemoryBlockEditorSlotParams.readyOrNull(): ReadyMemoryBlockEditor? {
+    val target = target ?: return null
+    val agentId = agentId ?: return null
+    val blockApi = blockApi ?: return null
+    return ReadyMemoryBlockEditor(target, agentId, blockApi)
+}
+
 @Composable
-internal fun MemoryBlockEditorSlot(params: MemoryBlockEditorSlotParams) {
-    val target = params.target
-    val agentId = params.agentId
-    val blockApi = params.blockApi
-    if (target == null || agentId == null || blockApi == null) return
+private fun MemoryBlockEditorDivider() {
     Box(
         modifier = Modifier
             .fillMaxHeight()
             .width(1.dp)
             .background(MaterialTheme.colorScheme.outlineVariant),
     )
+}
+
+@Composable
+internal fun MemoryBlockEditorSlot(params: MemoryBlockEditorSlotParams) {
+    val ready = params.readyOrNull() ?: return
+    MemoryBlockEditorDivider()
     BlockEditorPanel(
         request = BlockEditorRequest(
-            target = target,
-            agentId = agentId,
-            blockApi = blockApi,
+            target = ready.target,
+            agentId = ready.agentId,
+            blockApi = ready.blockApi,
             onDismiss = params.onDismiss,
             onChanged = params.onChanged,
         ),
