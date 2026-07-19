@@ -69,6 +69,44 @@ kotlin {
     }
 }
 
+val mermaidNativeDir = layout.buildDirectory.dir("generated/mermaid-native")
+val mermaidNativeLibraryName = when {
+    System.getProperty("os.name").startsWith("Windows", ignoreCase = true) -> "letta_mermaid_renderer.dll"
+    System.getProperty("os.name").startsWith("Mac", ignoreCase = true) -> "libletta_mermaid_renderer.dylib"
+    else -> "libletta_mermaid_renderer.so"
+}
+val mermaidRendererDir = rootProject.layout.projectDirectory.dir("native/mermaid_renderer")
+val buildDesktopMermaidNative by tasks.registering(Exec::class) {
+    val manifest = mermaidRendererDir.file("Cargo.toml")
+    inputs.files(
+        manifest,
+        mermaidRendererDir.file("Cargo.lock"),
+        fileTree(mermaidRendererDir.dir("src")),
+    )
+    outputs.file(mermaidRendererDir.file("target/release/$mermaidNativeLibraryName"))
+    commandLine(
+        providers.environmentVariable("CARGO").orElse("cargo").get(),
+        "build",
+        "--release",
+        "--locked",
+        "--manifest-path",
+        manifest.asFile.absolutePath,
+    )
+}
+val stageDesktopMermaidNative by tasks.registering(Sync::class) {
+    dependsOn(buildDesktopMermaidNative)
+    from(mermaidRendererDir.file("target/release/$mermaidNativeLibraryName"))
+    into(mermaidNativeDir)
+}
+
+sourceSets.main {
+    resources.srcDir(mermaidNativeDir)
+}
+
+tasks.named("processResources") {
+    dependsOn(stageDesktopMermaidNative)
+}
+
 dependencies {
     implementation(project(":sharedLogic"))
     // letta-mobile-cq2ju: Iroh QUIC transport for desktop. sharedLogic declares
@@ -88,6 +126,7 @@ dependencies {
     implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
+    implementation("org.jetbrains.skiko:skiko-awt:0.9.37.3")
     implementation("io.github.justdeko:kuiver:$kuiverVersion")
     implementation("sh.calvin.autolinktext:autolinktext:$autoLinkTextVersion")
     implementation("com.arjunjadeja:texty:$textyVersion")

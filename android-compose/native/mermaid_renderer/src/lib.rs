@@ -196,10 +196,8 @@ fn is_light_color(hex: &str) -> bool {
     }
 }
 
-#[unsafe(no_mangle)]
-pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeRenderToSvg(
+fn render_to_svg(
     mut env: JNIEnv,
-    _class: JClass,
     source: JString,
     dark_theme: jboolean,
     text_argb: jint,
@@ -281,10 +279,44 @@ pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_n
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeTakeLastError(
+pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeRenderToSvg(
     env: JNIEnv,
     _class: JClass,
+    source: JString,
+    dark_theme: jboolean,
+    text_argb: jint,
+    border_argb: jint,
+    surface_argb: jint,
+    primary_argb: jint,
+    secondary_argb: jint,
+    tertiary_argb: jint,
 ) -> jstring {
+    render_to_svg(
+        env, source, dark_theme, text_argb, border_argb, surface_argb,
+        primary_argb, secondary_argb, tertiary_argb,
+    )
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_letta_mobile_desktop_markdown_DesktopMermaidNativeBridge_nativeRenderToSvg(
+    env: JNIEnv,
+    _class: JClass,
+    source: JString,
+    dark_theme: jboolean,
+    text_argb: jint,
+    border_argb: jint,
+    surface_argb: jint,
+    primary_argb: jint,
+    secondary_argb: jint,
+    tertiary_argb: jint,
+) -> jstring {
+    render_to_svg(
+        env, source, dark_theme, text_argb, border_argb, surface_argb,
+        primary_argb, secondary_argb, tertiary_argb,
+    )
+}
+
+fn take_last_error(env: JNIEnv) -> jstring {
     let message = LAST_ERROR.lock().ok().and_then(|mut slot| slot.take());
     match message {
         Some(message) => match env.new_string(message) {
@@ -293,4 +325,20 @@ pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_n
         },
         None => null_mut(),
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeTakeLastError(
+    env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    take_last_error(env)
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_letta_mobile_desktop_markdown_DesktopMermaidNativeBridge_nativeTakeLastError(
+    env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    take_last_error(env)
 }
