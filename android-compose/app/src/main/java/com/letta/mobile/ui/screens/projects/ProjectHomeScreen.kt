@@ -90,6 +90,7 @@ fun ProjectHomeScreen(
     onNavigateToProjectIssues: (project: ProjectSummary) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToCreateProject: () -> Unit,
+    projectWorkSupported: Boolean = true,
     activeBackendLabel: String? = null,
     onNavigateToBackendSwitcher: (() -> Unit)? = null,
     viewModel: ProjectHomeViewModel = hiltViewModel(),
@@ -511,14 +512,16 @@ fun ProjectHomeScreen(
                         icon = LettaIcons.Chat,
                         onClick = { openProjectChat(null) },
                     )
-                    ActionSheetItem(
-                        text = stringResource(R.string.screen_projects_open_issues_action),
-                        icon = LettaIcons.ListIcon,
-                        onClick = {
-                            viewModel.selectProject(null)
-                            onNavigateToProjectIssues(project)
-                        },
-                    )
+                    if (projectWorkSupported) {
+                        ActionSheetItem(
+                            text = stringResource(R.string.screen_projects_open_issues_action),
+                            icon = LettaIcons.ListIcon,
+                            onClick = {
+                                viewModel.selectProject(null)
+                                onNavigateToProjectIssues(project)
+                            },
+                        )
+                    }
                     ActionSheetItem(
                         text = stringResource(R.string.screen_projects_sync_now_action),
                         icon = LettaIcons.Refresh,

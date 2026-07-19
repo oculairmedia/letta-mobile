@@ -18,4 +18,5 @@ class CapabilityViewModel @Inject constructor(
     capabilityRepository: CapabilityRepository,
 ) : ViewModel() {
     val projectsSupported: StateFlow<Boolean> = capabilityRepository.projectsSupported
+    val projectWorkSupported: StateFlow<Boolean> = capabilityRepository.projectWorkSupported
 }
