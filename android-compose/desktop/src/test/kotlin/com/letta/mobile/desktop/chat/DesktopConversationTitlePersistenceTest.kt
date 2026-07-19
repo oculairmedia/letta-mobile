@@ -4,12 +4,18 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DesktopConversationTitlePersistenceTest {
     @Test
     fun firstSubstantiveSendPersistsStableConversationTitle() = runTest {
@@ -25,15 +31,42 @@ class DesktopConversationTitlePersistenceTest {
         runCurrent()
         controller.updateComposerText("Plan the Windows release\nwith a checklist")
         controller.send()
+        // Send job completes, then title PATCH is launched on the same test scope.
+        runCurrent()
         runCurrent()
 
         assertEquals("Plan the Windows release", gateway.lastUpdate?.summary?.value)
         assertEquals("Plan the Windows release", controller.state.value.conversations.single().title)
         controller.close()
     }
+
+    @Test
+    fun failedSendDoesNotPersistConversationTitle() = runTest {
+        val gateway = SummaryGatewayFixture(failSend = true)
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(),
+            scope = this,
+            gatewayFactory = { gateway },
+            agentNamesByIdProvider = { emptyMap() },
+        )
+
+        controller.start()
+        runCurrent()
+        val originalTitle = controller.state.value.conversations.single().title
+        controller.updateComposerText("Plan the Windows release")
+        controller.send()
+        runCurrent()
+        runCurrent()
+
+        assertNull(gateway.lastUpdate)
+        assertEquals(originalTitle, controller.state.value.conversations.single().title)
+        controller.close()
+    }
 }
 
-private class SummaryGatewayFixture : FakeDesktopChatGateway(), ConversationSummaryGateway {
+private class SummaryGatewayFixture(
+    private val failSend: Boolean = false,
+) : FakeDesktopChatGateway(), ConversationSummaryGateway {
     var lastUpdate: ConversationSummaryUpdate? = null
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
@@ -52,6 +85,16 @@ private class SummaryGatewayFixture : FakeDesktopChatGateway(), ConversationSumm
         order: String?,
         conversationId: String?,
     ): List<LettaMessage> = emptyList()
+
+    override suspend fun sendConversationMessage(
+        conversationId: String,
+        request: MessageCreateRequest,
+    ): Flow<LettaMessage> {
+        if (failSend) {
+            return flow { error("stream rejected") }
+        }
+        return super.sendConversationMessage(conversationId, request)
+    }
 
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
         lastUpdate = update

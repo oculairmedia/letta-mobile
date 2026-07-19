@@ -77,7 +77,8 @@ internal fun UiToolCall.isErrorStatus(): Boolean =
     status?.let(::ToolStatusToken)?.isError() == true
 
 internal fun UiToolCall.shouldInitiallyExpand(): Boolean =
-    status?.let(::ToolStatusToken)?.isDoneStatus() != true
+    generatedImageAttachments.isNotEmpty() ||
+        status?.let(::ToolStatusToken)?.isDoneStatus() != true
 
 internal fun UiToolCall.disclosureKey(): String =
     toolCallId?.takeIf { it.isNotBlank() } ?: "$name:${arguments.hashCode()}"

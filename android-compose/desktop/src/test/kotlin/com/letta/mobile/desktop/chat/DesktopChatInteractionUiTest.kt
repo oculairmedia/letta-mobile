@@ -200,6 +200,28 @@ class DesktopChatInteractionUiTest {
     }
 
     @Test
+    fun completedImageToolsStartExpanded() = runComposeUiTest {
+        val tool = UiToolCall(
+            name = "generate_image",
+            arguments = "{}",
+            result = "ok",
+            status = "success",
+            toolCallId = "img-1",
+            generatedImageAttachments = listOf(
+                com.letta.mobile.data.model.UiImageAttachment(
+                    base64 = "aaaa",
+                    mediaType = "image/png",
+                ),
+            ),
+        )
+        assertTrue(tool.shouldInitiallyExpand())
+        setContent {
+            MaterialTheme { ToolCard(toolCall = tool, disclosureKey = "img-1") }
+        }
+        onNodeWithTag("tool-card-body").assertExists()
+    }
+
+    @Test
     fun truncatedToolOutputExplainsCopyScopeAndSupportsKeyboardScrolling() = runComposeUiTest {
         val output = (1..41).joinToString("\n") { index ->
             "line $index ${"x".repeat(120)}"

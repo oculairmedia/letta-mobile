@@ -541,7 +541,12 @@ class DesktopChatController(
             return
         }
 
-        val sendingConversationId = prepareConversationForSend(text)
+        val sendingConversationId = _state.value.selectedConversationId
+        val titleToPersist = sendingConversationId?.let { conversationId ->
+            _state.value.conversations
+                .firstOrNull { it.id == conversationId }
+                ?.persistedTitleCandidate(text)
+        }
         // This conversation now has content — it's no longer a throwaway.
         if (sendingConversationId != null && sendingConversationId == unsentConversationId) {
             unsentConversationId = null
@@ -565,6 +570,13 @@ class DesktopChatController(
                     ),
                 )
                 if (closed) return@launch
+                // Only rename after the send actually lands — avoid PATCHing a
+                // draft title when the stream rejects/disconnects. Candidate was
+                // computed before send so a hydrated last-message preview cannot
+                // suppress auto-title for brand-new chats.
+                if (sendingConversationId != null && titleToPersist != null) {
+                    persistConversationTitle(sendingConversationId, titleToPersist)
+                }
                 _state.update {
                     it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
                 }
@@ -596,19 +608,15 @@ class DesktopChatController(
         }
     }
 
-    private fun prepareConversationForSend(text: String): String? =
-        _state.value.selectedConversationId?.also { persistConversationTitleIfNeeded(it, text) }
-
-    private fun persistConversationTitleIfNeeded(conversationId: String, firstUserMessage: String) {
+    private fun persistConversationTitle(conversationId: String, candidate: String) {
         val summaryGateway = conversationSummaryGateway ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
-        val candidate = conversation.persistedTitleCandidate(firstUserMessage) ?: return
         val originalTitle = conversation.title
         _state.update { current ->
             current.withRuntimeState(
                 current.runtimeState.copy(
-                    conversations = current.conversations.map { conversation ->
-                        if (conversation.id == conversationId) conversation.copy(title = candidate) else conversation
+                    conversations = current.conversations.map { item ->
+                        if (item.id == conversationId) item.copy(title = candidate) else item
                     },
                 ),
             )
