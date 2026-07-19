@@ -124,6 +124,9 @@ internal fun JsonObject?.requireParam(key: AdminParamKey, error: AdminParamError
 internal fun projectIdentifierParam(params: JsonObject?): String? =
     param(params, AdminParamKey("identifier")) ?: param(params, AdminParamKey("project_id"))
 
+internal fun JsonObject?.requireProjectIdentifierParam(): String =
+    projectIdentifierParam(this) ?: adminError(PROJECT_IDENTIFIER_REQUIRED)
+
 internal const val PROJECT_IDENTIFIER_REQUIRED = "identifier or project_id required"
 
 internal fun passthroughBody(params: JsonObject?, excludedKeys: List<AdminParamKey>): String {
