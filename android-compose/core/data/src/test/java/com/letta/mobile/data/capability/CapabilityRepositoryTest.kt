@@ -17,6 +17,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -31,11 +32,7 @@ class CapabilityRepositoryTest {
     fun `local runtime config skips project probe and defaults unsupported`() = runTest {
         val settings = FakeSettingsRepository(initialActiveConfig = localConfig())
         val projectApi = FakeProjectApi { error("local config must not probe Admin API") }
-        val repository = CapabilityRepository(
-            settings,
-            projectApi,
-            CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-        )
+        val repository = repository(settings, projectApi)
         advanceUntilIdle()
 
         assertFalse(repository.projectsSupported.value)
@@ -47,11 +44,7 @@ class CapabilityRepositoryTest {
     fun `remote config still probes project capability`() = runTest {
         val settings = FakeSettingsRepository(initialActiveConfig = remoteConfig())
         val projectApi = FakeProjectApi { true }
-        val repository = CapabilityRepository(
-            settings,
-            projectApi,
-            CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-        )
+        val repository = repository(settings, projectApi)
         advanceUntilIdle()
 
         assertTrue(repository.projectsSupported.value)
@@ -63,11 +56,7 @@ class CapabilityRepositoryTest {
     fun `probe exception marks projects unsupported without escaping collector`() = runTest {
         val settings = FakeSettingsRepository(initialActiveConfig = remoteConfig(id = "remote-1"))
         val projectApi = FakeProjectApi { throw AdminApiUnavailableForLocalRuntimeException() }
-        val repository = CapabilityRepository(
-            settings,
-            projectApi,
-            CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-        )
+        val repository = repository(settings, projectApi)
         advanceUntilIdle()
         settings.activeConfigState.value = remoteConfig(id = "remote-2")
         advanceUntilIdle()
@@ -79,27 +68,14 @@ class CapabilityRepositoryTest {
 
     @Test
     fun `iroh config keeps projects probe but disables project work`() = runTest {
-        val irohConfig = irohConfig()
-        val settings = FakeSettingsRepository(initialActiveConfig = irohConfig)
-        val projectApi = FakeProjectApi { error("HTTP probe must not run for iroh backend") }
-        val irohSource = FakeIrohProjectSource(
+        val settings = irohSettings()
+        val projectApi = noHttpProbeProjectApi()
+        val irohSource = emptyCatalogIrohSource(settings)
+        val repository = irohRepository(
             settings = settings,
-            probeResult = { ProjectCatalog(projects = emptyList()) },
-        )
-        val sessionManager = sessionManagerWithTransport(
-            testScheduler = testScheduler,
-            transport = IrohChannelTransport(
-                scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-                onConnect = {},
-                activeConfigProvider = { null },
-            ),
-        )
-        val repository = CapabilityRepository(
-            settingsRepository = settings,
             projectApi = projectApi,
-            irohProjectSource = irohSource,
-            sessionManager = sessionManager,
-            scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
+            irohSource = irohSource,
+            sessionManager = sessionManagerWithTransport(irohChannelTransport()),
         )
         advanceUntilIdle()
 
@@ -111,30 +87,21 @@ class CapabilityRepositoryTest {
 
     @Test
     fun `iroh probe defers when transport is not ready and retries after session rebuild`() = runTest {
-        val irohConfig = irohConfig()
-        val settings = FakeSettingsRepository(initialActiveConfig = irohConfig)
-        val projectApi = FakeProjectApi { error("HTTP probe must not run for iroh backend") }
+        val settings = irohSettings()
+        val projectApi = noHttpProbeProjectApi()
         val staleTransport = mockk<IChannelTransport>(relaxed = true)
-        val irohTransport = IrohChannelTransport(
-            scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
-            onConnect = {},
-            activeConfigProvider = { null },
-        )
+        val irohTransport = irohChannelTransport()
         val graphFlow = MutableStateFlow(sessionGraph(id = 1L, transport = staleTransport))
         val sessionManager = mockk<SessionManager>(relaxed = true) {
             every { currentGraph } returns graphFlow
             every { current } answers { graphFlow.value }
         }
-        val irohSource = FakeIrohProjectSource(
+        val irohSource = emptyCatalogIrohSource(settings)
+        val repository = irohRepository(
             settings = settings,
-            probeResult = { ProjectCatalog(projects = emptyList()) },
-        )
-        val repository = CapabilityRepository(
-            settingsRepository = settings,
             projectApi = projectApi,
-            irohProjectSource = irohSource,
+            irohSource = irohSource,
             sessionManager = sessionManager,
-            scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler)),
         )
         advanceUntilIdle()
 
@@ -154,10 +121,48 @@ class CapabilityRepositoryTest {
         assertEquals(1, irohSource.probeCount)
     }
 
-    private fun sessionManagerWithTransport(
-        testScheduler: kotlinx.coroutines.test.TestCoroutineScheduler,
-        transport: IChannelTransport,
-    ): SessionManager {
+    private fun TestScope.testScope() = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
+
+    private fun TestScope.repository(
+        settings: FakeSettingsRepository,
+        projectApi: FakeProjectApi,
+    ) = CapabilityRepository(
+        settings,
+        projectApi,
+        testScope(),
+    )
+
+    private fun TestScope.irohRepository(
+        settings: FakeSettingsRepository,
+        projectApi: FakeProjectApi,
+        irohSource: FakeIrohProjectSource,
+        sessionManager: SessionManager,
+    ) = CapabilityRepository(
+        settingsRepository = settings,
+        projectApi = projectApi,
+        irohProjectSource = irohSource,
+        sessionManager = sessionManager,
+        scope = testScope(),
+    )
+
+    private fun irohSettings() = FakeSettingsRepository(initialActiveConfig = irohConfig())
+
+    private fun noHttpProbeProjectApi() = FakeProjectApi {
+        error("HTTP probe must not run for iroh backend")
+    }
+
+    private fun emptyCatalogIrohSource(settings: ISettingsRepository) = FakeIrohProjectSource(
+        settings = settings,
+        probeResult = { ProjectCatalog(projects = emptyList()) },
+    )
+
+    private fun TestScope.irohChannelTransport() = IrohChannelTransport(
+        scope = testScope(),
+        onConnect = {},
+        activeConfigProvider = { null },
+    )
+
+    private fun sessionManagerWithTransport(transport: IChannelTransport): SessionManager {
         val graph = sessionGraph(id = 1L, transport = transport)
         val graphFlow = MutableStateFlow(graph)
         return mockk(relaxed = true) {
