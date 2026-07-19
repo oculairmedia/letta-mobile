@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.runtime.SecureTokenStore
 import com.letta.mobile.data.health.IServerHealthRepository
 import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.storage.SecureSettingsStore
 import java.io.InputStream
 import java.io.OutputStream
@@ -257,8 +258,12 @@ data class DesktopDataBindings(
 fun createDefaultDesktopDataBindings(
     secureSettingsStore: SecureSettingsStore = DesktopFileSecureSettingsStore(),
     configProvider: () -> LettaConfig? = { null },
+    irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
 ): DesktopDataBindings {
-    val graphFactory = DesktopSessionGraphFactory(configProvider = configProvider)
+    val graphFactory = DesktopSessionGraphFactory(
+        configProvider = configProvider,
+        repositoryAdaptersFactory = { config -> DesktopRepositoryAdapters(config, irohAgentDirectoryProvider) },
+    )
     return DesktopDataBindings(
         secureSettingsStore = secureSettingsStore,
         healthRepository = DesktopServerHealthRepository(),

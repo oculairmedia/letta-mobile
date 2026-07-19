@@ -927,10 +927,12 @@ fun LettaDesktopApp(
     val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }
+    var currentIrohAgentDirectory by remember { mutableStateOf<IrohAdminRpcAgentDirectory?>(null) }
     val dataBindings = remember(configStore) {
         createDefaultDesktopDataBindings(
             secureSettingsStore = secureSettingsStore,
             configProvider = { activeConfig },
+            irohAgentDirectoryProvider = { currentIrohAgentDirectory },
         )
     }
     var bootstrapState by remember(dataBindings) {
@@ -948,6 +950,7 @@ fun LettaDesktopApp(
     val irohAgentDirectory = remember(irohTransport) {
         irohTransport?.let { IrohAdminRpcAgentDirectory(it) }
     }
+    currentIrohAgentDirectory = irohAgentDirectory
     val chatController = rememberDesktopChatController(
         bootstrapState = bootstrapState,
         chatScope = chatScope,

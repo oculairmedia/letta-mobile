@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
@@ -396,6 +397,25 @@ class IrohAdminRpcAgentDirectory(
         if (!response.success) return null
         val result = response.result ?: return null
         return json.decodeFromJsonElement(Agent.serializer(), result)
+    }
+
+    suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            conversationId?.let { put("conversation_id", it) }
+        }.toString()
+        val path = buildString {
+            append("/v1/agents/")
+            append(agentId)
+            append("/context")
+            if (conversationId != null) append("?conversation_id=").append(conversationId)
+        }
+        val response = transport.adminRpc("agent.context", path, body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "agent.context failed over iroh admin_rpc")
+        }
+        val result = response.result ?: throw TimelineTransportHttpException(502, "agent.context returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
     }
 
     companion object {

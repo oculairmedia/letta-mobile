@@ -29,6 +29,8 @@ import com.letta.mobile.data.session.SessionRepositoryGraphFactory
 import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
@@ -209,14 +211,19 @@ fun defaultDesktopChatSessionGraphFactory(
         gatewayFactory = { createDefaultDesktopChatGateway(configProvider() ?: defaultDesktopLettaConfig()) },
     )
 
-class DesktopRepositoryAdapters(config: LettaConfig? = null) {
+class DesktopRepositoryAdapters(
+    config: LettaConfig? = null,
+    irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+) {
+    private val irohMode = IrohChannelTransport.isIrohUrl(config?.serverUrl)
     private val adminRepositories = config
-        ?.takeIf { it.serverUrl.isNotBlank() }
+        ?.takeIf { it.serverUrl.isNotBlank() && !irohMode }
         ?.let(::DesktopLettaHttpAdminRepositories)
+    private val irohAgentRepository = if (irohMode) DesktopIrohAgentRepository(irohAgentDirectoryProvider) else null
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 
-    val agentRepository: IAgentRepository = adminRepositories ?: unavailableRepository()
+    val agentRepository: IAgentRepository = irohAgentRepository ?: adminRepositories ?: unavailableRepository()
     val archiveRepository: IArchiveRepository = unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = unavailableRepository()
