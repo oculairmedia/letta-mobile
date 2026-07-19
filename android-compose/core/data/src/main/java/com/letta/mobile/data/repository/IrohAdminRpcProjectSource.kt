@@ -14,9 +14,17 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+
+/** One admin_rpc invocation: registry method, HTTP-equivalent path, optional JSON body. */
+private data class AdminRpcCall(
+    val method: String,
+    val path: String,
+    val body: String? = null,
+)
 
 /**
  * Projects over the Iroh admin_rpc control channel.
@@ -53,32 +61,32 @@ class IrohAdminRpcProjectSource(
         val body = buildJsonObject {
             limit?.let { put("limit", it) }
         }.toString()
-        val result = rpc("project.list", path, body) ?: return ProjectCatalog(projects = emptyList())
+        val result = rpc(AdminRpcCall("project.list", path, body)) ?: return ProjectCatalog(projects = emptyList())
         return json.decodeFromJsonElement(ProjectCatalog.serializer(), result)
     }
 
     suspend fun getProject(identifier: String): ProjectSummary {
-        val result = rpc("project.get", "/api/projects/$identifier", idBody(identifier))
+        val result = rpc(AdminRpcCall("project.get", "/api/projects/$identifier", idBody(identifier)))
             ?: error("Iroh admin_rpc project.get returned no result")
         return json.decodeFromJsonElement(ProjectDetailResponse.serializer(), result).project
     }
 
     suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
-        val result = rpc("project.beadsRemoteStatus", "/api/projects/$identifier/beads-remote", idBody(identifier))
+        val result = rpc(AdminRpcCall("project.beadsRemoteStatus", "/api/projects/$identifier/beads-remote", idBody(identifier)))
             ?: error("Iroh admin_rpc project.beadsRemoteStatus returned no result")
         return json.decodeFromJsonElement(BeadsRemoteStatus.serializer(), result)
     }
 
     suspend fun provisionBeadsRemote(identifier: String, push: Boolean = true): BeadsRemoteProvisionResponse {
         val body = json.encodeToString(BeadsRemoteProvisionRequest.serializer(), BeadsRemoteProvisionRequest(push = push))
-        val result = rpc("project.provisionBeadsRemote", "/api/projects/$identifier/beads-remote/provision", mergeIdBody(identifier, body))
+        val result = rpc(AdminRpcCall("project.provisionBeadsRemote", "/api/projects/$identifier/beads-remote/provision", mergeIdBody(identifier, body)))
             ?: error("Iroh admin_rpc project.provisionBeadsRemote returned no result")
         return json.decodeFromJsonElement(BeadsRemoteProvisionResponse.serializer(), result)
     }
 
     suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
         val body = json.encodeToString(ProjectSyncTriggerRequest.serializer(), ProjectSyncTriggerRequest(projectId = ProjectId(identifier)))
-        val result = rpc("project.triggerSync", "/api/sync/trigger", body)
+        val result = rpc(AdminRpcCall("project.triggerSync", "/api/sync/trigger", body))
             ?: error("Iroh admin_rpc project.triggerSync returned no result")
         return json.decodeFromJsonElement(ProjectSyncTriggerResponse.serializer(), result)
     }
@@ -88,7 +96,7 @@ class IrohAdminRpcProjectSource(
             ProjectCreateRequest.serializer(),
             ProjectCreateRequest(name = name, filesystemPath = filesystemPath, gitUrl = gitUrl),
         )
-        val result = rpc("project.create", "/api/registry/projects", body)
+        val result = rpc(AdminRpcCall("project.create", "/api/registry/projects", body))
             ?: error("Iroh admin_rpc project.create returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
@@ -98,20 +106,20 @@ class IrohAdminRpcProjectSource(
             ProjectUpdateRequest.serializer(),
             ProjectUpdateRequest(filesystemPath = filesystemPath, gitUrl = gitUrl),
         )
-        val result = rpc("project.update", "/api/registry/projects/$identifier", mergeIdBody(identifier, body))
+        val result = rpc(AdminRpcCall("project.update", "/api/registry/projects/$identifier", mergeIdBody(identifier, body)))
             ?: error("Iroh admin_rpc project.update returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
 
     suspend fun archiveProject(identifier: String): ProjectSummary {
         val body = json.encodeToString(ProjectUpdateRequest.serializer(), ProjectUpdateRequest(status = "archived"))
-        val result = rpc("project.archive", "/api/registry/projects/$identifier", mergeIdBody(identifier, body))
+        val result = rpc(AdminRpcCall("project.archive", "/api/registry/projects/$identifier", mergeIdBody(identifier, body)))
             ?: error("Iroh admin_rpc project.archive returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
 
     suspend fun deleteProject(identifier: String) {
-        rpc("project.delete", "/api/registry/projects/$identifier", idBody(identifier))
+        rpc(AdminRpcCall("project.delete", "/api/registry/projects/$identifier", idBody(identifier)))
     }
 
     private fun idBody(identifier: String): String = buildJsonObject {
@@ -126,9 +134,9 @@ class IrohAdminRpcProjectSource(
         }.toString()
     }
 
-    private suspend fun rpc(method: String, path: String, body: String?): kotlinx.serialization.json.JsonElement? {
-        val response = channelTransport.adminRpc(method = method, path = path, body = body)
-        if (!response.success) error(response.error ?: "Iroh admin_rpc $method failed")
+    private suspend fun rpc(call: AdminRpcCall): JsonElement? {
+        val response = channelTransport.adminRpc(method = call.method, path = call.path, body = call.body)
+        if (!response.success) error(response.error ?: "Iroh admin_rpc ${call.method} failed")
         return response.result
     }
 }
