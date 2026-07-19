@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.IrohBlockApi
 import com.letta.mobile.desktop.chat.createDesktopLettaHttpClient
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -102,26 +103,17 @@ class DesktopHttpBlockApi(
 
 
 class DesktopIrohBlockApi(
-    private val directory: IrohAdminRpcAgentDirectory,
+    directory: IrohAdminRpcAgentDirectory,
 ) : DesktopBlockApi {
-    override suspend fun getBlockById(blockId: String): Block =
-        directory.getBlock(blockId) ?: throw NoSuchElementException("Block $blockId not found over iroh admin_rpc")
+    private val api = IrohBlockApi(directory)
+
+    override suspend fun getBlockById(blockId: String): Block = api.getBlockById(blockId)
 
     override suspend fun updateBlockById(blockId: String, value: String, limit: Int?): Block =
-        directory.updateBlock(blockId, BlockUpdateParams(value = value, limit = limit))
+        api.updateBlockById(blockId, value, limit)
 
-    override suspend fun deleteBlockById(blockId: String) {
-        directory.deleteBlock(blockId)
-    }
+    override suspend fun deleteBlockById(blockId: String) = api.deleteBlockById(blockId)
 
-    override suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int?): Block {
-        val block = directory.createBlock(BlockCreateParams(label = label, value = value, limit = limit))
-        return try {
-            directory.attachBlock(agentId, block.id.value)
-            block
-        } catch (t: Throwable) {
-            runCatching { directory.deleteBlock(block.id.value) }
-            throw t
-        }
-    }
+    override suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int?): Block =
+        api.createAndAttachBlock(agentId, label, value, limit)
 }
