@@ -43,6 +43,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.serializer
 
 /**
  * One `admin_rpc` invocation: the registry method plus the HTTP-equivalent
@@ -388,26 +389,50 @@ class IrohAdminRpcAgentDirectory(
 ) {
     private val json = lettaWireJson
 
+    private suspend fun adminRpcResult(method: String, path: String, body: String? = null): JsonElement? {
+        val response = transport.adminRpc(method, path, body)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
+        }
+        return response.result
+    }
+
+    private suspend fun adminRpcResultOrNull(method: String, path: String, body: String? = null): JsonElement? {
+        val response = transport.adminRpc(method, path, body)
+        if (!response.success) return null
+        return response.result
+    }
+
+    private suspend inline fun <reified T> adminRpcDecoded(
+        method: String,
+        path: String,
+        body: String? = null,
+    ): T {
+        val result = adminRpcResult(method, path, body)
+            ?: throw TimelineTransportHttpException(502, "$method returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(serializer<T>(), result)
+    }
+
+    private suspend inline fun <reified T> adminRpcDecodedList(
+        method: String,
+        path: String,
+        body: String? = null,
+    ): List<T> {
+        val result = adminRpcResult(method, path, body) ?: return emptyList()
+        return json.decodeFromJsonElement(ListSerializer(serializer<T>()), result)
+    }
+
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
         val body = buildJsonObject {
             put("limit", limit.toString())
             put("offset", "0")
         }.toString()
-        val call = AdminRpcCall("agent.list", "/v1/agents?limit=$limit&offset=0", body)
-        val response = transport.adminRpc(call.method, call.path, call.body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "${call.method} failed over iroh admin_rpc")
-        }
-        val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
+        return adminRpcDecodedList("agent.list", "/v1/agents?limit=$limit&offset=0", body)
     }
 
     suspend fun getAgent(agentId: String): Agent? {
         val body = buildJsonObject { put("agent_id", agentId) }.toString()
-        val call = AdminRpcCall("agent.get", "/v1/agents/$agentId", body)
-        val response = transport.adminRpc(call.method, call.path, call.body)
-        if (!response.success) return null
-        val result = response.result ?: return null
+        val result = adminRpcResultOrNull("agent.get", "/v1/agents/$agentId", body) ?: return null
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
@@ -417,12 +442,7 @@ class IrohAdminRpcAgentDirectory(
             put("agent_id", agentId)
             paramsJson.forEach { (key, value) -> put(key, value) }
         }.toString()
-        val response = transport.adminRpc("agent.update", "/v1/agents/$agentId", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "agent.update failed over iroh admin_rpc")
-        }
-        val result = response.result ?: throw TimelineTransportHttpException(502, "agent.update returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(Agent.serializer(), result)
+        return adminRpcDecoded("agent.update", "/v1/agents/$agentId", body)
     }
 
     suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview {
@@ -436,12 +456,7 @@ class IrohAdminRpcAgentDirectory(
             append("/context")
             if (conversationId != null) append("?conversation_id=").append(conversationId)
         }
-        val response = transport.adminRpc("agent.context", path, body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "agent.context failed over iroh admin_rpc")
-        }
-        val result = response.result ?: throw TimelineTransportHttpException(502, "agent.context returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
+        return adminRpcDecoded("agent.context", path, body)
     }
 
     suspend fun listTools(limit: Int, offset: Int): List<Tool> {
@@ -449,20 +464,12 @@ class IrohAdminRpcAgentDirectory(
             put("limit", limit)
             put("offset", offset)
         }.toString()
-        val response = transport.adminRpc("tool.list", "/v1/tools?limit=$limit&offset=$offset", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "tool.list failed over iroh admin_rpc")
-        }
-        val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(Tool.serializer()), result)
+        return adminRpcDecodedList("tool.list", "/v1/tools?limit=$limit&offset=$offset", body)
     }
 
     suspend fun createTool(params: ToolCreateParams): Tool {
         val body = json.encodeToString(ToolCreateParams.serializer(), params)
-        val response = transport.adminRpc("tool.create", "/v1/tools", body)
-        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "tool.create failed over iroh admin_rpc")
-        val result = response.result ?: throw TimelineTransportHttpException(502, "tool.create returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(Tool.serializer(), result)
+        return adminRpcDecoded("tool.create", "/v1/tools", body)
     }
 
     suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
@@ -471,16 +478,12 @@ class IrohAdminRpcAgentDirectory(
             put("tool_id", toolId)
             paramsJson.forEach { (key, value) -> put(key, value) }
         }.toString()
-        val response = transport.adminRpc("tool.update", "/v1/tools/$toolId", body)
-        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "tool.update failed over iroh admin_rpc")
-        val result = response.result ?: throw TimelineTransportHttpException(502, "tool.update returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(Tool.serializer(), result)
+        return adminRpcDecoded("tool.update", "/v1/tools/$toolId", body)
     }
 
     suspend fun deleteTool(toolId: String) {
         val body = buildJsonObject { put("tool_id", toolId) }.toString()
-        val response = transport.adminRpc("tool.delete", "/v1/tools/$toolId", body)
-        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "tool.delete failed over iroh admin_rpc")
+        adminRpcResult("tool.delete", "/v1/tools/$toolId", body)
     }
 
     suspend fun setToolAttached(agentId: String, toolId: String, attached: Boolean) {
@@ -490,8 +493,7 @@ class IrohAdminRpcAgentDirectory(
         }.toString()
         val method = if (attached) "tool.attach" else "tool.detach"
         val action = if (attached) "attach" else "detach"
-        val response = transport.adminRpc(method, "/v1/agents/$agentId/tools/$action/$toolId", body)
-        if (!response.success) throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
+        adminRpcResult(method, "/v1/agents/$agentId/tools/$action/$toolId", body)
     }
 
     suspend fun listSkills(agentId: String? = null): List<Skill> {
@@ -500,11 +502,7 @@ class IrohAdminRpcAgentDirectory(
         }.toString()
         val method = if (agentId == null) "skill.list" else "skill.list_agent"
         val path = agentId?.let { "/v1/agents/$it/skills" } ?: "/v1/skills"
-        val response = transport.adminRpc(method, path, body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "$method failed over iroh admin_rpc")
-        }
-        val result = response.result ?: return emptyList()
+        val result = adminRpcResult(method, path, body) ?: return emptyList()
         val skillsElement = (result as? kotlinx.serialization.json.JsonObject)?.get("skills") ?: result
         return json.decodeFromJsonElement(ListSerializer(Skill.serializer()), skillsElement)
     }
@@ -514,10 +512,7 @@ class IrohAdminRpcAgentDirectory(
             put("agent_id", agentId)
             put("name", skillName)
         }.toString()
-        val response = transport.adminRpc("skill.install", "/v1/agents/$agentId/skills", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "skill.install failed over iroh admin_rpc")
-        }
+        adminRpcResult("skill.install", "/v1/agents/$agentId/skills", body)
     }
 
     suspend fun uninstallSkill(agentId: String, skillName: String) {
@@ -525,28 +520,18 @@ class IrohAdminRpcAgentDirectory(
             put("agent_id", agentId)
             put("name", skillName)
         }.toString()
-        val response = transport.adminRpc("skill.uninstall", "/v1/agents/$agentId/skills/$skillName", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "skill.uninstall failed over iroh admin_rpc")
-        }
+        adminRpcResult("skill.uninstall", "/v1/agents/$agentId/skills/$skillName", body)
     }
 
     suspend fun getBlock(blockId: String): Block? {
         val body = buildJsonObject { put("block_id", blockId) }.toString()
-        val response = transport.adminRpc("block.get", "/v1/blocks/$blockId", body)
-        if (!response.success) return null
-        val result = response.result ?: return null
+        val result = adminRpcResultOrNull("block.get", "/v1/blocks/$blockId", body) ?: return null
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
 
     suspend fun createBlock(params: BlockCreateParams): Block {
         val body = json.encodeToString(BlockCreateParams.serializer(), params)
-        val response = transport.adminRpc("block.create", "/v1/blocks", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "block.create failed over iroh admin_rpc")
-        }
-        val result = response.result ?: throw TimelineTransportHttpException(502, "block.create returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(Block.serializer(), result)
+        return adminRpcDecoded("block.create", "/v1/blocks", body)
     }
 
     suspend fun updateBlock(blockId: String, params: BlockUpdateParams): Block {
@@ -556,20 +541,12 @@ class IrohAdminRpcAgentDirectory(
             params.limit?.let { put("limit", it) }
             params.description?.let { put("description", it) }
         }.toString()
-        val response = transport.adminRpc("block.update", "/v1/blocks/$blockId", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "block.update failed over iroh admin_rpc")
-        }
-        val result = response.result ?: throw TimelineTransportHttpException(502, "block.update returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(Block.serializer(), result)
+        return adminRpcDecoded("block.update", "/v1/blocks/$blockId", body)
     }
 
     suspend fun deleteBlock(blockId: String) {
         val body = buildJsonObject { put("block_id", blockId) }.toString()
-        val response = transport.adminRpc("block.delete", "/v1/blocks/$blockId", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "block.delete failed over iroh admin_rpc")
-        }
+        adminRpcResult("block.delete", "/v1/blocks/$blockId", body)
     }
 
     suspend fun attachBlock(agentId: String, blockId: String) {
@@ -577,10 +554,7 @@ class IrohAdminRpcAgentDirectory(
             put("agent_id", agentId)
             put("block_id", blockId)
         }.toString()
-        val response = transport.adminRpc("block.attach", "/v1/agents/$agentId/core-memory/blocks/attach/$blockId", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "block.attach failed over iroh admin_rpc")
-        }
+        adminRpcResult("block.attach", "/v1/agents/$agentId/core-memory/blocks/attach/$blockId", body)
     }
 
     suspend fun listSchedules(agentId: String? = null): List<ScheduledMessage> {
@@ -588,11 +562,7 @@ class IrohAdminRpcAgentDirectory(
             agentId?.let { put("agent_id", it) }
         }.toString()
         val path = agentId?.let { "/v1/agents/$it/schedule" } ?: "/v1/schedules"
-        val response = transport.adminRpc("schedule.list", path, body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "schedule.list failed over iroh admin_rpc")
-        }
-        val result = response.result ?: return emptyList()
+        val result = adminRpcResult("schedule.list", path, body) ?: return emptyList()
         val schedules = json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
         return agentId?.let { id -> schedules.filter { it.agentId == id } } ?: schedules
     }
@@ -603,9 +573,7 @@ class IrohAdminRpcAgentDirectory(
             agentId?.let { put("agent_id", it) }
         }.toString()
         val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
-        val response = transport.adminRpc("schedule.get", path, body)
-        if (!response.success) return null
-        val result = response.result ?: return null
+        val result = adminRpcResultOrNull("schedule.get", path, body) ?: return null
         return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
     }
 
@@ -615,12 +583,7 @@ class IrohAdminRpcAgentDirectory(
             put("agent_id", agentId)
             paramsJson.forEach { (key, value) -> put(key, value) }
         }.toString()
-        val response = transport.adminRpc("schedule.create", "/v1/agents/$agentId/schedule", body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "schedule.create failed over iroh admin_rpc")
-        }
-        val result = response.result ?: throw TimelineTransportHttpException(502, "schedule.create returned no result over iroh admin_rpc")
-        return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
+        return adminRpcDecoded("schedule.create", "/v1/agents/$agentId/schedule", body)
     }
 
     suspend fun deleteSchedule(scheduleId: String, agentId: String? = null) {
@@ -629,10 +592,7 @@ class IrohAdminRpcAgentDirectory(
             agentId?.let { put("agent_id", it) }
         }.toString()
         val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
-        val response = transport.adminRpc("schedule.delete", path, body)
-        if (!response.success) {
-            throw TimelineTransportHttpException(502, response.error ?: "schedule.delete failed over iroh admin_rpc")
-        }
+        adminRpcResult("schedule.delete", path, body)
     }
 
     companion object {
