@@ -6,12 +6,12 @@ import com.letta.mobile.data.model.ToolCreateParams
 import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.ToolUpdateParams
 import com.letta.mobile.data.repository.api.IToolRepository
-import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
+import kotlin.time.Clock
 
 class IrohToolRepository(
     private val directoryProvider: () -> IrohAdminRpcAgentDirectory?,
@@ -31,11 +31,11 @@ class IrohToolRepository(
 
     override suspend fun refreshTools() {
         toolsFlow.value = fetchAllTools(directory())
-        lastRefreshMs = System.currentTimeMillis()
+        lastRefreshMs = Clock.System.now().toEpochMilliseconds()
     }
 
     override suspend fun refreshToolsIfStale(maxAgeMs: Long): Boolean {
-        val now = System.currentTimeMillis()
+        val now = Clock.System.now().toEpochMilliseconds()
         if (toolsFlow.value.isNotEmpty() && now - lastRefreshMs <= maxAgeMs) return false
         refreshTools()
         return true
