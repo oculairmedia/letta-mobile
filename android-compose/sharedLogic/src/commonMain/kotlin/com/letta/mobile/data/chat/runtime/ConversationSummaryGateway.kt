@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.runtime
 
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import kotlin.jvm.JvmInline
 
 /** Optional transport capability for persisting a generated conversation title. */
 interface ConversationSummaryGateway {

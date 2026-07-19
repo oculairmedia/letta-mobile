@@ -41,12 +41,32 @@ fun ChatConversationSummary.displayTitle(maxLength: Int = 56): String {
     return previewTitle.ifBlank { cleanTitle.ifBlank { "New conversation" } }
 }
 
-fun ChatConversationSummary.persistedTitleCandidate(firstUserMessage: String, maxLength: Int = 56): String? =
-    if (hasGenericTitle()) conversationTitleFromText(firstUserMessage, maxLength) else null
+fun ChatConversationSummary.persistedTitleCandidate(firstUserMessage: String, maxLength: Int = 56): String? {
+    if (!hasGeneratedFallbackTitle()) return null
+    // Only auto-title brand-new chats. Remote threads with history can still carry a
+    // generated "Conversation <id>" placeholder when the backend summary is blank —
+    // do not overwrite those on the next send.
+    if (hasPriorMessageHistory()) return null
+    return conversationTitleFromText(firstUserMessage, maxLength)
+}
 
-private fun ChatConversationSummary.hasGenericTitle(): Boolean {
+private fun ChatConversationSummary.hasGenericTitle(): Boolean =
+    title.trim().isBlank() || hasGeneratedFallbackTitle()
+
+/** True only for the client-generated `Conversation <id-suffix>` placeholder. */
+private fun ChatConversationSummary.hasGeneratedFallbackTitle(): Boolean {
     val cleanTitle = title.trim()
-    return cleanTitle.isBlank() || cleanTitle.startsWith("Conversation ", ignoreCase = true)
+    if (cleanTitle.isBlank()) return false
+    val generated = "Conversation ${id.takeLast(6)}"
+    return cleanTitle.equals(generated, ignoreCase = true)
+}
+
+private fun ChatConversationSummary.hasPriorMessageHistory(): Boolean {
+    val preview = lastMessagePreview.trim()
+    if (preview.isBlank()) return false
+    // Initial list mapping uses this placeholder until timeline hydrate fills a real preview.
+    if (preview.equals("Loaded from backend", ignoreCase = true)) return false
+    return true
 }
 
 private fun conversationTitleFromText(text: String, maxLength: Int): String? {

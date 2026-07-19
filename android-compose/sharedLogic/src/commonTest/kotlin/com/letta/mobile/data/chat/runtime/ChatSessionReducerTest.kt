@@ -109,11 +109,37 @@ class ChatSessionReducerTest {
 
     @Test
     fun persistedTitleCandidateUsesOnlyGenericConversationAndSubstantiveText() {
-        val generic = conversation("conversation-abcdef").copy(title = "Conversation abcdef")
+        val generic = conversation("conversation-abcdef").copy(
+            title = "Conversation abcdef",
+            lastMessagePreview = "",
+        )
 
         assertEquals("Plan the Windows release", generic.persistedTitleCandidate("Plan the Windows release\nMore"))
         assertEquals(null, generic.persistedTitleCandidate("  \n  "))
         assertEquals(null, generic.copy(title = "Pinned title").persistedTitleCandidate("New message"))
+        assertEquals(
+            null,
+            generic.copy(title = "Conversation with support").persistedTitleCandidate("New message"),
+        )
+        assertEquals(
+            null,
+            generic.copy(lastMessagePreview = "Prior history").persistedTitleCandidate("New message"),
+        )
+        assertEquals(
+            "Plan the Windows release",
+            generic.copy(lastMessagePreview = "Loaded from backend")
+                .persistedTitleCandidate("Plan the Windows release"),
+        )
+    }
+
+    @Test
+    fun displayTitlePreservesCustomConversationPrefixedTitles() {
+        val summary = conversation("conversation-abcdef").copy(
+            title = "Conversation with support",
+            lastMessagePreview = "latest note",
+        )
+
+        assertEquals("Conversation with support", summary.displayTitle())
     }
 
     @Test

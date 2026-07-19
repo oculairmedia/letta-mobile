@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -37,6 +38,20 @@ private class SummaryGatewayFixture : FakeDesktopChatGateway(), ConversationSumm
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
         super.listConversations(limit, archiveStatus).map { it.copy(summary = "") }
+
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = emptyList()
+
+    override suspend fun listAgentMessages(
+        agentId: String,
+        limit: Int?,
+        order: String?,
+        conversationId: String?,
+    ): List<LettaMessage> = emptyList()
 
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
         lastUpdate = update
