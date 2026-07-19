@@ -220,18 +220,19 @@ private fun AppMessage.mapStandaloneToolCalls(): List<UiToolCall>? = when (messa
 internal fun extractGeneratedUi(raw: kotlinx.serialization.json.JsonElement?): GeneratedUiPayload? =
     runCatching {
         val obj = raw as? JsonObject ?: return@runCatching null
-        if (obj.stringPrimitive("type") != "generated_ui") return@runCatching null
-        val component = obj.stringPrimitive("component")?.takeIf(String::isNotBlank)
+        val type = (obj["type"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+        if (type != "generated_ui") return@runCatching null
+        val component = (obj["component"] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.contentOrNull
+            ?.takeIf(String::isNotBlank)
             ?: return@runCatching null
         GeneratedUiPayload(
             component = component,
             propsJson = obj["props"]?.toString() ?: buildJsonObject {}.toString(),
-            fallbackText = obj.stringPrimitive("text") ?: obj.stringPrimitive("fallback_text"),
+            fallbackText = (obj["text"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                ?: (obj["fallback_text"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull,
         )
     }.getOrNull()
-
-private fun JsonObject.stringPrimitive(name: String): String? =
-    (this[name] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
 
 internal fun extractGeneratedUiFromString(raw: String): GeneratedUiPayload? {
     if (raw.isBlank()) return null
