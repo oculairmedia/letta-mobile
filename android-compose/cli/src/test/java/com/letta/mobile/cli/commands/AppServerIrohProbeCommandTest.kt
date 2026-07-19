@@ -96,7 +96,7 @@ class AppServerIrohProbeCommandTest {
             ),
         )
 
-        val metrics = accumulator.toMetrics(dialMs = 1, firstFrameMs = 1, timedOut = false)
+        val metrics = accumulator.toMetrics(ProbeMetricsRequest(dialMs = 1, firstFrameMs = 1, timedOut = false))
 
         assertEquals(5, accumulator.recordedFrameCount)
         assertEquals(listOf(1L, 2L, 3L, 4L, 5L), accumulator.observedEventSeqs)
@@ -136,7 +136,7 @@ class AppServerIrohProbeCommandTest {
             ),
         )
 
-        val metrics = accumulator.toMetrics(dialMs = 1, firstFrameMs = 1, timedOut = false)
+        val metrics = accumulator.toMetrics(ProbeMetricsRequest(dialMs = 1, firstFrameMs = 1, timedOut = false))
 
         assertEquals(1, metrics.untypedFrameCount)
         assertEquals("completed", metrics.terminalStatus)
@@ -169,7 +169,7 @@ class AppServerIrohProbeCommandTest {
             ),
         )
 
-        val metrics = accumulator.toMetrics(dialMs = 1, firstFrameMs = 1, timedOut = false)
+        val metrics = accumulator.toMetrics(ProbeMetricsRequest(dialMs = 1, firstFrameMs = 1, timedOut = false))
 
         assertEquals(listOf("tc-open"), metrics.openToolCallIds)
     }
@@ -188,7 +188,7 @@ class AppServerIrohProbeCommandTest {
             ),
         )
 
-        val metrics = accumulator.toMetrics(dialMs = 1, firstFrameMs = 1, timedOut = false)
+        val metrics = accumulator.toMetrics(ProbeMetricsRequest(dialMs = 1, firstFrameMs = 1, timedOut = false))
 
         assertEquals(1, metrics.turnDoneCount)
         assertEquals("failed", metrics.terminalStatus)
