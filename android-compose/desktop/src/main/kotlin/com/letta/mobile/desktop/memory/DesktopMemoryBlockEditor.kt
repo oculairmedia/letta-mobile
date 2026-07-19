@@ -84,6 +84,7 @@ import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopTextArea
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.text.input.TextFieldValue
@@ -157,36 +158,73 @@ private suspend fun deleteBlock(
     blockId: String,
 ): Result<Unit> = runCatching { blockApi.deleteBlockById(blockId) }
 
+private class BlockEditorUiState(
+    initialLabel: String,
+    initialBlockId: String?,
+    isExisting: Boolean,
+) {
+    var label by mutableStateOf(initialLabel)
+    var value by mutableStateOf("")
+    var blockId by mutableStateOf(initialBlockId)
+    var loading by mutableStateOf(isExisting)
+    var busy by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    // When load fails, keep the editor read-only so Save can't clobber server content.
+    var loadFailed by mutableStateOf(false)
+}
+
+@Composable
+private fun rememberBlockEditorState(target: BlockEditorTarget): BlockEditorUiState =
+    remember(target) {
+        BlockEditorUiState(
+            initialLabel = (target as? BlockEditorTarget.Existing)?.label.orEmpty(),
+            initialBlockId = (target as? BlockEditorTarget.Existing)?.blockId,
+            isExisting = target is BlockEditorTarget.Existing,
+        )
+    }
+
+@Composable
+private fun BlockEditorLoadEffect(request: BlockEditorRequest, state: BlockEditorUiState) {
+    val target = request.target
+    LaunchedEffect(target) {
+        if (target !is BlockEditorTarget.Existing) return@LaunchedEffect
+        val result = loadExistingBlock(target, request.blockApi)
+        state.value = result.value
+        if (result.blockId != null) state.blockId = result.blockId
+        state.error = result.error
+        state.loadFailed = result.loadFailed
+        state.loading = false
+    }
+}
+
 @Composable
 internal fun BlockEditorPanel(request: BlockEditorRequest) {
-    val target = request.target
     val scope = rememberCoroutineScope()
-    val isNew = target is BlockEditorTarget.New
-    var label by remember(target) {
-        mutableStateOf((target as? BlockEditorTarget.Existing)?.label.orEmpty())
-    }
-    var value by remember(target) { mutableStateOf("") }
-    var blockId by remember(target) {
-        mutableStateOf((target as? BlockEditorTarget.Existing)?.blockId)
-    }
-    var loading by remember(target) { mutableStateOf(target is BlockEditorTarget.Existing) }
-    var busy by remember(target) { mutableStateOf(false) }
-    var error by remember(target) { mutableStateOf<String?>(null) }
-    // When an existing block fails to load, the editor is read-only — saving the
-    // empty value would clobber the real block content on the server.
-    var loadFailed by remember(target) { mutableStateOf(false) }
+    val state = rememberBlockEditorState(request.target)
+    val isNew = request.target is BlockEditorTarget.New
+    BlockEditorLoadEffect(request, state)
+    BlockEditorScaffold(
+        BlockEditorScaffoldParams(
+            title = if (isNew) "New memory block" else state.label,
+            isNew = isNew,
+            state = state,
+            onDismiss = request.onDismiss,
+            callbacks = blockEditorCallbacks(request, state, scope, isNew),
+        ),
+    )
+}
 
-    LaunchedEffect(target) {
-        if (target is BlockEditorTarget.Existing) {
-            val result = loadExistingBlock(target, request.blockApi)
-            value = result.value
-            if (result.blockId != null) blockId = result.blockId
-            error = result.error
-            loadFailed = result.loadFailed
-            loading = false
-        }
-    }
+private data class BlockEditorScaffoldParams(
+    val title: String,
+    val isNew: Boolean,
+    val state: BlockEditorUiState,
+    val onDismiss: () -> Unit,
+    val callbacks: BlockEditorActionCallbacks,
+)
 
+@Composable
+private fun BlockEditorScaffold(params: BlockEditorScaffoldParams) {
+    val state = params.state
     Column(
         modifier = Modifier
             .width(380.dp)
@@ -195,69 +233,78 @@ internal fun BlockEditorPanel(request: BlockEditorRequest) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        BlockEditorHeader(
-            title = if (isNew) "New memory block" else label,
-            onDismiss = request.onDismiss,
-        )
+        BlockEditorHeader(title = params.title, onDismiss = params.onDismiss)
         BlockEditorFields(
-            isNew = isNew,
-            onLabelChange = { label = it },
-            value = value,
-            onValueChange = { value = it },
-            loading = loading,
-            busy = busy,
-            loadFailed = loadFailed,
+            BlockEditorFieldsParams(
+                isNew = params.isNew,
+                label = state.label,
+                onLabelChange = { state.label = it },
+                value = state.value,
+                onValueChange = { state.value = it },
+                loading = state.loading,
+                busy = state.busy,
+                loadFailed = state.loadFailed,
+            ),
         )
-        error?.let {
-            Text(text = it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-        }
+        state.error?.let { BlockEditorError(it) }
         BlockEditorActions(
             state = BlockEditorActionState(
-                isNew = isNew,
-                blockId = blockId,
-                busy = busy,
-                loading = loading,
-                loadFailed = loadFailed,
+                isNew = params.isNew,
+                blockId = state.blockId,
+                busy = state.busy,
+                loading = state.loading,
+                loadFailed = state.loadFailed,
             ),
-            callbacks = BlockEditorActionCallbacks(
-                onDismiss = request.onDismiss,
-                onDelete = {
-                    val currentBlockId = blockId ?: return@BlockEditorActionCallbacks
-                    busy = true
-                    error = null
-                    scope.launch {
-                        deleteBlock(request.blockApi, currentBlockId)
-                            .onSuccess { request.onChanged() }
-                            .onFailure { error = it.message ?: "Delete failed"; busy = false }
-                    }
-                },
-                onSave = {
-                    if (label.isBlank()) {
-                        error = "Label is required"
-                        return@BlockEditorActionCallbacks
-                    }
-                    busy = true
-                    error = null
-                    val id = blockId
-                    scope.launch {
-                        saveBlock(
-                            SaveBlockParams(
-                                isNew = isNew,
-                                agentId = request.agentId,
-                                label = label,
-                                value = value,
-                                blockId = id,
-                                blockApi = request.blockApi,
-                            ),
-                        )
-                            .onSuccess { request.onChanged() }
-                            .onFailure { error = it.message ?: "Save failed"; busy = false }
-                    }
-                },
-            ),
+            callbacks = params.callbacks,
         )
     }
 }
+
+@Composable
+private fun BlockEditorError(message: String) {
+    Text(text = message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+}
+
+private fun blockEditorCallbacks(
+    request: BlockEditorRequest,
+    state: BlockEditorUiState,
+    scope: CoroutineScope,
+    isNew: Boolean,
+): BlockEditorActionCallbacks = BlockEditorActionCallbacks(
+    onDismiss = request.onDismiss,
+    onDelete = {
+        val currentBlockId = state.blockId ?: return@BlockEditorActionCallbacks
+        state.busy = true
+        state.error = null
+        scope.launch {
+            deleteBlock(request.blockApi, currentBlockId)
+                .onSuccess { request.onChanged() }
+                .onFailure { state.error = it.message ?: "Delete failed"; state.busy = false }
+        }
+    },
+    onSave = {
+        if (state.label.isBlank()) {
+            state.error = "Label is required"
+            return@BlockEditorActionCallbacks
+        }
+        state.busy = true
+        state.error = null
+        scope.launch {
+            saveBlock(
+                SaveBlockParams(
+                    isNew = isNew,
+                    agentId = request.agentId,
+                    label = state.label,
+                    value = state.value,
+                    blockId = state.blockId,
+                    blockApi = request.blockApi,
+                ),
+            )
+                .onSuccess { request.onChanged() }
+                .onFailure { state.error = it.message ?: "Save failed"; state.busy = false }
+        }
+    },
+)
 
 @Composable
 private fun BlockEditorHeader(
@@ -282,28 +329,31 @@ private fun BlockEditorHeader(
     }
 }
 
+private data class BlockEditorFieldsParams(
+    val isNew: Boolean,
+    val label: String,
+    val onLabelChange: (String) -> Unit,
+    val value: String,
+    val onValueChange: (String) -> Unit,
+    val loading: Boolean,
+    val busy: Boolean,
+    val loadFailed: Boolean,
+)
+
 @Composable
-private fun ColumnScope.BlockEditorFields(
-    isNew: Boolean,
-    onLabelChange: (String) -> Unit,
-    value: String,
-    onValueChange: (String) -> Unit,
-    loading: Boolean,
-    busy: Boolean,
-    loadFailed: Boolean,
-) {
-    if (isNew) {
+private fun ColumnScope.BlockEditorFields(params: BlockEditorFieldsParams) {
+    if (params.isNew) {
         Text("Label", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        var labelField by remember { mutableStateOf(TextFieldValue("")) }
+        var labelField by remember { mutableStateOf(TextFieldValue(params.label)) }
         JewelTextField(
             value = labelField,
-            onValueChange = { labelField = it; onLabelChange(it.text) },
+            onValueChange = { labelField = it; params.onLabelChange(it.text) },
             modifier = Modifier.fillMaxWidth(),
         )
     }
 
     Text("Value", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    if (loading) {
+    if (params.loading) {
         Text(
             text = "Loading…",
             style = MaterialTheme.typography.bodyMedium,
@@ -312,9 +362,9 @@ private fun ColumnScope.BlockEditorFields(
         )
     } else {
         DesktopTextArea(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = !busy && !loadFailed,
+            value = params.value,
+            onValueChange = params.onValueChange,
+            enabled = !params.busy && !params.loadFailed,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             placeholder = "Block contents…",
             decorationBoxModifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),

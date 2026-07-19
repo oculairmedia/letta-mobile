@@ -1,152 +1,54 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.foundation.Image
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.onClick
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material.icons.outlined.Terminal
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.HourglassEmpty
-import androidx.compose.material.icons.outlined.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Description
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.SmartToy
-import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.unit.sp
-import com.letta.mobile.data.chat.projection.ChatRenderItem
-import com.letta.mobile.data.chat.projection.StepDotIcon
-import com.letta.mobile.data.chat.runtime.ChatScreenStatus
-import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
-import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
-import com.letta.mobile.data.chat.runtime.isConnectionRetryable
-import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.UiApprovalRequest
-import com.letta.mobile.data.model.UiApprovalResponse
-import com.letta.mobile.data.model.UiGeneratedComponent
-import com.letta.mobile.data.model.UiImageAttachment
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.composer.AutocompleteTrigger
 import com.letta.mobile.data.composer.ComposerAutocomplete
 import com.letta.mobile.data.composer.ComposerEffort
-import com.letta.mobile.data.diff.DiffLineKind
-import com.letta.mobile.data.diff.UnifiedDiff
 import com.letta.mobile.data.composer.MentionCatalog
-import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
-import com.letta.mobile.data.onboarding.AgentOnboarding
-import com.letta.mobile.data.onboarding.OnboardingTask
-import com.letta.mobile.data.onboarding.OnboardingTaskKind
-import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
-import com.letta.mobile.desktop.DesktopButtonContent
-import com.letta.mobile.desktop.DesktopControlText
-import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.theme.customColors
-import java.util.Base64
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
-import org.jetbrains.skia.Image as SkiaImage
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
 /** Read-only composer inputs (text, attachments, model catalog, autocomplete sources). */
 internal data class ComposerBarState(
@@ -168,16 +70,6 @@ internal data class ComposerBarActions(
     val onAttachImage: () -> Unit,
     val onRemoveImageAttachment: (Int) -> Unit,
     val onOpenModelPicker: (() -> Unit)? = null,
-)
-
-/** Bundled label/options/select for [ComposerDropdownChip]. */
-internal data class ComposerDropdownChipModel(
-    val label: String,
-    val options: List<String>,
-    val onSelect: (String) -> Unit,
-    val leadingIcon: ImageVector? = null,
-    val contentColor: Color? = null,
-    val emptyHint: String? = null,
 )
 
 @Composable
@@ -434,7 +326,8 @@ private fun ComposerControlRow(
                 onThinkingChange = { thinking = it },
             ),
         )
-        Spacer(Modifier.weight(1f))
+        val grow = Modifier.weight(1f)
+        Spacer(grow)
         Surface(
             onClick = actions.onSend,
             enabled = canSend,
@@ -458,425 +351,6 @@ private fun ComposerControlRow(
                     modifier = Modifier.size(18.dp),
                 )
             }
-        }
-    }
-}
-
-/**
- * A functional pill selector in the composer control row (model / safety /
- * effort): click opens a popup of [options]; selecting one fires [onSelect].
- */
-/**
- * The `@mention` popup (Penpot "Composer (@ mentions)"): FILES / AGENTS / MEMORY
- * sections of mentionables, filtered by the shared MentionCatalog. Selecting one
- * inserts an `@label` token into the composer.
- */
-@Composable
-internal fun MentionPopup(
-    groups: List<Pair<MentionKind, List<Mentionable>>>,
-    onSelect: (Mentionable) -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp).heightIn(max = 320.dp),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
-            groups.forEach { (kind, items) ->
-                Text(
-                    text = MentionCatalog.sectionTitle(kind).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 2.dp),
-                )
-                items.take(6).forEach { mention ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(mention) }
-                            .padding(horizontal = 14.dp, vertical = 7.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = when (kind) {
-                                MentionKind.File -> Icons.Outlined.Description
-                                MentionKind.Agent -> Icons.Outlined.SmartToy
-                                MentionKind.Memory -> Icons.Outlined.Memory
-                            },
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Text(
-                            text = mention.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        mention.sublabel?.let {
-                            Text(
-                                text = it,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Composer effort chip + popover (Penpot "Effort popover"): an OPTIONS section
- * with a Thinking toggle and an EFFORT section (Minimal … Max) with the selected
- * level checked. Effort levels come from the shared [ComposerEffort].
- */
-internal data class ComposerEffortChipState(
-    val effort: ComposerEffort,
-    val thinking: Boolean,
-)
-
-internal data class ComposerEffortChipActions(
-    val onEffortChange: (ComposerEffort) -> Unit,
-    val onThinkingChange: (Boolean) -> Unit,
-)
-
-@Composable
-internal fun ComposerEffortChip(
-    state: ComposerEffortChipState,
-    actions: ComposerEffortChipActions,
-) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        ComposerActionChip(label = state.effort.label, onClick = { open = !open })
-        if (open) {
-            EffortPopover(
-                state = state,
-                actions = ComposerEffortChipActions(
-                    onEffortChange = { level ->
-                        actions.onEffortChange(level)
-                        open = false
-                    },
-                    onThinkingChange = actions.onThinkingChange,
-                ),
-                onDismiss = { open = false },
-            )
-        }
-    }
-}
-
-@Composable
-private fun EffortPopover(
-    state: ComposerEffortChipState,
-    actions: ComposerEffortChipActions,
-    onDismiss: () -> Unit,
-) {
-    val positionProvider = ViewportClampedPopupPositionProvider(yOffsetPx = -6)
-    Popup(
-        popupPositionProvider = positionProvider,
-        onDismissRequest = onDismiss,
-        properties = PopupProperties(focusable = true),
-    ) {
-        Surface(
-            modifier = Modifier.width(230.dp),
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            shadowElevation = 8.dp,
-        ) {
-            Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                EffortThinkingSection(
-                    thinking = state.thinking,
-                    onThinkingChange = actions.onThinkingChange,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                )
-                EffortLevelsSection(
-                    effort = state.effort,
-                    onEffortChange = actions.onEffortChange,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EffortThinkingSection(
-    thinking: Boolean,
-    onThinkingChange: (Boolean) -> Unit,
-) {
-    EffortSectionHeader("Options")
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "Thinking",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.weight(1f),
-        )
-        Switch(checked = thinking, onCheckedChange = onThinkingChange)
-    }
-}
-
-@Composable
-private fun EffortLevelsSection(
-    effort: ComposerEffort,
-    onEffortChange: (ComposerEffort) -> Unit,
-) {
-    EffortSectionHeader("Effort")
-    ComposerEffort.entries.forEach { level ->
-        EffortLevelRow(
-            level = level,
-            selected = level == effort,
-            onClick = { onEffortChange(level) },
-        )
-    }
-}
-
-@Composable
-private fun EffortLevelRow(
-    level: ComposerEffort,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = level.label,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        if (selected) {
-            Icon(
-                imageVector = Icons.Outlined.Check,
-                contentDescription = "Selected",
-                tint = Color(0xFF00BFA5),
-                modifier = Modifier.size(16.dp),
-            )
-        }
-    }
-}
-
-@Composable
-internal fun EffortSectionHeader(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 4.dp),
-    )
-}
-
-/** A composer chip that opens a separate picker (vs. an inline dropdown). */
-@Composable
-internal fun ComposerActionChip(
-    label: String,
-    onClick: () -> Unit,
-    leadingIcon: ImageVector? = null,
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    modifier = Modifier.size(13.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(text = label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
-            Icon(
-                imageVector = Icons.Outlined.KeyboardArrowDown,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun ComposerDropdownChip(model: ComposerDropdownChipModel) {
-    val contentColor = model.contentColor ?: MaterialTheme.colorScheme.onSurface
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Surface(
-            onClick = { open = !open },
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = contentColor,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (model.leadingIcon != null) {
-                    Icon(
-                        imageVector = model.leadingIcon,
-                        contentDescription = null,
-                        modifier = Modifier.size(13.dp),
-                        tint = contentColor,
-                    )
-                }
-                Text(
-                    text = model.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    maxLines = 1,
-                )
-                Icon(
-                    imageVector = Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        if (open) {
-            JewelPopupMenu(
-                onDismissRequest = {
-                    open = false
-                    true
-                },
-                horizontalAlignment = Alignment.Start,
-            ) {
-                if (model.options.isEmpty() && model.emptyHint != null) {
-                    selectableItem(selected = false, onClick = { open = false }) {
-                        DesktopControlText(model.emptyHint)
-                    }
-                }
-                model.options.forEach { option ->
-                    selectableItem(
-                        selected = option == model.label,
-                        onClick = {
-                            open = false
-                            model.onSelect(option)
-                        },
-                    ) {
-                        DesktopControlText(option)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun ComposerAttachmentChip(
-    image: MessageContentPart.Image,
-    onRemove: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            DesktopAttachmentImage(
-                attachment = UiImageAttachment(base64 = image.base64, mediaType = image.mediaType),
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = "image",
-                style = MaterialTheme.typography.labelMedium,
-                maxLines = 1,
-            )
-            Icon(
-                imageVector = Icons.Outlined.Close,
-                contentDescription = "Remove attachment",
-                modifier = Modifier
-                    .size(14.dp)
-                    .clickable(onClick = onRemove),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun DesktopImageAttachmentsGrid(
-    attachments: List<UiImageAttachment>,
-    modifier: Modifier = Modifier,
-) {
-    if (attachments.isEmpty()) return
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        val cellHeight = if (attachments.size == 1) 220.dp else 128.dp
-        attachments.take(4).forEach { attachment ->
-            DesktopAttachmentImage(
-                attachment = attachment,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(cellHeight),
-            )
-        }
-    }
-}
-
-@Composable
-internal fun DesktopAttachmentImage(
-    attachment: UiImageAttachment,
-    modifier: Modifier = Modifier,
-) {
-    val imageBitmap = remember(attachment.base64) {
-        runCatching {
-            val bytes = Base64.getDecoder().decode(attachment.base64)
-            SkiaImage.makeFromEncoded(bytes).toComposeImageBitmap()
-        }.getOrNull()
-    }
-    Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = MaterialTheme.shapes.medium,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        if (imageBitmap != null) {
-            Image(
-                bitmap = imageBitmap,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
-            )
         }
     }
 }
