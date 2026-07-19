@@ -157,7 +157,7 @@ fun DesktopScheduleSurface(
     // native-sourced ids are tracked so the rail can route Delete correctly
     // (native schedules aren't deletable through the cron API).
     val nativeSchedules = state.schedules
-    val (defs, nativeDefIds) = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
+    val defs = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
         // `now` is read but intentionally NOT a key: one-shot crons resolve to a
         // single instant at build time and must stay fixed (re-resolving each
         // tick would jump a just-fired one-shot to next year).
@@ -167,7 +167,7 @@ fun DesktopScheduleSurface(
         // re-filter by focusedAgentId (that empties them when selection lags).
         val nativeDefs = ScheduleProjection.toScheduleDefsFromNative(nativeSchedules, zone)
             .filter { it.id !in cronIds }
-        (cronDefs + nativeDefs) to nativeDefs.mapTo(HashSet()) { it.id }
+        cronDefs + nativeDefs
     }
     val defsById = remember(defs) { defs.associateBy { it.id } }
     val historySummary = remember(defs, now) { ScheduleProjection.history(defs, now, zone) }
@@ -239,7 +239,6 @@ fun DesktopScheduleSurface(
                         history = historySummary,
                         now = now,
                         zone = zone,
-                        nativeDefIds = nativeDefIds,
                         onSelectSchedule = { rail = RailState.Detail(it) },
                         onBackToOverview = { rail = RailState.Overview },
                         onDelete = { onDeleteCron(it); rail = RailState.Overview },
@@ -783,7 +782,6 @@ private fun ScheduleRail(
     history: com.letta.mobile.data.schedules.HistorySummary,
     now: Instant,
     zone: TimeZone,
-    nativeDefIds: Set<String>,
     onSelectSchedule: (String) -> Unit,
     onBackToOverview: () -> Unit,
     onDelete: (String) -> Unit,
@@ -802,9 +800,9 @@ private fun ScheduleRail(
                     reliability = history.schedules.firstOrNull { it.scheduleId == def.id },
                     now = now,
                     zone = zone,
-                    // Native schedule-admin schedules aren't deletable via the
-                    // cron API, so only offer Delete for cron-backed defs.
-                    canDelete = def.id !in nativeDefIds,
+                    // Delete is routed by the host: cron ids → CronApi, native
+                    // schedule ids → scheduleRepository.deleteSchedule.
+                    canDelete = true,
                     onBack = onBackToOverview,
                     onDelete = onDelete,
                 )

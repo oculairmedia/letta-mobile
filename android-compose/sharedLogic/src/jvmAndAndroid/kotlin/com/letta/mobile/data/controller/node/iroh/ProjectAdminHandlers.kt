@@ -12,43 +12,41 @@ object ProjectAdminHandlers {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
 
         router.register("project.list") { params ->
-            api.get(
-                adminProxyRequest("api", "projects")
-                    .query("limit", param(params, "limit"))
-                    .build(),
-            )
+            api.get(AdminPath.api("projects")) {
+                query("limit", param(params, "limit"))
+            }
         }
 
         router.register("project.get") { params ->
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
-            api.get(adminProxyRequest("api", "projects", identifier).build())
+            api.get(AdminPath.api("projects", identifier))
         }
 
         router.register("project.beadsRemoteStatus") { params ->
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
-            api.get(adminProxyRequest("api", "projects", identifier, "beads-remote").build())
+            api.get(AdminPath.api("projects", identifier, "beads-remote"))
         }
 
         router.register("project.provisionBeadsRemote") { params ->
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
             api.post(
-                adminProxyRequest("api", "projects", identifier, "beads-remote", "provision").build(),
+                AdminPath.api("projects", identifier, "beads-remote", "provision"),
                 body = passthroughBody(params, "identifier", "project_id"),
             )
         }
 
         router.register("project.triggerSync") { params ->
-            api.post(adminProxyRequest("api", "sync", "trigger").build(), body = params.toString())
+            api.post(AdminPath.api("sync", "trigger"), body = params.toString())
         }
 
         router.register("project.create") { params ->
-            api.post(adminProxyRequest("api", "registry", "projects").build(), body = params.toString())
+            api.post(AdminPath.api("registry", "projects"), body = params.toString())
         }
 
         router.register("project.update") { params ->
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
             api.patch(
-                adminProxyRequest("api", "registry", "projects", identifier).build(),
+                AdminPath.api("registry", "projects", identifier),
                 body = passthroughBody(params, "identifier", "project_id"),
             )
         }
@@ -56,14 +54,14 @@ object ProjectAdminHandlers {
         router.register("project.archive") { params ->
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
             api.patch(
-                adminProxyRequest("api", "registry", "projects", identifier).build(),
+                AdminPath.api("registry", "projects", identifier),
                 body = passthroughBody(params, "identifier", "project_id"),
             )
         }
 
         router.register("project.delete") { params ->
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
-            api.delete(adminProxyRequest("api", "registry", "projects", identifier).build())
+            api.delete(AdminPath.api("registry", "projects", identifier))
         }
     }
 }

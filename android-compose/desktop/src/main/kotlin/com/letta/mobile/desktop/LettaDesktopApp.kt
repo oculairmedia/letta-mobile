@@ -535,14 +535,24 @@ fun LettaDesktopApp(
                             onTokenCleared = { applyConfig(activeConfig.copy(accessToken = null)) },
                             blockApi = blockApi,
                             crons = cronPanel.crons,
-                            onDeleteCron = cronPanel::delete,
-                            canCreateCron = cronPanel.available &&
+                            onDeleteCron = { id ->
+                                if (scheduleLibraryState.schedules.any { it.id == id }) {
+                                    libraries.schedules.deleteSchedule(id)
+                                } else {
+                                    cronPanel.delete(id)
+                                }
+                            },
+                            // HTTP backends create via /v1/crons; iroh:// uses native
+                            // schedule.create over admin_rpc (CronApi has no HTTP base).
+                            canCreateCron = (cronPanel.available || irohMode) &&
                                 (scheduleLibraryState.selectedAgentId != null || selectedAgentId != null),
                             onCreateCron = { filteredAgentId, name, prompt, cron, recurring, tz ->
                                 val targetAgent = filteredAgentId
                                     ?: scheduleLibraryState.selectedAgentId
                                     ?: selectedAgentId
-                                if (targetAgent != null) {
+                                if (targetAgent == null) {
+                                    // No agent focused — create UI should already be disabled.
+                                } else if (cronPanel.available) {
                                     cronPanel.create(
                                         CronDraft(
                                             agentId = targetAgent,
@@ -552,6 +562,13 @@ fun LettaDesktopApp(
                                             recurring = recurring,
                                             timezone = tz,
                                         ),
+                                    )
+                                } else {
+                                    libraries.schedules.createRecurringSchedule(
+                                        agentId = targetAgent,
+                                        name = name,
+                                        prompt = prompt,
+                                        cronExpression = cron,
                                     )
                                 }
                             },

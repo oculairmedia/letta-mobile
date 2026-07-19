@@ -45,11 +45,12 @@ private fun DesktopClipboardImagePasteEffect(
             }
             val transferable = runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull()
                 ?: return@KeyEventDispatcher false
+            val sink = DesktopImageIngressSink(currentScope, loader, currentOnImage, currentOnError)
             when {
                 transferable.isDataFlavorSupported(DataFlavor.imageFlavor) ->
-                    handleClipboardImagePaste(transferable, currentScope, loader, currentOnImage, currentOnError)
+                    handleClipboardImagePaste(transferable, sink)
                 transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ->
-                    handleClipboardImageFilePaste(transferable, currentScope, loader, currentOnImage, currentOnError)
+                    handleClipboardImageFilePaste(transferable, sink)
                 else -> false
             }
         }
@@ -72,7 +73,8 @@ private fun DesktopImageFileDropEffect(
     DisposableEffect(enabled, loader) {
         if (!enabled) return@DisposableEffect onDispose { }
         val installed = java.util.WeakHashMap<Component, java.awt.dnd.DropTarget?>()
-        val target = createImageFileDropTarget(currentScope, loader, currentOnImage, currentOnError)
+        val sink = DesktopImageIngressSink(currentScope, loader, currentOnImage, currentOnError)
+        val target = createImageFileDropTarget(sink)
         installDropTargetsOnWindows(target, installed)
         val listener = createWindowOpenedDropTargetInstaller(target, installed)
         Toolkit.getDefaultToolkit().addAWTEventListener(listener, java.awt.AWTEvent.WINDOW_EVENT_MASK)

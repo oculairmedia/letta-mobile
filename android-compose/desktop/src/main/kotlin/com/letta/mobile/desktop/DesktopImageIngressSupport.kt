@@ -20,16 +20,19 @@ import kotlinx.coroutines.launch
 
 private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")
 
-internal fun CoroutineScope.launchLoadImage(
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
-    block: suspend DesktopImageAttachmentLoader.() -> MessageContentPart.Image,
+/** Callbacks + loader shared by clipboard paste and file-drop image ingress. */
+internal data class DesktopImageIngressSink(
+    val scope: CoroutineScope,
+    val loader: DesktopImageAttachmentLoader,
+    val onImage: (MessageContentPart.Image) -> Unit,
+    val onError: (String) -> Unit,
 ) {
-    launch {
-        runCatching { loader.block() }
-            .onSuccess(onImage)
-            .onFailure { onError(it.message ?: it::class.simpleName ?: "Could not attach image") }
+    fun launchLoad(block: suspend DesktopImageAttachmentLoader.() -> MessageContentPart.Image) {
+        scope.launch {
+            runCatching { loader.block() }
+                .onSuccess(onImage)
+                .onFailure { onError(it.message ?: it::class.simpleName ?: "Could not attach image") }
+        }
     }
 }
 
@@ -61,37 +64,26 @@ internal fun Transferable.imageFiles(): List<File> =
 
 internal fun handleClipboardImagePaste(
     transferable: Transferable,
-    scope: CoroutineScope,
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
+    sink: DesktopImageIngressSink,
 ): Boolean {
     val rawImage = runCatching {
         transferable.getTransferData(DataFlavor.imageFlavor) as? java.awt.Image
     }.getOrNull() ?: return false
     val image = rawImage.toBufferedImage() ?: return false
-    scope.launchLoadImage(loader, onImage, onError) { load(image) }
+    sink.launchLoad { load(image) }
     return true
 }
 
 internal fun handleClipboardImageFilePaste(
     transferable: Transferable,
-    scope: CoroutineScope,
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
+    sink: DesktopImageIngressSink,
 ): Boolean {
     val path = transferable.imageFiles().firstOrNull()?.toPath() ?: return false
-    scope.launchLoadImage(loader, onImage, onError) { load(path) }
+    sink.launchLoad { load(path) }
     return true
 }
 
-internal fun createImageFileDropTarget(
-    scope: CoroutineScope,
-    loader: DesktopImageAttachmentLoader,
-    onImage: (MessageContentPart.Image) -> Unit,
-    onError: (String) -> Unit,
-): DropTargetAdapter =
+internal fun createImageFileDropTarget(sink: DesktopImageIngressSink): DropTargetAdapter =
     object : DropTargetAdapter() {
         override fun drop(event: DropTargetDropEvent) {
             val path = event.transferable.imageFiles().firstOrNull()?.toPath()
@@ -100,7 +92,7 @@ internal fun createImageFileDropTarget(
                 return
             }
             event.acceptDrop(DnDConstants.ACTION_COPY)
-            scope.launchLoadImage(loader, onImage, onError) { load(path) }
+            sink.launchLoad { load(path) }
             event.dropComplete(true)
         }
     }

@@ -1,5 +1,8 @@
 package com.letta.mobile.desktop.schedules
 
+import com.letta.mobile.data.model.ScheduleCreateParams
+import com.letta.mobile.data.model.ScheduleDefinition
+import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.repository.http.LettaHttpAdminRepositoryException
 import com.letta.mobile.data.schedules.ScheduleLibraryController
 import com.letta.mobile.data.schedules.ScheduleLibraryState
@@ -34,6 +37,35 @@ class DesktopScheduleLibraryController(
 
     fun selectAgent(agentId: String) {
         delegate.selectAgent(agentId)
+    }
+
+    /** Create via native `/v1/agents/{id}/schedule` (iroh admin_rpc or HTTP schedule repo). */
+    fun createRecurringSchedule(
+        agentId: String,
+        name: String,
+        prompt: String,
+        cronExpression: String,
+    ) {
+        delegate.createSchedule(
+            agentId,
+            ScheduleCreateParams(
+                messages = listOf(
+                    ScheduleMessage(
+                        content = prompt,
+                        role = "user",
+                        name = name.takeIf { it.isNotBlank() },
+                    ),
+                ),
+                schedule = ScheduleDefinition(
+                    type = "recurring",
+                    cronExpression = cronExpression,
+                ),
+            ),
+        )
+    }
+
+    fun deleteSchedule(scheduleId: String) {
+        delegate.deleteSchedule(scheduleId)
     }
 
     override fun close() {
