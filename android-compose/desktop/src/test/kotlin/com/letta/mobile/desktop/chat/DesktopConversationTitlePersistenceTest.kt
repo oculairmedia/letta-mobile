@@ -4,11 +4,10 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -20,18 +19,19 @@ class DesktopConversationTitlePersistenceTest {
     @Test
     fun firstSubstantiveSendPersistsStableConversationTitle() = runTest {
         val gateway = SummaryGatewayFixture()
+        val loop = TitleTestTimelineLoop()
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
             agentNamesByIdProvider = { emptyMap() },
+            loopFactory = { _, _, _ -> loop },
         )
 
         controller.start()
         runCurrent()
         controller.updateComposerText("Plan the Windows release\nwith a checklist")
         controller.send()
-        // Send job completes, then title PATCH is launched on the same test scope.
         runCurrent()
         runCurrent()
 
@@ -42,12 +42,14 @@ class DesktopConversationTitlePersistenceTest {
 
     @Test
     fun failedSendDoesNotPersistConversationTitle() = runTest {
-        val gateway = SummaryGatewayFixture(failSend = true)
+        val gateway = SummaryGatewayFixture()
+        val loop = TitleTestTimelineLoop(sendFailure = IllegalStateException("stream rejected"))
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
             scope = this,
             gatewayFactory = { gateway },
             agentNamesByIdProvider = { emptyMap() },
+            loopFactory = { _, _, _ -> loop },
         )
 
         controller.start()
@@ -64,9 +66,7 @@ class DesktopConversationTitlePersistenceTest {
     }
 }
 
-private class SummaryGatewayFixture(
-    private val failSend: Boolean = false,
-) : FakeDesktopChatGateway(), ConversationSummaryGateway {
+private class SummaryGatewayFixture : FakeDesktopChatGateway(), ConversationSummaryGateway {
     var lastUpdate: ConversationSummaryUpdate? = null
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
@@ -86,18 +86,23 @@ private class SummaryGatewayFixture(
         conversationId: String?,
     ): List<LettaMessage> = emptyList()
 
-    override suspend fun sendConversationMessage(
-        conversationId: String,
-        request: MessageCreateRequest,
-    ): Flow<LettaMessage> {
-        if (failSend) {
-            return flow { error("stream rejected") }
-        }
-        return super.sendConversationMessage(conversationId, request)
-    }
-
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
         lastUpdate = update
         return getConversation(update.conversationId.value).copy(summary = update.summary.value)
     }
+}
+
+private class TitleTestTimelineLoop(
+    private val sendFailure: Throwable? = null,
+) : DesktopTimelineLoop {
+    override val state = MutableStateFlow(Timeline("conv-1"))
+
+    override suspend fun hydrate(request: DesktopTimelineHydrateRequest) = Unit
+
+    override suspend fun send(request: DesktopTimelineSendRequest): String {
+        sendFailure?.let { throw it }
+        return "client-test"
+    }
+
+    override fun close() = Unit
 }
