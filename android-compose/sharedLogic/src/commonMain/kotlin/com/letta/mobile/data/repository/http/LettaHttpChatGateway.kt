@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository.http
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -56,7 +57,7 @@ import kotlinx.serialization.json.buildJsonObject
 open class LettaHttpChatGateway(
     private val config: LettaConfig,
     private val httpClient: HttpClient,
-) : ChatGateway, ChatGatewayExtras, AutoCloseable {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, AutoCloseable {
     private val baseUrl = config.serverUrl.trimEnd('/')
 
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {

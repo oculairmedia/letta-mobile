@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository.iroh
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
@@ -69,7 +70,7 @@ class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     private val deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-) : ChatGateway, ChatGatewayExtras {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway {
 
     private val bridge = WsChatBridge(transport)
     private val json = lettaWireJson

@@ -8,6 +8,7 @@ import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
@@ -188,6 +189,8 @@ class DesktopChatController(
 
     private val gatewayExtras: ChatGatewayExtras?
         get() = gateway as? ChatGatewayExtras
+    private val conversationSummaryGateway: ConversationSummaryGateway?
+        get() = gateway as? ConversationSummaryGateway
     private var activeLoop: DesktopTimelineLoop? = null
     private var timelineJob: Job? = null
     private var loadJob: Job? = null
@@ -597,7 +600,7 @@ class DesktopChatController(
         _state.value.selectedConversationId?.also { persistConversationTitleIfNeeded(it, text) }
 
     private fun persistConversationTitleIfNeeded(conversationId: String, firstUserMessage: String) {
-        val extras = gatewayExtras ?: return
+        val summaryGateway = conversationSummaryGateway ?: return
         val conversation = _state.value.conversations.firstOrNull { it.id == conversationId } ?: return
         val candidate = conversation.persistedTitleCandidate(firstUserMessage) ?: return
         val originalTitle = conversation.title
@@ -612,7 +615,7 @@ class DesktopChatController(
         }
         scope.launch {
             val update = ConversationSummaryUpdate(ConversationId(conversationId), ConversationSummary(candidate))
-            runCatching { extras.setConversationSummary(update) }
+            runCatching { summaryGateway.setConversationSummary(update) }
                 .onFailure {
                     _state.update { current ->
                         current.withRuntimeState(

@@ -72,27 +72,28 @@ private fun PlainToolOutputBlock(params: ToolOutputBlockParams) {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
     val outputLines = remember(params.text) { params.text.trim().lines() }
-    val visibleLines = remember(outputLines) { outputLines.take(TOOL_OUTPUT_VISIBLE_LINE_LIMIT) }
+    val outputWindow = remember(outputLines) {
+        ToolOutputWindow(outputLines.take(TOOL_OUTPUT_VISIBLE_LINE_LIMIT), outputLines.size)
+    }
     val horizontalScrollState = rememberScrollState()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(6.dp),
         color = blockColor,
     ) {
-        ToolOutputContents(visibleLines, outputLines.size, params.isError, horizontalScrollState)
+        ToolOutputContents(outputWindow, params.isError, horizontalScrollState)
     }
 }
 
 @Composable
 private fun ToolOutputContents(
-    visibleLines: List<String>,
-    totalLineCount: Int,
+    outputWindow: ToolOutputWindow,
     isError: Boolean,
     horizontalScrollState: androidx.compose.foundation.ScrollState,
 ) {
     Column {
-        ToolOutputViewport(visibleLines, isError, horizontalScrollState)
-        if (totalLineCount > visibleLines.size) ToolOutputTruncationLabel(visibleLines.size, totalLineCount)
+        ToolOutputViewport(outputWindow.visibleLines, isError, horizontalScrollState)
+        if (outputWindow.isTruncated) ToolOutputTruncationLabel(outputWindow)
     }
 }
 
@@ -130,16 +131,16 @@ private fun Modifier.toolOutputKeyboardScroll(
 ): Modifier = semantics {
     contentDescription = "Tool output. Use left and right arrow keys to scroll horizontally."
 }.onPreviewKeyEvent { event ->
-    val delta = event.toolOutputScrollDelta() ?: return@onPreviewKeyEvent false
-    scrollTo((state.value + delta).coerceIn(0, state.maxValue))
+    val direction = event.toolOutputScrollDirection() ?: return@onPreviewKeyEvent false
+    scrollTo((state.value + direction.delta).coerceIn(0, state.maxValue))
     true
 }
 
-private fun androidx.compose.ui.input.key.KeyEvent.toolOutputScrollDelta(): Int? {
+private fun androidx.compose.ui.input.key.KeyEvent.toolOutputScrollDirection(): ToolOutputScrollDirection? {
     if (type != KeyEventType.KeyDown) return null
     return when (key) {
-        Key.DirectionLeft -> -TOOL_OUTPUT_KEYBOARD_SCROLL_PX
-        Key.DirectionRight -> TOOL_OUTPUT_KEYBOARD_SCROLL_PX
+        Key.DirectionLeft -> ToolOutputScrollDirection.Left
+        Key.DirectionRight -> ToolOutputScrollDirection.Right
         else -> null
     }
 }
@@ -155,9 +156,9 @@ private fun ToolOutputLine(line: String, isError: Boolean) {
 }
 
 @Composable
-private fun ToolOutputTruncationLabel(visibleLineCount: Int, totalLineCount: Int) {
+private fun ToolOutputTruncationLabel(outputWindow: ToolOutputWindow) {
     Text(
-        text = "Showing $visibleLineCount of $totalLineCount lines · Copy includes all output",
+        text = outputWindow.truncationLabel,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -165,7 +166,17 @@ private fun ToolOutputTruncationLabel(visibleLineCount: Int, totalLineCount: Int
 }
 
 private const val TOOL_OUTPUT_VISIBLE_LINE_LIMIT = 40
-private const val TOOL_OUTPUT_KEYBOARD_SCROLL_PX = 64
+
+private data class ToolOutputWindow(val visibleLines: List<String>, val totalLineCount: Int) {
+    val isTruncated: Boolean get() = totalLineCount > visibleLines.size
+    val truncationLabel: String get() =
+        "Showing ${visibleLines.size} of $totalLineCount lines · Copy includes all output"
+}
+
+private enum class ToolOutputScrollDirection(val delta: Int) {
+    Left(-64),
+    Right(64),
+}
 
 /**
  * Renders a unified diff (Penpot "Diff review"): a line-numbered gutter (old |
