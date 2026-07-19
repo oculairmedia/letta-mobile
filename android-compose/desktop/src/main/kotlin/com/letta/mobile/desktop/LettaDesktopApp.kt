@@ -1016,6 +1016,13 @@ fun LettaDesktopApp(
             }
         }
     }
+    DesktopImageIngressEffect(
+        enabled = selectedDestination == DesktopDestination.Conversations,
+        scope = chatScope,
+        loader = imageAttachmentLoader,
+        onImage = chatController::attachImage,
+        onError = chatController::showComposerError,
+    )
 
     val avatar = rememberAvatarCompanion(chatScope, secureSettingsStore)
 
