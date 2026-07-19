@@ -28,7 +28,10 @@ object ScheduleAdminHandlers {
             val agentId = param(p, "agent_id")
             if (agentId != null) api.delete("agents", agentId, "schedule", scheduleId) else api.delete("schedules", scheduleId)
         }
-        router.register("job.list") { api.get("jobs") }
-        router.register("job.get") { p -> param(p, "job_id")?.let { api.get("jobs", it) } ?: adminError("job_id required") }
+        router.register("job.list") { api.get(AdminPath.v1("jobs")) }
+        router.register("job.get") { params ->
+            val jobId = params.requireParam("job_id")
+            api.get(AdminPath.v1("jobs", jobId))
+        }
     }
 }
