@@ -4,10 +4,10 @@ import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiSubagentNotification
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 internal fun extractSubagentDispatch(
     toolCallId: String?,
@@ -55,8 +55,11 @@ private fun String.transcriptUri(): String? =
 private fun parseJsonObject(raw: String): JsonObject? =
     runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
 
+private fun JsonObject.primitiveField(name: String): JsonPrimitive? =
+    this[name] as? JsonPrimitive
+
 private fun JsonObject.stringField(name: String): String? =
-    this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+    primitiveField(name)?.contentOrNull?.takeIf { it.isNotBlank() }
 
 private fun JsonObject.subagentDescription(): String =
     stringField("description")
@@ -67,8 +70,8 @@ private fun JsonObject.subagentType(): String =
     stringField("subagent_type") ?: stringField("subagentType") ?: "agent"
 
 private fun JsonObject.runInBackgroundFlag(): Boolean =
-    this["run_in_background"]?.jsonPrimitive?.booleanOrNull
-        ?: this["runInBackground"]?.jsonPrimitive?.booleanOrNull
+    primitiveField("run_in_background")?.booleanOrNull
+        ?: primitiveField("runInBackground")?.booleanOrNull
         ?: false
 
 private fun JsonObject.taskIdField(): String? =

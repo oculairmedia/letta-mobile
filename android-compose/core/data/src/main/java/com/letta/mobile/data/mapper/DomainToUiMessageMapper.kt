@@ -15,7 +15,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 internal val generatedUiToolNames = setOf(
     "render_summary_card",
@@ -218,17 +217,21 @@ private fun AppMessage.mapStandaloneToolCalls(): List<UiToolCall>? = when (messa
     else -> null
 }
 
-internal fun extractGeneratedUi(raw: kotlinx.serialization.json.JsonElement?): GeneratedUiPayload? {
-    val obj = raw as? JsonObject ?: return null
-    if (obj["type"]?.jsonPrimitive?.contentOrNull != "generated_ui") return null
-    val component = obj["component"]?.jsonPrimitive?.contentOrNull?.takeIf(String::isNotBlank) ?: return null
-    return GeneratedUiPayload(
-        component = component,
-        propsJson = obj["props"]?.toString() ?: buildJsonObject {}.toString(),
-        fallbackText = obj["text"]?.jsonPrimitive?.contentOrNull
-            ?: obj["fallback_text"]?.jsonPrimitive?.contentOrNull,
-    )
-}
+internal fun extractGeneratedUi(raw: kotlinx.serialization.json.JsonElement?): GeneratedUiPayload? =
+    runCatching {
+        val obj = raw as? JsonObject ?: return@runCatching null
+        if (obj.stringPrimitive("type") != "generated_ui") return@runCatching null
+        val component = obj.stringPrimitive("component")?.takeIf(String::isNotBlank)
+            ?: return@runCatching null
+        GeneratedUiPayload(
+            component = component,
+            propsJson = obj["props"]?.toString() ?: buildJsonObject {}.toString(),
+            fallbackText = obj.stringPrimitive("text") ?: obj.stringPrimitive("fallback_text"),
+        )
+    }.getOrNull()
+
+private fun JsonObject.stringPrimitive(name: String): String? =
+    (this[name] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
 
 internal fun extractGeneratedUiFromString(raw: String): GeneratedUiPayload? {
     if (raw.isBlank()) return null

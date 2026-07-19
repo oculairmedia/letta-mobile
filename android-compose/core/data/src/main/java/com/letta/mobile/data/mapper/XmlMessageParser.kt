@@ -11,7 +11,7 @@ internal fun String.taskNotificationBlock(): String? {
 internal fun String.xmlTag(name: String): String? {
     val content = Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
         .find(this)?.groupValues?.getOrNull(1) ?: return null
-    return content.removePrefix("<![CDATA[").removeSuffix("]]>")
+    return content.trim().removePrefix("<![CDATA[").removeSuffix("]]>")
         .decodeXmlEntities().trim().takeIf(String::isNotBlank)
 }
 
