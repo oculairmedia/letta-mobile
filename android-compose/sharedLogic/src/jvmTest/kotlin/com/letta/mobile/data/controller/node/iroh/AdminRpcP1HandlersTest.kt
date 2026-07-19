@@ -95,6 +95,30 @@ class AdminRpcP1HandlersTest {
     }
 
     @Test
+    fun `project handlers accept project_id alias and prefer identifier`() = runTest {
+        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+
+        router.dispatchResult("project.get", params("project_id" to "legacy-proj"))
+        router.dispatchResult(
+            "project.update",
+            params("identifier" to "canonical", "project_id" to "legacy-proj", "git_url" to "https://example.com/repo.git"),
+        )
+        router.dispatchResult(
+            "project.provisionBeadsRemote",
+            params("project_id" to "legacy-proj", "push" to "true"),
+        )
+
+        assertEquals(
+            listOf(
+                ProxyCall("GET", "http://admin.test/api/projects/legacy-proj", null),
+                ProxyCall("PATCH", "http://admin.test/api/registry/projects/canonical", "{\"git_url\":\"https://example.com/repo.git\"}"),
+                ProxyCall("POST", "http://admin.test/api/projects/legacy-proj/beads-remote/provision", "{\"push\":\"true\"}"),
+            ),
+            calls,
+        )
+    }
+
+    @Test
     fun `project handlers proxy existing api project endpoints`() = runTest {
         val router = AdminRpcRegistry.buildRouter("http://admin.test")
 

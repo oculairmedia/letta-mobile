@@ -22,6 +22,12 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
 
 internal fun param(params: JsonObject?, key: String): String? = params?.get(key)?.jsonPrimitive?.contentOrNull
 
+/** Prefer `identifier` when both alias keys are present (back-compat with legacy `project_id`). */
+internal fun projectIdentifierParam(params: JsonObject?): String? =
+    param(params, "identifier") ?: param(params, "project_id")
+
+internal const val PROJECT_IDENTIFIER_REQUIRED = "identifier or project_id required"
+
 internal fun passthroughBody(params: JsonObject?, vararg excludedKeys: String): String {
     if (params == null) return "{}"
     val excluded = excludedKeys.toSet()
