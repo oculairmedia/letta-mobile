@@ -86,8 +86,10 @@ class DesktopChatInteractionUiTest {
         }
 
         onNodeWithTag("tool-card-body").assertDoesNotExist()
+        onNodeWithTag("tool-failure-badge", useUnmergedTree = true).assertDoesNotExist()
         runOnIdle { tool = toolCall(status = "failed", result = "boom") }
         onNodeWithTag("tool-card-body").assertExists()
+        onNodeWithTag("tool-failure-badge", useUnmergedTree = true).assertExists()
     }
 
     @Test

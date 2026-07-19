@@ -44,11 +44,10 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.theme.customColors
 
 /**
  * Full, collapsible single-tool card matching the Penpot "Tool call (expanded)"
- * board: terminal glyph + name + green outlined success badge + copy/chevron,
+ * board: terminal glyph + name + failure badge when needed + copy/chevron,
  * the command, an inset output block, and an exit-code footer.
  */
 @Composable
@@ -119,7 +118,7 @@ private fun ToolCardHeader(
                 modifier = Modifier.weight(1f),
             )
         }
-        ToolStatusBadge(ToolStatusToken(toolCall.status ?: "tool call"))
+        ToolFailureBadge(ToolStatusToken(toolCall.status ?: "tool call"))
         if (expanded) Spacer(Modifier.weight(1f))
         CopyIconButton(
             text = toolCall.copyPayload(),
@@ -290,7 +289,7 @@ internal fun ArtifactCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                ToolStatusBadge(status)
+                ToolFailureBadge(status)
                 Spacer(Modifier.weight(1f))
             }
             content()
@@ -299,22 +298,14 @@ internal fun ArtifactCard(
 }
 
 /**
- * Outlined status badge for tool cards (Penpot: green-bordered "success",
- * red-bordered "error", muted otherwise).
+ * Tool cards are quiet on success; only failures need a persistent badge.
  */
 @Composable
-internal fun ToolStatusBadge(status: String) =
-    ToolStatusBadge(ToolStatusToken(status))
-
-@Composable
-internal fun ToolStatusBadge(status: ToolStatusToken) {
-    val color = when {
-        status.isSuccess() -> MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
-            ?: MaterialTheme.colorScheme.primary
-        status.isError() -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+internal fun ToolFailureBadge(status: ToolStatusToken) {
+    if (!status.isError()) return
+    val color = MaterialTheme.colorScheme.error
     Surface(
+        modifier = Modifier.testTag("tool-failure-badge"),
         shape = RoundedCornerShape(5.dp),
         color = Color.Transparent,
         contentColor = color,
