@@ -1,5 +1,6 @@
 package com.letta.mobile.util
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.WordSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.maps.shouldContain
@@ -33,6 +34,41 @@ class TelemetryTest : WordSpec({
                 Telemetry.clear()
                 Telemetry.enabled.set(wasEnabled)
                 Telemetry.logcatEnabled.set(wasLogcatEnabled)
+            }
+        }
+
+        "balance synchronous tracing when measurement succeeds" {
+            val previousDelegate = Telemetry.delegate
+            val delegate = RecordingTelemetryDelegate()
+
+            try {
+                Telemetry.delegate = delegate
+
+                val result = Telemetry.measure("Metrics", "success") { "result" }
+
+                result shouldBe "result"
+                delegate.traceCalls shouldBe listOf("begin:Metrics/success", "end")
+            } finally {
+                Telemetry.delegate = previousDelegate
+            }
+        }
+
+        "balance synchronous tracing and rethrow when measurement fails" {
+            val previousDelegate = Telemetry.delegate
+            val delegate = RecordingTelemetryDelegate()
+            val failure = IllegalStateException("boom")
+
+            try {
+                Telemetry.delegate = delegate
+
+                val thrown = shouldThrow<IllegalStateException> {
+                    Telemetry.measure("Metrics", "failure") { throw failure }
+                }
+
+                thrown shouldBe failure
+                delegate.traceCalls shouldBe listOf("begin:Metrics/failure", "end")
+            } finally {
+                Telemetry.delegate = previousDelegate
             }
         }
 
@@ -73,3 +109,25 @@ class TelemetryTest : WordSpec({
         }
     }
 })
+
+private class RecordingTelemetryDelegate : TelemetryDelegate {
+    val traceCalls = mutableListOf<String>()
+
+    override fun logToLogcat(level: Telemetry.Level, tag: String, body: String, throwable: Throwable?) = Unit
+
+    override fun isLoggable(tag: String, level: Int): Boolean = false
+
+    override fun isTraceEnabled(): Boolean = true
+
+    override fun beginSection(name: String) {
+        traceCalls += "begin:$name"
+    }
+
+    override fun endSection() {
+        traceCalls += "end"
+    }
+
+    override fun beginAsyncSection(name: String, cookie: Int) = Unit
+
+    override fun endAsyncSection(name: String, cookie: Int) = Unit
+}

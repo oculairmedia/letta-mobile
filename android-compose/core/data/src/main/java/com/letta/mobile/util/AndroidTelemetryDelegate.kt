@@ -1,5 +1,6 @@
 package com.letta.mobile.util
 
+import android.annotation.SuppressLint
 import android.util.Log
 import androidx.tracing.Trace
 
@@ -35,6 +36,7 @@ class AndroidTelemetryDelegate : TelemetryDelegate {
         }
     }
 
+    @SuppressLint("UnclosedTrace") // Telemetry.measure owns the matching endSection call.
     override fun beginSection(name: String) {
         try {
             Trace.beginSection(name)
