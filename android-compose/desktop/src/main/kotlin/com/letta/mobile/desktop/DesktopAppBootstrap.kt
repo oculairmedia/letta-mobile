@@ -118,50 +118,86 @@ internal fun DesktopControllerLifecycles(
     selectedConversationAgentId: String?,
     cronPanel: DesktopCronPanelState,
 ) {
-    LaunchedEffect(chatController) {
-        chatController.start()
+    ControllerLifecycleEffect(
+        controller = chatController,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    ControllerLifecycleEffect(
+        controller = libraries.memory,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    ControllerLifecycleEffect(
+        controller = libraries.schedules,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    ControllerLifecycleEffect(
+        controller = libraries.channels,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    ControllerLifecycleEffect(
+        controller = libraries.tools,
+        onStart = { start() },
+        onClose = { close() },
+    )
+    DestinationAgentSelectionEffect(
+        selectedDestination = selectedDestination,
+        targetDestination = DesktopDestination.Memory,
+        selectedConversationAgentId = selectedConversationAgentId,
+        onSelectAgent = libraries.memory::selectAgent,
+    )
+    DestinationAgentSelectionEffect(
+        selectedDestination = selectedDestination,
+        targetDestination = DesktopDestination.Schedules,
+        selectedConversationAgentId = selectedConversationAgentId,
+        onSelectAgent = libraries.schedules::selectAgent,
+    )
+    DestinationRefreshEffect(
+        selectedDestination = selectedDestination,
+        targetDestination = DesktopDestination.Schedules,
+        onRefresh = cronPanel::refresh,
+    )
+}
+
+@Composable
+private inline fun <T> ControllerLifecycleEffect(
+    controller: T,
+    crossinline onStart: suspend T.() -> Unit,
+    crossinline onClose: T.() -> Unit,
+) {
+    LaunchedEffect(controller) { controller.onStart() }
+    DisposableEffect(controller) {
+        onDispose { controller.onClose() }
     }
-    DisposableEffect(chatController) {
-        onDispose { chatController.close() }
-    }
-    LaunchedEffect(libraries.memory) {
-        libraries.memory.start()
-    }
-    LaunchedEffect(libraries.schedules) {
-        libraries.schedules.start()
-    }
-    LaunchedEffect(libraries.channels) {
-        libraries.channels.start()
-    }
-    LaunchedEffect(libraries.tools) {
-        libraries.tools.start()
-    }
-    LaunchedEffect(selectedDestination, selectedConversationAgentId, libraries.memory) {
-        if (selectedDestination == DesktopDestination.Memory) {
-            selectedConversationAgentId?.let(libraries.memory::selectAgent)
+}
+
+@Composable
+private fun DestinationAgentSelectionEffect(
+    selectedDestination: DesktopDestination,
+    targetDestination: DesktopDestination,
+    selectedConversationAgentId: String?,
+    onSelectAgent: (String) -> Unit,
+) {
+    LaunchedEffect(selectedDestination, selectedConversationAgentId) {
+        if (selectedDestination == targetDestination) {
+            selectedConversationAgentId?.let(onSelectAgent)
         }
     }
-    LaunchedEffect(selectedDestination, selectedConversationAgentId, libraries.schedules) {
-        if (selectedDestination == DesktopDestination.Schedules) {
-            selectedConversationAgentId?.let(libraries.schedules::selectAgent)
+}
+
+@Composable
+private fun DestinationRefreshEffect(
+    selectedDestination: DesktopDestination,
+    targetDestination: DesktopDestination,
+    onRefresh: suspend () -> Unit,
+) {
+    LaunchedEffect(selectedDestination) {
+        if (selectedDestination == targetDestination) {
+            onRefresh()
         }
-    }
-    LaunchedEffect(selectedDestination, cronPanel) {
-        if (selectedDestination == DesktopDestination.Schedules) {
-            cronPanel.refresh()
-        }
-    }
-    DisposableEffect(libraries.memory) {
-        onDispose { libraries.memory.close() }
-    }
-    DisposableEffect(libraries.schedules) {
-        onDispose { libraries.schedules.close() }
-    }
-    DisposableEffect(libraries.channels) {
-        onDispose { libraries.channels.close() }
-    }
-    DisposableEffect(libraries.tools) {
-        onDispose { libraries.tools.close() }
     }
 }
 
@@ -171,23 +207,28 @@ internal fun DesktopControllerLifecycles(
  */
 @Composable
 internal fun CommandPaletteKeyDispatcherEffect(onOpenPalette: () -> Unit) {
-    DisposableEffect(Unit) {
+    DisposableEffect(onOpenPalette) {
         val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
-        val dispatcher = java.awt.KeyEventDispatcher { event ->
-            if (event.id == java.awt.event.KeyEvent.KEY_PRESSED &&
-                event.keyCode == java.awt.event.KeyEvent.VK_K &&
-                (event.isControlDown || event.isMetaDown)
-            ) {
-                onOpenPalette()
-                true
-            } else {
-                false
-            }
-        }
+        val dispatcher = commandPaletteKeyDispatcher(onOpenPalette)
         focusManager.addKeyEventDispatcher(dispatcher)
         onDispose { focusManager.removeKeyEventDispatcher(dispatcher) }
     }
 }
+
+private fun commandPaletteKeyDispatcher(onOpenPalette: () -> Unit): java.awt.KeyEventDispatcher =
+    java.awt.KeyEventDispatcher { event ->
+        if (isCommandPaletteKey(event)) {
+            onOpenPalette()
+            true
+        } else {
+            false
+        }
+    }
+
+private fun isCommandPaletteKey(event: java.awt.event.KeyEvent): Boolean =
+    event.id == java.awt.event.KeyEvent.KEY_PRESSED &&
+        event.keyCode == java.awt.event.KeyEvent.VK_K &&
+        (event.isControlDown || event.isMetaDown)
 
 /** A cron creation request from the schedules surface. */
 internal data class CronDraft(
@@ -229,20 +270,22 @@ internal class DesktopCronPanelState(
     fun create(draft: CronDraft) {
         val api = cronApi ?: return
         scope.launch {
-            runCatching {
-                api.createCron(
-                    agentId = draft.agentId,
-                    name = draft.name,
-                    description = draft.name,
-                    prompt = draft.prompt,
-                    cron = draft.cron,
-                    timezone = draft.timezone,
-                    recurring = draft.recurring,
-                )
-            }
+            runCatching { api.createCronFromDraft(draft) }
             refresh()
         }
     }
+}
+
+private suspend fun CronApi.createCronFromDraft(draft: CronDraft) {
+    createCron(
+        agentId = draft.agentId,
+        name = draft.name,
+        description = draft.name,
+        prompt = draft.prompt,
+        cron = draft.cron,
+        timezone = draft.timezone,
+        recurring = draft.recurring,
+    )
 }
 
 /**
@@ -270,33 +313,46 @@ internal class DesktopSkillsPanelState(
         val api = skillApi ?: return
         loading = true
         error = null
-        runCatching {
-            all = api.listSkills()
-            installedNames = agentId?.let { api.listAgentSkills(it).map { s -> s.name }.toSet() }
-                ?: emptySet()
-        }.onFailure { error = it.message ?: "Could not load skills." }
+        runCatching { loadSkillsSnapshot(api, agentId) }
+            .onSuccess { (registry, installed) ->
+                all = registry
+                installedNames = installed
+            }
+            .onFailure { error = it.message ?: "Could not load skills." }
         loading = false
     }
 
     fun install(agentId: String?, name: String) {
-        val api = skillApi ?: return
-        val agent = agentId ?: return
-        scope.launch {
-            runCatching { api.installSkill(agent, name) }
-                .onFailure { error = it.message ?: "Could not install skill." }
-            reload(agent)
-        }
+        mutateSkill(agentId, name, "Could not install skill.") { api, agent -> api.installSkill(agent, name) }
     }
 
     fun uninstall(agentId: String?, name: String) {
+        mutateSkill(agentId, name, "Could not remove skill.") { api, agent -> api.uninstallSkill(agent, name) }
+    }
+
+    private fun mutateSkill(
+        agentId: String?,
+        name: String,
+        failureMessage: String,
+        action: suspend (SkillsApi, String) -> Unit,
+    ) {
         val api = skillApi ?: return
         val agent = agentId ?: return
         scope.launch {
-            runCatching { api.uninstallSkill(agent, name) }
-                .onFailure { error = it.message ?: "Could not remove skill." }
+            runCatching { action(api, agent) }
+                .onFailure { error = it.message ?: failureMessage }
             reload(agent)
         }
     }
+}
+
+private suspend fun loadSkillsSnapshot(
+    api: SkillsApi,
+    agentId: String?,
+): Pair<List<Skill>, Set<String>> {
+    val registry = api.listSkills()
+    val installed = agentId?.let { api.listAgentSkills(it).map { skill -> skill.name }.toSet() } ?: emptySet()
+    return registry to installed
 }
 
 /** The focused agent's server slash commands for the composer palette. */
