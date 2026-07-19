@@ -43,14 +43,18 @@ Use this as the working ledger when hunting architectural “logical fallacies.�
 
 ```text
 Platform hosts
-  :app ───────────────┐
-  :feature-chat ──────┤──► :designsystem ──► (:core:data declared; types from :sharedLogic)
-  :feature-editagent ─┤
-  :cli ───────────────┤──► :core:data ──► :core:domain ──► :sharedLogic
-                      │                                      │
-  :desktop ───────────┴──► :sharedLogic only ◄───────────────┘
-                                                      │
-                                         :core:runtime ◄── :core:ids
+  :app ─────────────────────────────┐
+  :feature-chat ──┬──► :designsystem ┤──► (:core:data declared on designsystem;
+  :feature-editagent┤               │     designsystem imports types from :sharedLogic)
+                  └──► :core:data ──┤──► :core:domain ──► :sharedLogic
+  :cli ─────────────────────────────┤                        │
+                                    │                        │
+  :desktop ─────────────────────────┴──► :sharedLogic only ◄─┘
+                                                              │
+                                                 :core:runtime ◄── :core:ids
+
+Note: :feature-chat and :feature-editagent each declare implementation(:core:data)
+directly (not only via :designsystem).
 ```
 
 **Quantitative snapshot (2026-07-18):**
@@ -190,10 +194,10 @@ Diagram:   [app] → [feature-chat|admin|home|settings]  ← false
 | --- | --- |
 | **Claim** | Windows desktop runs the same chat logic via `sharedLogic`. |
 | **Where claimed** | High-level KMP narrative; easy inference from module diagram. |
-| **Evidence** | `:desktop` depends on `:sharedLogic` only (not `:feature-chat`, `:designsystem`, `:core:data`). Uses shared reducers/policies/gateways/`ChatTimelineProjector`, but owns `DesktopChatController` + `RealDesktopTimelineLoop`. Does **not** use `ChatTimelinePresenter`, `ChatTimelineObserver`, Android send strategies, A2UI Compose renderer, approvals/subagent rings, project chat UX. |
+| **Evidence** | `:desktop` depends on `:sharedLogic` only (not `:feature-chat`, `:designsystem`, `:core:data`). Uses shared reducers/policies/gateways/`ChatTimelineProjector`, but owns `DesktopChatController` + `RealDesktopTimelineLoop`. Does **not** use `ChatTimelinePresenter`, `ChatTimelineObserver`, Android send strategies, A2UI Compose renderer, or project chat UX. Subagents **are** wired on desktop via shared `SubagentRepository` over a WS side-channel into `DesktopBackgroundTasksPanel`. Approval *cards* exist in the desktop timeline UI; interactive approval orchestration still diverges from Android’s coordinator ring. |
 | **Verdict** | **CONFIRMED FALLACY** if phrased as “same stack”; **INTENDED TENSION** if phrased as “shared substrate, platform surfaces” (see `windows-chat-ui-decision.md`). |
-| **Risk** | Android-only chat fixes never reach desktop; desktop “fixes” reinvent Android coordinators. |
-| **Correction** | Always say **shared substrate + divergent hosts**. Maintain a parity checklist (send routes, A2UI, approvals, project overlay, local runtime). |
+| **Risk** | Android-only chat fixes never reach desktop; desktop “fixes” reinvent Android coordinators — except where desktop already shares substrate (e.g. subagent registry). |
+| **Correction** | Always say **shared substrate + divergent hosts**. Maintain a parity checklist (send routes, A2UI, approvals, project overlay, local runtime, subagents). |
 
 #### Desktop ↔ Android chat parity checklist
 
@@ -206,7 +210,8 @@ Diagram:   [app] → [feature-chat|admin|home|settings]  ← false
 | Local runtime send | yes | demo/local path only | divergent |
 | A2UI surface UI | designsystem | missing | protocol only |
 | Project chat overlay | yes | missing | Android-only |
-| Approvals / subagents | yes | missing | Android-only |
+| Approvals (interactive orchestration) | feature-chat coordinators | timeline cards; hybrid path auto-allows | divergent UX |
+| Subagents | feature-chat rings + scoped repo | shared `SubagentRepository` + `DesktopBackgroundTasksPanel` | sharedLogic repo; host UI differs |
 
 ---
 
@@ -464,9 +469,12 @@ flowchart TD
   UI["ChatScreen / AgentScaffold"] --> VM["AdminChatViewModel"]
   VM --> COMP["AdminChatComposerCoordinator"]
   COMP --> SEL["ChatSendStrategySelector"]
-  SEL -->|local| LOC["LocalRuntimeChatSendCoordinator"]
-  SEL -->|shim/iroh| WS["WsChatSendCoordinator → ChatSendCoordinator"]
-  SEL -->|vanilla| TL["TimelineSendCoordinator"]
+  SEL -->|local| LS["LocalRuntimeChatSendStrategy"]
+  SEL -->|shim/iroh| WS_S["WsChatSendStrategy"]
+  SEL -->|vanilla| TS["TimelineChatSendStrategy"]
+  LS --> LOC["LocalRuntimeChatSendCoordinator"]
+  WS_S --> WS["WsChatSendCoordinator → ChatSendCoordinator"]
+  TS --> TL["TimelineSendCoordinator"]
   LOC --> TR["TimelineRepository"]
   WS --> TR
   TL --> TR
@@ -496,7 +504,7 @@ flowchart LR
 Ordered for leverage vs blast radius (not calendar estimates):
 
 1. **Doc hygiene (P0, low risk)** — Fix `android-compose/README.md` chat section; banner/rewrite `diagrams.md`; fix CLAUDE.md/`README` module tables (F03, F04, F10, F16, F19).  
-2. **Drop false Gradle edge** — Remove `:core:data` from `:designsystem` (F05).  
+2. **Drop false Gradle edge (gated on Q1)** — Only after confirming no designsystem consumer needs `:core:data` transitively via that edge, remove `:core:data` from `:designsystem` (F05). Until Q1 is closed, treat the unused import graph as evidence, not a green light to delete the dependency.  
 3. **Name the dual repo stacks** — Ownership table in `kmp-extraction-current-state.md` + decide migrate-vs-accept for agents/tools/schedules (F07).  
 4. **Desktop/Android chat parity checklist** — Make F06 checklist a required review artifact for chat PRs.  
 5. **Extract pure calculators from `:app`** — F14 list into `sharedLogic` + commonTest.  
@@ -510,7 +518,7 @@ Ordered for leverage vs blast radius (not calendar estimates):
 | Date | Pass | What was scrutinized | Result |
 | --- | --- | --- | --- |
 | 2026-07-18 | Initial master pass | F01–F20; Gradle settings; README; diagrams; chat send selector; designsystem imports; repo dual stack; desktop chat controller; sharedLogic source-set counts | All indexed findings opened with evidence |
-| | | | |
+| 2026-07-19 | Bugbot review pass | F06 parity row; executive map Gradle edges; remediation vs Q1; chat send diagram strategy layer | Patched: desktop subagents corrected; feature→core:data edges shown; F05 removal gated on Q1; strategy wrappers inserted in send diagram |
 
 ### Pass notes — 2026-07-18
 
@@ -521,13 +529,20 @@ Ordered for leverage vs blast radius (not calendar estimates):
 - Confirmed `diagrams.md` phantom feature/plugin modules.  
 - `bd` CLI was unavailable in the audit environment; tracking via this document + PR until beads can be synced.
 
+### Pass notes — 2026-07-19 (Bugbot)
+
+- Desktop already wires shared `SubagentRepository` + `DesktopBackgroundTasksPanel` — F06 must not list subagents as Android-only.  
+- `:feature-chat` / `:feature-editagent` declare `implementation(:core:data)` directly; executive map updated.  
+- Remediation step 2 explicitly gated on Q1 so it no longer conflicts with the open-questions table.  
+- Send diagram now includes `*ChatSendStrategy` between selector and coordinators.
+
 ---
 
 ## Open questions / needs more evidence
 
 | QID | Question | Why it matters |
 | --- | --- | --- |
-| Q1 | Do any designsystem **transitive** consumers require `:core:data` via designsystem’s Gradle edge? | Blocks safe removal in F05 |
+| Q1 | Do any designsystem **transitive** consumers require `:core:data` via designsystem’s Gradle edge? | **Gates remediation step 2 / F05** — do not remove the Gradle edge until this is answered |
 | Q2 | Is there an active plan/bead to migrate Android `AgentRepository` onto `LettaHttpAdminRepositories`? | Determines F07 remediation path |
 | Q3 | Which desktop admin surfaces are intentionally stubbed vs incomplete? | Avoid false “desktop parity” bugs |
 | Q4 | Should `A2uiDataModel` Compose state move off `commonMain` before iOS targets? | F08 endgame |
