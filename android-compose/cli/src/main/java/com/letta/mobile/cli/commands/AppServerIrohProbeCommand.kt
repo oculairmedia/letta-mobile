@@ -100,21 +100,26 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         val fixture = ProbeSessionFixture(options)
         val admin = ProbeAdminClient(adminBaseUrl)
         val turns = mutableListOf<IrohProbeTurnMetrics>()
+        val address = ProbeEndpointAddress(normalizedAddress)
+        fun targetFor(suffix: String = "") = ProbeTarget(
+            address = address,
+            conversationId = ProbeConversationId(
+                if (suffix.isEmpty()) probeConversationId else "$probeConversationId$suffix",
+            ),
+        )
 
         if ("no-http" in scenarioSet) {
-            turns += NoHttpProbeScenario(options, fixture, admin).run(normalizedAddress, "$probeConversationId-nohttp")
+            turns += NoHttpProbeScenario(options, fixture, admin).run(targetFor("-nohttp"))
         }
-        turns += LegacyProbeScenarios(options, fixture).run(scenarioSet, normalizedAddress, probeConversationId)
+        turns += LegacyProbeScenarios(options, fixture).run(scenarioSet, targetFor())
         if ("duplicate-send" in scenarioSet) {
-            turns += DuplicateSendProbeScenario(options, fixture).run(normalizedAddress, "$probeConversationId-dup")
+            turns += DuplicateSendProbeScenario(options, fixture).run(targetFor("-dup"))
         }
         if ("cancel-midstream" in scenarioSet) {
-            turns += CancelMidstreamProbeScenario(options, fixture, admin)
-                .run(normalizedAddress, "$probeConversationId-cancel")
+            turns += CancelMidstreamProbeScenario(options, fixture, admin).run(targetFor("-cancel"))
         }
         if ("hydrate-heavy" in scenarioSet) {
-            turns += HydrateHeavyProbeScenario(options, fixture, admin)
-                .run(normalizedAddress, "$probeConversationId-hydrate")
+            turns += HydrateHeavyProbeScenario(options, fixture, admin).run(targetFor("-hydrate"))
         }
 
         val summary = IrohProbeAssertions.summarize(turns)
