@@ -37,7 +37,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.Add
@@ -68,6 +69,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -337,38 +339,44 @@ private fun MessageListColumn(params: MessageListColumnParams) {
     val renderItems = params.renderItems
     val streamingMessageId = params.streamingMessageId
     val isSending = params.isSending
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 28.dp),
-        // Vertical breathing room as CONTENT padding, not a viewport inset, so
-        // the scroll area itself runs to the top/bottom edges. Content then
-        // clips exactly where the fade reaches full transparency — no faint
-        // line from content ending mid-gradient.
-        contentPadding = PaddingValues(vertical = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        item(key = "__today__") {
-            Text(
-                text = "Today",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
-                textAlign = TextAlign.Center,
-            )
-        }
-        items(
-            items = renderItems,
-            key = { it.key },
-        ) { item ->
-            MessageListItem(item = item, streamingMessageId = streamingMessageId)
-        }
-        if (isSending) {
-            item(key = "__thinking__") {
-                Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
-                    ThinkingMessageRow()
+    val selectionColors = TextSelectionColors(
+        handleColor = MaterialTheme.colorScheme.primary,
+        backgroundColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.32f),
+    )
+    CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 28.dp),
+            // Vertical breathing room as CONTENT padding, not a viewport inset, so
+            // the scroll area itself runs to the top/bottom edges. Content then
+            // clips exactly where the fade reaches full transparency — no faint
+            // line from content ending mid-gradient.
+            contentPadding = PaddingValues(vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            item(key = "__today__") {
+                Text(
+                    text = "Today",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            }
+            items(
+                items = renderItems,
+                key = { it.key },
+            ) { item ->
+                MessageListItem(item = item, streamingMessageId = streamingMessageId)
+            }
+            if (isSending) {
+                item(key = "__thinking__") {
+                    Box(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                        ThinkingMessageRow()
+                    }
                 }
             }
         }

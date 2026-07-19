@@ -8,7 +8,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -281,15 +283,37 @@ internal fun AgentText(params: AgentTextParams) {
     } else {
         params.text
     }
-    SelectionContainer {
-        com.letta.mobile.ui.markdown.SharedMarkdownText(
-            text = displayText,
-            textColor = if (params.isError) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hoverable(hoverInteraction),
+    ) {
+        SelectionContainer {
+            com.letta.mobile.ui.markdown.SharedMarkdownText(
+                text = displayText,
+                modifier = Modifier.padding(end = 32.dp),
+                textColor = if (params.isError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        }
+        if (isHovered) {
+            Surface(
+                modifier = Modifier.align(Alignment.TopEnd),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ) {
+                CopyIconButton(
+                    text = params.text,
+                    modifier = Modifier.padding(4.dp),
+                )
+            }
+        }
     }
 }
 
