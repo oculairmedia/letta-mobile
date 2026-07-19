@@ -281,7 +281,7 @@ fn render_to_svg(
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeRenderToSvg(
     env: JNIEnv,
-    _class: JClass,
+    class: JClass,
     source: JString,
     dark_theme: jboolean,
     text_argb: jint,
@@ -291,8 +291,8 @@ pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_n
     secondary_argb: jint,
     tertiary_argb: jint,
 ) -> jstring {
-    render_to_svg(
-        env, source, dark_theme, text_argb, border_argb, surface_argb,
+    Java_com_letta_mobile_desktop_markdown_DesktopMermaidNativeBridge_nativeRenderToSvg(
+        env, class, source, dark_theme, text_argb, border_argb, surface_argb,
         primary_argb, secondary_argb, tertiary_argb,
     )
 }
@@ -330,9 +330,9 @@ fn take_last_error(env: JNIEnv) -> jstring {
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_letta_mobile_ui_components_MermaidNativeBridge_nativeTakeLastError(
     env: JNIEnv,
-    _class: JClass,
+    class: JClass,
 ) -> jstring {
-    take_last_error(env)
+    Java_com_letta_mobile_desktop_markdown_DesktopMermaidNativeBridge_nativeTakeLastError(env, class)
 }
 
 #[unsafe(no_mangle)]

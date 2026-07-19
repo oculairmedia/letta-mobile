@@ -31,12 +31,27 @@ internal enum class CodeFenceRenderer {
     HighlightedCode,
 }
 
-internal fun selectCodeFenceRenderer(language: String, source: String): CodeFenceRenderer =
-    if (language.equals("mermaid", ignoreCase = true) && source.isNotBlank()) {
+internal fun selectCodeFenceRenderer(
+    language: String,
+    source: String,
+    deferIncompleteMermaid: Boolean = false,
+): CodeFenceRenderer =
+    if (shouldRenderMermaidDiagram(language, source, deferIncompleteMermaid)) {
         CodeFenceRenderer.MermaidDiagram
     } else {
         CodeFenceRenderer.HighlightedCode
     }
+
+private fun shouldRenderMermaidDiagram(
+    language: String,
+    source: String,
+    deferIncompleteMermaid: Boolean,
+): Boolean {
+    if (!language.equals("mermaid", ignoreCase = true)) return false
+    if (source.isBlank()) return false
+    if (deferIncompleteMermaid) return false
+    return true
+}
 
 /**
  * Common Android/Desktop Markdown paint adapter.
@@ -53,12 +68,13 @@ fun SharedMarkdownText(
 ) {
     if (text.isBlank()) return
     val repaired = remember(text) { repairIncompleteMarkdownForStreaming(text) }
+    val deferIncompleteMermaid = remember(text) { hasOpenMarkdownCodeFence(text) }
     val isDark = isSystemInDarkTheme()
     val highlights = remember(isDark) {
         Highlights.Builder().theme(SyntaxThemes.atom(darkMode = isDark))
     }
     val mermaidRenderer = LocalMermaidDiagramRenderer.current
-    val components = remember(highlights, mermaidRenderer) {
+    val components = remember(highlights, mermaidRenderer, deferIncompleteMermaid) {
         markdownComponents(
             codeBlock = {
                 MarkdownHighlightedCodeBlock(
@@ -69,7 +85,7 @@ fun SharedMarkdownText(
             },
             codeFence = {
                 val (language, source) = extractCodeFenceInfo(it.content, it.node)
-                when (selectCodeFenceRenderer(language, source)) {
+                when (selectCodeFenceRenderer(language, source, deferIncompleteMermaid)) {
                     CodeFenceRenderer.MermaidDiagram -> mermaidRenderer?.Render(
                         source = source,
                         modifier = Modifier.fillMaxWidth(),

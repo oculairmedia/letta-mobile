@@ -30,5 +30,13 @@ class SharedMarkdownMermaidDispatchTest {
             CodeFenceRenderer.HighlightedCode,
             selectCodeFenceRenderer(language = "", source = "plain code"),
         )
+        assertEquals(
+            CodeFenceRenderer.HighlightedCode,
+            selectCodeFenceRenderer(
+                language = "mermaid",
+                source = "flowchart LR\nA --> B",
+                deferIncompleteMermaid = true,
+            ),
+        )
     }
 }

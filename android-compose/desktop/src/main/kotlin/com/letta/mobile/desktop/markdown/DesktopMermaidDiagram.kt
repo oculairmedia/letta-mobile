@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -26,13 +27,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.markdown.MermaidDiagramRenderer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Data
+import org.jetbrains.skia.Rect
 import org.jetbrains.skia.svg.SVGDOM
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -79,7 +85,7 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                is DesktopMermaidRenderResult.Rendered -> MermaidSvg(current.svg)
+                is DesktopMermaidRenderResult.Rendered -> MermaidSvg(current.svg, source)
                 is DesktopMermaidRenderResult.Failed -> MermaidSourceFallback(source, current.reason)
             }
         }
@@ -103,25 +109,47 @@ private fun MermaidHeader(source: String) {
 }
 
 @Composable
-private fun MermaidSvg(svg: String) {
-    val dom = remember(svg) { runCatching { SVGDOM(Data.makeFromBytes(svg.encodeToByteArray())) }.getOrNull() }
-    if (dom == null) {
+private fun MermaidSvg(svg: String, source: String) {
+    val parsed = remember(svg) {
+        runCatching {
+            val data = Data.makeFromBytes(svg.encodeToByteArray())
+            MermaidSvgDom(data = data, dom = SVGDOM(data))
+        }.getOrNull()
+    }
+    DisposableEffect(parsed) {
+        onDispose { parsed?.close() }
+    }
+    if (parsed == null) {
         MermaidSourceFallback(svg, "Rendered SVG could not be decoded")
         return
     }
-    val viewBox = dom.root?.viewBox
-    val aspectRatio = if (viewBox != null && viewBox.width > 0f && viewBox.height > 0f) {
-        viewBox.width / viewBox.height
-    } else {
-        16f / 9f
-    }
+    val aspectRatio = mermaidAspectRatio(parsed.dom.root?.viewBox)
     Canvas(
-        modifier = Modifier.fillMaxWidth().height((360f / aspectRatio).coerceIn(180f, 480f).dp).padding(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height((360f / aspectRatio).coerceIn(180f, 480f).dp)
+            .padding(12.dp)
+            .semantics { contentDescription = "Mermaid diagram:\n$source" },
     ) {
-        dom.setContainerSize(size.width, size.height)
+        parsed.dom.setContainerSize(size.width, size.height)
         drawContext.canvas.nativeCanvas.save()
-        dom.render(drawContext.canvas.nativeCanvas)
+        parsed.dom.render(drawContext.canvas.nativeCanvas)
         drawContext.canvas.nativeCanvas.restore()
+    }
+}
+
+private fun mermaidAspectRatio(viewBox: Rect?): Float =
+    viewBox?.takeIf(::hasPositiveSize)?.let { it.width / it.height } ?: 16f / 9f
+
+private fun hasPositiveSize(viewBox: Rect): Boolean =
+    viewBox.width > 0f && viewBox.height > 0f
+
+private class MermaidSvgDom(
+    private val data: Data,
+    val dom: SVGDOM,
+) {
+    fun close() {
+        runCatching { data.close() }
     }
 }
 
@@ -164,6 +192,8 @@ private sealed interface DesktopMermaidRenderResult {
 }
 
 private object DesktopMermaidNativeBridge {
+    private val renderMutex = Mutex()
+
     private val available by lazy {
         runCatching {
             val libraryName = when {
@@ -181,25 +211,30 @@ private object DesktopMermaidNativeBridge {
         }.getOrDefault(false)
     }
 
-    fun renderToSvg(source: String, style: DesktopMermaidStyle): DesktopMermaidRenderResult {
+    suspend fun renderToSvg(source: String, style: DesktopMermaidStyle): DesktopMermaidRenderResult {
         if (!available) return DesktopMermaidRenderResult.Failed("Desktop Mermaid renderer is unavailable")
-        return runCatching {
-            val svg = nativeRenderToSvg(
-                source = source,
-                darkTheme = style.darkTheme,
-                textArgb = style.textArgb,
-                borderArgb = style.borderArgb,
-                surfaceArgb = style.surfaceArgb,
-                primaryArgb = style.primaryArgb,
-                secondaryArgb = style.secondaryArgb,
-                tertiaryArgb = style.tertiaryArgb,
-            )
-            if (svg.isNullOrBlank()) {
-                DesktopMermaidRenderResult.Failed(nativeTakeLastError().orEmpty().ifBlank { "Renderer returned no SVG" })
-            } else {
-                DesktopMermaidRenderResult.Rendered(svg)
-            }
-        }.getOrElse { DesktopMermaidRenderResult.Failed(it.message ?: it::class.java.simpleName) }
+        // Native LAST_ERROR is process-global; serialize renders across diagrams.
+        return renderMutex.withLock {
+            runCatching {
+                val svg = nativeRenderToSvg(
+                    source = source,
+                    darkTheme = style.darkTheme,
+                    textArgb = style.textArgb,
+                    borderArgb = style.borderArgb,
+                    surfaceArgb = style.surfaceArgb,
+                    primaryArgb = style.primaryArgb,
+                    secondaryArgb = style.secondaryArgb,
+                    tertiaryArgb = style.tertiaryArgb,
+                )
+                if (svg.isNullOrBlank()) {
+                    DesktopMermaidRenderResult.Failed(
+                        nativeTakeLastError().orEmpty().ifBlank { "Renderer returned no SVG" },
+                    )
+                } else {
+                    DesktopMermaidRenderResult.Rendered(svg)
+                }
+            }.getOrElse { DesktopMermaidRenderResult.Failed(it.message ?: it::class.java.simpleName) }
+        }
     }
 
     @JvmStatic
