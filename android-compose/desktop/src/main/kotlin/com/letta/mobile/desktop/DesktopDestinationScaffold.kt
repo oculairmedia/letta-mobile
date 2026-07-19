@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudQueue
 import androidx.compose.material.icons.outlined.Dashboard
@@ -114,41 +115,31 @@ internal fun DestinationContent(
     onUninstallSkill: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (destination == DesktopDestination.Memory) {
-        DesktopMemorySurface(
-            state = memoryState,
-            onRefresh = onMemoryRefresh,
-            onAgentSelected = onMemoryAgentSelected,
-            modifier = modifier,
+    when (destination) {
+        DesktopDestination.Memory -> MemoryDestinationContent(
+            memoryState = memoryState,
+            onMemoryRefresh = onMemoryRefresh,
+            onMemoryAgentSelected = onMemoryAgentSelected,
             blockApi = blockApi,
-            onBlockChanged = onMemoryRefresh,
-        )
-        return
-    }
-    if (destination == DesktopDestination.Schedules) {
-        DesktopScheduleSurface(
-            state = scheduleLibraryState,
-            onRefresh = onSchedulesRefresh,
-            onAgentSelected = onScheduleAgentSelected,
             modifier = modifier,
+        )
+        DesktopDestination.Schedules -> SchedulesDestinationContent(
+            scheduleLibraryState = scheduleLibraryState,
+            onSchedulesRefresh = onSchedulesRefresh,
+            onScheduleAgentSelected = onScheduleAgentSelected,
             crons = crons,
             focusedAgentId = focusedAgentId,
             onDeleteCron = onDeleteCron,
-            canCreate = canCreateCron,
+            canCreateCron = canCreateCron,
             onCreateCron = onCreateCron,
-        )
-        return
-    }
-    if (destination == DesktopDestination.Channels) {
-        DesktopChannelLibrarySurface(
-            state = channelLibraryState,
-            onRefresh = onChannelsRefresh,
             modifier = modifier,
         )
-        return
-    }
-    if (destination == DesktopDestination.Agents) {
-        DesktopSkillsSurface(
+        DesktopDestination.Channels -> ChannelsDestinationContent(
+            channelLibraryState = channelLibraryState,
+            onChannelsRefresh = onChannelsRefresh,
+            modifier = modifier,
+        )
+        DesktopDestination.Agents -> AgentsDestinationContent(
             skills = skills,
             installedSkillNames = installedSkillNames,
             skillsLoading = skillsLoading,
@@ -158,7 +149,7 @@ internal fun DestinationContent(
             onRefreshSkills = onRefreshSkills,
             onInstallSkill = onInstallSkill,
             onUninstallSkill = onUninstallSkill,
-            toolState = toolLibraryState,
+            toolLibraryState = toolLibraryState,
             onToolsRefresh = onToolsRefresh,
             onToolsSearchQueryChanged = onToolsSearchQueryChanged,
             onToolsTagToggled = onToolsTagToggled,
@@ -166,9 +157,119 @@ internal fun DestinationContent(
             onToolsLoadMore = onToolsLoadMore,
             modifier = modifier,
         )
-        return
+        else -> ScrollableDestinationContent(
+            destination = destination,
+            state = state,
+            onConfigSaved = onConfigSaved,
+            onTokenCleared = onTokenCleared,
+            modifier = modifier,
+        )
     }
+}
 
+@Composable
+private fun MemoryDestinationContent(
+    memoryState: DesktopMemorySurfaceState,
+    onMemoryRefresh: () -> Unit,
+    onMemoryAgentSelected: (String) -> Unit,
+    blockApi: DesktopBlockApi?,
+    modifier: Modifier = Modifier,
+) {
+    DesktopMemorySurface(
+        state = memoryState,
+        onRefresh = onMemoryRefresh,
+        onAgentSelected = onMemoryAgentSelected,
+        modifier = modifier,
+        blockApi = blockApi,
+        onBlockChanged = onMemoryRefresh,
+    )
+}
+
+@Composable
+private fun SchedulesDestinationContent(
+    scheduleLibraryState: DesktopScheduleLibraryState,
+    onSchedulesRefresh: () -> Unit,
+    onScheduleAgentSelected: (String) -> Unit,
+    crons: List<CronTask>,
+    focusedAgentId: String?,
+    onDeleteCron: (String) -> Unit,
+    canCreateCron: Boolean,
+    onCreateCron: (agentId: String?, name: String, prompt: String, cron: String, recurring: Boolean, timezone: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DesktopScheduleSurface(
+        state = scheduleLibraryState,
+        onRefresh = onSchedulesRefresh,
+        onAgentSelected = onScheduleAgentSelected,
+        modifier = modifier,
+        crons = crons,
+        focusedAgentId = focusedAgentId,
+        onDeleteCron = onDeleteCron,
+        canCreate = canCreateCron,
+        onCreateCron = onCreateCron,
+    )
+}
+
+@Composable
+private fun ChannelsDestinationContent(
+    channelLibraryState: DesktopChannelLibraryState,
+    onChannelsRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DesktopChannelLibrarySurface(
+        state = channelLibraryState,
+        onRefresh = onChannelsRefresh,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun AgentsDestinationContent(
+    skills: List<Skill>,
+    installedSkillNames: Set<String>,
+    skillsLoading: Boolean,
+    skillsError: String?,
+    canManageSkills: Boolean,
+    focusedAgentName: String?,
+    onRefreshSkills: () -> Unit,
+    onInstallSkill: (String) -> Unit,
+    onUninstallSkill: (String) -> Unit,
+    toolLibraryState: DesktopToolLibraryState,
+    onToolsRefresh: () -> Unit,
+    onToolsSearchQueryChanged: (String) -> Unit,
+    onToolsTagToggled: (String) -> Unit,
+    onToolsClearTags: () -> Unit,
+    onToolsLoadMore: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    DesktopSkillsSurface(
+        skills = skills,
+        installedSkillNames = installedSkillNames,
+        skillsLoading = skillsLoading,
+        skillsError = skillsError,
+        canManageSkills = canManageSkills,
+        focusedAgentName = focusedAgentName,
+        onRefreshSkills = onRefreshSkills,
+        onInstallSkill = onInstallSkill,
+        onUninstallSkill = onUninstallSkill,
+        toolState = toolLibraryState,
+        onToolsRefresh = onToolsRefresh,
+        onToolsSearchQueryChanged = onToolsSearchQueryChanged,
+        onToolsTagToggled = onToolsTagToggled,
+        onToolsClearTags = onToolsClearTags,
+        onToolsLoadMore = onToolsLoadMore,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ScrollableDestinationContent(
+    destination: DesktopDestination,
+    state: DesktopBootstrapState,
+    onConfigSaved: (LettaConfig) -> Unit,
+    onTokenCleared: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     LazyColumn(
         modifier = modifier
             .fillMaxHeight()
@@ -176,51 +277,53 @@ internal fun DestinationContent(
             .padding(horizontal = 32.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = destination.label,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = destination.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        item { DestinationHeader(destination) }
+        scrollableDestinationItems(
+            destination = destination,
+            state = state,
+            onConfigSaved = onConfigSaved,
+            onTokenCleared = onTokenCleared,
+        )
+    }
+}
 
-        when (destination) {
-            DesktopDestination.Overview -> {
-                item { BackendCard(state.config) }
-                item { StartupReadinessCard(state.featureReadiness) }
-            }
-            DesktopDestination.Agents -> {
-                // Rendered by the full-height branch above.
-            }
-            DesktopDestination.Memory -> {
-                // Rendered by the full-height branch above.
-            }
-            DesktopDestination.Schedules -> {
-                // Rendered by the full-height branch above.
-            }
-            DesktopDestination.Channels -> {
-                // Rendered by the full-height branch above.
-            }
-            DesktopDestination.Conversations -> {
-                // Rendered by the full-height branch above.
-            }
-            DesktopDestination.Settings -> {
-                item {
-                    BackendSettingsCard(
-                        config = state.config,
-                        onConfigSaved = onConfigSaved,
-                        onTokenCleared = onTokenCleared,
-                    )
-                }
+@Composable
+private fun DestinationHeader(destination: DesktopDestination) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = destination.label,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = destination.summary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun LazyListScope.scrollableDestinationItems(
+    destination: DesktopDestination,
+    state: DesktopBootstrapState,
+    onConfigSaved: (LettaConfig) -> Unit,
+    onTokenCleared: () -> Unit,
+) {
+    when (destination) {
+        DesktopDestination.Overview -> {
+            item { BackendCard(state.config) }
+            item { StartupReadinessCard(state.featureReadiness) }
+        }
+        DesktopDestination.Settings -> {
+            item {
+                BackendSettingsCard(
+                    config = state.config,
+                    onConfigSaved = onConfigSaved,
+                    onTokenCleared = onTokenCleared,
+                )
             }
         }
+        else -> Unit
     }
 }
 
