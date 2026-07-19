@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
@@ -92,6 +93,28 @@ class AdminRpcP1HandlersTest {
             calls,
         )
         assertTrue(result.jsonObject.containsKey("ok"))
+    }
+
+    @Test
+    fun `project handlers reject missing identifier without proxying`() = runTest {
+        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val methods = listOf(
+            "project.get",
+            "project.beadsRemoteStatus",
+            "project.provisionBeadsRemote",
+            "project.update",
+            "project.archive",
+            "project.delete",
+        )
+
+        methods.forEach { method ->
+            val response = router.dispatch("test-request", method, buildJsonObject {})
+                .let { kotlinx.serialization.json.Json.parseToJsonElement(it).jsonObject }
+
+            assertEquals("false", response.getValue("success").jsonPrimitive.content, method)
+            assertEquals(PROJECT_IDENTIFIER_REQUIRED, response.getValue("error").jsonPrimitive.content, method)
+        }
+        assertTrue(calls.isEmpty())
     }
 
     @Test
