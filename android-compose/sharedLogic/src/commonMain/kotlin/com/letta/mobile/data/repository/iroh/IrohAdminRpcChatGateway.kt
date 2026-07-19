@@ -46,17 +46,6 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
 
 /**
- * One `admin_rpc` invocation: the registry method plus the HTTP-equivalent
- * path (and optional JSON body) the server-side handler expects — the same
- * conventions the Android IrohAdminRpc*Source classes use.
- */
-private data class AdminRpcCall(
-    val method: String,
-    val path: String,
-    val body: String? = null,
-)
-
-/**
  * [ChatGateway] served entirely over an Iroh [IChannelTransport] — no HTTP.
  *
  * Reads (conversation/message/model listing) go over `admin_rpc`, mirroring

@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.ProjectSyncTriggerRequest
 import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.iroh.AdminRpcCall
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -18,13 +19,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-
-/** One admin_rpc invocation: registry method, HTTP-equivalent path, optional JSON body. */
-private data class AdminRpcCall(
-    val method: String,
-    val path: String,
-    val body: String? = null,
-)
 
 /**
  * Projects over the Iroh admin_rpc control channel.
