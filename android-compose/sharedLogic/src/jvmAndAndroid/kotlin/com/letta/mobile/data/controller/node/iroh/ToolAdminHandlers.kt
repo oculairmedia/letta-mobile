@@ -32,25 +32,37 @@ object ToolAdminHandlers {
             val toolId = p.requireParam("tool_id")
             api.patch("agents", agentId, "tools", "detach", toolId, body = "{}")
         }
-        router.register("block.list") { api.get("blocks") }
-        router.register("block.get") { p -> param(p, "block_id")?.let { api.get("blocks", it) } ?: adminError("block_id required") }
-        router.register("block.create") { p -> api.post("blocks", body = p?.toString() ?: "{}") }
-        router.register("block.update") { p -> param(p, "block_id")?.let { api.patch("blocks", it, body = p.toString()) } ?: adminError("block_id required") }
-        router.register("block.delete") { p -> param(p, "block_id")?.let { api.delete("blocks", it) } ?: adminError("block_id required") }
+        router.register("block.list") { api.get(AdminPath.v1("blocks")) }
+        router.register("block.get") { p ->
+            val blockId = p.requireParam("block_id")
+            api.get(AdminPath.v1("blocks", blockId))
+        }
+        router.register("block.create") { p -> api.post(AdminPath.v1("blocks"), body = p?.toString() ?: "{}") }
+        router.register("block.update") { p ->
+            val blockId = p.requireParam("block_id")
+            api.patch(AdminPath.v1("blocks", blockId), body = p.toString())
+        }
+        router.register("block.delete") { p ->
+            val blockId = p.requireParam("block_id")
+            api.delete(AdminPath.v1("blocks", blockId))
+        }
         router.register("block.attach") { p ->
             val agentId = p.requireParam("agent_id")
             val blockId = p.requireParam("block_id")
-            api.patch("agents", agentId, "core-memory", "blocks", "attach", blockId, body = "{}")
+            api.patch(AdminPath.v1("agents", agentId, "core-memory", "blocks", "attach", blockId), body = "{}")
         }
         router.register("block.detach") { p ->
             val agentId = p.requireParam("agent_id")
             val blockId = p.requireParam("block_id")
-            api.patch("agents", agentId, "core-memory", "blocks", "detach", blockId, body = "{}")
+            api.patch(AdminPath.v1("agents", agentId, "core-memory", "blocks", "detach", blockId), body = "{}")
         }
         router.register("block.update_agent") { p ->
             val agentId = p.requireParam("agent_id")
             val label = p.requireParam("label")
-            api.patch("agents", agentId, "core-memory", "blocks", label, body = passthroughBody(p, "agent_id", "label"))
+            api.patch(
+                AdminPath.v1("agents", agentId, "core-memory", "blocks", label),
+                body = passthroughBody(p, "agent_id", "label"),
+            )
         }
     }
 }
