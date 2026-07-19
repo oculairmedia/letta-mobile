@@ -174,8 +174,14 @@ internal fun DesktopSkillEnvelopeChip(item: ChatRenderItem.SkillEnvelopeChip) {
     }
 }
 
+@JvmInline
+internal value class StreamingMessageId(val value: String)
+
 @Composable
-internal fun DesktopRunBlock(item: ChatRenderItem.RunBlock, streamingMessageId: String? = null) {
+internal fun DesktopRunBlock(
+    item: ChatRenderItem.RunBlock,
+    streamingMessageId: StreamingMessageId? = null,
+) {
     val messages = item.messages.map { it.first }
     val reasoning = messages.filter { it.isReasoning && it.content.isNotBlank() }
     val toolCalls = messages.flatMap { it.toolCalls.orEmpty() }
@@ -187,7 +193,15 @@ internal fun DesktopRunBlock(item: ChatRenderItem.RunBlock, streamingMessageId: 
         if (toolCalls.isNotEmpty()) {
             RunStepsCard(toolCalls)
         }
-        narration.forEach { AgentText(it.content, it.isError, isStreaming = it.id == streamingMessageId) }
+        narration.forEach { message ->
+            AgentText(
+                AgentTextParams(
+                    text = message.content,
+                    isError = message.isError,
+                    isStreaming = streamingMessageId?.value == message.id,
+                ),
+            )
+        }
         messages.forEach { message ->
             message.generatedUi?.let { GeneratedUiCard(it) }
             message.approvalRequest?.let { ApprovalRequestCard(it) }
@@ -211,20 +225,39 @@ internal fun UiToolCall.stepState(): StepState = when (status?.lowercase()) {
 
 /** "Ran ./gradlew …" / "Read Foo.kt" — a friendly verb + short target. */
 internal fun UiToolCall.stepLabel(): String {
-    val n = name.lowercase()
-    val verb = when {
-        listOf("bash", "shell", "command", "exec", "run", "terminal").any { n.contains(it) } -> "Ran"
-        listOf("read", "cat", "view", "open").any { n.contains(it) } -> "Read"
-        listOf("write", "create").any { n.contains(it) } -> "Wrote"
-        listOf("edit", "replace", "apply", "patch").any { n.contains(it) } -> "Edited"
-        listOf("search", "grep", "glob", "find", "list").any { n.contains(it) } -> "Searched"
-        listOf("fetch", "http", "web", "curl", "request").any { n.contains(it) } -> "Fetched"
+    val verb = toolStepVerb(name)
+    val target = truncateToolTarget(primaryToolArgument(arguments))
+    return when {
+        verb != null && target.isNotBlank() -> "$verb  $target"
+        verb != null -> verb
+        else -> name
+    }
+}
+
+private fun toolStepVerb(toolName: String): String? {
+    val n = toolName.lowercase()
+    return when {
+        TOOL_VERB_RAN.any { n.contains(it) } -> "Ran"
+        TOOL_VERB_READ.any { n.contains(it) } -> "Read"
+        TOOL_VERB_WROTE.any { n.contains(it) } -> "Wrote"
+        TOOL_VERB_EDITED.any { n.contains(it) } -> "Edited"
+        TOOL_VERB_SEARCHED.any { n.contains(it) } -> "Searched"
+        TOOL_VERB_FETCHED.any { n.contains(it) } -> "Fetched"
         else -> null
     }
-    val target = primaryToolArgument(arguments).lineSequence().firstOrNull()?.trim().orEmpty()
-        .let { if (it.length > 52) it.take(52) + "…" else it }
-    return if (verb != null && target.isNotBlank()) "$verb  $target" else if (verb != null) verb else name
 }
+
+private fun truncateToolTarget(raw: String, maxLen: Int = 52): String {
+    val target = raw.lineSequence().firstOrNull()?.trim().orEmpty()
+    return if (target.length > maxLen) target.take(maxLen) + "…" else target
+}
+
+private val TOOL_VERB_RAN = listOf("bash", "shell", "command", "exec", "run", "terminal")
+private val TOOL_VERB_READ = listOf("read", "cat", "view", "open")
+private val TOOL_VERB_WROTE = listOf("write", "create")
+private val TOOL_VERB_EDITED = listOf("edit", "replace", "apply", "patch")
+private val TOOL_VERB_SEARCHED = listOf("search", "grep", "glob", "find", "list")
+private val TOOL_VERB_FETCHED = listOf("fetch", "http", "web", "curl", "request")
 
 /** Right-aligned step summary (result first line / duration). */
 internal fun UiToolCall.stepSummary(): String {
@@ -410,9 +443,20 @@ internal fun StepStatusCircle(state: StepState) {
     }
 }
 
+internal data class ToolOutputBlockParams(
+    val text: String,
+    val isError: Boolean = false,
+)
+
 /** Inset output block (monospace) with light per-line colorization. */
 @Composable
-internal fun ToolOutputBlock(text: String, isError: Boolean = false) {
+internal fun ToolOutputBlock(text: String, isError: Boolean = false) =
+    ToolOutputBlock(ToolOutputBlockParams(text = text, isError = isError))
+
+@Composable
+internal fun ToolOutputBlock(params: ToolOutputBlockParams) {
+    val text = params.text
+    val isError = params.isError
     // Unified diffs (file-edit tool output) render as a reviewable diff block
     // (Penpot "Diff review") rather than plain monospace lines.
     if (!isError && UnifiedDiff.looksLikeDiff(text)) {

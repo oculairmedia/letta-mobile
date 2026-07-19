@@ -281,7 +281,7 @@ fun LettaDesktopApp(
             libraries = libraries,
             selection = DesktopDestinationSelection(
                 selectedDestination = selectedDestination,
-                selectedConversationAgentId = chatState.selectedConversation?.agentId,
+                selectedConversationAgentId = chatState.selectedConversation?.agentId?.let(::DesktopAgentId),
             ),
             cronPanel = cronPanel,
         ),
@@ -402,12 +402,15 @@ fun LettaDesktopApp(
     // Skills page is open (or the focused agent changes).
     LaunchedEffect(selectedDestination, skillsPanel, selectedAgentId) {
         if (selectedDestination == DesktopDestination.Agents) {
-            skillsPanel.reload(selectedAgentId)
+            skillsPanel.reload(selectedAgentId?.let(::DesktopAgentId))
         }
     }
     // Load the focused agent's server slash commands for the composer palette.
     LaunchedEffect(httpApis.slashCommandApi, selectedAgentId) {
-        agentSlashCommands = loadAgentSlashCommands(httpApis.slashCommandApi, selectedAgentId)
+        agentSlashCommands = loadAgentSlashCommands(
+            httpApis.slashCommandApi,
+            selectedAgentId?.let(::DesktopAgentId),
+        )
     }
 
     DesktopMaterialTheme {
@@ -497,11 +500,13 @@ fun LettaDesktopApp(
                         )
                     } else if (selectedDestination == DesktopDestination.Conversations) {
                         val composerCommands = buildComposerCommands(
-                            chatController = chatController,
-                            agentSlashCommands = agentSlashCommands,
-                            onCreateAgent = { showNewAgentDialog = true },
-                            onEditAgent = { editAgentId = selectedAgentId },
-                            onNavigate = { selectedDestination = it },
+                            BuildComposerCommandsParams(
+                                chatController = chatController,
+                                agentSlashCommands = agentSlashCommands,
+                                onCreateAgent = { showNewAgentDialog = true },
+                                onEditAgent = { editAgentId = selectedAgentId },
+                                onNavigate = { selectedDestination = it },
+                            ),
                         )
                         ChatDetailPane(
                             state = ChatDetailPaneState(
@@ -576,7 +581,7 @@ fun LettaDesktopApp(
                                         if (scheduleLibraryState.schedules.any { it.id == id }) {
                                             libraries.schedules.deleteSchedule(id)
                                         } else {
-                                            cronPanel.delete(id)
+                                            cronPanel.delete(DesktopCronTaskId(id))
                                         }
                                     },
                                     onCreateCron = { filteredAgentId, name, prompt, cron, recurring, tz ->
@@ -616,13 +621,21 @@ fun LettaDesktopApp(
                                 ),
                                 skills = DestinationSkillsActions(
                                     onRefresh = {
-                                        chatScope.launch { skillsPanel.reload(selectedAgentId) }
+                                        chatScope.launch {
+                                            skillsPanel.reload(selectedAgentId?.let(::DesktopAgentId))
+                                        }
                                     },
                                     onInstall = { name ->
-                                        skillsPanel.install(selectedAgentId, name)
+                                        skillsPanel.install(
+                                            selectedAgentId?.let(::DesktopAgentId),
+                                            DesktopSkillName(name),
+                                        )
                                     },
                                     onUninstall = { name ->
-                                        skillsPanel.uninstall(selectedAgentId, name)
+                                        skillsPanel.uninstall(
+                                            selectedAgentId?.let(::DesktopAgentId),
+                                            DesktopSkillName(name),
+                                        )
                                     },
                                 ),
                                 onConfigSaved = { applyConfig(it) },

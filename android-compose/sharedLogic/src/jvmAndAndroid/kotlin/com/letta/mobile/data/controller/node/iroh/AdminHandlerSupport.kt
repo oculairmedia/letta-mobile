@@ -49,8 +49,6 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
 
     fun get(request: AdminProxyRequest): JsonElement = proxy.get(request)
 
-    fun get(vararg segments: String): JsonElement = get(AdminPath.v1(*segments))
-
     fun post(
         path: AdminPath,
         body: AdminJsonBody,
@@ -63,8 +61,6 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
     fun post(request: AdminProxyRequest, body: AdminJsonBody): JsonElement = proxy.post(request, body.value)
 
     fun post(request: AdminProxyRequest, body: String): JsonElement = post(request, AdminJsonBody(body))
-
-    fun post(vararg segments: String, body: String): JsonElement = post(AdminPath.v1(*segments), body)
 
     fun put(
         path: AdminPath,
@@ -79,8 +75,6 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
 
     fun put(request: AdminProxyRequest, body: String): JsonElement = put(request, AdminJsonBody(body))
 
-    fun put(vararg segments: String, body: String): JsonElement = put(AdminPath.v1(*segments), body)
-
     fun patch(
         path: AdminPath,
         body: AdminJsonBody,
@@ -94,14 +88,10 @@ internal class AdminHandlerSupport(val proxy: AdminProxyClient) {
 
     fun patch(request: AdminProxyRequest, body: String): JsonElement = patch(request, AdminJsonBody(body))
 
-    fun patch(vararg segments: String, body: String): JsonElement = patch(AdminPath.v1(*segments), body)
-
     fun delete(path: AdminPath, configure: AdminProxyRequest.Builder.() -> Unit = {}): JsonElement =
         delete(path.builder().apply(configure).build())
 
     fun delete(request: AdminProxyRequest): JsonElement = proxy.delete(request)
-
-    fun delete(vararg segments: String): JsonElement = delete(AdminPath.v1(*segments))
 }
 
 internal fun param(params: JsonObject?, key: AdminParamKey): String? =
@@ -122,7 +112,7 @@ internal fun JsonObject?.requireParam(key: String, message: String): String =
 
 /** Prefer `identifier` when both alias keys are present (back-compat with legacy `project_id`). */
 internal fun projectIdentifierParam(params: JsonObject?): String? =
-    param(params, "identifier") ?: param(params, "project_id")
+    param(params, AdminParamKey("identifier")) ?: param(params, AdminParamKey("project_id"))
 
 internal const val PROJECT_IDENTIFIER_REQUIRED = "identifier or project_id required"
 

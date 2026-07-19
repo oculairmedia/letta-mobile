@@ -274,37 +274,50 @@ private fun AgentRailOrb(params: AgentRailOrbParams) {
     val flags = params.toFlags()
     val target = params.toTarget(flags)
     DesktopTooltip(text = target.tooltip) {
-        Box(
-            modifier = Modifier.size(width = 46.dp, height = 40.dp),
-            contentAlignment = Alignment.Center,
+        AgentRailOrbContent(
+            params = params,
+            flags = flags,
+            target = target,
+        )
+    }
+}
+
+@Composable
+private fun AgentRailOrbContent(
+    params: AgentRailOrbParams,
+    flags: AgentRailOrbFlags,
+    target: AgentRailOrbTarget,
+) {
+    Box(
+        modifier = Modifier.size(width = 46.dp, height = 40.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (flags.selected) {
+            SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
+        }
+        if (flags.thinking) {
+            // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
+            // and sized to fit the 40dp slot so it doesn't crowd
+            // neighbouring orbs.
+            ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
+        }
+        AgentOrb(
+            index = target.orbStyle,
+            size = 36.dp,
+            onClick = { params.onAgentSelected(target.agentId) },
         ) {
-            if (flags.selected) {
-                SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
-            }
-            if (flags.thinking) {
-                // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
-                // and sized to fit the 40dp slot so it doesn't crowd
-                // neighbouring orbs.
-                ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
-            }
-            AgentOrb(
-                index = target.orbStyle,
-                size = 36.dp,
-                onClick = { params.onAgentSelected(target.agentId) },
-            ) {
-                Text(
-                    text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                )
-            }
-            if (flags.count > 1) {
-                AgentCountChip(
-                    count = flags.count,
-                    modifier = Modifier.align(Alignment.TopEnd),
-                )
-            }
+            Text(
+                text = params.group.name.firstOrNull()?.uppercase() ?: "?",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+            )
+        }
+        if (flags.count > 1) {
+            AgentCountChip(
+                count = flags.count,
+                modifier = Modifier.align(Alignment.TopEnd),
+            )
         }
     }
 }

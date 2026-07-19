@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
+import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
@@ -315,15 +316,7 @@ class AgentListViewModelTest {
     @Test
     fun `importAgent forwards safety flags and returns imported ids`() = runTest {
         coEvery {
-            agentRepository.importAgent(
-                match {
-                    it.fileName == "agent.json" &&
-                        it.overrideName == "Cloned Agent" &&
-                        it.overrideExistingTools == false &&
-                        it.projectId == null &&
-                        it.stripMessages == true
-                },
-            )
+            agentRepository.importAgent(match { it.matchesImportSafetyFlags() })
         } returns ImportedAgentsResponse(agentIds = listOf("a2"))
 
         var importedIds: List<String> = emptyList()
@@ -337,17 +330,16 @@ class AgentListViewModelTest {
 
         assertEquals(listOf("a2"), importedIds)
         coVerify(exactly = 1) {
-            agentRepository.importAgent(
-                match {
-                    it.fileName == "agent.json" &&
-                        it.overrideName == "Cloned Agent" &&
-                        it.overrideExistingTools == false &&
-                        it.projectId == null &&
-                        it.stripMessages == true
-                },
-            )
+            agentRepository.importAgent(match { it.matchesImportSafetyFlags() })
         }
     }
+
+    private fun AgentImportParams.matchesImportSafetyFlags(): Boolean =
+        fileName == "agent.json" &&
+            overrideName == "Cloned Agent" &&
+            overrideExistingTools == false &&
+            projectId == null &&
+            stripMessages == true
 
     @Test
     fun `getAllTags returns sorted distinct tags from all agents`() = runTest {

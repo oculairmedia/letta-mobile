@@ -174,7 +174,7 @@ internal fun MessageList(
     // stream — unlike [isSending]/"thinking", which clears at the first token).
     // Everything else is settled history.
     val streamingMessageId = if (params.isStreamingReply) {
-        renderItems.lastOrNull()?.streamingCandidateMessageId()
+        renderItems.lastOrNull()?.streamingCandidateMessageId()?.let(::StreamingMessageId)
     } else {
         null
     }
@@ -327,7 +327,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
 private data class MessageListColumnParams(
     val listState: LazyListState,
     val renderItems: List<ChatRenderItem>,
-    val streamingMessageId: String?,
+    val streamingMessageId: StreamingMessageId?,
     val isSending: Boolean,
 )
 
@@ -378,7 +378,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
 @Composable
 private fun MessageListItem(
     item: ChatRenderItem,
-    streamingMessageId: String?,
+    streamingMessageId: StreamingMessageId?,
 ) {
     Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
         // Message text is selectable (SelectionContainer), which is the

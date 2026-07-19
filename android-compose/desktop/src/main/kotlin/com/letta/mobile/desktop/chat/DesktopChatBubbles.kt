@@ -149,7 +149,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
 @Composable
-internal fun DesktopMessageBubble(message: UiMessage, streamingMessageId: String? = null) {
+internal fun DesktopMessageBubble(
+    message: UiMessage,
+    streamingMessageId: StreamingMessageId? = null,
+) {
     if (message.role == "user") {
         UserPrompt(message)
         return
@@ -159,7 +162,13 @@ internal fun DesktopMessageBubble(message: UiMessage, streamingMessageId: String
         if (message.isReasoning && message.content.isNotBlank()) {
             ReasoningRow(message.content)
         } else if (message.content.isNotBlank()) {
-            AgentText(message.content, message.isError, isStreaming = message.id == streamingMessageId)
+            AgentText(
+                AgentTextParams(
+                    text = message.content,
+                    isError = message.isError,
+                    isStreaming = streamingMessageId?.value == message.id,
+                ),
+            )
         }
         DesktopImageAttachmentsGrid(
             attachments = message.attachments,
@@ -320,22 +329,36 @@ internal fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this)
 }
 
 /** Plain agent narration text, full width (no bubble), per the detailed board. */
+internal data class AgentTextParams(
+    val text: String,
+    val isError: Boolean,
+    val isStreaming: Boolean = false,
+)
+
 @Composable
-internal fun AgentText(text: String, isError: Boolean, isStreaming: Boolean = false) {
+internal fun AgentText(text: String, isError: Boolean, isStreaming: Boolean = false) =
+    AgentText(AgentTextParams(text = text, isError = isError, isStreaming = isStreaming))
+
+@Composable
+internal fun AgentText(params: AgentTextParams) {
     // While the agent's reply is still landing, reveal the latest assistant
     // message progressively via the shared smoother (the same hook Android
     // uses) instead of snapping in each raw chunk. Settled history renders the
     // full text directly. The smoother continues revealing the buffered tail at
     // its own cadence even after [isStreaming] flips back to false, so the reply
     // still finishes smoothly once the in-flight signal clears.
-    val displayText = if (isStreaming) {
-        rememberSmoothedStreamingText(rawText = text, isStreaming = true)
+    val displayText = if (params.isStreaming) {
+        rememberSmoothedStreamingText(rawText = params.text, isStreaming = true)
     } else {
-        text
+        params.text
     }
     com.letta.mobile.ui.markdown.SharedMarkdownText(
         text = displayText,
-        textColor = if (isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+        textColor = if (params.isError) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        },
     )
 }
 

@@ -10,6 +10,7 @@ import java.awt.Component
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
 import java.awt.event.KeyEvent
 import kotlinx.coroutines.CoroutineScope
 
@@ -35,24 +36,42 @@ private fun DesktopClipboardImagePasteEffect(config: DesktopImageIngressConfig) 
     DisposableEffect(config.enabled, config.loader) {
         if (!config.enabled) return@DisposableEffect onDispose { }
         val manager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
-        val dispatcher = java.awt.KeyEventDispatcher { event ->
-            if (event.id != KeyEvent.KEY_PRESSED || event.keyCode != KeyEvent.VK_V || !event.isShortcutPaste()) {
-                return@KeyEventDispatcher false
-            }
-            val transferable = runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull()
-                ?: return@KeyEventDispatcher false
-            val sink = DesktopImageIngressSink(currentScope, config.loader, currentOnImage, currentOnError)
-            when {
-                transferable.isDataFlavorSupported(DataFlavor.imageFlavor) ->
-                    handleClipboardImagePaste(transferable, sink)
-                transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ->
-                    handleClipboardImageFilePaste(transferable, sink)
-                else -> false
-            }
-        }
+        val dispatcher = clipboardImagePasteDispatcher(
+            sinkProvider = {
+                DesktopImageIngressSink(currentScope, config.loader, currentOnImage, currentOnError)
+            },
+        )
         manager.addKeyEventDispatcher(dispatcher)
         onDispose { manager.removeKeyEventDispatcher(dispatcher) }
     }
+}
+
+private fun clipboardImagePasteDispatcher(
+    sinkProvider: () -> DesktopImageIngressSink,
+): java.awt.KeyEventDispatcher =
+    java.awt.KeyEventDispatcher { event ->
+        if (!isClipboardPasteShortcut(event)) return@KeyEventDispatcher false
+        val transferable = clipboardTransferable() ?: return@KeyEventDispatcher false
+        dispatchClipboardImagePaste(transferable, sinkProvider())
+    }
+
+private fun isClipboardPasteShortcut(event: KeyEvent): Boolean =
+    event.id == KeyEvent.KEY_PRESSED &&
+        event.keyCode == KeyEvent.VK_V &&
+        event.isShortcutPaste()
+
+private fun clipboardTransferable(): Transferable? =
+    runCatching { Toolkit.getDefaultToolkit().systemClipboard.getContents(null) }.getOrNull()
+
+private fun dispatchClipboardImagePaste(
+    transferable: Transferable,
+    sink: DesktopImageIngressSink,
+): Boolean = when {
+    transferable.isDataFlavorSupported(DataFlavor.imageFlavor) ->
+        handleClipboardImagePaste(transferable, sink)
+    transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) ->
+        handleClipboardImageFilePaste(transferable, sink)
+    else -> false
 }
 
 @Composable

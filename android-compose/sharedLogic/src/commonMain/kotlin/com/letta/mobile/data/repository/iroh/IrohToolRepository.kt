@@ -22,6 +22,10 @@ class IrohToolRepository(
     override fun getTools(): StateFlow<List<Tool>> = toolsFlow
 
     override fun getAgentTools(agentId: String): Flow<List<Tool>> =
+        agentScopedTools(AgentId(agentId))
+
+    /** Agent-scoped tool listing is not yet exposed over admin_rpc. */
+    private fun agentScopedTools(@Suppress("UNUSED_PARAMETER") agentId: AgentId): Flow<List<Tool>> =
         flowOf(emptyList())
 
     override suspend fun countTools(): Int {
@@ -45,7 +49,7 @@ class IrohToolRepository(
     }
 
     override suspend fun fetchToolsPage(limit: Int, offset: Int): List<Tool> =
-        fetchToolsPage(directory(), ToolPageRequest(limit, offset))
+        fetchToolsPage(directory(), ToolPageRequest(ToolPageLimit(limit), ToolPageOffset(offset)))
 
     override suspend fun attachTool(agentId: String, toolId: String) {
         setToolAttachment(ToolAttachmentRequest(AgentId(agentId), ToolId(toolId), attached = true))
@@ -72,7 +76,7 @@ class IrohToolRepository(
             val newTools = page.filterNot { candidate -> paging.merged.any { it.id == candidate.id } }
             if (newTools.isEmpty()) break
             paging.merged += newTools
-            if (page.size < PAGE_SIZE) break
+            if (page.size < PAGE_SIZE.value) break
             paging.advanceBy(page.size)
         }
         return paging.merged
@@ -81,7 +85,7 @@ class IrohToolRepository(
     private suspend fun fetchToolsPage(
         directory: IrohAdminRpcAgentDirectory,
         request: ToolPageRequest,
-    ): List<Tool> = directory.listTools(request.limit, request.offset)
+    ): List<Tool> = directory.listTools(request.limit.value, request.offset.value)
 
     private suspend fun setToolAttachment(request: ToolAttachmentRequest) {
         directory().setToolAttached(request.agentId.value, request.toolId.value, request.attached)
@@ -106,16 +110,16 @@ class IrohToolRepository(
     private fun directory(): IrohAdminRpcAgentDirectory =
         directoryProvider() ?: error("Iroh admin RPC directory is unavailable for tools")
 
-    private data class ToolPageRequest(val limit: Int, val offset: Int)
+    private data class ToolPageRequest(val limit: ToolPageLimit, val offset: ToolPageOffset)
 
     private data class ToolPagingState(
         val merged: MutableList<Tool> = mutableListOf(),
-        var offset: Int = 0,
+        var offset: ToolPageOffset = ToolPageOffset(0),
     ) {
         fun nextRequest(): ToolPageRequest = ToolPageRequest(PAGE_SIZE, offset)
 
         fun advanceBy(count: Int) {
-            offset += count
+            offset = ToolPageOffset(offset.value + count)
         }
     }
 
@@ -128,8 +132,14 @@ class IrohToolRepository(
     @JvmInline
     private value class CacheMaxAgeMs(val value: Long)
 
+    @JvmInline
+    private value class ToolPageLimit(val value: Int)
+
+    @JvmInline
+    private value class ToolPageOffset(val value: Int)
+
     private companion object {
-        const val PAGE_SIZE = 100
+        val PAGE_SIZE = ToolPageLimit(100)
         const val DEFAULT_REFRESH_MAX_AGE_MS = 30_000L
     }
 }

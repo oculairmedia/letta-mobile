@@ -20,14 +20,16 @@ data class AgentImportParams(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
-        other as AgentImportParams
-        return fileName == other.fileName &&
+        return sameImportFields(other as AgentImportParams)
+    }
+
+    private fun sameImportFields(other: AgentImportParams): Boolean =
+        fileName == other.fileName &&
             fileBytes.contentEquals(other.fileBytes) &&
             overrideName == other.overrideName &&
             overrideExistingTools == other.overrideExistingTools &&
             projectId == other.projectId &&
             stripMessages == other.stripMessages
-    }
 
     override fun hashCode(): Int {
         var result = fileName.hashCode()

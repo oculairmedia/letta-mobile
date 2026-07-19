@@ -2,36 +2,18 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatComposerError
-import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
-import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
-import com.letta.mobile.data.chat.runtime.ChatSessionReducer
-import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
-import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
-import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
-import com.letta.mobile.data.model.AgentCreateParams
-import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransport
-import com.letta.mobile.ui.chat.render.ChatTimelineProjector
-import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.desktop.DesktopBootstrapState
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 
 internal fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."
@@ -55,7 +37,7 @@ internal class RealDesktopTimelineLoop(
 
     private val delegate = TimelineSyncLoop(
         messageApi = routing.transport,
-        conversationId = routing.loopConversationId,
+        conversationId = routing.loopConversationId.value,
         scope = scope,
         logTag = "DesktopChat",
     )
@@ -76,19 +58,23 @@ internal class RealDesktopTimelineLoop(
     }
 }
 
+internal data class DefaultShimTransportIds(
+    val agentId: AgentId,
+    val externalConversationId: ConversationId,
+)
+
 internal class DefaultShimDesktopTimelineTransport(
     private val gateway: DesktopChatGateway,
-    private val agentId: String,
-    private val externalConversationId: String,
+    private val ids: DefaultShimTransportIds,
 ) : TimelineTransport {
     override suspend fun sendConversationMessage(
         conversationId: String,
         request: MessageCreateRequest,
     ): Flow<LettaMessage> =
-        gateway.sendConversationMessage(externalConversationId, request)
+        gateway.sendConversationMessage(ids.externalConversationId.value, request)
 
     override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-        gateway.streamConversation(externalConversationId)
+        gateway.streamConversation(ids.externalConversationId.value)
 
     override suspend fun listConversationMessages(
         conversationId: String,
@@ -98,7 +84,7 @@ internal class DefaultShimDesktopTimelineTransport(
     ): List<LettaMessage> =
         // Default-shim conversations hydrate from the agent message stream
         // (there is no real conversation id on the backend yet).
-        listViaGateway(limit = limit, order = order, conversationId = null)
+        listViaGateway(GatewayListParams(limit = limit, order = order, conversationId = null))
 
     override suspend fun listAgentMessages(
         agentId: String,
@@ -106,18 +92,20 @@ internal class DefaultShimDesktopTimelineTransport(
         order: String?,
         conversationId: String?,
     ): List<LettaMessage> =
-        listViaGateway(limit = limit, order = order, conversationId = conversationId)
+        listViaGateway(GatewayListParams(limit = limit, order = order, conversationId = conversationId))
 
-    private suspend fun listViaGateway(
-        limit: Int?,
-        order: String?,
-        conversationId: String?,
-    ): List<LettaMessage> =
+    private data class GatewayListParams(
+        val limit: Int?,
+        val order: String?,
+        val conversationId: String?,
+    )
+
+    private suspend fun listViaGateway(params: GatewayListParams): List<LettaMessage> =
         gateway.listAgentMessages(
-            agentId = agentId,
-            limit = limit,
-            order = order,
-            conversationId = conversationId,
+            agentId = ids.agentId.value,
+            limit = params.limit,
+            order = params.order,
+            conversationId = params.conversationId,
         )
 }
 
@@ -126,27 +114,29 @@ internal fun String.isDefaultShimConversationId(): Boolean =
 
 private data class DesktopTimelineRouting(
     val transport: TimelineTransport,
-    val loopConversationId: String,
+    val loopConversationId: ConversationId,
 )
 
 private fun resolveDesktopTimelineRouting(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
 ): DesktopTimelineRouting {
-    val conversationId = conversation.id
-    val agentId = conversation.agentId
-    val usesDefaultShim = conversationId.isDefaultShimConversationId() && agentId != null
+    val conversationId = ConversationId(conversation.id)
+    val agentId = conversation.agentId?.let(::AgentId)
+    val usesDefaultShim = conversationId.value.isDefaultShimConversationId() && agentId != null
     val transport: TimelineTransport = if (usesDefaultShim) {
         DefaultShimDesktopTimelineTransport(
             gateway = gateway,
-            agentId = agentId!!,
-            externalConversationId = conversationId,
+            ids = DefaultShimTransportIds(
+                agentId = agentId!!,
+                externalConversationId = conversationId,
+            ),
         )
     } else {
         gateway
     }
     val loopConversationId = if (usesDefaultShim) {
-        "desktop-default-shim-$agentId-$conversationId"
+        ConversationId("desktop-default-shim-${agentId!!.value}-${conversationId.value}")
     } else {
         conversationId
     }

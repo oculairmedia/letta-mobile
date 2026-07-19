@@ -125,14 +125,48 @@ internal suspend fun resolveDesktopAgentModels(
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
     IrohChannelTransport(activeConfigProvider = { desktopIrohConnectConfig(config) })
 
+private data class DesktopConnectParams(
+    val baseShimUrl: String,
+    val token: String,
+    val deviceId: String,
+    val clientVersion: String,
+)
+
+private suspend fun connectWithParams(
+    connect: suspend (String, String, String, String) -> Unit,
+    params: DesktopConnectParams,
+) {
+    connect(params.baseShimUrl, params.token, params.deviceId, params.clientVersion)
+}
+
 private suspend fun connectIrohTransport(transport: IrohChannelTransport, config: LettaConfig) {
     val connectConfig = desktopIrohConnectConfig(config)
-    transport.connect(
-        baseShimUrl = connectConfig.baseShimUrl,
-        token = connectConfig.token,
-        deviceId = connectConfig.deviceId,
-        clientVersion = connectConfig.clientVersion,
+    connectWithParams(
+        connect = transport::connect,
+        params = DesktopConnectParams(
+            baseShimUrl = connectConfig.baseShimUrl,
+            token = connectConfig.token,
+            deviceId = connectConfig.deviceId,
+            clientVersion = connectConfig.clientVersion,
+        ),
     )
+}
+
+@Composable
+private fun <T> DesktopTransportLifecycleEffect(
+    transport: T?,
+    activeConfig: LettaConfig,
+    chatScope: CoroutineScope,
+    onConnect: suspend (T, LettaConfig) -> Unit,
+    onDisposeTransport: (T) -> Unit,
+) {
+    DisposableEffect(transport, activeConfig) {
+        val active = transport
+        if (active != null) {
+            chatScope.launch { runCatching { onConnect(active, activeConfig) } }
+        }
+        onDispose { active?.let(onDisposeTransport) }
+    }
 }
 
 @Composable
@@ -143,15 +177,13 @@ internal fun rememberIrohTransport(
     val irohTransport = remember(activeConfig) {
         activeConfig.takeIf { IrohChannelTransport.isIrohUrl(it.serverUrl) }?.let(::createIrohTransport)
     }
-    DisposableEffect(irohTransport, activeConfig) {
-        val transport = irohTransport
-        if (transport != null) {
-            chatScope.launch { runCatching { connectIrohTransport(transport, activeConfig) } }
-        }
-        onDispose {
-            transport?.let { t -> chatScope.launch { runCatching { t.disconnect() } } }
-        }
-    }
+    DesktopTransportLifecycleEffect(
+        transport = irohTransport,
+        activeConfig = activeConfig,
+        chatScope = chatScope,
+        onConnect = ::connectIrohTransport,
+        onDisposeTransport = { t -> chatScope.launch { runCatching { t.disconnect() } } },
+    )
     return irohTransport
 }
 
@@ -298,11 +330,14 @@ private fun createSubagentTransport(
 private suspend fun connectSubagentTransport(transport: DesktopWsChannelTransport, config: LettaConfig) {
     // WS side-channel keeps the shorter clientVersion label used historically
     // for mobile-shim subagent registry dials (distinct from iroh's label).
-    transport.connect(
-        baseShimUrl = config.serverUrl,
-        token = config.accessToken.orEmpty(),
-        deviceId = DESKTOP_DEVICE_ID,
-        clientVersion = DESKTOP_DEVICE_ID,
+    connectWithParams(
+        connect = transport::connect,
+        params = DesktopConnectParams(
+            baseShimUrl = config.serverUrl,
+            token = config.accessToken.orEmpty(),
+            deviceId = DESKTOP_DEVICE_ID,
+            clientVersion = DESKTOP_DEVICE_ID,
+        ),
     )
 }
 
@@ -318,12 +353,13 @@ internal fun rememberSubagentRegistry(
     val subagentRepository = remember(subagentTransport) {
         subagentTransport?.let { SubagentRepository(it, includeAll = true) }
     }
-    DisposableEffect(subagentTransport, activeConfig) {
-        subagentTransport?.let { transport ->
-            chatScope.launch { runCatching { connectSubagentTransport(transport, activeConfig) } }
-        }
-        onDispose { subagentTransport?.close() }
-    }
+    DesktopTransportLifecycleEffect(
+        transport = subagentTransport,
+        activeConfig = activeConfig,
+        chatScope = chatScope,
+        onConnect = ::connectSubagentTransport,
+        onDisposeTransport = { it.close() },
+    )
     val activeSubagents = produceState(emptyList<SubagentEntry>(), subagentRepository) {
         subagentRepository?.activeSubagentsFlow()?.collect { value = it } ?: run { value = emptyList() }
     }

@@ -45,17 +45,7 @@ internal fun SidebarConversationRow(
     val interactionSource = remember { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
     var confirmDelete by remember { mutableStateOf(false) }
-    val container = if (model.selected) {
-        MaterialTheme.colorScheme.surfaceContainer
-    } else {
-        Color.Transparent
-    }
-    val pulseAlpha = conversationPulseAlpha(thinking = model.thinking)
-    val iconColor = conversationIconColor(
-        thinking = model.thinking,
-        selected = model.selected,
-        pulseAlpha = pulseAlpha,
-    )
+    val appearance = sidebarConversationAppearance(model)
     // Right-click anywhere on the row for the archive/restore + delete actions.
     ContextMenuArea(
         items = {
@@ -67,49 +57,14 @@ internal fun SidebarConversationRow(
             )
         },
     ) {
-        Surface(
-            onClick = actions.onClick,
-            enabled = !model.deleting,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.small,
-            color = container,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            // Drives both the click ripple (now clipped to the rounded shape) and the
-            // `hovered` state below, so no separate .hoverable is needed.
+        SidebarConversationRowSurface(
+            model = model,
+            appearance = appearance,
+            hovered = hovered,
             interactionSource = interactionSource,
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SidebarConversationLeadingIcon(
-                    model = SidebarConversationLeadingIconModel(
-                        deleting = model.deleting,
-                        hovered = hovered,
-                        archived = model.archived,
-                        thinking = model.thinking,
-                        iconColor = iconColor,
-                    ),
-                    onArchiveToggle = actions.onArchiveToggle,
-                )
-                Text(
-                    text = model.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = conversationTitleColor(deleting = model.deleting),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    text = if (model.deleting) "Deleting…" else model.timeLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-        }
+            onClick = actions.onClick,
+            onArchiveToggle = actions.onArchiveToggle,
+        )
     }
 
     if (confirmDelete) {
@@ -125,6 +80,84 @@ internal fun SidebarConversationRow(
             },
             onDismiss = { confirmDelete = false },
         )
+    }
+}
+
+private data class SidebarConversationAppearance(
+    val container: Color,
+    val pulseAlpha: Float,
+    val iconColor: Color,
+)
+
+@Composable
+private fun sidebarConversationAppearance(model: SidebarConversationRowModel): SidebarConversationAppearance {
+    val pulseAlpha = conversationPulseAlpha(thinking = model.thinking)
+    return SidebarConversationAppearance(
+        container = if (model.selected) {
+            MaterialTheme.colorScheme.surfaceContainer
+        } else {
+            Color.Transparent
+        },
+        pulseAlpha = pulseAlpha,
+        iconColor = conversationIconColor(
+            thinking = model.thinking,
+            selected = model.selected,
+            pulseAlpha = pulseAlpha,
+        ),
+    )
+}
+
+@Composable
+private fun SidebarConversationRowSurface(
+    model: SidebarConversationRowModel,
+    appearance: SidebarConversationAppearance,
+    hovered: Boolean,
+    interactionSource: MutableInteractionSource,
+    onClick: () -> Unit,
+    onArchiveToggle: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = !model.deleting,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small,
+        color = appearance.container,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        // Drives both the click ripple (now clipped to the rounded shape) and the
+        // `hovered` state below, so no separate .hoverable is needed.
+        interactionSource = interactionSource,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SidebarConversationLeadingIcon(
+                model = SidebarConversationLeadingIconModel(
+                    deleting = model.deleting,
+                    hovered = hovered,
+                    archived = model.archived,
+                    thinking = model.thinking,
+                    iconColor = appearance.iconColor,
+                ),
+                onArchiveToggle = onArchiveToggle,
+            )
+            Text(
+                text = model.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (model.selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = conversationTitleColor(deleting = model.deleting),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = if (model.deleting) "Deleting…" else model.timeLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
 }
 

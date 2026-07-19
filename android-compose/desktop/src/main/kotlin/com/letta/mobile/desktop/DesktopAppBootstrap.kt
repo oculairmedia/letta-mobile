@@ -108,7 +108,7 @@ internal fun rememberDesktopLibraryControllers(
 
 internal data class DesktopDestinationSelection(
     val selectedDestination: DesktopDestination,
-    val selectedConversationAgentId: String?,
+    val selectedConversationAgentId: DesktopAgentId?,
 )
 
 internal data class DesktopControllerLifecycleParams(
@@ -204,7 +204,7 @@ private fun DestinationAgentSelectionEffect(params: DestinationAgentSelectionPar
     val selection = params.selection
     LaunchedEffect(selection.selectedDestination, selection.selectedConversationAgentId) {
         if (selection.selectedDestination == params.targetDestination) {
-            selection.selectedConversationAgentId?.let(params.onSelectAgent)
+            selection.selectedConversationAgentId?.value?.let(params.onSelectAgent)
         }
     }
 }
@@ -271,6 +271,10 @@ internal data class CronDraft(
     val timezone: String,
 )
 
+/** Typed cron task id for panel delete actions. */
+@JvmInline
+internal value class DesktopCronTaskId(val value: String)
+
 /**
  * Snapshot-backed state + actions for the cron panel. Every mutation reloads
  * the list from the API so the panel reflects the server's view; all actions
@@ -290,10 +294,10 @@ internal class DesktopCronPanelState(
         crons = runCatching { api.listCrons() }.getOrDefault(emptyList())
     }
 
-    fun delete(id: String) {
+    fun delete(id: DesktopCronTaskId) {
         val api = cronApi ?: return
         scope.launch {
-            runCatching { api.deleteCron(id) }
+            runCatching { api.deleteCron(id.value) }
             refresh()
         }
     }
@@ -340,7 +344,7 @@ internal class DesktopSkillsPanelState(
     val available: Boolean get() = skillApi != null
 
     /** Load the registry + [agentId]'s installed skills (null agent -> none). */
-    suspend fun reload(agentId: String?) {
+    suspend fun reload(agentId: DesktopAgentId?) {
         val api = skillApi ?: return
         loading = true
         error = null
@@ -353,45 +357,57 @@ internal class DesktopSkillsPanelState(
         loading = false
     }
 
-    fun install(agentId: String?, name: String) {
-        mutateSkill(agentId, name, "Could not install skill.") { api, agent -> api.installSkill(agent, name) }
+    fun install(agentId: DesktopAgentId?, name: DesktopSkillName) {
+        mutateSkill(
+            SkillMutationParams(agentId, name, "Could not install skill.") { api, agent, skill ->
+                api.installSkill(agent.value, skill.value)
+            },
+        )
     }
 
-    fun uninstall(agentId: String?, name: String) {
-        mutateSkill(agentId, name, "Could not remove skill.") { api, agent -> api.uninstallSkill(agent, name) }
+    fun uninstall(agentId: DesktopAgentId?, name: DesktopSkillName) {
+        mutateSkill(
+            SkillMutationParams(agentId, name, "Could not remove skill.") { api, agent, skill ->
+                api.uninstallSkill(agent.value, skill.value)
+            },
+        )
     }
 
-    private fun mutateSkill(
-        agentId: String?,
-        name: String,
-        failureMessage: String,
-        action: suspend (SkillsApi, String) -> Unit,
-    ) {
+    private fun mutateSkill(params: SkillMutationParams) {
         val api = skillApi ?: return
-        val agent = agentId ?: return
+        val agent = params.agentId ?: return
         scope.launch {
-            runCatching { action(api, agent) }
-                .onFailure { error = it.message ?: failureMessage }
+            runCatching { params.action(api, agent, params.name) }
+                .onFailure { error = it.message ?: params.failureMessage }
             reload(agent)
         }
     }
 }
 
+private data class SkillMutationParams(
+    val agentId: DesktopAgentId?,
+    val name: DesktopSkillName,
+    val failureMessage: String,
+    val action: suspend (SkillsApi, DesktopAgentId, DesktopSkillName) -> Unit,
+)
+
 private suspend fun loadSkillsSnapshot(
     api: SkillsApi,
-    agentId: String?,
+    agentId: DesktopAgentId?,
 ): Pair<List<Skill>, Set<String>> {
     val registry = api.listSkills()
-    val installed = agentId?.let { api.listAgentSkills(it).map { skill -> skill.name }.toSet() } ?: emptySet()
+    val installed = agentId?.let { id ->
+        api.listAgentSkills(id.value).map { skill -> skill.name }.toSet()
+    } ?: emptySet()
     return registry to installed
 }
 
 /** The focused agent's server slash commands for the composer palette. */
 internal suspend fun loadAgentSlashCommands(
     api: SlashCommandsApi?,
-    agentId: String?,
+    agentId: DesktopAgentId?,
 ): List<AgentSlashCommand> = if (api != null && agentId != null) {
-    runCatching { api.listAgentSlashCommands(agentId) }.getOrDefault(emptyList())
+    runCatching { api.listAgentSlashCommands(agentId.value) }.getOrDefault(emptyList())
 } else {
     emptyList()
 }

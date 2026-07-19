@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.DialogWindowScope
 import androidx.compose.ui.window.rememberDialogState
 
 /**
@@ -47,7 +48,6 @@ internal fun DesktopConfirmDialog(
         undecorated = true,
         resizable = false,
     ) {
-        val windowScope = this
         DesktopMaterialTheme {
             Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -55,68 +55,98 @@ internal fun DesktopConfirmDialog(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Custom dark title bar — the native OS chrome is hidden.
-                    with(windowScope) {
-                        WindowDraggableArea(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(38.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = request.title,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f).padding(start = 16.dp),
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .size(width = 46.dp, height = 38.dp)
-                                        .clickable(onClick = onDismiss),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Close,
-                                        contentDescription = "Close",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(15.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    ConfirmDialogTitleBar(
+                        windowScope = this@DialogWindow,
+                        title = request.title,
+                        onDismiss = onDismiss,
                     )
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(22.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        Text(
-                            request.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                        ) {
-                            DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
-                            DesktopDefaultButton(onClick = onConfirm) {
-                                DesktopButtonContent(request.confirmLabel)
-                            }
-                        }
-                    }
+                    ConfirmDialogDivider()
+                    ConfirmDialogBody(
+                        request = request,
+                        onConfirm = onConfirm,
+                        onDismiss = onDismiss,
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfirmDialogTitleBar(
+    windowScope: DialogWindowScope,
+    title: String,
+    onDismiss: () -> Unit,
+) {
+    with(windowScope) {
+        WindowDraggableArea(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(38.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 16.dp),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(width = 46.dp, height = 38.dp)
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = "Close",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfirmDialogDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+@Composable
+private fun ConfirmDialogBody(
+    request: ConfirmDialogRequest,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(22.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            request.message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+        ) {
+            DesktopOutlinedButton(onClick = onDismiss) { DesktopButtonContent("Cancel") }
+            DesktopDefaultButton(onClick = onConfirm) {
+                DesktopButtonContent(request.confirmLabel)
             }
         }
     }

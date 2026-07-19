@@ -237,6 +237,13 @@ internal fun rememberAvatarCompanion(
     )
 }
 
+internal data class AvatarPresenceParams(
+    val avatar: DesktopAvatarCompanionHandle,
+    val isStreamingReplySelected: Boolean,
+    val thinkingConversationId: String?,
+    val errorMessage: String?,
+)
+
 /** Agent presence -> avatar companion behavior. */
 @Composable
 internal fun AvatarPresenceEffects(
@@ -245,19 +252,32 @@ internal fun AvatarPresenceEffects(
     thinkingConversationId: String?,
     errorMessage: String?,
 ) {
-    LaunchedEffect(isStreamingReplySelected, thinkingConversationId, avatar.state) {
+    AvatarPresenceEffects(
+        AvatarPresenceParams(
+            avatar = avatar,
+            isStreamingReplySelected = isStreamingReplySelected,
+            thinkingConversationId = thinkingConversationId,
+            errorMessage = errorMessage,
+        ),
+    )
+}
+
+@Composable
+internal fun AvatarPresenceEffects(params: AvatarPresenceParams) {
+    val avatar = params.avatar
+    LaunchedEffect(params.isStreamingReplySelected, params.thinkingConversationId, avatar.state) {
         if (avatar.isActive) {
             avatar.companion.setActivity(
                 when {
-                    isStreamingReplySelected -> AvatarActivity.SPEAKING
-                    thinkingConversationId != null -> AvatarActivity.THINKING
+                    params.isStreamingReplySelected -> AvatarActivity.SPEAKING
+                    params.thinkingConversationId != null -> AvatarActivity.THINKING
                     else -> AvatarActivity.IDLE
                 },
             )
         }
     }
-    LaunchedEffect(errorMessage) {
-        if (errorMessage != null) avatar.companion.flashError()
+    LaunchedEffect(params.errorMessage) {
+        if (params.errorMessage != null) avatar.companion.flashError()
     }
 }
 
@@ -431,22 +451,26 @@ internal fun buildPaletteItems(
  * command fills the composer so the user can add args and send; the server
  * interprets the slash prefix.
  */
-internal fun buildComposerCommands(
-    chatController: DesktopChatController,
-    agentSlashCommands: List<AgentSlashCommand>,
-    onCreateAgent: () -> Unit,
-    onEditAgent: () -> Unit,
-    onNavigate: (DesktopDestination) -> Unit,
-): List<ComposerCommand> = buildList {
+internal data class BuildComposerCommandsParams(
+    val chatController: DesktopChatController,
+    val agentSlashCommands: List<AgentSlashCommand>,
+    val onCreateAgent: () -> Unit,
+    val onEditAgent: () -> Unit,
+    val onNavigate: (DesktopDestination) -> Unit,
+)
+
+internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<ComposerCommand> = buildList {
+    val chatController = params.chatController
+    val onNavigate = params.onNavigate
     add(ComposerCommand("new", "Start a new chat") { chatController.createConversation() })
-    add(ComposerCommand("agent", "Create a new agent") { onCreateAgent() })
-    add(ComposerCommand("edit", "Edit this agent") { onEditAgent() })
+    add(ComposerCommand("agent", "Create a new agent") { params.onCreateAgent() })
+    add(ComposerCommand("edit", "Edit this agent") { params.onEditAgent() })
     add(ComposerCommand("memory", "Open memory") { onNavigate(DesktopDestination.Memory) })
     add(ComposerCommand("schedules", "Open schedules") { onNavigate(DesktopDestination.Schedules) })
     add(ComposerCommand("skills", "Open skills & tools") { onNavigate(DesktopDestination.Agents) })
     add(ComposerCommand("channels", "Open channels") { onNavigate(DesktopDestination.Channels) })
     add(ComposerCommand("settings", "Open settings") { onNavigate(DesktopDestination.Settings) })
-    agentSlashCommands.forEach { cmd ->
+    params.agentSlashCommands.forEach { cmd ->
         add(
             ComposerCommand(
                 label = cmd.command,
