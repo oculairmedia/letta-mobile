@@ -51,7 +51,7 @@ class AdminHandlerSupportTest {
     @Test
     fun requireParamUsesCustomMessage() {
         val error = assertFailsWith<IllegalArgumentException> {
-            null.requireParam("identifier", PROJECT_IDENTIFIER_REQUIRED)
+            null.requireParam(AdminParamKey("identifier"), AdminParamError(PROJECT_IDENTIFIER_REQUIRED))
         }
         assertEquals(PROJECT_IDENTIFIER_REQUIRED, error.message)
     }

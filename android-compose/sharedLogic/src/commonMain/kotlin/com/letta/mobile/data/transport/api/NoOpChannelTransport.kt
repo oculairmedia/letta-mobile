@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonArray
  * Common placeholder for runtimes that can compile against the transport
  * contract before wiring a platform socket implementation.
  */
-class NoOpChannelTransport : IChannelTransport {
+open class NoOpChannelTransport : IChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state
     override val events: SharedFlow<ServerFrame> = MutableSharedFlow()
