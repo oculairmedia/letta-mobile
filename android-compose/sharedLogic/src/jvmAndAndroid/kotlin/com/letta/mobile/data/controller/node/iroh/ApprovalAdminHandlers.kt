@@ -34,8 +34,8 @@ object ApprovalAdminHandlers {
         params: JsonObject?,
         controller: AppServerController?,
     ): JsonElement {
-        val agentId = params.requireParam("agent_id")
-        val conversationId = param(params, "conversation_id")
+        val agentId = params.requireParam(AdminParamKey("agent_id"))
+        val conversationId = param(params, AdminParamKey("conversation_id"))
         val payload = params?.get("payload")?.jsonObject
             ?: throw IllegalArgumentException("payload required")
         val approval = payload["messages"]?.jsonArray?.firstOrNull()?.jsonObject

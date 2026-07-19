@@ -5,7 +5,7 @@ object IdentityAdminHandlers {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("identity.list") { api.get(AdminPath.v1("identities")) }
         router.register("identity.get") { p ->
-            val identityId = p.requireParam("identity_id")
+            val identityId = p.requireParam(AdminParamKey("identity_id"))
             api.get(AdminPath.v1("identities", identityId))
         }
     }

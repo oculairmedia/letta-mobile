@@ -13,7 +13,7 @@ object ProjectAdminHandlers {
 
         router.register("project.list") { params ->
             api.get(AdminPath.api("projects")) {
-                query("limit", param(params, "limit"))
+                query("limit", param(params, AdminParamKey("limit")))
             }
         }
 
@@ -31,7 +31,7 @@ object ProjectAdminHandlers {
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
             api.post(
                 AdminPath.api("projects", identifier, "beads-remote", "provision"),
-                body = passthroughBody(params, "identifier", "project_id"),
+                body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
             )
         }
 
@@ -47,7 +47,7 @@ object ProjectAdminHandlers {
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
             api.patch(
                 AdminPath.api("registry", "projects", identifier),
-                body = passthroughBody(params, "identifier", "project_id"),
+                body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
             )
         }
 
@@ -55,7 +55,7 @@ object ProjectAdminHandlers {
             val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
             api.patch(
                 AdminPath.api("registry", "projects", identifier),
-                body = passthroughBody(params, "identifier", "project_id"),
+                body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
             )
         }
 

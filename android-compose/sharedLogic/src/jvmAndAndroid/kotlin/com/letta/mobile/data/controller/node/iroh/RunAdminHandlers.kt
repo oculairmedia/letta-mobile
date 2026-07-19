@@ -5,11 +5,11 @@ object RunAdminHandlers {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("run.list") { api.get(AdminPath.v1("runs")) }
         router.register("run.get") { params ->
-            val runId = params.requireParam("run_id")
+            val runId = params.requireParam(AdminParamKey("run_id"))
             api.get(AdminPath.v1("runs", runId))
         }
         router.register("step.list") { params ->
-            val runId = params.requireParam("run_id")
+            val runId = params.requireParam(AdminParamKey("run_id"))
             api.get(AdminPath.v1("runs", runId, "steps"))
         }
     }

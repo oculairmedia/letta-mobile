@@ -11,7 +11,7 @@ object SlashCommandAdminHandlers {
         // /v1/agents/{id}/slash-commands. Routed over admin_rpc so the composer's
         // slash-command autocomplete populates in iroh:// mode.
         router.register("slash_command.list_agent") { params ->
-            val agentId = params.requireParam("agent_id")
+            val agentId = params.requireParam(AdminParamKey("agent_id"))
             api.get(AdminPath.v1("agents", agentId, "slash-commands"))
         }
     }

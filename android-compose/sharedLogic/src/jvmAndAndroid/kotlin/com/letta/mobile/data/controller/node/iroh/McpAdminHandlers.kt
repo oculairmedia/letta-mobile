@@ -5,7 +5,7 @@ object McpAdminHandlers {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("mcp.list") { api.get(AdminPath.v1("mcp", "servers")) }
         router.register("passage.list") { params ->
-            val agentId = params.requireParam("agent_id")
+            val agentId = params.requireParam(AdminParamKey("agent_id"))
             api.get(AdminPath.v1("agents", agentId, "passages"))
         }
     }

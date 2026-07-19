@@ -37,13 +37,13 @@ class AdminHandlerSupportTest {
     @Test
     fun requireParamReturnsValueWhenPresent() {
         val params = buildJsonObject { put("agent_id", "agent-1") }
-        assertEquals("agent-1", params.requireParam("agent_id"))
+        assertEquals("agent-1", params.requireParam(AdminParamKey("agent_id")))
     }
 
     @Test
     fun requireParamThrowsWhenMissing() {
         val error = assertFailsWith<IllegalArgumentException> {
-            buildJsonObject {}.requireParam("agent_id")
+            buildJsonObject {}.requireParam(AdminParamKey("agent_id"))
         }
         assertEquals("agent_id required", error.message)
     }
