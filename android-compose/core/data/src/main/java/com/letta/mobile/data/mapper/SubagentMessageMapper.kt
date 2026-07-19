@@ -30,18 +30,27 @@ internal fun extractSubagentDispatch(
 internal fun extractSubagentNotification(raw: String): UiSubagentNotification? {
     val block = raw.taskNotificationBlock() ?: return null
     return UiSubagentNotification(
-        toolCallId = block.xmlTag("tool_call_id") ?: block.xmlTag("toolCallId"),
-        status = block.xmlTag("status") ?: block.xmlTag("state") ?: "completed",
+        toolCallId = block.firstXmlTag("tool_call_id", "toolCallId"),
+        status = block.notificationStatus(),
         summary = block.xmlTag("summary"),
         result = block.xmlTag("result"),
         usage = block.xmlTag("usage"),
-        transcriptUri = block.xmlTag("transcript")
-            ?: block.lineAfter("Full transcript at")
-            ?: block.lineAfter("Full transcript:"),
-        taskId = block.xmlTag("task_id") ?: block.xmlTag("taskId"),
-        subagentAgentId = block.xmlTag("agent_id") ?: block.xmlTag("agentId"),
+        transcriptUri = block.transcriptUri(),
+        taskId = block.firstXmlTag("task_id", "taskId"),
+        subagentAgentId = block.firstXmlTag("agent_id", "agentId"),
     )
 }
+
+private fun String.firstXmlTag(primary: String, alternate: String): String? =
+    xmlTag(primary) ?: xmlTag(alternate)
+
+private fun String.notificationStatus(): String =
+    firstXmlTag("status", "state") ?: "completed"
+
+private fun String.transcriptUri(): String? =
+    xmlTag("transcript")
+        ?: lineAfter("Full transcript at")
+        ?: lineAfter("Full transcript:")
 
 private fun parseJsonObject(raw: String): JsonObject? =
     runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()

@@ -66,11 +66,24 @@ private fun List<AppMessage>.associateSubagentCalls(
     returnsByCallId: Map<String, AppMessage>,
 ): Map<String, String> = buildMap {
     for (message in this@associateSubagentCalls) {
-        if (message.messageType != MessageType.TOOL_CALL || message.toolName != "Agent") continue
-        val callId = message.toolCallId?.takeIf(String::isNotBlank) ?: continue
-        val dispatch = extractSubagentDispatch(callId, message.content, returnsByCallId[callId]?.content) ?: continue
-        dispatch.taskId?.takeIf(String::isNotBlank)?.let { putIfAbsent(it, callId) }
+        val binding = message.subagentTaskBinding(returnsByCallId) ?: continue
+        putIfAbsent(binding.taskId, binding.toolCallId)
     }
+}
+
+private data class SubagentTaskBinding(val taskId: String, val toolCallId: String)
+
+private fun AppMessage.subagentTaskBinding(
+    returnsByCallId: Map<String, AppMessage>,
+): SubagentTaskBinding? {
+    if (messageType != MessageType.TOOL_CALL) return null
+    if (toolName != "Agent") return null
+    val callId = toolCallId?.takeIf(String::isNotBlank) ?: return null
+    val taskId = extractSubagentDispatch(callId, content, returnsByCallId[callId]?.content)
+        ?.taskId
+        ?.takeIf(String::isNotBlank)
+        ?: return null
+    return SubagentTaskBinding(taskId = taskId, toolCallId = callId)
 }
 
 private fun UiMessage.correlateSubagentNotification(
