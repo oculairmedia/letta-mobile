@@ -18,17 +18,17 @@ object ProjectAdminHandlers {
         }
 
         router.register("project.get") { params ->
-            val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
+            val identifier = params.requireProjectIdentifierParam()
             api.get(AdminPath.api("projects", identifier))
         }
 
         router.register("project.beadsRemoteStatus") { params ->
-            val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
+            val identifier = params.requireProjectIdentifierParam()
             api.get(AdminPath.api("projects", identifier, "beads-remote"))
         }
 
         router.register("project.provisionBeadsRemote") { params ->
-            val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
+            val identifier = params.requireProjectIdentifierParam()
             api.post(
                 AdminPath.api("projects", identifier, "beads-remote", "provision"),
                 body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
@@ -44,7 +44,7 @@ object ProjectAdminHandlers {
         }
 
         router.register("project.update") { params ->
-            val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
+            val identifier = params.requireProjectIdentifierParam()
             api.patch(
                 AdminPath.api("registry", "projects", identifier),
                 body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
@@ -52,7 +52,7 @@ object ProjectAdminHandlers {
         }
 
         router.register("project.archive") { params ->
-            val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
+            val identifier = params.requireProjectIdentifierParam()
             api.patch(
                 AdminPath.api("registry", "projects", identifier),
                 body = passthroughBody(params, listOf(AdminParamKey("identifier"), AdminParamKey("project_id"))),
@@ -60,7 +60,7 @@ object ProjectAdminHandlers {
         }
 
         router.register("project.delete") { params ->
-            val identifier = projectIdentifierParam(params) ?: return@register adminError(PROJECT_IDENTIFIER_REQUIRED)
+            val identifier = params.requireProjectIdentifierParam()
             api.delete(AdminPath.api("registry", "projects", identifier))
         }
     }
