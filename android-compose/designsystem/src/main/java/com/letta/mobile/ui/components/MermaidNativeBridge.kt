@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.components
 
 import android.util.Log
+import com.letta.mobile.mermaid.MermaidNativeRenderer
 
 internal sealed interface MermaidNativeRenderResult {
     data class Rendered(val svg: String) : MermaidNativeRenderResult
@@ -47,7 +48,7 @@ internal object MermaidNativeBridge {
         if (!loadState) return MermaidNativeRenderResult.Unavailable
 
         return runCatching {
-            val svg = nativeRenderToSvg(
+            val svg = MermaidNativeRenderer.nativeRenderToSvg(
                 source = source,
                 darkTheme = darkTheme,
                 textArgb = style.textArgb,
@@ -58,7 +59,7 @@ internal object MermaidNativeBridge {
                 tertiaryArgb = style.tertiaryArgb,
             )
             if (svg.isNullOrBlank()) {
-                val reason = nativeTakeLastError()
+                val reason = MermaidNativeRenderer.nativeTakeLastError()
                     ?.takeIf { it.isNotBlank() }
                     ?: "native renderer returned empty SVG"
                 MermaidNativeRenderResult.Failed(reason)
@@ -71,19 +72,4 @@ internal object MermaidNativeBridge {
             )
         }
     }
-
-    @JvmStatic
-    private external fun nativeRenderToSvg(
-        source: String,
-        darkTheme: Boolean,
-        textArgb: Int,
-        borderArgb: Int,
-        surfaceArgb: Int,
-        primaryArgb: Int,
-        secondaryArgb: Int,
-        tertiaryArgb: Int,
-    ): String?
-
-    @JvmStatic
-    private external fun nativeTakeLastError(): String?
 }

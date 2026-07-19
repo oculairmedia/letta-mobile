@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.markdown
 
+import com.letta.mobile.mermaid.MermaidNativeRenderer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
@@ -216,7 +217,7 @@ private object DesktopMermaidNativeBridge {
         // Native LAST_ERROR is process-global; serialize renders across diagrams.
         return renderMutex.withLock {
             runCatching {
-                val svg = nativeRenderToSvg(
+                val svg = MermaidNativeRenderer.nativeRenderToSvg(
                     source = source,
                     darkTheme = style.darkTheme,
                     textArgb = style.textArgb,
@@ -228,7 +229,7 @@ private object DesktopMermaidNativeBridge {
                 )
                 if (svg.isNullOrBlank()) {
                     DesktopMermaidRenderResult.Failed(
-                        nativeTakeLastError().orEmpty().ifBlank { "Renderer returned no SVG" },
+                        MermaidNativeRenderer.nativeTakeLastError().orEmpty().ifBlank { "Renderer returned no SVG" },
                     )
                 } else {
                     DesktopMermaidRenderResult.Rendered(svg)
@@ -236,19 +237,4 @@ private object DesktopMermaidNativeBridge {
             }.getOrElse { DesktopMermaidRenderResult.Failed(it.message ?: it::class.java.simpleName) }
         }
     }
-
-    @JvmStatic
-    private external fun nativeRenderToSvg(
-        source: String,
-        darkTheme: Boolean,
-        textArgb: Int,
-        borderArgb: Int,
-        surfaceArgb: Int,
-        primaryArgb: Int,
-        secondaryArgb: Int,
-        tertiaryArgb: Int,
-    ): String?
-
-    @JvmStatic
-    private external fun nativeTakeLastError(): String?
 }
