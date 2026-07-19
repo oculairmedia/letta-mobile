@@ -2,6 +2,8 @@ package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import java.awt.Component
@@ -43,6 +45,9 @@ private fun DesktopClipboardImagePasteEffect(
     onImage: (MessageContentPart.Image) -> Unit,
     onError: (String) -> Unit,
 ) {
+    val currentOnImage by rememberUpdatedState(onImage)
+    val currentOnError by rememberUpdatedState(onError)
+    val currentScope by rememberUpdatedState(scope)
     DisposableEffect(enabled, loader) {
         if (!enabled) return@DisposableEffect onDispose { }
         val manager = KeyboardFocusManager.getCurrentKeyboardFocusManager()
@@ -58,12 +63,12 @@ private fun DesktopClipboardImagePasteEffect(
                         transferable.getTransferData(DataFlavor.imageFlavor) as? java.awt.Image
                     }.getOrNull() ?: return@KeyEventDispatcher false
                     val image = rawImage.toBufferedImage() ?: return@KeyEventDispatcher false
-                    scope.launchLoadImage(loader, onImage, onError) { load(image) }
+                    currentScope.launchLoadImage(loader, currentOnImage, currentOnError) { load(image) }
                     true
                 }
                 transferable.isDataFlavorSupported(DataFlavor.javaFileListFlavor) -> {
                     val path = transferable.imageFiles().firstOrNull()?.toPath() ?: return@KeyEventDispatcher false
-                    scope.launchLoadImage(loader, onImage, onError) { load(path) }
+                    currentScope.launchLoadImage(loader, currentOnImage, currentOnError) { load(path) }
                     true
                 }
                 else -> false
@@ -82,6 +87,9 @@ private fun DesktopImageFileDropEffect(
     onImage: (MessageContentPart.Image) -> Unit,
     onError: (String) -> Unit,
 ) {
+    val currentOnImage by rememberUpdatedState(onImage)
+    val currentOnError by rememberUpdatedState(onError)
+    val currentScope by rememberUpdatedState(scope)
     DisposableEffect(enabled, loader) {
         if (!enabled) return@DisposableEffect onDispose { }
         val installed = java.util.WeakHashMap<Component, DropTarget?>()
@@ -94,7 +102,7 @@ private fun DesktopImageFileDropEffect(
                     return
                 }
                 event.acceptDrop(DnDConstants.ACTION_COPY)
-                scope.launchLoadImage(loader, onImage, onError) { load(path) }
+                currentScope.launchLoadImage(loader, currentOnImage, currentOnError) { load(path) }
                 event.dropComplete(true)
             }
         }
