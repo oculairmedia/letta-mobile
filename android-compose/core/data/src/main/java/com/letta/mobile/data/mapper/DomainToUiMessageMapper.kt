@@ -88,35 +88,50 @@ private fun UiMessage.correlateSubagentNotification(
 
 internal fun extractSendMessageText(arguments: String, returnContent: String): String {
     return try {
-        val messageStart = arguments.indexOf("\"message\"")
-        if (messageStart < 0) return returnContent
-        val colon = arguments.indexOf(':', messageStart)
-        if (colon < 0) return returnContent
-        val valueStart = arguments.indexOf('"', colon + 1)
-        if (valueStart < 0) return returnContent
-        buildString {
-            var index = valueStart + 1
-            while (index < arguments.length) {
-                val char = arguments[index]
-                if (char == '\\' && index + 1 < arguments.length) {
-                    when (val escaped = arguments[index + 1]) {
-                        '"' -> append('"')
-                        '\\' -> append('\\')
-                        'n' -> append('\n')
-                        't' -> append('\t')
-                        else -> { append('\\'); append(escaped) }
-                    }
-                    index += 2
-                } else if (char == '"') {
-                    break
-                } else {
-                    append(char)
-                    index++
-                }
-            }
-        }.ifBlank { returnContent }
+        val valueStart = findQuotedMessageValueStart(arguments) ?: return returnContent
+        unescapeJsonStringLiteral(arguments, startIndex = valueStart + 1).ifBlank { returnContent }
     } catch (_: Exception) {
         returnContent
+    }
+}
+
+private fun findQuotedMessageValueStart(arguments: String): Int? {
+    val messageStart = arguments.indexOf("\"message\"")
+    if (messageStart < 0) return null
+    val colon = arguments.indexOf(':', messageStart)
+    if (colon < 0) return null
+    val valueStart = arguments.indexOf('"', colon + 1)
+    return valueStart.takeIf { it >= 0 }
+}
+
+private fun unescapeJsonStringLiteral(source: String, startIndex: Int): String = buildString {
+    var index = startIndex
+    while (index < source.length) {
+        val char = source[index]
+        when {
+            char == '\\' && index + 1 < source.length -> {
+                appendEscapedJsonChar(source[index + 1])
+                index += 2
+            }
+            char == '"' -> return@buildString
+            else -> {
+                append(char)
+                index++
+            }
+        }
+    }
+}
+
+private fun StringBuilder.appendEscapedJsonChar(escaped: Char) {
+    when (escaped) {
+        '"' -> append('"')
+        '\\' -> append('\\')
+        'n' -> append('\n')
+        't' -> append('\t')
+        else -> {
+            append('\\')
+            append(escaped)
+        }
     }
 }
 

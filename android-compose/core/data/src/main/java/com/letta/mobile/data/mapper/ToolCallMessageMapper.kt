@@ -9,6 +9,14 @@ import java.time.Duration
 
 internal data class MappedToolCall(val message: UiMessage, val consumedReturnId: String?)
 
+internal data class BaseUiMessageParams(
+    val role: String,
+    val content: String,
+    val toolCalls: List<UiToolCall>? = null,
+    val generatedUi: UiGeneratedComponent? = null,
+    val attachments: List<UiImageAttachment> = emptyList(),
+)
+
 internal fun AppMessage.mapToolCall(
     matchedReturn: AppMessage?,
     foldedApprovals: Map<String, FoldedToolApproval>,
@@ -16,12 +24,24 @@ internal fun AppMessage.mapToolCall(
     val name = toolName
     val returnContent = matchedReturn?.content
     mapGeneratedUiResult(name, returnContent)?.let {
-        return MappedToolCall(baseUiMessage(role = "assistant", content = it.fallbackText.orEmpty(), generatedUi = it), matchedReturn?.id)
+        return MappedToolCall(
+            message = baseUiMessage(
+                BaseUiMessageParams(
+                    role = "assistant",
+                    content = it.fallbackText.orEmpty(),
+                    generatedUi = it,
+                ),
+            ),
+            consumedReturnId = matchedReturn?.id,
+        )
     }
     if (name == "send_message" && returnContent != null) {
         val visibleText = extractSendMessageText(content, returnContent)
         if (visibleText.isNotBlank()) {
-            return MappedToolCall(baseUiMessage(role = "assistant", content = visibleText), matchedReturn.id)
+            return MappedToolCall(
+                message = baseUiMessage(BaseUiMessageParams(role = "assistant", content = visibleText)),
+                consumedReturnId = matchedReturn.id,
+            )
         }
     }
     val imageAttachments = matchedReturn.imageAttachments()
@@ -38,31 +58,27 @@ internal fun AppMessage.mapToolCall(
     )
     return MappedToolCall(
         message = baseUiMessage(
-            role = "tool",
-            content = "",
-            toolCalls = listOf(toolCall),
-            attachments = if (name == "generate_image") emptyList() else imageAttachments,
+            BaseUiMessageParams(
+                role = "tool",
+                content = "",
+                toolCalls = listOf(toolCall),
+                attachments = if (name == "generate_image") emptyList() else imageAttachments,
+            ),
         ),
         consumedReturnId = matchedReturn?.id,
     )
 }
 
-internal fun AppMessage.baseUiMessage(
-    role: String,
-    content: String,
-    toolCalls: List<UiToolCall>? = null,
-    generatedUi: UiGeneratedComponent? = null,
-    attachments: List<UiImageAttachment> = emptyList(),
-): UiMessage = UiMessage(
+internal fun AppMessage.baseUiMessage(params: BaseUiMessageParams): UiMessage = UiMessage(
     id = id,
-    role = role,
-    content = content,
+    role = params.role,
+    content = params.content,
     timestamp = date.toString(),
     runId = runId,
     stepId = stepId,
-    toolCalls = toolCalls,
-    generatedUi = generatedUi,
-    attachments = attachments,
+    toolCalls = params.toolCalls,
+    generatedUi = params.generatedUi,
+    attachments = params.attachments,
 )
 
 internal fun AppMessage?.imageAttachments(): List<UiImageAttachment> =

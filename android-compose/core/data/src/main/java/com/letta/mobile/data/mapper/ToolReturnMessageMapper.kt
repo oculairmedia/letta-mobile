@@ -9,32 +9,40 @@ internal fun AppMessage.mapUnmatchedToolReturn(
 ): com.letta.mobile.data.model.UiMessage {
     val name = toolName ?: "tool"
     mapGeneratedUiResult(name, content)?.let {
-        return baseUiMessage(role = "assistant", content = it.fallbackText.orEmpty(), generatedUi = it)
+        return baseUiMessage(
+            BaseUiMessageParams(
+                role = "assistant",
+                content = it.fallbackText.orEmpty(),
+                generatedUi = it,
+            ),
+        )
     }
     if (name == "send_message" && content.isNotBlank()) {
-        return baseUiMessage(role = "assistant", content = content)
+        return baseUiMessage(BaseUiMessageParams(role = "assistant", content = content))
     }
     val imageAttachments = this.imageAttachments()
     return baseUiMessage(
-        role = "tool",
-        content = "",
-        toolCalls = listOf(
-            UiToolCall(
-                name = name,
-                arguments = "",
-                result = content.ifBlank { null },
-                status = toolReturnStatus,
-                generatedImageAttachments = imageAttachments,
-                toolCallId = toolCallId,
-                approvalDecision = toolCallId?.let { foldedApprovals[it]?.decision },
-                subagentDispatch = if (name == "Agent") {
-                    extractSubagentDispatch(toolCallId, "", content)
-                } else {
-                    null
-                },
+        BaseUiMessageParams(
+            role = "tool",
+            content = "",
+            toolCalls = listOf(
+                UiToolCall(
+                    name = name,
+                    arguments = "",
+                    result = content.ifBlank { null },
+                    status = toolReturnStatus,
+                    generatedImageAttachments = imageAttachments,
+                    toolCallId = toolCallId,
+                    approvalDecision = toolCallId?.let { foldedApprovals[it]?.decision },
+                    subagentDispatch = if (name == "Agent") {
+                        extractSubagentDispatch(toolCallId, "", content)
+                    } else {
+                        null
+                    },
+                ),
             ),
+            attachments = if (name == "generate_image") emptyList() else imageAttachments,
         ),
-        attachments = if (name == "generate_image") emptyList() else imageAttachments,
     )
 }
 

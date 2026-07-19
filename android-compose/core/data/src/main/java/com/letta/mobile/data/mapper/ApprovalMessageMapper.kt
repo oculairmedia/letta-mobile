@@ -1,6 +1,8 @@
 package com.letta.mobile.data.mapper
 
 import com.letta.mobile.data.model.AppMessage
+import com.letta.mobile.data.model.ApprovalDecisionPayload
+import com.letta.mobile.data.model.ApprovalResponsePayload
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.UiToolApprovalDecision
 
@@ -22,28 +24,43 @@ internal fun List<AppMessage>.foldedApprovals(
     renderedToolCallIds: Set<String>,
 ): Map<String, FoldedToolApproval> = buildMap {
     for (message in this@foldedApprovals) {
-        if (message.messageType != MessageType.APPROVAL_RESPONSE) continue
-        val response = message.approvalResponse ?: continue
-        val topLevelReason = response.reason?.takeIf(String::isNotBlank)
-        for (approval in response.approvals) {
-            val toolCallId = approval.toolCallId.takeIf(String::isNotBlank) ?: continue
-            if (toolCallId !in renderedToolCallIds) continue
-            val approved = approval.approved ?: continue
-            put(
-                toolCallId,
-                FoldedToolApproval(
-                    decision = if (approved) {
-                        UiToolApprovalDecision.Approved
-                    } else {
-                        UiToolApprovalDecision.Rejected
-                    },
-                    carriedReason = !approval.reason.isNullOrBlank() || topLevelReason != null,
-                    sourceMessageId = message.id,
-                ),
-            )
-        }
+        foldApprovalResponse(message, renderedToolCallIds)
     }
 }
+
+private fun MutableMap<String, FoldedToolApproval>.foldApprovalResponse(
+    message: AppMessage,
+    renderedToolCallIds: Set<String>,
+) {
+    if (message.messageType != MessageType.APPROVAL_RESPONSE) return
+    val response = message.approvalResponse ?: return
+    val topLevelReason = response.reason?.takeIf(String::isNotBlank)
+    for (approval in response.approvals) {
+        putFoldedApproval(approval, message.id, topLevelReason, renderedToolCallIds)
+    }
+}
+
+private fun MutableMap<String, FoldedToolApproval>.putFoldedApproval(
+    approval: ApprovalDecisionPayload,
+    sourceMessageId: String,
+    topLevelReason: String?,
+    renderedToolCallIds: Set<String>,
+) {
+    val toolCallId = approval.toolCallId.takeIf(String::isNotBlank) ?: return
+    if (toolCallId !in renderedToolCallIds) return
+    val approved = approval.approved ?: return
+    put(
+        toolCallId,
+        FoldedToolApproval(
+            decision = toApprovalDecision(approved),
+            carriedReason = !approval.reason.isNullOrBlank() || topLevelReason != null,
+            sourceMessageId = sourceMessageId,
+        ),
+    )
+}
+
+private fun toApprovalDecision(approved: Boolean): UiToolApprovalDecision =
+    if (approved) UiToolApprovalDecision.Approved else UiToolApprovalDecision.Rejected
 
 internal fun List<AppMessage>.fullyAbsorbedApprovalResponseIds(
     foldedApprovals: Map<String, FoldedToolApproval>,
@@ -52,19 +69,37 @@ internal fun List<AppMessage>.fullyAbsorbedApprovalResponseIds(
     val foldedByResponseId = foldedApprovals.values.groupBy(FoldedToolApproval::sourceMessageId)
     return buildSet {
         for (message in this@fullyAbsorbedApprovalResponseIds) {
-            val response = message.approvalResponse
-            val folded = foldedByResponseId[message.id].orEmpty()
-            if (message.messageType != MessageType.APPROVAL_RESPONSE || response == null || folded.isEmpty()) continue
-            val explicit = response.approvals.filter { !it.toolCallId.isNullOrBlank() && it.approved != null }
-            val canAbsorb = explicit.isNotEmpty() &&
-                explicit.all { it.toolCallId in renderedToolCallIds } &&
-                folded.size == explicit.size &&
-                folded.none(FoldedToolApproval::carriedReason) &&
-                response.reason.isNullOrBlank() &&
-                folded.none { it.decision == UiToolApprovalDecision.Rejected }
-            if (canAbsorb) add(message.id)
+            if (isFullyAbsorbed(message, foldedByResponseId, renderedToolCallIds)) {
+                add(message.id)
+            }
         }
     }
+}
+
+private fun isFullyAbsorbed(
+    message: AppMessage,
+    foldedByResponseId: Map<String, List<FoldedToolApproval>>,
+    renderedToolCallIds: Set<String>,
+): Boolean {
+    if (message.messageType != MessageType.APPROVAL_RESPONSE) return false
+    val response = message.approvalResponse ?: return false
+    val folded = foldedByResponseId[message.id].orEmpty()
+    if (folded.isEmpty()) return false
+    return canAbsorbApprovalResponse(response, folded, renderedToolCallIds)
+}
+
+private fun canAbsorbApprovalResponse(
+    response: ApprovalResponsePayload,
+    folded: List<FoldedToolApproval>,
+    renderedToolCallIds: Set<String>,
+): Boolean {
+    val explicit = response.approvals.filter { it.toolCallId.isNotBlank() && it.approved != null }
+    if (explicit.isEmpty()) return false
+    if (explicit.any { it.toolCallId !in renderedToolCallIds }) return false
+    if (folded.size != explicit.size) return false
+    if (folded.any(FoldedToolApproval::carriedReason)) return false
+    if (!response.reason.isNullOrBlank()) return false
+    return folded.none { it.decision == UiToolApprovalDecision.Rejected }
 }
 
 internal fun AppMessage.hasExplicitApprovalDecision(): Boolean {
