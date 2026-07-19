@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -38,13 +39,21 @@ class IrohAdminRpcProjectSource(
 ) {
     fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
 
-    suspend fun probeAvailability(): Boolean = runCatching {
+    suspend fun probeAvailability(): Boolean = try {
         refreshProjects(limit = 1)
-    }.isSuccess
+        true
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        false
+    }
 
     suspend fun refreshProjects(limit: Int? = null): ProjectCatalog {
         val path = "/api/projects" + (limit?.let { "?limit=$it" } ?: "")
-        val result = rpc("project.list", path, "{}") ?: return ProjectCatalog(projects = emptyList())
+        val body = buildJsonObject {
+            limit?.let { put("limit", it) }
+        }.toString()
+        val result = rpc("project.list", path, body) ?: return ProjectCatalog(projects = emptyList())
         return json.decodeFromJsonElement(ProjectCatalog.serializer(), result)
     }
 
