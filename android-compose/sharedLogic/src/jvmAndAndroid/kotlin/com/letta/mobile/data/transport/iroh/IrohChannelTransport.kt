@@ -141,6 +141,15 @@ class IrohChannelTransport(
     @Volatile
     private var activeTurn: ActiveTurn? = null
 
+    /**
+     * A nonterminal turn whose connection died before its send job could emit a
+     * terminal. Closing the stale handle cancels that job and clears
+     * [activeTurn], so retain only the immutable identity needed to trigger the
+     * existing reconcile-and-settle path after redial.
+     */
+    @Volatile
+    private var interruptedTurn: RedialWhileTurnActive? = null
+
     override val hasActiveChatTurn: Boolean
         get() = activeTurn?.terminalReached?.isCompleted == false
 
@@ -229,6 +238,12 @@ class IrohChannelTransport(
                 // AND reconciles frames missed during the dead window.
                 reSubscribeViewedConversation()
             } else {
+                // Snapshot turn identity before a degraded handle is closed and
+                // its send job clears activeTurn. Intentional disconnects and
+                // config replacement must not synthesize redial recovery.
+                if (supervisorState is IrohConnectionState.Degraded) {
+                    rememberInterruptedTurn()
+                }
                 // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
                 // stops observer ingestion. On redial a fresh Ready fires and the
                 // collector restarts against the new handle above.
@@ -552,15 +567,32 @@ class IrohChannelTransport(
         )
 
     private fun notifyRedialIfTurnActive() {
+        val interrupted = interruptedTurn
+        val turn = activeTurn
+        val recovery = interrupted ?: turn
+            ?.takeUnless { it.hasTerminal }
+            ?.let {
+                RedialWhileTurnActive(
+                    agentId = it.agentId,
+                    conversationId = it.conversationId,
+                    turnId = it.turnId,
+                    runId = it.runId,
+                )
+            }
+            ?: return
+        if (_redialWhileTurnActive.tryEmit(recovery) && interrupted === recovery) {
+            interruptedTurn = null
+        }
+    }
+
+    private fun rememberInterruptedTurn() {
         val turn = activeTurn ?: return
         if (turn.hasTerminal) return
-        _redialWhileTurnActive.tryEmit(
-            RedialWhileTurnActive(
-                agentId = turn.agentId,
-                conversationId = turn.conversationId,
-                turnId = turn.turnId,
-                runId = turn.runId,
-            )
+        interruptedTurn = RedialWhileTurnActive(
+            agentId = turn.agentId,
+            conversationId = turn.conversationId,
+            turnId = turn.turnId,
+            runId = turn.runId,
         )
     }
 
@@ -879,6 +911,9 @@ class IrohChannelTransport(
                     "status" to frame.status,
                 )
                 return
+            }
+            interruptedTurn?.takeIf { it.turnId == turn.turnId }?.let {
+                interruptedTurn = null
             }
             emitBoth(frame)
             turn.terminalReached.complete(frame.status)
