@@ -428,7 +428,7 @@ internal fun ChatMessageList(
 
     LaunchedEffect(pinchAnimationSuppressionTick) {
         if (pinchAnimationSuppressionTick > 0) {
-            delay(ChatMotion.ContentSizeMillis.toLong())
+            delay(ChatMotion.CONTENT_SIZE_MILLIS.toLong())
             if (!pinchFontScaleController.isPinching) {
                 suppressPinchLayoutAnimations = false
             }
@@ -823,8 +823,8 @@ internal fun ChatMessageList(
                 contentPadding = PaddingValues(
                     start = chatDimens.contentPaddingHorizontal,
                     end = chatDimens.contentPaddingHorizontal,
-                    top = LettaSpacing.cardGap + topPadding,
-                    bottom = LettaSpacing.cardGap + bottomPadding,
+                    top = LettaSpacing.CARD_GAP + topPadding,
+                    bottom = LettaSpacing.CARD_GAP + bottomPadding,
                 ),
                 reverseLayout = true,
                 // letta-mobile-erhjl: keep an identity graphicsLayer so the
@@ -1073,7 +1073,7 @@ internal fun ChatMessageList(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = LettaSpacing.innerPaddingSmall),
+                                .padding(vertical = LettaSpacing.INNER_PADDING_SMALL),
                             contentAlignment = Alignment.Center,
                         ) {
                             CircularProgressIndicator()
@@ -1140,8 +1140,8 @@ internal fun ChatMessageList(
                         .padding(
                             start = chatDimens.contentPaddingHorizontal,
                             end = chatDimens.contentPaddingHorizontal,
-                            top = LettaSpacing.innerPaddingSmall,
-                            bottom = LettaSpacing.innerPaddingSmall,
+                            top = LettaSpacing.INNER_PADDING_SMALL,
+                            bottom = LettaSpacing.INNER_PADDING_SMALL,
                         )
                 ) {
                     RenderChatMessage(
@@ -1170,8 +1170,8 @@ internal fun ChatMessageList(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(
-                    end = LettaSpacing.innerPadding,
-                    bottom = LettaSpacing.innerPadding + bottomPadding,
+                    end = LettaSpacing.INNER_PADDING,
+                    bottom = LettaSpacing.INNER_PADDING + bottomPadding,
                 ),
         )
 
@@ -1191,7 +1191,7 @@ internal fun ChatMessageList(
                         MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
                         RoundedCornerShape(chatShapes.bubbleRadius),
                     )
-                    .padding(horizontal = LettaSpacing.innerPadding + LettaSpacing.cardGap, vertical = LettaSpacing.innerPaddingSmall),
+                    .padding(horizontal = LettaSpacing.INNER_PADDING + LettaSpacing.CARD_GAP, vertical = LettaSpacing.INNER_PADDING_SMALL),
             )
         }
     }
@@ -1378,7 +1378,7 @@ private fun RenderChatMessage(
         position == GroupPosition.Middle || position == GroupPosition.Last -> MaterialTheme.chatDimens.groupedMessageSpacing
         else -> MaterialTheme.chatDimens.ungroupedMessageSpacing
     }
-    val spacingAbove = if (message.isReasoning) LettaSpacing.innerPaddingSmall else LettaSpacing.none
+    val spacingAbove = if (message.isReasoning) LettaSpacing.INNER_PADDING_SMALL else LettaSpacing.NONE
     val isHighlighted = message.id == highlightedMessageId
     val highlightModifier = if (isHighlighted) {
         Modifier.background(
@@ -1424,13 +1424,13 @@ private fun DebugMessageCard(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         ),
     ) {
-        Column(modifier = Modifier.padding(LettaSpacing.cardGap)) {
+        Column(modifier = Modifier.padding(LettaSpacing.CARD_GAP)) {
             Text(
                 text = "${message.role} | ${message.id}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(modifier = Modifier.height(LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap))
+            Spacer(modifier = Modifier.height(LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP))
             Text(
                 text = buildString {
                     append("content: ${message.content.take(200)}")
