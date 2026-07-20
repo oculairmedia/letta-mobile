@@ -378,8 +378,12 @@ private fun CreateAgentRuntimeModels(
         onModelSelected = { onFormStateChange(formState.copy(embedding = it)) },
         onLoadModels = resources.onLoadModels,
         modifier = Modifier.fillMaxWidth(),
-        label = stringResource(R.string.common_embedding),
-        supportingText = remoteCreateAgentModelHelp(formState.model, formState.embedding),
+        label = stringResource(R.string.screen_agent_edit_embedding_model),
+    )
+    Text(
+        text = remoteCreateAgentModelHelp(model = formState.model, embedding = formState.embedding),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }
 
