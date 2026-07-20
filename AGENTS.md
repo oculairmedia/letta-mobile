@@ -371,6 +371,98 @@ Do not duplicate these — use `MaterialTheme.customColors.warningContainerColor
   - `EditAgentScreen`, `ScheduleListScreen`, `McpScreen`, `AgentListScreen` — continue migrating multi-field forms toward `FormItem` and reusable dialog structure.
 - When auditing a screen now, prioritize: (1) raw `AlertDialog` replacement, (2) grouped detail surfaces, (3) semantic typography, and only then shell-level chrome changes.
 
+## Cursor Cloud specific instructions
+
+This section covers non-obvious caveats for the Cursor Cloud VM. Standard build/test/run
+commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md` — use those.
+
+### Toolchain layout (already provisioned in the VM snapshot)
+
+- JDK 26 (Temurin, CI parity + desktop runtime): `/usr/lib/jvm/jdk-26`. JDK 21 also exists at
+  `/usr/lib/jvm/java-21-openjdk-amd64` (needed by detekt — see below).
+- Android SDK: `$HOME/Android/Sdk` (platform 36, build-tools 36, platform-tools).
+- `JAVA_HOME`, `ANDROID_HOME`, and `PATH` are exported for interactive shells from `~/.bashrc`.
+  Non-interactive scripts should set `JAVA_HOME=/usr/lib/jvm/jdk-26` explicitly.
+- `android-compose/local.properties` (`sdk.dir=…`, gitignored) is auto-created by the startup
+  update script; recreate it if missing.
+
+### Running the app on this VM
+
+- Both clients are runnable here: the **Compose Desktop** app (`:desktop:run`) and the **Android**
+  `:app` in the emulator (see the Android emulator subsection below). They can run side by side on
+  the same VNC display (`:1`).
+- The desktop app renders through Skiko, which **cannot create a GL context on the VNC X server**
+  (`RenderException: Cannot create Linux GL context`). Force software rendering and target the
+  VNC display:
+  ```bash
+  DISPLAY=:1 JAVA_TOOL_OPTIONS="-Dskiko.renderApi=SOFTWARE" ./gradlew :desktop:run
+  ```
+- `:desktop:run` needs JDK 25+ at runtime (Jewel ships class-file v69); JDK 26 satisfies this.
+- The desktop build compiles a Rust native lib via `:desktop:buildDesktopMermaidNative`
+  (`native/mermaid_renderer`), whose `Cargo.toml` requires **`edition2024`** → Rust/Cargo **≥ 1.85**.
+  A current stable toolchain is provisioned via rustup (`rustup default stable`); if a fresh VM only
+  has an older default (e.g. 1.83), run `rustup toolchain install stable && rustup default stable`.
+- To connect to a backend: in the running app click **Settings** → set **Server URL**, pick a
+  **Mode** (Cloud / Self-hosted / Local runtime), and paste an **Access token** if required, then
+  **Save**. With no token, `https://api.letta.com` returns HTTP 401 (expected). The client makes a
+  real HTTP call to `<url>/v1/…` on save, so an unconfigured/unreachable server shows
+  "Connection refused" / "Couldn't load this view".
+- An `iroh://<nodeId>@<host>:<port>` ticket in the Server URL field switches the client to the
+  Iroh QUIC P2P transport automatically (scheme-detected — Mode does not matter); admin/agent
+  traffic then flows over QUIC instead of HTTP.
+
+### Running the Android app (`:app`) in the emulator
+
+- There is **no KVM** on this VM (`/dev/kvm` absent), so the emulator runs under **software (TCG)
+  emulation** — functional but slow. The SDK `emulator`, an `x86_64` system image, and an AVD named
+  `letta_test` are provisioned in the snapshot.
+- Launch on the VNC display with software GPU + no acceleration:
+  ```bash
+  DISPLAY=:1 emulator -avd letta_test -accel off -gpu swiftshader_indirect \
+    -no-snapshot -no-boot-anim -no-audio -memory 3072 -partition-size 4096 -no-metrics &
+  adb wait-for-device
+  # boot is slow under TCG (several minutes); poll until it prints 1:
+  until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 10; done
+  ```
+- Install + launch the debug build (the app id is `com.letta.mobile.dev`, and debug builds also
+  register a LeakCanary launcher — start `MainActivity` explicitly, not via the launcher):
+  ```bash
+  adb -s emulator-5554 install -r android-compose/app/build/outputs/apk/root/debug/app-root-debug.apk
+  adb -s emulator-5554 shell am start -n com.letta.mobile.dev/com.letta.mobile.MainActivity
+  ```
+- Under TCG the OS is slow enough that Android may show "System/Process isn't responding" ANR
+  dialogs during startup — tap **Wait** (or `adb shell input tap`) and give it time; these are
+  emulation-speed artifacts, not app bugs. `adb exec-out screencap -p > out.png` is the most
+  reliable way to capture the app's screen.
+
+### Persisting the desktop backend config (without committing the URL)
+
+- On **Save**, the desktop client writes its config to `~/.letta-mobile/desktop-settings.properties`
+  (outside the git repo — never commit this or paste backend URLs into tracked files / the PR).
+- The backend URL is treated as a **secret**. To auto-restore it on a fresh VM, set the
+  `LETTA_DESKTOP_SERVER_URL` secret (its value is the full `iroh://…` or `https://…` URL) in the
+  Secrets panel. The startup update script recreates
+  `~/.letta-mobile/desktop-settings.properties` from that env var when the file is missing, so the
+  URL stays encrypted in Cursor Secrets and out of the repo.
+
+### Lint (detekt)
+
+- Detekt (`1.23.8`) rejects `--jvm-target 26`, so `./gradlew detekt` fails on JDK 26 with
+  "Invalid value (26) passed to --jvm-target". Run it on JDK 21 instead:
+  ```bash
+  JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew detekt
+  ```
+  Detekt is **not** a required CI gate (CI static analysis is Qodana) and `detekt.yml` sets
+  `maxIssues: 0`, so it currently reports pre-existing findings on `main`.
+
+### Flaky unit tests
+
+- Under cold-VM CPU contention a few timing-sensitive tests can spuriously fail
+  (`AndroidNetworkBridgeStreamingTest` → `SocketTimeoutException`,
+  `LettaDatabaseCharacterizationTest` / `MessageRepositoryE2eTest` → `UncompletedCoroutinesError`).
+  They pass on an isolated re-run (`--tests`); treat these specific failures as flakiness, not a
+  regression.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 
 ## Beads Issue Tracker
