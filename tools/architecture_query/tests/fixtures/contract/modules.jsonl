@@ -1,0 +1,3 @@
+{"module":":app","name":"app","directory":"android-compose/app","kind":"android-application","tags":["ui"]}
+{"module":":feature:chat","name":"chat","directory":"android-compose/feature/chat","kind":"kotlin-library","tags":["feature"]}
+{"module":":core:model","name":"model","directory":"android-compose/core/model","kind":"kotlin-library","tags":["core"]}

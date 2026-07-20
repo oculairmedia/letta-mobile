@@ -1,0 +1,2 @@
+{"source":":app","coordinate":"androidx.compose.ui:ui","configuration":"implementation"}
+{"source":":feature:chat","coordinate":"org.jetbrains.kotlinx:kotlinx-coroutines-core","configuration":"commonMainImplementation"}
