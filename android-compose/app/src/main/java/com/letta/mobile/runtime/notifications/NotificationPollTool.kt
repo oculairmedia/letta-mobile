@@ -7,7 +7,6 @@ import com.letta.mobile.runtime.actions.MobileActionRiskTier
 import com.letta.mobile.runtime.actions.MobileActionSensitivity
 import com.letta.mobile.runtime.actions.MobileActionToolResponse
 import com.letta.mobile.runtime.actions.MobileExternalToolHandler
-import com.letta.mobile.runtime.actions.newActionId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.intOrNull

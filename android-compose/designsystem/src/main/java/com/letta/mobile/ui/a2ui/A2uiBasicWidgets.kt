@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.a2ui
 
 import android.content.Intent
-import android.net.Uri
 import androidx.core.net.toUri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -81,7 +80,6 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import java.time.LocalTime
-
 
 import kotlin.time.Duration.Companion.milliseconds
 @Composable

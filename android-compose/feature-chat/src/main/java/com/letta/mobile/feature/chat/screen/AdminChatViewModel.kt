@@ -61,12 +61,10 @@ import com.letta.mobile.feature.chat.coordination.AdminChatSlashCommandsCoordina
 import com.letta.mobile.feature.chat.coordination.AdminChatTransportCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatTruncatedToolReturnCoordinator
 import com.letta.mobile.data.model.AgentRuntimeBinding
-import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.feature.chat.subagent.WsSelfTodoSource
-import android.os.SystemClock
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -89,8 +87,6 @@ import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
-
-
 
 internal fun resolveLocalRuntimeRouting(
     agent: Agent?,

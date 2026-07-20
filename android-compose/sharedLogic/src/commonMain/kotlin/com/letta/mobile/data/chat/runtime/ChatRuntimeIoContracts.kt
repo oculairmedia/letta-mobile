@@ -5,13 +5,11 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.timeline.TimelineTransport
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 
 interface ChatGateway : TimelineTransport {
