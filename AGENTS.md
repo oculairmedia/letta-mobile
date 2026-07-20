@@ -38,7 +38,23 @@ git push --force-with-lease                 # safe force-push to your branch
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
 - **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`.
-- **CI gates merges, not pushes.** Required status checks: `test`, `build-apk`, and `shared-multiplatform`. All must be green before squash-merge.
+- **CI gates merges, not pushes.** Required status checks: `test`, `build-apk-pass`, `shared-multiplatform`, and `iroh-probe-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
+- **Advisory CI (non-blocking):** `agents-policy` (greppable AGENTS.md rules via `scripts/ci/agents-policy-check.py`) and `detekt` surface debt in job summaries without blocking merge. Do not treat them as required gates yet.
+- **Additive module tests:** on PRs, `scripts/ci/changed-gradle-modules.sh` may also run `:feature-chat` / `:feature-editagent` / `:designsystem` / `:desktop` / `:cli` unit tests when those trees change. This never skips `:sharedLogic:allTests`.
+
+## Module map (where work belongs)
+
+| Area | Module path | Put logic here | Host binding only |
+| --- | --- | --- | --- |
+| Shared domain / transport / timeline | `android-compose/sharedLogic/` | repositories, reducers, mappers, RPC, caching | — |
+| Android UI / navigation | `android-compose/app/`, `feature-*` | Compose screens, ViewModels that call shared APIs | Activity, Hilt, permissions |
+| Design system / A2UI | `android-compose/designsystem/` | reusable components, theme, A2UI renderer | — |
+| Desktop shell | `android-compose/desktop/` | — | windowing, installer, Ktor engine, OS lock |
+| CLI / probes | `android-compose/cli/`, `appserver-cli/` | JVM tooling | — |
+
+Local quality: `cd android-compose && ./gradlew detekt` and `python3 scripts/ci/agents-policy-check.py` (full) or `--diff-base origin/main` (PR-shaped).
+
+## Hard rules for agents (continued)
 - **`sharedLogic` commonMain/commonTest must stay platform-neutral.** No JVM-only APIs (`String.format`, `StringBuilder.delete(start, end)`, `String.toByteArray()`, …) — the code must compile for every configured KMP target (Android, JVM/desktop, host-native for Windows). The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) enforces this; see bead letta-mobile-kx1r3 for the leaks that motivated it.
 - **First-time setup in a fresh clone:** run `./scripts/install-hooks.sh` to activate the local hooks via `core.hooksPath`.
 - **Feature LOGIC goes in `sharedLogic/commonMain`; platform modules add only the binding.** State, transforms, caching, TTL, retry/cache policy, request/response shaping, mappers, and reducers are platform-neutral — they belong in `sharedLogic`, implemented once, consumed by every host (Android `app`, `desktop`, future iOS). A platform module (`desktop/`, `app/`) should contain ONLY what genuinely cannot be shared:
