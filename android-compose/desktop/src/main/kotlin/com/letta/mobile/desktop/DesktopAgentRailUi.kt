@@ -44,6 +44,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.desktop.chat.AgentOrb
 
+private val androidx.compose.material3.Typography.countBadge
+    get() = labelSmall.copy(fontWeight = FontWeight.SemiBold)
+
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
  * (now / 5m / 2h / 4d / 3w / 2mo). Non-ISO values are returned unchanged.
@@ -343,7 +346,7 @@ private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = if (count > 99) "99+" else count.toString(),
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            style = MaterialTheme.typography.countBadge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
