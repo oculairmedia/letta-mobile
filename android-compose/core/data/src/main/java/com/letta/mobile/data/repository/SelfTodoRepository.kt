@@ -50,7 +50,7 @@ internal fun defaultSelfTodoScope(): CoroutineScope =
 @Singleton
 open class SelfTodoRepository(
     private val transport: IChannelTransport,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
 ) : ISelfTodoRepository {
     /**
      * Hilt-friendly constructor — uses a fresh [defaultSelfTodoScope] tied

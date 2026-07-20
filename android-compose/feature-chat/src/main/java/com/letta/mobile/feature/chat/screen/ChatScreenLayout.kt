@@ -3,7 +3,6 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -291,7 +290,7 @@ private data class ChatScreenFloatingOverlaysParams(
 )
 
 @Composable
-private fun BoxScope.ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
+private fun ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
     CompositionLocalProvider(LocalSubagentTodoSheetOpener provides params.openSubagentTarget) {
         ActiveSubagentRings(
             subagents = params.layoutParams.subagentBarState.activeSubagents,

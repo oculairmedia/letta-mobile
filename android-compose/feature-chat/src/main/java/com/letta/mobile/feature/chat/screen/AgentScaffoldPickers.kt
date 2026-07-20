@@ -943,7 +943,6 @@ private fun buildModelSubtitle(model: LlmModel): String {
     return parts.joinToString(" · ")
 }
 
-@androidx.annotation.VisibleForTesting
 @Composable
 internal fun DrawerContent(
     agentName: String,

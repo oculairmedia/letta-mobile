@@ -1537,7 +1537,7 @@ tasks.register<Test>("testScreenshot") {
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
     maxHeapSize = testTask.maxHeapSize
-    jvmArgs(testTask.jvmArgs.orEmpty())
+    jvmArgs(testTask.jvmArgs)
     setForkEvery(1L)
 
     useJUnitPlatform {

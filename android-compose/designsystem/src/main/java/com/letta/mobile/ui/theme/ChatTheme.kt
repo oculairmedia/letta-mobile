@@ -141,18 +141,18 @@ fun LettaChatTheme(
     )
 }
 
+@Suppress("UnusedReceiverParameter")
 val MaterialTheme.chatColors: ChatColors
-    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatColors.current
 
+@Suppress("UnusedReceiverParameter")
 val MaterialTheme.chatTypography: ChatTypography
-    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatTypography.current
 
+@Suppress("UnusedReceiverParameter")
 val MaterialTheme.chatShapes: ChatShapes
-    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatShapes.current
 
+@Suppress("UnusedReceiverParameter")
 val MaterialTheme.chatDimens: ChatDimens
-    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatDimens.current

@@ -252,7 +252,7 @@ private const val BASE_TABLE_CELL_WIDTH_DP = 64
 private const val TABLE_CELL_WORD_WIDTH_STEP_DP = 5
 private const val TABLE_CELL_LINE_WIDTH_STEP_DP = 2
 
-private val markdownLinkSourceRegex = Regex("""\[([^\]]+)]\([^)]+\)""")
+private val markdownLinkSourceRegex = Regex("""\[([^]]+)]\([^)]+\)""")
 private val markdownCodeSourceRegex = Regex("""`([^`\n]+)`""")
 private val markdownMarkerSourceRegex = Regex("""\*\*|__|\*|_|~~""")
 

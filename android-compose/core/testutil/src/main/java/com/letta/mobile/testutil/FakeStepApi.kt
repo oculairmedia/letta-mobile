@@ -38,7 +38,7 @@ class FakeStepApi : StepApi(mockk(relaxed = true)) {
         return stepMetrics[stepId] ?: StepMetrics(id = stepId, stepStartNs = 100L, llmRequestNs = 250L, stepNs = 500L)
     }
 
-    override suspend fun retrieveStepTrace(stepId: String): ProviderTrace? {
+    override suspend fun retrieveStepTrace(stepId: String): ProviderTrace {
         calls.add("retrieveStepTrace:$stepId")
         if (shouldFail) throw ApiException(500, "Server error")
         return stepTraces[stepId] ?: ProviderTrace(

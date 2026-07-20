@@ -1,7 +1,5 @@
 package com.letta.mobile.feature.chat.render
 
-import androidx.annotation.VisibleForTesting
-
 internal data class MarkdownClampSource(val raw: String)
 
 internal data class MarkdownClampLineText(val value: String)
@@ -32,7 +30,6 @@ internal data class MarkdownClampScanResult(
  * can safely re-parse without producing a "raw markup flash" when
  * the construct's closer arrives in a later chunk.
  */
-@VisibleForTesting
 internal fun clampToStableMarkdown(source: MarkdownClampSource): String {
     val scan = MarkdownClampScanResult(source, source.lastLine())
     if (scan.line.text.value.isEmpty()) return unchangedSource(scan)

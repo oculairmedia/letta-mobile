@@ -133,10 +133,7 @@ class MessageProcessor @Inject constructor(
                             onEmit(appMessage)
                         }
 
-                        is EventMessage -> {
-                            if (lettaMessage.eventType != "ping") {
-                            }
-                        }
+                        is EventMessage -> Unit
 
                         is HiddenReasoningMessage -> {
                         }

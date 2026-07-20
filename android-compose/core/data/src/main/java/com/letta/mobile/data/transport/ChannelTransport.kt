@@ -49,8 +49,8 @@ internal fun defaultChannelTransportScope(): CoroutineScope =
 @Singleton
 class ChannelTransport internal constructor(
     private val scope: CoroutineScope,
-    private val cursorStore: RunCursorStore,
-    private val conversationCursorStore: ConversationCursorStore,
+    cursorStore: RunCursorStore,
+    conversationCursorStore: ConversationCursorStore,
 ) : IChannelTransport {
     @Inject
     constructor(

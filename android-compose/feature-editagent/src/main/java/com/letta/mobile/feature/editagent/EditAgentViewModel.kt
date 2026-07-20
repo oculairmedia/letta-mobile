@@ -126,7 +126,7 @@ internal class EditAgentViewModel @Inject constructor(
             originalBlocks = originalBlocks,
             originalEmbedding = originalEmbedding,
             originalProviderType = originalProviderType,
-            servedModelIds = { llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } } },
+            servedModelIds = { llmModels.value.map { model -> model.handle ?: model.name.ifBlank { model.id } } },
         )
         state.setSuccess(snapshot.uiState)
     }

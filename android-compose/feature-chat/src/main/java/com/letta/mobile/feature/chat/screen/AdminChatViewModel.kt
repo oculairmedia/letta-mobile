@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -707,17 +708,16 @@ internal class AdminChatViewModel @Inject constructor(
     override fun onCleared() {
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
-        super.onCleared()
     }
 
     // --- Composer coordination delegates ---
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
 
-    fun selectSlashCommand(command: com.letta.mobile.data.model.SlashCommand) =
+    fun selectSlashCommand(command: SlashCommand) =
         slashCommandsCoordinator.selectSlashCommand(command)
 
-    fun uninstallSlashCommand(command: com.letta.mobile.data.model.SlashCommand) =
+    fun uninstallSlashCommand(command: SlashCommand) =
         slashCommandsCoordinator.uninstallSlashCommand(command)
 
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =

@@ -1,7 +1,5 @@
 package com.letta.mobile.feature.chat.render
 
-import androidx.annotation.VisibleForTesting
-
 private const val MAX_SIMPLE_INLINE_MATH_CHARS = 3
 
 internal data class MarkdownMathScanLine(val raw: String)
@@ -18,7 +16,6 @@ internal data class MarkdownMathInlineBodySpan(
     val start: MarkdownMathScanIndex,
 )
 
-@VisibleForTesting
 internal fun findUnmatchedMathOpenerInLine(line: MarkdownMathScanLine): Int {
     val displayOpenIdx = findUnmatchedDisplayMathOpenerInLine(line)
     val inlineOpenIdx = findUnmatchedInlineMathOpenerInLine(line)

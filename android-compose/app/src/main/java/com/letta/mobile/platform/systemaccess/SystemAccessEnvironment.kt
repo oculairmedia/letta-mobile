@@ -1,6 +1,7 @@
 package com.letta.mobile.platform.systemaccess
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -90,7 +91,7 @@ class AndroidSystemAccessEnvironment @Inject constructor(
             ".${serviceClassName.substringAfterLast('.')}",
         )
         return flattenedComponents.split(':').any { flattened ->
-            val component = android.content.ComponentName.unflattenFromString(flattened) ?: return@any false
+            val component = ComponentName.unflattenFromString(flattened) ?: return@any false
             component.packageName == context.packageName && component.className in expectedClassNames
         }
     }
@@ -103,7 +104,7 @@ internal object AndroidPermissionNames {
     const val READ_MEDIA_VIDEO = "android.permission.READ_MEDIA_VIDEO"
     const val READ_MEDIA_AUDIO = "android.permission.READ_MEDIA_AUDIO"
     const val READ_EXTERNAL_STORAGE = Manifest.permission.READ_EXTERNAL_STORAGE
-    const val MANAGE_EXTERNAL_STORAGE = Manifest.permission.MANAGE_EXTERNAL_STORAGE
+    const val MANAGE_EXTERNAL_STORAGE = "android.permission.MANAGE_EXTERNAL_STORAGE"
     const val READ_CONTACTS = Manifest.permission.READ_CONTACTS
     const val WRITE_CONTACTS = Manifest.permission.WRITE_CONTACTS
     const val SYSTEM_ALERT_WINDOW = Manifest.permission.SYSTEM_ALERT_WINDOW
@@ -119,7 +120,7 @@ internal object AndroidSettingsActions {
     const val ACTION_MANAGE_OVERLAY_PERMISSION = Settings.ACTION_MANAGE_OVERLAY_PERMISSION
     const val ACTION_NOTIFICATION_LISTENER_SETTINGS = Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
     const val ACTION_ACCESSIBILITY_SETTINGS = Settings.ACTION_ACCESSIBILITY_SETTINGS
-    const val ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
+    const val ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION = "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"
 
     fun appDetailsUri(packageName: String): Uri = "package:$packageName".toUri()
 }

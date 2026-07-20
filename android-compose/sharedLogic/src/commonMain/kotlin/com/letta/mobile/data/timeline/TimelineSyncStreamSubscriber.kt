@@ -46,7 +46,7 @@ internal suspend fun runStreamSubscriber(
         try {
             val stream = messageApi.streamConversation(conversationId)
             val activeStreamCountOnOpen = activeStreamCount.incrementAndGet()
-            var activeStreamCountAfterClose = activeStreamCountOnOpen
+            var activeStreamCountAfterClose: Int
             var streamTimedOut = false
             var timedOutSilenceMs = 0L
             try {

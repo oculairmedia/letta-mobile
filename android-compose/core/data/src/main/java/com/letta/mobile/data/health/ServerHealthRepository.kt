@@ -59,7 +59,7 @@ internal fun defaultServerHealthScope(): CoroutineScope =
 @Singleton
 class ServerHealthRepository(
     private val settingsRepository: SettingsRepository,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
 ) : IServerHealthRepository {
     /** Hilt-friendly constructor — uses [defaultServerHealthScope]. */
     @Inject

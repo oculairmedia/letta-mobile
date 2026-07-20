@@ -251,7 +251,7 @@ class AppServerTurnEngine(
         // finally so the released event carries a RELEASE REASON. Defaults to a
         // normal completion; overwritten (pure write) if a distinct terminal
         // path is observed. Never gates control flow.
-        var releaseReason: String = "normal_completion"
+        var releaseReason = "normal_completion"
         try {
             val turnPermissionMode = permissionModeProvider(command)
             Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
@@ -389,10 +389,8 @@ class AppServerTurnEngine(
         var speculativeCompletionArmed = false
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
-        // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame currently being
-        // processed, and the seq of the frame that produced the pending
-        // completed terminal (so the delayed settle can record it). Pure reads.
-        var currentFrameSeq: Long? = null
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame that produced
+        // the pending completed terminal, so the delayed settle can record it.
         var pendingCompletedSeq: Long? = null
         
         // letta-mobile-oqfbj: track emitted and returned tool_call_ids for settlement
@@ -510,7 +508,6 @@ class AppServerTurnEngine(
                 // same place the engine learns the real run id (frames carry
                 // run_id → draft.runId); we do not alter that promotion flow.
                 val frameSeq = received.eventSeqOrNull()
-                currentFrameSeq = frameSeq
                 val drafts = mapper.map(command, received)
                 drafts.firstOrNull { it.runId != null }?.runId?.value?.let { promoteOwnerRunId(it) }
                 drafts.forEach { draft ->

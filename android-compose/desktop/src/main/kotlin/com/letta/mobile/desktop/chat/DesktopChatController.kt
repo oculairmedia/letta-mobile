@@ -45,7 +45,7 @@ class DesktopChatController(
     // The backend doesn't yet persist a conversation's archived flag, so we keep a
     // local, durable record of archived ids and overlay it on every load. Still
     // PATCHes the server so this lights up automatically once the backend lands.
-    private val loadArchivedConversationIds: () -> Set<String> = { emptySet() },
+    loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
     private val loopFactory: (
         gateway: DesktopChatGateway,
