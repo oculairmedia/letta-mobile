@@ -252,23 +252,21 @@ class IrohNodeConnection(
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
 
-    private suspend fun handleAdminRpcControlCommand(
-        requestId: String?,
-        obj: JsonObject,
-    ): String {
-        val method = obj["method"]?.jsonPrimitive?.content
-        if (method == null || requestId == null) {
-            return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
-        }
-        return adminRpcRouter.dispatch(
+    private data class ControlAdminRpcFrame(
+        val requestId: String,
+        val method: String,
+        val params: JsonObject?,
+    )
+
+    private suspend fun dispatchControlAdminRpc(frame: ControlAdminRpcFrame): String =
+        adminRpcRouter.dispatch(
             AdminRpcInvocation(
-                requestId = requestId,
-                method = method,
-                params = obj["params"]?.jsonObject,
+                requestId = frame.requestId,
+                method = frame.method,
+                params = frame.params,
                 context = currentAdminRpcRequestContext(),
             ),
         )
-    }
 
     /**
      * Conversation-scoped auth context for both admin_rpc BiStreams and
@@ -363,7 +361,18 @@ class IrohNodeConnection(
                     null
                 }
                 "admin_rpc" -> ifAuthorized(requestId) {
-                    handleAdminRpcControlCommand(requestId, obj)
+                    val method = obj["method"]?.jsonPrimitive?.content
+                    if (method == null || requestId == null) {
+                        """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
+                    } else {
+                        dispatchControlAdminRpc(
+                            ControlAdminRpcFrame(
+                                requestId = requestId,
+                                method = method,
+                                params = obj["params"]?.jsonObject,
+                            ),
+                        )
+                    }
                 }
                 "sync" -> ifAuthorized(requestId) {
                     if (requestId == null) {
