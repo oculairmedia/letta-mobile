@@ -10,7 +10,7 @@
           ActivityTaskManager launch but empty gfxinfo framestats.
         -->
         <activity
-            android:name=".MainActivity"
+            android:name="com.letta.mobile.MainActivity"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             tools:targetApi="27"

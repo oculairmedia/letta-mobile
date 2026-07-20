@@ -17,6 +17,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarMessage
 import com.letta.mobile.ui.haptics.HapticEffects
+import kotlin.time.Duration.Companion.milliseconds
 
 // letta-mobile-gi9o0: minimum gap between reveal-synchronized streaming
 // haptics. Pulses are triggered by the smoothed text actually revealing (word
@@ -143,7 +144,7 @@ private fun ChatScreenFloatingBannerDismissEffect(
 ) {
     LaunchedEffect(floatingBannerMessage) {
         if (floatingBannerMessage.isNotBlank()) {
-            kotlinx.coroutines.delay(2600)
+            kotlinx.coroutines.delay(2600.milliseconds)
             onFloatingBannerMessageChange("")
         }
     }
@@ -204,7 +205,7 @@ private fun ChatScreenAmbientStatusEffect(
             }
             ambient.hadActiveRun -> {
                 ambient.onStatusChange("Completed")
-                kotlinx.coroutines.delay(1400)
+                kotlinx.coroutines.delay(1400.milliseconds)
                 ambient.onHadActiveRunChange(false)
                 ambient.onStatusChange("Idle")
             }

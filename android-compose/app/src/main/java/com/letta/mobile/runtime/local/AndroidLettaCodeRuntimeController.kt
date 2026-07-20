@@ -12,6 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -136,6 +137,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun collectTurnOutputWithLivenessWatchdog(
         onOutput: suspend (String) -> Boolean,
         startTurn: suspend () -> Unit,
@@ -165,7 +167,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
                             "Embedded LettaCode turn exceeded absolute maximum of ${turnAbsoluteMaxMs / 1000}s.",
                         )
                     }
-                    onTimeout(turnSilenceMs) {
+                    onTimeout(turnSilenceMs.milliseconds) {
                         throw TurnTimeoutException(
                             "Embedded LettaCode turn produced no output for ${turnSilenceMs / 1000}s.",
                         )

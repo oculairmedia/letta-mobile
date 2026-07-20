@@ -25,7 +25,7 @@ internal class CancelMidstreamProbeScenario(
         var abortJob: Job? = null
         val turnStartedAt = nowMs()
         return try {
-            withTimeoutOrNull(options.timeoutMs) {
+            withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 val established = fixture.establish(
                     ProbeEstablishRequest(
                         target = target,

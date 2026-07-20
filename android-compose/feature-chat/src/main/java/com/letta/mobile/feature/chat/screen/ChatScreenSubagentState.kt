@@ -14,6 +14,7 @@ import com.letta.mobile.feature.chat.subagent.withLingeringTerminals
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class ChatScreenSubagentBarState(
     val activeSubagents: ImmutableList<ActiveSubagent>,
@@ -32,7 +33,7 @@ internal fun rememberChatScreenSubagentBarState(
     LaunchedEffect(subagentSnapshot) {
         while (subagentSnapshot.any { it.isTerminal || it.isActive }) {
             lingerTick = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1_000)
+            kotlinx.coroutines.delay(1_000.milliseconds)
         }
         lingerTick = System.currentTimeMillis()
     }

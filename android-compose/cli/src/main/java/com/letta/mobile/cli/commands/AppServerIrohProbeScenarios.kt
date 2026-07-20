@@ -43,7 +43,7 @@ internal class LegacyProbeScenarios(
         if ("restart-send" in scenarioSet) {
             runWrapperRestart()?.let { turns += restartSkippedTurn(turn = 2, note = it) }
         } else {
-            delay(options.secondTurnDelayMs)
+            delay(options.secondTurnDelayMs.milliseconds)
         }
         if (turns.none { it.turn == 2 }) {
             turns += fixture.runProbeTurn(2, target)
@@ -64,7 +64,7 @@ internal class LegacyProbeScenarios(
         val turns = mutableListOf<IrohProbeTurnMetrics>()
         val turnStartedAt = nowMs()
         try {
-            val setup = withTimeoutOrNull(options.timeoutMs) {
+            val setup = withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 fixture.establish(
                     ProbeEstablishRequest(
                         target = target,
@@ -84,7 +84,7 @@ internal class LegacyProbeScenarios(
                 ProbeSendInputRequest(turn = 1, session = session, turnStartedAt = turnStartedAt),
             )
             turns += firstTurn
-            delay(options.idleMs)
+            delay(options.idleMs.milliseconds)
             val secondTurn = fixture.sendProbeInput(
                 ProbeSendInputRequest(turn = 2, session = session, sendFailureViolation = true),
             )
@@ -190,7 +190,7 @@ internal class NoHttpProbeScenario(
         }
         return try {
             sample()
-            val metrics = withTimeoutOrNull(options.timeoutMs) {
+            val metrics = withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 val established = fixture.establish(
                     ProbeEstablishRequest(
                         target = target,
