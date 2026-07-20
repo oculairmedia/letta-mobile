@@ -14,9 +14,15 @@ on:
       # triggers the required checks (test/build-apk-pass/shared-multiplatform).
       # Without this, a workflow-only PR skips these jobs, the required contexts
       # never report, and branch protection leaves it BLOCKED forever.
+      # Same for tooling-smoke / architecture-stack scripts: those PRs must still
+      # report the required Android contexts or they stay BLOCKED forever.
       - ".github/workflows/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
+      - "scripts/tests/**"
+      - "scripts/mcp/**"
+      - "scripts/scip/**"
+      - "tools/architecture_query/**"
   workflow_dispatch:
 
 concurrency:
