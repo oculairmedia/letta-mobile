@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -65,219 +66,261 @@ import kotlinx.coroutines.launch
  */
 internal const val TOOL_AFFORDANCE_ROW_ENABLED = true
 
+internal data class ChatScreenLayoutParams(
+    val state: ChatUiState,
+    val composerState: ChatComposerState,
+    val viewModel: AdminChatViewModel,
+    val contentPadding: PaddingValues,
+    val chatBackground: ChatBackground,
+    val chatMode: String,
+    val navigation: ChatScreenNavigationCallbacks,
+    val resolvedSubagentSource: ActiveSubagentSource,
+    val subagentBarState: ChatScreenSubagentBarState,
+    val activeFontScale: Float,
+    val onActiveFontScaleChange: (Float) -> Unit,
+    val bottomInsetDp: Dp,
+    val floatingBannerMessage: String,
+    val onFloatingBannerMessageChange: (String) -> Unit,
+    val streamingRevealPulse: () -> Unit,
+)
+
 @Composable
 internal fun ChatScreenLayout(
-    state: ChatUiState,
-    composerState: ChatComposerState,
-    viewModel: AdminChatViewModel,
-    contentPadding: PaddingValues,
-    chatBackground: ChatBackground,
-    chatMode: String,
-    navigation: ChatScreenNavigationCallbacks,
-    resolvedSubagentSource: ActiveSubagentSource,
-    subagentBarState: ChatScreenSubagentBarState,
-    activeFontScale: Float,
-    onActiveFontScaleChange: (Float) -> Unit,
-    bottomInsetDp: Dp,
-    floatingBannerMessage: String,
-    onFloatingBannerMessageChange: (String) -> Unit,
-    streamingRevealPulse: () -> Unit,
+    params: ChatScreenLayoutParams,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
+    val localState = rememberChatScreenLayoutLocalState(params)
     val haptic = LocalHapticFeedback.current
     val reducedMotion = rememberReducedMotionEnabled()
-    val subagentNavigationScope = rememberCoroutineScope()
-    val currentConversationId = viewModel.conversationId?.value
-
-    var tappedSubagentTarget by remember { mutableStateOf<SubagentTodoSheetTarget?>(null) }
-    val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit = { target ->
-        tappedSubagentTarget = target
-        if (target.subagentConversationId == null) {
-            subagentNavigationScope.launch {
-                val subagent = resolvedSubagentSource.resolveSubagent(target.toolCallId).getOrNull()
-                val agentId = target.subagentAgentId ?: subagent?.subagentAgentId
-                val conversationId = subagent?.let { resolvedSubagentSource.resolveConversationId(it).getOrNull() }
-                if (agentId != null && conversationId != null) {
-                    tappedSubagentTarget = target.copy(
-                        subagentAgentId = agentId,
-                        subagentConversationId = conversationId,
-                    )
-                }
-            }
-        }
-    }
-    var imageViewerState by remember {
-        mutableStateOf<Pair<kotlinx.collections.immutable.ImmutableList<UiImageAttachment>, Int>?>(null)
-    }
-    val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = { attachments, index ->
-        imageViewerState = attachments.toImmutableList() to index
-    }
-    var composerHeightDp by remember { mutableStateOf(0.dp) }
-    val bottomPaddingDp = composerHeightDp + bottomInsetDp
-
-    val contentCallbacks = remember(viewModel, openImageViewer, onActiveFontScaleChange) {
-        ChatContentCallbacks(
-            onSendMessage = { viewModel.sendMessage(it) },
-            onRerunMessage = { viewModel.rerunMessage(it) },
-            onLoadOlderMessages = { viewModel.loadOlderMessages() },
-            onSubmitApproval = { requestId, toolCallIds, approve, reason ->
-                viewModel.submitApproval(requestId, toolCallIds, approve, reason)
-            },
-            onToggleRunCollapsed = viewModel::toggleRunCollapsed,
-            onToggleReasoningExpanded = viewModel::toggleReasoningExpanded,
-            onA2uiAction = viewModel::submitA2uiAction,
-            onDismissA2uiSurface = viewModel::dismissA2uiSurface,
-            onAttachmentImageTap = openImageViewer,
-            onActiveFontScaleChange = onActiveFontScaleChange,
-            onFontScaleChange = { viewModel.setChatFontScale(it) },
-        )
-    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        val contentPhase = when {
-            state.conversationState is ConversationState.Loading -> "loading"
-            state.conversationState is ConversationState.Error -> "error"
-            state.conversationState == ConversationState.NoConversation -> "no-conv"
-            state.isLoadingMessages && state.messages.isEmpty() -> "loading"
-            state.error != null && state.messages.isEmpty() -> "error"
-            else -> "ready"
-        }
+        ChatScreenMainContent(
+            params = params,
+            contentCallbacks = localState.contentCallbacks,
+            bottomPaddingDp = localState.bottomPaddingDp,
+            openSubagentTarget = localState.openSubagentTarget,
+        )
+        ChatScreenSubagentRingsOverlay(
+            params = params,
+            openSubagentTarget = localState.openSubagentTarget,
+            onTargetChange = localState.onTappedSubagentTargetChange,
+            subagentNavigationScope = localState.subagentNavigationScope,
+            haptic = haptic,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = params.contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
+        )
+        ChatScreenComposerColumn(
+            state = params.state,
+            composerState = params.composerState,
+            viewModel = params.viewModel,
+            navigation = params.navigation,
+            reducedMotion = reducedMotion,
+            bottomInsetDp = params.bottomInsetDp,
+            onComposerHeightChange = localState.onComposerHeightChange,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+        ChatScreenSubagentTodoSheet(
+            target = localState.tappedSubagentTarget,
+            resolvedSubagentSource = params.resolvedSubagentSource,
+            resolvedSelfTodoSource = params.viewModel.selfTodoSource,
+            currentConversationId = localState.currentConversationId,
+            navigation = params.navigation,
+            onDismiss = { localState.onTappedSubagentTargetChange(null) },
+            onTargetUpdate = localState.onTappedSubagentTargetChange,
+        )
+        ChatScreenFloatingOverlays(
+            floatingBannerMessage = params.floatingBannerMessage,
+            imageViewerState = localState.imageViewerState,
+            onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
+            chatMode = params.chatMode,
+            a2uiDebugFrames = params.state.a2uiDebugFrames,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
 
-        val truncatedToolResultResolver = remember(viewModel) {
-            TruncatedToolResultResolver { messageId ->
-                viewModel.onTruncatedToolResultExpanded(messageId)
-            }
+@Composable
+private fun ChatScreenMainContent(
+    params: ChatScreenLayoutParams,
+    contentCallbacks: ChatContentCallbacks,
+    bottomPaddingDp: Dp,
+    openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
+) {
+    val contentPhase = chatScreenContentPhase(params.state)
+    val truncatedToolResultResolver = remember(params.viewModel) {
+        TruncatedToolResultResolver { messageId ->
+            params.viewModel.onTruncatedToolResultExpanded(messageId)
         }
-        CompositionLocalProvider(
-            LocalSubagentTodoSheetOpener provides openSubagentTarget,
-            LocalStreamingRevealHapticPulse provides streamingRevealPulse,
-            LocalTruncatedToolResultResolver provides truncatedToolResultResolver,
-        ) {
-            Crossfade(
-                targetState = contentPhase,
-                animationSpec = tween(durationMillis = 200),
-                modifier = Modifier.fillMaxSize(),
-                label = "chat-content",
-            ) { phase ->
-                val appearance = ChatContentAppearance(
-                    chatMode = chatMode,
-                    chatBackground = chatBackground,
-                    topPadding = contentPadding.calculateTopPadding(),
+    }
+    CompositionLocalProvider(
+        LocalSubagentTodoSheetOpener provides openSubagentTarget,
+        LocalStreamingRevealHapticPulse provides params.streamingRevealPulse,
+        LocalTruncatedToolResultResolver provides truncatedToolResultResolver,
+    ) {
+        Crossfade(
+            targetState = contentPhase,
+            animationSpec = tween(durationMillis = 200),
+            modifier = Modifier.fillMaxSize(),
+            label = "chat-content",
+        ) { phase ->
+            ChatScreenPhaseContent(
+                phase = phase,
+                state = params.state,
+                viewModel = params.viewModel,
+                contentCallbacks = contentCallbacks,
+                appearance = ChatContentAppearance(
+                    chatMode = params.chatMode,
+                    chatBackground = params.chatBackground,
+                    topPadding = params.contentPadding.calculateTopPadding(),
                     bottomPadding = bottomPaddingDp,
-                    activeFontScale = activeFontScale,
-                    scrollToMessageId = viewModel.scrollToMessageId,
-                )
-                when (phase) {
-                    "loading" -> {
-                        MessageSkeletonList(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = contentPadding.calculateTopPadding())
-                        )
-                    }
-                    "error" -> {
-                        val msg = (state.conversationState as? ConversationState.Error)?.message
-                            ?: state.error ?: "Unknown error"
-                        val retry = if (state.conversationState is ConversationState.Error) {
-                            { viewModel.retryConversationLoad() }
-                        } else {
-                            { viewModel.loadMessages() }
-                        }
-                        ChatScreenErrorContent(
-                            message = msg,
-                            onRetry = retry,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(top = contentPadding.calculateTopPadding()),
-                        )
-                    }
-                    "no-conv" -> {
-                        NoConversationChatContent(
-                            state = state,
-                            callbacks = contentCallbacks,
-                            appearance = appearance,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                    else -> {
-                        ChatContent(
-                            state = state,
-                            callbacks = contentCallbacks,
-                            appearance = appearance,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
+                    activeFontScale = params.activeFontScale,
+                    scrollToMessageId = params.viewModel.scrollToMessageId,
+                ),
+                topPadding = params.contentPadding.calculateTopPadding(),
+            )
         }
+    }
+}
 
-        CompositionLocalProvider(
-            LocalSubagentTodoSheetOpener provides openSubagentTarget,
-        ) {
-            ActiveSubagentRings(
-                subagents = subagentBarState.activeSubagents,
-                now = subagentBarState.lingerTick,
-                onRingClick = { subagent ->
-                    tappedSubagentTarget = SubagentTodoSheetTarget(
+private fun chatScreenContentPhase(state: ChatUiState): String = when {
+    state.conversationState is ConversationState.Loading -> "loading"
+    state.conversationState is ConversationState.Error -> "error"
+    state.conversationState == ConversationState.NoConversation -> "no-conv"
+    state.isLoadingMessages && state.messages.isEmpty() -> "loading"
+    state.error != null && state.messages.isEmpty() -> "error"
+    else -> "ready"
+}
+
+@Composable
+private fun ChatScreenPhaseContent(
+    phase: String,
+    state: ChatUiState,
+    viewModel: AdminChatViewModel,
+    contentCallbacks: ChatContentCallbacks,
+    appearance: ChatContentAppearance,
+    topPadding: Dp,
+) {
+    when (phase) {
+        "loading" -> MessageSkeletonList(
+            modifier = Modifier.fillMaxSize().padding(top = topPadding),
+        )
+        "error" -> ChatScreenErrorPhase(state, viewModel, topPadding)
+        "no-conv" -> NoConversationChatContent(
+            state = state,
+            callbacks = contentCallbacks,
+            appearance = appearance,
+            modifier = Modifier.fillMaxSize(),
+        )
+        else -> ChatContent(
+            state = state,
+            callbacks = contentCallbacks,
+            appearance = appearance,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@Composable
+private fun ChatScreenErrorPhase(
+    state: ChatUiState,
+    viewModel: AdminChatViewModel,
+    topPadding: Dp,
+) {
+    val msg = (state.conversationState as? ConversationState.Error)?.message
+        ?: state.error ?: "Unknown error"
+    val retry = if (state.conversationState is ConversationState.Error) {
+        { viewModel.retryConversationLoad() }
+    } else {
+        { viewModel.loadMessages() }
+    }
+    ChatScreenErrorContent(
+        message = msg,
+        onRetry = retry,
+        modifier = Modifier.fillMaxSize().padding(top = topPadding),
+    )
+}
+
+@Composable
+private fun BoxScope.ChatScreenSubagentRingsOverlay(
+    params: ChatScreenLayoutParams,
+    openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
+    onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
+    subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    modifier: Modifier = Modifier,
+) {
+    CompositionLocalProvider(LocalSubagentTodoSheetOpener provides openSubagentTarget) {
+        ActiveSubagentRings(
+            subagents = params.subagentBarState.activeSubagents,
+            now = params.subagentBarState.lingerTick,
+            onRingClick = { subagent ->
+                onTargetChange(
+                    SubagentTodoSheetTarget(
                         toolCallId = subagent.id,
                         description = subagent.description,
                         subagentAgentId = subagent.subagentAgentId,
                         subagentConversationId = subagent.subagentConversationId,
-                    )
-                },
-                onViewConversation = { subagent ->
-                    subagentNavigationScope.launch {
-                        val agentId = subagent.subagentAgentId?.takeIf { it.isNotBlank() }
-                        val conversationId = if (agentId == null) {
-                            null
-                        } else {
-                            resolvedSubagentSource.resolveConversationId(subagent)
-                                .getOrNull()
-                                ?.takeIf { it.isNotBlank() }
-                        }
-                        if (agentId != null && conversationId != null && navigation.onViewSubagentConversation != null) {
-                            HapticEffects.longPress(haptic)
-                            navigation.onViewSubagentConversation.invoke(agentId, conversationId)
-                        } else {
-                            tappedSubagentTarget = SubagentTodoSheetTarget(
-                                toolCallId = subagent.id,
-                                description = subagent.description,
-                                subagentAgentId = subagent.subagentAgentId,
-                                subagentConversationId = subagent.subagentConversationId,
-                            )
-                            onFloatingBannerMessageChange("Subagent conversation is not available yet")
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
-            )
+                    ),
+                )
+            },
+            onViewConversation = { subagent ->
+                handleSubagentViewConversation(
+                    subagent = subagent,
+                    resolvedSubagentSource = params.resolvedSubagentSource,
+                    navigation = params.navigation,
+                    subagentNavigationScope = subagentNavigationScope,
+                    haptic = haptic,
+                    onTargetChange = onTargetChange,
+                    onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
+                )
+            },
+            modifier = modifier,
+        )
+    }
+}
+
+private fun handleSubagentViewConversation(
+    subagent: ActiveSubagent,
+    resolvedSubagentSource: ActiveSubagentSource,
+    navigation: ChatScreenNavigationCallbacks,
+    subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
+    onFloatingBannerMessageChange: (String) -> Unit,
+) {
+    subagentNavigationScope.launch {
+        val agentId = subagent.subagentAgentId?.takeIf { it.isNotBlank() }
+        val conversationId = agentId?.let {
+            resolvedSubagentSource.resolveConversationId(subagent).getOrNull()?.takeIf { id -> id.isNotBlank() }
         }
-
-        ChatScreenComposerColumn(
-            state = state,
-            composerState = composerState,
-            viewModel = viewModel,
-            chatMode = chatMode,
-            navigation = navigation,
-            reducedMotion = reducedMotion,
-            bottomInsetDp = bottomInsetDp,
-            onComposerHeightChange = { composerHeightDp = it },
-            modifier = Modifier.align(Alignment.BottomCenter),
+        if (agentId != null && conversationId != null && navigation.onViewSubagentConversation != null) {
+            HapticEffects.longPress(haptic)
+            navigation.onViewSubagentConversation.invoke(agentId, conversationId)
+            return@launch
+        }
+        onTargetChange(
+            SubagentTodoSheetTarget(
+                toolCallId = subagent.id,
+                description = subagent.description,
+                subagentAgentId = subagent.subagentAgentId,
+                subagentConversationId = subagent.subagentConversationId,
+            ),
         )
+        onFloatingBannerMessageChange("Subagent conversation is not available yet")
+    }
+}
 
-        ChatScreenSubagentTodoSheet(
-            target = tappedSubagentTarget,
-            resolvedSubagentSource = resolvedSubagentSource,
-            resolvedSelfTodoSource = viewModel.selfTodoSource,
-            currentConversationId = currentConversationId,
-            navigation = navigation,
-            onDismiss = { tappedSubagentTarget = null },
-            onTargetUpdate = { tappedSubagentTarget = it },
-        )
-
+@Composable
+private fun ChatScreenFloatingOverlays(
+    floatingBannerMessage: String,
+    imageViewerState: Pair<ImmutableList<UiImageAttachment>, Int>?,
+    onImageViewerDismiss: () -> Unit,
+    chatMode: String,
+    a2uiDebugFrames: List<com.letta.mobile.ui.chat.render.A2uiDebugFrameUi>,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier) {
         FloatingBanner(
             visible = floatingBannerMessage.isNotBlank(),
             text = floatingBannerMessage,
@@ -286,25 +329,22 @@ internal fun ChatScreenLayout(
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(LettaSpacing.lg),
         )
-
         imageViewerState?.let { (viewerAttachments, initialIndex) ->
             ChatImageViewer(
                 attachments = viewerAttachments,
                 initialPage = initialIndex,
-                onDismiss = { imageViewerState = null },
+                onDismiss = onImageViewerDismiss,
                 modifier = Modifier.fillMaxSize(),
             )
         }
-
-        if (chatMode == "debug" && state.a2uiDebugFrames.isNotEmpty()) {
+        if (chatMode == "debug" && a2uiDebugFrames.isNotEmpty()) {
             A2uiDebugOverlay(
-                frames = state.a2uiDebugFrames,
+                frames = a2uiDebugFrames,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.md),
             )
         }
-
         ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
     }
 }
@@ -314,7 +354,6 @@ private fun ChatScreenComposerColumn(
     state: ChatUiState,
     composerState: ChatComposerState,
     viewModel: AdminChatViewModel,
-    chatMode: String,
     navigation: ChatScreenNavigationCallbacks,
     reducedMotion: Boolean,
     bottomInsetDp: Dp,
@@ -328,63 +367,96 @@ private fun ChatScreenComposerColumn(
             .padding(bottom = bottomInsetDp)
             .onSizeChanged { size ->
                 onComposerHeightChange(with(density) { size.height.toDp() })
-            }
+            },
     ) {
-        GoalStatusCard(
-            goal = state.goalStatus,
-            loading = state.isGoalStatusLoading,
-            onRefresh = viewModel::refreshGoalStatus,
-            onContinue = viewModel::continueGoal,
-            onPause = { viewModel.sendGoalCommand("/goal pause") },
-            onResume = { viewModel.sendGoalCommand("/goal resume") },
-            onComplete = { viewModel.sendGoalCommand("/goal complete") },
-            onClear = { viewModel.sendGoalCommand("/goal clear") },
-        )
-
-        val thinkingTokenActive = state.isStreaming ||
-            state.isAgentTyping ||
-            !state.a2uiThinkingDelayMessage.isNullOrBlank()
-        ThinkingTextToken(
-            visible = thinkingTokenActive,
-            delayMessage = state.a2uiThinkingDelayMessage,
-            reducedMotion = reducedMotion,
-            reserveSpace = thinkingTokenActive,
-        )
-
-        val launchPicker = rememberImageAttachmentPicker(
-            onPicked = { viewModel.addAttachment(it) },
-            onError = { viewModel.reportComposerError(it) },
-            limits = viewModel.attachmentLimits,
-        )
-        val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
-        ChatComposer(
-            inputText = composerState.inputText,
-            pendingAttachments = composerState.pendingAttachments,
-            isStreaming = state.isStreaming,
-            canSendMessages = viewModel.canSendMessages,
-            onTextChange = { newText ->
-                if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
-                    navigation.onBugCommand?.invoke()
-                }
-            },
-            onSend = {
-                if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
-                    navigation.onBugCommand?.invoke()
-                }
-            },
-            onStop = { viewModel.interruptRun() },
-            onRemoveAttachment = { viewModel.removeAttachment(it) },
-            onAttachImage = launchPicker,
-            slashCommands = composerState.slashCommands,
-            onSlashCommandSelected = viewModel::selectSlashCommand,
-            onSlashCommandUninstall = viewModel::uninstallSlashCommand,
-            availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
-                activeAgent?.tools.orEmpty()
-            } else {
-                emptyList()
-            },
+        ChatScreenGoalStatusSection(state, viewModel)
+        ChatScreenThinkingTokenSection(state, reducedMotion)
+        ChatScreenComposerInputSection(
+            state = state,
+            composerState = composerState,
+            viewModel = viewModel,
+            navigation = navigation,
         )
     }
+}
+
+@Composable
+private fun ChatScreenGoalStatusSection(
+    state: ChatUiState,
+    viewModel: AdminChatViewModel,
+) {
+    GoalStatusCard(
+        goal = state.goalStatus,
+        loading = state.isGoalStatusLoading,
+        callbacks = remember(viewModel) {
+            GoalStatusCallbacks(
+                onRefresh = viewModel::refreshGoalStatus,
+                onContinue = viewModel::continueGoal,
+                onPause = { viewModel.sendGoalCommand("/goal pause") },
+                onResume = { viewModel.sendGoalCommand("/goal resume") },
+                onComplete = { viewModel.sendGoalCommand("/goal complete") },
+                onClear = { viewModel.sendGoalCommand("/goal clear") },
+            )
+        },
+    )
+}
+
+@Composable
+private fun ChatScreenThinkingTokenSection(
+    state: ChatUiState,
+    reducedMotion: Boolean,
+) {
+    val thinkingTokenActive = state.isStreaming ||
+        state.isAgentTyping ||
+        !state.a2uiThinkingDelayMessage.isNullOrBlank()
+    ThinkingTextToken(
+        visible = thinkingTokenActive,
+        delayMessage = state.a2uiThinkingDelayMessage,
+        reducedMotion = reducedMotion,
+        reserveSpace = thinkingTokenActive,
+    )
+}
+
+@Composable
+private fun ChatScreenComposerInputSection(
+    state: ChatUiState,
+    composerState: ChatComposerState,
+    viewModel: AdminChatViewModel,
+    navigation: ChatScreenNavigationCallbacks,
+) {
+    val launchPicker = rememberImageAttachmentPicker(
+        onPicked = { viewModel.addAttachment(it) },
+        onError = { viewModel.reportComposerError(it) },
+        limits = viewModel.attachmentLimits,
+    )
+    val activeAgent by viewModel.activeAgent.collectAsStateWithLifecycle()
+    ChatComposer(
+        inputText = composerState.inputText,
+        pendingAttachments = composerState.pendingAttachments,
+        isStreaming = state.isStreaming,
+        canSendMessages = viewModel.canSendMessages,
+        onTextChange = { newText ->
+            if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
+                navigation.onBugCommand?.invoke()
+            }
+        },
+        onSend = {
+            if (viewModel.submitComposer(it) == ChatComposerEffect.OpenBugReport) {
+                navigation.onBugCommand?.invoke()
+            }
+        },
+        onStop = { viewModel.interruptRun() },
+        onRemoveAttachment = { viewModel.removeAttachment(it) },
+        onAttachImage = launchPicker,
+        slashCommands = composerState.slashCommands,
+        onSlashCommandSelected = viewModel::selectSlashCommand,
+        onSlashCommandUninstall = viewModel::uninstallSlashCommand,
+        availableTools = if (TOOL_AFFORDANCE_ROW_ENABLED) {
+            activeAgent?.tools.orEmpty()
+        } else {
+            emptyList()
+        },
+    )
 }
 
 @Composable

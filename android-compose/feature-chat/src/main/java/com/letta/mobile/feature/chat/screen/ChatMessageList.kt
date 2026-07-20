@@ -5,10 +5,13 @@ import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.screen.messagelist.ChatLoadPressureSummary
+import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListBodyParams
+import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListEffectsParams
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListAppearance
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListBody
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListCallbacks
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListEffects
+import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchGestureBoxParams
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchGestureBox
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffects
 import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchFrameBudgetSampler
@@ -166,35 +169,39 @@ internal fun ChatMessageList(
     }
 
     ChatMessageListPinchGestureBox(
-        listState = listState,
-        activeFontScale = activeFontScale,
-        currentRenderItems = currentRenderItems,
-        currentLoadPressureSummary = currentLoadPressureSummary,
-        callbacks = callbacks,
-        pinchFontScaleController = pinchFontScaleController,
-        pinchFrameBudgetSampler = pinchFrameBudgetSampler,
-        onPinchTick = { pinchTick = it },
-        onPinchAnimationSuppressionTick = { pinchAnimationSuppressionTick = it },
-        onSuppressPinchLayoutAnimations = { suppressPinchLayoutAnimations = it },
-        scope = scope,
+        params = ChatPinchGestureBoxParams(
+            listState = listState,
+            activeFontScale = activeFontScale,
+            currentRenderItems = currentRenderItems,
+            currentLoadPressureSummary = currentLoadPressureSummary,
+            callbacks = callbacks,
+            pinchFontScaleController = pinchFontScaleController,
+            pinchFrameBudgetSampler = pinchFrameBudgetSampler,
+            onPinchTick = { pinchTick = it },
+            onPinchAnimationSuppressionTick = { pinchAnimationSuppressionTick = it },
+            onSuppressPinchLayoutAnimations = { suppressPinchLayoutAnimations = it },
+            scope = scope,
+        ),
         modifier = modifier,
     ) {
         ChatMessageListBody(
-            state = state,
-            renderItems = renderItems,
-            appearance = appearance,
-            callbacks = callbacks,
-            listState = listState,
-            isUserScrolling = isUserScrolling,
-            liveFontScale = liveFontScale,
-            pinchFontScaleController = pinchFontScaleController,
-            scaleWindowIndexRange = scaleWindowIndexRange,
-            itemGeometryState = itemGeometryState,
-            highlightedMessageId = highlightedMessageId,
-            showScrollFab = showScrollFab,
-            suppressPinchLayoutAnimations = suppressPinchLayoutAnimations,
-            onScrollToBottom = { scope.launch { listState.animateScrollToItem(0) } },
-            showFontIndicator = showFontIndicator,
+            params = ChatMessageListBodyParams(
+                state = state,
+                renderItems = renderItems,
+                appearance = appearance,
+                callbacks = callbacks,
+                listState = listState,
+                isUserScrolling = isUserScrolling,
+                liveFontScale = liveFontScale,
+                pinchFontScaleController = pinchFontScaleController,
+                scaleWindowIndexRange = scaleWindowIndexRange,
+                itemGeometryState = itemGeometryState,
+                highlightedMessageId = highlightedMessageId,
+                showScrollFab = showScrollFab,
+                suppressPinchLayoutAnimations = suppressPinchLayoutAnimations,
+                onScrollToBottom = { scope.launch { listState.animateScrollToItem(0) } },
+                showFontIndicator = showFontIndicator,
+            ),
         )
     }
 }

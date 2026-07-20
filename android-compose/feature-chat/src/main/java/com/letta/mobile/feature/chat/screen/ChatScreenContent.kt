@@ -92,9 +92,60 @@ internal fun ChatContent(
     appearance: ChatContentAppearance,
     modifier: Modifier = Modifier,
 ) {
+    val renderItems = rememberChatRenderItems(state, appearance.chatMode)
+    var a2uiStackHeightDp by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+    val showStarterPrompts = state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
+
+    Box(modifier = modifier.fillMaxSize()) {
+        if (showStarterPrompts) {
+            StarterPrompts(
+                onPromptClick = callbacks.onSendMessage,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = appearance.topPadding, bottom = appearance.bottomPadding),
+            )
+        } else {
+            ChatContentMessageArea(
+                state = state,
+                renderItems = renderItems,
+                callbacks = callbacks,
+                appearance = appearance,
+                a2uiStackHeightDp = a2uiStackHeightDp,
+            )
+            if (state.a2uiSurfaces.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = appearance.bottomPadding)
+                        .onSizeChanged { size ->
+                            a2uiStackHeightDp = with(density) { size.height.toDp() }
+                        },
+                ) {
+                    A2uiSurfaceStack(
+                        surfaces = state.a2uiSurfaces,
+                        resolvedActionCounters = state.a2uiResolvedActionCounters,
+                        onAction = callbacks.onA2uiAction,
+                        onDismissSurface = callbacks.onDismissA2uiSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun rememberChatRenderItems(
+    state: ChatUiState,
+    chatMode: String,
+): List<com.letta.mobile.data.chat.projection.ChatRenderItem> {
     val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
-    val chatDisplayMode = appearance.chatMode.toChatDisplayMode()
-    val renderItems = remember(state.messages, appearance.chatMode, state.messageListChange) {
+    val chatDisplayMode = chatMode.toChatDisplayMode()
+    return remember(state.messages, chatMode, state.messageListChange) {
         renderItemsCache.renderItems(
             messages = state.messages,
             mode = chatDisplayMode,
@@ -113,68 +164,41 @@ internal fun ChatContent(
             )
         }
     }
+}
 
-    var a2uiStackHeightDp by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
+@Composable
+private fun ChatContentMessageArea(
+    state: ChatUiState,
+    renderItems: List<com.letta.mobile.data.chat.projection.ChatRenderItem>,
+    callbacks: ChatContentCallbacks,
+    appearance: ChatContentAppearance,
+    a2uiStackHeightDp: Dp,
+) {
+    val hasMessagesOrStreaming = state.messages.isNotEmpty() || state.isStreaming
+    if (!hasMessagesOrStreaming) return
 
-    Box(modifier = modifier.fillMaxSize()) {
-        if (state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()) {
-            StarterPrompts(
-                onPromptClick = callbacks.onSendMessage,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = appearance.topPadding, bottom = appearance.bottomPadding),
-            )
-        } else {
-            val listBottomPadding = appearance.bottomPadding +
-                if (state.a2uiSurfaces.isNotEmpty()) a2uiStackHeightDp else 0.dp
-            if (state.messages.isEmpty() && !state.isStreaming) {
-                // List is empty but A2UI is shown
-            } else {
-                ChatMessageList(
-                    state = state,
-                    renderItems = renderItems,
-                    chatMode = appearance.chatMode,
-                    scrollToMessageId = appearance.scrollToMessageId,
-                    activeFontScale = appearance.activeFontScale,
-                    onActiveFontScaleChange = callbacks.onActiveFontScaleChange,
-                    onFontScaleChange = callbacks.onFontScaleChange,
-                    onLoadOlderMessages = callbacks.onLoadOlderMessages,
-                    onSendMessage = callbacks.onSendMessage,
-                    onRerunMessage = callbacks.onRerunMessage,
-                    onSubmitApproval = callbacks.onSubmitApproval,
-                    onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
-                    onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
-                    onAttachmentImageTap = callbacks.onAttachmentImageTap,
-                    modifier = Modifier.fillMaxSize(),
-                    chatBackground = appearance.chatBackground,
-                    topPadding = appearance.topPadding,
-                    bottomPadding = listBottomPadding,
-                )
-            }
-            if (state.a2uiSurfaces.isNotEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(bottom = appearance.bottomPadding)
-                        .onSizeChanged { size ->
-                            a2uiStackHeightDp = with(density) { size.height.toDp() }
-                        }
-                ) {
-                    A2uiSurfaceStack(
-                        surfaces = state.a2uiSurfaces,
-                        resolvedActionCounters = state.a2uiResolvedActionCounters,
-                        onAction = callbacks.onA2uiAction,
-                        onDismissSurface = callbacks.onDismissA2uiSurface,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
-                    )
-                }
-            }
-        }
-    }
+    val listBottomPadding = appearance.bottomPadding +
+        if (state.a2uiSurfaces.isNotEmpty()) a2uiStackHeightDp else 0.dp
+    ChatMessageList(
+        state = state,
+        renderItems = renderItems,
+        chatMode = appearance.chatMode,
+        scrollToMessageId = appearance.scrollToMessageId,
+        activeFontScale = appearance.activeFontScale,
+        onActiveFontScaleChange = callbacks.onActiveFontScaleChange,
+        onFontScaleChange = callbacks.onFontScaleChange,
+        onLoadOlderMessages = callbacks.onLoadOlderMessages,
+        onSendMessage = callbacks.onSendMessage,
+        onRerunMessage = callbacks.onRerunMessage,
+        onSubmitApproval = callbacks.onSubmitApproval,
+        onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
+        onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
+        onAttachmentImageTap = callbacks.onAttachmentImageTap,
+        modifier = Modifier.fillMaxSize(),
+        chatBackground = appearance.chatBackground,
+        topPadding = appearance.topPadding,
+        bottomPadding = listBottomPadding,
+    )
 }
 
 @Composable
@@ -298,12 +322,7 @@ internal fun ChatScreenErrorContent(
 internal fun GoalStatusCard(
     goal: GoalStatusUi?,
     loading: Boolean,
-    onRefresh: () -> Unit,
-    onContinue: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onComplete: () -> Unit,
-    onClear: () -> Unit,
+    callbacks: GoalStatusCallbacks,
 ) {
     if (goal == null && !loading) return
     Surface(
@@ -318,53 +337,83 @@ internal fun GoalStatusCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = if (loading) "Goal" else "Goal • ${goal?.status.orEmpty()}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = onRefresh) { Text("Refresh") }
-            }
+            GoalStatusCardHeader(goal = goal, loading = loading, onRefresh = callbacks.onRefresh)
             if (goal != null) {
-                Text(
-                    text = goal.objective,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val budget = goal.tokenBudget?.let { " / $it" }.orEmpty()
-                Text(
-                    text = "Tokens ${goal.tokensUsed}$budget • active ${goal.activeTimeSeconds}s",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    if (goal.status == "complete") {
-                        TextButton(onClick = onClear) { Text("Clear") }
-                    } else {
-                        Button(onClick = onContinue, enabled = goal.status == "active") { Text("Continue") }
-                        if (goal.status == "paused") TextButton(onClick = onResume) { Text("Resume") }
-                        else TextButton(onClick = onPause, enabled = goal.status == "active") { Text("Pause") }
-                        TextButton(onClick = onComplete) { Text("Done") }
-                        TextButton(onClick = onClear) { Text("Clear") }
-                    }
-                }
+                GoalStatusCardDetails(goal = goal)
+                GoalStatusCardActions(goal = goal, callbacks = callbacks)
             } else {
-                Text(
-                    text = "Loading goal status…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                GoalStatusCardLoadingBody()
             }
         }
+    }
+}
+
+@Composable
+private fun GoalStatusCardHeader(
+    goal: GoalStatusUi?,
+    loading: Boolean,
+    onRefresh: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = if (loading) "Goal" else "Goal • ${goal?.status.orEmpty()}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(onClick = onRefresh) { Text("Refresh") }
+    }
+}
+
+@Composable
+private fun GoalStatusCardDetails(goal: GoalStatusUi) {
+    Text(
+        text = goal.objective,
+        style = MaterialTheme.typography.bodyMedium,
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+    )
+    val budget = goal.tokenBudget?.let { " / $it" }.orEmpty()
+    Text(
+        text = "Tokens ${goal.tokensUsed}$budget • active ${goal.activeTimeSeconds}s",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun GoalStatusCardLoadingBody() {
+    Text(
+        text = "Loading goal status…",
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun GoalStatusCardActions(
+    goal: GoalStatusUi,
+    callbacks: GoalStatusCallbacks,
+) {
+    Row(
+        modifier = Modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (goal.status == "complete") {
+            TextButton(onClick = callbacks.onClear) { Text("Clear") }
+            return
+        }
+        Button(onClick = callbacks.onContinue, enabled = goal.status == "active") { Text("Continue") }
+        if (goal.status == "paused") {
+            TextButton(onClick = callbacks.onResume) { Text("Resume") }
+        } else {
+            TextButton(onClick = callbacks.onPause, enabled = goal.status == "active") { Text("Pause") }
+        }
+        TextButton(onClick = callbacks.onComplete) { Text("Done") }
+        TextButton(onClick = callbacks.onClear) { Text("Clear") }
     }
 }
 

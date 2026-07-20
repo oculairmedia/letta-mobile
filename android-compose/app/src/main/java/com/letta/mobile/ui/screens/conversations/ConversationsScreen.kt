@@ -123,17 +123,21 @@ fun ConversationsScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ConversationsTopBar(
-                searchQuery = uiState.searchQuery,
-                onSearchQueryChange = viewModel::updateSearchQuery,
-                isSearchExpanded = isSearchExpanded,
-                onSearchExpandedChange = { isSearchExpanded = it },
-                activeBackendLabel = activeBackendLabel,
-                onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
-                onNavigateToSettings = onNavigateToSettings,
+                state = ConversationsTopBarState(
+                    searchQuery = uiState.searchQuery,
+                    isSearchExpanded = isSearchExpanded,
+                    activeBackendLabel = activeBackendLabel,
+                    showOverflowMenu = showOverflowMenu,
+                    scrollBehavior = scrollBehavior,
+                ),
+                callbacks = ConversationsTopBarCallbacks(
+                    onSearchQueryChange = viewModel::updateSearchQuery,
+                    onSearchExpandedChange = { isSearchExpanded = it },
+                    onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
+                    onNavigateToSettings = onNavigateToSettings,
+                    onShowOverflowMenuChange = { showOverflowMenu = it },
+                ),
                 navigation = navigation,
-                showOverflowMenu = showOverflowMenu,
-                onShowOverflowMenuChange = { showOverflowMenu = it },
-                scrollBehavior = scrollBehavior,
             )
         },
         floatingActionButton = {
@@ -190,13 +194,15 @@ fun ConversationsScreen(
                     )
                 }
                 ConversationListContent(
-                    conversations = filteredConversations,
-                    isRefreshing = uiState.isRefreshing,
-                    isSearchActive = uiState.searchQuery.isNotBlank(),
-                    showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
-                    localReadiness = uiState.localLettaCodeReadiness,
-                    onCreateFirstAgent = onCreateFirstAgent,
-                    onOpenLocalSettings = onNavigateToSettings,
+                    state = ConversationListContentState(
+                        conversations = filteredConversations,
+                        isRefreshing = uiState.isRefreshing,
+                        isSearchActive = uiState.searchQuery.isNotBlank(),
+                        showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
+                        localReadiness = uiState.localLettaCodeReadiness,
+                        onCreateFirstAgent = onCreateFirstAgent,
+                        onOpenLocalSettings = onNavigateToSettings,
+                    ),
                     actions = listActions,
                     modifier = Modifier.padding(paddingValues),
                 )
@@ -206,20 +212,24 @@ fun ConversationsScreen(
 
     uiState.selectedConversation?.let { display ->
         ConversationAdminDialog(
-            display = display,
-            recompilePreview = uiState.recompilePreview,
-            onDismiss = { viewModel.closeConversationAdmin() },
-            onRename = { newName ->
-                viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
-            },
-            onToggleArchived = { archived -> viewModel.setConversationArchived(display, archived) },
-            onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
-            onCancelRuns = { viewModel.cancelConversationRuns(display) },
-            inspectorMessages = uiState.inspectorMessages,
-            isInspectorLoading = uiState.isInspectorLoading,
-            inspectorError = uiState.inspectorError,
-            onRecompile = { viewModel.recompileConversation(display) },
-            onDelete = { viewModel.deleteConversation(display.conversation.id) },
+            state = ConversationAdminDialogState(
+                display = display,
+                recompilePreview = uiState.recompilePreview,
+                inspectorMessages = uiState.inspectorMessages,
+                isInspectorLoading = uiState.isInspectorLoading,
+                inspectorError = uiState.inspectorError,
+            ),
+            callbacks = ConversationAdminDialogCallbacks(
+                onDismiss = { viewModel.closeConversationAdmin() },
+                onRename = { newName ->
+                    viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
+                },
+                onToggleArchived = { archived -> viewModel.setConversationArchived(display, archived) },
+                onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
+                onCancelRuns = { viewModel.cancelConversationRuns(display) },
+                onRecompile = { viewModel.recompileConversation(display) },
+                onDelete = { viewModel.deleteConversation(display.conversation.id) },
+            ),
         )
     }
 }

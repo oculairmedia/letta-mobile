@@ -375,19 +375,23 @@ internal fun EditAgentScreenContent(
                 }
 
                 EditAgentDialogs(
-                    showActionSheet = showActionSheet,
-                    onShowActionSheetChange = { showActionSheet = it },
-                    showResetDialog = showResetDialog,
-                    onShowResetDialogChange = { showResetDialog = it },
-                    showDeleteDialog = showDeleteDialog,
-                    onShowDeleteDialogChange = { showDeleteDialog = it },
-                    showCloneDialog = showCloneDialog,
-                    onShowCloneDialogChange = { showCloneDialog = it },
-                    agentState = state.data,
-                    viewModel = viewModel,
-                    snackbar = snackbar,
-                    context = context,
-                    onNavigateBack = onNavigateBack,
+                    visibility = EditAgentDialogVisibility(
+                        showActionSheet = showActionSheet,
+                        onShowActionSheetChange = { showActionSheet = it },
+                        showResetDialog = showResetDialog,
+                        onShowResetDialogChange = { showResetDialog = it },
+                        showDeleteDialog = showDeleteDialog,
+                        onShowDeleteDialogChange = { showDeleteDialog = it },
+                        showCloneDialog = showCloneDialog,
+                        onShowCloneDialogChange = { showCloneDialog = it },
+                    ),
+                    host = EditAgentDialogsHost(
+                        agentState = state.data,
+                        viewModel = viewModel,
+                        snackbar = snackbar,
+                        context = context,
+                        onNavigateBack = onNavigateBack,
+                    ),
                 )
             }
         }

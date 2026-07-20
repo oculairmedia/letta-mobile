@@ -34,3 +34,12 @@ internal data class ChatContentAppearance(
     val activeFontScale: Float = 1f,
     val scrollToMessageId: String? = null,
 )
+
+internal data class GoalStatusCallbacks(
+    val onRefresh: () -> Unit,
+    val onContinue: () -> Unit,
+    val onPause: () -> Unit,
+    val onResume: () -> Unit,
+    val onComplete: () -> Unit,
+    val onClear: () -> Unit,
+)

@@ -30,13 +30,17 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.material3.DrawerState
 
+internal data class HomeScreenDrawerParams(
+    val state: DashboardUiState,
+    val navigation: HomeNavigationCallbacks,
+    val viewModel: DashboardViewModel,
+    val drawerState: DrawerState,
+    val scope: CoroutineScope,
+)
+
 @Composable
 internal fun HomeScreenDrawerContent(
-    state: DashboardUiState,
-    navigation: HomeNavigationCallbacks,
-    viewModel: DashboardViewModel,
-    drawerState: DrawerState,
-    scope: CoroutineScope,
+    params: HomeScreenDrawerParams,
 ) {
     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
         Text(
@@ -55,56 +59,83 @@ internal fun HomeScreenDrawerContent(
             previousGroup = shortcut.group
 
             key(shortcut) {
-                val isPinned = state.pinnedItems.any {
-                    it is PinnedItem.Shortcut && it.value == shortcut
-                }
-                val context = LocalContext.current
-                val label = stringResource(shortcut.labelResId)
-                val haptic = LocalHapticFeedback.current
-                val view = LocalView.current
-
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .combinedClickable(
-                            onClick = {
-                                scope.launch { drawerState.close() }
-                                navigation.shortcutNavigator(shortcut, state)()
-                            },
-                            onLongClick = {
-                                HapticEffects.longPress(haptic, view)
-                                if (isPinned) {
-                                    viewModel.unpinShortcut(shortcut)
-                                    android.widget.Toast
-                                        .makeText(context, "$label unpinned", android.widget.Toast.LENGTH_SHORT)
-                                        .show()
-                                } else {
-                                    viewModel.pinShortcut(shortcut)
-                                    android.widget.Toast
-                                        .makeText(context, "$label pinned", android.widget.Toast.LENGTH_SHORT)
-                                        .show()
-                                }
-                            },
-                        )
-                        .padding(start = 16.dp, end = 24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        shortcut.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                HomeDrawerShortcutRow(
+                    shortcut = shortcut,
+                    params = params,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun HomeDrawerShortcutRow(
+    shortcut: DashboardShortcut,
+    params: HomeScreenDrawerParams,
+) {
+    val isPinned = params.state.pinnedItems.any {
+        it is PinnedItem.Shortcut && it.value == shortcut
+    }
+    val context = LocalContext.current
+    val label = stringResource(shortcut.labelResId)
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+
+    Row(
+        modifier = Modifier
+            .padding(horizontal = 12.dp)
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .combinedClickable(
+                onClick = {
+                    params.scope.launch { params.drawerState.close() }
+                    params.navigation.shortcutNavigator(shortcut, params.state)()
+                },
+                onLongClick = {
+                    HapticEffects.longPress(haptic, view)
+                    toggleDrawerShortcutPin(
+                        shortcut = shortcut,
+                        isPinned = isPinned,
+                        label = label,
+                        context = context,
+                        viewModel = params.viewModel,
+                    )
+                },
+            )
+            .padding(start = 16.dp, end = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            shortcut.icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun toggleDrawerShortcutPin(
+    shortcut: DashboardShortcut,
+    isPinned: Boolean,
+    label: String,
+    context: android.content.Context,
+    viewModel: DashboardViewModel,
+) {
+    if (isPinned) {
+        viewModel.unpinShortcut(shortcut)
+        android.widget.Toast
+            .makeText(context, "$label unpinned", android.widget.Toast.LENGTH_SHORT)
+            .show()
+    } else {
+        viewModel.pinShortcut(shortcut)
+        android.widget.Toast
+            .makeText(context, "$label pinned", android.widget.Toast.LENGTH_SHORT)
+            .show()
     }
 }

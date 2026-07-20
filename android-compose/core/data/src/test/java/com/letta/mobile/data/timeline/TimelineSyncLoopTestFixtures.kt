@@ -1,57 +1,42 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.api.NoActiveRunException
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.MessageCreateRequest
-import com.letta.mobile.data.model.ReasoningMessage
-import com.letta.mobile.data.model.SystemMessage
-import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.UserMessage
 import io.ktor.utils.io.ByteChannel
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.writeStringUtf8
 import io.mockk.mockk
 import kotlin.random.Random
-import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
-import app.cash.turbine.test
-import kotlinx.coroutines.test.advanceUntilIdle
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import java.time.Instant
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
-import org.junit.jupiter.api.Tag
 
-@OptIn(ExperimentalCoroutinesApi::class)
+internal data class TimelineTestMessageSpec(
+    val id: String,
+    val content: JsonElement,
+    val otid: String? = null,
+)
+
+internal fun timelineUserMessage(spec: TimelineTestMessageSpec): UserMessage =
+    UserMessage(
+        id = spec.id,
+        contentRaw = spec.content,
+        otid = spec.otid,
+    )
+
+internal fun timelineAssistantMessage(spec: TimelineTestMessageSpec): AssistantMessage =
+    AssistantMessage(
+        id = spec.id,
+        contentRaw = spec.content,
+        otid = spec.otid,
+    )
+
 internal class BlockingListApi : MessageApi(mockk(relaxed = true)) {
     val listStarted = CompletableDeferred<Unit>()
     val releaseList = CompletableDeferred<List<LettaMessage>>()
@@ -98,9 +83,8 @@ internal class OneShotAssistantStreamApi : MessageApi(mockk(relaxed = true)) {
         if (opened) kotlinx.coroutines.awaitCancellation()
         opened = true
         val json = kotlinx.serialization.json.Json { encodeDefaults = true }
-        val message = AssistantMessage(
-            id = "asst-dynamic",
-            contentRaw = JsonPrimitive("late listener works"),
+        val message = timelineAssistantMessage(
+            TimelineTestMessageSpec(id = "asst-dynamic", content = JsonPrimitive("late listener works")),
         )
         val sseBody = buildString {
             append("data: ")
@@ -256,26 +240,7 @@ internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         }
         lastSendRequest = request
         sendResponseGate?.await()
-        // Extract otid from request and create a UserMessage in the store to
-        // mimic server persistence.
-        val firstMessage = request.messages?.firstOrNull()
-        val otid = firstMessage?.let {
-            (it as? kotlinx.serialization.json.JsonObject)?.get("otid")?.let { v ->
-                (v as? JsonPrimitive)?.contentOrNull
-            }
-        }
-        val userContent = firstMessage?.let {
-            (it as? JsonObject)?.get("content")
-        }
-        if (otid != null) {
-            stored.add(
-                UserMessage(
-                    id = "message-$otid",
-                    contentRaw = userContent ?: JsonPrimitive(""),
-                    otid = otid,
-                )
-            )
-        }
+        persistUserMessageFromRequest(request)
 
         // Emit nextStreamMessages as real SSE frames and close
         val json = kotlinx.serialization.json.Json { encodeDefaults = true }
@@ -296,6 +261,26 @@ internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         // in the same JVM worker, eventually OOMing CI (letta-mobile-o8pr).
         return ByteReadChannel(sseBody.toByteArray())
     }
+
+    private fun persistUserMessageFromRequest(request: MessageCreateRequest) {
+        val firstMessage = request.messages?.firstOrNull() ?: return
+        val otid = firstMessage.extractOtid() ?: return
+        val userContent = (firstMessage as? JsonObject)?.get("content")
+        stored.add(
+            timelineUserMessage(
+                TimelineTestMessageSpec(
+                    id = "message-$otid",
+                    content = userContent ?: JsonPrimitive(""),
+                    otid = otid,
+                )
+            )
+        )
+    }
+
+    private fun JsonElement.extractOtid(): String? =
+        (this as? JsonObject)?.get("otid")?.let { value ->
+            (value as? JsonPrimitive)?.contentOrNull
+        }
 }
 
 internal fun <T> List<T>.randomOrNull(random: Random): T? =

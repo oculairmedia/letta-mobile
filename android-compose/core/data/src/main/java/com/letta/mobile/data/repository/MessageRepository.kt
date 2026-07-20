@@ -75,13 +75,15 @@ open class MessageRepository @Inject constructor(
         conversationId: ConversationId,
         targetMessageId: String?,
     ): List<AppMessage> = MessageRepositoryFetch.fetchMessages(
-        messageApi = messageApi,
-        agentId = agentId,
-        conversationId = conversationId,
-        targetMessageId = targetMessageId,
-        defaultFetchLimit = DEFAULT_FETCH_LIMIT,
-        targetedFetchLimit = TARGETED_FETCH_LIMIT,
-        maxTargetedFetchPages = MAX_TARGETED_FETCH_PAGES,
+        MessageFetchParams(
+            messageApi = messageApi,
+            agentId = agentId,
+            conversationId = conversationId,
+            targetMessageId = targetMessageId,
+            defaultFetchLimit = DEFAULT_FETCH_LIMIT,
+            targetedFetchLimit = TARGETED_FETCH_LIMIT,
+            maxTargetedFetchPages = MAX_TARGETED_FETCH_PAGES,
+        )
     )
 
     override suspend fun fetchOlderMessages(
@@ -146,14 +148,16 @@ open class MessageRepository @Inject constructor(
         reason: String?,
     ) {
         MessageRepositoryApproval.submitApproval(
-            messageApi = messageApi,
-            irohApprovalSource = irohApprovalSource,
-            json = json,
-            agentId = agentId,
-            approvalRequestId = approvalRequestId,
-            toolCallIds = toolCallIds,
-            approve = approve,
-            reason = reason,
+            ApprovalSubmitParams(
+                messageApi = messageApi,
+                irohApprovalSource = irohApprovalSource,
+                json = json,
+                agentId = agentId,
+                approvalRequestId = approvalRequestId,
+                toolCallIds = toolCallIds,
+                approve = approve,
+                reason = reason,
+            )
         )
     }
 

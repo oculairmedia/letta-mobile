@@ -35,3 +35,52 @@ internal data class ChatMessageRenderCallbacks(
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
 )
+
+internal data class ChatMessageListEffectsParams(
+    val state: com.letta.mobile.ui.chat.render.ChatUiState,
+    val renderItems: List<com.letta.mobile.data.chat.projection.ChatRenderItem>,
+    val listState: androidx.compose.foundation.lazy.LazyListState,
+    val isUserScrolling: Boolean,
+    val scrollToMessageId: String?,
+    val onLoadOlderMessages: () -> Unit,
+    val onHighlightedMessageIdChange: (String?) -> Unit,
+    val hasScrolledToTarget: Boolean,
+    val onHasScrolledToTargetChange: (Boolean) -> Unit,
+)
+
+internal data class ChatMessageListLazyColumnParams(
+    val bodyParams: ChatMessageListBodyParams,
+    val renderCallbacks: ChatMessageRenderCallbacks,
+    val contentWidthPx: Int,
+    val newestMessageId: String?,
+    val density: androidx.compose.ui.unit.Density,
+    val layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
+    val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
+)
+
+internal data class ActiveStreamingGeometryInput(
+    val bodyParams: ChatMessageListBodyParams,
+    val newestMessageId: String?,
+    val contentWidthPx: Int,
+    val density: androidx.compose.ui.unit.Density,
+    val layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+)
+
+internal data class ChatMessageListBodyParams(
+    val state: com.letta.mobile.ui.chat.render.ChatUiState,
+    val renderItems: List<com.letta.mobile.data.chat.projection.ChatRenderItem>,
+    val appearance: ChatMessageListAppearance,
+    val callbacks: ChatMessageListCallbacks,
+    val listState: androidx.compose.foundation.lazy.LazyListState,
+    val isUserScrolling: Boolean,
+    val liveFontScale: Float,
+    val pinchFontScaleController: com.letta.mobile.ui.zoom.PinchScalePreviewController,
+    val scaleWindowIndexRange: IntRange,
+    val itemGeometryState: com.letta.mobile.ui.chat.render.ChatMessageGeometryState,
+    val highlightedMessageId: String?,
+    val showScrollFab: Boolean,
+    val suppressPinchLayoutAnimations: Boolean,
+    val onScrollToBottom: () -> Unit,
+    val showFontIndicator: Boolean,
+)

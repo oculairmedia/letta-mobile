@@ -38,91 +38,137 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+internal data class ConversationListContentState(
+    val conversations: List<ConversationDisplay>,
+    val isRefreshing: Boolean,
+    val isSearchActive: Boolean,
+    val showFirstRunOnboarding: Boolean,
+    val localReadiness: LocalLettaCodeCreateReadiness,
+    val onCreateFirstAgent: () -> Unit,
+    val onOpenLocalSettings: () -> Unit,
+)
+
 internal fun ConversationDisplay.routeAgentName(): String? =
     agentName.takeIf { it.isNotBlank() && it != conversation.agentId.value.take(8) }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ConversationListContent(
-    conversations: List<ConversationDisplay>,
-    isRefreshing: Boolean,
-    isSearchActive: Boolean,
-    showFirstRunOnboarding: Boolean,
-    localReadiness: LocalLettaCodeCreateReadiness,
-    onCreateFirstAgent: () -> Unit,
-    onOpenLocalSettings: () -> Unit,
+    state: ConversationListContentState,
+    actions: ConversationListActions,
+    modifier: Modifier = Modifier,
+) {
+    if (state.conversations.isEmpty()) {
+        ConversationListEmptyContent(
+            state = state,
+            modifier = modifier,
+        )
+        return
+    }
+
+    ConversationListRefreshableContent(
+        state = state,
+        actions = actions,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ConversationListEmptyContent(
+    state: ConversationListContentState,
+    modifier: Modifier = Modifier,
+) {
+    if (state.showFirstRunOnboarding) {
+        FirstRunWelcomeCard(
+            localReadiness = state.localReadiness,
+            onCreateFirstAgent = state.onCreateFirstAgent,
+            onOpenLocalSettings = state.onOpenLocalSettings,
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
+
+    EmptyState(
+        icon = LettaIcons.ChatOutline,
+        message = stringResource(
+            if (state.isSearchActive) R.string.screen_conversations_search_empty
+            else R.string.screen_conversations_empty,
+        ),
+        modifier = modifier.fillMaxSize(),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun ConversationListRefreshableContent(
+    state: ConversationListContentState,
     actions: ConversationListActions,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    if (conversations.isEmpty()) {
-        if (showFirstRunOnboarding) {
-            FirstRunWelcomeCard(
-                localReadiness = localReadiness,
-                onCreateFirstAgent = onCreateFirstAgent,
-                onOpenLocalSettings = onOpenLocalSettings,
-                modifier = modifier.fillMaxSize(),
-            )
-        } else {
-            EmptyState(
-                icon = LettaIcons.ChatOutline,
-                message = stringResource(
-                    if (isSearchActive) R.string.screen_conversations_search_empty
-                    else R.string.screen_conversations_empty,
-                ),
-                modifier = modifier.fillMaxSize(),
-            )
-        }
-    } else {
-        @OptIn(ExperimentalMaterial3Api::class)
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                HapticEffects.confirm(haptic, view)
-                actions.onRefresh()
-            },
-            modifier = modifier.fillMaxSize(),
-        ) {
-            val sections = remember(conversations) {
-                buildConversationSections(conversations)
+    PullToRefreshBox(
+        isRefreshing = state.isRefreshing,
+        onRefresh = {
+            HapticEffects.confirm(haptic, view)
+            actions.onRefresh()
+        },
+        modifier = modifier.fillMaxSize(),
+    ) {
+        ConversationListSections(
+            conversations = state.conversations,
+            actions = actions,
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ConversationListSections(
+    conversations: List<ConversationDisplay>,
+    actions: ConversationListActions,
+) {
+    val sections = remember(conversations) {
+        buildConversationSections(conversations)
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        var runningIndex = 0
+        sections.forEach { section ->
+            val sectionBaseIndex = runningIndex
+            item(key = section.key) {
+                ConversationSectionHeader(section = section)
             }
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                var runningIndex = 0
-                sections.forEach { section ->
-                    val sectionBaseIndex = runningIndex
-                    item(key = section.key) {
-                        when {
-                            section.isPinned -> ConversationPinnedHeader()
-                            section.date != null -> DateSeparator(date = section.date)
-                        }
-                    }
-                    itemsIndexed(
-                        items = section.items,
-                        // Index-suffixed so a residual duplicate id can never
-                        // collide the LazyColumn key and crash the render thread
-                        // (dedupe above is the primary guard; this is defense).
-                        key = { index, display -> "${section.key}:${display.conversation.id}:$index" },
-                    ) { index, display ->
-                        StaggeredListItem(index = sectionBaseIndex + index) {
-                            ConversationCard(
-                                display = display,
-                                onClick = { actions.onConversationClick(display) },
-                                onOpenAdmin = { actions.onOpenAdmin(display) },
-                                onDelete = { actions.onDeleteConversation(display) },
-                                onRename = { newName -> actions.onRenameConversation(display, newName) },
-                                onTogglePinned = { actions.onTogglePinned(display) },
-                                onFork = { actions.onForkConversation(display) },
-                            )
-                        }
-                    }
-                    runningIndex += section.items.size
+            itemsIndexed(
+                items = section.items,
+                key = { index, display -> "${section.key}:${display.conversation.id}:$index" },
+            ) { index, display ->
+                StaggeredListItem(index = sectionBaseIndex + index) {
+                    ConversationCard(
+                        display = display,
+                        callbacks = ConversationCardCallbacks(
+                            onClick = { actions.onConversationClick(display) },
+                            onOpenAdmin = { actions.onOpenAdmin(display) },
+                            onDelete = { actions.onDeleteConversation(display) },
+                            onRename = { newName -> actions.onRenameConversation(display, newName) },
+                            onTogglePinned = { actions.onTogglePinned(display) },
+                            onFork = { actions.onForkConversation(display) },
+                        ),
+                    )
                 }
             }
+            runningIndex += section.items.size
         }
+    }
+}
+
+@Composable
+private fun ConversationSectionHeader(section: ConversationSection) {
+    when {
+        section.isPinned -> ConversationPinnedHeader()
+        section.date != null -> DateSeparator(date = section.date)
     }
 }
 
@@ -159,13 +205,7 @@ private data class ConversationSection(
 private fun buildConversationSections(conversations: List<ConversationDisplay>): List<ConversationSection> {
     if (conversations.isEmpty()) return emptyList()
 
-    // Defensive dedupe by conversation id: a duplicated conversation row (e.g.
-    // from concurrent list refreshes / admin_rpc churn) would otherwise produce
-    // two LazyColumn items with the same "date_<date>:conv-<id>" key and crash
-    // the render thread with IllegalArgumentException "Key ... was already used"
-    // (letta-mobile conversations-list duplicate-key crash class).
     val deduped = conversations.distinctBy { it.conversation.id }
-
     val pinned = deduped.filter { it.isPinned }
     val regular = deduped.filterNot { it.isPinned }
 

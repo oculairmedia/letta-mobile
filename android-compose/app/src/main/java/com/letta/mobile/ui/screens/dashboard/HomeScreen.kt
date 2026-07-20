@@ -134,11 +134,13 @@ fun HomeScreen(
         drawerContent = {
             ModalDrawerSheet {
                 HomeScreenDrawerContent(
-                    state = uiState,
-                    navigation = navigation,
-                    viewModel = viewModel,
-                    drawerState = drawerState,
-                    scope = scope,
+                    params = HomeScreenDrawerParams(
+                        state = uiState,
+                        navigation = navigation,
+                        viewModel = viewModel,
+                        drawerState = drawerState,
+                        scope = scope,
+                    ),
                 )
             }
         },
@@ -151,17 +153,19 @@ fun HomeScreen(
             containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
             topBar = {
                 HomeScreenTopBar(
-                    title = title,
-                    state = uiState,
-                    isSearchExpanded = isSearchExpanded,
-                    onSearchExpandedChange = { isSearchExpanded = it },
-                    onSearchQueryChange = viewModel::updateSearchQuery,
-                    onSearchClear = viewModel::clearSearch,
-                    onOpenDrawer = { scope.launch { drawerState.open() } },
-                    onNavigateToSettings = onNavigateToSettings,
-                    activeBackendLabel = activeBackendLabel,
-                    onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
-                    scrollBehavior = scrollBehavior,
+                    params = HomeScreenTopBarParams(
+                        title = title,
+                        state = uiState,
+                        isSearchExpanded = isSearchExpanded,
+                        onSearchExpandedChange = { isSearchExpanded = it },
+                        onSearchQueryChange = viewModel::updateSearchQuery,
+                        onSearchClear = viewModel::clearSearch,
+                        onOpenDrawer = { scope.launch { drawerState.open() } },
+                        onNavigateToSettings = onNavigateToSettings,
+                        activeBackendLabel = activeBackendLabel,
+                        onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
+                        scrollBehavior = scrollBehavior,
+                    ),
                 )
             },
         ) { paddingValues ->

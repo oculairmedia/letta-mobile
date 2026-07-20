@@ -64,14 +64,8 @@ internal data class AgentListContentActions(
     val onCreateAgent: () -> Unit,
 )
 
-/**
- * Bundle of the state, callbacks, and scroll handles the content composables
- * need. Keeping this as one holder is what lets [AgentListContent] and its
- * private children stay under the 4-argument CodeScene threshold.
- */
-internal data class AgentListContentParams(
-    val state: AgentListContentState,
-    val actions: AgentListContentActions,
+internal data class AgentListContentLayout(
+    val paddingValues: PaddingValues,
     val listState: LazyListState,
     val gridState: LazyGridState,
     val haptic: HapticFeedback,
@@ -79,64 +73,100 @@ internal data class AgentListContentParams(
 
 @Composable
 internal fun AgentListContent(
-    params: AgentListContentParams,
-    paddingValues: PaddingValues,
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+    layout: AgentListContentLayout,
 ) {
     val uiState = params.state.uiState
     val agentError = uiState.error
     when {
-        uiState.isLoading -> ShimmerGrid(modifier = Modifier.padding(paddingValues))
+        uiState.isLoading -> ShimmerGrid(modifier = Modifier.padding(layout.paddingValues))
         agentError != null && uiState.agents.isEmpty() -> ErrorContent(
             message = agentError,
-            onRetry = params.actions.onRetry,
-            modifier = Modifier.padding(paddingValues),
+            onRetry = actions.onRetry,
+            modifier = Modifier.padding(layout.paddingValues),
         )
-        else -> AgentListRefreshableContent(params = params, paddingValues = paddingValues)
+        else -> AgentListRefreshableContent(
+            state = state,
+            actions = actions,
+            layout = layout,
+        )
     }
 }
 
 @Composable
 private fun AgentListRefreshableContent(
-    params: AgentListContentParams,
-    paddingValues: PaddingValues,
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+    layout: AgentListContentLayout,
 ) {
     val uiState = params.state.uiState
     val view = LocalView.current
     PullToRefreshBox(
         isRefreshing = uiState.isRefreshing,
         onRefresh = {
-            HapticEffects.confirm(params.haptic, view)
-            params.actions.onRefresh()
+            HapticEffects.confirm(layout.haptic, view)
+            actions.onRefresh()
         },
         modifier = Modifier.fillMaxSize(),
     ) {
-        if (params.state.filteredAgents.isEmpty()) {
-            AgentListEmptyState(
-                message = emptyAgentListMessage(uiState),
-                showCreateAction = shouldShowEmptyAgentCreateAction(
-                    isShareMode = params.state.isShareMode,
-                    isHydrating = uiState.isHydrating,
-                    searchQuery = uiState.searchQuery,
-                ),
-                onCreateAgent = params.actions.onCreateAgent,
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .fillMaxSize(),
-            )
-        } else if (uiState.showGrid) {
-            AgentListGridContent(params = params, paddingValues = paddingValues)
-        } else {
-            AgentListListContent(params = params, paddingValues = paddingValues)
-        }
+        AgentListBody(
+            state = state,
+            actions = actions,
+            layout = layout,
+        )
     }
 }
 
 @Composable
-private fun emptyAgentListMessage(uiState: AgentListUiState): String = when {
-    uiState.searchQuery.isNotBlank() && uiState.isHydrating ->
-        "Still loading agents while searching for \"${uiState.searchQuery}\""
-    uiState.searchQuery.isBlank() -> stringResource(R.string.screen_agents_empty)
-    else -> "No agents matching \"${uiState.searchQuery}\""
+private fun AgentListBody(
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+    layout: AgentListContentLayout,
+) {
+    val uiState = state.uiState
+    if (state.filteredAgents.isEmpty()) {
+        AgentListEmptyState(
+            message = agentListEmptyMessage(uiState),
+            showCreateAction = shouldShowEmptyAgentCreateAction(
+                isShareMode = state.isShareMode,
+                isHydrating = uiState.isHydrating,
+                searchQuery = uiState.searchQuery,
+            ),
+            onCreateAgent = actions.onCreateAgent,
+            modifier = Modifier
+                .padding(layout.paddingValues)
+                .fillMaxSize(),
+        )
+        return
+    }
+
+    if (uiState.showGrid) {
+        AgentListGridContent(
+            state = state,
+            actions = actions,
+            paddingValues = layout.paddingValues,
+            gridState = layout.gridState,
+        )
+    } else {
+        AgentListListContent(
+            state = state,
+            actions = actions,
+            paddingValues = layout.paddingValues,
+            listState = layout.listState,
+        )
+    }
+}
+
+@Composable
+private fun agentListEmptyMessage(uiState: AgentListUiState): String {
+    if (uiState.searchQuery.isNotBlank() && uiState.isHydrating) {
+        return "Still loading agents while searching for \"${uiState.searchQuery}\""
+    }
+    if (uiState.searchQuery.isBlank()) {
+        return stringResource(R.string.screen_agents_empty)
+    }
+    return "No agents matching \"${uiState.searchQuery}\""
 }
 
 @Composable

@@ -88,21 +88,29 @@ internal fun AgentScaffoldContent(
     var chatMode by rememberSaveable { mutableStateOf(viewModel.initialChatMode ?: "simple") }
 
     AgentScaffoldBody(
-        navigation = navigation,
-        viewModel = viewModel,
-        chatMode = chatMode,
-        onChatModeChange = { chatMode = it },
-        showBugReportSheet = showBugReportSheet,
-        onShowBugReportSheetChange = { showBugReportSheet = it },
-        showAgentSwitcher = showAgentSwitcher,
-        onShowAgentSwitcherChange = { showAgentSwitcher = it },
-        isChatSearchExpanded = isChatSearchExpanded,
-        onChatSearchExpandedChange = { isChatSearchExpanded = it },
-        isProjectInfoExpanded = isProjectInfoExpanded,
-        onProjectInfoExpandedChange = { isProjectInfoExpanded = it },
-        showModelPicker = showModelPicker,
-        onShowModelPickerChange = { showModelPicker = it },
-        chatSearchFocusRequester = chatSearchFocusRequester,
-        conversationRepository = conversationRepository,
+        params = AgentScaffoldBodyParams(
+            navigation = navigation,
+            viewModel = viewModel,
+            chatMode = chatMode,
+            onChatModeChange = { chatMode = it },
+            sheetVisibility = AgentScaffoldSheetVisibility(
+                showBugReportSheet = showBugReportSheet,
+                onShowBugReportSheetChange = { showBugReportSheet = it },
+                showAgentSwitcher = showAgentSwitcher,
+                onShowAgentSwitcherChange = { showAgentSwitcher = it },
+                showModelPicker = showModelPicker,
+                onShowModelPickerChange = { showModelPicker = it },
+            ),
+            searchUi = AgentScaffoldSearchUiState(
+                isChatSearchExpanded = isChatSearchExpanded,
+                onChatSearchExpandedChange = { isChatSearchExpanded = it },
+                chatSearchFocusRequester = chatSearchFocusRequester,
+            ),
+            projectUi = AgentScaffoldProjectUiState(
+                isProjectInfoExpanded = isProjectInfoExpanded,
+                onProjectInfoExpandedChange = { isProjectInfoExpanded = it },
+            ),
+            conversationRepository = conversationRepository,
+        ),
     )
 }

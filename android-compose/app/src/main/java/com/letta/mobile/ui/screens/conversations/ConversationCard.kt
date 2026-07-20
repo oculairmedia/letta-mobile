@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -35,16 +34,29 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.util.formatRelativeTime
 
+data class ConversationCardCallbacks(
+    val onClick: () -> Unit,
+    val onOpenAdmin: () -> Unit,
+    val onDelete: () -> Unit,
+    val onRename: (String) -> Unit,
+    val onTogglePinned: () -> Unit,
+    val onFork: () -> Unit,
+)
+
+private data class ConversationCardMenuState(
+    val show: Boolean,
+    val title: String,
+    val display: ConversationDisplay,
+    val onDismiss: () -> Unit,
+    val onRequestRename: () -> Unit,
+    val onRequestDelete: () -> Unit,
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConversationCard(
     display: ConversationDisplay,
-    onClick: () -> Unit,
-    onOpenAdmin: () -> Unit,
-    onDelete: () -> Unit,
-    onRename: (String) -> Unit,
-    onTogglePinned: () -> Unit,
-    onFork: () -> Unit,
+    callbacks: ConversationCardCallbacks,
     modifier: Modifier = Modifier,
 ) {
     val conversation = display.conversation
@@ -52,19 +64,60 @@ fun ConversationCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-
     val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
 
+    ConversationCardSurface(
+        title = title,
+        display = display,
+        onClick = callbacks.onClick,
+        onLongClick = {
+            HapticEffects.longPress(haptic)
+            showContextMenu = true
+        },
+        modifier = modifier,
+    )
+
+    ConversationCardContextMenu(
+        state = ConversationCardMenuState(
+            show = showContextMenu,
+            title = title,
+            display = display,
+            onDismiss = { showContextMenu = false },
+            onRequestRename = { showRenameDialog = true },
+            onRequestDelete = { showDeleteDialog = true },
+        ),
+        callbacks = callbacks,
+    )
+
+    ConversationCardDeleteDialog(
+        show = showDeleteDialog,
+        onDismiss = { showDeleteDialog = false },
+        onConfirm = callbacks.onDelete,
+    )
+
+    ConversationCardRenameDialog(
+        show = showRenameDialog,
+        initialValue = conversation.summary ?: "",
+        onDismiss = { showRenameDialog = false },
+        onConfirm = callbacks.onRename,
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ConversationCardSurface(
+    title: String,
+    display: ConversationDisplay,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Card(
         modifier = modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = onClick,
-                onLongClick = {
-                    HapticEffects.longPress(haptic)
-                    showContextMenu = true
-                },
+                onLongClick = onLongClick,
             ),
         shape = RoundedCornerShape(12.dp),
         colors = LettaCardDefaults.listCardColors(),
@@ -77,22 +130,9 @@ fun ConversationCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-
-            val timeText = conversationActivityText(conversation)
-            val metadataText = buildString {
-                if (display.isPinned) {
-                    append("Pinned • ")
-                }
-                append(display.agentName)
-                if (timeText != null) {
-                    append(" • ")
-                    append(timeText)
-                }
-            }
-
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = metadataText,
+                text = conversationCardMetadata(display),
                 style = MaterialTheme.typography.listItemSupporting,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -100,60 +140,101 @@ fun ConversationCard(
             )
         }
     }
+}
 
+@Composable
+private fun conversationCardMetadata(display: ConversationDisplay): String {
+    val timeText = conversationActivityText(display.conversation)
+    return buildString {
+        if (display.isPinned) {
+            append("Pinned • ")
+        }
+        append(display.agentName)
+        if (timeText != null) {
+            append(" • ")
+            append(timeText)
+        }
+    }
+}
+
+@Composable
+private fun ConversationCardContextMenu(
+    state: ConversationCardMenuState,
+    callbacks: ConversationCardCallbacks,
+) {
     ActionSheet(
-        show = showContextMenu,
-        onDismiss = { showContextMenu = false },
-        title = title,
+        show = state.show,
+        onDismiss = state.onDismiss,
+        title = state.title,
     ) {
         ActionSheetItem(
             text = stringResource(R.string.screen_conversations_admin_details),
             icon = LettaIcons.ManageSearch,
-            onClick = { showContextMenu = false; onOpenAdmin() },
+            onClick = { state.onDismiss(); callbacks.onOpenAdmin() },
         )
         ActionSheetItem(
-            text = if (display.isPinned) "Unpin" else "Pin",
+            text = conversationPinActionLabel(state.display.isPinned),
             icon = LettaIcons.Star,
-            onClick = { showContextMenu = false; onTogglePinned() },
+            onClick = { state.onDismiss(); callbacks.onTogglePinned() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_rename),
             icon = LettaIcons.Edit,
-            onClick = { showContextMenu = false; showRenameDialog = true },
+            onClick = { state.onDismiss(); state.onRequestRename() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_fork),
             icon = LettaIcons.ForkRight,
-            onClick = { showContextMenu = false; onFork() },
+            onClick = { state.onDismiss(); callbacks.onFork() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_delete),
             icon = LettaIcons.Delete,
-            onClick = { showContextMenu = false; showDeleteDialog = true },
+            onClick = { state.onDismiss(); state.onRequestDelete() },
             destructive = true,
         )
     }
+}
 
+@Composable
+private fun conversationPinActionLabel(isPinned: Boolean): String {
+    return if (isPinned) "Unpin" else "Pin"
+}
+
+@Composable
+private fun ConversationCardDeleteDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
     ConfirmDialog(
-        show = showDeleteDialog,
+        show = show,
         title = stringResource(R.string.screen_conversations_dialog_delete_title),
         message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
         confirmText = stringResource(R.string.action_delete),
         dismissText = stringResource(R.string.action_cancel),
-        onConfirm = { showDeleteDialog = false; onDelete() },
-        onDismiss = { showDeleteDialog = false },
+        onConfirm = { onDismiss(); onConfirm() },
+        onDismiss = onDismiss,
         destructive = true,
     )
+}
 
+@Composable
+private fun ConversationCardRenameDialog(
+    show: Boolean,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
     TextInputDialog(
-        show = showRenameDialog,
+        show = show,
         title = stringResource(R.string.screen_conversations_dialog_rename_title),
         label = stringResource(R.string.common_name),
         confirmText = stringResource(R.string.action_save),
         dismissText = stringResource(R.string.action_cancel),
-        onConfirm = { showRenameDialog = false; onRename(it) },
-        onDismiss = { showRenameDialog = false },
-        initialValue = conversation.summary ?: "",
+        onConfirm = { onDismiss(); onConfirm(it) },
+        onDismiss = onDismiss,
+        initialValue = initialValue,
     )
 }
 

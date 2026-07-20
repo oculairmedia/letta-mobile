@@ -51,18 +51,7 @@ internal fun NewChatAgentScreen(
     modifier: Modifier = Modifier,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    val filteredAgents = remember(agents, query) {
-        val needle = query.trim()
-        if (needle.isBlank()) {
-            agents
-        } else {
-            agents.filter { agent ->
-                agent.name.contains(needle, ignoreCase = true) ||
-                    agent.description.orEmpty().contains(needle, ignoreCase = true) ||
-                    agent.model.orEmpty().contains(needle, ignoreCase = true)
-            }
-        }
-    }
+    val filteredAgents = rememberFilteredAgents(agents, query)
 
     Scaffold(
         modifier = modifier,
@@ -92,79 +81,153 @@ internal fun NewChatAgentScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
             )
-
-            when {
-                agents.isEmpty() -> EmptyState(
-                    icon = LettaIcons.AccountCircle,
-                    message = "Create an agent before starting a new chat.",
-                    modifier = Modifier.fillMaxSize(),
-                )
-                filteredAgents.isEmpty() -> EmptyState(
-                    icon = LettaIcons.Search,
-                    message = "No matching agents. Try another name, description, or model.",
-                    modifier = Modifier.fillMaxSize(),
-                )
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    item {
-                        Text(
-                            text = "Agents",
-                            style = MaterialTheme.typography.sectionTitle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
-                    }
-                    items(filteredAgents, key = { it.id.value }) { agent ->
-                        Card(
-                            onClick = { onAgentSelected(agent) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(4.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            ) {
-                                AgentInitialAvatar(agent.name)
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = agent.name.ifBlank { "Unnamed agent" },
-                                        style = MaterialTheme.typography.listItemHeadline,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = agent.description?.takeIf(String::isNotBlank)
-                                            ?: agent.model?.takeIf(String::isNotBlank)
-                                            ?: agent.id.value,
-                                        style = MaterialTheme.typography.listItemSupporting,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    val model = agent.model
-                                    if (!agent.description.isNullOrBlank() && !model.isNullOrBlank()) {
-                                        Text(
-                                            text = model,
-                                            style = MaterialTheme.typography.listItemMetadataMonospace,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            NewChatAgentBody(
+                agents = agents,
+                filteredAgents = filteredAgents,
+                onAgentSelected = onAgentSelected,
+            )
         }
     }
+}
+
+@Composable
+private fun rememberFilteredAgents(agents: List<Agent>, query: String): List<Agent> {
+    return remember(agents, query) { filterAgentsForNewChat(agents, query) }
+}
+
+private fun filterAgentsForNewChat(agents: List<Agent>, query: String): List<Agent> {
+    val needle = query.trim()
+    if (needle.isBlank()) return agents
+    return agents.filter { agent ->
+        agent.name.contains(needle, ignoreCase = true) ||
+            agent.description.orEmpty().contains(needle, ignoreCase = true) ||
+            agent.model.orEmpty().contains(needle, ignoreCase = true)
+    }
+}
+
+@Composable
+private fun NewChatAgentBody(
+    agents: List<Agent>,
+    filteredAgents: List<Agent>,
+    onAgentSelected: (Agent) -> Unit,
+) {
+    when {
+        agents.isEmpty() -> NewChatNoAgentsEmptyState()
+        filteredAgents.isEmpty() -> NewChatNoMatchesEmptyState()
+        else -> NewChatAgentList(
+            agents = filteredAgents,
+            onAgentSelected = onAgentSelected,
+        )
+    }
+}
+
+@Composable
+private fun NewChatNoAgentsEmptyState() {
+    EmptyState(
+        icon = LettaIcons.AccountCircle,
+        message = "Create an agent before starting a new chat.",
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+@Composable
+private fun NewChatNoMatchesEmptyState() {
+    EmptyState(
+        icon = LettaIcons.Search,
+        message = "No matching agents. Try another name, description, or model.",
+        modifier = Modifier.fillMaxSize(),
+    )
+}
+
+@Composable
+private fun NewChatAgentList(
+    agents: List<Agent>,
+    onAgentSelected: (Agent) -> Unit,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        item {
+            Text(
+                text = "Agents",
+                style = MaterialTheme.typography.sectionTitle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+        }
+        items(agents, key = { it.id.value }) { agent ->
+            NewChatAgentRow(
+                agent = agent,
+                onClick = { onAgentSelected(agent) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewChatAgentRow(
+    agent: Agent,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            AgentInitialAvatar(agent.name)
+            NewChatAgentDetails(
+                agent = agent,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NewChatAgentDetails(
+    agent: Agent,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = agent.name.ifBlank { "Unnamed agent" },
+            style = MaterialTheme.typography.listItemHeadline,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = newChatAgentSubtitle(agent),
+            style = MaterialTheme.typography.listItemSupporting,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val model = agent.model
+        if (!agent.description.isNullOrBlank() && !model.isNullOrBlank()) {
+            Text(
+                text = model,
+                style = MaterialTheme.typography.listItemMetadataMonospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+private fun newChatAgentSubtitle(agent: Agent): String {
+    return agent.description?.takeIf(String::isNotBlank)
+        ?: agent.model?.takeIf(String::isNotBlank)
+        ?: agent.id.value
 }
 
 @Composable

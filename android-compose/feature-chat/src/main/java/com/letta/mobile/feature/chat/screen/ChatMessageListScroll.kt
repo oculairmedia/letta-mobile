@@ -30,6 +30,15 @@ internal enum class ChatAutoScrollAction {
     Skip,
 }
 
+internal data class AutoScrollActionInput(
+    val signature: ChatAutoScrollSignature,
+    val isStreaming: Boolean,
+    val firstVisibleItemIndex: Int,
+    val firstVisibleItemScrollOffset: Int,
+    val lastStreamingSnapMs: Long,
+    val nowMs: Long,
+)
+
 internal const val StreamingAutoScrollSnapThrottleMs = 96L
 
 internal fun chatRenderItemSeesLiveScale(
@@ -38,6 +47,16 @@ internal fun chatRenderItemSeesLiveScale(
     itemIndex: Int,
 ): Boolean = !isPinching || scaleWindowIndexRange.isEmpty() || itemIndex in scaleWindowIndexRange
 
+internal fun autoScrollAction(input: AutoScrollActionInput): ChatAutoScrollAction {
+    if (!input.isStreaming || input.signature.role != "assistant") return ChatAutoScrollAction.Animate
+    if (input.firstVisibleItemIndex != 0) return ChatAutoScrollAction.Animate
+    if (abs(input.firstVisibleItemScrollOffset) > 12) return ChatAutoScrollAction.Animate
+    if (input.nowMs - input.lastStreamingSnapMs < StreamingAutoScrollSnapThrottleMs) {
+        return ChatAutoScrollAction.Skip
+    }
+    return ChatAutoScrollAction.Snap
+}
+
 internal fun autoScrollAction(
     signature: ChatAutoScrollSignature,
     isStreaming: Boolean,
@@ -45,13 +64,16 @@ internal fun autoScrollAction(
     firstVisibleItemScrollOffset: Int,
     lastStreamingSnapMs: Long,
     nowMs: Long,
-): ChatAutoScrollAction {
-    if (!isStreaming || signature.role != "assistant") return ChatAutoScrollAction.Animate
-    if (firstVisibleItemIndex != 0) return ChatAutoScrollAction.Animate
-    if (abs(firstVisibleItemScrollOffset) > 12) return ChatAutoScrollAction.Animate
-    if (nowMs - lastStreamingSnapMs < StreamingAutoScrollSnapThrottleMs) return ChatAutoScrollAction.Skip
-    return ChatAutoScrollAction.Snap
-}
+): ChatAutoScrollAction = autoScrollAction(
+    AutoScrollActionInput(
+        signature = signature,
+        isStreaming = isStreaming,
+        firstVisibleItemIndex = firstVisibleItemIndex,
+        firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
+        lastStreamingSnapMs = lastStreamingSnapMs,
+        nowMs = nowMs,
+    ),
+)
 
 internal fun shouldForceScrollOnUserSend(
     signature: ChatAutoScrollSignature,

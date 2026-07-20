@@ -59,41 +59,72 @@ internal class AdminChatModelCoordinator(
 
     fun modelSwitchUpdateParams(handle: String, config: LettaConfig?, agent: Agent?): AgentUpdateParams {
         val normalizedHandle = handle.trim()
-        val configuredLocalModelHandle = config?.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
-        val normalizedLower = normalizedHandle.lowercase()
-        val knownGemmaLocalHandle = when (normalizedLower) {
-            "google/gemma-3n-e2b-it-litert-lm",
-            "lmstudio/google/gemma-3n-e2b-it-litert-lm" -> "google/gemma-3n-E2B-it-litert-lm"
-            else -> null
-        }
-        val effectiveLocalModelHandle = knownGemmaLocalHandle ?: configuredLocalModelHandle
-        val localLeattaCodeHandle = effectiveLocalModelHandle?.let { "lmstudio/${it.removePrefix("lmstudio/")}" }
-        val localSelected = com.letta.mobile.data.model.AgentRuntimeBinding.isLocalRuntime(config) &&
-            effectiveLocalModelHandle != null &&
-            (knownGemmaLocalHandle != null || normalizedHandle in setOf(effectiveLocalModelHandle, localLeattaCodeHandle))
         val baseMetadata = agent?.metadata.orEmpty().filterKeys { it !in localRuntimeModelSwitchMetadataKeys }
-        if (!localSelected || config == null) {
+        val localSelection = resolveLocalModelSelection(normalizedHandle, config)
+        if (!localSelection.isSelected || config == null) {
             return AgentUpdateParams(model = normalizedHandle, metadata = baseMetadata)
         }
-        val runtime = config.localModelRuntime?.trim()?.takeIf { it.isNotBlank() } ?: "litert-lm"
-        val accelerator = config.localModelAccelerator?.trim()?.takeIf { it.isNotBlank() } ?: "gpu"
-        val maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: 4096
-        val localMetadata = mapOf(
-            LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
-            LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
-            LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
-            LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(effectiveLocalModelHandle),
-            LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(runtime.lowercase()),
-            LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(accelerator.lowercase()),
-        )
-        return AgentUpdateParams(
-            model = effectiveLocalModelHandle,
-            metadata = baseMetadata + localMetadata,
-            modelSettings = (agent?.modelSettings ?: ModelSettings()).copy(
-                providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
-                parallelToolCalls = false,
-                maxOutputTokens = maxTokens,
-            ),
+        return buildLocalModelUpdateParams(
+            agent = agent,
+            baseMetadata = baseMetadata,
+            effectiveLocalModelHandle = localSelection.effectiveHandle,
+            config = config,
         )
     }
+}
+
+private data class LocalModelSelection(
+    val isSelected: Boolean,
+    val effectiveHandle: String?,
+)
+
+private fun resolveKnownGemmaLocalHandle(normalizedLower: String): String? = when (normalizedLower) {
+    "google/gemma-3n-e2b-it-litert-lm",
+    "lmstudio/google/gemma-3n-e2b-it-litert-lm" -> "google/gemma-3n-E2B-it-litert-lm"
+    else -> null
+}
+
+private fun resolveLocalModelSelection(
+    normalizedHandle: String,
+    config: LettaConfig?,
+): LocalModelSelection {
+    val configuredLocalModelHandle = config?.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
+    val knownGemmaLocalHandle = resolveKnownGemmaLocalHandle(normalizedHandle.lowercase())
+    val effectiveLocalModelHandle = knownGemmaLocalHandle ?: configuredLocalModelHandle
+    val localLeattaCodeHandle = effectiveLocalModelHandle?.let { "lmstudio/${it.removePrefix("lmstudio/")}" }
+    val localSelected = com.letta.mobile.data.model.AgentRuntimeBinding.isLocalRuntime(config) &&
+        effectiveLocalModelHandle != null &&
+        (knownGemmaLocalHandle != null || normalizedHandle in setOf(effectiveLocalModelHandle, localLeattaCodeHandle))
+    return LocalModelSelection(
+        isSelected = localSelected,
+        effectiveHandle = effectiveLocalModelHandle,
+    )
+}
+
+private fun buildLocalModelUpdateParams(
+    agent: Agent?,
+    baseMetadata: Map<String, kotlinx.serialization.json.JsonElement>,
+    effectiveLocalModelHandle: String?,
+    config: LettaConfig,
+): AgentUpdateParams {
+    val runtime = config.localModelRuntime?.trim()?.takeIf { it.isNotBlank() } ?: "litert-lm"
+    val accelerator = config.localModelAccelerator?.trim()?.takeIf { it.isNotBlank() } ?: "gpu"
+    val maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: 4096
+    val localMetadata = mapOf(
+        LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
+        LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
+        LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
+        LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(effectiveLocalModelHandle),
+        LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(runtime.lowercase()),
+        LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(accelerator.lowercase()),
+    )
+    return AgentUpdateParams(
+        model = effectiveLocalModelHandle,
+        metadata = baseMetadata + localMetadata,
+        modelSettings = (agent?.modelSettings ?: ModelSettings()).copy(
+            providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
+            parallelToolCalls = false,
+            maxOutputTokens = maxTokens,
+        ),
+    )
 }

@@ -25,82 +25,106 @@ import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.customColors
 
+internal data class HomeScreenTopBarParams(
+    val title: String,
+    val state: DashboardUiState,
+    val isSearchExpanded: Boolean,
+    val onSearchExpandedChange: (Boolean) -> Unit,
+    val onSearchQueryChange: (String) -> Unit,
+    val onSearchClear: () -> Unit,
+    val onOpenDrawer: () -> Unit,
+    val onNavigateToSettings: () -> Unit,
+    val activeBackendLabel: String?,
+    val onNavigateToBackendSwitcher: (() -> Unit)?,
+    val scrollBehavior: TopAppBarScrollBehavior,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun HomeScreenTopBar(
-    title: String,
-    state: DashboardUiState,
-    isSearchExpanded: Boolean,
-    onSearchExpandedChange: (Boolean) -> Unit,
-    onSearchQueryChange: (String) -> Unit,
-    onSearchClear: () -> Unit,
-    onOpenDrawer: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    activeBackendLabel: String?,
-    onNavigateToBackendSwitcher: (() -> Unit)?,
-    scrollBehavior: TopAppBarScrollBehavior,
-) {
+internal fun HomeScreenTopBar(params: HomeScreenTopBarParams) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        LargeFlexibleTopAppBar(
-            title = {
-                ExpandableTitleSearch(
-                    query = state.searchQuery,
-                    onQueryChange = onSearchQueryChange,
-                    onClear = onSearchClear,
-                    expanded = isSearchExpanded,
-                    onExpandedChange = onSearchExpandedChange,
-                    placeholder = stringResource(R.string.screen_home_search_placeholder),
-                    openSearchContentDescription = stringResource(R.string.action_search),
-                    closeSearchContentDescription = stringResource(R.string.action_close),
-                    titleContent = {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(title)
-                            if (state.isConnected) {
-                                Icon(
-                                    LettaIcons.Circle,
-                                    contentDescription = "Connected",
-                                    tint = MaterialTheme.customColors.onlineColor,
-                                    modifier = Modifier.size(8.dp),
-                                )
-                            }
-                            if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
-                                AssistChip(
-                                    onClick = onNavigateToBackendSwitcher,
-                                    label = {
-                                        Text(
-                                            activeBackendLabel,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    },
-                                )
-                            }
-                        }
-                    },
-                )
-            },
-            navigationIcon = {
-                IconButton(onClick = onOpenDrawer) {
-                    Icon(LettaIcons.Menu, contentDescription = "Menu")
-                }
-            },
-            actions = {
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(LettaIcons.Settings, contentDescription = "Settings")
-                }
-            },
-            colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
-            scrollBehavior = scrollBehavior,
-        )
-        ExpandableSearchField(
-            query = state.searchQuery,
-            onQueryChange = onSearchQueryChange,
-            onClear = onSearchClear,
-            expanded = isSearchExpanded,
-            placeholder = stringResource(R.string.screen_home_search_placeholder),
-        )
+        HomeScreenTopBarAppBar(params)
+        HomeScreenTopBarSearchField(params)
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeScreenTopBarAppBar(params: HomeScreenTopBarParams) {
+    LargeFlexibleTopAppBar(
+        title = { HomeScreenTopBarTitle(params) },
+        navigationIcon = {
+            IconButton(onClick = params.onOpenDrawer) {
+                Icon(LettaIcons.Menu, contentDescription = "Menu")
+            }
+        },
+        actions = {
+            IconButton(onClick = params.onNavigateToSettings) {
+                Icon(LettaIcons.Settings, contentDescription = "Settings")
+            }
+        },
+        colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+        scrollBehavior = params.scrollBehavior,
+    )
+}
+
+@Composable
+private fun HomeScreenTopBarTitle(params: HomeScreenTopBarParams) {
+    ExpandableTitleSearch(
+        query = params.state.searchQuery,
+        onQueryChange = params.onSearchQueryChange,
+        onClear = params.onSearchClear,
+        expanded = params.isSearchExpanded,
+        onExpandedChange = params.onSearchExpandedChange,
+        placeholder = stringResource(R.string.screen_home_search_placeholder),
+        openSearchContentDescription = stringResource(R.string.action_search),
+        closeSearchContentDescription = stringResource(R.string.action_close),
+        titleContent = { HomeScreenTopBarTitleRow(params) },
+    )
+}
+
+@Composable
+private fun HomeScreenTopBarTitleRow(params: HomeScreenTopBarParams) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(params.title)
+        if (params.state.isConnected) {
+            Icon(
+                LettaIcons.Circle,
+                contentDescription = "Connected",
+                tint = MaterialTheme.customColors.onlineColor,
+                modifier = Modifier.size(8.dp),
+            )
+        }
+        HomeScreenTopBarBackendChip(params)
+    }
+}
+
+@Composable
+private fun HomeScreenTopBarBackendChip(params: HomeScreenTopBarParams) {
+    val label = params.activeBackendLabel ?: return
+    val onNavigate = params.onNavigateToBackendSwitcher ?: return
+    AssistChip(
+        onClick = onNavigate,
+        label = {
+            Text(
+                label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+    )
+}
+
+@Composable
+private fun HomeScreenTopBarSearchField(params: HomeScreenTopBarParams) {
+    ExpandableSearchField(
+        query = params.state.searchQuery,
+        onQueryChange = params.onSearchQueryChange,
+        onClear = params.onSearchClear,
+        expanded = params.isSearchExpanded,
+        placeholder = stringResource(R.string.screen_home_search_placeholder),
+    )
 }

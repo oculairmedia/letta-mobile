@@ -9,32 +9,49 @@ internal class EditAgentModelSelection(
 ) {
     fun updateModel(value: String) {
         val currentState = state.successData() ?: return
-        val selectedModel = llmModels().firstOrNull { model ->
+        val selectedModel = findSelectedModel(value)
+        val selectedHandle = selectedModel?.handle ?: value
+        val validationError = validateSelectedHandle(selectedHandle)
+        if (validationError != null) {
+            state.setError(validationError)
+            return
+        }
+        applyModelSelection(currentState, selectedModel, selectedHandle)
+    }
+
+    private fun findSelectedModel(value: String): LlmModel? =
+        llmModels().firstOrNull { model ->
             model.handle.equals(value, ignoreCase = true) ||
                 model.name.equals(value, ignoreCase = true) ||
                 model.displayName.equals(value, ignoreCase = true)
         }
+
+    private fun validateSelectedHandle(selectedHandle: String): String? {
+        val backend = if (selectedHandle.startsWith("lmstudio/", ignoreCase = true)) {
+            ModelHandleValidator.Backend.REMOTE
+        } else {
+            ModelHandleValidator.Backend.ON_DEVICE
+        }
+        val validation = ModelHandleValidator.validate(
+            handle = selectedHandle,
+            backend = backend,
+            servedModels = llmModels().mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } },
+        )
+        return (validation as? ModelHandleValidator.Result.Invalid)?.reason
+    }
+
+    private fun applyModelSelection(
+        currentState: EditAgentUiState,
+        selectedModel: LlmModel?,
+        selectedHandle: String,
+    ) {
         val normalizedProviderType = selectedModel?.let { model ->
             EditAgentUseCases.normalizeModelSettingsProviderType(
                 providerType = model.providerType,
-                modelHandle = model.handle ?: value,
+                modelHandle = model.handle ?: selectedHandle,
             )
         }
         val selectedContextWindow = selectedModel?.contextWindow?.takeIf { it > 0 }
-        val selectedHandle = selectedModel?.handle ?: value
-        val validation = ModelHandleValidator.validate(
-            handle = selectedHandle,
-            backend = if (selectedHandle.startsWith("lmstudio/", ignoreCase = true)) {
-                ModelHandleValidator.Backend.REMOTE
-            } else {
-                ModelHandleValidator.Backend.ON_DEVICE
-            },
-            servedModels = llmModels().mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } },
-        )
-        if (validation is ModelHandleValidator.Result.Invalid) {
-            state.setError(validation.reason)
-            return
-        }
         state.setSuccess(
             currentState.copy(
                 model = selectedHandle,

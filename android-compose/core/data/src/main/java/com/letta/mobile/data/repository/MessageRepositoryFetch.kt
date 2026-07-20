@@ -6,31 +6,40 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 
+internal data class MessageFetchParams(
+    val messageApi: MessageApi,
+    val agentId: AgentId,
+    val conversationId: ConversationId,
+    val targetMessageId: String?,
+    val defaultFetchLimit: Int,
+    val targetedFetchLimit: Int,
+    val maxTargetedFetchPages: Int,
+)
+
+internal data class TargetedMessageFetchParams(
+    val messageApi: MessageApi,
+    val agentId: AgentId,
+    val conversationId: ConversationId,
+    val targetMessageId: String,
+    val targetedFetchLimit: Int,
+    val maxTargetedFetchPages: Int,
+)
+
 internal object MessageRepositoryFetch {
-    suspend fun fetchMessages(
-        messageApi: MessageApi,
-        agentId: AgentId,
-        conversationId: ConversationId,
-        targetMessageId: String?,
-        defaultFetchLimit: Int,
-        targetedFetchLimit: Int,
-        maxTargetedFetchPages: Int,
-    ): List<AppMessage> {
+    suspend fun fetchMessages(params: MessageFetchParams): List<AppMessage> {
         return try {
-            if (targetMessageId.isNullOrBlank()) {
-                messageApi.fetchRecentMessages(
-                    conversationId = conversationId,
-                    messageLimit = defaultFetchLimit,
-                    beforeMessageId = null,
-                ).toAppMessages()
+            if (params.targetMessageId.isNullOrBlank()) {
+                fetchRecentMessages(params)
             } else {
                 fetchMessagesUntilTarget(
-                    messageApi = messageApi,
-                    agentId = agentId,
-                    conversationId = conversationId,
-                    targetMessageId = targetMessageId,
-                    targetedFetchLimit = targetedFetchLimit,
-                    maxTargetedFetchPages = maxTargetedFetchPages,
+                    TargetedMessageFetchParams(
+                        messageApi = params.messageApi,
+                        agentId = params.agentId,
+                        conversationId = params.conversationId,
+                        targetMessageId = params.targetMessageId,
+                        targetedFetchLimit = params.targetedFetchLimit,
+                        maxTargetedFetchPages = params.maxTargetedFetchPages,
+                    )
                 )
             }
         } catch (e: Exception) {
@@ -39,36 +48,21 @@ internal object MessageRepositoryFetch {
         }
     }
 
-    suspend fun fetchMessagesUntilTarget(
-        messageApi: MessageApi,
-        agentId: AgentId,
-        conversationId: ConversationId,
-        targetMessageId: String,
-        targetedFetchLimit: Int,
-        maxTargetedFetchPages: Int,
-    ): List<AppMessage> {
+    suspend fun fetchMessagesUntilTarget(params: TargetedMessageFetchParams): List<AppMessage> {
         var after: String? = null
         var pagesFetched = 0
         var mergedMessages: List<AppMessage> = emptyList()
 
-        while (pagesFetched < maxTargetedFetchPages) {
-            val page = messageApi.listMessages(
-                agentId = agentId,
-                limit = targetedFetchLimit,
-                before = null,
-                after = after,
-                order = "asc",
-                conversationId = conversationId,
-            )
-
+        while (pagesFetched < params.maxTargetedFetchPages) {
+            val page = fetchTargetedPage(params, after)
             if (page.isEmpty()) break
 
-            mergedMessages = mergedMessages + page.toAppMessages()
-            if (mergedMessages.any { it.id == targetMessageId }) {
+            mergedMessages = mergedMessages + page
+            if (containsTargetMessage(mergedMessages, params.targetMessageId)) {
                 return mergedMessages
             }
 
-            if (page.size < targetedFetchLimit) break
+            if (page.size < params.targetedFetchLimit) break
 
             after = page.lastOrNull()?.id ?: break
             pagesFetched++
@@ -102,4 +96,27 @@ internal object MessageRepositoryFetch {
             beforeMessageId = beforeMessageId,
         ).toAppMessages()
     }
+
+    private suspend fun fetchRecentMessages(params: MessageFetchParams): List<AppMessage> =
+        params.messageApi.fetchRecentMessages(
+            conversationId = params.conversationId,
+            messageLimit = params.defaultFetchLimit,
+            beforeMessageId = null,
+        ).toAppMessages()
+
+    private suspend fun fetchTargetedPage(
+        params: TargetedMessageFetchParams,
+        after: String?,
+    ): List<AppMessage> =
+        params.messageApi.listMessages(
+            agentId = params.agentId,
+            limit = params.targetedFetchLimit,
+            before = null,
+            after = after,
+            order = "asc",
+            conversationId = params.conversationId,
+        ).toAppMessages()
+
+    private fun containsTargetMessage(messages: List<AppMessage>, targetMessageId: String): Boolean =
+        messages.any { it.id == targetMessageId }
 }

@@ -29,6 +29,164 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.runtime.snapshotFlow
 
 @Composable
+internal fun ChatMessageListEffects(params: ChatMessageListEffectsParams) {
+    ChatMessageListFocusClearEffect(params.listState)
+    ChatMessageListConversationResetEffect(
+        conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId,
+        renderItems = params.renderItems,
+        listState = params.listState,
+    )
+    ChatMessageListAutoScrollEffect(params)
+    ChatMessageListLoadOlderEffect(params)
+    ChatMessageListScrollToMessageEffect(params)
+}
+
+@Composable
+private fun ChatMessageListFocusClearEffect(listState: LazyListState) {
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(listState.interactionSource) {
+        listState.interactionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Start) {
+                focusManager.clearFocus()
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatMessageListConversationResetEffect(
+    conversationId: String?,
+    renderItems: List<ChatRenderItem>,
+    listState: LazyListState,
+) {
+    LaunchedEffect(conversationId) {
+        if (renderItems.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
+    }
+}
+
+@Composable
+private fun ChatMessageListAutoScrollEffect(params: ChatMessageListEffectsParams) {
+    val density = LocalDensity.current
+    val autoScrollSignature = newestMessageAutoScrollSignature(params.state.messages)
+    val isStreamingForAutoScroll by rememberUpdatedState(params.state.isStreaming)
+    val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
+
+    var lastStreamingSnapMs by remember { mutableStateOf(0L) }
+    var followLatest by remember(conversationId) { mutableStateOf(true) }
+    val lastAutoScrollSignature = remember { mutableStateOf<ChatAutoScrollSignature?>(null) }
+
+    LaunchedEffect(conversationId) {
+        followLatest = true
+        if (params.renderItems.isNotEmpty()) {
+            params.listState.scrollToItem(0)
+        }
+    }
+
+    LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size) {
+        snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size) }
+            .distinctUntilChanged()
+            .collect { snapshot ->
+                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
+                    currentFollowMode = followLatest,
+                    snapshot = snapshot,
+                )
+            }
+    }
+
+    LaunchedEffect(autoScrollSignature, isStreamingForAutoScroll, params.renderItems.size) {
+        val signature = autoScrollSignature ?: return@LaunchedEffect
+        val previousSignature = lastAutoScrollSignature.value
+
+        if (shouldForceScrollOnUserSend(signature, previousSignature?.messageId)) {
+            followLatest = true
+            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
+            params.listState.animateScrollToItem(0, sendScrollOffset)
+        } else if (shouldAutoScrollToLatest(signature, previousSignature, followLatest, params.renderItems.size)) {
+            lastStreamingSnapMs = performAutoScrollToLatest(
+                listState = params.listState,
+                isStreaming = isStreamingForAutoScroll,
+                lastStreamingSnapMs = lastStreamingSnapMs,
+            )
+        }
+
+        lastAutoScrollSignature.value = signature
+    }
+}
+
+private fun shouldAutoScrollToLatest(
+    signature: ChatAutoScrollSignature,
+    previousSignature: ChatAutoScrollSignature?,
+    followLatest: Boolean,
+    renderItemCount: Int,
+): Boolean {
+    if (!ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItemCount)) return false
+    return signature.role != "user" || signature.messageId != previousSignature?.messageId
+}
+
+private suspend fun performAutoScrollToLatest(
+    listState: LazyListState,
+    isStreaming: Boolean,
+    lastStreamingSnapMs: Long,
+): Long {
+    val nowMs = System.currentTimeMillis()
+    if (isStreaming) {
+        if (nowMs - lastStreamingSnapMs < StreamingAutoScrollSnapThrottleMs) {
+            return lastStreamingSnapMs
+        }
+        listState.scrollToItem(0)
+        return nowMs
+    }
+    listState.scrollToItem(0)
+    return lastStreamingSnapMs
+}
+
+@Composable
+private fun ChatMessageListLoadOlderEffect(params: ChatMessageListEffectsParams) {
+    LaunchedEffect(params.listState, params.state.hasMoreOlderMessages, params.state.isLoadingOlderMessages, params.state.messages.size) {
+        snapshotFlow { params.listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { _ ->
+                if (!shouldLoadOlderMessages(params)) return@collect
+                val lastVisible = params.listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
+                val totalItems = params.listState.layoutInfo.totalItemsCount
+                if (totalItems > 0 && lastVisible >= totalItems - 3) {
+                    params.onLoadOlderMessages()
+                }
+            }
+    }
+}
+
+private fun shouldLoadOlderMessages(params: ChatMessageListEffectsParams): Boolean {
+    if (!params.state.hasMoreOlderMessages) return false
+    if (params.state.isLoadingOlderMessages) return false
+    if (params.state.messages.isEmpty()) return false
+    return true
+}
+
+@Composable
+private fun ChatMessageListScrollToMessageEffect(params: ChatMessageListEffectsParams) {
+    LaunchedEffect(params.scrollToMessageId, params.renderItems.size) {
+        if (params.scrollToMessageId == null || params.hasScrolledToTarget || params.renderItems.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val targetIdx = params.renderItems.indexOfFirst { it.containsMessageId(params.scrollToMessageId) }
+        if (targetIdx < 0) return@LaunchedEffect
+        params.listState.scrollToItem(
+            calculateLazyIndexForRenderItem(
+                targetRenderIndex = targetIdx,
+                renderItems = params.renderItems,
+            ),
+        )
+        params.onHighlightedMessageIdChange(params.scrollToMessageId)
+        params.onHasScrolledToTargetChange(true)
+        delay(2000)
+        params.onHighlightedMessageIdChange(null)
+    }
+}
+
+@Composable
 internal fun ChatMessageListEffects(
     state: ChatUiState,
     renderItems: List<ChatRenderItem>,
@@ -40,101 +198,19 @@ internal fun ChatMessageListEffects(
     hasScrolledToTarget: Boolean,
     onHasScrolledToTargetChange: (Boolean) -> Unit,
 ) {
-    val focusManager = LocalFocusManager.current
-    val density = LocalDensity.current
-
-    LaunchedEffect(listState.interactionSource) {
-        listState.interactionSource.interactions.collect { interaction ->
-            if (interaction is DragInteraction.Start) {
-                focusManager.clearFocus()
-            }
-        }
-    }
-
-    val autoScrollSignature = newestMessageAutoScrollSignature(state.messages)
-    val isStreamingForAutoScroll by rememberUpdatedState(state.isStreaming)
-    val conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
-
-    var lastStreamingSnapMs by remember { mutableStateOf(0L) }
-    var followLatest by remember(conversationId) { mutableStateOf(true) }
-
-    LaunchedEffect(conversationId) {
-        followLatest = true
-        if (renderItems.isNotEmpty()) {
-            listState.scrollToItem(0)
-        }
-    }
-
-    LaunchedEffect(listState, renderItems.size) {
-        snapshotFlow { listState.toChatViewportSnapshot(isUserScrolling, renderItems.size) }
-            .distinctUntilChanged()
-            .collect { snapshot ->
-                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
-                    currentFollowMode = followLatest,
-                    snapshot = snapshot,
-                )
-            }
-    }
-
-    val lastAutoScrollSignature = remember { mutableStateOf<ChatAutoScrollSignature?>(null) }
-
-    LaunchedEffect(autoScrollSignature, isStreamingForAutoScroll, renderItems.size) {
-        val signature = autoScrollSignature ?: return@LaunchedEffect
-        val previousSignature = lastAutoScrollSignature.value
-
-        if (shouldForceScrollOnUserSend(signature, previousSignature?.messageId)) {
-            followLatest = true
-            val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
-            listState.animateScrollToItem(0, sendScrollOffset)
-        } else if (
-            ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItems.size) &&
-            (signature.role != "user" || signature.messageId != previousSignature?.messageId)
-        ) {
-            val nowMs = System.currentTimeMillis()
-            if (isStreamingForAutoScroll) {
-                if (nowMs - lastStreamingSnapMs >= StreamingAutoScrollSnapThrottleMs) {
-                    lastStreamingSnapMs = nowMs
-                    listState.scrollToItem(0)
-                }
-            } else {
-                listState.scrollToItem(0)
-            }
-        }
-
-        lastAutoScrollSignature.value = signature
-    }
-
-    LaunchedEffect(listState, state.hasMoreOlderMessages, state.isLoadingOlderMessages, state.messages.size) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .distinctUntilChanged()
-            .collect { _ ->
-                if (!state.hasMoreOlderMessages || state.isLoadingOlderMessages || state.messages.isEmpty()) {
-                    return@collect
-                }
-                val lastVisible = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
-                val totalItems = listState.layoutInfo.totalItemsCount
-                if (totalItems > 0 && lastVisible >= totalItems - 3) {
-                    onLoadOlderMessages()
-                }
-            }
-    }
-
-    LaunchedEffect(scrollToMessageId, renderItems.size) {
-        if (scrollToMessageId == null || hasScrolledToTarget || renderItems.isEmpty()) return@LaunchedEffect
-        val targetIdx = renderItems.indexOfFirst { it.containsMessageId(scrollToMessageId) }
-        if (targetIdx >= 0) {
-            listState.scrollToItem(
-                calculateLazyIndexForRenderItem(
-                    targetRenderIndex = targetIdx,
-                    renderItems = renderItems,
-                ),
-            )
-            onHighlightedMessageIdChange(scrollToMessageId)
-            onHasScrolledToTargetChange(true)
-            delay(2000)
-            onHighlightedMessageIdChange(null)
-        }
-    }
+    ChatMessageListEffects(
+        params = ChatMessageListEffectsParams(
+            state = state,
+            renderItems = renderItems,
+            listState = listState,
+            isUserScrolling = isUserScrolling,
+            scrollToMessageId = scrollToMessageId,
+            onLoadOlderMessages = onLoadOlderMessages,
+            onHighlightedMessageIdChange = onHighlightedMessageIdChange,
+            hasScrolledToTarget = hasScrolledToTarget,
+            onHasScrolledToTargetChange = onHasScrolledToTargetChange,
+        ),
+    )
 }
 
 @Composable

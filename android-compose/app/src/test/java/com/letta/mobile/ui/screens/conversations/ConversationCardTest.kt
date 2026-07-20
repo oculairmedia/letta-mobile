@@ -39,12 +39,14 @@ class ConversationCardTest {
         composeTestRule.setLettaTestContent {
                 ConversationCard(
                     display = display,
-                    onClick = {},
-                    onOpenAdmin = {},
-                    onDelete = {},
-                    onRename = {},
-                    onTogglePinned = {},
-                    onFork = {}
+                    callbacks = ConversationCardCallbacks(
+                        onClick = {},
+                        onOpenAdmin = {},
+                        onDelete = {},
+                        onRename = {},
+                        onTogglePinned = {},
+                        onFork = {},
+                    ),
                 )
         }
 
@@ -72,12 +74,14 @@ class ConversationCardTest {
         composeTestRule.setLettaTestContent {
                 ConversationCard(
                     display = display,
-                    onClick = {},
-                    onOpenAdmin = {},
-                    onDelete = {},
-                    onRename = {},
-                    onTogglePinned = {},
-                    onFork = {}
+                    callbacks = ConversationCardCallbacks(
+                        onClick = {},
+                        onOpenAdmin = {},
+                        onDelete = {},
+                        onRename = {},
+                        onTogglePinned = {},
+                        onFork = {},
+                    ),
                 )
         }
 

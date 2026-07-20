@@ -33,11 +33,13 @@ internal object TextMessageRenderer : MessageContentRenderer {
             )
         } else {
             AssistantResponseText(
-                messageId = message.id,
-                text = message.content,
-                textColor = textColor,
-                modifier = modifier,
-                isStreaming = isStreaming,
+                AssistantResponseTextProps(
+                    messageId = message.id,
+                    text = message.content,
+                    textColor = textColor,
+                    modifier = modifier,
+                    isStreaming = isStreaming,
+                ),
             )
         }
     }

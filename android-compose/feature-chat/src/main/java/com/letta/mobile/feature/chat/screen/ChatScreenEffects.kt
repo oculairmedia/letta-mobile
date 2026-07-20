@@ -8,10 +8,10 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import com.letta.mobile.data.model.ToolReturnStatus
+import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
@@ -56,48 +56,130 @@ internal fun ChatScreenEffects(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
 
-    LaunchedEffect(composerState.error) {
-        val message = composerState.error ?: return@LaunchedEffect
+    ChatScreenComposerErrorEffect(
+        composerError = composerState.error,
+        haptic = haptic,
+        view = view,
+        onFloatingBannerMessageChange = onFloatingBannerMessageChange,
+        onClearComposerError = viewModel::clearComposerError,
+    )
+
+    ChatScreenFloatingBannerDismissEffect(
+        floatingBannerMessage = floatingBannerMessage,
+        onFloatingBannerMessageChange = onFloatingBannerMessageChange,
+    )
+
+    ChatScreenA2uiSnackbarEffect(
+        snackbar = state.a2uiActionSnackbar,
+        snackbarDispatcher = snackbarDispatcher,
+        onMarkShown = viewModel::markA2uiActionSnackbarShown,
+        onRetry = viewModel::submitA2uiAction,
+    )
+
+    ChatScreenErrorSnackbarEffect(
+        error = state.error,
+        hasMessages = state.messages.isNotEmpty(),
+        snackbarDispatcher = snackbarDispatcher,
+        onClearError = viewModel::clearError,
+    )
+
+    ChatScreenAmbientStatusEffect(state = state, ambient = ambient)
+
+    ChatScreenStreamingHapticEffect(
+        isStreaming = state.isStreaming,
+        error = state.error,
+        hapticsEnabled = hapticsEnabled,
+        view = view,
+    )
+
+    ChatScreenPendingToolHapticEffect(
+        pendingTools = state.pendingTools,
+        hapticsEnabled = hapticsEnabled,
+        view = view,
+    )
+
+    ChatScreenResolvedToolHapticEffect(
+        messages = state.messages,
+        hapticsEnabled = hapticsEnabled,
+        view = view,
+    )
+}
+
+@Composable
+private fun ChatScreenComposerErrorEffect(
+    composerError: String?,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    view: android.view.View,
+    onFloatingBannerMessageChange: (String) -> Unit,
+    onClearComposerError: () -> Unit,
+) {
+    LaunchedEffect(composerError) {
+        val message = composerError ?: return@LaunchedEffect
         HapticEffects.reject(haptic, view)
         onFloatingBannerMessageChange(message)
-        viewModel.clearComposerError()
+        onClearComposerError()
     }
+}
 
+@Composable
+private fun ChatScreenFloatingBannerDismissEffect(
+    floatingBannerMessage: String,
+    onFloatingBannerMessageChange: (String) -> Unit,
+) {
     LaunchedEffect(floatingBannerMessage) {
         if (floatingBannerMessage.isNotBlank()) {
             kotlinx.coroutines.delay(2600)
             onFloatingBannerMessageChange("")
         }
     }
+}
 
-    LaunchedEffect(state.a2uiActionSnackbar) {
-        val snackbar = state.a2uiActionSnackbar ?: return@LaunchedEffect
+@Composable
+private fun ChatScreenA2uiSnackbarEffect(
+    snackbar: com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi?,
+    snackbarDispatcher: com.letta.mobile.ui.common.SnackbarDispatcher,
+    onMarkShown: (Long) -> Unit,
+    onRetry: (com.letta.mobile.data.a2ui.A2uiAction) -> Unit,
+) {
+    LaunchedEffect(snackbar) {
+        val current = snackbar ?: return@LaunchedEffect
         snackbarDispatcher.dispatch(
             SnackbarMessage(
-                message = snackbar.message,
-                actionLabel = snackbar.actionLabel,
-                duration = snackbar.duration,
-                onAction = snackbar.retryAction?.let { retry ->
-                    { viewModel.submitA2uiAction(retry) }
-                },
-            )
+                message = current.message,
+                actionLabel = current.actionLabel,
+                duration = current.duration,
+                onAction = current.retryAction?.let { retry -> { onRetry(retry) } },
+            ),
         )
-        viewModel.markA2uiActionSnackbarShown(snackbar.id)
+        onMarkShown(current.id)
     }
+}
 
-    LaunchedEffect(state.error) {
-        val err = state.error ?: return@LaunchedEffect
-        if (state.messages.isNotEmpty()) {
-            snackbarDispatcher.dispatch(
-                SnackbarMessage(
-                    message = err,
-                    duration = SnackbarDuration.Long,
-                )
-            )
-            viewModel.clearError()
-        }
+@Composable
+private fun ChatScreenErrorSnackbarEffect(
+    error: String?,
+    hasMessages: Boolean,
+    snackbarDispatcher: com.letta.mobile.ui.common.SnackbarDispatcher,
+    onClearError: () -> Unit,
+) {
+    LaunchedEffect(error) {
+        val err = error ?: return@LaunchedEffect
+        if (!hasMessages) return@LaunchedEffect
+        snackbarDispatcher.dispatch(
+            SnackbarMessage(
+                message = err,
+                duration = SnackbarDuration.Long,
+            ),
+        )
+        onClearError()
     }
+}
 
+@Composable
+private fun ChatScreenAmbientStatusEffect(
+    state: ChatUiState,
+    ambient: ChatScreenAmbientState,
+) {
     LaunchedEffect(state.error, state.isAgentTyping, state.isStreaming) {
         when {
             state.error != null -> ambient.onStatusChange("Failed")
@@ -114,13 +196,87 @@ internal fun ChatScreenEffects(
             else -> ambient.onStatusChange("Idle")
         }
     }
+}
 
-    ChatScreenHapticEffects(
-        state = state,
-        hapticsEnabled = hapticsEnabled,
-        haptic = haptic,
-        view = view,
-    )
+@Composable
+private fun ChatScreenStreamingHapticEffect(
+    isStreaming: Boolean,
+    error: String?,
+    hapticsEnabled: Boolean,
+    view: android.view.View,
+) {
+    var streamingHapticActive by remember { mutableStateOf(false) }
+    LaunchedEffect(isStreaming, error, hapticsEnabled) {
+        if (!hapticsEnabled) {
+            streamingHapticActive = false
+            return@LaunchedEffect
+        }
+        when {
+            isStreaming && !streamingHapticActive -> {
+                streamingHapticActive = true
+                HapticEffects.streamingStart(view, enabled = true)
+            }
+            !isStreaming && streamingHapticActive -> {
+                streamingHapticActive = false
+                if (error != null) {
+                    HapticEffects.toolCallFailed(view, enabled = true)
+                } else {
+                    HapticEffects.streamingComplete(view, enabled = true)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatScreenPendingToolHapticEffect(
+    pendingTools: kotlinx.collections.immutable.ImmutableList<com.letta.mobile.ui.chat.render.PendingToolCall>,
+    hapticsEnabled: Boolean,
+    view: android.view.View,
+) {
+    val greetedToolIds = remember { HashSet<String>() }
+    LaunchedEffect(pendingTools, hapticsEnabled) {
+        if (!hapticsEnabled) return@LaunchedEffect
+        pendingTools.forEach { pending ->
+            if (greetedToolIds.add(pending.id)) {
+                HapticEffects.toolCallStarted(view, enabled = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatScreenResolvedToolHapticEffect(
+    messages: List<com.letta.mobile.data.model.UiMessage>,
+    hapticsEnabled: Boolean,
+    view: android.view.View,
+) {
+    val greetedToolIds = remember { HashSet<String>() }
+    val resolvedToolIds = remember { HashSet<String>() }
+    LaunchedEffect(messages, hapticsEnabled) {
+        if (!hapticsEnabled) return@LaunchedEffect
+        if (greetedToolIds.size == resolvedToolIds.size) return@LaunchedEffect
+        messages.forEach { message ->
+            message.toolCalls?.forEach toolCall@{ toolCall ->
+                val id = toolCall.toolCallId ?: return@toolCall
+                if (id !in greetedToolIds) return@toolCall
+                if (!isTerminalToolCall(toolCall)) return@toolCall
+                if (!resolvedToolIds.add(id)) return@toolCall
+                if (ToolReturnStatus.isError(toolCall.status)) {
+                    HapticEffects.toolCallFailed(view, enabled = true)
+                } else {
+                    HapticEffects.toolCallSucceeded(view, enabled = true)
+                }
+            }
+        }
+    }
+}
+
+private fun isTerminalToolCall(toolCall: UiToolCall): Boolean {
+    if (ToolReturnStatus.isError(toolCall.status)) return true
+    if (toolCall.result != null) return true
+    if (toolCall.status == ToolReturnStatus.SUCCESS) return true
+    return toolCall.status == "warning"
 }
 
 @Composable
@@ -135,68 +291,6 @@ internal fun rememberStreamingRevealHapticPulse(
             if (now - lastRevealHapticAt >= STREAMING_REVEAL_HAPTIC_MIN_INTERVAL_MS) {
                 lastRevealHapticAt = now
                 HapticEffects.streamingPulse(view, enabled = true)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChatScreenHapticEffects(
-    state: ChatUiState,
-    hapticsEnabled: Boolean,
-    haptic: HapticFeedback,
-    view: android.view.View,
-) {
-    var streamingHapticActive by remember { mutableStateOf(false) }
-    LaunchedEffect(state.isStreaming, state.error, hapticsEnabled) {
-        if (!hapticsEnabled) {
-            streamingHapticActive = false
-            return@LaunchedEffect
-        }
-        when {
-            state.isStreaming && !streamingHapticActive -> {
-                streamingHapticActive = true
-                HapticEffects.streamingStart(view, enabled = true)
-            }
-            !state.isStreaming && streamingHapticActive -> {
-                streamingHapticActive = false
-                if (state.error != null) {
-                    HapticEffects.toolCallFailed(view, enabled = true)
-                } else {
-                    HapticEffects.streamingComplete(view, enabled = true)
-                }
-            }
-        }
-    }
-
-    val greetedToolIds = remember { HashSet<String>() }
-    val resolvedToolIds = remember { HashSet<String>() }
-    LaunchedEffect(state.pendingTools, hapticsEnabled) {
-        if (!hapticsEnabled) return@LaunchedEffect
-        state.pendingTools.forEach { pending ->
-            if (greetedToolIds.add(pending.id)) {
-                HapticEffects.toolCallStarted(view, enabled = true)
-            }
-        }
-    }
-    LaunchedEffect(state.messages, hapticsEnabled) {
-        if (!hapticsEnabled) return@LaunchedEffect
-        if (greetedToolIds.size == resolvedToolIds.size) return@LaunchedEffect
-        state.messages.forEach { message ->
-            message.toolCalls?.forEach toolCall@{ toolCall ->
-                val id = toolCall.toolCallId ?: return@toolCall
-                if (id !in greetedToolIds) return@toolCall
-                val isTerminal = ToolReturnStatus.isError(toolCall.status) ||
-                    toolCall.result != null ||
-                    toolCall.status == ToolReturnStatus.SUCCESS ||
-                    toolCall.status == "warning"
-                if (isTerminal && resolvedToolIds.add(id)) {
-                    if (ToolReturnStatus.isError(toolCall.status)) {
-                        HapticEffects.toolCallFailed(view, enabled = true)
-                    } else {
-                        HapticEffects.toolCallSucceeded(view, enabled = true)
-                    }
-                }
             }
         }
     }

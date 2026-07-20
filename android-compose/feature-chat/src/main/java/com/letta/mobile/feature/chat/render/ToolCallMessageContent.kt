@@ -62,10 +62,12 @@ private fun renderToolCallMessageText(
 ) {
     if (message.role == "assistant") {
         AssistantResponseText(
-            messageId = message.id,
-            text = message.content,
-            textColor = textColor,
-            isStreaming = isStreaming,
+            AssistantResponseTextProps(
+                messageId = message.id,
+                text = message.content,
+                textColor = textColor,
+                isStreaming = isStreaming,
+            ),
         )
         return
     }

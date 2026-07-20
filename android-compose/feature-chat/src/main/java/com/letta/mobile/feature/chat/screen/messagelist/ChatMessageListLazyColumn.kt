@@ -150,104 +150,152 @@ private fun ChatMessageListRenderItem(
             geometryState = context.itemGeometryState,
             isStreaming = isStreamingRenderItem,
         ) {
-            when (renderItem) {
-                is ChatRenderItem.Single -> {
-                    val msg = renderItem.message
-                    val stableKey = renderItem.stableRunKey
-                    if (stableKey != null) {
-                        val runId = renderItem.stableRunId ?: stableKey.removePrefix("run-")
-                        RunBlock(
-                            messages = listOf(msg),
-                            collapsed = runId in context.state.collapsedRunIds,
-                            onToggleCollapsed = {
-                                context.itemGeometryState.clearStreamingFloors()
-                                context.callbacks.onToggleRunCollapsed(runId)
-                            },
-                            modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
-                            isStreaming = context.state.isStreaming,
-                            activeApprovalRequestId = context.state.activeApprovalRequestId,
-                            onApprovalDecision = context.callbacks.onSubmitApproval,
-                        ) { message, position, rowModifier ->
-                            RenderChatMessage(
-                                message = message,
-                                position = position,
-                                isStreaming = isStreamingRenderItem && message.id == context.newestMessageId,
-                                rerunEnabled = !context.state.isStreaming,
-                                approvalInFlight = context.state.activeApprovalRequestId == message.approvalRequest?.requestId,
-                                chatMode = context.chatMode,
-                                highlightedMessageId = context.highlightedMessageId,
-                                callbacks = context.callbacks,
-                                reasoningCollapsed = message.id !in context.state.expandedReasoningMessageIds,
-                                onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(message.id) },
-                                modifier = rowModifier,
-                            )
-                        }
-                    } else {
-                        RenderChatMessage(
-                            message = msg,
-                            position = renderItem.groupPosition,
-                            isStreaming = isStreamingRenderItem && msg.id == context.newestMessageId,
-                            rerunEnabled = !context.state.isStreaming,
-                            approvalInFlight = context.state.activeApprovalRequestId == msg.approvalRequest?.requestId,
-                            chatMode = context.chatMode,
-                            highlightedMessageId = context.highlightedMessageId,
-                            callbacks = context.callbacks,
-                            reasoningCollapsed = msg.id !in context.state.expandedReasoningMessageIds,
-                            onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(msg.id) },
-                        )
-                    }
-                }
-
-                is ChatRenderItem.SkillEnvelopeChip -> {
-                    SkillEnvelopeChip(
-                        slug = renderItem.slug,
-                        name = renderItem.name,
-                        description = renderItem.description,
-                        args = renderItem.args,
-                        rawContent = renderItem.rawContent,
-                        chatMode = context.chatMode,
-                        modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
-                    )
-                }
-
-                is ChatRenderItem.RunBlock -> {
-                    val isHighlighted = renderItem.containsMessageId(context.highlightedMessageId.orEmpty())
-                    val highlightModifier = if (isHighlighted) {
-                        Modifier.background(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                            RoundedCornerShape(chatShapes.bubbleRadius),
-                        )
-                    } else {
-                        Modifier
-                    }
-                    RunBlock(
-                        messages = renderItem.messages.map { it.first },
-                        collapsed = renderItem.runId in context.state.collapsedRunIds,
-                        onToggleCollapsed = {
-                            context.itemGeometryState.clearStreamingFloors()
-                            context.callbacks.onToggleRunCollapsed(renderItem.runId)
-                        },
-                        modifier = highlightModifier.padding(top = chatDimens.ungroupedMessageSpacing),
-                        isStreaming = context.state.isStreaming,
-                        activeApprovalRequestId = context.state.activeApprovalRequestId,
-                        onApprovalDecision = context.callbacks.onSubmitApproval,
-                    ) { message, position, rowModifier ->
-                        RenderChatMessage(
-                            message = message,
-                            position = position,
-                            isStreaming = isStreamingRenderItem && message.id == context.newestMessageId,
-                            rerunEnabled = !context.state.isStreaming,
-                            approvalInFlight = context.state.activeApprovalRequestId == message.approvalRequest?.requestId,
-                            chatMode = context.chatMode,
-                            highlightedMessageId = context.highlightedMessageId,
-                            callbacks = context.callbacks,
-                            reasoningCollapsed = message.id !in context.state.expandedReasoningMessageIds,
-                            onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(message.id) },
-                            modifier = rowModifier,
-                        )
-                    }
-                }
-            }
+            ChatMessageListRenderItemBody(
+                renderItem = renderItem,
+                context = context,
+                chatDimens = chatDimens,
+                chatShapes = chatShapes,
+                isStreamingRenderItem = isStreamingRenderItem,
+            )
         }
     }
+}
+
+@Composable
+private fun ChatMessageListRenderItemBody(
+    renderItem: ChatRenderItem,
+    context: ChatMessageListLazyContext,
+    chatDimens: ChatDimens,
+    chatShapes: ChatShapes,
+    isStreamingRenderItem: Boolean,
+) {
+    when (renderItem) {
+        is ChatRenderItem.Single -> ChatMessageListRenderSingleItem(
+            renderItem = renderItem,
+            context = context,
+            chatDimens = chatDimens,
+            isStreamingRenderItem = isStreamingRenderItem,
+        )
+        is ChatRenderItem.SkillEnvelopeChip -> {
+            SkillEnvelopeChip(
+                slug = renderItem.slug,
+                name = renderItem.name,
+                description = renderItem.description,
+                args = renderItem.args,
+                rawContent = renderItem.rawContent,
+                chatMode = context.chatMode,
+                modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
+            )
+        }
+        is ChatRenderItem.RunBlock -> ChatMessageListRenderRunBlockItem(
+            renderItem = renderItem,
+            context = context,
+            chatDimens = chatDimens,
+            chatShapes = chatShapes,
+            isStreamingRenderItem = isStreamingRenderItem,
+        )
+    }
+}
+
+@Composable
+private fun ChatMessageListRenderSingleItem(
+    renderItem: ChatRenderItem.Single,
+    context: ChatMessageListLazyContext,
+    chatDimens: ChatDimens,
+    isStreamingRenderItem: Boolean,
+) {
+    val msg = renderItem.message
+    val stableKey = renderItem.stableRunKey
+    if (stableKey != null) {
+        val runId = renderItem.stableRunId ?: stableKey.removePrefix("run-")
+        RunBlock(
+            messages = listOf(msg),
+            collapsed = runId in context.state.collapsedRunIds,
+            onToggleCollapsed = {
+                context.itemGeometryState.clearStreamingFloors()
+                context.callbacks.onToggleRunCollapsed(runId)
+            },
+            modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
+            isStreaming = context.state.isStreaming,
+            activeApprovalRequestId = context.state.activeApprovalRequestId,
+            onApprovalDecision = context.callbacks.onSubmitApproval,
+        ) { message, position, rowModifier ->
+            RenderChatMessageRow(
+                message = message,
+                position = position,
+                context = context,
+                isStreamingRenderItem = isStreamingRenderItem,
+                modifier = rowModifier,
+            )
+        }
+        return
+    }
+    RenderChatMessageRow(
+        message = msg,
+        position = renderItem.groupPosition,
+        context = context,
+        isStreamingRenderItem = isStreamingRenderItem,
+    )
+}
+
+@Composable
+private fun ChatMessageListRenderRunBlockItem(
+    renderItem: ChatRenderItem.RunBlock,
+    context: ChatMessageListLazyContext,
+    chatDimens: ChatDimens,
+    chatShapes: ChatShapes,
+    isStreamingRenderItem: Boolean,
+) {
+    val isHighlighted = renderItem.containsMessageId(context.highlightedMessageId.orEmpty())
+    val highlightModifier = if (isHighlighted) {
+        Modifier.background(
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+            RoundedCornerShape(chatShapes.bubbleRadius),
+        )
+    } else {
+        Modifier
+    }
+    RunBlock(
+        messages = renderItem.messages.map { it.first },
+        collapsed = renderItem.runId in context.state.collapsedRunIds,
+        onToggleCollapsed = {
+            context.itemGeometryState.clearStreamingFloors()
+            context.callbacks.onToggleRunCollapsed(renderItem.runId)
+        },
+        modifier = highlightModifier.padding(top = chatDimens.ungroupedMessageSpacing),
+        isStreaming = context.state.isStreaming,
+        activeApprovalRequestId = context.state.activeApprovalRequestId,
+        onApprovalDecision = context.callbacks.onSubmitApproval,
+    ) { message, position, rowModifier ->
+        RenderChatMessageRow(
+            message = message,
+            position = position,
+            context = context,
+            isStreamingRenderItem = isStreamingRenderItem,
+            modifier = rowModifier,
+        )
+    }
+}
+
+@Composable
+private fun RenderChatMessageRow(
+    message: com.letta.mobile.data.model.UiMessage,
+    position: com.letta.mobile.ui.common.GroupPosition,
+    context: ChatMessageListLazyContext,
+    isStreamingRenderItem: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    RenderChatMessage(
+        message = message,
+        position = position,
+        isStreaming = isStreamingRenderItem && message.id == context.newestMessageId,
+        rerunEnabled = !context.state.isStreaming,
+        approvalInFlight = context.state.activeApprovalRequestId == message.approvalRequest?.requestId,
+        chatMode = context.chatMode,
+        highlightedMessageId = context.highlightedMessageId,
+        callbacks = context.callbacks,
+        reasoningCollapsed = message.id !in context.state.expandedReasoningMessageIds,
+        onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(message.id) },
+        modifier = modifier,
+    )
 }

@@ -145,8 +145,7 @@ internal class EditAgentViewModel @Inject constructor(
 
     fun updateBlockLimit(blockLabel: String, limit: Int?) = blockEditor.updateBlockLimit(blockLabel, limit)
 
-    fun addBlock(label: String, value: String, description: String, limit: Int?) =
-        blockEditor.addBlock(label, value, description, limit)
+    fun addBlock(draft: NewBlockDraft) = blockEditor.addBlock(draft)
 
     fun attachExistingBlock(blockId: String) = blockEditor.attachExistingBlock(blockId)
 

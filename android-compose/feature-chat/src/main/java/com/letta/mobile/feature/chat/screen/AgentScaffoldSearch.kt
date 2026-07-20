@@ -53,34 +53,12 @@ internal fun ChatSearchResultsContent(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         item(key = "chat-search-header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.screen_home_search_messages_section),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f),
-                )
-                if (isSearching) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                }
-            }
+            ChatSearchResultsHeader(isSearching = isSearching)
         }
 
         if (!isSearching && results.isEmpty()) {
             item(key = "chat-search-empty") {
-                Text(
-                    text = stringResource(R.string.screen_home_search_no_results),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(32.dp),
-                )
+                ChatSearchResultsEmptyState()
             }
         }
 
@@ -88,75 +66,139 @@ internal fun ChatSearchResultsContent(
             items = results,
             key = { index, result -> chatSearchResultKey(result, index) },
         ) { _, result ->
-            val conversation = result.conversationId?.let(conversationsById::get)
-            val isCurrentConversation = result.conversationId != null && result.conversationId == currentConversationId
-            val conversationScope = when {
-                isCurrentConversation -> "Current conversation"
-                result.conversationId != null -> "Previous conversation"
-                else -> "Conversation unknown"
+            ChatSearchResultCard(
+                result = result,
+                searchQuery = searchQuery,
+                conversationsById = conversationsById,
+                currentConversationId = currentConversationId,
+                highlightColors = highlightColors,
+                onResultClick = onResultClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatSearchResultsHeader(isSearching: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.screen_home_search_messages_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        if (isSearching) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+        }
+    }
+}
+
+@Composable
+private fun ChatSearchResultsEmptyState() {
+    Text(
+        text = stringResource(R.string.screen_home_search_no_results),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+    )
+}
+
+@Composable
+private fun ChatSearchResultCard(
+    result: ParsedSearchMessage,
+    searchQuery: String,
+    conversationsById: Map<String, Conversation>,
+    currentConversationId: String?,
+    highlightColors: com.letta.mobile.ui.components.SearchHighlightColors,
+    onResultClick: (ParsedSearchMessage) -> Unit,
+) {
+    val conversation = result.conversationId?.let(conversationsById::get)
+    val isCurrentConversation = result.conversationId != null && result.conversationId == currentConversationId
+    val conversationScope = when {
+        isCurrentConversation -> "Current conversation"
+        result.conversationId != null -> "Previous conversation"
+        else -> "Conversation unknown"
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onResultClick(result) },
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            ChatSearchResultCardHeader(
+                conversationScope = conversationScope,
+                isCurrentConversation = isCurrentConversation,
+                result = result,
+            )
+            conversation?.summary?.takeIf { it.isNotBlank() }?.let { summary ->
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
             }
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onResultClick(result) },
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            LettaIcons.ChatOutline,
-                            contentDescription = null,
-                            tint = if (isCurrentConversation) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.tertiary
-                            },
-                            modifier = Modifier.size(18.dp),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = conversationScope,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isCurrentConversation) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.tertiary
-                            },
-                        )
-                        result.date?.let(::formatRelativeTime)?.takeIf { it.isNotBlank() }?.let { timeText ->
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = timeText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                    conversation?.summary?.takeIf { it.isNotBlank() }?.let { summary ->
-                        Text(
-                            text = summary,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
-                    }
-                    Text(
-                        text = highlightSearchMatches(
-                            searchResultSnippet(result.content.orEmpty(), searchQuery),
-                            searchQuery,
-                            highlightColors,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
+            Text(
+                text = highlightSearchMatches(
+                    searchResultSnippet(result.content.orEmpty(), searchQuery),
+                    searchQuery,
+                    highlightColors,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChatSearchResultCardHeader(
+    conversationScope: String,
+    isCurrentConversation: Boolean,
+    result: ParsedSearchMessage,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            LettaIcons.ChatOutline,
+            contentDescription = null,
+            tint = if (isCurrentConversation) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.tertiary
+            },
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = conversationScope,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isCurrentConversation) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.tertiary
+            },
+        )
+        result.date?.let(::formatRelativeTime)?.takeIf { it.isNotBlank() }?.let { timeText ->
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = timeText,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

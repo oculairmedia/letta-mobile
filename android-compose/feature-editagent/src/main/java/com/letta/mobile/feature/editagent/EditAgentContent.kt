@@ -65,7 +65,7 @@ internal fun EditAgentContent(
     onBlockValueChange: (String, String) -> Unit,
     onBlockDescriptionChange: (String, String) -> Unit,
     onBlockLimitChange: (String, Int?) -> Unit,
-    onAddBlock: (String, String, String, Int?) -> Unit,
+    onAddBlock: (NewBlockDraft) -> Unit,
     onAttachExistingBlock: (String) -> Unit,
     onAttachExistingBlocks: (List<String>) -> Unit,
     onDeleteBlock: (String) -> Unit,
@@ -635,7 +635,7 @@ internal fun EditAgentContent(
         AddBlockDialog(
             onDismiss = { showAddBlockDialog = false },
             onAdd = { label, value, description, limit ->
-                onAddBlock(label, value, description, limit)
+                onAddBlock(NewBlockDraft(label, value, description, limit))
                 showAddBlockDialog = false
             },
         )

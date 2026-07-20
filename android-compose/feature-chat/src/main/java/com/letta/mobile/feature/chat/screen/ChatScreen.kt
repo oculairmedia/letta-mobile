@@ -91,21 +91,23 @@ internal fun ChatScreen(
                 .then(backgroundModifier),
         ) {
             ChatScreenLayout(
-                state = state,
-                composerState = composerState,
-                viewModel = viewModel,
-                contentPadding = contentPadding,
-                chatBackground = chatBackground,
-                chatMode = chatMode,
-                navigation = navigation,
-                resolvedSubagentSource = resolvedSubagentSource,
-                subagentBarState = subagentBarState,
-                activeFontScale = activeFontScale,
-                onActiveFontScaleChange = { activeFontScale = it },
-                bottomInsetDp = bottomInsetDp,
-                floatingBannerMessage = floatingBannerMessage,
-                onFloatingBannerMessageChange = { floatingBannerMessage = it },
-                streamingRevealPulse = streamingRevealPulse,
+                params = ChatScreenLayoutParams(
+                    state = state,
+                    composerState = composerState,
+                    viewModel = viewModel,
+                    contentPadding = contentPadding,
+                    chatBackground = chatBackground,
+                    chatMode = chatMode,
+                    navigation = navigation,
+                    resolvedSubagentSource = resolvedSubagentSource,
+                    subagentBarState = subagentBarState,
+                    activeFontScale = activeFontScale,
+                    onActiveFontScaleChange = { activeFontScale = it },
+                    bottomInsetDp = bottomInsetDp,
+                    floatingBannerMessage = floatingBannerMessage,
+                    onFloatingBannerMessageChange = { floatingBannerMessage = it },
+                    streamingRevealPulse = streamingRevealPulse,
+                ),
             )
         }
     }

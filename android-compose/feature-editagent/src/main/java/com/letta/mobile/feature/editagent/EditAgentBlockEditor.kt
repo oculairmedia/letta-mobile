@@ -6,6 +6,13 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+internal data class NewBlockDraft(
+    val label: String,
+    val value: String,
+    val description: String,
+    val limit: Int?,
+)
+
 internal class EditAgentBlockEditor(
     private val agentId: String,
     private val blockRepository: IBlockRepository,
@@ -25,15 +32,15 @@ internal class EditAgentBlockEditor(
         updateBlock(blockLabel) { it.copy(limit = limit) }
     }
 
-    fun addBlock(label: String, value: String, description: String, limit: Int?) {
+    fun addBlock(draft: NewBlockDraft) {
         scope.launch {
             try {
                 val block = blockRepository.createBlock(
                     BlockCreateParams(
-                        label = label,
-                        value = value,
-                        description = description.ifBlank { null },
-                        limit = limit,
+                        label = draft.label,
+                        value = draft.value,
+                        description = draft.description.ifBlank { null },
+                        limit = draft.limit,
                     )
                 )
                 blockRepository.attachBlock(agentId, block.id.value)

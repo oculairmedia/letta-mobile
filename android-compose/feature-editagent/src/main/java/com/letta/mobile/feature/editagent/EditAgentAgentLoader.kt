@@ -1,7 +1,10 @@
 package com.letta.mobile.feature.editagent
 
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IToolRepository
@@ -22,7 +25,41 @@ internal class EditAgentAgentLoader(
 ) {
     suspend fun load(llmModels: List<LlmModel>): EditAgentLoadSnapshot {
         val agent = agentRepository.getAgent(AgentId(agentId)).first()
-        val editableBlocks = agent.blocks.map { block ->
+        val editableBlocks = agent.toEditableBlocks()
+        val availableTools = loadAvailableTools()
+        val availableBlocks = loadAvailableBlocks()
+        val resolvedEmbedding = agent.resolveEmbedding()
+        val normalizedProviderType = agent.resolveProviderType()
+        return EditAgentLoadSnapshot(
+            uiState = EditAgentUiStateMapper.fromAgent(
+                EditAgentMapperInput(
+                    agent = agent,
+                    editableBlocks = editableBlocks,
+                    availableTools = availableTools,
+                    availableBlocks = availableBlocks,
+                    resolvedEmbedding = resolvedEmbedding,
+                    normalizedProviderType = normalizedProviderType,
+                )
+            ),
+            originalBlocks = editableBlocks.associateBy { it.label },
+            originalEmbedding = resolvedEmbedding,
+            originalProviderType = normalizedProviderType,
+        )
+    }
+
+    private suspend fun loadAvailableTools(): List<Tool> {
+        runCatching { toolRepository.refreshTools() }
+            .onFailure { android.util.Log.w("EditAgentVM", "Failed to load tools", it) }
+        return toolRepository.getTools().value
+    }
+
+    private suspend fun loadAvailableBlocks(): List<Block> =
+        runCatching { blockRepository.listAllBlocks() }
+            .onFailure { android.util.Log.w("EditAgentVM", "Failed to load available blocks", it) }
+            .getOrDefault(emptyList())
+
+    private fun Agent.toEditableBlocks(): List<EditableBlock> =
+        blocks.map { block ->
             EditableBlock(
                 id = block.id.value,
                 label = block.label ?: "",
@@ -33,36 +70,21 @@ internal class EditAgentAgentLoader(
                 readOnly = block.readOnly ?: false,
             )
         }
-        runCatching { toolRepository.refreshTools() }
-            .onFailure { android.util.Log.w("EditAgentVM", "Failed to load tools", it) }
-        val availableTools = toolRepository.getTools().value
-        val availableBlocks = runCatching { blockRepository.listAllBlocks() }
-            .onFailure { android.util.Log.w("EditAgentVM", "Failed to load available blocks", it) }
-            .getOrDefault(emptyList())
-        val resolvedEmbedding = agent.embedding
-            ?: agent.embeddingConfig?.handle
-            ?: agent.embeddingConfig?.embeddingModel
+
+    private fun Agent.resolveEmbedding(): String =
+        embedding
+            ?: embeddingConfig?.handle
+            ?: embeddingConfig?.embeddingModel
             ?: ""
-        val resolvedProviderType = agent.modelSettings?.providerType
-            ?: agent.llmConfig?.modelEndpointType
-            ?: agent.llmConfig?.providerName
+
+    private fun Agent.resolveProviderType(): String {
+        val resolvedProviderType = modelSettings?.providerType
+            ?: llmConfig?.modelEndpointType
+            ?: llmConfig?.providerName
             ?: ""
-        val normalizedProviderType = EditAgentUseCases.normalizeModelSettingsProviderType(
+        return EditAgentUseCases.normalizeModelSettingsProviderType(
             providerType = resolvedProviderType,
-            modelHandle = agent.model ?: agent.llmConfig?.handle ?: agent.llmConfig?.model,
+            modelHandle = model ?: llmConfig?.handle ?: llmConfig?.model,
         ).orEmpty()
-        return EditAgentLoadSnapshot(
-            uiState = EditAgentUiStateMapper.fromAgent(
-                agent = agent,
-                editableBlocks = editableBlocks,
-                availableTools = availableTools,
-                availableBlocks = availableBlocks,
-                resolvedEmbedding = resolvedEmbedding,
-                normalizedProviderType = normalizedProviderType,
-            ),
-            originalBlocks = editableBlocks.associateBy { it.label },
-            originalEmbedding = resolvedEmbedding,
-            originalProviderType = normalizedProviderType,
-        )
     }
 }

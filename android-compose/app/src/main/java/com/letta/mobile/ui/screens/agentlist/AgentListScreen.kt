@@ -184,7 +184,18 @@ fun AgentListScreen(
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = { AgentListTopBar(params = topBarParams) },
+        topBar = {
+            AgentListTopBar(
+                state = AgentListTopBarState(
+                    uiState = uiState,
+                    isShareMode = isShareMode,
+                    shareContentPreview = shareContentPreview,
+                    scrollBehavior = scrollBehavior,
+                ),
+                actions = topBarActions,
+                haptic = haptic,
+            )
+        },
         floatingActionButton = {
             if (!isShareMode) {
                 FloatingActionButton(onClick = { viewModel.showCreateDialog() }) {
@@ -193,7 +204,16 @@ fun AgentListScreen(
             }
         },
     ) { paddingValues ->
-        AgentListContent(params = contentParams, paddingValues = paddingValues)
+        AgentListContent(
+            state = contentState,
+            actions = contentActions,
+            layout = AgentListContentLayout(
+                paddingValues = paddingValues,
+                listState = listState,
+                gridState = gridState,
+                haptic = haptic,
+            ),
+        )
     }
 
     AgentListDialogHost(

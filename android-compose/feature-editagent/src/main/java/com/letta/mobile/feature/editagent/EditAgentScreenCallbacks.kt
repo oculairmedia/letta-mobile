@@ -9,7 +9,7 @@ internal data class EditAgentContentCallbacks(
     val onBlockValueChange: (String, String) -> Unit,
     val onBlockDescriptionChange: (String, String) -> Unit,
     val onBlockLimitChange: (String, Int?) -> Unit,
-    val onAddBlock: (String, String, String, Int?) -> Unit,
+    val onAddBlock: (NewBlockDraft) -> Unit,
     val onAttachExistingBlock: (String) -> Unit,
     val onAttachExistingBlocks: (List<String>) -> Unit,
     val onDeleteBlock: (String) -> Unit,
