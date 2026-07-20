@@ -44,7 +44,7 @@ class MergeTracer(private val verbose: Boolean = true) {
             is AssistantMessage -> frame.content to "assistant"
             is ReasoningMessage -> frame.reasoning.orEmpty() to "reasoning"
             is ToolCallMessage -> describeToolCall(frame) to "tool_call"
-            is ToolReturnMessage -> frame.toolReturn.funcResponse to "tool_return"
+            is ToolReturnMessage -> runCatching { frame.toolReturn.funcResponse }.getOrNull().orEmpty() to "tool_return"
             else -> "" to type
         }
 
