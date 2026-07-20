@@ -334,7 +334,10 @@ class ArchitectureQuery:
     @staticmethod
     def limit(value: Any) -> int:
         """Coerce and bound a caller-provided result limit."""
-        limit = DEFAULT_LIMIT if value is None else int(value)
+        try:
+            limit = DEFAULT_LIMIT if value is None else int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("limit must be an integer") from exc
         if not 1 <= limit <= MAX_LIMIT:
             raise ValueError(f"limit must be between 1 and {MAX_LIMIT}")
         return limit

@@ -83,7 +83,7 @@ printf '%s\n' '{"documents":{}}'
 EOF
 chmod +x "$fixture_root/invalid-scip"
 set +e
-invalid_output="$($REPO_ROOT/scripts/scip/extract-scip-graph.py "$fixture_root/index.scip" \
+invalid_output="$("$REPO_ROOT/scripts/scip/extract-scip-graph.py" "$fixture_root/index.scip" \
   "$fixture_root/invalid.jsonl" --scip-command "$fixture_root/invalid-scip" 2>&1)"
 invalid_status=$?
 set -e

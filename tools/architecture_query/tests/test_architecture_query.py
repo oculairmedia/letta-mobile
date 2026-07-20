@@ -44,6 +44,10 @@ class ArchitectureQueryTest(unittest.TestCase):
         violations = self.query.architecture_violations()
         self.assertEqual("core-no-app", violations["items"][0]["rule"])
 
+    def test_limit_rejects_non_integer_values(self):
+        with self.assertRaisesRegex(ValueError, "limit must be an integer"):
+            architecture_query.ArchitectureQuery.limit({"not": "an integer"})
+
     def test_limits_and_paths_are_validated(self):
         with self.assertRaisesRegex(ValueError, "between 1 and 200"):
             self.query.module_deps(":app", limit=201)
