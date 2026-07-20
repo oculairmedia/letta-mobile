@@ -140,20 +140,23 @@ internal class EditAgentViewModel @Inject constructor(
 
     fun updateSystemPrompt(value: String) = state.updateField { copy(systemPrompt = value) }
 
-    fun updateBlockValue(blockLabel: String, value: String) = blockEditor.updateBlockValue(blockLabel, value)
+    fun updateBlockValue(blockLabel: String, value: String) =
+        blockEditor.updateBlockValue(BlockValueUpdate(EditableBlockLabel(blockLabel), value))
 
     fun updateBlockDescription(blockLabel: String, description: String) =
-        blockEditor.updateBlockDescription(blockLabel, description)
+        blockEditor.updateBlockDescription(BlockDescriptionUpdate(EditableBlockLabel(blockLabel), description))
 
-    fun updateBlockLimit(blockLabel: String, limit: Int?) = blockEditor.updateBlockLimit(blockLabel, limit)
+    fun updateBlockLimit(blockLabel: String, limit: Int?) =
+        blockEditor.updateBlockLimit(BlockLimitUpdate(EditableBlockLabel(blockLabel), limit))
 
     fun addBlock(draft: NewBlockDraft) = blockEditor.addBlock(draft)
 
-    fun attachExistingBlock(blockId: String) = blockEditor.attachExistingBlock(blockId)
+    fun attachExistingBlock(blockId: String) = blockEditor.attachExistingBlock(AttachedBlockId(blockId))
 
-    fun attachExistingBlocks(blockIds: List<String>) = blockEditor.attachExistingBlocks(blockIds)
+    fun attachExistingBlocks(blockIds: List<String>) =
+        blockEditor.attachExistingBlocks(BlockAttachRequest(blockIds.map(::AttachedBlockId)))
 
-    fun deleteBlock(blockId: String) = blockEditor.deleteBlock(blockId)
+    fun deleteBlock(blockId: String) = blockEditor.deleteBlock(AttachedBlockId(blockId))
 
     fun addTag(tag: String) {
         val currentState = state.successData() ?: return

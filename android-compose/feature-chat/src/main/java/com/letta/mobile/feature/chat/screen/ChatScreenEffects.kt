@@ -59,11 +59,12 @@ internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
     val view = LocalView.current
 
     ChatScreenComposerErrorEffect(
-        composerError = params.composerState.error,
-        haptic = haptic,
-        view = view,
-        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
-        onClearComposerError = params.viewModel::clearComposerError,
+        state = ChatScreenComposerErrorEffectState(composerError = params.composerState.error),
+        haptics = ChatScreenComposerErrorEffectHaptics(haptic = haptic, view = view),
+        callbacks = ChatScreenComposerErrorEffectCallbacks(
+            onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
+            onClearComposerError = params.viewModel::clearComposerError,
+        ),
     )
 
     ChatScreenFloatingBannerDismissEffect(
@@ -107,19 +108,31 @@ internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
     )
 }
 
+private data class ChatScreenComposerErrorEffectState(
+    val composerError: String?,
+)
+
+private data class ChatScreenComposerErrorEffectHaptics(
+    val haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    val view: android.view.View,
+)
+
+private data class ChatScreenComposerErrorEffectCallbacks(
+    val onFloatingBannerMessageChange: (String) -> Unit,
+    val onClearComposerError: () -> Unit,
+)
+
 @Composable
 private fun ChatScreenComposerErrorEffect(
-    composerError: String?,
-    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
-    view: android.view.View,
-    onFloatingBannerMessageChange: (String) -> Unit,
-    onClearComposerError: () -> Unit,
+    state: ChatScreenComposerErrorEffectState,
+    haptics: ChatScreenComposerErrorEffectHaptics,
+    callbacks: ChatScreenComposerErrorEffectCallbacks,
 ) {
-    LaunchedEffect(composerError) {
-        val message = composerError ?: return@LaunchedEffect
-        HapticEffects.reject(haptic, view)
-        onFloatingBannerMessageChange(message)
-        onClearComposerError()
+    LaunchedEffect(state.composerError) {
+        val message = state.composerError ?: return@LaunchedEffect
+        HapticEffects.reject(haptics.haptic, haptics.view)
+        callbacks.onFloatingBannerMessageChange(message)
+        callbacks.onClearComposerError()
     }
 }
 

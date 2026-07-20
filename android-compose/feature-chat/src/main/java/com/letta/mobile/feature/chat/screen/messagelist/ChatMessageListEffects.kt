@@ -198,8 +198,9 @@ private fun resolveScrollToMessageTarget(
     hasScrolledToTarget: Boolean,
     renderItems: List<ChatRenderItem>,
 ): ResolvedScrollToMessageTarget? {
-    if (scrollToMessageId == null || hasScrolledToTarget || renderItems.isEmpty()) return null
-    val targetIdx = renderItems.indexOfFirst { it.containsMessageId(scrollToMessageId) }
+    if (!shouldAttemptScrollToMessage(scrollToMessageId, hasScrolledToTarget)) return null
+    if (renderItems.isEmpty()) return null
+    val targetIdx = findRenderIndexForMessage(scrollToMessageId!!, renderItems)
     if (targetIdx < 0) return null
     return ResolvedScrollToMessageTarget(
         messageId = scrollToMessageId,
@@ -207,6 +208,20 @@ private fun resolveScrollToMessageTarget(
         renderItems = renderItems,
     )
 }
+
+private fun shouldAttemptScrollToMessage(
+    scrollToMessageId: String?,
+    hasScrolledToTarget: Boolean,
+): Boolean {
+    if (scrollToMessageId == null) return false
+    if (hasScrolledToTarget) return false
+    return true
+}
+
+private fun findRenderIndexForMessage(
+    messageId: String,
+    renderItems: List<ChatRenderItem>,
+): Int = renderItems.indexOfFirst { it.containsMessageId(messageId) }
 
 @Composable
 internal fun ChatMessageListPinchIndicatorEffects(

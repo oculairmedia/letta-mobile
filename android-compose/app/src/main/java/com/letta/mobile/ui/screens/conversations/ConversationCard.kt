@@ -101,12 +101,16 @@ fun ConversationCard(
 
     ConversationCardConfirmDialog(
         show = showDeleteDialog,
-        title = stringResource(R.string.screen_conversations_dialog_delete_title),
-        message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
-        confirmText = stringResource(R.string.action_delete),
-        destructive = true,
-        onConfirm = callbacks.onDelete,
-        onDismiss = { showDeleteDialog = false },
+        content = ConversationCardConfirmDialogContent(
+            title = stringResource(R.string.screen_conversations_dialog_delete_title),
+            message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
+            confirmText = stringResource(R.string.action_delete),
+            destructive = true,
+        ),
+        callbacks = ConversationCardConfirmDialogCallbacks(
+            onConfirm = callbacks.onDelete,
+            onDismiss = { showDeleteDialog = false },
+        ),
     )
 
     ConversationCardTextInputDialog(
@@ -214,25 +218,33 @@ private fun conversationPinActionLabel(isPinned: Boolean): String {
     return if (isPinned) "Unpin" else "Pin"
 }
 
+private data class ConversationCardConfirmDialogContent(
+    val title: String,
+    val message: String,
+    val confirmText: String,
+    val destructive: Boolean,
+)
+
+private data class ConversationCardConfirmDialogCallbacks(
+    val onConfirm: () -> Unit,
+    val onDismiss: () -> Unit,
+)
+
 @Composable
 private fun ConversationCardConfirmDialog(
     show: Boolean,
-    title: String,
-    message: String,
-    confirmText: String,
-    destructive: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
+    content: ConversationCardConfirmDialogContent,
+    callbacks: ConversationCardConfirmDialogCallbacks,
 ) {
     ConfirmDialog(
         show = show,
-        title = title,
-        message = message,
-        confirmText = confirmText,
+        title = content.title,
+        message = content.message,
+        confirmText = content.confirmText,
         dismissText = stringResource(R.string.action_cancel),
-        onConfirm = { onDismiss(); onConfirm() },
-        onDismiss = onDismiss,
-        destructive = destructive,
+        onConfirm = { callbacks.onDismiss(); callbacks.onConfirm() },
+        onDismiss = callbacks.onDismiss,
+        destructive = content.destructive,
     )
 }
 

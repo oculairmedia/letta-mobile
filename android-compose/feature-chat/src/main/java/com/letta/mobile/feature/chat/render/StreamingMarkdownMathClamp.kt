@@ -8,10 +8,7 @@ private const val MAX_SIMPLE_INLINE_MATH_CHARS = 3
 internal value class MarkdownMathScanLine(val raw: String)
 
 @VisibleForTesting
-internal fun findUnmatchedMathOpenerInLine(line: String): Int =
-    findUnmatchedMathOpenerInLine(MarkdownMathScanLine(line))
-
-private fun findUnmatchedMathOpenerInLine(line: MarkdownMathScanLine): Int {
+internal fun findUnmatchedMathOpenerInLine(line: MarkdownMathScanLine): Int {
     val displayOpenIdx = findUnmatchedDisplayMathOpenerInLine(line)
     val inlineOpenIdx = findUnmatchedInlineMathOpenerInLine(line)
     return when {

@@ -165,19 +165,21 @@ private fun ChatScreenMainContent(
             label = "chat-content",
         ) { phase ->
             ChatScreenPhaseContent(
-                phase = phase,
-                state = params.state,
-                viewModel = params.viewModel,
-                contentCallbacks = contentCallbacks,
-                appearance = ChatContentAppearance(
-                    chatMode = params.chatMode,
-                    chatBackground = params.chatBackground,
+                params = ChatScreenPhaseContentParams(
+                    phase = phase,
+                    state = params.state,
+                    viewModel = params.viewModel,
+                    contentCallbacks = contentCallbacks,
+                    appearance = ChatContentAppearance(
+                        chatMode = params.chatMode,
+                        chatBackground = params.chatBackground,
+                        topPadding = params.contentPadding.calculateTopPadding(),
+                        bottomPadding = bottomPaddingDp,
+                        activeFontScale = params.activeFontScale,
+                        scrollToMessageId = params.viewModel.scrollToMessageId,
+                    ),
                     topPadding = params.contentPadding.calculateTopPadding(),
-                    bottomPadding = bottomPaddingDp,
-                    activeFontScale = params.activeFontScale,
-                    scrollToMessageId = params.viewModel.scrollToMessageId,
                 ),
-                topPadding = params.contentPadding.calculateTopPadding(),
             )
         }
     }
@@ -192,30 +194,32 @@ private fun chatScreenContentPhase(state: ChatUiState): String = when {
     else -> "ready"
 }
 
+private data class ChatScreenPhaseContentParams(
+    val phase: String,
+    val state: ChatUiState,
+    val viewModel: AdminChatViewModel,
+    val contentCallbacks: ChatContentCallbacks,
+    val appearance: ChatContentAppearance,
+    val topPadding: Dp,
+)
+
 @Composable
-private fun ChatScreenPhaseContent(
-    phase: String,
-    state: ChatUiState,
-    viewModel: AdminChatViewModel,
-    contentCallbacks: ChatContentCallbacks,
-    appearance: ChatContentAppearance,
-    topPadding: Dp,
-) {
-    when (phase) {
+private fun ChatScreenPhaseContent(params: ChatScreenPhaseContentParams) {
+    when (params.phase) {
         "loading" -> MessageSkeletonList(
-            modifier = Modifier.fillMaxSize().padding(top = topPadding),
+            modifier = Modifier.fillMaxSize().padding(top = params.topPadding),
         )
-        "error" -> ChatScreenErrorPhase(state, viewModel, topPadding)
+        "error" -> ChatScreenErrorPhase(params.state, params.viewModel, params.topPadding)
         "no-conv" -> NoConversationChatContent(
-            state = state,
-            callbacks = contentCallbacks,
-            appearance = appearance,
+            state = params.state,
+            callbacks = params.contentCallbacks,
+            appearance = params.appearance,
             modifier = Modifier.fillMaxSize(),
         )
         else -> ChatContent(
-            state = state,
-            callbacks = contentCallbacks,
-            appearance = appearance,
+            state = params.state,
+            callbacks = params.contentCallbacks,
+            appearance = params.appearance,
             modifier = Modifier.fillMaxSize(),
         )
     }

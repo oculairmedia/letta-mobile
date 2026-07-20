@@ -25,13 +25,13 @@ internal fun clampToStableMarkdown(raw: String): String {
 }
 
 private fun clipAtUnmatchedMath(raw: String, lineStart: Int, line: String): String? {
-    val unmatchedMathOpenIdx = findUnmatchedMathOpenerInLine(line)
+    val unmatchedMathOpenIdx = findUnmatchedMathOpenerInLine(MarkdownMathScanLine(line))
     if (unmatchedMathOpenIdx < 0) return null
     return raw.substring(0, lineStart + unmatchedMathOpenIdx)
 }
 
 private fun clipAtUnmatchedOpener(raw: String, lineStart: Int, line: String): String? {
-    val unmatchedOpenIdx = findUnmatchedOpenerInLine(line)
+    val unmatchedOpenIdx = findUnmatchedOpenerInLine(MarkdownOpenerScanLine(line))
     if (unmatchedOpenIdx < 0) return null
     return raw.substring(0, lineStart + unmatchedOpenIdx)
 }

@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat
 import com.letta.mobile.feature.chat.render.MAX_HELD_TAIL_CHARS
 import com.letta.mobile.feature.chat.render.clampToStableMarkdown
 import com.letta.mobile.feature.chat.render.clampToWordBoundary
+import com.letta.mobile.feature.chat.render.MarkdownOpenerScanLine
 import com.letta.mobile.feature.chat.render.findUnmatchedOpenerInLine
 import com.letta.mobile.feature.chat.render.hasOpenDisplayMathFence
 import com.letta.mobile.feature.chat.render.insideOpenCodeFence
@@ -341,45 +342,45 @@ class StreamingDisplayTextTest {
 
     @Test
     fun `findUnmatchedOpenerInLine balanced returns -1`() {
-        assertEquals(-1, findUnmatchedOpenerInLine("**bold**"))
-        assertEquals(-1, findUnmatchedOpenerInLine("*italic*"))
-        assertEquals(-1, findUnmatchedOpenerInLine("`code`"))
-        assertEquals(-1, findUnmatchedOpenerInLine("~~strike~~"))
+        assertEquals(-1, openerScanIndex("**bold**"))
+        assertEquals(-1, openerScanIndex("*italic*"))
+        assertEquals(-1, openerScanIndex("`code`"))
+        assertEquals(-1, openerScanIndex("~~strike~~"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine unmatched double-star`() {
-        assertEquals(6, findUnmatchedOpenerInLine("Hello **world"))
+        assertEquals(6, openerScanIndex("Hello **world"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine unmatched single-star`() {
-        assertEquals(6, findUnmatchedOpenerInLine("Hello *world"))
+        assertEquals(6, openerScanIndex("Hello *world"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine unmatched backtick`() {
-        assertEquals(4, findUnmatchedOpenerInLine("Run `command"))
+        assertEquals(4, openerScanIndex("Run `command"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine unmatched tilde-tilde`() {
-        assertEquals(5, findUnmatchedOpenerInLine("This ~~text"))
+        assertEquals(5, openerScanIndex("This ~~text"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine unmatched bracket`() {
-        assertEquals(4, findUnmatchedOpenerInLine("See [link"))
+        assertEquals(4, openerScanIndex("See [link"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine unmatched underscore`() {
-        assertEquals(6, findUnmatchedOpenerInLine("Hello _world"))
+        assertEquals(6, openerScanIndex("Hello _world"))
     }
 
     @Test
     fun `findUnmatchedOpenerInLine multiple unmatched returns earliest`() {
-        assertEquals(2, findUnmatchedOpenerInLine("a *b `c"))
+        assertEquals(2, openerScanIndex("a *b `c"))
     }
 
     // ═══ insideOpenCodeFence ═══
@@ -515,3 +516,6 @@ class StreamingDisplayTextTest {
         assertEquals("Jules queue", streamingDisplayText("Jules queue"))
     }
 }
+
+private fun openerScanIndex(line: String): Int =
+    findUnmatchedOpenerInLine(MarkdownOpenerScanLine(line))

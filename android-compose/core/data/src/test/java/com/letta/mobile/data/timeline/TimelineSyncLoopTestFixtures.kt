@@ -13,6 +13,7 @@ import io.ktor.utils.io.writeStringUtf8
 import io.mockk.mockk
 import kotlin.random.Random
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -35,6 +36,18 @@ private fun conversationListQuery(
     order: String?,
 ): ConversationListQuery = ConversationListQuery(limit = limit, after = after, order = order)
 
+private val timelineTestJson = Json { encodeDefaults = true }
+
+internal suspend fun timelineListConversationMessages(
+    limit: Int?,
+    after: String?,
+    order: String?,
+    deliver: suspend (ConversationListQuery) -> List<LettaMessage>,
+): List<LettaMessage> {
+    val query = conversationListQuery(limit, after, order)
+    return deliver(query)
+}
+
 internal fun timelineUserMessage(spec: TimelineTestMessageSpec): UserMessage =
     UserMessage(
         id = spec.id,
@@ -49,7 +62,31 @@ internal fun timelineAssistantMessage(spec: TimelineTestMessageSpec): AssistantM
         otid = spec.otid,
     )
 
-internal class BlockingListApi : MessageApi(mockk(relaxed = true)) {
+internal fun encodeLettaMessagesAsSse(messages: List<LettaMessage>): ByteReadChannel {
+    val sseBody = buildString {
+        messages.forEach { message ->
+            append("data: ")
+            append(timelineTestJson.encodeToString(LettaMessage.serializer(), message))
+            append("\n\n")
+        }
+        append("data: [DONE]\n\n")
+    }
+    return ByteReadChannel(sseBody.toByteArray())
+}
+
+internal open class TimelineTestMessageApi : MessageApi(mockk(relaxed = true)) {
+    final override suspend fun listConversationMessages(
+        conversationId: ConversationId,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = timelineListConversationMessages(limit, after, order, ::onListConversationMessages)
+
+    protected open suspend fun onListConversationMessages(query: ConversationListQuery): List<LettaMessage> =
+        emptyList()
+}
+
+internal class BlockingListApi : TimelineTestMessageApi() {
     val listStarted = CompletableDeferred<Unit>()
     val releaseList = CompletableDeferred<List<LettaMessage>>()
 
@@ -57,19 +94,13 @@ internal class BlockingListApi : MessageApi(mockk(relaxed = true)) {
         kotlinx.coroutines.awaitCancellation()
     }
 
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        conversationListQuery(limit, after, order)
+    override suspend fun onListConversationMessages(query: ConversationListQuery): List<LettaMessage> {
         listStarted.complete(Unit)
         return releaseList.await()
     }
 }
 
-internal class OpenStreamApi : MessageApi(mockk(relaxed = true)) {
+internal class OpenStreamApi : TimelineTestMessageApi() {
     val streamOpened = CompletableDeferred<Unit>()
     @Volatile var listMessagesCalls: Int = 0
 
@@ -78,49 +109,26 @@ internal class OpenStreamApi : MessageApi(mockk(relaxed = true)) {
         return ByteChannel(autoFlush = true)
     }
 
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        conversationListQuery(limit, after, order)
+    override suspend fun onListConversationMessages(query: ConversationListQuery): List<LettaMessage> {
         listMessagesCalls++
         return emptyList()
     }
 }
 
-internal class OneShotAssistantStreamApi : MessageApi(mockk(relaxed = true)) {
+internal class OneShotAssistantStreamApi : TimelineTestMessageApi() {
     private var opened = false
 
     override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         if (opened) kotlinx.coroutines.awaitCancellation()
         opened = true
-        val json = kotlinx.serialization.json.Json { encodeDefaults = true }
         val message = timelineAssistantMessage(
             TimelineTestMessageSpec(id = "asst-dynamic", content = JsonPrimitive("late listener works")),
         )
-        val sseBody = buildString {
-            append("data: ")
-            append(json.encodeToString(LettaMessage.serializer(), message))
-            append("\n\n")
-            append("data: [DONE]\n\n")
-        }
-        return ByteReadChannel(sseBody.toByteArray())
-    }
-
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        conversationListQuery(limit, after, order)
-        return emptyList()
+        return encodeLettaMessagesAsSse(listOf(message))
     }
 }
 
-internal class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
+internal class SilentAfterHeartbeatApi : TimelineTestMessageApi() {
     @Volatile var streamCallCount: Int = 0
 
     override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
@@ -129,36 +137,14 @@ internal class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
         channel.writeStringUtf8(": ping\n\n")
         return channel
     }
-
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        conversationListQuery(limit, after, order)
-        return emptyList()
-    }
 }
 
-internal class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
+internal class AlwaysIdleApi : TimelineTestMessageApi() {
     @Volatile var streamCallCount: Int = 0
 
     override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         streamCallCount++
-        // letta-mobile-t8q7: real MessageApi classifies the "No active runs"
-        // 400 body into NoActiveRunException before it reaches the subscriber.
         throw NoActiveRunException(conversationId.value)
-    }
-
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        conversationListQuery(limit, after, order)
-        return emptyList()
     }
 }
 
@@ -169,7 +155,7 @@ internal class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
  * subsequent calls idle. Before t8q7 the fake threw `ApiException` and the
  * subscriber re-classified by message-text in its catch block.
  */
-internal class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
+internal class ExpiredThenIdleApi : TimelineTestMessageApi() {
     @Volatile var streamCallCount: Int = 0
 
     override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
@@ -178,16 +164,6 @@ internal class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
             throw NoActiveRunException(conversationId.value)
         }
         kotlinx.coroutines.awaitCancellation()
-    }
-
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        conversationListQuery(limit, after, order)
-        return emptyList()
     }
 }
 
@@ -199,7 +175,7 @@ internal class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
  * On each send: the user message is added to the store with its otid preserved,
  * and the stream yields [nextStreamMessages] as SSE events.
  */
-internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
+internal class FakeSyncApi : TimelineTestMessageApi() {
     internal val stored = mutableListOf<LettaMessage>()
     var nextStreamMessages: List<LettaMessage> = emptyList()
     var lastSendRequest: MessageCreateRequest? = null
@@ -223,12 +199,6 @@ internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         stored.add(msg)
     }
 
-    // The default `MessageApi.streamConversation` calls into a relaxed-mockk
-    // HttpClient and returns an ApiException on every invocation, which sends
-    // `runStreamSubscriber` into a 5s-delay retry loop that accumulates
-    // timers for the full duration of each test (observed: 91s for one test
-    // that never exercises the subscriber). Idle here instead so the loop
-    // suspends until the test's scope is cancelled. letta-mobile-o8pr.
     override suspend fun streamConversation(conversationId: ConversationId): ByteReadChannel {
         if (streamConversationReturnsOpenChannel) {
             return ByteChannel()
@@ -236,13 +206,7 @@ internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         kotlinx.coroutines.awaitCancellation()
     }
 
-    override suspend fun listConversationMessages(
-        conversationId: ConversationId,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        val query = conversationListQuery(limit, after, order)
+    override suspend fun onListConversationMessages(query: ConversationListQuery): List<LettaMessage> {
         listMessagesCalls++
         lastConversationLimit = query.limit
         conversationLimits += query.limit
@@ -268,25 +232,8 @@ internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         lastSendRequest = request
         sendResponseGate?.await()
         persistUserMessageFromRequest(request)
-
-        // Emit nextStreamMessages as real SSE frames and close
-        val json = kotlinx.serialization.json.Json { encodeDefaults = true }
-        val sseBody = buildString {
-            nextStreamMessages.forEach { msg ->
-                append("data: ")
-                append(json.encodeToString(LettaMessage.serializer(), msg))
-                append("\n\n")
-            }
-            append("data: [DONE]\n\n")
-        }
-
-        // Also add stream messages to the store so subsequent listMessages reflects them
         stored.addAll(nextStreamMessages)
-
-        // Pre-filled ByteReadChannel — no background writer coroutine. The
-        // previous GlobalScope.launch pattern leaked coroutines across tests
-        // in the same JVM worker, eventually OOMing CI (letta-mobile-o8pr).
-        return ByteReadChannel(sseBody.toByteArray())
+        return encodeLettaMessagesAsSse(nextStreamMessages)
     }
 
     private fun persistUserMessageFromRequest(request: MessageCreateRequest) {
@@ -333,5 +280,5 @@ internal class RecordingConversationCursorStore : ConversationCursorStore {
     }
 }
 
-internal val kotlinx.serialization.json.JsonPrimitive.contentOrNull: String?
+internal val JsonPrimitive.contentOrNull: String?
     get() = if (isString) content else content.takeIf { it != "null" }

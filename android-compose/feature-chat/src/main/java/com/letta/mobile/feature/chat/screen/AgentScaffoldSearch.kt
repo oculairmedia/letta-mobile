@@ -73,12 +73,14 @@ internal fun ChatSearchResultsContent(
             key = { index, result -> chatSearchResultKey(result, index) },
         ) { _, result ->
             ChatSearchResultCard(
-                result = result,
-                searchQuery = params.searchQuery,
-                conversationsById = conversationsById,
-                currentConversationId = params.currentConversationId,
-                highlightColors = highlightColors,
-                onResultClick = params.onResultClick,
+                params = ChatSearchResultCardParams(
+                    result = result,
+                    searchQuery = params.searchQuery,
+                    conversationsById = conversationsById,
+                    currentConversationId = params.currentConversationId,
+                    highlightColors = highlightColors,
+                    onResultClick = params.onResultClick,
+                ),
             )
         }
     }
@@ -116,32 +118,35 @@ private fun ChatSearchResultsEmptyState() {
     )
 }
 
+private data class ChatSearchResultCardParams(
+    val result: ParsedSearchMessage,
+    val searchQuery: String,
+    val conversationsById: Map<String, Conversation>,
+    val currentConversationId: String?,
+    val highlightColors: com.letta.mobile.ui.components.SearchHighlightColors,
+    val onResultClick: (ParsedSearchMessage) -> Unit,
+)
+
 @Composable
-private fun ChatSearchResultCard(
-    result: ParsedSearchMessage,
-    searchQuery: String,
-    conversationsById: Map<String, Conversation>,
-    currentConversationId: String?,
-    highlightColors: com.letta.mobile.ui.components.SearchHighlightColors,
-    onResultClick: (ParsedSearchMessage) -> Unit,
-) {
-    val conversation = result.conversationId?.let(conversationsById::get)
-    val isCurrentConversation = result.conversationId != null && result.conversationId == currentConversationId
+private fun ChatSearchResultCard(params: ChatSearchResultCardParams) {
+    val conversation = params.result.conversationId?.let(params.conversationsById::get)
+    val isCurrentConversation = params.result.conversationId != null &&
+        params.result.conversationId == params.currentConversationId
     val conversationScope = when {
         isCurrentConversation -> "Current conversation"
-        result.conversationId != null -> "Previous conversation"
+        params.result.conversationId != null -> "Previous conversation"
         else -> "Conversation unknown"
     }
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onResultClick(result) },
+            .clickable { params.onResultClick(params.result) },
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             ChatSearchResultCardHeader(
                 conversationScope = conversationScope,
                 isCurrentConversation = isCurrentConversation,
-                result = result,
+                result = params.result,
             )
             conversation?.summary?.takeIf { it.isNotBlank() }?.let { summary ->
                 Text(
@@ -155,9 +160,9 @@ private fun ChatSearchResultCard(
             }
             Text(
                 text = highlightSearchMatches(
-                    searchResultSnippet(result.content.orEmpty(), searchQuery),
-                    searchQuery,
-                    highlightColors,
+                    searchResultSnippet(params.result.content.orEmpty(), params.searchQuery),
+                    params.searchQuery,
+                    params.highlightColors,
                 ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,

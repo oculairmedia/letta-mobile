@@ -57,6 +57,27 @@ internal data class ChatPinchFrameBudgetStartContext(
     val committedScale: Float,
 )
 
+internal data class ChatPinchZoomContext(
+    val event: PointerEvent,
+    val pinchFontScaleController: PinchScalePreviewController,
+)
+
+internal data class ChatPinchFrameBudgetStopContext(
+    val committedScale: Float,
+    val targetScale: Float,
+)
+
+internal data class ChatPinchFrameBudgetFinishedContext(
+    val frames: List<Long>,
+    val elapsedMs: Long,
+    val scales: ChatPinchFrameBudgetStopContext,
+)
+
+internal data class ChatPinchFrameBudgetEmptyFinishedContext(
+    val elapsedMs: Long,
+    val scales: ChatPinchFrameBudgetStopContext,
+)
+
 internal data class ChatPinchGestureBoxParams(
     val listState: androidx.compose.foundation.lazy.LazyListState,
     val activeFontScale: Float,
@@ -110,7 +131,12 @@ private fun Modifier.chatMessageListPinchGesture(runtime: ChatPinchGestureRuntim
                         gesturePinching = true
                         startChatPinchGesture(runtime)
                     }
-                    applyChatPinchZoom(event, runtime.pinchFontScaleController)
+                    applyChatPinchZoom(
+                        ChatPinchZoomContext(
+                            event = event,
+                            pinchFontScaleController = runtime.pinchFontScaleController,
+                        ),
+                    )
                 }
             } while (event.changes.any { it.pressed })
             finishChatPinchGesture(runtime, gesturePinching)
@@ -145,14 +171,11 @@ private fun visiblePinchContent(runtime: ChatPinchGestureRuntime): ChatPinchVisi
     return visibleRenderItems.pinchVisibleContentSummary()
 }
 
-private fun applyChatPinchZoom(
-    event: PointerEvent,
-    pinchFontScaleController: PinchScalePreviewController,
-) {
-    val zoom = event.calculateZoom()
+private fun applyChatPinchZoom(context: ChatPinchZoomContext) {
+    val zoom = context.event.calculateZoom()
     if (zoom != 1f) {
-        event.changes.forEach { it.consume() }
-        pinchFontScaleController.applyZoom(zoom)
+        context.event.changes.forEach { it.consume() }
+        context.pinchFontScaleController.applyZoom(zoom)
     }
 }
 
@@ -169,8 +192,10 @@ private fun finishActiveChatPinchGesture(runtime: ChatPinchGestureRuntime) {
     runtime.callbacks.onActiveFontScaleChange(snapped)
     runtime.callbacks.onFontScaleChange(snapped)
     runtime.pinchFrameBudgetSampler.stop(
-        committedScale = runtime.activeFontScale,
-        targetScale = snapped,
+        ChatPinchFrameBudgetStopContext(
+            committedScale = runtime.activeFontScale,
+            targetScale = snapped,
+        ),
     )
     runtime.onPinchTick(System.nanoTime())
     runtime.onPinchAnimationSuppressionTick(System.nanoTime())
@@ -296,16 +321,27 @@ internal class ChatPinchFrameBudgetSampler {
         emitFrameBudgetStartedTelemetry()
     }
 
-    fun stop(committedScale: Float, targetScale: Float) {
+    fun stop(context: ChatPinchFrameBudgetStopContext) {
         if (!running) return
         val elapsedMs = System.currentTimeMillis() - startedAtMs
         val frames = frameDurationsMs.toList()
         cancel()
         if (frames.isEmpty()) {
-            emitEmptyFrameBudgetFinishedTelemetry(elapsedMs, committedScale, targetScale)
+            emitEmptyFrameBudgetFinishedTelemetry(
+                ChatPinchFrameBudgetEmptyFinishedContext(
+                    elapsedMs = elapsedMs,
+                    scales = context,
+                ),
+            )
             return
         }
-        emitFrameBudgetFinishedTelemetry(frames, elapsedMs, committedScale, targetScale)
+        emitFrameBudgetFinishedTelemetry(
+            ChatPinchFrameBudgetFinishedContext(
+                frames = frames,
+                elapsedMs = elapsedMs,
+                scales = context,
+            ),
+        )
     }
 
     fun cancel() {
@@ -322,56 +358,50 @@ internal class ChatPinchFrameBudgetSampler {
             "ChatPinch",
             "frameBudget.started",
             *frameBudgetTelemetryPairs(
-                committedScale = committedScale,
-                targetScale = null,
+                ChatPinchFrameBudgetStopContext(
+                    committedScale = committedScale,
+                    targetScale = committedScale,
+                ),
+                includeTargetScale = false,
             ),
         )
     }
 
-    private fun emitEmptyFrameBudgetFinishedTelemetry(
-        elapsedMs: Long,
-        committedScale: Float,
-        targetScale: Float,
-    ) {
+    private fun emitEmptyFrameBudgetFinishedTelemetry(context: ChatPinchFrameBudgetEmptyFinishedContext) {
         Telemetry.event(
             "ChatPinch",
             "frameBudget.finished",
             "frames" to 0,
-            "elapsedMs" to elapsedMs,
-            *frameBudgetTelemetryPairs(committedScale = committedScale, targetScale = targetScale),
+            "elapsedMs" to context.elapsedMs,
+            *frameBudgetTelemetryPairs(context.scales, includeTargetScale = true),
         )
     }
 
-    private fun emitFrameBudgetFinishedTelemetry(
-        frames: List<Long>,
-        elapsedMs: Long,
-        committedScale: Float,
-        targetScale: Float,
-    ) {
-        val sorted = frames.sorted()
+    private fun emitFrameBudgetFinishedTelemetry(context: ChatPinchFrameBudgetFinishedContext) {
+        val sorted = context.frames.sorted()
         val frameBudgetMs = 16L
-        val jankFrames = frames.count { it > frameBudgetMs }
-        val maxMs = frames.maxOrNull() ?: 0L
-        val avgMs = frames.average()
+        val jankFrames = context.frames.count { it > frameBudgetMs }
+        val maxMs = context.frames.maxOrNull() ?: 0L
+        val avgMs = context.frames.average()
         val p95Index = ((sorted.size - 1) * 95 / 100).coerceIn(0, sorted.lastIndex)
         Telemetry.event(
             "ChatPinch",
             "frameBudget.finished",
-            "frames" to frames.size,
+            "frames" to context.frames.size,
             "jankFrames" to jankFrames,
-            "jankPercent" to ((jankFrames * 100.0) / frames.size),
+            "jankPercent" to ((jankFrames * 100.0) / context.frames.size),
             "avgMs" to avgMs,
             "p95Ms" to sorted[p95Index],
             "maxMs" to maxMs,
-            "overBudgetTotalMs" to frames.sumOf { (it - frameBudgetMs).coerceAtLeast(0L) },
-            "elapsedMs" to elapsedMs,
-            *frameBudgetTelemetryPairs(committedScale = committedScale, targetScale = targetScale),
+            "overBudgetTotalMs" to context.frames.sumOf { (it - frameBudgetMs).coerceAtLeast(0L) },
+            "elapsedMs" to context.elapsedMs,
+            *frameBudgetTelemetryPairs(context.scales, includeTargetScale = true),
         )
     }
 
     private fun frameBudgetTelemetryPairs(
-        committedScale: Float,
-        targetScale: Float?,
+        scales: ChatPinchFrameBudgetStopContext,
+        includeTargetScale: Boolean,
     ): Array<out Pair<String, Any?>> {
         val pairs = mutableListOf<Pair<String, Any?>>(
             "visibleItems" to visibleItems,
@@ -388,10 +418,10 @@ internal class ChatPinchFrameBudgetSampler {
             "isHydrating" to loadPressure.isHydrating,
             "isReconciling" to loadPressure.isReconciling,
             "toolCardCount" to loadPressure.toolCardCount,
-            "committedScale" to committedScale,
+            "committedScale" to scales.committedScale,
         )
-        if (targetScale != null) {
-            pairs += "targetScale" to targetScale
+        if (includeTargetScale) {
+            pairs += "targetScale" to scales.targetScale
         }
         return pairs.toTypedArray()
     }

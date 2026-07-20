@@ -18,10 +18,7 @@ internal data class MarkdownOpenerScanLine(val raw: String) {
  * Returns -1 if the line is fully balanced.
  */
 @VisibleForTesting
-internal fun findUnmatchedOpenerInLine(line: String): Int =
-    findUnmatchedOpenerInLine(MarkdownOpenerScanLine(line))
-
-private fun findUnmatchedOpenerInLine(line: MarkdownOpenerScanLine): Int {
+internal fun findUnmatchedOpenerInLine(line: MarkdownOpenerScanLine): Int {
     var i = 0
     val len = line.length
     while (i < len) {

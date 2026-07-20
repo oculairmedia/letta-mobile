@@ -280,20 +280,37 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.scrollProgres
     val total = layoutInfo.totalItemsCount
     if (total == 0) return
 
-    var lastSeenIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-    var safety = 0
-    while (lastSeenIndex < total - 1 && safety < 16) {
-        val nextStart = (lastSeenIndex + 1).coerceAtMost(total - 1)
-        scrollToItem(nextStart)
-        indexOfVisibleKey(targetKey)?.let { found ->
-            animateScrollToItem(found)
-            return
-        }
-        val newLast = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: break
-        if (newLast <= lastSeenIndex) break
-        lastSeenIndex = newLast
-        safety++
+    var cursor = ProgressiveScrollCursor(
+        lastSeenIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0,
+        safety = 0,
+    )
+    while (cursor.canContinue(total)) {
+        cursor = advanceProgressiveScroll(targetKey, cursor, total) ?: return
     }
+}
+
+private data class ProgressiveScrollCursor(
+    val lastSeenIndex: Int,
+    val safety: Int,
+) {
+    fun canContinue(totalItems: Int): Boolean =
+        lastSeenIndex < totalItems - 1 && safety < 16
+}
+
+private suspend fun androidx.compose.foundation.lazy.LazyListState.advanceProgressiveScroll(
+    targetKey: Any,
+    cursor: ProgressiveScrollCursor,
+    total: Int,
+): ProgressiveScrollCursor? {
+    val nextStart = (cursor.lastSeenIndex + 1).coerceAtMost(total - 1)
+    scrollToItem(nextStart)
+    indexOfVisibleKey(targetKey)?.let { found ->
+        animateScrollToItem(found)
+        return null
+    }
+    val newLast = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: return null
+    if (newLast <= cursor.lastSeenIndex) return null
+    return ProgressiveScrollCursor(lastSeenIndex = newLast, safety = cursor.safety + 1)
 }
 
 internal fun shareAgentExport(context: Context, exportData: String): Boolean {

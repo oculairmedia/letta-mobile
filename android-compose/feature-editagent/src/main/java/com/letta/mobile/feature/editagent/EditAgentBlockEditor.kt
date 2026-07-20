@@ -13,6 +13,20 @@ internal data class NewBlockDraft(
     val limit: Int?,
 )
 
+@JvmInline
+internal value class EditableBlockLabel(val value: String)
+
+@JvmInline
+internal value class AttachedBlockId(val value: String)
+
+internal data class BlockValueUpdate(val label: EditableBlockLabel, val value: String)
+
+internal data class BlockDescriptionUpdate(val label: EditableBlockLabel, val description: String)
+
+internal data class BlockLimitUpdate(val label: EditableBlockLabel, val limit: Int?)
+
+internal data class BlockAttachRequest(val blockIds: List<AttachedBlockId>)
+
 internal data class EditAgentBlockEditorDeps(
     val agentId: String,
     val blockRepository: IBlockRepository,
@@ -24,16 +38,16 @@ internal data class EditAgentBlockEditorDeps(
 internal class EditAgentBlockEditor(
     private val deps: EditAgentBlockEditorDeps,
 ) {
-    fun updateBlockValue(blockLabel: String, value: String) {
-        updateBlock(blockLabel) { it.copy(value = value) }
+    fun updateBlockValue(update: BlockValueUpdate) {
+        updateBlock(update.label) { it.copy(value = update.value) }
     }
 
-    fun updateBlockDescription(blockLabel: String, description: String) {
-        updateBlock(blockLabel) { it.copy(description = description) }
+    fun updateBlockDescription(update: BlockDescriptionUpdate) {
+        updateBlock(update.label) { it.copy(description = update.description) }
     }
 
-    fun updateBlockLimit(blockLabel: String, limit: Int?) {
-        updateBlock(blockLabel) { it.copy(limit = limit) }
+    fun updateBlockLimit(update: BlockLimitUpdate) {
+        updateBlock(update.label) { it.copy(limit = update.limit) }
     }
 
     fun addBlock(draft: NewBlockDraft) {
@@ -55,20 +69,20 @@ internal class EditAgentBlockEditor(
         }
     }
 
-    fun attachExistingBlock(blockId: String) {
-        attachExistingBlocks(listOf(blockId), "Failed to attach block")
+    fun attachExistingBlock(blockId: AttachedBlockId) {
+        attachExistingBlocks(BlockAttachRequest(listOf(blockId)), "Failed to attach block")
     }
 
-    fun attachExistingBlocks(blockIds: List<String>) {
-        attachExistingBlocks(blockIds, "Failed to attach blocks")
+    fun attachExistingBlocks(request: BlockAttachRequest) {
+        attachExistingBlocks(request, "Failed to attach blocks")
     }
 
-    fun deleteBlock(blockId: String) {
+    fun deleteBlock(blockId: AttachedBlockId) {
         deps.scope.launch {
             try {
-                deps.blockRepository.detachBlock(deps.agentId, blockId)
+                deps.blockRepository.detachBlock(deps.agentId, blockId.value)
                 deps.state.updateField {
-                    copy(blocks = blocks.filter { it.id != blockId }.toImmutableList())
+                    copy(blocks = blocks.filter { it.id != blockId.value }.toImmutableList())
                 }
             } catch (e: Exception) {
                 android.util.Log.w("EditAgentVM", "Failed to delete block", e)
@@ -76,20 +90,20 @@ internal class EditAgentBlockEditor(
         }
     }
 
-    private fun updateBlock(blockLabel: String, transform: (EditableBlock) -> EditableBlock) {
+    private fun updateBlock(blockLabel: EditableBlockLabel, transform: (EditableBlock) -> EditableBlock) {
         deps.state.updateField {
             copy(
                 blocks = blocks.map { block ->
-                    if (block.label == blockLabel) transform(block) else block
+                    if (block.label == blockLabel.value) transform(block) else block
                 }.toImmutableList()
             )
         }
     }
 
-    private fun attachExistingBlocks(blockIds: List<String>, errorMessage: String) {
+    private fun attachExistingBlocks(request: BlockAttachRequest, errorMessage: String) {
         deps.scope.launch {
             try {
-                blockIds.forEach { deps.blockRepository.attachBlock(deps.agentId, it) }
+                request.blockIds.forEach { deps.blockRepository.attachBlock(deps.agentId, it.value) }
                 deps.reload()
             } catch (e: Exception) {
                 deps.state.setError(e.message ?: errorMessage)

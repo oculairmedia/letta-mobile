@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed as lazyItemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -200,48 +202,24 @@ private fun AgentListGridContent(
     LazyVerticalGrid(
         state = params.gridState,
         columns = GridCells.Adaptive(minSize = minTileWidth),
-        contentPadding = PaddingValues(
-            start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
-            top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
-            end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
-            bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
-        ),
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+        contentPadding = agentListContentPadding(paddingValues, layoutDirection),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
     ) {
-        if (uiState.isHydrating) {
-            item(
-                key = "agent-hydrating-banner",
-                span = { GridItemSpan(maxLineSpan) },
-            ) {
-                AgentListHydratingBannerItem(loadedCount = uiState.agents.size)
-            }
-        }
+        agentListSharedPrefixItems(state = state, actions = actions)
 
-        params.state.visibleFavoriteAgent?.let { favoriteAgent ->
-            item(
-                key = "favorite-${favoriteAgent.id}",
-                span = { GridItemSpan(maxLineSpan) },
-            ) {
-                AgentListFavoriteAgentItem(
-                    favoriteAgent = favoriteAgent,
-                    isShareMode = state.isShareMode,
-                    actions = actions,
-                )
-            }
-        }
-
-        items(params.state.gridAgents, key = { it.id.value }) { agent ->
+        items(state.gridAgents, key = { it.id.value }) { agent ->
+            val rowModel = state.agentRowModel(agent)
             CompactAgentCard(
-                agent = agent,
-                isFavorite = agent.id == uiState.favoriteAgentId,
-                isPinned = agent.id in uiState.pinnedAgentIds,
-                onClick = { params.actions.onSelectAgent(agent.id.value, agent.name) },
-                onLongPress = { params.actions.onNavigateToEditAgent(agent.id.value) },
-                onDelete = { params.actions.onDeleteAgent(agent.id) },
-                onToggleFavorite = { params.actions.onToggleFavorite(agent.id) },
-                onTogglePinned = { params.actions.onTogglePinned(agent.id) },
-                contextualActionsEnabled = !params.state.isShareMode,
+                agent = rowModel.agent,
+                isFavorite = rowModel.isFavorite,
+                isPinned = rowModel.isPinned,
+                onClick = rowModel.selectAction(actions),
+                onLongPress = rowModel.editAction(actions),
+                onDelete = rowModel.deleteAction(actions),
+                onToggleFavorite = rowModel.toggleFavoriteAction(actions),
+                onTogglePinned = rowModel.togglePinnedAction(actions),
+                contextualActionsEnabled = rowModel.contextualActionsEnabled,
             )
         }
     }
@@ -252,54 +230,124 @@ private fun AgentListListContent(
     params: AgentListContentParams,
     paddingValues: PaddingValues,
 ) {
-    val uiState = params.state.uiState
     val layoutDirection = LocalLayoutDirection.current
     LazyColumn(
-        state = params.listState,
-        contentPadding = PaddingValues(
-            start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
-            top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
-            end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
-            bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
-        ),
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+        state = listState,
+        contentPadding = agentListContentPadding(paddingValues, layoutDirection),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
     ) {
-        if (uiState.isHydrating) {
-            item(key = "agent-hydrating-banner") {
-                AgentListHydratingBannerItem(loadedCount = uiState.agents.size)
-            }
-        }
-
-        params.state.visibleFavoriteAgent?.let { favoriteAgent ->
-            item(key = "favorite-${favoriteAgent.id}") {
-                AgentListFavoriteAgentItem(
-                    favoriteAgent = favoriteAgent,
-                    isShareMode = state.isShareMode,
-                    actions = actions,
-                )
-            }
-        }
+        agentListSharedPrefixItems(state = state, actions = actions)
 
         lazyItemsIndexed(
             items = params.state.gridAgents,
             key = { _, agent -> agent.id.value },
         ) { index, agent ->
+            val rowModel = state.agentRowModel(agent)
             StaggeredListItem(index = index) {
                 AgentCard(
-                    agent = agent,
-                    isFavorite = agent.id == uiState.favoriteAgentId,
-                    isPinned = agent.id in uiState.pinnedAgentIds,
-                    onClick = { params.actions.onSelectAgent(agent.id.value, agent.name) },
-                    onLongPress = { params.actions.onNavigateToEditAgent(agent.id.value) },
-                    onDelete = { params.actions.onDeleteAgent(agent.id) },
-                    onToggleFavorite = { params.actions.onToggleFavorite(agent.id) },
-                    onTogglePinned = { params.actions.onTogglePinned(agent.id) },
-                    contextualActionsEnabled = !params.state.isShareMode,
+                    agent = rowModel.agent,
+                    isFavorite = rowModel.isFavorite,
+                    isPinned = rowModel.isPinned,
+                    onClick = rowModel.selectAction(actions),
+                    onLongPress = rowModel.editAction(actions),
+                    onDelete = rowModel.deleteAction(actions),
+                    onToggleFavorite = rowModel.toggleFavoriteAction(actions),
+                    onTogglePinned = rowModel.togglePinnedAction(actions),
+                    contextualActionsEnabled = rowModel.contextualActionsEnabled,
                 )
             }
         }
     }
 }
+
+private fun LazyGridScope.agentListSharedPrefixItems(
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+) {
+    if (state.uiState.isHydrating) {
+        item(
+            key = "agent-hydrating-banner",
+            span = { GridItemSpan(maxLineSpan) },
+        ) {
+            AgentListHydratingBannerItem(loadedCount = state.uiState.agents.size)
+        }
+    }
+
+    state.visibleFavoriteAgent?.let { favoriteAgent ->
+        item(
+            key = "favorite-${favoriteAgent.id}",
+            span = { GridItemSpan(maxLineSpan) },
+        ) {
+            AgentListFavoriteAgentItem(
+                favoriteAgent = favoriteAgent,
+                isShareMode = state.isShareMode,
+                actions = actions,
+            )
+        }
+    }
+}
+
+private fun LazyListScope.agentListSharedPrefixItems(
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+) {
+    if (state.uiState.isHydrating) {
+        item(key = "agent-hydrating-banner") {
+            AgentListHydratingBannerItem(loadedCount = state.uiState.agents.size)
+        }
+    }
+
+    state.visibleFavoriteAgent?.let { favoriteAgent ->
+        item(key = "favorite-${favoriteAgent.id}") {
+            AgentListFavoriteAgentItem(
+                favoriteAgent = favoriteAgent,
+                isShareMode = state.isShareMode,
+                actions = actions,
+            )
+        }
+    }
+}
+
+private data class AgentListAgentRowModel(
+    val agent: Agent,
+    val isFavorite: Boolean,
+    val isPinned: Boolean,
+    val contextualActionsEnabled: Boolean,
+)
+
+private fun AgentListContentState.agentRowModel(agent: Agent): AgentListAgentRowModel =
+    AgentListAgentRowModel(
+        agent = agent,
+        isFavorite = agent.id == uiState.favoriteAgentId,
+        isPinned = agent.id in uiState.pinnedAgentIds,
+        contextualActionsEnabled = !isShareMode,
+    )
+
+private fun AgentListAgentRowModel.selectAction(actions: AgentListContentActions): () -> Unit =
+    { actions.onSelectAgent(agent.id.value, agent.name) }
+
+private fun AgentListAgentRowModel.editAction(actions: AgentListContentActions): () -> Unit =
+    { actions.onNavigateToEditAgent(agent.id.value) }
+
+private fun AgentListAgentRowModel.deleteAction(actions: AgentListContentActions): () -> Unit =
+    { actions.onDeleteAgent(agent.id) }
+
+private fun AgentListAgentRowModel.toggleFavoriteAction(actions: AgentListContentActions): () -> Unit =
+    { actions.onToggleFavorite(agent.id) }
+
+private fun AgentListAgentRowModel.togglePinnedAction(actions: AgentListContentActions): () -> Unit =
+    { actions.onTogglePinned(agent.id) }
+
+@Composable
+private fun agentListContentPadding(
+    paddingValues: PaddingValues,
+    layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+): PaddingValues = PaddingValues(
+    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
+    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
+    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
+    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+)
 
 @Composable
 private fun AgentListEmptyState(
