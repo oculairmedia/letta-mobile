@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.ui.theme.countBadge
 
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
@@ -343,8 +344,7 @@ private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = if (count > 99) "99+" else count.toString(),
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.countBadge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

@@ -660,6 +660,7 @@ class DesktopChatController(
             val update = ConversationSummaryUpdate(ConversationId(conversationId), ConversationSummary(candidate))
             runCatching { summaryGateway.setConversationSummary(update) }
                 .onFailure {
+                    if (closed) return@onFailure
                     _state.update { current ->
                         current.withRuntimeState(
                             current.runtimeState.copy(

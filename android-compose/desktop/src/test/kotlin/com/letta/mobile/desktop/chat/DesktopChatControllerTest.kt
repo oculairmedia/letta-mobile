@@ -574,6 +574,26 @@ class DesktopChatControllerTest {
     }
 
     @Test
+    fun lateTitleUpdateFailureAfterCloseLeavesStateUntouched() = runTest {
+        val gateway = FailingTitleSummaryGateway()
+        val loop = FakeDesktopTimelineLoop("conv-1").also { it.completeHydrate() }
+        val controller = testController(gateway = gateway, loopFactory = { _, _, _ -> loop })
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText(TITLE_EXPECTED)
+        controller.send()
+        runCurrent()
+        assertEquals(TITLE_EXPECTED, controller.state.value.conversations.single().title)
+
+        controller.close()
+        gateway.failUpdate()
+        runCurrent()
+
+        assertEquals(TITLE_EXPECTED, controller.state.value.conversations.single().title)
+    }
+
+    @Test
     fun failedSendDoesNotPersistConversationTitle() = runTest {
         val gateway = TitleSummaryGateway()
         val loop = FakeDesktopTimelineLoop(
@@ -744,6 +764,20 @@ private class TitleSummaryGateway :
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
         lastUpdate = update
         return getConversation(update.conversationId.value).copy(summary = update.summary.value)
+    }
+}
+
+private class FailingTitleSummaryGateway :
+    FakeDesktopChatGateway(blankSummaries = true, emptyHistory = true),
+    ConversationSummaryGateway {
+    private val updateFailure = CompletableDeferred<Throwable>()
+
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
+        throw updateFailure.await()
+    }
+
+    fun failUpdate() {
+        updateFailure.complete(IllegalStateException("title update failed"))
     }
 }
 
