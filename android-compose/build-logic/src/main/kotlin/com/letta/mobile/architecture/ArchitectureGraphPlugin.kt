@@ -30,6 +30,7 @@ class ArchitectureGraphPlugin : Plugin<Project> {
             group = "reporting"
             description = "Exports the configured Gradle, KMP, and Android architecture as deterministic JSONL."
             outputFile.convention(project.layout.buildDirectory.file("reports/architecture/graph.jsonl"))
+            contractDirectory.convention(project.layout.buildDirectory.dir("reports/architecture/contract"))
         }
 
         project.gradle.projectsEvaluated {

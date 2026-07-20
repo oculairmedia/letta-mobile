@@ -8,6 +8,14 @@ on:
       - "android-compose/**/*.gradle.kts"
       - "android-compose/gradle/**"
       - "android-compose/build-logic/**"
+      - "android-compose/architecture-tests/**"
+      - "tools/architecture_query/**"
+      - "scripts/mcp/**"
+      - "scripts/scip/**"
+      - "scripts/tests/tooling-smoke.sh"
+      - "config/mcp/**"
+      - "config/scip-java/**"
+      - ".serena/**"
   pull_request:
     branches: [main]
     paths:
@@ -15,6 +23,14 @@ on:
       - "android-compose/**/*.gradle.kts"
       - "android-compose/gradle/**"
       - "android-compose/build-logic/**"
+      - "android-compose/architecture-tests/**"
+      - "tools/architecture_query/**"
+      - "scripts/mcp/**"
+      - "scripts/scip/**"
+      - "scripts/tests/tooling-smoke.sh"
+      - "config/mcp/**"
+      - "config/scip-java/**"
+      - ".serena/**"
   workflow_dispatch:
 
 permissions:
@@ -29,25 +45,35 @@ jobs:
       run:
         working-directory: android-compose
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Setup Java 26
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: 26
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
       - name: Test exporter and write authoritative graph
         run: ./gradlew :build-logic:test exportArchitectureGraph --configuration-cache
+      - name: Validate architecture query and tooling pilots
+        working-directory: .
+        run: |
+          python3 -m unittest discover -s tools/architecture_query/tests -v
+          scripts/tests/tooling-smoke.sh
+      - name: Run advisory architecture gates
+        run: ./gradlew :architecture-tests:architectureTest advisoryDetekt
       - name: Probe dependency analysis support
         continue-on-error: true
         run: ./gradlew buildHealth -PdependencyAnalysisAdvisory=true
       - name: Upload architecture reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: gradle-architecture-graph
           if-no-files-found: warn
           path: |
             android-compose/build/reports/architecture/graph.jsonl
+            android-compose/build/reports/architecture/contract/**
             android-compose/build/reports/dependency-analysis/**
+            android-compose/**/build/reports/detekt/**
+            android-compose/architecture-tests/build/reports/tests/**

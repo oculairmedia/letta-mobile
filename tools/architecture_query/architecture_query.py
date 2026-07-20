@@ -201,7 +201,15 @@ def import_contract(contract_value: str, db_value: str) -> dict[str, Any]:
                          (source, target, _configuration(record), _compact(record)))
         for record in data["external_edges.jsonl"]:
             source = _edge_source(record)
-            coordinate = str(_first(record, ("coordinate", "target", "to", "dependency", "module_id"), required=True))
+            coordinate_value = _first(record, ("coordinate", "target", "to", "dependency", "module_id"))
+            if coordinate_value is None:
+                group = str(record.get("group") or "")
+                name = str(record.get("name") or "")
+                version = str(record.get("version") or "")
+                if not name:
+                    raise ValueError("external dependency is missing coordinate/name")
+                coordinate_value = ":".join(part for part in (group, name, version) if part)
+            coordinate = str(coordinate_value)
             conn.execute("INSERT INTO external_edges VALUES (?, ?, ?, ?)",
                          (source, coordinate, _configuration(record), _compact(record)))
         conn.commit()
