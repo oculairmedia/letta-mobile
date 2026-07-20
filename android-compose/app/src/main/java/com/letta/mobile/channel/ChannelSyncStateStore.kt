@@ -2,6 +2,7 @@ package com.letta.mobile.channel
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import androidx.core.content.edit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,7 +17,7 @@ class ChannelSyncStateStore @Inject constructor(
     }
 
     override fun setProcessedLastActivityAt(conversationId: String, value: String) {
-        prefs.edit().putString(processedKey(conversationId), value).apply()
+        prefs.edit { putString(processedKey(conversationId), value) }
     }
 
     override fun getLastNotifiedMessageId(conversationId: String): String? {
@@ -24,7 +25,7 @@ class ChannelSyncStateStore @Inject constructor(
     }
 
     override fun setLastNotifiedMessageId(conversationId: String, messageId: String) {
-        prefs.edit().putString(notifiedKey(conversationId), messageId).apply()
+        prefs.edit { putString(notifiedKey(conversationId), messageId) }
     }
 
     private fun processedKey(conversationId: String) = "processed::$conversationId"

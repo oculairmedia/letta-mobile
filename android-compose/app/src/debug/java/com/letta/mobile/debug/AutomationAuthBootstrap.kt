@@ -3,6 +3,7 @@ package com.letta.mobile.debug
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import androidx.core.content.edit
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.screens.config.ConfigViewModel
@@ -51,7 +52,7 @@ object AutomationAuthBootstrap {
             Log.w(TAG, "Dropping invalid automation credential payload", error)
         }
 
-        prefs.edit().remove(KEY_PAYLOAD_BASE64).commit()
+        prefs.edit(commit = true) { remove(KEY_PAYLOAD_BASE64) }
     }
 
     private fun decodePayload(encodedPayload: String): AutomationAuthPayload {

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.CalendarContract
 import android.provider.ContactsContract
 import android.provider.Settings
+import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.LocalDateTime
@@ -162,11 +163,11 @@ fun openWifiSettingsIntent(): Intent = Intent(Settings.ACTION_WIFI_SETTINGS)
 
 fun showLocationOnMapIntent(location: String): Intent = Intent(
     Intent.ACTION_VIEW,
-    Uri.parse("geo:0,0?q=${Uri.encode(location.trim())}"),
+    "geo:0,0?q=${Uri.encode(location.trim())}".toUri(),
 )
 
 fun composeEmailIntent(to: String, subject: String, body: String): Intent = Intent(Intent.ACTION_SENDTO).apply {
-    data = Uri.parse("mailto:")
+    data = "mailto:".toUri()
     putExtra(Intent.EXTRA_EMAIL, arrayOf(to.trim()))
     putExtra(Intent.EXTRA_SUBJECT, subject)
     putExtra(Intent.EXTRA_TEXT, body)

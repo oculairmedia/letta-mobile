@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -70,8 +71,8 @@ object MessageListPageGuard {
         val oldestKeptId = idOf(if (newestLast) kept.firstOrNull() else kept.firstOrNull())
         return buildJsonObject {
             put("messages", keptArray)
-            put("has_more", kotlinx.serialization.json.JsonPrimitive(true))
-            if (oldestKeptId != null) put("next_before", kotlinx.serialization.json.JsonPrimitive(oldestKeptId))
+            put("has_more", JsonPrimitive(true))
+            if (oldestKeptId != null) put("next_before", JsonPrimitive(oldestKeptId))
         }
     }
 
@@ -103,14 +104,14 @@ object MessageListPageGuard {
     ): JsonElement {
         if (response !is JsonObject) return response
         if (byteLen(response) <= maxTotalBytes) return response
-        val out = kotlinx.serialization.json.buildJsonObject {
+        val out = buildJsonObject {
             for ((key, value) in response) {
-                val prim = value as? kotlinx.serialization.json.JsonPrimitive
+                val prim = value as? JsonPrimitive
                 val str = prim?.contentOrNull
                 if (prim != null && prim.isString && str != null && str.encodeToByteArray().size > maxFieldBytes) {
                     val prefix = MessageListWireProjection.utf8SafePrefix(str, maxFieldBytes)
                     val marker = "\n… [truncated: " + str.encodeToByteArray().size + " bytes]"
-                    put(key, kotlinx.serialization.json.JsonPrimitive(prefix + marker))
+                    put(key, JsonPrimitive(prefix + marker))
                 } else {
                     put(key, value)
                 }

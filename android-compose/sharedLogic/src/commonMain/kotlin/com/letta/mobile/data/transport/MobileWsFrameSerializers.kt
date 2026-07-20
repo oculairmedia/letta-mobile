@@ -1,8 +1,14 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.a2ui.decodeA2uiMessages
+import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -19,7 +25,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * losing visibility into what the shim sent.
  */
 object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(ServerFrame::class) {
-    override fun selectDeserializer(element: JsonElement): kotlinx.serialization.DeserializationStrategy<ServerFrame> {
+    override fun selectDeserializer(element: JsonElement): DeserializationStrategy<ServerFrame> {
         val type = element.jsonObject["type"]?.jsonPrimitive?.content
         return when (type) {
             "welcome" -> ServerFrame.Welcome.serializer()
@@ -56,12 +62,12 @@ object ServerFrameSerializer : JsonContentPolymorphicSerializer<ServerFrame>(Ser
     }
 }
 
-private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerFrame> {
-    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ServerFrame.A2ui")
+private object A2uiFrameDeserializer : KSerializer<ServerFrame> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ServerFrame.A2ui")
 
-    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ServerFrame {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+    override fun deserialize(decoder: Decoder): ServerFrame {
+        val jsonDecoder = decoder as? JsonDecoder
             ?: error("A2uiFrameDeserializer requires a JsonDecoder")
         val element = jsonDecoder.decodeJsonElement().jsonObject
         // Shim §2.2: payload lives under `a2ui` (single object or array
@@ -89,7 +95,7 @@ private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerF
     }
 
     override fun serialize(
-        encoder: kotlinx.serialization.encoding.Encoder,
+        encoder: Encoder,
         value: ServerFrame,
     ): Unit = error("ServerFrame.A2ui is inbound-only; encoding it is never valid")
 }
@@ -102,12 +108,12 @@ private object A2uiFrameDeserializer : kotlinx.serialization.KSerializer<ServerF
  * with [ServerFrameSerializer] and route it through the same handler as
  * a live frame — replayed and live frames must take the same code path.
  */
-private object SubscribeFrameDeserializer : kotlinx.serialization.KSerializer<ServerFrame> {
-    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ServerFrame.SubscribeFrameMessage")
+private object SubscribeFrameDeserializer : KSerializer<ServerFrame> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ServerFrame.SubscribeFrameMessage")
 
-    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ServerFrame {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+    override fun deserialize(decoder: Decoder): ServerFrame {
+        val jsonDecoder = decoder as? JsonDecoder
             ?: error("SubscribeFrameDeserializer requires a JsonDecoder")
         val element = jsonDecoder.decodeJsonElement().jsonObject
         val frameField = element["frame"]
@@ -126,7 +132,7 @@ private object SubscribeFrameDeserializer : kotlinx.serialization.KSerializer<Se
     }
 
     override fun serialize(
-        encoder: kotlinx.serialization.encoding.Encoder,
+        encoder: Encoder,
         value: ServerFrame,
     ): Unit = error("ServerFrame.SubscribeFrameMessage is inbound-only; encoding it is never valid")
 }
@@ -140,12 +146,12 @@ private object SubscribeFrameDeserializer : kotlinx.serialization.KSerializer<Se
  * surface because [JsonContentPolymorphicSerializer.selectDeserializer]
  * casts its return value to KSerializer at runtime.
  */
-private object UnknownFrameDeserializer : kotlinx.serialization.KSerializer<ServerFrame> {
-    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ServerFrame.Unknown")
+private object UnknownFrameDeserializer : KSerializer<ServerFrame> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("ServerFrame.Unknown")
 
-    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ServerFrame {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+    override fun deserialize(decoder: Decoder): ServerFrame {
+        val jsonDecoder = decoder as? JsonDecoder
             ?: error("UnknownFrameDeserializer requires a JsonDecoder")
         val element = jsonDecoder.decodeJsonElement().jsonObject
         return ServerFrame.Unknown(
@@ -163,7 +169,7 @@ private object UnknownFrameDeserializer : kotlinx.serialization.KSerializer<Serv
      * frames). Throwing here makes any accidental encode loud.
      */
     override fun serialize(
-        encoder: kotlinx.serialization.encoding.Encoder,
+        encoder: Encoder,
         value: ServerFrame,
     ): Unit = error("ServerFrame.Unknown is inbound-only; encoding it is never valid")
 }

@@ -21,7 +21,12 @@ import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
+import com.letta.mobile.runtime.RunId
+import com.letta.mobile.util.Telemetry
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -31,6 +36,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -80,7 +89,7 @@ class AppServerTurnEngine(
      * when it acquired the lock, and its last-seen terminal. Backed by an
      * atomicfu ref so the read accessor is safe from any thread with no locking.
      */
-    private val activeTurnOwnerRef = kotlinx.atomicfu.atomic<ActiveTurnOwner?>(null)
+    private val activeTurnOwnerRef = atomic<ActiveTurnOwner?>(null)
 
     /**
      * Pure read accessor for the current active-turn owner (telemetry only).
@@ -138,7 +147,7 @@ class AppServerTurnEngine(
                 AppServerCommand.AdminRpc(
                     requestId = requestIdFactory(),
                     method = "run.get",
-                    params = kotlinx.serialization.json.buildJsonObject { put("run_id", runId) },
+                    params = buildJsonObject { put("run_id", runId) },
                 ),
             )
             when {
@@ -152,11 +161,11 @@ class AppServerTurnEngine(
         } catch (t: Throwable) {
             // Never clear the lock on an inconclusive/errored liveness check — that
             // could interrupt a live run. Only server-CONFIRMED death releases.
-            com.letta.mobile.util.Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to runId)
+            Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to runId)
             return false
         }
         if (!dead) {
-            com.letta.mobile.util.Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to runId)
+            Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to runId)
             return false
         }
         // Confirmed dead: release the stale lock so the pending send can proceed.
@@ -167,7 +176,7 @@ class AppServerTurnEngine(
         } catch (t: Throwable) {
             // If it was already unlocked concurrently, treat as released.
         }
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "AppServerTurnEngine", "activeTurn.reconciledDead",
             "runId" to runId,
             "agentId" to (released?.agentId ?: ""),
@@ -178,7 +187,7 @@ class AppServerTurnEngine(
     }
 
     /** True iff a run.get result body proves the run is terminal/dead. */
-    private fun runResultIsDead(result: kotlinx.serialization.json.JsonElement?): Boolean {
+    private fun runResultIsDead(result: JsonElement?): Boolean {
         val obj = (result as? JsonObject) ?: return false
         val status = obj["status"]?.jsonPrimitive?.contentOrNull?.lowercase()
         if (status != null && (status == "completed" || status == "failed" || status == "cancelled" || status == "error" || status == "expired")) return true
@@ -226,7 +235,7 @@ class AppServerTurnEngine(
             settleDeadlineMs = terminalSettleQuietMs,
             watchdogDeadlineMs = turnIdleTimeoutMs,
         )
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "AppServerTurnEngine", "activeTurn.acquired",
             "runtimeId" to command.runtimeId.value,
             "agentId" to command.agentId.value,
@@ -237,7 +246,7 @@ class AppServerTurnEngine(
             "watchdogDeadlineMs" to turnIdleTimeoutMs,
         )
 
-        var collector: kotlinx.coroutines.Job? = null
+        var collector: Job? = null
         // letta-mobile-kyqdt: TELEMETRY-ONLY. Track which path reached the
         // finally so the released event carries a RELEASE REASON. Defaults to a
         // normal completion; overwritten (pure write) if a distinct terminal
@@ -245,9 +254,9 @@ class AppServerTurnEngine(
         var releaseReason: String = "normal_completion"
         try {
             val turnPermissionMode = permissionModeProvider(command)
-            com.letta.mobile.util.Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
+            Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
             val scope = ensureRuntime(command, turnPermissionMode)
-            com.letta.mobile.util.Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
+            Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
             send(command.startedDraft())
 
             val collectorReady = CompletableDeferred<Unit>()
@@ -262,12 +271,12 @@ class AppServerTurnEngine(
                     // terminal stop_reason. Force a Failed lifecycle so the UI stops
                     // "Thinking..." and the activeTurn lock is released for the next send.
                     releaseReason = "watchdog_timeout" // letta-mobile-kyqdt: telemetry-only
-                    com.letta.mobile.util.Telemetry.event(
+                    Telemetry.event(
                         "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
                     )
                     noteOwnerTerminal(RuntimeRunStatus.Failed, source = "idle_timeout") // letta-mobile-kyqdt: telemetry-only
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
-                } catch (cancellation: kotlinx.coroutines.CancellationException) {
+                } catch (cancellation: CancellationException) {
                     // letta-mobile-kyqdt: TELEMETRY-ONLY. The turn was cancelled/
                     // preempted (e.g. abort/scope teardown) before a terminal.
                     // Record the reason then rethrow unchanged — no behavior change.
@@ -282,7 +291,7 @@ class AppServerTurnEngine(
             }
             collectorReady.await()
             client.input(command.toInputCommand(scope))
-            com.letta.mobile.util.Telemetry.event("IrohTurn", "input.sent")
+            Telemetry.event("IrohTurn", "input.sent")
             collector.join()
         } finally {
             // letta-mobile-c4igq.1: the busy lock MUST release on every terminal,
@@ -293,7 +302,7 @@ class AppServerTurnEngine(
             // CancellationException and SKIP activeTurn.unlock(), wedging the engine
             // busy until a manual restart. Run the whole cleanup under NonCancellable
             // so the unlock is guaranteed regardless of the terminal outcome.
-            withContext(kotlinx.coroutines.NonCancellable) {
+            withContext(NonCancellable) {
             collector?.cancelAndJoin()
             // letta-mobile-kyqdt: P1a RACE FIX (TELEMETRY-ONLY ordering).
             // Snapshot the owner metadata for the release event, but do NOT clear
@@ -312,7 +321,7 @@ class AppServerTurnEngine(
                 // Clear STRICTLY after unlock returns (or throws). While the lock
                 // is still held-observable, the owner is never null.
                 activeTurnOwnerRef.value = null
-                com.letta.mobile.util.Telemetry.event(
+                Telemetry.event(
                     "AppServerTurnEngine", "activeTurn.released",
                     "runtimeId" to command.runtimeId.value,
                     "agentId" to command.agentId.value,
@@ -351,7 +360,7 @@ class AppServerTurnEngine(
         collectorReady: CompletableDeferred<Unit>,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
-        val lastFrameAt = kotlinx.atomicfu.atomic(currentTimeMs())
+        val lastFrameAt = atomic(currentTimeMs())
         val watchdog = this.launch {
             while (true) {
                 val idleFor = currentTimeMs() - lastFrameAt.value
@@ -469,7 +478,7 @@ class AppServerTurnEngine(
                             source = "scope_rejected_terminal",
                             seq = received.eventSeqOrNull(),
                         )
-                        com.letta.mobile.util.Telemetry.event(
+                        Telemetry.event(
                             "AppServerTurnEngine", "terminal.scope_rejected",
                             "expectedAgent" to scope.agentId,
                             "expectedConv" to scope.conversationId,
@@ -623,7 +632,7 @@ class AppServerTurnEngine(
             // letta-mobile-oqfbj: settle before emitting the failed draft
             settleDanglingToolCalls(command, emittedToolCallIds, returnedToolCallIds, emitDraft, "Tool execution interrupted by turn timeout")
             throw idle
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             // letta-mobile-oqfbj: settle on cancellation/abort.
             // fix(no-settle-on-clean-completion): structured concurrency can
             // deliver a CLEAN completion's `throw TurnCompleted` (thrown from
@@ -689,7 +698,7 @@ class AppServerTurnEngine(
     }
 
     private fun TurnCommand.draftFor(
-        runId: com.letta.mobile.runtime.RunId?,
+        runId: RunId?,
         payload: RuntimeEventPayload,
     ): RuntimeEventDraft = RuntimeEventDraft(
         backendId = backendId,
@@ -708,7 +717,7 @@ class AppServerTurnEngine(
     ): Boolean {
         if (turnPermissionMode != AppServerPermissionMode.Unrestricted) return false
         val approval = draft.toApprovalAutoAllowRequest() ?: return false
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "IrohTurn", "approval.auto_allow",
             "approvalId" to approval.requestId,
             "toolCallId" to (approval.toolCallId ?: ""),
@@ -783,7 +792,7 @@ class AppServerTurnEngine(
                 forceDeviceStatus = true,
             ),
         )
-        com.letta.mobile.util.Telemetry.event("IrohTurn", "runtimeStart.response", "success" to response.success, "hasRuntime" to (response.runtime != null), "error" to response.error)
+        Telemetry.event("IrohTurn", "runtimeStart.response", "success" to response.success, "hasRuntime" to (response.runtime != null), "error" to response.error)
         if (!response.success) {
             error(response.error ?: "App Server runtime_start failed.")
         }
@@ -805,7 +814,7 @@ class AppServerTurnEngine(
                             role = "user",
                             content = turnInput.contentPartsJson
                                 ?.let { AppServerProtocol.json.parseToJsonElement(it) }
-                                ?: kotlinx.serialization.json.JsonPrimitive(turnInput.text),
+                                ?: JsonPrimitive(turnInput.text),
                             clientMessageId = turnInput.localMessageId,
                         ),
                     ),
@@ -818,13 +827,13 @@ class AppServerTurnEngine(
                     requestId = turnInput.decision.approvalId.value,
                     decision = when (turnInput.decision.decision) {
                         ToolApprovalDecisionValue.Approved -> {
-                            com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision.Allow(
+                            AppServerApprovalResponseDecision.Allow(
                                 message = turnInput.decision.response,
                             )
                         }
                         ToolApprovalDecisionValue.Denied,
                         ToolApprovalDecisionValue.TimedOut,
-                        -> com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision.Deny(
+                        -> AppServerApprovalResponseDecision.Deny(
                             message = turnInput.decision.response ?: "Denied by mobile client.",
                         )
                     },
@@ -845,7 +854,7 @@ class AppServerTurnEngine(
             payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Started),
         )
 
-    private fun TurnCommand.completedDraft(runId: com.letta.mobile.runtime.RunId?): RuntimeEventDraft =
+    private fun TurnCommand.completedDraft(runId: RunId?): RuntimeEventDraft =
         RuntimeEventDraft(
             backendId = backendId,
             runtimeId = runtimeId,
@@ -938,7 +947,7 @@ class AppServerTurnEngine(
         delta.string("message_type")
     }.getOrNull()
 
-    private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.matches(
+    private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
     ): Boolean {
         val eventRuntime = frame.runtime ?: return true
@@ -950,13 +959,13 @@ class AppServerTurnEngine(
      * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort event_seq for a received
      * frame, if the concrete frame type carries one. Pure read; null otherwise.
      */
-    private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.eventSeqOrNull(): Long? =
+    private fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
         when (val f = frame) {
-            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.StreamDelta -> f.eventSeq
-            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
-            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
-            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateQueue -> f.eventSeq
-            is com.letta.mobile.data.transport.appserver.AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
+            is AppServerInboundFrame.StreamDelta -> f.eventSeq
+            is AppServerInboundFrame.UpdateLoopStatus -> f.eventSeq
+            is AppServerInboundFrame.UpdateDeviceStatus -> f.eventSeq
+            is AppServerInboundFrame.UpdateQueue -> f.eventSeq
+            is AppServerInboundFrame.UpdateSubagentState -> f.eventSeq
             else -> null
         }
 
@@ -967,8 +976,8 @@ class AppServerTurnEngine(
      * terminal-bearing frames that were rejected by matches(scope). Pure read of
      * the frame's delta message_type; never gates control flow.
      */
-    private fun com.letta.mobile.data.transport.appserver.AppServerReceivedFrame.carriesTerminal(): Boolean {
-        val streamDelta = frame as? com.letta.mobile.data.transport.appserver.AppServerInboundFrame.StreamDelta
+    private fun AppServerReceivedFrame.carriesTerminal(): Boolean {
+        val streamDelta = frame as? AppServerInboundFrame.StreamDelta
             ?: return false
         val messageType = runCatching {
             val delta = streamDelta.delta.jsonObject
@@ -1054,7 +1063,7 @@ class AppServerTurnEngine(
             )
             emitDraft(syntheticReturn)
             
-            com.letta.mobile.util.Telemetry.event(
+            Telemetry.event(
                 "IrohTurn",
                 "settlement.synthesized",
                 "toolCallId" to toolCallId,

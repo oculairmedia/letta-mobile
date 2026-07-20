@@ -2,6 +2,7 @@ package com.letta.mobile.ui.a2ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1191,7 +1192,7 @@ internal fun A2uiButton(
                 HapticEffects.confirm(haptic, view)
                 runCatching {
                     context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(localOpenUrl))
+                        Intent(Intent.ACTION_VIEW, localOpenUrl.toUri())
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 }.onFailure { error ->

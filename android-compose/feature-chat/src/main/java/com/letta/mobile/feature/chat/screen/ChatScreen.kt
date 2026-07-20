@@ -25,7 +25,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import android.app.Activity
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
+import com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay
+import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -774,13 +781,13 @@ internal fun ChatScreen(
             // hosts ChatScreen on a plain ComponentActivity, so we skip the
             // voice overlay when there's no Hilt host (production always
             // has one).
-            val voiceActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+            val voiceActivity = LocalContext.current as? Activity
             val voiceIsHiltHost = voiceActivity is dagger.hilt.internal.GeneratedComponentManager<*>
             if (voiceIsHiltHost) {
-                val voiceVm: com.letta.mobile.feature.chat.voice.VoiceInputViewModel =
-                    androidx.hilt.navigation.compose.hiltViewModel()
+                val voiceVm: VoiceInputViewModel =
+                    hiltViewModel()
                 val voiceState by voiceVm.uiState.collectAsStateWithLifecycle()
-                com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay(
+                VoiceRecognizerOverlay(
                     visible = voiceState.recognizing,
                     recognizedText = voiceState.recognizedText,
                     amplitude = voiceState.amplitude,
@@ -1132,14 +1139,14 @@ internal fun DismissibleA2uiSurface(
             .longPressPassthrough { menuExpanded = true },
     ) {
         content()
-        androidx.compose.material3.IconButton(
+        IconButton(
             onClick = { onDismissSurface(surfaceId) },
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
             Icon(
                 imageVector = LettaIcons.Close,
                 contentDescription = "Close A2UI surface",
-                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         DropdownMenu(

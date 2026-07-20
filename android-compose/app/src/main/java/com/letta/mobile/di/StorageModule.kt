@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.letta.mobile.data.storage.SecureSettingsStore
 import com.letta.mobile.util.EncryptedPrefsHelper
+import androidx.core.content.edit
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -51,14 +52,14 @@ private class SharedPreferencesSecureSettingsStore(
         sharedPreferences.getString(key, defaultValue)
 
     override fun putString(key: String, value: String) {
-        sharedPreferences.edit().putString(key, value).apply()
+        sharedPreferences.edit { putString(key, value) }
     }
 
     override fun remove(key: String) {
-        sharedPreferences.edit().remove(key).apply()
+        sharedPreferences.edit { remove(key) }
     }
 
     override fun clear() {
-        sharedPreferences.edit().clear().apply()
+        sharedPreferences.edit { clear() }
     }
 }

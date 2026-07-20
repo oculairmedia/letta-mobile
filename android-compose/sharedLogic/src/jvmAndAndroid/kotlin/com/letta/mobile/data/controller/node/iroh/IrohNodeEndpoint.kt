@@ -13,6 +13,7 @@ import computer.iroh.EndpointBuilder
 import computer.iroh.AddrChangeCallback
 import computer.iroh.HomeRelayCallback
 import computer.iroh.NetworkChangeCallback
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -185,7 +186,7 @@ class IrohNodeEndpoint(
         IrohDiagnostics.endpointIdHex(endpointAddr.id())
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        com.letta.mobile.util.Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
+        Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
     }
 
     fun start(controller: AppServerController) {
@@ -238,7 +239,7 @@ class IrohNodeEndpoint(
                                     connectionRegistry = connectionRegistry,
                                 ).serve()
                             }
-                        } catch (e: kotlinx.coroutines.CancellationException) {
+                        } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
                             Telemetry.event(

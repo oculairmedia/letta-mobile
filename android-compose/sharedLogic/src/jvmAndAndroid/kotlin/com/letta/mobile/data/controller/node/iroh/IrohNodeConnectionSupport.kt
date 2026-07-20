@@ -418,22 +418,22 @@ internal class CumulativeStreamText {
  * keep their stable ids; frames without an otid are left unchanged; idempotent.
  */
 internal fun tagStreamDeltaForOptimisticDedup(
-    delta: kotlinx.serialization.json.JsonObject,
-): kotlinx.serialization.json.JsonObject {
-    val messageType = delta["message_type"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+    delta: JsonObject,
+): JsonObject {
+    val messageType = delta["message_type"]?.let { (it as? JsonPrimitive)?.contentOrNull }
         ?: return delta
     val prefix = when (messageType) {
         "assistant_message" -> "cm-stream-"
         "reasoning_message", "hidden_reasoning_message" -> "cm-reason-"
         else -> return delta
     }
-    val otid = delta["otid"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+    val otid = delta["otid"]?.let { (it as? JsonPrimitive)?.contentOrNull }
     if (otid.isNullOrEmpty()) return delta
-    val currentId = delta["id"]?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull }
+    val currentId = delta["id"]?.let { (it as? JsonPrimitive)?.contentOrNull }
     if (currentId != null && (currentId.startsWith("cm-stream-") || currentId.startsWith("cm-reason-"))) {
         return delta
     }
-    return kotlinx.serialization.json.buildJsonObject {
+    return buildJsonObject {
         delta.forEach { (k, v) -> if (k != "id") put(k, v) }
         put("id", "$prefix$otid")
     }
@@ -441,12 +441,12 @@ internal fun tagStreamDeltaForOptimisticDedup(
 
 /** Frame-level wrapper: parse a raw wire frame; if stream_delta, tag its inner delta id. */
 internal fun retagStreamDeltaFrameForOptimisticDedup(rawFrame: String): String = runCatching {
-    val obj = kotlinx.serialization.json.Json.parseToJsonElement(rawFrame).jsonObject
-    if ((obj["type"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull != "stream_delta") return@runCatching rawFrame
-    val delta = obj["delta"] as? kotlinx.serialization.json.JsonObject ?: return@runCatching rawFrame
+    val obj = Json.parseToJsonElement(rawFrame).jsonObject
+    if ((obj["type"] as? JsonPrimitive)?.contentOrNull != "stream_delta") return@runCatching rawFrame
+    val delta = obj["delta"] as? JsonObject ?: return@runCatching rawFrame
     val taggedDelta = tagStreamDeltaForOptimisticDedup(delta)
     if (taggedDelta === delta) return@runCatching rawFrame
-    kotlinx.serialization.json.buildJsonObject {
+    buildJsonObject {
         obj.forEach { (k, v) -> if (k != "delta") put(k, v) }
         put("delta", taggedDelta)
     }.toString()

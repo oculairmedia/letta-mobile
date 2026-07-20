@@ -67,7 +67,15 @@ import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import com.letta.mobile.feature.chat.coordination.AdminChatA2uiCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatComposerCoordinator
+import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.SlashCommand
+import com.letta.mobile.data.repository.api.ISelfTodoRepository
+import com.letta.mobile.data.timeline.TimelineRepository
+import com.letta.mobile.feature.chat.subagent.SelfTodoSource
+import com.letta.mobile.feature.chat.subagent.WsSelfTodoSource
+import android.os.SystemClock
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -121,7 +129,7 @@ internal fun resolveLocalRuntimeRouting(
 internal class AdminChatViewModel @Inject constructor(
     private val routeArgs: ChatRouteArgs,
     private val messageRepository: MessageRepository,
-    private val timelineRepository: com.letta.mobile.data.timeline.TimelineRepository,
+    private val timelineRepository: TimelineRepository,
     private val agentRepository: IAgentRepository,
     private val blockRepository: IBlockRepository,
     private val bugReportRepository: IBugReportRepository,
@@ -129,16 +137,16 @@ internal class AdminChatViewModel @Inject constructor(
     private val settingsRepository: ISettingsRepository,
     private val sessionManager: SessionManager,
     private val runtimeEventOutbox: RuntimeEventOutbox,
-    private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
+    private val currentConversationTracker: CurrentConversationTracker,
     private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val subagentRepository: ISubagentRepository,
     private val slashCommandRepository: ISlashCommandRepository,
     private val clientVersionProvider: ChatClientVersionProvider,
-    private val selfTodoRepository: com.letta.mobile.data.repository.api.ISelfTodoRepository,
+    private val selfTodoRepository: ISelfTodoRepository,
     private val modelRepository: IModelRepository,
-    val attachmentLimits: com.letta.mobile.data.attachment.AttachmentLimits =
-        com.letta.mobile.data.attachment.AttachmentLimits.Default,
+    val attachmentLimits: AttachmentLimits =
+        AttachmentLimits.Default,
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
@@ -193,8 +201,8 @@ internal class AdminChatViewModel @Inject constructor(
      * a seam so [ChatScreen] can merge the self entry into the active-subagent
      * bar alongside dispatched subagents.
      */
-    val selfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource =
-        com.letta.mobile.feature.chat.subagent.WsSelfTodoSource(selfTodoRepository)
+    val selfTodoSource: SelfTodoSource =
+        WsSelfTodoSource(selfTodoRepository)
 
     private val initialAgentName: String? = routeArgs.initialAgentName
     private val initialMessage: String? = routeArgs.initialMessage
@@ -754,7 +762,7 @@ internal class AdminChatViewModel @Inject constructor(
             val builtIns = buildList {
                 if (projectContext != null) {
                     add(
-                        com.letta.mobile.data.model.SlashCommand(
+                        SlashCommand(
                             name = "bug",
                             command = "/bug",
                             description = "Open a project bug report",
@@ -793,7 +801,7 @@ internal class AdminChatViewModel @Inject constructor(
             val merged = (builtIns + agentCommands + globalCommands)
                 .groupBy { it.command }
                 .map { (_, dupes) -> dupes.maxByOrNull { it.installed } ?: dupes.first() }
-                .sortedWith(compareByDescending<com.letta.mobile.data.model.SlashCommand> { it.installed }
+                .sortedWith(compareByDescending<SlashCommand> { it.installed }
                     .thenBy { it.command })
             Log.d(TAG, "Slash commands loaded: total=${merged.size} installed=${merged.count { it.installed }}")
             if (loadVersion == slashCommandsLoadVersion) {
@@ -911,7 +919,7 @@ internal class AdminChatViewModel @Inject constructor(
                     messageListChange = ChatMessageListChange.Full,
                 )
             } catch (e: Exception) {
-                android.util.Log.w("AdminChatViewModel", "Failed to reset messages", e)
+                Log.w("AdminChatViewModel", "Failed to reset messages", e)
             }
         }
     }
@@ -928,7 +936,7 @@ internal class AdminChatViewModel @Inject constructor(
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
     fun onScreenResumed() {
-        val now = android.os.SystemClock.elapsedRealtime()
+        val now = SystemClock.elapsedRealtime()
         if (now - lastScreenResumedAtMs < 200) return
         lastScreenResumedAtMs = now
         val currentId = conversationId?.value
@@ -957,7 +965,7 @@ internal class AdminChatViewModel @Inject constructor(
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
 
-    fun selectSlashCommand(command: com.letta.mobile.data.model.SlashCommand) {
+    fun selectSlashCommand(command: SlashCommand) {
         composerCoordinator.insertSlashCommand(command)
         // Tapping an uninstalled skill command installs it to this agent so
         // the skill becomes available, then refreshes the picker.
@@ -974,7 +982,7 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun uninstallSlashCommand(command: com.letta.mobile.data.model.SlashCommand) {
+    fun uninstallSlashCommand(command: SlashCommand) {
         val skillName = command.skillName ?: return
         if (!command.installed) return
         viewModelScope.launch {

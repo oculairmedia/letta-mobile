@@ -75,6 +75,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
@@ -859,9 +860,9 @@ internal fun ChatMessageList(
                         // letta-mobile-x1xnl render diagnostics (flag-gated).
                         // Logs each composed key; a key composed twice within one
                         // render generation is the phantom double-draw.
-                        if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
-                            androidx.compose.runtime.SideEffect {
-                                com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
+                        if (RenderDiagnostics.enabled()) {
+                            SideEffect {
+                                RenderDiagnostics.onLazyItemComposed(
                                     conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
                                     key = renderItem.key,
                                     contentType = when (renderItem) {

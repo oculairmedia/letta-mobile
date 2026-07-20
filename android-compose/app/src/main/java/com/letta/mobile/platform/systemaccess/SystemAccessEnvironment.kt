@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.letta.mobile.platform.ManifestCapabilityProbe
 import com.letta.mobile.platform.SystemAccessBuild
 import com.letta.mobile.platform.SystemAccessFlavor
@@ -120,5 +121,5 @@ internal object AndroidSettingsActions {
     const val ActionAccessibilitySettings = Settings.ACTION_ACCESSIBILITY_SETTINGS
     const val ActionManageAppAllFilesAccessPermission = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
 
-    fun appDetailsUri(packageName: String): Uri = Uri.parse("package:$packageName")
+    fun appDetailsUri(packageName: String): Uri = "package:$packageName".toUri()
 }

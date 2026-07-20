@@ -576,7 +576,7 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.MessageDelta -> {
                 val conversationId = event.conversationId ?: activeWsConversationId ?: activeConversationId()
-                com.letta.mobile.util.Telemetry.event(
+                Telemetry.event(
                     "IrohGate", "gate3.coordinatorMessageDelta",
                     "resolvedConversationId" to conversationId,
                     "messageId" to event.message.id,

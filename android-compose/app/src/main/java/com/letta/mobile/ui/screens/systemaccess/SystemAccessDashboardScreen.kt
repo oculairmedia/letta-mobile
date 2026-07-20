@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.core.net.toUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -401,7 +402,7 @@ private fun SystemAccessPermissionIntent.toAndroidIntent(context: Context): Inte
         when (action) {
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
             Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-            -> data = Uri.parse("package:${context.packageName}")
+            -> data = "package:${context.packageName}".toUri()
         }
         if (context !is Activity) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
