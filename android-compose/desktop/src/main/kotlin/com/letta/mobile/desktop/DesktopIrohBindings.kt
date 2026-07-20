@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.SubagentRepository
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -210,6 +211,8 @@ internal fun rememberSubagentRegistry(
     activeConfig: LettaConfig,
     irohMode: Boolean,
     chatScope: CoroutineScope,
+    parentAgentId: String?,
+    parentConversationId: String?,
 ): DesktopSubagentRegistry {
     val subagentTransport = remember(activeConfig, irohMode) {
         createSubagentTransport(activeConfig, irohMode, chatScope)
@@ -228,8 +231,20 @@ internal fun rememberSubagentRegistry(
             ),
         ),
     )
-    val activeSubagents = produceState(emptyList<SubagentEntry>(), subagentRepository) {
-        subagentRepository?.activeSubagentsFlow()?.collect { value = it } ?: run { value = emptyList() }
+    val activeSubagents = produceState(
+        initialValue = emptyList<SubagentEntry>(),
+        subagentRepository,
+        parentAgentId,
+        parentConversationId,
+    ) {
+        val repository = subagentRepository
+        if (repository == null || parentAgentId == null || parentConversationId == null) {
+            value = emptyList()
+        } else {
+            repository.activeSubagentsFlow(
+                SubagentParentScope(parentAgentId, parentConversationId),
+            ).collect { value = it }
+        }
     }
     return DesktopSubagentRegistry(subagentRepository, activeSubagents)
 }
