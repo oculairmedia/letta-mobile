@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * One real mobile client (an [IrohChannelTransport]) participating in the
  * two-client probe. Wraps connect/subscribe/send/redial and continuously
@@ -110,16 +111,16 @@ internal class TwoClientEndpoint(
     }
 
     private suspend fun awaitConnected(timeoutMs: Long) {
-        val ok = withTimeoutOrNull(timeoutMs) {
-            while (transport.state.value !is ChannelTransportState.Connected) delay(25)
+        val ok = withTimeoutOrNull(timeoutMs.milliseconds) {
+            while (transport.state.value !is ChannelTransportState.Connected) delay(25.milliseconds)
             true
         }
         require(ok == true) { "$label failed to reach Connected within ${timeoutMs}ms" }
     }
 
     private suspend fun awaitDisconnected(timeoutMs: Long) {
-        withTimeoutOrNull(timeoutMs) {
-            while (transport.state.value is ChannelTransportState.Connected) delay(25)
+        withTimeoutOrNull(timeoutMs.milliseconds) {
+            while (transport.state.value is ChannelTransportState.Connected) delay(25.milliseconds)
             true
         }
     }

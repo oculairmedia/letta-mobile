@@ -47,6 +47,8 @@ import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runners.MethodSorters
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class EmbeddedRuntimeDeviceLoopTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
@@ -84,7 +86,7 @@ class EmbeddedRuntimeDeviceLoopTest {
         val bridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
         val workingDirectory = File(context.filesDir, "embedded-node-smoke").apply { mkdirs() }
         val output = async(Dispatchers.Default) {
-            withTimeoutOrNull(NODE_SMOKE_TIMEOUT_MS) {
+            withTimeoutOrNull(NODE_SMOKE_TIMEOUT_MS.milliseconds) {
                 bridge.outputLines.first { line -> line.contains(EXPECTED_NODE_VERSION) }
             }
         }
@@ -167,7 +169,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             memFsStore = NoopMemFsStore,
         )
 
-        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS.milliseconds) {
             backend.runTurn(command()).firstOrNull { envelope -> envelope.isAssistantTextOrCleanFailure() }
         }
 
@@ -245,7 +247,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             memFsStore = NoopMemFsStore,
         )
 
-        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS.milliseconds) {
             backend.runTurn(command()).firstOrNull { envelope ->
                 val payload = envelope.payload
                 payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.contains("tool-loop-ok")
@@ -332,7 +334,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                 memFsStore = NoopMemFsStore,
             )
 
-            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS.milliseconds) {
                 backend.runTurn(command()).firstOrNull { envelope ->
                     val payload = envelope.payload
                     payload is RuntimeEventPayload.RemoteStreamFrame && payload.body.contains("custom-provider-ok")
@@ -398,7 +400,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             memFsStore = NoopMemFsStore,
         )
 
-        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+        val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS.milliseconds) {
             backend.runTurn(command()).firstOrNull { envelope ->
                 val payload = envelope.payload
                 payload is RuntimeEventPayload.RemoteStreamFrame &&
@@ -418,7 +420,7 @@ class EmbeddedRuntimeDeviceLoopTest {
         val networkSession = LocalAndroidNetworkBridge().start()
         val bridge = NativeLettaCodeNodeBridge().also(bridgesToStop::add)
         val output = async(Dispatchers.Default) {
-            withTimeoutOrNull(NODE_SMOKE_TIMEOUT_MS) {
+            withTimeoutOrNull(NODE_SMOKE_TIMEOUT_MS.milliseconds) {
                 bridge.outputLines.first { line -> line.contains("android-network-ok") }
             }
         }
@@ -498,7 +500,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                     environment()["LETTA_ANDROID_NETWORK_BRIDGE_URL"] = networkSession.baseUrl
                 }
                 .start()
-            val output = withTimeoutOrNull(30_000L) {
+            val output = withTimeoutOrNull(30.seconds) {
                 process.inputStream.bufferedReader().readText()
             }
             val exitCode = if (output == null) {
@@ -536,7 +538,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                 environment()["PATH"] = "${binDirectory.absolutePath}:${System.getenv("PATH") ?: "/system/bin"}"
             }
             .start()
-        val output = withTimeoutOrNull(30_000L) {
+        val output = withTimeoutOrNull(30.seconds) {
             process.inputStream.bufferedReader().readText()
         }
         val exitCode = if (output == null) {
@@ -644,7 +646,7 @@ class EmbeddedRuntimeDeviceLoopTest {
                 environment()["LETTA_NODE_BIN"] = nodeLink.absolutePath
             }
             .start()
-        val output = withTimeoutOrNull(60_000L) {
+        val output = withTimeoutOrNull(60.seconds) {
             process.inputStream.bufferedReader().readText()
         }
         val exitCode = if (output == null) {
@@ -749,7 +751,7 @@ class EmbeddedRuntimeDeviceLoopTest {
             // A tiny valid 1x1 PNG (base64), the same flat shape the composer produces.
             val onePxPng =
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS.milliseconds) {
                 backend.runTurn(imageCommand(text = "What is in this image?", base64Png = onePxPng))
                     .firstOrNull { envelope ->
                         val payload = envelope.payload

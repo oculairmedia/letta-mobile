@@ -1,6 +1,5 @@
 package com.letta.mobile.avatar.core
 
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 

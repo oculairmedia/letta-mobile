@@ -7,6 +7,7 @@ import kotlinx.coroutines.withTimeout
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Manages request correlation and timeout coordination for Cron WebSocket RPCs.
  */
@@ -35,7 +36,7 @@ internal class CronRequestCorrelator {
                 pendingCronRequests.remove(requestId, deferred)
                 throw IllegalStateException("Cron send failed: sendFrame returned false")
             }
-            return withTimeout(timeoutMs) { deferred.await() }
+            return withTimeout(timeoutMs.milliseconds) { deferred.await() }
         } catch (e: TimeoutCancellationException) {
             pendingCronRequests.remove(requestId, deferred)
             throw e

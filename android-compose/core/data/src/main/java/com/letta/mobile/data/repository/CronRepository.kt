@@ -14,7 +14,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
@@ -162,7 +161,6 @@ open class CronRepository(
             throw IllegalStateException(response.error ?: "cron_delete failed")
         }
         stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
-        Unit
     }
 
     private fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =

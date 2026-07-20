@@ -25,8 +25,8 @@ import com.letta.mobile.designsystem.R
 import com.letta.mobile.ui.icons.LettaIcons
 
 object ToolAffordanceRowTestTags {
-    const val Container = "tool-affordance-row"
-    const val ChipPrefix = "tool-affordance-chip-"
+    const val CONTAINER = "tool-affordance-row"
+    const val CHIP_PREFIX = "tool-affordance-chip-"
 }
 
 @Composable
@@ -41,7 +41,7 @@ fun ToolAffordanceRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(ToolAffordanceRowTestTags.Container),
+            .testTag(ToolAffordanceRowTestTags.CONTAINER),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
@@ -83,7 +83,7 @@ fun ToolAffordanceRow(
                         )
                     },
                     modifier = Modifier
-                        .testTag(ToolAffordanceRowTestTags.ChipPrefix + tool.id.value)
+                        .testTag(ToolAffordanceRowTestTags.CHIP_PREFIX + tool.id.value)
                         .semantics { contentDescription = chipDescription },
                 )
             }

@@ -60,6 +60,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+import kotlin.time.Duration.Companion.milliseconds
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 @Tag("integration")
@@ -104,7 +105,7 @@ class A2uiToolApprovalRoundTripTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.ToolApprovalCard).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.TOOL_APPROVAL_CARD).assertIsDisplayed()
         composeRule.onNodeWithText("bash").assertIsDisplayed()
         composeRule.onNodeWithText("rm -rf /tmp/junk").assertIsDisplayed()
         assertTrue("ToolApprovalCard should render inside the 2s budget", elapsedMs(renderedAt) < 2_000)
@@ -346,9 +347,9 @@ class A2uiToolApprovalRoundTripTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.ScheduleCard).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.SCHEDULE_CARD).assertIsDisplayed()
         composeRule.onNodeWithText("Morning check-in").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.ScheduleSelectorInput).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.SCHEDULE_SELECTOR_INPUT).assertIsDisplayed()
 
         composeRule.onAllNodes(hasText("Run now") and hasClickAction())[0].performClick()
         withRealTimeout { server.actions.receive() }.assertScheduleAction(
@@ -686,7 +687,7 @@ private suspend fun Channel<JsonObject>.receiveOfType(type: String): JsonObject 
 
 private suspend fun Channel<JsonObject>.receiveOrNullWithin(timeoutMs: Long = 250L): JsonObject? =
     try {
-        withRealTimeout { withTimeout(timeoutMs) { receive() } }
+        withRealTimeout { withTimeout(timeoutMs.milliseconds) { receive() } }
     } catch (_: TimeoutCancellationException) {
         null
     }
@@ -696,7 +697,7 @@ private fun elapsedMs(startNanos: Long): Long =
 
 private suspend fun <T> withRealTimeout(block: suspend () -> T): T =
     withContext(Dispatchers.IO) {
-        withTimeout(TIMEOUT_MS) { block() }
+        withTimeout(TIMEOUT_MS.milliseconds) { block() }
     }
 
 private class A2uiShimServer {

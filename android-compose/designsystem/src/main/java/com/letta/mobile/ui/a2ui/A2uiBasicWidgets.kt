@@ -2,6 +2,7 @@ package com.letta.mobile.ui.a2ui
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -60,7 +61,6 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
@@ -83,6 +83,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.time.LocalTime
 
 
+import kotlin.time.Duration.Companion.milliseconds
 @Composable
 internal fun A2uiText(
     component: A2uiComponent,
@@ -92,7 +93,7 @@ internal fun A2uiText(
 ) {
     val text = component.resolveText(surface, renderScope)
     if (text == null) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_TEXT))
         return
     }
     Text(
@@ -154,14 +155,14 @@ internal fun A2uiTextField(
         },
         modifier = modifier
             .fillMaxWidth()
-            .testTag(A2uiTestTags.TextField),
+            .testTag(A2uiTestTags.TEXT_FIELD),
         label = label?.let { { Text(it) } },
         placeholder = placeholder?.let { { Text(it) } },
         isError = isError,
         readOnly = surfaceSubmitting,
         supportingText = when {
             surfaceSubmitting -> ({ Text("submitting...") })
-            isError -> ({ Text(validationError.orEmpty()) })
+            isError -> ({ Text(validationError) })
             else -> null
         },
         singleLine = fieldType != "longText",
@@ -260,7 +261,7 @@ internal fun A2uiRadio(
     val view = LocalView.current
 
     if (options.isEmpty()) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -272,7 +273,7 @@ internal fun A2uiRadio(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(A2uiTestTags.Radio),
+            .testTag(A2uiTestTags.RADIO),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         label?.let {
@@ -341,7 +342,7 @@ internal fun A2uiChoicePicker(
     val view = LocalView.current
 
     if (options.isEmpty()) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -367,7 +368,7 @@ internal fun A2uiChoicePicker(
         modifier = modifier
             .fillMaxWidth()
             .then(if (surfaceSubmitting) Modifier.semantics { disabled() } else Modifier)
-            .testTag(A2uiTestTags.ChoicePicker),
+            .testTag(A2uiTestTags.CHOICE_PICKER),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         label?.let {
@@ -390,7 +391,7 @@ internal fun A2uiChoicePicker(
                         selected = option.key in selected,
                         onClick = { update(option.key) },
                         enabled = !surfaceSubmitting,
-                        modifier = Modifier.testTag(A2uiTestTags.ChoicePickerChipOption),
+                        modifier = Modifier.testTag(A2uiTestTags.CHOICE_PICKER_CHIP_OPTION),
                         label = {
                             Text(
                                 text = option.label,
@@ -406,7 +407,7 @@ internal fun A2uiChoicePicker(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag(A2uiTestTags.ChoicePickerListOption)
+                        .testTag(A2uiTestTags.CHOICE_PICKER_LIST_OPTION)
                         .clickable(enabled = !surfaceSubmitting) { update(option.key) },
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -492,7 +493,7 @@ internal fun A2uiDateTimeInput(
                         showTimePicker = true
                     }
                 }
-                .testTag(A2uiTestTags.DateTimeInput),
+                .testTag(A2uiTestTags.DATE_TIME_INPUT),
         )
     }
 
@@ -575,7 +576,7 @@ internal fun A2uiImage(
 ) {
     val imageUrl = resolveBindingText(component.raw["url"] ?: component.raw["src"], surface, renderScope)
     if (imageUrl.isNullOrBlank()) {
-        A2uiSkeletonImage(modifier = modifier.testTag(A2uiTestTags.MissingImage))
+        A2uiSkeletonImage(modifier = modifier.testTag(A2uiTestTags.MISSING_IMAGE))
         return
     }
 
@@ -693,7 +694,7 @@ internal fun A2uiIcon(
             )
         }
         A2uiSkeletonIcon(
-            modifier = modifier.testTag(A2uiTestTags.MissingIcon),
+            modifier = modifier.testTag(A2uiTestTags.MISSING_ICON),
             size = size,
         )
         return
@@ -709,7 +710,7 @@ internal fun A2uiIcon(
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
-            .testTag(A2uiTestTags.Icon),
+            .testTag(A2uiTestTags.ICON),
         tint = component.iconTint(),
     )
 }
@@ -778,14 +779,14 @@ internal fun A2uiDivider(
         VerticalDivider(
             modifier = modifier
                 .height(component.height() ?: 32.dp)
-                .testTag(A2uiTestTags.Divider),
+                .testTag(A2uiTestTags.DIVIDER),
             color = MaterialTheme.colorScheme.outlineVariant,
         )
     } else {
         HorizontalDivider(
             modifier = modifier
                 .fillMaxWidth()
-                .testTag(A2uiTestTags.Divider),
+                .testTag(A2uiTestTags.DIVIDER),
             color = MaterialTheme.colorScheme.outlineVariant,
         )
     }
@@ -809,12 +810,12 @@ internal fun A2uiColumn(
         verticalArrangement = Arrangement.spacedBy(component.spacing()),
     ) {
         if (children.isEmpty()) {
-            A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+            A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         }
         children.forEach { childId ->
             val child = surface.components[childId]
             if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             } else {
                 A2uiComponentNode(
                     component = child,
@@ -850,12 +851,12 @@ internal fun A2uiRow(
         verticalAlignment = component.verticalAlignment(),
     ) {
         if (children.isEmpty()) {
-            A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+            A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         }
         children.forEach { childId ->
             val child = surface.components[childId]
             if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             } else {
                 A2uiComponentNode(
                     component = child,
@@ -889,19 +890,19 @@ internal fun A2uiListView(
     if (template == null) {
         val children = component.children
         if (children.isEmpty()) {
-            A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+            A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             return
         }
         Column(
             modifier = modifier
                 .fillMaxWidth()
-                .testTag(A2uiTestTags.ListView),
+                .testTag(A2uiTestTags.LIST_VIEW),
             verticalArrangement = Arrangement.spacedBy(component.spacing()),
         ) {
             children.forEach { childId ->
                 val child = surface.components[childId]
                 if (child == null) {
-                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
                 } else {
                     A2uiComponentNode(
                         component = child,
@@ -924,14 +925,14 @@ internal fun A2uiListView(
     val items = itemsValue as? JsonArray
     val templateComponent = surface.components[template.itemTemplateComponentId]
     if (items == null || templateComponent == null) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(A2uiTestTags.ListView),
+            .testTag(A2uiTestTags.LIST_VIEW),
         verticalArrangement = Arrangement.spacedBy(component.spacing()),
     ) {
         items.forEachIndexed { index, item ->
@@ -978,17 +979,17 @@ internal fun A2uiModal(
     val child = component.child ?: component.children.firstOrNull()
     AlertDialog(
         onDismissRequest = { dismissed = true },
-        modifier = Modifier.testTag(A2uiTestTags.Modal),
+        modifier = Modifier.testTag(A2uiTestTags.MODAL),
         title = resolveBindingText(component.raw["title"], surface, renderScope)?.let { title ->
             { Text(title) }
         },
         text = {
             if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             } else {
                 val childComponent = surface.components[child]
                 if (childComponent == null) {
-                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
                 } else {
                     A2uiComponentNode(
                         component = childComponent,
@@ -1026,7 +1027,7 @@ internal fun A2uiMedia(
     )?.takeIf { it.isNotBlank() }
 
     if (source == null) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -1075,7 +1076,7 @@ internal fun A2uiMedia(
             ) {
                 OutlinedButton(
                     onClick = { playing = !playing },
-                    modifier = Modifier.testTag(A2uiTestTags.MediaPlayPause),
+                    modifier = Modifier.testTag(A2uiTestTags.MEDIA_PLAY_PAUSE),
                 ) {
                     Text(if (playing) "Pause" else "Play")
                 }
@@ -1125,11 +1126,11 @@ internal fun A2uiCard(
         val child = component.child ?: component.children.firstOrNull()
         Box(modifier = Modifier.padding(16.dp)) {
             if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             } else {
                 val childComponent = surface.components[child]
                 if (childComponent == null) {
-                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                    A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
                 } else {
                     A2uiComponentNode(
                         component = childComponent,
@@ -1167,7 +1168,7 @@ internal fun A2uiButton(
 
     LaunchedEffect(inFlight) {
         if (!inFlight) return@LaunchedEffect
-        delay(A2uiButtonLocalTimeoutMillis)
+        delay(A2uiButtonLocalTimeoutMillis.milliseconds)
         inFlight = false
         onPendingActionDelta(-1)
     }
@@ -1191,7 +1192,7 @@ internal fun A2uiButton(
                 HapticEffects.confirm(haptic, view)
                 runCatching {
                     context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(localOpenUrl))
+                        Intent(Intent.ACTION_VIEW, localOpenUrl.toUri())
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 }.onFailure { error ->
@@ -1228,7 +1229,7 @@ internal fun A2uiButton(
             A2uiSkeletonLine(
                 modifier = Modifier
                     .widthIn(min = 72.dp)
-                    .testTag(A2uiTestTags.MissingText),
+                    .testTag(A2uiTestTags.MISSING_TEXT),
                 height = 12.dp,
             )
         } else {
@@ -1240,7 +1241,7 @@ internal fun A2uiButton(
                     CircularProgressIndicator(
                         modifier = Modifier
                             .size(16.dp)
-                            .testTag(A2uiTestTags.ButtonProgress),
+                            .testTag(A2uiTestTags.BUTTON_PROGRESS),
                         strokeWidth = 2.dp,
                     )
                 }

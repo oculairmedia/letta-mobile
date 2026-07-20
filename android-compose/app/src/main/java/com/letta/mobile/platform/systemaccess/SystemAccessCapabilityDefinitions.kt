@@ -68,7 +68,7 @@ sealed interface SystemAccessProbe {
 
     data object Overlay : SystemAccessProbe {
         override fun status(environment: SystemAccessEnvironment): ProbeResult {
-            if (!environment.hasDeclaredPermission(AndroidPermissionNames.SystemAlertWindow)) {
+            if (!environment.hasDeclaredPermission(AndroidPermissionNames.SYSTEM_ALERT_WINDOW)) {
                 return ProbeResult(SystemAccessCapabilityStatus.Unavailable, "Overlay special-access permission is not declared in this build.")
             }
             return if (environment.canDrawOverlays()) {
@@ -119,10 +119,10 @@ sealed interface SystemAccessProbe {
             if (!environment.shizukuBuildEnabled) {
                 return ProbeResult(SystemAccessCapabilityStatus.Unavailable, "Shizuku/Sui bridge code is disabled by this build flavor.")
             }
-            if (!environment.hasDeclaredPermission(AndroidPermissionNames.ShizukuApiV23)) {
+            if (!environment.hasDeclaredPermission(AndroidPermissionNames.SHIZUKU_API_V23)) {
                 return ProbeResult(SystemAccessCapabilityStatus.Unavailable, "Shizuku API permission is not declared in this build.")
             }
-            return if (environment.isPermissionGranted(AndroidPermissionNames.ShizukuApiV23)) {
+            return if (environment.isPermissionGranted(AndroidPermissionNames.SHIZUKU_API_V23)) {
                 ProbeResult(SystemAccessCapabilityStatus.Granted, "Shizuku API permission is granted.")
             } else {
                 ProbeResult(SystemAccessCapabilityStatus.AvailableNeedsSetup, "Install/start Shizuku or Sui and grant Letta access.")
@@ -256,13 +256,13 @@ object SystemAccessCapabilityDefinitions {
                 id = "storage.saf.open_document",
                 label = "Choose file",
                 kind = SystemAccessPermissionIntentKind.SystemPicker,
-                settingsAction = AndroidSettingsActions.ActionOpenDocument,
+                settingsAction = AndroidSettingsActions.ACTION_OPEN_DOCUMENT,
             ),
             SystemAccessPermissionIntent(
                 id = "storage.saf.open_tree",
                 label = "Choose folder",
                 kind = SystemAccessPermissionIntentKind.SystemPicker,
-                settingsAction = AndroidSettingsActions.ActionOpenDocumentTree,
+                settingsAction = AndroidSettingsActions.ACTION_OPEN_DOCUMENT_TREE,
             ),
         ),
         dataSensitivity = SystemAccessDataSensitivity.Personal,
@@ -283,7 +283,7 @@ object SystemAccessCapabilityDefinitions {
                 id = "storage.media_library.read",
                 label = "Allow selected media access",
                 kind = SystemAccessPermissionIntentKind.RuntimePermission,
-                permissions = listOf(AndroidPermissionNames.ReadMediaImages, AndroidPermissionNames.ReadMediaVideo, AndroidPermissionNames.ReadMediaAudio),
+                permissions = listOf(AndroidPermissionNames.READ_MEDIA_IMAGES, AndroidPermissionNames.READ_MEDIA_VIDEO, AndroidPermissionNames.READ_MEDIA_AUDIO),
                 minSdk = Build.VERSION_CODES.TIRAMISU,
             ),
         ),
@@ -293,8 +293,8 @@ object SystemAccessCapabilityDefinitions {
         auditPolicy = SystemAccessAuditPolicy(loggedFields = listOf("toolId", "mediaType", "operation"), redactedFields = listOf("mediaContent")),
         policyRisk = SystemAccessPolicyRisk(SystemAccessPolicyRiskLevel.Medium, "Media can contain sensitive personal data and must be minimized."),
         probe = SystemAccessProbe.AnyRuntimePermission(
-            permissions = listOf(AndroidPermissionNames.ReadMediaImages, AndroidPermissionNames.ReadMediaVideo, AndroidPermissionNames.ReadMediaAudio),
-            legacyPermission = AndroidPermissionNames.ReadExternalStorage,
+            permissions = listOf(AndroidPermissionNames.READ_MEDIA_IMAGES, AndroidPermissionNames.READ_MEDIA_VIDEO, AndroidPermissionNames.READ_MEDIA_AUDIO),
+            legacyPermission = AndroidPermissionNames.READ_EXTERNAL_STORAGE,
         ),
     )
 
@@ -312,8 +312,8 @@ object SystemAccessCapabilityDefinitions {
                 id = "storage.all_files.settings",
                 label = "Open all-files access settings",
                 kind = SystemAccessPermissionIntentKind.SettingsDeepLink,
-                permissions = listOf(AndroidPermissionNames.ManageExternalStorage),
-                settingsAction = AndroidSettingsActions.ActionManageAppAllFilesAccessPermission,
+                permissions = listOf(AndroidPermissionNames.MANAGE_EXTERNAL_STORAGE),
+                settingsAction = AndroidSettingsActions.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
                 minSdk = Build.VERSION_CODES.R,
             ),
         ),
@@ -322,7 +322,7 @@ object SystemAccessCapabilityDefinitions {
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
         auditPolicy = SystemAccessAuditPolicy(loggedFields = listOf("toolId", "path", "operation", "approvalId"), redactedFields = listOf("fileContent")),
         policyRisk = SystemAccessPolicyRisk(SystemAccessPolicyRiskLevel.High, "Broad storage access is generally unsuitable for Play without a core file-manager use case."),
-        probe = SystemAccessProbe.RuntimePermission(AndroidPermissionNames.ManageExternalStorage, minSdk = Build.VERSION_CODES.R),
+        probe = SystemAccessProbe.RuntimePermission(AndroidPermissionNames.MANAGE_EXTERNAL_STORAGE, minSdk = Build.VERSION_CODES.R),
         defaultUserEnabled = false,
     )
 
@@ -331,13 +331,13 @@ object SystemAccessCapabilityDefinitions {
         title = "Contacts read",
         summary = "Look up contacts locally and share only user-approved snippets with agents.",
         flavorAvailability = allFlavors(),
-        permissionIntents = listOf(runtimeIntent("contacts.read.permission", "Allow contacts lookup", AndroidPermissionNames.ReadContacts)),
+        permissionIntents = listOf(runtimeIntent("contacts.read.permission", "Allow contacts lookup", AndroidPermissionNames.READ_CONTACTS)),
         dataSensitivity = SystemAccessDataSensitivity.Personal,
         toolIds = setOf("contacts.lookup", "contacts.prompt_snippet"),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
         auditPolicy = SystemAccessAuditPolicy(loggedFields = listOf("toolId", "contactId", "fieldsShared"), redactedFields = listOf("phone", "email")),
         policyRisk = SystemAccessPolicyRisk(SystemAccessPolicyRiskLevel.Medium, "Contacts are sensitive personal data and require disclosure/minimization."),
-        probe = SystemAccessProbe.RuntimePermission(AndroidPermissionNames.ReadContacts),
+        probe = SystemAccessProbe.RuntimePermission(AndroidPermissionNames.READ_CONTACTS),
     )
 
     private fun contactsWrite() = SystemAccessCapabilityDefinition(
@@ -349,13 +349,13 @@ object SystemAccessCapabilityDefinitions {
             sideload = SystemAccessFlavorAvailability.Supported,
             root = SystemAccessFlavorAvailability.Supported,
         ),
-        permissionIntents = listOf(runtimeIntent("contacts.write.permission", "Allow contacts writes", AndroidPermissionNames.WriteContacts)),
+        permissionIntents = listOf(runtimeIntent("contacts.write.permission", "Allow contacts writes", AndroidPermissionNames.WRITE_CONTACTS)),
         dataSensitivity = SystemAccessDataSensitivity.Personal,
         toolIds = setOf("contacts.create", "contacts.update"),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
         auditPolicy = SystemAccessAuditPolicy(loggedFields = listOf("toolId", "contactId", "diff", "approvalId"), redactedFields = listOf("phone", "email")),
         policyRisk = SystemAccessPolicyRisk(SystemAccessPolicyRiskLevel.High, "Writing contacts is higher risk and should be justified separately for Play."),
-        probe = SystemAccessProbe.RuntimePermission(AndroidPermissionNames.WriteContacts),
+        probe = SystemAccessProbe.RuntimePermission(AndroidPermissionNames.WRITE_CONTACTS),
         defaultUserEnabled = false,
     )
 
@@ -364,7 +364,7 @@ object SystemAccessCapabilityDefinitions {
         title = "Floating assistant overlay",
         summary = "Show a persistent floating assistant surface above other apps after Android special access is enabled.",
         flavorAvailability = allFlavors(),
-        permissionIntents = listOf(settingsIntent("overlay.settings", "Open overlay settings", AndroidSettingsActions.ActionManageOverlayPermission, AndroidPermissionNames.SystemAlertWindow)),
+        permissionIntents = listOf(settingsIntent("overlay.settings", "Open overlay settings", AndroidSettingsActions.ACTION_MANAGE_OVERLAY_PERMISSION, AndroidPermissionNames.SYSTEM_ALERT_WINDOW)),
         dataSensitivity = SystemAccessDataSensitivity.CrossApp,
         toolIds = setOf("overlay.floating_assistant"),
         approvalPolicy = SystemAccessApprovalPolicy.RememberPerScope,
@@ -378,7 +378,7 @@ object SystemAccessCapabilityDefinitions {
         title = "Notification listener",
         summary = "Read notifications for local triage and summaries after Android notification access is enabled.",
         flavorAvailability = allFlavors(),
-        permissionIntents = listOf(settingsIntent("notifications.listener.settings", "Open notification access settings", AndroidSettingsActions.ActionNotificationListenerSettings)),
+        permissionIntents = listOf(settingsIntent("notifications.listener.settings", "Open notification access settings", AndroidSettingsActions.ACTION_NOTIFICATION_LISTENER_SETTINGS)),
         dataSensitivity = SystemAccessDataSensitivity.CrossApp,
         toolIds = setOf("notifications.triage", "notifications.summarize", "notifications.action_suggest"),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
@@ -398,7 +398,7 @@ object SystemAccessCapabilityDefinitions {
                 id = "notifications.post.permission",
                 label = "Allow Letta notifications",
                 kind = SystemAccessPermissionIntentKind.RuntimePermission,
-                permissions = listOf(AndroidPermissionNames.PostNotifications),
+                permissions = listOf(AndroidPermissionNames.POST_NOTIFICATIONS),
                 minSdk = Build.VERSION_CODES.TIRAMISU,
             ),
         ),
@@ -408,7 +408,7 @@ object SystemAccessCapabilityDefinitions {
         auditPolicy = SystemAccessAuditPolicy(loggedFields = listOf("toolId", "channelId", "notificationType")),
         policyRisk = SystemAccessPolicyRisk(SystemAccessPolicyRiskLevel.Medium, "Notification volume and content must remain user-appropriate."),
         probe = SystemAccessProbe.RuntimePermission(
-            permission = AndroidPermissionNames.PostNotifications,
+            permission = AndroidPermissionNames.POST_NOTIFICATIONS,
             minSdk = Build.VERSION_CODES.TIRAMISU,
         ),
     )
@@ -422,7 +422,7 @@ object SystemAccessCapabilityDefinitions {
             sideload = SystemAccessFlavorAvailability.Supported,
             root = SystemAccessFlavorAvailability.Supported,
         ),
-        permissionIntents = listOf(settingsIntent("accessibility.settings", "Open accessibility settings", AndroidSettingsActions.ActionAccessibilitySettings, AndroidPermissionNames.BindAccessibilityService)),
+        permissionIntents = listOf(settingsIntent("accessibility.settings", "Open accessibility settings", AndroidSettingsActions.ACTION_ACCESSIBILITY_SETTINGS, AndroidPermissionNames.BIND_ACCESSIBILITY_SERVICE)),
         dataSensitivity = SystemAccessDataSensitivity.CrossApp,
         toolIds = setOf("accessibility.inspect", "accessibility.ui_automation", "accessibility.screen_summary"),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
@@ -452,7 +452,7 @@ object SystemAccessCapabilityDefinitions {
         title = "Shizuku bridge",
         summary = "Use user-granted Shizuku APIs for delegated privileged Android operations.",
         flavorAvailability = sideloadAndRoot(),
-        permissionIntents = listOf(runtimeIntent("bridge.shizuku.permission", "Grant Shizuku access", AndroidPermissionNames.ShizukuApiV23)),
+        permissionIntents = listOf(runtimeIntent("bridge.shizuku.permission", "Grant Shizuku access", AndroidPermissionNames.SHIZUKU_API_V23)),
         dataSensitivity = SystemAccessDataSensitivity.System,
         toolIds = setOf("shizuku.package_ops", "shizuku.appops", "shizuku.settings"),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
@@ -467,7 +467,7 @@ object SystemAccessCapabilityDefinitions {
         title = "Sui bridge",
         summary = "Use a root-backed Sui module exposing Shizuku-compatible APIs.",
         flavorAvailability = sideloadAndRoot(),
-        permissionIntents = listOf(runtimeIntent("bridge.sui.permission", "Grant Sui/Shizuku access", AndroidPermissionNames.ShizukuApiV23)),
+        permissionIntents = listOf(runtimeIntent("bridge.sui.permission", "Grant Sui/Shizuku access", AndroidPermissionNames.SHIZUKU_API_V23)),
         dataSensitivity = SystemAccessDataSensitivity.Root,
         toolIds = setOf("sui.package_ops", "sui.appops", "sui.settings"),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,

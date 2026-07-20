@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Composable-side wrapper around [StreamingDisplayTextSmoother].
  *
@@ -83,7 +84,7 @@ fun rememberSmoothedStreamingText(
                 currentOnRevealStep?.invoke(nextText)
             }
             displayedText = nextText
-            delay(STREAMING_TEXT_PAINT_INTERVAL_MS)
+            delay(STREAMING_TEXT_PAINT_INTERVAL_MS.milliseconds)
         }
         // Final step to ensure we don't leave a partial reveal.
         val finalText = smoother.step(nowMs())

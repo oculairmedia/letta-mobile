@@ -4,19 +4,19 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 object LocalAgentRuntimeMetadata {
-    const val RuntimeKey = "runtime"
-    const val RuntimeProviderKey = "runtime_provider"
-    const val RuntimeIdKey = "runtime_id"
-    const val LocalModelHandleKey = "local_model_handle"
-    const val LocalModelRuntimeKey = "local_model_runtime"
-    const val LocalModelAcceleratorKey = "local_model_accelerator"
-    const val LocalLettaCodeRuntime = "local-lettacode"
+    const val RUNTIME_KEY = "runtime"
+    const val RUNTIME_PROVIDER_KEY = "runtime_provider"
+    const val RUNTIME_ID_KEY = "runtime_id"
+    const val LOCAL_MODEL_HANDLE_KEY = "local_model_handle"
+    const val LOCAL_MODEL_RUNTIME_KEY = "local_model_runtime"
+    const val LOCAL_MODEL_ACCELERATOR_KEY = "local_model_accelerator"
+    const val LOCAL_LETTA_CODE_RUNTIME = "local-lettacode"
 
     val bindingKeys: Set<String> = setOf(
-        RuntimeKey,
-        RuntimeIdKey,
+        RUNTIME_KEY,
+        RUNTIME_ID_KEY,
         "runtimeId",
-        RuntimeProviderKey,
+        RUNTIME_PROVIDER_KEY,
         "runtimeProvider",
     )
 }

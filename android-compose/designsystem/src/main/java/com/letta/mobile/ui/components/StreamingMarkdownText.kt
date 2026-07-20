@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Streaming-aware markdown renderer with a stable committed-prefix path.
  *
@@ -120,7 +121,7 @@ fun StreamingMarkdownText(
     // chars at 90–180 cps, the per-char re-parse caused visible
     // flicker.
     //
-    // Revision 1 used `LaunchedEffect(text) { delay(50) }` which
+    // Revision 1 used `LaunchedEffect(text) { delay(50.milliseconds) }` which
     // cancelled+restarted on every char and never completed until
     // the stream ended (chars arrive every ~10ms; 50ms delay never
     // wins) — content popped in at end-of-stream.
@@ -166,7 +167,7 @@ fun StreamingMarkdownText(
             if (displayed != latestText) {
                 displayed = latestText
             }
-            delay(PAINT_INTERVAL_MS)
+            delay(PAINT_INTERVAL_MS.milliseconds)
         }
     }
 

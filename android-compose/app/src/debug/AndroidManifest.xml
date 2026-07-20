@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        tools:ignore="ExportedReceiver,ExportedService">
         <!-- Debug/self-test hooks for ADB validation. These components live only
              in the debug source set and are not packaged in release builds. -->
         <receiver

@@ -25,7 +25,7 @@ fun LatencyText(
 fun Float.humanReadableDuration(): String {
     return when {
         this < 1000f -> "${this.toInt()}ms"
-        this < 60_000f -> String.format("%.1fs", this / 1000f)
+        this < 60_000f -> String.format(java.util.Locale.US, "%.1fs", this / 1000f)
         else -> {
             val minutes = (this / 60_000f).toInt()
             val seconds = ((this % 60_000f) / 1000f).toInt()

@@ -71,7 +71,6 @@ import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedChars
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
 

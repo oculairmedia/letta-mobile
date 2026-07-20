@@ -117,7 +117,7 @@ internal class ReplayInteractiveShell(
         println("[replay] saved ${fixtureLines.size} frames to $path")
     }
 
-    private suspend fun reset() {
+    private fun reset() {
         reader?.close()
         session = newSession()
         fixtureLines.clear()

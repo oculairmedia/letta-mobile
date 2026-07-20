@@ -16,9 +16,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * eaczz.4 — the fanout core. Owns a single turn's per-connection frame-shaping
  * state (cumulative assistant text + open-tool_call tracking + terminal-dedup)
@@ -370,7 +370,7 @@ internal class ConversationTurnFanout(
                 writeToViewer(viewer, delta)
             } else {
                 // Observer: bounded so a wedged stream cannot stall the fanout.
-                withTimeoutOrNull(observerWriteTimeoutMs) { writeToViewer(viewer, delta) }
+                withTimeoutOrNull(observerWriteTimeoutMs.milliseconds) { writeToViewer(viewer, delta) }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e

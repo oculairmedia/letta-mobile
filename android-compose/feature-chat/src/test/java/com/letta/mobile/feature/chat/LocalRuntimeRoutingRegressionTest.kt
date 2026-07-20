@@ -49,7 +49,7 @@ class LocalRuntimeRoutingRegressionTest {
             id = AgentId("agent-1"),
             name = "Gemma metadata",
             model = "google/gemma-3n-E2B-it-litert-lm",
-            metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+            metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
         )
 
         assertEquals(LocalRuntimeRouting.LocalBound, resolveLocalRuntimeRouting(agent, localRuntimeBackendAvailable = true))

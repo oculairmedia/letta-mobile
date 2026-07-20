@@ -28,7 +28,7 @@ class InMemoryRuntimeEventOutbox(
                 source = draft.source,
                 payload = draft.payload,
             )
-            events.value = events.value + envelope
+            events.value += envelope
             envelope
         }
 

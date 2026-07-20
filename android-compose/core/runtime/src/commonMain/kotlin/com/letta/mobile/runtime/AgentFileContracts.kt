@@ -22,17 +22,3 @@ data class AgentFile(
     val sizeBytes: Long? = null,
     val metadata: Map<String, String> = emptyMap(),
 )
-
-@Serializable
-data class AgentFileImportCommand(
-    val sourceUri: String,
-    val destinationPath: MemFsPath,
-    val displayName: String,
-    val mimeType: String? = null,
-)
-
-@Serializable
-data class AgentFileExportCommand(
-    val fileId: AgentFileId,
-    val destinationUri: String,
-)

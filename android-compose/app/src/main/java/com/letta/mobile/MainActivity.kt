@@ -27,7 +27,11 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import android.content.Intent
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -65,8 +69,8 @@ class MainActivity : ComponentActivity() {
             val windowSizeClass = calculateWindowSizeClass(this@MainActivity)
             val snackbarDispatcher = remember { SnackbarDispatcher() }
             val snackbarHostState = remember { SnackbarHostState() }
-            val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
-            val view = androidx.compose.ui.platform.LocalView.current
+            val haptic = LocalHapticFeedback.current
+            val view = LocalView.current
             val appThemeState = settingsRepository.getTheme().collectAsStateWithLifecycle(initialValue = AppTheme.SYSTEM)
             val themePresetState = settingsRepository.getThemePreset().collectAsStateWithLifecycle(initialValue = ThemePreset.DEFAULT)
             val dynamicColorState = settingsRepository.getDynamicColor().collectAsStateWithLifecycle(initialValue = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
@@ -159,7 +163,7 @@ class MainActivity : ComponentActivity() {
         reportFullyDrawn()
     }
 
-    override fun onNewIntent(intent: android.content.Intent) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         importAutomationPayloadFromLaunchIntent()
@@ -174,9 +178,9 @@ class MainActivity : ComponentActivity() {
             return
         }
         getSharedPreferences(AutomationAuthBootstrap.PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, encodedPayload)
-            .commit()
+            .edit(commit = true) {
+                putString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, encodedPayload)
+            }
         AutomationAuthBootstrap.importPendingConfig(this, settingsRepository)
         intent.removeExtra(AutomationAuthBootstrap.EXTRA_PAYLOAD_BASE64)
     }

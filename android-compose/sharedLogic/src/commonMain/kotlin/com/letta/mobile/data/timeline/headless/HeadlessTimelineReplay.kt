@@ -26,7 +26,7 @@ enum class HydrationReplayOrder(val cliValue: String) {
 
     companion object {
         fun fromCliValue(value: String): HydrationReplayOrder? =
-            values().firstOrNull { it.cliValue == value.trim().lowercase() }
+            entries.firstOrNull { it.cliValue == value.trim().lowercase() }
     }
 }
 
@@ -1044,7 +1044,7 @@ private fun ServerFrame.runIdForAssertionOrNull(): String? = when (this) {
 
 private fun ServerFrame.ToolCallMessage.toolCallIds(): List<String> {
     val payloads = when {
-        toolCalls != null -> toolCalls.orEmpty()
+        toolCalls != null -> toolCalls
         toolCall != null -> listOfNotNull(toolCall)
         else -> emptyList()
     }

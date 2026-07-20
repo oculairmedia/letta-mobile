@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -66,8 +65,6 @@ class MobileActionRegistry @Inject constructor(
         record(response)
         return response
     }
-
-    fun auditEvents(): List<MobileActionAuditEvent> = auditSink.recent()
 
     private fun record(response: MobileActionToolResponse) {
         val capability = matrix().capabilities.firstOrNull { it.id == response.capabilityId }

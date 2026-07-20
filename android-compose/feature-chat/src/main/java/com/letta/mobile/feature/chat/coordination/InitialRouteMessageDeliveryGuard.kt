@@ -37,8 +37,4 @@ internal object InitialRouteMessageDeliveryGuard {
             true
         }
     }
-
-    fun resetForTests() = synchronized(deliveredAtByKey) {
-        deliveredAtByKey.clear()
-    }
 }

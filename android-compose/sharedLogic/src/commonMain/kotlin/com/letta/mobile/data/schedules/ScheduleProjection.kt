@@ -111,9 +111,7 @@ data class ScheduleReliability(
     /** Most-recent-last outcome squares: true=ok, false=fail, null=unknown/pending. */
     val squares: List<Boolean?>,
     val recentRuns: List<ScheduleRun>,
-) {
-    val successRate: Double? get() = if (total == 0) null else succeeded.toDouble() / total
-}
+)
 
 data class HistorySummary(
     val overallSuccessRate: Double?,
@@ -227,7 +225,7 @@ object ScheduleProjection {
         !def.active -> emptyList()
         def.cron != null ->
             CronSchedule.parse(def.cron)?.let { CronSchedule.runsBetween(it, start, end, def.zone) }.orEmpty()
-        def.oneShotAt != null -> listOfNotNull(def.oneShotAt.takeIf { it >= start && it < end })
+        def.oneShotAt != null -> listOfNotNull(def.oneShotAt.takeIf { it in start..<end })
         else -> emptyList()
     }
 

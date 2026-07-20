@@ -8,7 +8,6 @@ import javax.inject.Singleton
 @Singleton
 class ClientToolSync @Inject constructor(
     private val toolApi: ToolApi,
-    private val clientToolRegistry: ClientToolRegistry,
 ) {
     suspend fun syncTools(agentId: String) {
         val deviceInfoTool = ToolCreateParams(

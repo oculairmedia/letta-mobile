@@ -164,7 +164,7 @@ object IrohFrameCodec {
                                     "Plain Iroh frame interleaved mid frame_part sequence (expected part $expectedPartIndex)"
                                 )
                             }
-                            if (decodedLength > maxFrameBytes || decodedLength < 0) {
+                            if (decodedLength !in 0..maxFrameBytes) {
                                 throw ProtocolException("Iroh frame too large: $decodedLength bytes > max $maxFrameBytes")
                             }
                             currentSegmentIsPart = false
@@ -222,7 +222,7 @@ object IrohFrameCodec {
             if (index != expectedPartIndex) {
                 throw ProtocolException("Out-of-sequence frame_part: expected part $expectedPartIndex, received part $index")
             }
-            if (partLen <= 0 || partLen > maxFrameBytes) {
+            if (partLen !in 1..maxFrameBytes) {
                 throw ProtocolException("Invalid frame_part payload length: $partLen bytes (max $maxFrameBytes)")
             }
             val maxReassembledBytes = maxReassembledBytesProvider()

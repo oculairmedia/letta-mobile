@@ -49,6 +49,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * [ChatGateway] served entirely over an Iroh [IChannelTransport] — no HTTP.
  *
@@ -279,7 +280,7 @@ class IrohAdminRpcChatGateway(
         }
         val heartbeats = flow<TimelineStreamFrame> {
             while (true) {
-                delay(heartbeatIntervalMs)
+                delay(heartbeatIntervalMs.milliseconds)
                 emit(TimelineStreamFrame.Heartbeat)
             }
         }

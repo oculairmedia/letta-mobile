@@ -40,8 +40,7 @@ internal abstract class RestVerbCommand(
     override fun run() = runBlocking {
         val requestBody = resolveRequestBody(body, bodyFile)
         val url = buildRestUrl(baseUrl, path, parseQueryParams(query))
-        val client = cliHttpClient()
-        try {
+        cliHttpClient().use { client ->
             val response = client.executeJsonRestRequest(verb, url, token, requestBody, parseHeaderParams(headers))
             val text = response.bodyAsText()
             if (response.status.value !in 200..299) {
@@ -52,8 +51,6 @@ internal abstract class RestVerbCommand(
                 }
             }
             formatJsonResponse(text, compact, raw)?.let(::println)
-        } finally {
-            client.close()
         }
         Unit
     }

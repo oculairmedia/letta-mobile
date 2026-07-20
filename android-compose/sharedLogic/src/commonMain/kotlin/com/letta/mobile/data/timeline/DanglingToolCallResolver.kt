@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * letta-mobile-dangling-tool: post-turn dangling tool-call resolver.
  *
@@ -87,7 +88,7 @@ class DanglingToolCallResolver(
         )
         sweepJob = scope.launch {
             for ((index, stepMs) in backoffMs.withIndex()) {
-                delay(stepMs)
+                delay(stepMs.milliseconds)
                 if (state.value.unresolvedToolCallIds().isEmpty()) {
                     Telemetry.event(
                         "TimelineSync", "danglingToolResolve.resolved",

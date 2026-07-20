@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
+import kotlin.time.Duration.Companion.milliseconds
 private const val AUDIO_METER_MIN_DB = -2.0f
 private const val AUDIO_METER_MAX_DB = 100.0f
 
@@ -71,7 +72,7 @@ internal class VoiceInputViewModel @Inject constructor(@ApplicationContext priva
 
     fun stopSpeechRecognition() {
         viewModelScope.launch {
-            delay(500)
+            delay(500.milliseconds)
             speechRecognizer.stopListening()
             _uiState.update { it.copy(recognizing = false, amplitude = 0) }
         }
@@ -125,7 +126,6 @@ internal class VoiceInputViewModel @Inject constructor(@ApplicationContext priva
     override fun onEvent(eventType: Int, params: Bundle?) {}
 
     override fun onCleared() {
-        super.onCleared()
         speechRecognizer.destroy()
     }
 

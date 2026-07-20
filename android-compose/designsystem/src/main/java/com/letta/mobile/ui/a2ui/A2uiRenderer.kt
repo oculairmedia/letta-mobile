@@ -1,16 +1,5 @@
 package com.letta.mobile.ui.a2ui
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Badge
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -26,6 +15,8 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_SELECTOR_WIDGET_ID
+
+private const val A2UI_LOG_TAG = "A2UI"
 
 @Composable
 fun A2uiRenderer(
@@ -50,7 +41,7 @@ fun A2uiSurfaceRenderer(
     actionResolutionToken: Int = 0,
 ) {
     if (surface == null) {
-        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.SurfaceMissing))
+        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.SURFACE_MISSING))
         return
     }
 
@@ -59,7 +50,7 @@ fun A2uiSurfaceRenderer(
         ?: surface.components.values.firstOrNull()
 
     if (root == null) {
-        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.SurfacePending))
+        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.SURFACE_PENDING))
         return
     }
 
@@ -85,45 +76,45 @@ fun A2uiSurfaceRenderer(
 }
 
 object A2uiTestTags {
-    const val SurfaceMissing = "a2ui_surface_missing"
-    const val SurfacePending = "a2ui_surface_pending"
-    const val MissingComponent = "a2ui_missing_component"
-    const val MissingText = "a2ui_missing_text"
-    const val MissingImage = "a2ui_missing_image"
-    const val TextField = "a2ui_text_field"
-    const val DateTimeInput = "a2ui_date_time_input"
-    const val Checkbox = "a2ui_checkbox"
-    const val Switch = "a2ui_switch"
-    const val Radio = "a2ui_radio"
-    const val ChoicePicker = "a2ui_choice_picker"
-    const val ChoicePickerChipOption = "a2ui_choice_picker_chip_option"
-    const val ChoicePickerListOption = "a2ui_choice_picker_list_option"
-    const val Slider = "a2ui_slider"
-    const val Stepper = "a2ui_stepper"
-    const val StepperDecrement = "a2ui_stepper_decrement"
-    const val StepperIncrement = "a2ui_stepper_increment"
-    const val Dropdown = "a2ui_dropdown"
-    const val Chip = "a2ui_chip"
-    const val FilterChip = "a2ui_filter_chip"
-    const val Badge = "a2ui_badge"
-    const val Tabs = "a2ui_tabs"
-    const val Accordion = "a2ui_accordion"
-    const val Icon = "a2ui_icon"
-    const val MissingIcon = "a2ui_missing_icon"
-    const val ScheduleCard = "a2ui_schedule_card"
-    const val ScheduleSelectorInput = "a2ui_schedule_selector_input"
-    const val Divider = "a2ui_divider"
-    const val ToolApprovalCard = "a2ui_tool_approval_card"
-    const val ToolApprovalSensitiveValue = "a2ui_tool_approval_sensitive_value"
-    const val ToolApprovalCountdown = "a2ui_tool_approval_countdown"
-    const val ButtonProgress = "a2ui_button_progress"
-    const val LinearProgress = "a2ui_linear_progress"
-    const val CircularProgress = "a2ui_circular_progress"
-    const val ListView = "a2ui_list_view"
-    const val Modal = "a2ui_modal"
-    const val Video = "a2ui_video"
-    const val AudioPlayer = "a2ui_audio_player"
-    const val MediaPlayPause = "a2ui_media_play_pause"
+    const val SURFACE_MISSING = "a2ui_surface_missing"
+    const val SURFACE_PENDING = "a2ui_surface_pending"
+    const val MISSING_COMPONENT = "a2ui_missing_component"
+    const val MISSING_TEXT = "a2ui_missing_text"
+    const val MISSING_IMAGE = "a2ui_missing_image"
+    const val TEXT_FIELD = "a2ui_text_field"
+    const val DATE_TIME_INPUT = "a2ui_date_time_input"
+    const val CHECKBOX = "a2ui_checkbox"
+    const val SWITCH = "a2ui_switch"
+    const val RADIO = "a2ui_radio"
+    const val CHOICE_PICKER = "a2ui_choice_picker"
+    const val CHOICE_PICKER_CHIP_OPTION = "a2ui_choice_picker_chip_option"
+    const val CHOICE_PICKER_LIST_OPTION = "a2ui_choice_picker_list_option"
+    const val SLIDER = "a2ui_slider"
+    const val STEPPER = "a2ui_stepper"
+    const val STEPPER_DECREMENT = "a2ui_stepper_decrement"
+    const val STEPPER_INCREMENT = "a2ui_stepper_increment"
+    const val DROPDOWN = "a2ui_dropdown"
+    const val CHIP = "a2ui_chip"
+    const val FILTER_CHIP = "a2ui_filter_chip"
+    const val BADGE = "a2ui_badge"
+    const val TABS = "a2ui_tabs"
+    const val ACCORDION = "a2ui_accordion"
+    const val ICON = "a2ui_icon"
+    const val MISSING_ICON = "a2ui_missing_icon"
+    const val SCHEDULE_CARD = "a2ui_schedule_card"
+    const val SCHEDULE_SELECTOR_INPUT = "a2ui_schedule_selector_input"
+    const val DIVIDER = "a2ui_divider"
+    const val TOOL_APPROVAL_CARD = "a2ui_tool_approval_card"
+    const val TOOL_APPROVAL_SENSITIVE_VALUE = "a2ui_tool_approval_sensitive_value"
+    const val TOOL_APPROVAL_COUNTDOWN = "a2ui_tool_approval_countdown"
+    const val BUTTON_PROGRESS = "a2ui_button_progress"
+    const val LINEAR_PROGRESS = "a2ui_linear_progress"
+    const val CIRCULAR_PROGRESS = "a2ui_circular_progress"
+    const val LIST_VIEW = "a2ui_list_view"
+    const val MODAL = "a2ui_modal"
+    const val VIDEO = "a2ui_video"
+    const val AUDIO_PLAYER = "a2ui_audio_player"
+    const val MEDIA_PLAY_PAUSE = "a2ui_media_play_pause"
 }
 
 @Composable
@@ -139,7 +130,7 @@ internal fun A2uiComponentNode(
     renderScope: A2uiRenderScope = A2uiRenderScope.Root,
 ) {
     if (component.id in visited || visited.size > MaxRenderDepth) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
     val parentLocalState = LocalA2uiLocalState.current
@@ -192,12 +183,7 @@ private fun A2uiComponentNodeContent(
 ) {
     val nextVisited = visited + component.id
     androidx.compose.runtime.SideEffect {
-        if (android.util.Log.isLoggable("A2UI", android.util.Log.DEBUG)) {
-            android.util.Log.d(
-                "A2UI",
-                "Render component surfaceId=${surface.surfaceId} componentId=${component.id} type=${component.component}",
-            )
-        }
+        logA2uiRender(surface.surfaceId, component.id, component.component)
     }
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -421,6 +407,16 @@ private fun A2uiComponentNodeContent(
             actionResolutionToken = actionResolutionToken,
             renderScope = renderScope,
         )
-        else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
+    }
+}
+
+@android.annotation.SuppressLint("LogTagMismatch")
+private fun logA2uiRender(surfaceId: String, componentId: String, componentType: String) {
+    if (android.util.Log.isLoggable(A2UI_LOG_TAG, android.util.Log.DEBUG)) {
+        android.util.Log.d(
+            A2UI_LOG_TAG,
+            "Render component surfaceId=$surfaceId componentId=$componentId type=$componentType",
+        )
     }
 }

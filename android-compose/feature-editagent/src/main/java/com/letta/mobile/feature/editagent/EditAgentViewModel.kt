@@ -120,12 +120,11 @@ internal class EditAgentViewModel @Inject constructor(
                     agentRepository = agentRepository,
                     blockRepository = blockRepository,
                     messageRepository = messageRepository,
-                    settingsRepository = settingsRepository,
                     uiState = _uiState,
                     originalBlocks = originalBlocks,
                     originalEmbedding = originalEmbedding,
                     originalProviderType = originalProviderType,
-                    servedModelIds = { llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } } },
+                    servedModelIds = { llmModels.value.map { model -> model.handle ?: model.name.ifBlank { model.id } } },
                 )
                 _uiState.value = UiState.Success(
                     EditAgentUiState(
@@ -238,7 +237,7 @@ internal class EditAgentViewModel @Inject constructor(
                 } else {
                     ModelHandleValidator.Backend.ON_DEVICE
                 },
-                servedModels = llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } },
+                servedModels = llmModels.value.map { model -> model.handle ?: model.name.ifBlank { model.id } },
             )
             if (validation is ModelHandleValidator.Result.Invalid) {
                 _uiState.value = UiState.Error(validation.reason)

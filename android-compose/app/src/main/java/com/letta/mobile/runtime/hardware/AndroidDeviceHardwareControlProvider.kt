@@ -12,7 +12,7 @@ import android.os.VibratorManager
 import javax.inject.Inject
 
 class AndroidDeviceHardwareControlProvider @Inject constructor(
-    private val context: Context,
+    context: Context,
 ) : DeviceHardwareControlProvider {
     private val appContext = context.applicationContext
 

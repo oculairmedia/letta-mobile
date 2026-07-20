@@ -25,6 +25,7 @@ import org.junit.After
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-bn008.3: OPT-IN real-loopback probe for the full receive path.
  * A sender (bn008.2) dials a receiver; the inbound message lands in the correct
@@ -94,7 +95,7 @@ class IrohAgentMessageReceiveE2ETest {
         val result = sender.send(IrohAgentMessage("agent-sender", "agent-recv", "hi", "m-1", 1L))
         assertIs<AgentSendResult.Delivered>(result)
 
-        val landedConv = withTimeout(15_000) { landed.await() }
+        val landedConv = withTimeout(15.seconds) { landed.await() }
         assertEquals("chat", landedConv, "must land in the INTERACTIVE conversation, not the heartbeat")
         assertEquals(1, turns.get(), "exactly one turn triggered")
         job.cancel()

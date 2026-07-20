@@ -6,11 +6,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Generic RPC client for admin operations over the Iroh control channel.
  *
@@ -31,7 +30,6 @@ import kotlinx.serialization.json.buildJsonObject
 class IrohAdminRpcClient(
     private val controlFrames: Flow<AppServerReceivedFrame>,
     private val send: suspend (AppServerCommand.AdminRpc) -> Unit,
-    private val json: Json = Json { ignoreUnknownKeys = true },
     private val timeoutMs: Long = DEFAULT_RPC_TIMEOUT_MS,
 ) {
     /**
@@ -72,7 +70,7 @@ class IrohAdminRpcClient(
 
         try {
             send(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-            withTimeout(timeoutMs) {
+            withTimeout(timeoutMs.milliseconds) {
                 val result = deferred.await()
                 parser(result)
             }

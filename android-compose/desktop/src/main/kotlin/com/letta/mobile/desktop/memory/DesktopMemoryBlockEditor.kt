@@ -1,8 +1,6 @@
 package com.letta.mobile.desktop.memory
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,23 +8,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.TooltipArea
-import androidx.compose.foundation.TooltipPlacement
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.DpOffset
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Hub
@@ -34,7 +20,6 @@ import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,51 +32,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dk.kuiver.model.buildKuiver
-import com.dk.kuiver.model.edge
-import com.dk.kuiver.model.layout.LayoutConfig
-import com.dk.kuiver.model.nodes
-import com.dk.kuiver.rememberKuiverViewerState
-import com.dk.kuiver.renderer.KuiverViewer
-import com.dk.kuiver.renderer.KuiverViewerConfig
-import com.dk.kuiver.ui.StyledEdgeContent
-import com.letta.mobile.desktop.components.DesktopChipTab
-import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.data.memory.MemoryAccentRole
-import com.letta.mobile.data.memory.MemoryCategories
 import com.letta.mobile.data.memory.MemoryCategory
-import com.letta.mobile.data.memory.MemoryGraphNode
-import com.letta.mobile.data.memory.MemoryGraphNodeKind
-import com.letta.mobile.data.memory.MemoryParityGraph
 import com.letta.mobile.data.memory.MemoryParityItem
 import com.letta.mobile.data.memory.MemoryParitySectionKind
-import com.letta.mobile.data.memory.MemoryParitySummary
-import com.letta.mobile.data.memory.MemorySummaryMetric
-import com.letta.mobile.data.memory.MemorySummaryMetricKind
 import com.letta.mobile.ui.theme.customColors
-import com.letta.mobile.data.memory.MemoryTextLink
 import com.letta.mobile.data.memory.accentRole
-import com.letta.mobile.data.memory.validForText
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopDefaultButton
-import com.letta.mobile.desktop.DesktopInlineError
 import com.letta.mobile.desktop.DesktopOutlinedButton
 import com.letta.mobile.desktop.DesktopTextArea
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.text.input.TextFieldValue
-import sh.calvin.autolinktext.SimpleTextMatchResult
-import sh.calvin.autolinktext.TextMatcher
-import sh.calvin.autolinktext.TextRule
-import sh.calvin.autolinktext.rememberAutoLinkText
 
 /** Bundled inputs for [BlockEditorPanel] (keeps the composable arity low). */
 internal data class BlockEditorRequest(

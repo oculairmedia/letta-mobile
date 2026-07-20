@@ -11,6 +11,7 @@ import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import kotlin.time.Duration.Companion.milliseconds
 @Singleton
 class MessageProcessor @Inject constructor(
     private val clientToolRegistry: ClientToolRegistry,
@@ -55,7 +56,7 @@ class MessageProcessor @Inject constructor(
         }
 
         try {
-            withTimeout(CHAIN_TIMEOUT_MS) {
+            withTimeout(CHAIN_TIMEOUT_MS.milliseconds) {
                 stream.collect { lettaMessage ->
                     when (lettaMessage) {
                         is UserMessage -> {

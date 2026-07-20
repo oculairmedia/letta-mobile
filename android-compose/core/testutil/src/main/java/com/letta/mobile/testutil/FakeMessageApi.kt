@@ -8,8 +8,6 @@ import com.letta.mobile.data.model.BatchMessagesResponse
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.LettaResponse
-import com.letta.mobile.data.model.MessageCreateRequest
 import io.mockk.mockk
 
 class FakeMessageApi : MessageApi(mockk(relaxed = true)) {

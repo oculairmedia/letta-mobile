@@ -388,7 +388,7 @@ class ConversationsViewModelTest {
     private fun localAgent(id: String, name: String): Agent = Agent(
         id = AgentId(id),
         name = name,
-        metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+        metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
     )
 
     private class FakeAllConversationsRepository : AllConversationsRepository(FakeConversationApi()) {

@@ -52,6 +52,7 @@ import org.jetbrains.jewel.ui.component.TextArea as JewelTextArea
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import org.jetbrains.jewel.ui.component.Text as JewelText
 
+import kotlin.time.Duration.Companion.milliseconds
 private const val TooltipShowDelayMs = 450L
 private const val TooltipGapPx = 6
 
@@ -77,7 +78,7 @@ internal fun DesktopTooltip(
 
     LaunchedEffect(hovered) {
         if (hovered) {
-            delay(TooltipShowDelayMs)
+            delay(TooltipShowDelayMs.milliseconds)
             show = true
         } else {
             show = false

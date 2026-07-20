@@ -23,6 +23,7 @@ import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.util.Telemetry
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Owns the long-lived timeline subscriptions and projection of timeline events
  * into [ChatUiState]. [AdminChatViewModel] still decides when to bind a
@@ -270,7 +271,7 @@ internal class ChatTimelineObserver(
                     // interval (tests) disables pacing so virtual-clock tests
                     // that drive emissions with runCurrent() stay synchronous.
                     if (projectionFrameIntervalMs > 0L) {
-                        delay(projectionFrameIntervalMs)
+                        delay(projectionFrameIntervalMs.milliseconds)
                     }
                 }
             } finally {

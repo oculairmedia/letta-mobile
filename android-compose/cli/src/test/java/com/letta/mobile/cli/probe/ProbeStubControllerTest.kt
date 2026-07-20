@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+import kotlin.time.Duration.Companion.milliseconds
 class ProbeStubControllerTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -82,7 +83,7 @@ class ProbeStubControllerTest {
         // Let the turn start streaming, then abort with the active run id.
         var abortResult: com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AbortMessageResponse? = null
         for (attempt in 0 until 200) {
-            delay(10)
+            delay(10.milliseconds)
             val activeRunId = store.runStatuses.entries.firstOrNull { it.value == "running" }?.key
             if (activeRunId != null) {
                 abortResult = controller.abort(runtime, activeRunId)

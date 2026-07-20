@@ -267,7 +267,7 @@ internal fun MessageBubbleSurface(
                 message.latencyMs?.let { latencyMs ->
                     LatencyText(
                         latencyMs = latencyMs.toFloat(),
-                        modifier = Modifier.padding(top = LettaSpacing.xxxs),
+                        modifier = Modifier.padding(top = LettaSpacing.XXXS),
                     )
                 }
             }
@@ -286,7 +286,7 @@ internal fun MessageBubbleSurface(
             contentColumn()
         }
     } else {
-        val bubbleShape = MessageBubbleShape(radius = LettaSpacing.bubbleRadius, isFromUser = isUser, groupPosition = groupPosition)
+        val bubbleShape = MessageBubbleShape(radius = LettaSpacing.BUBBLE_RADIUS, isFromUser = isUser, groupPosition = groupPosition)
         Surface(
             shape = bubbleShape,
             color = style.containerColor,

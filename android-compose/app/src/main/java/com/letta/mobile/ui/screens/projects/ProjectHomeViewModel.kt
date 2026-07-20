@@ -19,7 +19,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -397,7 +396,6 @@ class ProjectHomeViewModel private constructor(
 
     override fun onCleared() {
         vibesyncEventStreamRepository?.stop()
-        super.onCleared()
     }
 
     private inline fun updateSuccess(transform: (ProjectHomeUiState) -> ProjectHomeUiState) {
@@ -443,11 +441,6 @@ class ProjectHomeViewModel private constructor(
                 showCreateOptions = true,
             )
         )
-    }
-
-    fun dismissCreateProjectOptions() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(showCreateOptions = false))
     }
 
     fun startManualProjectCreation() {

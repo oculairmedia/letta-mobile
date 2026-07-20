@@ -51,6 +51,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -62,13 +63,27 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
+import com.letta.mobile.data.model.ApprovalRequestMessage
+import com.letta.mobile.data.model.ApprovalResponseMessage
+import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ErrorMessage
+import com.letta.mobile.data.model.EventMessage
+import com.letta.mobile.data.model.HiddenReasoningMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.PingMessage
 import com.letta.mobile.data.model.ProviderTrace
+import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.RunMetrics
 import com.letta.mobile.data.model.Step
 import com.letta.mobile.data.model.StepMetrics
+import com.letta.mobile.data.model.StopReason
+import com.letta.mobile.data.model.SystemMessage
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.model.UnknownMessage
 import com.letta.mobile.data.model.UsageStatistics
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.Accordions
 import com.letta.mobile.ui.components.CardGroup
@@ -89,6 +104,8 @@ import com.letta.mobile.ui.tags.TagDrillInViewModel
 import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.motion.StaggeredListItem
 import com.letta.mobile.ui.theme.LettaTheme
+import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -97,6 +114,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import java.time.Instant
 import java.util.Locale
 
+import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RunMonitorScreen(
@@ -114,7 +132,7 @@ fun RunMonitorScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
+        containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             Column(modifier = Modifier.fillMaxWidth()) {
             LargeFlexibleTopAppBar(
@@ -136,7 +154,7 @@ fun RunMonitorScreen(
                         Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+                colors = LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
             )
             ExpandableSearchField(
@@ -337,7 +355,7 @@ private fun RunCard(
         LaunchedEffect(run.id, startEpochMs) {
             while (true) {
                 liveDuration = formatElapsedDuration(System.currentTimeMillis() - startEpochMs)
-                delay(1000L)
+                delay(1.seconds)
             }
         }
     }
@@ -447,7 +465,7 @@ private fun RunCard(
 }
 
 @Composable
-private fun runCardContainerColor(status: String?): androidx.compose.ui.graphics.Color {
+private fun runCardContainerColor(status: String?): Color {
     return when (status?.trim()?.lowercase(Locale.ROOT)) {
         "error", "failed", "cancelled", "expired" -> MaterialTheme.colorScheme.errorContainer
         "completed" -> MaterialTheme.colorScheme.secondaryContainer
@@ -1203,7 +1221,7 @@ private fun StepTraceAccordion(
         title = title,
         expanded = expanded,
         onExpandedChange = { expanded = it },
-        subtitle = stringResource(R.string.screen_runs_step_trace_size_subtitle, truncated.totalLength),
+        subtitle = pluralStringResource(R.plurals.screen_runs_step_trace_size_subtitle, truncated.totalLength, truncated.totalLength),
     ) {
         Column(
             modifier = Modifier
@@ -1223,8 +1241,9 @@ private fun StepTraceAccordion(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(
-                            R.string.screen_runs_step_trace_truncation_warning,
+                        text = pluralStringResource(
+                            R.plurals.screen_runs_step_trace_truncation_warning,
+                            STEP_TRACE_DISPLAY_LIMIT,
                             STEP_TRACE_DISPLAY_LIMIT,
                         ),
                         style = MaterialTheme.typography.labelSmall,
@@ -1319,21 +1338,21 @@ private fun JsonElement.toDisplayString(): String = toString().trim('"')
 
 private fun messageSummary(message: LettaMessage): String {
     return when (message) {
-        is com.letta.mobile.data.model.SystemMessage -> message.content
-        is com.letta.mobile.data.model.UserMessage -> message.content
-        is com.letta.mobile.data.model.AssistantMessage -> message.content
-        is com.letta.mobile.data.model.ReasoningMessage -> message.reasoning
-        is com.letta.mobile.data.model.ToolCallMessage -> message.effectiveToolCalls.firstOrNull()?.name.orEmpty()
-        is com.letta.mobile.data.model.ToolReturnMessage -> message.toolReturn.funcResponse.orEmpty()
-        is com.letta.mobile.data.model.ApprovalRequestMessage -> message.effectiveToolCalls.joinToString { it.name.orEmpty() }
-        is com.letta.mobile.data.model.ApprovalResponseMessage -> message.approvals?.joinToString { it.status.orEmpty() }.orEmpty()
-        is com.letta.mobile.data.model.HiddenReasoningMessage -> message.hiddenReasoning.orEmpty()
-        is com.letta.mobile.data.model.EventMessage -> message.eventType
-        is com.letta.mobile.data.model.PingMessage -> message.messageType
-        is com.letta.mobile.data.model.UnknownMessage -> message.messageType
-        is com.letta.mobile.data.model.ErrorMessage -> "Error: ${message.text.take(80)}"
-        is com.letta.mobile.data.model.StopReason -> "Stop: ${message.reason}"
-        is com.letta.mobile.data.model.UsageStatistics -> "Usage: ${message.totalTokens ?: 0} tokens"
+        is SystemMessage -> message.content
+        is UserMessage -> message.content
+        is AssistantMessage -> message.content
+        is ReasoningMessage -> message.reasoning
+        is ToolCallMessage -> message.effectiveToolCalls.firstOrNull()?.name.orEmpty()
+        is ToolReturnMessage -> message.toolReturn.funcResponse.orEmpty()
+        is ApprovalRequestMessage -> message.effectiveToolCalls.joinToString { it.name.orEmpty() }
+        is ApprovalResponseMessage -> message.approvals?.joinToString { it.status.orEmpty() }.orEmpty()
+        is HiddenReasoningMessage -> message.hiddenReasoning.orEmpty()
+        is EventMessage -> message.eventType
+        is PingMessage -> message.messageType
+        is UnknownMessage -> message.messageType
+        is ErrorMessage -> "Error: ${message.text.take(80)}"
+        is StopReason -> "Stop: ${message.reason}"
+        is UsageStatistics -> "Usage: ${message.totalTokens ?: 0} tokens"
     }
 }
 

@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
+import kotlin.time.Duration.Companion.milliseconds
 @Singleton
 class SuRootShellBridge @Inject constructor(
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -159,7 +160,7 @@ class SuRootShellBridge @Inject constructor(
                 val completed = withTimeoutOrNull(request.timeoutMs) {
                     while (process.isAlive) {
                         if (process.waitFor(50, TimeUnit.MILLISECONDS)) return@withTimeoutOrNull true
-                        delay(50)
+                        delay(50.milliseconds)
                     }
                     true
                 } == true

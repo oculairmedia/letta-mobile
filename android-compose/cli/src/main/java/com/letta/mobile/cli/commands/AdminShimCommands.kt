@@ -34,6 +34,7 @@ import java.nio.file.Path
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -45,6 +46,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 internal abstract class AdminShimCommand(
     name: String,
     @Suppress("unused") help: String,
@@ -123,8 +126,8 @@ internal class ConnectCommand : AdminShimCommand(
         }
         try {
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(timeoutMs) {
-                bridge.state.filter { it is ChannelTransportState.Connected }.first()
+            withTimeout(timeoutMs.milliseconds) {
+                bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
             }
             val connected = bridge.state.value as ChannelTransportState.Connected
             println(
@@ -132,7 +135,7 @@ internal class ConnectCommand : AdminShimCommand(
                     "deviceId=${connected.deviceId ?: "<none>"} a2ui=${connected.a2uiEnabled} " +
                     "canonical=${connected.canonicalLiveTransport ?: "<unspecified>"}"
             )
-            if (holdMs > 0) delay(holdMs)
+            if (holdMs > 0) delay(holdMs.milliseconds)
         } finally {
             bridge.disconnect()
             collector.cancel()
@@ -494,8 +497,8 @@ internal class DisconnectCommand : AdminShimCommand(
         val transport = ChannelTransport(RunCursorStore.inMemory())
         val bridge = WsChatBridge(transport)
         bridge.connect(baseUrl, token, deviceId, clientVersion)
-        withTimeout(5_000) {
-            bridge.state.filter { it is ChannelTransportState.Connected }.first()
+        withTimeout(5.seconds) {
+            bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
         }
         println("[disconnect] connected; sending bye")
         bridge.bye()
@@ -526,14 +529,14 @@ internal class ReconnectCommand : AdminShimCommand(
         }
         try {
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5_000) { bridge.state.filter { it is ChannelTransportState.Connected }.first() }
+            withTimeout(5.seconds) { bridge.state.filterIsInstance<ChannelTransportState.Connected>().first() }
             println("[reconnect] first connection up")
             bridge.disconnect()
             println("[reconnect] disconnected")
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5_000) { bridge.state.filter { it is ChannelTransportState.Connected }.first() }
+            withTimeout(5.seconds) { bridge.state.filterIsInstance<ChannelTransportState.Connected>().first() }
             println("[reconnect] second connection up")
-            delay(holdMs)
+            delay(holdMs.milliseconds)
         } finally {
             bridge.disconnect()
             collector.cancel()

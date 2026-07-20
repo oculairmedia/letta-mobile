@@ -8,54 +8,50 @@ import androidx.compose.ui.unit.dp
  * canonical spacing reference (letta-mobile-awbf.1).
  *
  * Chat surfaces use the full scale; other features may use a subset.
- * Prefer semantic names (screenHorizontal, cardGap) over raw scale
+ * Prefer semantic names (SCREEN_HORIZONTAL, CARD_GAP) over raw scale
  * references where the intent is clear.
  */
 object LettaSpacing {
     // Core scale
-    val none: Dp = LettaSpacingTokens.none.dp
-    val xxxs: Dp = LettaSpacingTokens.xxxs.dp
-    val xxs: Dp = LettaSpacingTokens.xxs.dp
-    val xs: Dp = LettaSpacingTokens.xs.dp
-    val sm: Dp = LettaSpacingTokens.sm.dp
-    val md: Dp = LettaSpacingTokens.md.dp
-    val lg: Dp = LettaSpacingTokens.lg.dp
-    val xl: Dp = LettaSpacingTokens.xl.dp
-    val xxl: Dp = LettaSpacingTokens.xxl.dp
-    val xxxl: Dp = LettaSpacingTokens.xxxl.dp
+    val NONE: Dp = LettaSpacingTokens.NONE.dp
+    val XXXS: Dp = LettaSpacingTokens.XXXS.dp
+    val XXS: Dp = LettaSpacingTokens.XXS.dp
+    val XS: Dp = LettaSpacingTokens.XS.dp
+    val SM: Dp = LettaSpacingTokens.SM.dp
+    val MD: Dp = LettaSpacingTokens.MD.dp
+    val LG: Dp = LettaSpacingTokens.LG.dp
+    val XL: Dp = LettaSpacingTokens.XL.dp
+    val XXL: Dp = LettaSpacingTokens.XXL.dp
+    val XXXL: Dp = LettaSpacingTokens.XXXL.dp
 
     // Semantic tokens (legacy, preserved for compat)
-    val screenHorizontal: Dp = LettaSpacingTokens.screenHorizontal.dp
-    val cardGap: Dp = LettaSpacingTokens.cardGap.dp
-    val sectionGap: Dp = LettaSpacingTokens.sectionGap.dp
-    val cardGroupItemGap: Dp = LettaSpacingTokens.cardGroupItemGap.dp
-    val innerPadding: Dp = LettaSpacingTokens.innerPadding.dp
-    val innerPaddingSmall: Dp = LettaSpacingTokens.innerPaddingSmall.dp
-    val iconGap: Dp = LettaSpacingTokens.iconGap.dp
-    val chipGap: Dp = LettaSpacingTokens.chipGap.dp
+    val SCREEN_HORIZONTAL: Dp = LettaSpacingTokens.SCREEN_HORIZONTAL.dp
+    val CARD_GAP: Dp = LettaSpacingTokens.CARD_GAP.dp
+    val SECTION_GAP: Dp = LettaSpacingTokens.SECTION_GAP.dp
+    val CARD_GROUP_ITEM_GAP: Dp = LettaSpacingTokens.CARD_GROUP_ITEM_GAP.dp
+    val INNER_PADDING: Dp = LettaSpacingTokens.INNER_PADDING.dp
+    val INNER_PADDING_SMALL: Dp = LettaSpacingTokens.INNER_PADDING_SMALL.dp
+    val ICON_GAP: Dp = LettaSpacingTokens.ICON_GAP.dp
+    val CHIP_GAP: Dp = LettaSpacingTokens.CHIP_GAP.dp
 
     // Chat-specific semantic tokens (awbf.1 extraction)
-    val bubblePaddingHorizontal: Dp = LettaSpacingTokens.bubblePaddingHorizontal.dp
-    val bubblePaddingVertical: Dp = LettaSpacingTokens.bubblePaddingVertical.dp
-    val messageSpacing: Dp = LettaSpacingTokens.messageSpacing.dp
-    val composerAttachIconSize: Dp = LettaSpacingTokens.composerAttachIconSize.dp
-    val composerAttachButtonSize: Dp = LettaSpacingTokens.composerAttachButtonSize.dp
+    val COMPOSER_ATTACH_ICON_SIZE: Dp = LettaSpacingTokens.COMPOSER_ATTACH_ICON_SIZE.dp
+    val COMPOSER_ATTACH_BUTTON_SIZE: Dp = LettaSpacingTokens.COMPOSER_ATTACH_BUTTON_SIZE.dp
 
     // Corner radii (chat bubble and code blocks)
-    val bubbleRadius: Dp = LettaSpacingTokens.bubbleRadius.dp
-    val codeBlockRadius: Dp = LettaSpacingTokens.codeBlockRadius.dp
+    val BUBBLE_RADIUS: Dp = LettaSpacingTokens.BUBBLE_RADIUS.dp
 
     // Avatar and icon sizing
-    val avatarSize: Dp = LettaSpacingTokens.avatarSize.dp
-    val iconSizeSmall: Dp = LettaSpacingTokens.iconSizeSmall.dp
-    val borderWidthThin: Dp = LettaSpacingTokens.borderWidthThin.dp
+    val AVATAR_SIZE: Dp = LettaSpacingTokens.AVATAR_SIZE.dp
+    val ICON_SIZE_SMALL: Dp = LettaSpacingTokens.ICON_SIZE_SMALL.dp
+    val BORDER_WIDTH_THIN: Dp = LettaSpacingTokens.BORDER_WIDTH_THIN.dp
 
     // Homogeneous chip sizing for active-subagent and tool chips.
-    val chipMinHeight: Dp = LettaSpacingTokens.chipMinHeight.dp
-    val chipPaddingVertical: Dp = LettaSpacingTokens.chipPaddingVertical.dp
-    val chipPaddingHorizontal: Dp = LettaSpacingTokens.chipPaddingHorizontal.dp
+    val CHIP_MIN_HEIGHT: Dp = LettaSpacingTokens.CHIP_MIN_HEIGHT.dp
+    val CHIP_PADDING_VERTICAL: Dp = LettaSpacingTokens.CHIP_PADDING_VERTICAL.dp
+    val CHIP_PADDING_HORIZONTAL: Dp = LettaSpacingTokens.CHIP_PADDING_HORIZONTAL.dp
 
     // Determinate progress ring drawn around chip icons.
-    val chipRingSize: Dp = LettaSpacingTokens.chipRingSize.dp
-    val chipRingStroke: Dp = LettaSpacingTokens.chipRingStroke.dp
+    val CHIP_RING_SIZE: Dp = LettaSpacingTokens.CHIP_RING_SIZE.dp
+    val CHIP_RING_STROKE: Dp = LettaSpacingTokens.CHIP_RING_STROKE.dp
 }

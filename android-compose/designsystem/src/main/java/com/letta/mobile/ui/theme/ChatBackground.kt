@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.theme
 
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
@@ -62,5 +61,3 @@ private fun ChatBackgroundToken.SolidColor.toChatBackground(): ChatBackground.So
 
 private fun ChatBackgroundToken.Gradient.toChatBackground(): ChatBackground.Gradient =
     ChatBackground.Gradient(argbColors.map { Color(it) }, name)
-
-val LocalChatBackground = staticCompositionLocalOf<ChatBackground> { ChatBackground.Default }

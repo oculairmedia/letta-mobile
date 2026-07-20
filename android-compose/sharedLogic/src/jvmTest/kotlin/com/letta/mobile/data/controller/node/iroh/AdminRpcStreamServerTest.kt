@@ -23,6 +23,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 class AdminRpcStreamServerTest {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -55,7 +57,7 @@ class AdminRpcStreamServerTest {
         val idle = FakeBiStream()
 
         val job = launchTracked(server, idle)
-        withTimeout(1_000) { job.join() }
+        withTimeout(1.seconds) { job.join() }
 
         assertEquals(0, server.activeHandlerCount)
         assertTrue(idle.send.finished)
@@ -75,8 +77,8 @@ class AdminRpcStreamServerTest {
         val streams = List(6) { FakeBiStream() }
         val jobs = streams.map { launchTracked(server, it) }
 
-        withTimeout(1_000) {
-            while (server.activeHandlerCount < 2) delay(1)
+        withTimeout(1.seconds) {
+            while (server.activeHandlerCount < 2) delay(1.milliseconds)
         }
         assertEquals(2, server.activeHandlerCount)
         assertTrue(server.maxObservedHandlerCount <= 2)
@@ -333,11 +335,11 @@ class AdminRpcStreamServerTest {
         recv.chunks.send(ByteArray(0))
     }
 
-    private suspend fun FakeBiStream.awaitFrame(): JsonObject = withTimeout(1_000) {
+    private suspend fun FakeBiStream.awaitFrame(): JsonObject = withTimeout(1.seconds) {
         var result: JsonObject? = null
         while (result == null) {
             result = writtenFrames().firstOrNull()?.let { json.parseToJsonElement(it).jsonObject }
-            if (result == null) delay(1)
+            if (result == null) delay(1.milliseconds)
         }
         result
     }

@@ -90,6 +90,7 @@ data class CustomColors(
 val LocalCustomColors = staticCompositionLocalOf { CustomColors() }
 
 val MaterialTheme.customColors: CustomColors
+    @Suppress("UnusedReceiverParameter")
     @Composable
     @ReadOnlyComposable
     get() = LocalCustomColors.current

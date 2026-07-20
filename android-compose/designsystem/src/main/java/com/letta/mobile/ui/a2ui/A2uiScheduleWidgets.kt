@@ -57,7 +57,7 @@ internal fun A2uiScheduleCard(
 ) {
     val props = component.scheduleCardProps(surface, renderScope)
     if (props == null) {
-        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -68,7 +68,7 @@ internal fun A2uiScheduleCard(
                 contentDescription = "Schedule ${props.name}, ${props.status.label}"
                 props.nextRun?.let { stateDescription = "Next run $it" }
             }
-            .testTag(A2uiTestTags.ScheduleCard),
+            .testTag(A2uiTestTags.SCHEDULE_CARD),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -241,7 +241,7 @@ internal fun A2uiScheduleSelectorInput(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(A2uiTestTags.ScheduleSelectorInput),
+            .testTag(A2uiTestTags.SCHEDULE_SELECTOR_INPUT),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(

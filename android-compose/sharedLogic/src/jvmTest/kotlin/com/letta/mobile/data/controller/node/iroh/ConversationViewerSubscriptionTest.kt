@@ -16,6 +16,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * eaczz.3 (S3-T): a connection subscribes to a conversation on BOTH signals —
  * runtime_start (initiator/sender) AND admin_rpc message.list (passive observer
@@ -184,13 +186,13 @@ class ConversationViewerSubscriptionTest {
         recv.chunks.send(IrohFrameCodec.encodeFrame(frame))
     }
 
-    private suspend fun FakeBiStream.awaitFrame() = withTimeout(1_000) {
+    private suspend fun FakeBiStream.awaitFrame() = withTimeout(1.seconds) {
         var result: kotlinx.serialization.json.JsonObject? = null
         while (result == null) {
             val decoder = IrohFrameCodec.Decoder()
             result = send.writes.flatMap { decoder.feed(it) }.firstOrNull()
                 ?.let { json.parseToJsonElement(it).jsonObject }
-            if (result == null) delay(1)
+            if (result == null) delay(1.milliseconds)
         }
         result
     }

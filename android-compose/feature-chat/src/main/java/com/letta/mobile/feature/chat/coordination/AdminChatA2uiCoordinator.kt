@@ -27,6 +27,7 @@ import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.a2ui.toToolApprovalSubmission
 
+import kotlin.time.Duration.Companion.milliseconds
 internal class AdminChatA2uiCoordinator(
     private val scope: CoroutineScope,
     private val wsChatBridge: WsChatBridge,
@@ -194,7 +195,7 @@ internal class AdminChatA2uiCoordinator(
             )
         }
         a2uiThinkingTimeoutJob = scope.launch {
-            delay(A2UI_THINKING_TIMEOUT_MS)
+            delay(A2UI_THINKING_TIMEOUT_MS.milliseconds)
             if (a2uiThinkingStartMessageCount != null) {
                 a2uiThinkingStartMessageCount = null
                 uiState.update {

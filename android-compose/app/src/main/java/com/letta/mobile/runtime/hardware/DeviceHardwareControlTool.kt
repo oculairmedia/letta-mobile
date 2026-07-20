@@ -1,6 +1,5 @@
 package com.letta.mobile.runtime.hardware
 
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -54,7 +53,6 @@ class DeviceHardwareControlTool(
     }
 
     companion object {
-        const val CAPABILITIES_TOOL_NAME = "hardware_capabilities"
         const val SET_FLASHLIGHT_TOOL_NAME = "set_flashlight"
         const val VIBRATE_TOOL_NAME = "vibrate"
         const val AUDIO_STATUS_TOOL_NAME = "audio_status"

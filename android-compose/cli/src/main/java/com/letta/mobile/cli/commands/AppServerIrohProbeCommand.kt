@@ -14,7 +14,6 @@ import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-probe") {

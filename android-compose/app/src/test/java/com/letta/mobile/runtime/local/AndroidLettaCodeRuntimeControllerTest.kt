@@ -42,6 +42,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidLettaCodeRuntimeControllerTest {
     @After
@@ -411,7 +413,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         val nodeBridge = FakeNodeBridge(
             outputLines = flow {
                 repeat(5) { index ->
-                    delay(40_000L)
+                    delay(40.seconds)
                     emit("""{"type":"stream_event","event":{"type":"reasoning_message","message":"$index"}}""")
                 }
                 emit("""{"type":"result"}""")
@@ -448,7 +450,7 @@ class AndroidLettaCodeRuntimeControllerTest {
         val nodeBridge = FakeNodeBridge(
             outputLines = flow {
                 while (true) {
-                    delay(500L)
+                    delay(500.milliseconds)
                     emit("""{"type":"stream_event","event":{"type":"status","message":"working"}}""")
                 }
             }

@@ -105,22 +105,6 @@ enum class ToolApprovalMode {
 }
 
 @Serializable
-data class ToolExecutionRequest(
-    val callId: ToolCallId,
-    val name: ToolName,
-    val argumentsJson: String? = null,
-    val approval: ToolApprovalRequest? = null,
-)
-
-@Serializable
-data class ToolExecutionResult(
-    val callId: ToolCallId,
-    val status: ToolExecutionStatus,
-    val body: String,
-    val errorMessage: String? = null,
-)
-
-@Serializable
 enum class ToolExecutionStatus {
     Pending,
     Running,

@@ -7,12 +7,12 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
-import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
@@ -24,18 +24,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -50,6 +48,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Handles a single Iroh connection serving the App Server protocol.
  *
@@ -294,7 +293,7 @@ class IrohNodeConnection(
             if (agentId == null || conversationId == null) {
                 """{"type":"sync_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id required for sync"}"""
             } else {
-                val runtime = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
+                val runtime = AppServerRuntimeScope(
                     agentId = agentId, conversationId = conversationId
                 )
                 val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
@@ -349,7 +348,7 @@ class IrohNodeConnection(
                     if (response != null) {
                         IrohFrameCodec.write(sendStream, response, MAX_FRAME_BYTES, allowFrameParts = peerSupportsFrameParts())
                     }
-                } catch (ce: kotlinx.coroutines.CancellationException) {
+                } catch (ce: CancellationException) {
                     throw ce
                 } catch (error: Exception) {
                     Telemetry.event(
@@ -397,7 +396,7 @@ class IrohNodeConnection(
                 "abort_message" -> ifAuthorized(requestId) { handleAbort(frameJson, requestId) }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             """{"type":"error","message":"Failed to parse frame: ${e.message?.replace("\"", "\\\"")}"}"""
@@ -445,7 +444,7 @@ class IrohNodeConnection(
             "remoteEndpointId" to remoteEndpointId,
             "activeJobs" to jobs.size,
         )
-        val completed = withTimeoutOrNull(STREAM_JOB_DRAIN_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(STREAM_JOB_DRAIN_TIMEOUT_MS.milliseconds) {
             jobs.joinAll()
             true
         } ?: false
@@ -463,7 +462,7 @@ class IrohNodeConnection(
     }
 
     private fun handleAuth(
-        obj: kotlinx.serialization.json.JsonObject,
+        obj: JsonObject,
         requestId: String?,
     ): String {
         if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
@@ -472,7 +471,7 @@ class IrohNodeConnection(
         val isAuthenticated = expected.isNullOrBlank() || provided == expected
         authenticated.set(isAuthenticated)
         return if (isAuthenticated) {
-            val advertised = (obj["capabilities"] as? kotlinx.serialization.json.JsonArray)
+            val advertised = (obj["capabilities"] as? JsonArray)
                 ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
                 ?.toSet()
                 .orEmpty()
@@ -506,7 +505,7 @@ class IrohNodeConnection(
         }
 
     private suspend fun handleRuntimeStart(
-        obj: kotlinx.serialization.json.JsonObject,
+        obj: JsonObject,
         requestId: String?,
     ): String {
         val agentId = obj["agent_id"]?.jsonPrimitive?.content
@@ -565,9 +564,9 @@ class IrohNodeConnection(
             }.getOrNull()?.runtime
             AppServerProtocol.json.encodeToString(
                 AppServerInboundFrame.serializer(),
-                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AbortMessageResponse(
+                AppServerInboundFrame.AbortMessageResponse(
                     requestId = requestId,
-                    runtime = runtime ?: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope("", ""),
+                    runtime = runtime ?: AppServerRuntimeScope("", ""),
                     aborted = false,
                     success = false,
                     error = e.message ?: e.toString(),
@@ -584,7 +583,7 @@ class IrohNodeConnection(
         val userMsg = (input.payload as? AppServerInputPayload.CreateMessage)
             ?.messages
             ?.firstOrNull { it.role == "user" }
-        val contentParts = userMsg?.content as? kotlinx.serialization.json.JsonArray
+        val contentParts = userMsg?.content as? JsonArray
         val text = userMsg?.content
             ?.let { (it as? JsonPrimitive)?.contentOrNull ?: extractTextFromContentParts(contentParts) ?: it.toString() }
             ?: ""
@@ -747,13 +746,13 @@ class IrohNodeConnection(
         }
     }
 
-    private fun interruptedTerminalDelta(): kotlinx.serialization.json.JsonObject = buildJsonObject {
+    private fun interruptedTerminalDelta(): JsonObject = buildJsonObject {
         put("message_type", "error_message")
         put("message", "connection interrupted before the turn completed")
         put("status", "cancelled")
     }
 
-    private fun extractTextFromContentParts(parts: kotlinx.serialization.json.JsonArray?): String? =
+    private fun extractTextFromContentParts(parts: JsonArray?): String? =
         parts?.firstOrNull { part ->
             runCatching { part.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "text" }.getOrDefault(false)
         }?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull
@@ -767,8 +766,8 @@ class IrohNodeConnection(
      */
     private suspend fun writeStreamDelta(
         streamSend: SendStream,
-        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
-        delta: kotlinx.serialization.json.JsonObject,
+        runtime: AppServerRuntimeScope,
+        delta: JsonObject,
     ) {
         // letta-mobile-h30cy: the Iroh stream forwards the App Server delta with
         // its raw provider id (letta-msg-*), but message.list later returns the

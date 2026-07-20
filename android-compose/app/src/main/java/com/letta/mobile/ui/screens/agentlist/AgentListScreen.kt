@@ -134,8 +134,9 @@ fun AgentListScreen(
                 ) { response ->
                     val importedId = response.agentIds.firstOrNull()
                     snackbar.dispatch(
-                        context.getString(
-                            if (response.agentIds.size == 1) R.string.screen_agents_import_success_single else R.string.screen_agents_import_success_multiple,
+                        context.resources.getQuantityString(
+                            R.plurals.screen_agents_import_success,
+                            response.agentIds.size,
                             response.agentIds.size,
                         )
                     )
@@ -334,13 +335,13 @@ fun AgentListScreen(
                                 state = gridState,
                                 columns = GridCells.Adaptive(minSize = minTileWidth),
                                 contentPadding = PaddingValues(
-                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
-                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
+                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
                                 ),
-                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                             ) {
                                 if (uiState.isHydrating) {
                                     item(
@@ -384,12 +385,12 @@ fun AgentListScreen(
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(
-                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
-                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
+                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
                                 ),
-                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                             ) {
                                 if (uiState.isHydrating) {
                                     item(key = "agent-hydrating-banner") {
@@ -438,12 +439,14 @@ fun AgentListScreen(
     if (uiState.showCreateDialog) {
         CreateAgentDialog(
             onDismiss = { viewModel.hideCreateDialog() },
-            availableTools = uiState.availableTools,
-            llmModels = uiState.llmModels,
-            embeddingModels = uiState.embeddingModels,
-            onLoadModels = { viewModel.loadAvailableModels() },
-            localReadiness = uiState.localLettaCodeReadiness,
-            onOpenLocalSettings = onNavigateToSettings,
+            inputs = CreateAgentDialogInputs(
+                availableTools = uiState.availableTools,
+                llmModels = uiState.llmModels,
+                embeddingModels = uiState.embeddingModels,
+                onLoadModels = { viewModel.loadAvailableModels() },
+                localReadiness = uiState.localLettaCodeReadiness,
+                onOpenLocalSettings = onNavigateToSettings,
+            ),
             onCreate = { params, runtimeOption ->
                 viewModel.createAgent(params, runtimeOption) { agentId ->
                     viewModel.hideCreateDialog()
@@ -532,7 +535,7 @@ internal fun AgentHydratingBanner(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = LettaSpacing.cardGap),
+            .padding(bottom = LettaSpacing.CARD_GAP),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         ),

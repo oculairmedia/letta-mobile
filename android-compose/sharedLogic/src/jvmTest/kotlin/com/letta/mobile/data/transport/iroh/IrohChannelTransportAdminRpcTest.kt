@@ -25,6 +25,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohChannelTransportAdminRpcTest {
     private val config = IrohConnectConfig("iroh://ticket", "token", "device", "client")
@@ -193,7 +195,7 @@ class IrohChannelTransportAdminRpcTest {
             fakeHandle("dial-1") { _, path, _ ->
                 if (path == "/messages/slow") {
                     delayedCallEntered.complete(Unit)
-                    delay(1_000)
+                    delay(1.seconds)
                 }
                 response(path, success = true, result = JsonPrimitive(path))
             }
@@ -254,7 +256,7 @@ class IrohChannelTransportAdminRpcTest {
                     ticket = "ticket",
                     sessionId = "session",
                     adminRpcCall = { method, _, _ ->
-                        if (method == "slow.method") delay(500)
+                        if (method == "slow.method") delay(500.milliseconds)
                         AppServerInboundFrame.AdminRpcResponse(
                             requestId = method,
                             success = true,
@@ -274,7 +276,7 @@ class IrohChannelTransportAdminRpcTest {
                 }
             }
 
-            val fast = withTimeout(250) { calls.drop(1).awaitAll() }
+            val fast = withTimeout(250.milliseconds) { calls.drop(1).awaitAll() }
             assertEquals(9, fast.size)
             assertTrue(fast.all { (_, response) -> response.success })
             assertTrue(calls.first().await().second.success)
@@ -346,7 +348,7 @@ class IrohChannelTransportAdminRpcTest {
         )
 
         try {
-            val response = withTimeout(3_000) { transport.adminRpc("message.list", "/v1/retry", null) }
+            val response = withTimeout(3.seconds) { transport.adminRpc("message.list", "/v1/retry", null) }
             assertTrue(response.success)
             assertEquals(JsonPrimitive("session-2"), response.result)
             assertEquals(2, dials)

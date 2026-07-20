@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
+import kotlin.time.Duration.Companion.milliseconds
 class RuntimeEventFanoutTest {
     @Test
     fun subscribeReturnsFlowForRuntime() = runTest {
@@ -64,7 +65,7 @@ class RuntimeEventFanoutTest {
         }
         
         // Give subscribers time to start collecting
-        delay(50)
+        delay(50.milliseconds)
         
         fanout.route(streamDelta)
         
@@ -113,15 +114,15 @@ class RuntimeEventFanoutTest {
         }
 
         // Give subscribers time to start collecting
-        delay(50)
+        delay(50.milliseconds)
 
         // Send event to runtime A
         fanout.route(eventForA)
-        delay(50)
+        delay(50.milliseconds)
 
         // Send event to runtime B
         fanout.route(eventForB)
-        delay(50)
+        delay(50.milliseconds)
 
         // Only subscriber A should have received eventForA
         assertEquals(1, receivedA.size)
@@ -243,14 +244,14 @@ class RuntimeEventFanoutTest {
         val turn1 = async {
             fanout.withTurnLock(agentId, conversationId) {
                 turn1Started = true
-                delay(100) // Simulate work
+                delay(100.milliseconds) // Simulate work
                 turn1Completed = true
             }
         }
 
         // Launch turn 2 (should wait for turn 1)
         val turn2 = async {
-            delay(10) // Ensure turn 1 acquires lock first
+            delay(10.milliseconds) // Ensure turn 1 acquires lock first
             fanout.withTurnLock(agentId, conversationId) {
                 turn2Started = true
                 // Turn 1 should be completed by now
@@ -281,19 +282,19 @@ class RuntimeEventFanoutTest {
         val turn1 = async {
             fanout.withTurnLock(AgentId("agent-A"), ConversationId("conv-A")) {
                 turn1Started = true
-                delay(100) // Simulate work
+                delay(100.milliseconds) // Simulate work
                 turn1Completed = true
             }
         }
 
         // Launch turn on runtime B (should NOT wait for turn 1)
         val turn2 = async {
-            delay(10) // Ensure turn 1 acquires lock first
+            delay(10.milliseconds) // Ensure turn 1 acquires lock first
             fanout.withTurnLock(AgentId("agent-B"), ConversationId("conv-B")) {
                 turn2Started = true
                 // Turn 1 should NOT be completed yet (running in parallel)
                 assertFalse(turn1Completed, "Turn 1 should not be completed (parallel execution)")
-                delay(50)
+                delay(50.milliseconds)
                 turn2Completed = true
             }
         }

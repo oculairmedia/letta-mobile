@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.milliseconds
 class AppServerRequestCorrelator(
     private val controlFrames: Flow<AppServerReceivedFrame>,
     private val timeoutMs: Long = DEFAULT_REQUEST_TIMEOUT_MS,
@@ -31,7 +32,7 @@ class AppServerRequestCorrelator(
 
         try {
             send()
-            withTimeout(timeoutMs) {
+            withTimeout(timeoutMs.milliseconds) {
                 deferred.await()
             }
         } finally {

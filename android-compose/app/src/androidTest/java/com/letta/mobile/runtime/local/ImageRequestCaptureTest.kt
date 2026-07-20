@@ -32,6 +32,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * letta-mobile-8ll0c-v2: TRUE end-to-end image-pipeline test.
  *
@@ -123,7 +124,7 @@ class ImageRequestCaptureTest {
             val onePxPng =
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 
-            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS) {
+            val event = withTimeoutOrNull(LOCAL_TURN_TIMEOUT_MS.milliseconds) {
                 backend.runTurn(
                     TurnCommand(
                         backendId = BackendId("test-backend"),

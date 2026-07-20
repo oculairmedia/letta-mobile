@@ -23,6 +23,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 @Tag("integration")
 class TimelineRepositoryTest {
     private val repositories = mutableListOf<TimelineRepository>()
@@ -264,12 +266,12 @@ private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
 
     fun activeCount(conversationId: String): Int = activeStreams[conversationId]?.get() ?: 0
 
-    suspend fun awaitActive(conversationId: String) = withTimeout(5_000) {
-        while (!isActive(conversationId)) delay(10)
+    suspend fun awaitActive(conversationId: String) = withTimeout(5.seconds) {
+        while (!isActive(conversationId)) delay(10.milliseconds)
     }
 
-    suspend fun awaitClosed(conversationId: String) = withTimeout(5_000) {
-        while (closedStreams[conversationId]?.get()?.let { it > 0 } != true) delay(10)
+    suspend fun awaitClosed(conversationId: String) = withTimeout(5.seconds) {
+        while (closedStreams[conversationId]?.get()?.let { it > 0 } != true) delay(10.milliseconds)
     }
 
     private fun ConcurrentHashMap<String, AtomicInteger>.counter(conversationId: String): AtomicInteger =

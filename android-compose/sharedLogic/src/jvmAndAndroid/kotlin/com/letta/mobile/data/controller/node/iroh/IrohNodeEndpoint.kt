@@ -13,6 +13,7 @@ import computer.iroh.EndpointBuilder
 import computer.iroh.AddrChangeCallback
 import computer.iroh.HomeRelayCallback
 import computer.iroh.NetworkChangeCallback
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.milliseconds
 class IrohNodeEndpoint(
     private val alpn: ByteArray = DEFAULT_ALPN,
     private val scope: CoroutineScope,
@@ -98,7 +100,7 @@ class IrohNodeEndpoint(
      */
     fun ticketString(): String {
         val endpointAddr = addr()
-        val ticket = EndpointTicket.Companion.fromAddr(endpointAddr)
+        val ticket = EndpointTicket.fromAddr(endpointAddr)
         return ticket.toString()
     }
 
@@ -184,7 +186,7 @@ class IrohNodeEndpoint(
         IrohDiagnostics.endpointIdHex(endpointAddr.id())
 
     private val irohExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        com.letta.mobile.util.Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
+        Telemetry.event("IrohNode", "crash.caught", "error" to (throwable.message ?: throwable.toString()), "class" to throwable::class.simpleName)
     }
 
     fun start(controller: AppServerController) {
@@ -194,7 +196,7 @@ class IrohNodeEndpoint(
         acceptJob = scope.launch(irohExceptionHandler) {
             while (isActive) {
                 try {
-                    val incoming = withTimeout(ACCEPT_TIMEOUT_MS) {
+                    val incoming = withTimeout(ACCEPT_TIMEOUT_MS.milliseconds) {
                         ep.acceptNext()
                     }
                     if (incoming == null) {
@@ -208,7 +210,7 @@ class IrohNodeEndpoint(
                             level = Telemetry.Level.WARN,
                         )
                         if (!isActive) break
-                        delay(ACCEPT_NULL_RETRY_MS)
+                        delay(ACCEPT_NULL_RETRY_MS.milliseconds)
                         continue
                     }
                     Telemetry.event("IrohNode", "incoming.accepting")
@@ -219,7 +221,7 @@ class IrohNodeEndpoint(
                     launch {
                         try {
                             val accepting = incoming.accept()
-                            val connection = withTimeout(HANDSHAKE_TIMEOUT_MS) { accepting.connect() }
+                            val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
                             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
                             Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
                             if (allowedPeerIds.isNotEmpty() && remoteId !in allowedPeerIds) {
@@ -237,7 +239,7 @@ class IrohNodeEndpoint(
                                     connectionRegistry = connectionRegistry,
                                 ).serve()
                             }
-                        } catch (e: kotlinx.coroutines.CancellationException) {
+                        } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
                             Telemetry.event(
@@ -253,7 +255,7 @@ class IrohNodeEndpoint(
                 } catch (e: Exception) {
                     if (!isActive) break
                     Telemetry.event("IrohNode", "incoming.accept.failed", "error" to (e.message ?: e.toString()), "class" to e::class.simpleName)
-                    delay(ACCEPT_FAILURE_RETRY_MS)
+                    delay(ACCEPT_FAILURE_RETRY_MS.milliseconds)
                 }
             }
         }

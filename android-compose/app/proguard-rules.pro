@@ -2,27 +2,17 @@
 # Last audited: letta-mobile-o7ob.2.3
 
 # ---------------------------------------------------------------------------
-# Data model serialization (Moshi + kotlinx.serialization)
-# Keep fields and constructors for Moshi-annotated classes and all data models.
+# Data model serialization (kotlinx.serialization)
+# Keep fields and constructors for all data models.
 # ---------------------------------------------------------------------------
 -keepclassmembers class com.letta.mobile.data.model.** {
     <fields>;
     <init>(...);
 }
--keepclassmembers class ** {
-    @com.squareup.moshi.Json <fields>;
-}
--keepclassmembers @com.squareup.moshi.JsonClass class * {
-    <init>(...);
-}
-# Moshi generated adapter look-up relies on class names and no-arg constructors.
--keep class com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
--keep class com.squareup.moshi.adapters.** { *; }
--dontwarn com.squareup.moshi.**
 
 # ---------------------------------------------------------------------------
 # Kotlin reflection metadata
-# Required for Moshi kotlin-reflect, kotlinx.serialization, and Hilt.
+# Required for kotlinx.serialization and Hilt.
 # ---------------------------------------------------------------------------
 -keepattributes RuntimeVisibleAnnotations,AnnotationDefault
 -keepattributes *Annotation*
@@ -65,7 +55,9 @@
 -keep class io.ktor.client.engine.** { *; }
 -keep class io.ktor.client.plugins.** { *; }
 -keep class io.ktor.serialization.** { *; }
--keepclassmembers class * extends io.ktor.client.features.HttpClientFeature { *; }
+# Ktor 2+ renamed HttpClientFeature → HttpClientPlugin; keep both shapes via dontwarn.
+-dontwarn io.ktor.client.features.**
+-keepclassmembers class * extends io.ktor.client.plugins.HttpClientPlugin { *; }
 
 # ---------------------------------------------------------------------------
 # Hilt / Dagger — generated component classes must survive renaming.

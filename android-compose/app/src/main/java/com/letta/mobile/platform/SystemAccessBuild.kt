@@ -29,7 +29,4 @@ object SystemAccessBuild {
     val localShellEnabled: Boolean = BuildConfig.ENABLE_LOCAL_SHELL
     val shizukuEnabled: Boolean = BuildConfig.ENABLE_SHIZUKU
     val rootToolsEnabled: Boolean = BuildConfig.ENABLE_ROOT_TOOLS
-
-    val privilegedToolsEnabled: Boolean
-        get() = localShellEnabled || shizukuEnabled || rootToolsEnabled
 }

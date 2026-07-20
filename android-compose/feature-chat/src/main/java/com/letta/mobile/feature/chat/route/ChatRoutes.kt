@@ -26,7 +26,7 @@ data class AgentChatRoute(
 )
 
 object ProjectChatStartAction {
-    const val ActiveAgents = "active_agents"
-    const val ProjectBrief = "project_brief"
-    const val BugReport = "bug_report"
+    const val ACTIVE_AGENTS = "active_agents"
+    const val PROJECT_BRIEF = "project_brief"
+    const val BUG_REPORT = "bug_report"
 }

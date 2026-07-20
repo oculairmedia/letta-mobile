@@ -178,7 +178,7 @@ class FakeSettingsRepository(
 
     override suspend fun addPinnedShortcut(name: String) {
         if (name !in pinnedShortcutOrder.value) {
-            pinnedShortcutOrder.value = pinnedShortcutOrder.value + name
+            pinnedShortcutOrder.value += name
         }
     }
 
@@ -201,7 +201,7 @@ class FakeSettingsRepository(
     override fun getPinnedAgentNames(): Flow<Map<String, String>> = pinnedAgentNames
 
     override suspend fun upsertPinnedAgentName(id: String, name: String) {
-        pinnedAgentNames.value = pinnedAgentNames.value + (id to name)
+        pinnedAgentNames.value += (id to name)
     }
 
     override suspend fun removePinnedAgentName(id: String) {

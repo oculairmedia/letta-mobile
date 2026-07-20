@@ -35,7 +35,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,7 +67,7 @@ internal fun A2uiChip(
     val label = component.resolveControlLabel(surface, renderScope)
     val action = component.action(surface, renderScope)
     if (label == null) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_TEXT))
         return
     }
     val haptic = LocalHapticFeedback.current
@@ -83,7 +82,7 @@ internal fun A2uiChip(
         },
         enabled = action != null && !surfaceSubmitting,
         label = { Text(label) },
-        modifier = modifier.testTag(A2uiTestTags.Chip),
+        modifier = modifier.testTag(A2uiTestTags.CHIP),
     )
 }
 
@@ -104,7 +103,7 @@ internal fun A2uiFilterChip(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     if (label == null) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_TEXT))
         return
     }
 
@@ -120,7 +119,7 @@ internal fun A2uiFilterChip(
         onClick = { update(!selected) },
         enabled = !surfaceSubmitting,
         label = { Text(label) },
-        modifier = modifier.testTag(A2uiTestTags.FilterChip),
+        modifier = modifier.testTag(A2uiTestTags.FILTER_CHIP),
     )
 }
 
@@ -137,11 +136,11 @@ internal fun A2uiBadge(
         renderScope,
     )
     if (text == null) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingText))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_TEXT))
         return
     }
 
-    Badge(modifier = modifier.testTag(A2uiTestTags.Badge)) {
+    Badge(modifier = modifier.testTag(A2uiTestTags.BADGE)) {
         Text(text)
     }
 }
@@ -161,7 +160,7 @@ internal fun A2uiTabs(
 ) {
     val items = component.resolveTabs(surface, renderScope)
     if (items.isEmpty()) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
     val defaultIndex = component.defaultTabIndex(items)
@@ -173,7 +172,7 @@ internal fun A2uiTabs(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(A2uiTestTags.Tabs),
+            .testTag(A2uiTestTags.TABS),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         PrimaryTabRow(selectedTabIndex = selectedIndex) {
@@ -191,7 +190,7 @@ internal fun A2uiTabs(
         Crossfade(targetState = selectedIndex, label = "a2ui-tab-content") { index ->
             val child = surface.components[items[index].childId]
             if (child == null) {
-                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
             } else {
                 A2uiComponentNode(
                     component = child,
@@ -222,7 +221,7 @@ internal fun A2uiAccordion(
 ) {
     val items = component.resolveAccordionItems(surface, renderScope)
     if (items.isEmpty()) {
-        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -230,7 +229,7 @@ internal fun A2uiAccordion(
         modifier = modifier
             .fillMaxWidth()
             .animateContentSize()
-            .testTag(A2uiTestTags.Accordion),
+            .testTag(A2uiTestTags.ACCORDION),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->
@@ -270,7 +269,7 @@ internal fun A2uiAccordion(
                         Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
                             val child = surface.components[item.childId]
                             if (child == null) {
-                                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MissingComponent))
+                                A2uiSkeletonLine(modifier = Modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
                             } else {
                                 A2uiComponentNode(
                                     component = child,
@@ -337,7 +336,7 @@ internal fun A2uiDropdown(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
-                .testTag(A2uiTestTags.Dropdown),
+                .testTag(A2uiTestTags.DROPDOWN),
             label = label?.let { { Text(it) } },
             placeholder = placeholder?.let { { Text(it) } },
             readOnly = true,
@@ -446,7 +445,7 @@ internal fun A2uiSlider(
                 }
                 dragStartValue = null
             },
-            modifier = Modifier.testTag(A2uiTestTags.Slider),
+            modifier = Modifier.testTag(A2uiTestTags.SLIDER),
             enabled = !surfaceSubmitting,
             valueRange = range.min.toFloat()..range.max.toFloat(),
             steps = range.sliderSteps,
@@ -488,7 +487,7 @@ internal fun A2uiStepper(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .testTag(A2uiTestTags.Stepper),
+            .testTag(A2uiTestTags.STEPPER),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -507,7 +506,7 @@ internal fun A2uiStepper(
         OutlinedButton(
             onClick = { update(value - range.step) },
             enabled = !surfaceSubmitting && value > range.min,
-            modifier = Modifier.testTag(A2uiTestTags.StepperDecrement),
+            modifier = Modifier.testTag(A2uiTestTags.STEPPER_DECREMENT),
         ) {
             Text("âˆ’")
         }
@@ -519,7 +518,7 @@ internal fun A2uiStepper(
         OutlinedButton(
             onClick = { update(value + range.step) },
             enabled = !surfaceSubmitting && value < range.max,
-            modifier = Modifier.testTag(A2uiTestTags.StepperIncrement),
+            modifier = Modifier.testTag(A2uiTestTags.STEPPER_INCREMENT),
         ) {
             Text("+")
         }
@@ -574,7 +573,7 @@ internal fun A2uiLinearProgress(
                         contentDescription = "Linear progress ${progress.progressPercentLabel()}"
                         stateDescription = progress.progressPercentLabel()
                     }
-                    .testTag(A2uiTestTags.LinearProgress),
+                    .testTag(A2uiTestTags.LINEAR_PROGRESS),
             )
         } else {
             LinearProgressIndicator(
@@ -584,7 +583,7 @@ internal fun A2uiLinearProgress(
                         contentDescription = "Linear progress indeterminate"
                         stateDescription = "Indeterminate"
                     }
-                    .testTag(A2uiTestTags.LinearProgress),
+                    .testTag(A2uiTestTags.LINEAR_PROGRESS),
             )
         }
     }
@@ -628,7 +627,7 @@ internal fun A2uiCircularProgress(
                             contentDescription = "Circular progress ${progress.progressPercentLabel()}"
                             stateDescription = progress.progressPercentLabel()
                         }
-                        .testTag(A2uiTestTags.CircularProgress),
+                        .testTag(A2uiTestTags.CIRCULAR_PROGRESS),
                 )
                 Text(
                     text = progress.progressPercentLabel(),
@@ -643,7 +642,7 @@ internal fun A2uiCircularProgress(
                         contentDescription = "Circular progress indeterminate"
                         stateDescription = "Indeterminate"
                     }
-                    .testTag(A2uiTestTags.CircularProgress),
+                    .testTag(A2uiTestTags.CIRCULAR_PROGRESS),
             )
         }
     }

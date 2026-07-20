@@ -55,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -219,8 +220,8 @@ fun ProjectIssuesScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
-                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                        contentPadding = PaddingValues(LettaSpacing.SCREEN_HORIZONTAL),
+                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                     ) {
                         item {
                             IssueFilterRow(
@@ -350,8 +351,8 @@ fun ProjectIssueDetailScreen(
                     modifier = Modifier
                         .padding(paddingValues)
                         .fillMaxSize(),
-                    contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
-                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                    contentPadding = PaddingValues(LettaSpacing.SCREEN_HORIZONTAL),
+                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                 ) {
                     item { ProjectIssueHeader(issue = state.data.issue) }
                     item { ProjectIssueBody(issue = state.data.issue) }
@@ -421,8 +422,8 @@ private fun ProjectIssuesLoading(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(LettaSpacing.screenHorizontal),
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+            .padding(LettaSpacing.SCREEN_HORIZONTAL),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
     ) {
         repeat(5) { ShimmerBox(height = 104.dp, widthFraction = 1f) }
     }
@@ -592,7 +593,7 @@ private fun ProjectIssueCompletedTimelineCard(
                         text = if (expanded) {
                             stringResource(R.string.action_collapse)
                         } else {
-                            stringResource(R.string.screen_project_issues_timeline_count, items.size)
+                            pluralStringResource(R.plurals.screen_project_issues_timeline_count, items.size, items.size)
                         },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -827,7 +828,7 @@ private fun ProjectIssueBody(issue: ProjectIssueDetail) {
             item(
                 overlineContent = { Text(stringResource(R.string.screen_project_issue_acceptance_title)) },
                 supportingContent = { Text(issue.acceptanceCriteria.joinToString(separator = "\n") { "• $it" }) },
-                headlineContent = { Text(stringResource(R.string.screen_project_issue_acceptance_summary, issue.acceptanceCriteria.size)) },
+                headlineContent = { Text(pluralStringResource(R.plurals.screen_project_issue_acceptance_summary, issue.acceptanceCriteria.size, issue.acceptanceCriteria.size)) },
             )
         }
         issue.updatedAt?.let { updatedAt ->
@@ -840,7 +841,7 @@ private fun ProjectIssueBody(issue: ProjectIssueDetail) {
             item(
                 overlineContent = { Text(stringResource(R.string.screen_project_issues_blocked_label)) },
                 supportingContent = { Text(issue.blockedBy.joinToString { it.id }) },
-                headlineContent = { Text(stringResource(R.string.screen_project_issue_blocked_by_summary, issue.blockedBy.size)) },
+                headlineContent = { Text(pluralStringResource(R.plurals.screen_project_issue_blocked_by_summary, issue.blockedBy.size, issue.blockedBy.size)) },
             )
         }
     }

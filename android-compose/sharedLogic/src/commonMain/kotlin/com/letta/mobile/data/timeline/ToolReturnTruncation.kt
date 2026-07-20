@@ -72,7 +72,7 @@ internal fun foldToolReturnBodies(
             if (bodyBytes.size > maxInboundBodyBytes) {
                 val boundedPrefix = bodyBytes.decodeToString(0, maxInboundBodyBytes)
                 content[callId] = boundedPrefix +
-                    "\n… [truncated at ingest: ${bodyBytes.size} bytes > ${maxInboundBodyBytes} cap — expand to load the full output]"
+                    "\n… [truncated at ingest: ${bodyBytes.size} bytes > $maxInboundBodyBytes cap — expand to load the full output]"
                 truncation[callId] = ToolReturnTruncation(
                     messageId = toolReturn.id,
                     byteLen = bodyBytes.size.toLong(),

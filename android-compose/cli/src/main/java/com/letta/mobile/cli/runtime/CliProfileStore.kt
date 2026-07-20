@@ -5,7 +5,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 
 @Serializable
 internal data class CliProfileDocument(
@@ -116,8 +115,6 @@ internal class CliProfileStore(
             profile = profile,
         )
     }
-
-    fun exportJson(): String = prettyJson.encodeToString(CliProfileDocument.serializer(), load())
 
     companion object {
         const val DEFAULT_BASE_URL = "https://letta.oculair.ca"

@@ -777,7 +777,6 @@ private fun GeneratedImageToolCard(
     val reducedMotion = rememberReducedMotionEnabled()
     val hasImage = toolCall.generatedImageAttachments.isNotEmpty()
     val isError = ToolReturnStatus.isError(toolCall.status)
-    val isWarning = toolCall.status == "warning"
     val prompt = remember(toolCall.arguments) { summarizeGenerateImagePrompt(toolCall.arguments) }
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -1057,7 +1056,7 @@ private fun ToolCallExpandedBodyContentInner(
                     val lineCount = result.count { it == '\n' } + 1
                     if (lineCount > 1 || result.length > 80) {
                         Text(
-                            text = if (resultExpanded) "collapse" else "${lineCount} line${if (lineCount == 1) "" else "s"}",
+                            text = if (resultExpanded) "collapse" else "$lineCount line${if (lineCount == 1) "" else "s"}",
                             style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
                         )
@@ -1169,7 +1168,7 @@ internal fun ToolCallExpandedBody(
                     val lineCount = result.count { it == '\n' } + 1
                     if (lineCount > 1 || result.length > 80) {
                         Text(
-                            text = if (resultExpanded) "collapse" else "${lineCount} line${if (lineCount == 1) "" else "s"}",
+                            text = if (resultExpanded) "collapse" else "$lineCount line${if (lineCount == 1) "" else "s"}",
                             style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
                         )

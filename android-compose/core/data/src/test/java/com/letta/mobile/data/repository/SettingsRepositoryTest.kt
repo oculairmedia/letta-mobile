@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
+import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("unit")
 class SettingsRepositoryTest {
@@ -135,7 +136,7 @@ class SettingsRepositoryTest {
         assertEquals("c1", emissions.receive().id)
 
         repository.saveConfig(c1Updated)
-        assertNull(withTimeoutOrNull(100) { emissions.receive() })
+        assertNull(withTimeoutOrNull(100.milliseconds) { emissions.receive() })
 
         repository.saveConfig(c2)
         assertEquals("c2", emissions.receive().id)

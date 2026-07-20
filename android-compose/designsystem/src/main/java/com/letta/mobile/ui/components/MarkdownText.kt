@@ -328,7 +328,6 @@ internal fun autolinkBareUrls(text: String): String {
 
     while (urlMatcher.find()) {
         val urlStart = urlMatcher.start()
-        val urlEnd = urlMatcher.end()
         var url = urlMatcher.group()
 
         // Skip if inside code fence, inline code, or markdown link
@@ -420,7 +419,7 @@ private fun stripTrailingPunctuation(url: String): String {
 
 private val codeFenceRegex = Regex("""(?m)^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1\s*$""")
 private val inlineCodeRegex = Regex("`[^`\n]+?`")
-private val markdownLinkRegex = Regex("\\[([^\\]]+)\\]\\(([^)]+)\\)")
+private val markdownLinkRegex = Regex("\\[([^\\]]+)]\\(([^)]+)\\)")
 
 /** Find ranges of code fences (```...```) to exclude from URL linkification. */
 private fun findCodeFenceRanges(text: String): List<IntRange> {

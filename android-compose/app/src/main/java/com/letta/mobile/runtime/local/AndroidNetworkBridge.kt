@@ -130,7 +130,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 }
             }
             val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
-            if (contentLength < 0 || contentLength > MAX_REQUEST_BODY_BYTES) {
+            if (contentLength !in 0..MAX_REQUEST_BODY_BYTES) {
                 socket.outputStream.writeJsonResponse(400, errorBody("invalid_request", "Content-Length out of range."))
                 return
             }
@@ -492,7 +492,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
                         write(buffer, 0, allowed)
                         flush()
                     }
-                    throw IllegalStateException("Response body exceeds ${limit} bytes.")
+                    throw IllegalStateException("Response body exceeds $limit bytes.")
                 }
                 write(buffer, 0, read)
                 flush()
@@ -561,18 +561,4 @@ private fun HttpURLConnection.useResponse(block: (InputStream) -> Unit) {
     } finally {
         disconnect()
     }
-}
-
-private fun readLimitedBytes(input: InputStream, limit: Int): ByteArray {
-    val output = java.io.ByteArrayOutputStream()
-    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    while (true) {
-        val read = input.read(buffer)
-        if (read < 0) break
-        if (output.size() + read > limit) {
-            throw IllegalStateException("Response body exceeds ${limit} bytes.")
-        }
-        output.write(buffer, 0, read)
-    }
-    return output.toByteArray()
 }

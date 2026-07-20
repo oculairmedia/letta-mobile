@@ -38,8 +38,6 @@ internal object MermaidNativeBridge {
         }
     }
 
-    fun isAvailable(): Boolean = loadState
-
     fun renderToSvg(
         source: String,
         darkTheme: Boolean,

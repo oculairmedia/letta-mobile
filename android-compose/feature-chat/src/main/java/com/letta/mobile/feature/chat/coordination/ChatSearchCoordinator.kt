@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Coordinates chat search UI state, local results, and debounced remote lookup.
  * This keeps search job lifecycle out of [AdminChatViewModel] while preserving
@@ -51,7 +52,7 @@ internal class ChatSearchCoordinator(
         }
 
         searchJob = scope.launch {
-            delay(remoteDebounceMs)
+            delay(remoteDebounceMs.milliseconds)
             try {
                 val parsed = controller.remoteResults(query, agentId)
                 uiState.update { current ->

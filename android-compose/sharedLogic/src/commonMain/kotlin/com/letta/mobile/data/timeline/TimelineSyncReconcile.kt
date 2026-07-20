@@ -24,10 +24,10 @@ suspend fun reconcileAfterSend(
     listMessagesWithRetry: suspend (String) -> List<LettaMessage>,
 ) {
     val timer = Telemetry.startTimer("TimelineSync", "reconcile")
-    var confirmedLocal = false
-    var appendedMissing = 0
-    var confirmedServerId: String? = null
-    var shouldDeletePendingLocal = false
+    var confirmedLocal: Boolean
+    var appendedMissing: Int
+    var confirmedServerId: String?
+    var shouldDeletePendingLocal: Boolean
     try {
         // letta-mobile-j44j: retry the GET on transient failures before
         // surfacing a user-visible error. The stream already landed the

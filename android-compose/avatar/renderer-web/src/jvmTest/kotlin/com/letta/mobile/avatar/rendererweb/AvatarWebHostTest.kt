@@ -22,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.seconds
 /**
  * Real-socket integration tests for the loopback host. runBlocking (not
  * runTest): virtual time would fire the timeouts while blocked on real IO.
@@ -93,7 +94,7 @@ class AvatarWebHostTest {
 
                     val loadJob = async { runtime.load(model) }
 
-                    val command = withTimeout(10_000) {
+                    val command = withTimeout(10.seconds) {
                         var received: AvatarRendererCommand? = null
                         while (received !is AvatarRendererCommand.LoadAvatar) {
                             val frame = incoming.receive()

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -22,7 +21,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +45,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 
+import kotlin.time.Duration.Companion.seconds
 @Composable
 internal fun A2uiToolApprovalCard(
     component: A2uiComponent,
@@ -56,7 +55,7 @@ internal fun A2uiToolApprovalCard(
 ) {
     val props = remember(component.raw) { component.toolApprovalProps() }
     if (props == null) {
-        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -88,7 +87,7 @@ internal fun A2uiToolApprovalCard(
     LaunchedEffect(component.id, props.callId, props.timeoutSeconds, result) {
         if (result != null || props.timeoutSeconds <= 0) return@LaunchedEffect
         while (remainingSeconds > 0 && result == null) {
-            delay(1_000)
+            delay(1.seconds)
             remainingSeconds = (remainingSeconds - 1).coerceAtLeast(0)
         }
         if (remainingSeconds == 0 && result == null) {
@@ -105,7 +104,7 @@ internal fun A2uiToolApprovalCard(
                 contentDescription = "Tool approval for ${props.toolName}, ${props.risk.label} risk"
                 stateDescription = result?.statusLabel() ?: "Awaiting approval"
             }
-            .testTag(A2uiTestTags.ToolApprovalCard),
+            .testTag(A2uiTestTags.TOOL_APPROVAL_CARD),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -331,7 +330,7 @@ internal fun ToolApprovalArgumentRow(
         val valueModifier = if (argument.isSensitive && !revealed) {
             Modifier
                 .clickable(onClickLabel = "Reveal value for ${argument.key}") { onReveal() }
-                .testTag(A2uiTestTags.ToolApprovalSensitiveValue)
+                .testTag(A2uiTestTags.TOOL_APPROVAL_SENSITIVE_VALUE)
         } else {
             Modifier
         }
@@ -354,7 +353,7 @@ internal fun ToolApprovalStatusLine(
     val text = result?.statusLabel() ?: "Auto-denies in ${remainingSeconds}s"
     Text(
         text = text,
-        modifier = Modifier.testTag(A2uiTestTags.ToolApprovalCountdown),
+        modifier = Modifier.testTag(A2uiTestTags.TOOL_APPROVAL_COUNTDOWN),
         style = MaterialTheme.typography.labelMedium,
         color = when (result?.decision) {
             "deny", "timeout" -> MaterialTheme.colorScheme.error

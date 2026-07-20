@@ -16,6 +16,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class KtorAppServerWebSocketTransportIntegrationTest {
     @Test
@@ -90,7 +91,7 @@ class KtorAppServerWebSocketTransportIntegrationTest {
                     ),
                 ),
             )
-            val streamDelta = withTimeout(120_000) {
+            val streamDelta = withTimeout(120.seconds) {
                 firstStreamDelta.await()
             }
             assertEquals("stream_delta", streamDelta.type)

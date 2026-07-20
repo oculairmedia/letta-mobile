@@ -486,10 +486,6 @@ class AgentListViewModel @Inject constructor(
     fun setPendingImportStripMessages(strip: Boolean) {
         _transient.update { it.copy(pendingImportStripMessages = strip) }
     }
-
-    fun setShareNavigationConsumed(consumed: Boolean) {
-        _transient.update { it.copy(shareNavigationConsumed = consumed) }
-    }
 }
 internal fun LettaConfig?.localLettaCodeCreateReadiness(
     runtimeRunnable: Boolean,
@@ -513,8 +509,6 @@ internal fun LettaConfig?.localLettaCodeCreateReadiness(
     )
 }
 
-private fun LettaConfig?.isLocalRuntimeConfig(): Boolean = AgentRuntimeBinding.isLocalRuntime(this)
-
 private fun LettaConfig.selectedLocalModelHandle(): String? = localModelHandle
     ?.trim()
     ?.takeIf { it.isNotBlank() && it != EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE }
@@ -529,20 +523,20 @@ private fun AgentCreateParams.withLocalLettaCodeRuntimeBinding(config: LettaConf
     val pickedModel = model?.trim()?.takeIf { it.isNotBlank() }
     val effectiveModel = pickedModel ?: selection.modelHandle
     val localMetadata = mapOf(
-        LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
-        LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
-        LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
+        LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
+        LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
+        LocalAgentRuntimeMetadata.RUNTIME_ID_KEY to JsonPrimitive("${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:${config.id}"),
         // Track the effective model, not the config default — otherwise the
         // agent record's model and its metadata handle disagree and the
         // per-agent override could be lost on later reads (CodeRabbit).
-        LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(effectiveModel),
-        LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(selection.runtime),
-        LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(selection.accelerator),
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY to JsonPrimitive(effectiveModel),
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY to JsonPrimitive(selection.runtime),
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY to JsonPrimitive(selection.accelerator),
     )
     return copy(
         model = effectiveModel,
         modelSettings = (modelSettings ?: ModelSettings()).copy(
-            providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
+            providerType = LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME,
             parallelToolCalls = false,
             maxOutputTokens = selection.maxTokens,
         ),

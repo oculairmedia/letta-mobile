@@ -48,9 +48,9 @@ class ChatComposerAttachmentThumbnailTest {
             }
         }
 
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentThumbnailImage, useUnmergedTree = true)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_IMAGE, useUnmergedTree = true)
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentThumbnailPlaceholder, useUnmergedTree = true)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_PLACEHOLDER, useUnmergedTree = true)
             .assertDoesNotExist()
     }
 
@@ -76,21 +76,21 @@ class ChatComposerAttachmentThumbnailTest {
             }
         }
 
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentThumbnail)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL)
             .performClick()
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentPreviewDialog)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_DIALOG)
             .assertIsDisplayed()
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentPreviewImage)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_IMAGE)
             .assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("Close")
             .performClick()
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentPreviewDialog)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_DIALOG)
             .assertDoesNotExist()
 
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentThumbnailRemoveButton, useUnmergedTree = true)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_REMOVE_BUTTON, useUnmergedTree = true)
             .performClick()
-        composeRule.onNodeWithTag(ChatComposerTestTags.AttachmentThumbnailImage, useUnmergedTree = true)
+        composeRule.onNodeWithTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_IMAGE, useUnmergedTree = true)
             .assertDoesNotExist()
     }
 

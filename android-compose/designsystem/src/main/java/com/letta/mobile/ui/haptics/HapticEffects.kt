@@ -44,10 +44,6 @@ object HapticEffects {
         perform(LettaHapticCue.SegmentTick, haptic, view, enabled)
     }
 
-    fun segmentFrequentTick(haptic: HapticFeedback, view: View? = null, enabled: Boolean = true) {
-        perform(LettaHapticCue.SegmentFrequentTick, haptic, view, enabled)
-    }
-
     fun gestureThreshold(haptic: HapticFeedback, view: View? = null, enabled: Boolean = true) {
         perform(LettaHapticCue.GestureThreshold, haptic, view, enabled)
     }
@@ -220,6 +216,7 @@ internal data class PlatformHapticSpec(
     val composeType: HapticFeedbackType,
 )
 
+@SuppressLint("StaticFieldLeak") // caches HapticExecutor keyed by applicationContext only
 private object JindongHapticPatternPlayer {
     private var executorContext: Context? = null
     private var executor: HapticExecutor? = null
@@ -243,7 +240,7 @@ private object JindongHapticPatternPlayer {
         }
     }
 
-    internal fun LettaHapticPattern.toJindongPattern(): JindongHapticPattern = JindongHapticPattern(
+    private fun LettaHapticPattern.toJindongPattern(): JindongHapticPattern = JindongHapticPattern(
         events = pulses.map { pulse ->
             ScheduledHapticEvent(
                 startTimeMs = pulse.startTimeMs,

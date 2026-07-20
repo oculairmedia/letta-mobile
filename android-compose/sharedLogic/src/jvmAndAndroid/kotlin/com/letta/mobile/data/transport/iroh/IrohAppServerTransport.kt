@@ -37,6 +37,7 @@ import java.util.UUID
 import kotlinx.serialization.json.put
 import com.letta.mobile.util.Telemetry
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Iroh-backed App Server transport.
  *
@@ -155,7 +156,7 @@ class IrohAppServerTransport(
         if (runCatching { connectionReady.await() }.isFailure || !::connection.isInitialized) return@launch
         val activeConnection = connection
         while (true) {
-            kotlinx.coroutines.delay(KEEPALIVE_INTERVAL_MS)
+            kotlinx.coroutines.delay(KEEPALIVE_INTERVAL_MS.milliseconds)
             val ok = runCatching { activeConnection.sendDatagram(KEEPALIVE_PAYLOAD) }.isSuccess
             if (!ok) {
                 Telemetry.event("IrohTransport", "keepalive.stopped")
@@ -210,7 +211,7 @@ class IrohAppServerTransport(
         method: String,
         path: String,
         params: JsonObject,
-    ): AppServerInboundFrame.AdminRpcResponse = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) {
+    ): AppServerInboundFrame.AdminRpcResponse = withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS.milliseconds) {
         val biStream = connection.openBi()
         val sendStream = biStream.send()
         var sendFinished = false
@@ -246,7 +247,7 @@ class IrohAppServerTransport(
         legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses[requestId] = pending }
         return try {
             sendControl(AppServerCommand.AdminRpc(requestId = requestId, method = method, params = params))
-            withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS) { pending.await() }
+            withTimeoutOrNull(ADMIN_RPC_TIMEOUT_MS.milliseconds) { pending.await() }
                 ?: error("legacy admin_rpc timed out for method=$method")
         } finally {
             legacyAdminRpcResponsesMutex.withLock { legacyAdminRpcResponses.remove(requestId) }
@@ -270,7 +271,7 @@ class IrohAppServerTransport(
     private suspend fun runControlChannel() = coroutineScope {
         // Establish connection and open control bi-stream
         try {
-            connection = withTimeout(CONNECT_TIMEOUT_MS) {
+            connection = withTimeout(CONNECT_TIMEOUT_MS.milliseconds) {
                 endpoint.connect(remoteAddr, alpn)
             }
             Telemetry.event("IrohTransport", "connect.ok", *IrohDiagnostics.connectionAttributes(connection).toTypedArray())

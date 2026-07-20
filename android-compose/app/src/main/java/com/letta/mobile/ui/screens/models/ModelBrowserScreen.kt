@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -341,14 +342,14 @@ private fun EmbeddingModelCard(
                 AssistChip(onClick = {}, label = { Text(model.providerType) })
                 model.embeddingDim?.let { dim ->
                     Text(
-                        text = "${dim}d",
+                        text = "$dim",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 model.embeddingChunkSize?.let { chunk ->
                     Text(
-                        text = "${chunk} chunk",
+                        text = "$chunk chunk",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -391,7 +392,7 @@ private fun LlmModelDetailDialog(
                 DetailRow(stringResource(R.string.screen_models_detail_context_window, formatNumber(it)))
             }
             model.maxOutputTokens?.let {
-                DetailRow(stringResource(R.string.screen_models_detail_max_output, it))
+                DetailRow(pluralStringResource(R.plurals.screen_models_detail_max_output, it, it))
             }
             model.temperature?.let {
                 DetailRow(stringResource(R.string.screen_models_detail_temperature, it))
@@ -529,7 +530,7 @@ private fun formatNumber(value: Int): String {
     return if (value >= 1000) {
         val thousands = value / 1000
         val remainder = value % 1000
-        if (remainder == 0) "${thousands},000" else "$thousands,${remainder.toString().padStart(3, '0')}"
+        if (remainder == 0) "$thousands,000" else "$thousands,${remainder.toString().padStart(3, '0')}"
     } else {
         value.toString()
     }

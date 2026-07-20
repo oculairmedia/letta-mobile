@@ -64,7 +64,6 @@ fun ShimmerBox(
 fun ShimmerCard(
     modifier: Modifier = Modifier,
 ) {
-    val color = shimmerColor()
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -76,32 +75,6 @@ fun ShimmerCard(
         ShimmerBox(widthFraction = 0.6f, height = 16.dp)
         ShimmerBox(widthFraction = 1f, height = 12.dp)
         ShimmerBox(widthFraction = 0.8f, height = 12.dp)
-    }
-}
-
-@Composable
-fun ShimmerListItem(
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(shimmerColor())
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            ShimmerBox(widthFraction = 0.5f, height = 14.dp)
-            ShimmerBox(widthFraction = 0.8f, height = 12.dp)
-        }
     }
 }
 

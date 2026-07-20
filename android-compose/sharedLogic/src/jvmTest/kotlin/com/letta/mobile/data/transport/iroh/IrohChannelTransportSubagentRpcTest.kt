@@ -14,6 +14,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.seconds
 class IrohChannelTransportSubagentRpcTest {
     private val config = IrohConnectConfig("iroh://ticket", "token", "device", "client")
     private val json = Json { ignoreUnknownKeys = true }
@@ -98,7 +99,7 @@ class IrohChannelTransportSubagentRpcTest {
             when (method) {
                 "message.list" -> response("hydrate")
                 "subagent.list" -> if (timeout) {
-                    delay(1_000)
+                    delay(1.seconds)
                     response("late")
                 } else {
                     response("missing", success = false, error = "Unknown method: subagent.list")

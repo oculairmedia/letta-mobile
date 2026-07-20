@@ -2,11 +2,6 @@ package com.letta.mobile.ui.common
 
 enum class GroupPosition { First, Middle, Last, None }
 
-data class BubbleState(
-    val groupPosition: GroupPosition,
-    val isMine: Boolean,
-)
-
 fun <T> groupMessages(
     messages: List<T>,
     getRole: (T) -> String,

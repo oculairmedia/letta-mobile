@@ -654,28 +654,6 @@ internal fun ContextWindowCard(
 }
 
 @Composable
-internal fun ContextMetricRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-internal fun formatDrawerNumber(value: Int): String = String.format(Locale.US, "%,d", value)
-
-@Composable
 internal fun contrastDrawerItemColors() =
     NavigationDrawerItemDefaults.colors(
         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,

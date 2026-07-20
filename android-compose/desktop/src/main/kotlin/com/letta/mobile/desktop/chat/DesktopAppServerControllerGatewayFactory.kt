@@ -80,7 +80,7 @@ class DesktopAppServerControllerGatewayFactory(
         lettaConfig: LettaConfig,
     ): Pair<IrohAppServerTransport, DesktopTransportResources> {
         val normalizedAddress = IrohChannelTransport.normalizeIrohAddress(serverUrl)
-        val irohEndpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.Companion.defaultMode()))
+        val irohEndpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
         var resources: DesktopTransportResources? = null
         try {
             val irohTransport = IrohAppServerTransportAdapter(irohEndpoint).createTransport(

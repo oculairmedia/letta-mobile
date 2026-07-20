@@ -7,7 +7,7 @@ object SyntheticSkillEnvelopeDetector {
     private val closingSlugTag = Regex("""</[a-z0-9-]+>\s*$""")
     private val nameLine = Regex("""^name\s*:\s*\S+.*$""", RegexOption.IGNORE_CASE)
     private val descriptionLine = Regex("""^description\s*:\s*\S+.*$""", RegexOption.IGNORE_CASE)
-    private val literalSkillOpening = Regex("""<skill(?:\s|>|/)""", RegexOption.IGNORE_CASE)
+    private val literalSkillOpening = Regex("""<skill(?:\s|[>/])""", RegexOption.IGNORE_CASE)
     private val literalSkillClosing = Regex("""</skill>""", RegexOption.IGNORE_CASE)
 
     fun isSyntheticSkillEnvelope(role: String?, content: String?): Boolean {

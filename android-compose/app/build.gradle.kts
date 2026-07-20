@@ -1186,7 +1186,7 @@ android {
                 // loader state into late suites such as ProjectHomeViewModelTest.
                 it.maxHeapSize = "3072m"
                 it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=512m")
-                it.setForkEvery(20L)
+                it.forkEvery = 20L
                 it.filter {
                     excludeTestsMatching("*ScreenshotTest")
                 }

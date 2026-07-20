@@ -18,7 +18,6 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
@@ -70,12 +69,10 @@ internal class StreamCommand : AdminShimCommand(
             }
         }
 
-        try {
+        client.use {
             val tracer = MergeTracer(verbose = !raw)
-            sendAndStream(client, tracer)
+            sendAndStream(it, tracer)
             tracer.printSummary()
-        } finally {
-            client.close()
         }
     }
 

@@ -37,6 +37,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -162,22 +163,22 @@ internal fun resolveContextualInfo(
     return when (shortcut) {
         DashboardShortcut.AGENTS -> {
             if (state.isAgentCountLoading) "—"
-            else state.agentCount?.let { stringResource(R.string.widget_tile_count_format, it) }
+            else state.agentCount?.let { pluralStringResource(R.plurals.widget_tile_count_format, it, it) }
         }
         DashboardShortcut.CONVERSATIONS -> {
             if (state.isConversationCountLoading) "—"
             else state.conversationCount?.let {
-                val count = stringResource(R.string.widget_tile_count_format, it)
+                val count = pluralStringResource(R.plurals.widget_tile_count_format, it, it)
                 if (state.isConversationCountApproximate) "$count+" else count
             }
         }
         DashboardShortcut.TOOLS -> {
             if (state.isToolCountLoading) "—"
-            else state.toolCount?.let { stringResource(R.string.widget_tile_count_format, it) }
+            else state.toolCount?.let { pluralStringResource(R.plurals.widget_tile_count_format, it, it) }
         }
         DashboardShortcut.BLOCKS -> {
             if (state.isBlockCountLoading) "—"
-            else state.blockCount?.let { stringResource(R.string.widget_tile_count_format, it) }
+            else state.blockCount?.let { pluralStringResource(R.plurals.widget_tile_count_format, it, it) }
         }
         DashboardShortcut.USAGE -> state.usageSummary?.let {
             formatNumber(it.totalTokens) + " tokens"
@@ -231,9 +232,8 @@ internal fun DashboardWidgetTile(
     )
 
     // letta-mobile-rnyg: the long-press shortcut menu and the reordering grid's
-    // long-press-to-drag gesture both fight for the same surface. When the tile
-    // is rendered inside ReorderableWidgetGrid, suppress the menu so dragging
-    // wins; the parent provides reorder semantics in that mode.
+    // long-press-to-drag gesture both fight for the same surface. When reorder
+    // mode is active, suppress the menu so dragging wins.
     val clickModifier = if (enableLongPressMenu) {
         Modifier.combinedClickable(
             onClick = onClick,
@@ -306,89 +306,6 @@ internal fun DashboardWidgetTile(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ReorderableWidgetGrid(
-    shortcuts: ImmutableList<DashboardShortcut>,
-    state: DashboardUiState,
-    onShortcutClick: (DashboardShortcut) -> Unit,
-    onUnpinShortcut: (DashboardShortcut) -> Unit,
-    onReorder: (List<DashboardShortcut>) -> Unit,
-    columns: Int,
-    modifier: Modifier = Modifier,
-) {
-    // letta-mobile-rnyg superseded: the previous hand-rolled Layout +
-    // detectDragGesturesAfterLongPress + rect tracking implementation had
-    // bugs around cross-row drag and parent-scroll interference. Use
-    // sh.calvin.reorderable's LazyGrid integration instead — handles
-    // long-press start, swap detection, item displacement animation, and
-    // auto-scroll out of the box.
-    var currentList by remember(shortcuts) { mutableStateOf(shortcuts.toList()) }
-    val view = LocalView.current
-    val lazyGridState = rememberLazyGridState()
-    val reorderableState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
-        currentList = currentList.toMutableList().apply {
-            add(to.index, removeAt(from.index))
-        }
-        HapticEffects.reorderSwapTick(view)
-    }
-
-    // Commit the new order to the caller when no item is being dragged.
-    // The library's onMove fires on every swap; we only persist once the
-    // user settles to avoid spammy writes mid-drag.
-    LaunchedEffect(reorderableState, currentList) {
-        snapshotFlow { reorderableState.isAnyItemDragging }
-            .collect { dragging ->
-                if (!dragging && currentList != shortcuts.toList()) {
-                    onReorder(currentList)
-                }
-            }
-    }
-
-    val gap = LettaSpacing.cardGap
-    val rows = (currentList.size + columns - 1) / columns
-    // Tile content (icon + optional contextual text + label + padding) lands
-    // around ~96-100dp. Pad to 108 so wider text doesn't clip. Items inside
-    // each cell still fillMaxWidth and align to a fixed cell height.
-    val tileHeight = 108.dp
-    val totalHeight = tileHeight * rows + gap * (rows - 1).coerceAtLeast(0)
-
-    LazyVerticalGrid(
-        state = lazyGridState,
-        columns = GridCells.Fixed(columns),
-        modifier = modifier
-            .fillMaxWidth()
-            .height(totalHeight),
-        horizontalArrangement = Arrangement.spacedBy(gap),
-        verticalArrangement = Arrangement.spacedBy(gap),
-        userScrollEnabled = false,
-    ) {
-        items(currentList, key = { it.name }) { shortcut ->
-            ReorderableItem(reorderableState, key = shortcut.name) { isDragging ->
-                DashboardWidgetTile(
-                    shortcut = shortcut,
-                    contextualInfo = resolveContextualInfo(shortcut, state),
-                    onClick = { onShortcutClick(shortcut) },
-                    onUnpin = { onUnpinShortcut(shortcut) },
-                    isDragging = isDragging,
-                    enableLongPressMenu = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(tileHeight)
-                        .longPressDraggableHandle(
-                            onDragStarted = {
-                                HapticEffects.reorderDragStart(view)
-                            },
-                            onDragStopped = {
-                                HapticEffects.reorderDragEnd(view)
-                            },
-                        ),
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
 internal fun ReorderablePinnedItemsGrid(
     items: ImmutableList<PinnedItem>,
     state: DashboardUiState,
@@ -420,7 +337,7 @@ internal fun ReorderablePinnedItemsGrid(
             }
     }
 
-    val gap = LettaSpacing.cardGap
+    val gap = LettaSpacing.CARD_GAP
     val rows = (currentList.size + columns - 1) / columns
     // Tile content (icon + 1-2 text lines + padding) lands around 96-100dp
     // for both shortcut and agent tiles. Pad to 108 so wider text doesn't
@@ -472,79 +389,6 @@ internal fun ReorderablePinnedItemsGrid(
                         modifier = tileModifier,
                     )
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-internal fun ReorderableAgentGrid(
-    pinnedAgents: ImmutableList<PinnedAgent>,
-    onAgentClick: (PinnedAgent) -> Unit,
-    onUnpinAgent: (PinnedAgent) -> Unit,
-    onConfigureAgent: (PinnedAgent) -> Unit,
-    onReorder: (List<String>) -> Unit,
-    columns: Int,
-    modifier: Modifier = Modifier,
-) {
-    var currentList by remember(pinnedAgents) { mutableStateOf(pinnedAgents.toList()) }
-    val view = LocalView.current
-    val lazyGridState = rememberLazyGridState()
-    val reorderableState = rememberReorderableLazyGridState(lazyGridState) { from, to ->
-        currentList = currentList.toMutableList().apply {
-            add(to.index, removeAt(from.index))
-        }
-        HapticEffects.reorderSwapTick(view)
-    }
-
-    LaunchedEffect(reorderableState, currentList) {
-        snapshotFlow { reorderableState.isAnyItemDragging }
-            .collect { dragging ->
-                if (!dragging && currentList != pinnedAgents.toList()) {
-                    onReorder(currentList.map { it.id })
-                }
-            }
-    }
-
-    val gap = LettaSpacing.cardGap
-    val rows = (currentList.size + columns - 1) / columns
-    // Agent tile content (icon + name + subtitle + padding) is similar to
-    // shortcut tiles — ~90dp. Pad to 100 for safety.
-    val tileHeight = 100.dp
-    val totalHeight = tileHeight * rows + gap * (rows - 1).coerceAtLeast(0)
-
-    LazyVerticalGrid(
-        state = lazyGridState,
-        columns = GridCells.Fixed(columns),
-        modifier = modifier
-            .fillMaxWidth()
-            .height(totalHeight),
-        horizontalArrangement = Arrangement.spacedBy(gap),
-        verticalArrangement = Arrangement.spacedBy(gap),
-        userScrollEnabled = false,
-    ) {
-        items(currentList, key = { it.id }) { agent ->
-            ReorderableItem(reorderableState, key = agent.id) { isDragging ->
-                PinnedAgentCard(
-                    name = agent.name,
-                    onClick = { onAgentClick(agent) },
-                    onUnpin = { onUnpinAgent(agent) },
-                    onConfigure = { onConfigureAgent(agent) },
-                    isDragging = isDragging,
-                    enableLongPressMenu = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(tileHeight)
-                        .longPressDraggableHandle(
-                            onDragStarted = {
-                                HapticEffects.reorderDragStart(view)
-                            },
-                            onDragStopped = {
-                                HapticEffects.reorderDragEnd(view)
-                            },
-                        ),
-                )
             }
         }
     }

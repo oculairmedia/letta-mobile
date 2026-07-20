@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Tag
 
+import kotlin.time.Duration.Companion.milliseconds
 @Tag("unit")
 class CronRequestCorrelatorTest : WordSpec({
 
@@ -46,7 +47,7 @@ class CronRequestCorrelatorTest : WordSpec({
                 }
 
                 // Simulate response arrival
-                delay(50L)
+                delay(50.milliseconds)
                 val completed = correlator.completeRequest(requestId, expectedFrame)
                 completed shouldBe true
 
@@ -134,7 +135,7 @@ class CronRequestCorrelatorTest : WordSpec({
                     }
                 }
 
-                delay(50L)
+                delay(50.milliseconds)
                 correlator.cancelPendingRequests("connection closed")
 
                 def1.await() shouldBe "connection closed"

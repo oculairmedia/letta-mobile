@@ -1,7 +1,6 @@
 package com.letta.mobile.ui.a2ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,24 +9,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -282,6 +273,7 @@ internal fun resolveBindingElement(
     }
 
 @Composable
+@Suppress("UnusedReceiverParameter")
 internal fun A2uiComponent.resolveInputValue(
     surface: A2uiSurfaceState,
     binding: JsonElement?,
@@ -425,6 +417,7 @@ internal fun A2uiComponent.contentScale(): ContentScale =
         else -> ContentScale.Crop
     }
 
+@Suppress("UnusedReceiverParameter")
 internal fun A2uiComponent.inputValue(
     value: String,
     fieldType: String,
@@ -472,6 +465,7 @@ internal fun JsonElement?.progressFractionOrNull(): Float? =
 
 internal fun Float.progressPercentLabel(): String = "${(this * 100f).roundToInt()}%"
 
+@Suppress("UnusedReceiverParameter")
 internal fun A2uiComponent.dateTimePlaceholder(
     enableDate: Boolean,
     enableTime: Boolean,
@@ -561,13 +555,13 @@ internal enum class ScheduleSelectorMode(
 }
 
 internal enum class A2uiBooleanInputKind(val testTag: String) {
-    Checkbox(A2uiTestTags.Checkbox),
-    Switch(A2uiTestTags.Switch),
+    Checkbox(A2uiTestTags.CHECKBOX),
+    Switch(A2uiTestTags.SWITCH),
 }
 
 internal enum class A2uiMediaKind(val testTag: String) {
-    Video(A2uiTestTags.Video),
-    Audio(A2uiTestTags.AudioPlayer),
+    Video(A2uiTestTags.VIDEO),
+    Audio(A2uiTestTags.AUDIO_PLAYER),
 }
 
 internal data class A2uiRadioOption(
@@ -772,7 +766,7 @@ internal fun JsonObject.withValidationValue(value: String): JsonObject {
 }
 
 internal fun JsonElement.validationBoolean(): Boolean = when (this) {
-    is JsonPrimitive -> contentOrNull?.toBooleanStrictOrNull() ?: contentOrNull?.isNotBlank() == true
+    is JsonPrimitive -> contentOrNull?.toBooleanStrictOrNull() ?: (contentOrNull?.isNotBlank() == true)
     is JsonArray -> isNotEmpty()
     is JsonObject -> isNotEmpty()
     else -> false

@@ -25,7 +25,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import android.app.Activity
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.letta.mobile.feature.chat.voice.VoiceInputViewModel
+import com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay
+import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -51,8 +58,6 @@ import com.letta.mobile.feature.chat.render.LocalTruncatedToolResultResolver
 import com.letta.mobile.feature.chat.render.TruncatedToolResultResolver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -77,7 +82,6 @@ import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
-import com.letta.mobile.ui.components.ThinkingShader
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
@@ -87,7 +91,6 @@ import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
-import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentRings
 import kotlinx.collections.immutable.toImmutableList
@@ -110,6 +113,8 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * Feature flag: when false, the tool-affordance chip strip above the
  * composer is suppressed. The component (`ToolAffordanceRow`), the
@@ -155,8 +160,6 @@ internal fun ChatScreen(
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
-    val projectBindings = viewModel.projectBindings
-
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
     LaunchedEffect(fontScale) { activeFontScale = fontScale }
 
@@ -195,7 +198,7 @@ internal fun ChatScreen(
             // re-evaluate, so we idle â€” no wakeups on the hot streaming path.
             while (subagentSnapshot.any { it.isTerminal || it.isActive }) {
                 lingerTick = System.currentTimeMillis()
-                kotlinx.coroutines.delay(1_000)
+                kotlinx.coroutines.delay(1.seconds)
             }
             lingerTick = System.currentTimeMillis()
         }
@@ -263,7 +266,7 @@ internal fun ChatScreen(
 
         LaunchedEffect(floatingBannerMessage) {
             if (floatingBannerMessage.isNotBlank()) {
-                kotlinx.coroutines.delay(2600)
+                kotlinx.coroutines.delay(2600.milliseconds)
                 floatingBannerMessage = ""
             }
         }
@@ -305,7 +308,7 @@ internal fun ChatScreen(
                 }
                 hadActiveAmbientRun -> {
                     ambientAgentStatus = "Completed"
-                    kotlinx.coroutines.delay(1400)
+                    kotlinx.coroutines.delay(1400.milliseconds)
                     hadActiveAmbientRun = false
                     ambientAgentStatus = "Idle"
                 }
@@ -745,7 +748,7 @@ internal fun ChatScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(LettaSpacing.lg),
+                    .padding(LettaSpacing.LG),
             )
 
             imageViewerState?.let { (viewerAttachments, initialIndex) ->
@@ -762,7 +765,7 @@ internal fun ChatScreen(
                     frames = state.a2uiDebugFrames,
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.md),
+                        .padding(horizontal = LettaSpacing.LG, vertical = LettaSpacing.MD),
                 )
             }
 
@@ -776,13 +779,13 @@ internal fun ChatScreen(
             // hosts ChatScreen on a plain ComponentActivity, so we skip the
             // voice overlay when there's no Hilt host (production always
             // has one).
-            val voiceActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+            val voiceActivity = LocalContext.current as? Activity
             val voiceIsHiltHost = voiceActivity is dagger.hilt.internal.GeneratedComponentManager<*>
             if (voiceIsHiltHost) {
-                val voiceVm: com.letta.mobile.feature.chat.voice.VoiceInputViewModel =
-                    androidx.hilt.navigation.compose.hiltViewModel()
+                val voiceVm: VoiceInputViewModel =
+                    hiltViewModel()
                 val voiceState by voiceVm.uiState.collectAsStateWithLifecycle()
-                com.letta.mobile.ui.components.audio.VoiceRecognizerOverlay(
+                VoiceRecognizerOverlay(
                     visible = voiceState.recognizing,
                     recognizedText = voiceState.recognizedText,
                     amplitude = voiceState.amplitude,
@@ -807,15 +810,15 @@ private fun A2uiDebugOverlay(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
                 shape = MaterialTheme.shapes.small,
             )
-            .padding(LettaSpacing.sm),
+            .padding(LettaSpacing.SM),
     ) {
         Text(
             text = "A2UI frames",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.tertiary,
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.xs))
-        LazyColumn(modifier = Modifier.height(LettaSpacing.xxxl.times(2))) {
+        HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.XS))
+        LazyColumn(modifier = Modifier.height(LettaSpacing.XXXL.times(2))) {
             items(frames.takeLast(8).asReversed(), key = { it.id }) { frame ->
                 Text(
                     text = buildString {
@@ -1069,7 +1072,7 @@ private fun ChatContent(
                         onDismissSurface = onDismissA2uiSurface,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
+                            .padding(horizontal = LettaSpacing.LG, vertical = LettaSpacing.SM),
                     )
                 }
             }
@@ -1093,7 +1096,7 @@ internal fun A2uiSurfaceStack(
     }
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
     ) {
         orderedSurfaces.forEach { surface ->
             key(surface.surfaceId) {
@@ -1134,14 +1137,14 @@ internal fun DismissibleA2uiSurface(
             .longPressPassthrough { menuExpanded = true },
     ) {
         content()
-        androidx.compose.material3.IconButton(
+        IconButton(
             onClick = { onDismissSurface(surfaceId) },
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
             Icon(
                 imageVector = LettaIcons.Close,
                 contentDescription = "Close A2UI surface",
-                tint = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         DropdownMenu(
@@ -1184,12 +1187,12 @@ private fun ErrorContent(
         Icon(
             imageVector = LettaIcons.Error,
             contentDescription = "Error",
-            modifier = Modifier.size(LettaSpacing.xxxl),
+            modifier = Modifier.size(LettaSpacing.XXXL),
             tint = MaterialTheme.colorScheme.error
         )
-        Spacer(modifier = Modifier.height(LettaSpacing.lg))
+        Spacer(modifier = Modifier.height(LettaSpacing.LG))
         Text(text = message, style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(LettaSpacing.lg))
+        Spacer(modifier = Modifier.height(LettaSpacing.LG))
         Button(onClick = onRetry) {
             Text(stringResource(R.string.action_retry))
         }

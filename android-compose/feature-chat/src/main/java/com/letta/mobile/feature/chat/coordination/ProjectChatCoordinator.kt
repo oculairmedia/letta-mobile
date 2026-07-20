@@ -203,8 +203,6 @@ internal class ProjectChatCoordinator(
             }
         }
     }
-
-    private fun Throwable.asException(): Exception = this as? Exception ?: Exception(this)
 }
 
 private val projectBriefLabelAliases = mapOf(

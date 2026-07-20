@@ -93,7 +93,7 @@ fun MermaidDiagram(
         )
     }
 
-    var renderError by mutableStateOf<String?>(null)
+    var renderError by remember { mutableStateOf<String?>(null) }
 
     val nativeRender = remember(source, isDark, nativeStyle) {
         MermaidNativeBridge.renderToSvg(
@@ -160,9 +160,9 @@ private fun MermaidSvgDiagram(
     }
 
         Surface(
-            shape = RoundedCornerShape(LettaSpacing.cardGap),
+            shape = RoundedCornerShape(LettaSpacing.CARD_GAP),
             color = Color.Transparent,
-            modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
+            modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP),
         ) {
             Column {
                 MermaidHeader(onCopy = onCopy)
@@ -221,7 +221,7 @@ private fun MermaidFullscreenDialog(
                 Modifier
                     .widthIn(max = LettaSizing.readableDialogMaxWidth)
                     .fillMaxWidth()
-                    .padding(LettaSpacing.innerPadding + LettaSpacing.innerPadding)
+                    .padding(LettaSpacing.INNER_PADDING + LettaSpacing.INNER_PADDING)
             }
 
             Card(
@@ -233,7 +233,7 @@ private fun MermaidFullscreenDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = LettaSpacing.innerPaddingSmall, vertical = LettaSpacing.cardGap),
+                            .padding(horizontal = LettaSpacing.INNER_PADDING_SMALL, vertical = LettaSpacing.CARD_GAP),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
@@ -252,7 +252,7 @@ private fun MermaidFullscreenDialog(
                         }
                         FilledTonalButton(
                             onClick = onCopy,
-                            modifier = Modifier.padding(start = LettaSpacing.cardGap),
+                            modifier = Modifier.padding(start = LettaSpacing.CARD_GAP),
                         ) {
                             Icon(
                                 imageVector = LettaIcons.Copy,
@@ -261,7 +261,7 @@ private fun MermaidFullscreenDialog(
                             )
                             Text(
                                 text = "Copy",
-                                modifier = Modifier.padding(start = LettaSpacing.cardGap),
+                                modifier = Modifier.padding(start = LettaSpacing.CARD_GAP),
                             )
                         }
                     }
@@ -269,9 +269,9 @@ private fun MermaidFullscreenDialog(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = LettaSpacing.innerPaddingSmall, vertical = LettaSpacing.cardGap)
+                            .padding(horizontal = LettaSpacing.INNER_PADDING_SMALL, vertical = LettaSpacing.CARD_GAP)
                             .onSizeChanged { viewportSize = it }
-                            .clip(RoundedCornerShape(LettaSpacing.innerPadding))
+                            .clip(RoundedCornerShape(LettaSpacing.INNER_PADDING))
                             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.08f))
                             .pointerInput(Unit) {
                                 detectTransformGestures { centroid, panChange, zoomChange, _ ->
@@ -310,14 +310,14 @@ private fun MermaidHeader(onCopy: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = LettaSpacing.innerPaddingSmall, end = LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
+            .padding(start = LettaSpacing.INNER_PADDING_SMALL, end = LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = "mermaid",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.padding(vertical = LettaSpacing.cardGap),
+            modifier = Modifier.padding(vertical = LettaSpacing.CARD_GAP),
         )
         Box(modifier = Modifier.weight(1f))
         IconButton(
@@ -329,7 +329,7 @@ private fun MermaidHeader(onCopy: () -> Unit) {
             Icon(
                 imageVector = LettaIcons.Copy,
                 contentDescription = "Copy diagram source",
-                modifier = Modifier.padding(LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
+                modifier = Modifier.padding(LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP),
             )
         }
     }
@@ -342,11 +342,11 @@ private fun MermaidErrorFallback(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-            shape = RoundedCornerShape(LettaSpacing.cardGap),
+            shape = RoundedCornerShape(LettaSpacing.CARD_GAP),
             color = MaterialTheme.colorScheme.errorContainer,
-            modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap),
+            modifier = modifier.fillMaxWidth().padding(vertical = LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP),
         ) {
-            Column(modifier = Modifier.padding(LettaSpacing.innerPaddingSmall)) {
+            Column(modifier = Modifier.padding(LettaSpacing.INNER_PADDING_SMALL)) {
             Text(
                 text = "Mermaid render failed: $errorMessage",
                 style = MaterialTheme.typography.labelSmall,
@@ -356,7 +356,7 @@ private fun MermaidErrorFallback(
                 text = source,
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = LettaCodeFont),
                 color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.padding(top = LettaSpacing.cardGap),
+                    modifier = Modifier.padding(top = LettaSpacing.CARD_GAP),
             )
         }
     }

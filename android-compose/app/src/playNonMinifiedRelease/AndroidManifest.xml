@@ -13,6 +13,7 @@
             android:name=".MainActivity"
             android:showWhenLocked="true"
             android:turnScreenOn="true"
+            tools:targetApi="27"
             tools:node="merge" />
     </application>
 </manifest>

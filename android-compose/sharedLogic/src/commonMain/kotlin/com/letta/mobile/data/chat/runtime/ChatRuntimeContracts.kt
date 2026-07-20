@@ -147,9 +147,6 @@ fun Iterable<Conversation>.toChatConversationSummaries(
 ): List<ChatConversationSummary> =
     map { it.toChatConversationSummary(agentNamesById) }
 
-fun Conversation.isDefaultShimConversation(): Boolean =
-    id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX)
-
 private fun ChatConversationSummary.agentDisplayName(): String =
     agentName.trim().ifBlank { UNKNOWN_AGENT_LABEL }
 
@@ -157,7 +154,6 @@ private fun ChatConversationSummary.agentGroupKey(): String =
     agentDisplayName().lowercase()
 
 private const val UNKNOWN_AGENT_LABEL = "Unknown agent"
-private const val DEFAULT_SHIM_CONVERSATION_PREFIX = "conv-default-"
 
 @Immutable
 enum class ChatComposerError {
@@ -185,13 +181,4 @@ data class ChatSessionState(
 
     val selectedMessages: List<UiMessage>
         get() = selectedConversationId?.let { messagesByConversationId[it] }.orEmpty()
-}
-
-sealed interface ChatAction {
-    data object RetryConnection : ChatAction
-    data class SelectConversation(val conversationId: String) : ChatAction
-    data class UpdateComposerText(val text: String) : ChatAction
-    data class AttachImage(val image: MessageContentPart.Image) : ChatAction
-    data class RemoveImageAttachment(val index: Int) : ChatAction
-    data object Send : ChatAction
 }

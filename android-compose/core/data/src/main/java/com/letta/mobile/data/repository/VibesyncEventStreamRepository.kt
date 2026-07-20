@@ -28,6 +28,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+import kotlin.time.Duration.Companion.milliseconds
 @Singleton
 open class VibesyncEventStreamRepository internal constructor(
     private val apiClient: LettaApiClient,
@@ -80,7 +81,7 @@ open class VibesyncEventStreamRepository internal constructor(
                 Log.i(TAG, "vibesync event stream unavailable", error)
             }
             if (activeSubscribers.get() <= 0) break
-            delay(backoffMs)
+            delay(backoffMs.milliseconds)
             backoffMs = (backoffMs * 2).coerceAtMost(30_000L)
         }
     }

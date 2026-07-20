@@ -58,10 +58,10 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
             selfTestLog("bridge_start", "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
             return
         }
-        try {
+        session.use {
             val response = try {
                 selfTestLog("inference", "PASS", "sending one-shot chat completion")
-                postChatCompletion(session, modelHandle)
+                postChatCompletion(it, modelHandle)
             } catch (error: Throwable) {
                 selfTestLog("inference", "FAIL", error.fullLiteRtErrorText(), Log.ERROR)
                 return
@@ -73,8 +73,6 @@ class LiteRtSelfTestReceiver : BroadcastReceiver() {
                 response,
                 if (passed) Log.INFO else Log.ERROR,
             )
-        } finally {
-            session.close()
         }
     }
 

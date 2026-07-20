@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.iroh
 import computer.iroh.Endpoint
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.milliseconds
 /** Typed outcome of a direct agent-to-agent send. Never throws to the caller. */
 sealed interface AgentSendResult {
     /** The peer acked receipt of [msgId]. */
@@ -43,7 +44,7 @@ class IrohAgentMessageSender(
                 return AgentSendResult.Unaddressable(message.toAgentId, resolution.reason)
         }
         return runCatching {
-            val connection = withTimeout(connectTimeoutMs) {
+            val connection = withTimeout(connectTimeoutMs.milliseconds) {
                 endpointProvider().connect(address.toEndpointAddr(), IrohAgentMessage.ALPN)
             }
             connection.use { conn ->
@@ -52,7 +53,7 @@ class IrohAgentMessageSender(
                     val sendStream = stream.send()
                     IrohFrameCodec.write(sendStream, message.encode())
                     sendStream.finish()
-                    val ackWire = withTimeout(ackTimeoutMs) {
+                    val ackWire = withTimeout(ackTimeoutMs.milliseconds) {
                         IrohFrameCodec.readOne(stream.recv())
                     } ?: return@runCatching AgentSendResult.Failed(message.toAgentId, "no_ack")
                     val ack = IrohAgentMessageAck.decode(ackWire)

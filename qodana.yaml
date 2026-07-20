@@ -10,3 +10,63 @@ profile:
   name: qodana.recommended
 include:
   - name: CheckDependencyLicenses
+
+# JVM/desktop/cli sources are analyzed under the Android linter model and
+# produce false-positive NewApi/SDK checks. Keep Android inspections scoped
+# to Android modules; CLI is a pure JVM tool.
+exclude:
+  - name: AndroidLintNewApi
+    paths:
+      - cli
+  - name: AndroidLintInlinedApi
+    paths:
+      - cli
+  - name: AndroidLintObsoleteSdkInt
+    paths:
+      - cli
+  # Dependency-version noise is tracked via Dependabot/Gradle, not Qodana gates.
+  - name: AndroidLintNewerVersionAvailable
+  - name: AndroidLintGradleDependency
+  - name: AndroidLintAndroidGradlePluginVersion
+  # Fake* test doubles inherit these open API/repository classes (mockk ctor
+  # injection). Qodana analyzes production sources and flags the required
+  # `open` modality as redundant; keep inheritance working for fakes.
+  - name: RedundantModalityModifier
+    paths:
+      - core/data/src/main
+      - app/src/main/java/com/letta/mobile/runtime/local
+  # Duplicate-block notes are tracked via CodeScene / review, not this gate.
+  - name: DuplicatedCode
+  # Resource keep rules / build-script false positives without a line anchor.
+  - name: AndroidLintUnusedResources
+    paths:
+      - app/build.gradle.kts
+  # Manifest meta-data string consumed by Sentry SDK (not Kotlin R.string refs).
+  - name: AndroidLintUnusedResources
+    paths:
+      - app/src/main/res/values/sentry.xml
+  # Hilt @Binds/@Provides, Room @Dao/@TypeConverter, and Compose @Preview entry
+  # points look "unused" to static analysis but are required by frameworks.
+  - name: UnusedSymbol
+    paths:
+      - app/src/main/java/com/letta/mobile/di # Hilt @Module/@Binds/@Provides wiring
+      - app/src/play/java/com/letta/mobile/di # play-flavor Hilt modules (RootShellBridgeModule)
+      - core/data/src/main/java/com/letta/mobile/data/local # Room @Dao query methods
+      - core/data/src/main/java/com/letta/mobile/data/session # SessionScoped Hilt factory bindings
+      - core/data/src/main/java/com/letta/mobile/data/model/DomainIdConverters.kt # Room @TypeConverter
+      - designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt # @Preview composables
+      - desktop/src/main/kotlin/com/letta/mobile/desktop # @Composable surfaces wired from LettaDesktopApp/Main
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatUiStateProvider.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/agentlist/AgentListUiStateProvider.kt
+  # Adaptive icons must stay in mipmap-anydpi-v26 (API 26+). Renaming to
+  # mipmap-anydpi to silence ObsoleteSdkInt breaks AAPT linking for play builds.
+  - name: AndroidLintObsoleteSdkInt
+    paths:
+      - app/src/main/res/mipmap-anydpi-v26
+  # SentryInitializer must use Resources.getIdentifier so missing optional
+  # strings (DSN/env/sample-rate) soft-fail; R.string lookups throw and break
+  # App Startup / unit tests when resources are absent.
+  - name: AndroidLintDiscouragedApi
+    paths:
+      - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt

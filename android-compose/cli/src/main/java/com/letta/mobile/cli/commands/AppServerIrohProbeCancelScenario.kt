@@ -13,6 +13,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+import kotlin.time.Duration.Companion.milliseconds
 internal class CancelMidstreamProbeScenario(
     private val options: IrohProbeOptions,
     private val fixture: ProbeSessionFixture,
@@ -70,13 +71,13 @@ internal class CancelMidstreamProbeScenario(
             }
         }
         fixture.sendInputFrame(established, ProbeClientMessageId("probe-cancel-${UUID.randomUUID()}"))
-        while (observed.activeRunId == null && observed.terminalCount == 0) delay(20)
+        while (observed.activeRunId == null && observed.terminalCount == 0) delay(20.milliseconds)
         val runId = observed.activeRunId
         if (runId != null) {
             onAbortJob(launchAbort(established, runId))
         }
-        while (observed.terminalCount == 0) delay(50)
-        delay(500)
+        while (observed.terminalCount == 0) delay(50.milliseconds)
+        delay(500.milliseconds)
         collector.cancelAndJoin()
         val outcome = evaluateCancelOutcome(runId)
         return observed.toMetrics(
@@ -131,12 +132,12 @@ internal class CancelMidstreamProbeScenario(
                     .jsonObject["status"]?.jsonPrimitive?.contentOrNull
             }.getOrNull()
             if (status == null) {
-                delay(250)
+                delay(250.milliseconds)
                 continue
             }
             lastStatus = status
             if (status != "running") return status
-            delay(250)
+            delay(250.milliseconds)
         }
         return lastStatus
     }

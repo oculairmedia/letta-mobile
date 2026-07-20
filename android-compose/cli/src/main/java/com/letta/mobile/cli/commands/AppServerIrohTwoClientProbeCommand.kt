@@ -18,6 +18,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.data.transport.ServerFrame
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-r3i1z (B): HEADLESS TWO-CLIENT LIVE-SYNC PROBE.
  *
@@ -113,7 +115,7 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
             // 1. Both dial + hydrate/subscribe to the same conversation.
             report.record("A.connect", runCatching { clientA.connectAndSubscribe(conv, timeoutMs) })
             report.record("B.connect", runCatching { clientB.connectAndSubscribe(conv, timeoutMs) })
-            delay(settleMs)
+            delay(settleMs.milliseconds)
 
             // 2. Round 1: A sends -> B observes live.
             report.observation(
@@ -142,8 +144,8 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
                 clientB.clearFrames()
                 val sentText = "kyqdt-busy-second-send payload"
                 clientB.send(conv, sentText)
-                val gotTerminal = withTimeoutOrNull(10_000L) {
-                    while (clientB.snapshot().none { it is ServerFrame.TurnDone }) delay(50)
+                val gotTerminal = withTimeoutOrNull(10.seconds) {
+                    while (clientB.snapshot().none { it is ServerFrame.TurnDone }) delay(50.milliseconds)
                     true
                 } == true
                 val result = TwoClientObservation.classify(clientB.snapshot(), sentText, gotTerminal)
@@ -163,7 +165,7 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
             //    proving B auto-re-subscribed on the fresh Ready (deliverable A).
             if (!skipRedial) {
                 report.record("B.redial", runCatching { clientB.redial(conv, timeoutMs) })
-                delay(settleMs)
+                delay(settleMs.milliseconds)
                 report.observation(
                     name = "round3_after_B_redial_A_sends_B_observes",
                     sender = clientA, observer = clientB, conversationId = conv,

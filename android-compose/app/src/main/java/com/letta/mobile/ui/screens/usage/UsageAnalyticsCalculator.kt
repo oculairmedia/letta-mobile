@@ -159,9 +159,6 @@ internal object UsageAnalyticsCalculator {
         val bucketDurationMinutes = (timeRange.hours * 60L) / bucketCount
 
         val buckets = (0 until bucketCount).map { i ->
-            val bucketStart = windowStart.plus(i * bucketDurationMinutes, ChronoUnit.MINUTES)
-            val bucketEnd = windowStart.plus((i + 1) * bucketDurationMinutes, ChronoUnit.MINUTES)
-
             val label = when (timeRange) {
                 TimeRange.ONE_HOUR -> "${i * 10}m"
                 TimeRange.TWENTY_FOUR_HOURS -> "${i * 2}h"

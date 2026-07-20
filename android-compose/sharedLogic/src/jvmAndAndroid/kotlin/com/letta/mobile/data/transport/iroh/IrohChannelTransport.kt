@@ -31,7 +31,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +41,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.runtime.RuntimeEventDraft
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -59,6 +65,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
 import java.util.UUID
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Mobile-compatible [IChannelTransport] backed by the App Server controller path over Iroh.
  *
@@ -122,7 +129,7 @@ class IrohChannelTransport(
         else -> null
     }
 
-    private var activeSendJob: kotlinx.coroutines.Job? = null
+    private var activeSendJob: Job? = null
 
     /**
      * The turn currently being streamed, if any. Holds the promotable run id and
@@ -240,7 +247,7 @@ class IrohChannelTransport(
     // long-lived collector fixes that: while connected it continuously ingests
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
-    private val observerMapper = com.letta.mobile.data.runtime.AppServerRuntimeEventMapper()
+    private val observerMapper = AppServerRuntimeEventMapper()
     private val observerGeneration = atomic(0)
     @Volatile
     private var observerJob: Job? = null
@@ -588,7 +595,7 @@ class IrohChannelTransport(
             deviceId = deviceId,
             clientVersion = clientVersion,
         )
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "IrohTrace", "transport.connect.begin",
             "baseShimUrl" to baseShimUrl,
             "forced" to DEBUG_FORCE_IROH_URL.isNotBlank(),
@@ -596,7 +603,7 @@ class IrohChannelTransport(
         )
         supervisor.refreshConfig()
         val handle = supervisor.ready()
-        com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
+        Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
     }
 
     private suspend fun dial(config: IrohConnectConfig): IrohConnectionHandle {
@@ -612,10 +619,10 @@ class IrohChannelTransport(
         onConnect()
         val localEndpoint = runCatching {
             Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.Companion.defaultMode())
+                EndpointOptions(relayMode = RelayMode.defaultMode())
             )
         }.onFailure { t ->
-            com.letta.mobile.util.Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
+            Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
         }.getOrThrow()
         var transport: IrohAppServerTransport? = null
         // letta-mobile-r3i1z: attribute this connection's loss reports to the
@@ -640,7 +647,7 @@ class IrohChannelTransport(
             // failing them. Send it even with a blank token — servers without
             // a required token still ack and record capabilities.
             val auth = appServerClient.auth(
-                com.letta.mobile.data.transport.appserver.AppServerCommand.Auth(
+                AppServerCommand.Auth(
                     requestId = "auth-${UUID.randomUUID()}",
                     token = config.token,
                     capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
@@ -649,18 +656,18 @@ class IrohChannelTransport(
             if (!auth.success && config.token.isNotBlank()) {
                 throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
             }
-            com.letta.mobile.util.Telemetry.event(
+            Telemetry.event(
                 "IrohTransport", "auth.negotiated",
                 "success" to auth.success,
                 "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
             )
             val engine = AppServerTurnEngine(
                 client = appServerClient,
-                clientInfo = com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo(
+                clientInfo = AppServerRuntimeStartClientInfo(
                     name = "letta-mobile-android-iroh",
                     version = config.clientVersion,
                 ),
-                permissionMode = com.letta.mobile.data.transport.appserver.AppServerPermissionMode.Unrestricted,
+                permissionMode = AppServerPermissionMode.Unrestricted,
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(
@@ -688,7 +695,7 @@ class IrohChannelTransport(
         contentParts: JsonArray?,
         startNewConversation: Boolean,
     ): Boolean {
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "IrohTrace", "transport.send.called",
             "agentId" to agentId,
             "conversationId" to conversationId,
@@ -705,9 +712,9 @@ class IrohChannelTransport(
         )
         activeTurn = turn
         val sendJob = scope.launch {
-            com.letta.mobile.util.Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
+            Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
             val handle = runCatching { supervisor.ready() }.getOrElse { error ->
-                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.ready_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+                Telemetry.event("IrohTransport", "turn.ready_failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
                 emitTurnFrame(
                     turn,
                     ServerFrame.Error(
@@ -741,7 +748,7 @@ class IrohChannelTransport(
                 // terminal — alongside the incoming (rejected) send's identity.
                 val owner = engine.activeTurnOwner
                 val ownerAcquiredAtMs = owner?.acquiredAtMs
-                com.letta.mobile.util.Telemetry.event(
+                Telemetry.event(
                     "IrohTransport", "turn.busy",
                     "turnId" to turnId,
                     "runId" to runId,
@@ -820,10 +827,10 @@ class IrohChannelTransport(
                 }
             }.onFailure { error ->
                 if (error is CancellationException) {
-                    com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to turn.runId)
+                    Telemetry.event("IrohTransport", "turn.cancelled", "turnId" to turnId, "runId" to turn.runId)
                     return@onFailure
                 }
-                com.letta.mobile.util.Telemetry.event("IrohTransport", "turn.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
+                Telemetry.event("IrohTransport", "turn.failed", "error" to (error.message ?: error.toString()), "class" to error::class.simpleName)
                 emitTurnFrame(
                     turn,
                     ServerFrame.Error(
@@ -881,7 +888,7 @@ class IrohChannelTransport(
     }
 
     private fun emitDraft(
-        draft: com.letta.mobile.runtime.RuntimeEventDraft,
+        draft: RuntimeEventDraft,
         turn: ActiveTurn,
     ): List<ServerFrame> {
         val agentId = turn.agentId
@@ -896,14 +903,14 @@ class IrohChannelTransport(
         val realRunId = draft.runId?.value?.takeIf { it.isNotBlank() }
         val promoted = realRunId != null && turn.promoteRunId(realRunId)
         val effectiveRunId = turn.runId
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "IrohTrace", "transport.emitDraft",
             "payload" to (draft.payload::class.simpleName ?: ""),
             "runId" to effectiveRunId,
             "promoted" to promoted,
         )
         val promotionFrames: List<ServerFrame> = if (promoted) {
-            com.letta.mobile.util.Telemetry.event(
+            Telemetry.event(
                 "IrohTransport", "turn.run_id_promoted",
                 "turnId" to turnId,
                 "runId" to effectiveRunId,
@@ -1024,7 +1031,7 @@ class IrohChannelTransport(
             }
             // 2. Bounded wait for the server terminal to flow through the normal
             //    streaming path (emitTurnFrame claims the single terminal).
-            val serverTerminalStatus = withTimeoutOrNull(serverTerminalWaitMs) {
+            val serverTerminalStatus = withTimeoutOrNull(serverTerminalWaitMs.milliseconds) {
                 turn.terminalReached.await()
             }
             // 3. Fallback: only if the server never produced a terminal, synthesize
@@ -1094,7 +1101,7 @@ class IrohChannelTransport(
 
         if (!shouldEscalate) {
             // Retry on the SAME connection (no supervisor invalidation)
-            com.letta.mobile.util.Telemetry.event(
+            Telemetry.event(
                 "IrohTransport", "admin_rpc.retry.same_connection",
                 "method" to method,
                 "path" to path,
@@ -1109,7 +1116,7 @@ class IrohChannelTransport(
             }.getOrElse { retryError ->
                 if (retryError is CancellationException) throw retryError
                 // Second failure on same connection — now escalate
-                com.letta.mobile.util.Telemetry.event(
+                Telemetry.event(
                     "IrohTransport", "admin_rpc.escalate.reconnect",
                     "method" to method,
                     "path" to path,
@@ -1123,7 +1130,7 @@ class IrohChannelTransport(
             }
         } else {
             // Escalate: connection is idle and multiple failures accumulated
-            com.letta.mobile.util.Telemetry.event(
+            Telemetry.event(
                 "IrohTransport", "admin_rpc.escalate.reconnect",
                 "method" to method,
                 "path" to path,
@@ -1161,7 +1168,7 @@ class IrohChannelTransport(
     }
 
     private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
-        com.letta.mobile.util.Telemetry.event(
+        Telemetry.event(
             "IrohTrace", "transport.closeCurrent",
             "reason" to reason,
             "hasTransport" to (transport != null),
@@ -1286,10 +1293,10 @@ class IrohChannelTransport(
         timeoutMs: Long,
         labels: SubagentRpcLabels,
         call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
-        mapSuccess: (kotlinx.serialization.json.JsonElement) -> T,
+        mapSuccess: (JsonElement) -> T,
         onFailure: (String, String) -> T,
     ): T = try {
-        withTimeoutOrNull(timeoutMs) {
+        withTimeoutOrNull(timeoutMs.milliseconds) {
             val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
             if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
             val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")
@@ -1345,7 +1352,7 @@ class IrohChannelTransport(
         val found: Boolean = false,
         val subagent: SubagentEntry? = null,
         val todos: List<SubagentTodo> = emptyList(),
-        @kotlinx.serialization.SerialName("todos_found") val todosFound: Boolean = false,
+        @SerialName("todos_found") val todosFound: Boolean = false,
     )
 
     private data class SubagentRpcScope(val conversationId: String, val agentId: String?)

@@ -60,19 +60,19 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
-internal val ChatComposerAttachButtonSize = LettaSpacing.composerAttachButtonSize
-private val ChatComposerAttachIconSize = LettaSpacing.composerAttachIconSize
-private val ChatComposerInputHorizontalPadding = LettaSpacing.sm
-private val ChatComposerInputVerticalPadding = LettaSpacing.xs
-private val ChatComposerInputItemSpacing = LettaSpacing.xs
+internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
+private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
+private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
+private val ChatComposerInputVerticalPadding = LettaSpacing.XS
+private val ChatComposerInputItemSpacing = LettaSpacing.XS
 
 internal object ChatComposerTestTags {
-    const val AttachmentThumbnail = "chat-composer-attachment-thumbnail"
-    const val AttachmentThumbnailImage = "chat-composer-attachment-thumbnail-image"
-    const val AttachmentThumbnailPlaceholder = "chat-composer-attachment-thumbnail-placeholder"
-    const val AttachmentThumbnailRemoveButton = "chat-composer-attachment-thumbnail-remove"
-    const val AttachmentPreviewDialog = "chat-composer-attachment-preview-dialog"
-    const val AttachmentPreviewImage = "chat-composer-attachment-preview-image"
+    const val ATTACHMENT_THUMBNAIL = "chat-composer-attachment-thumbnail"
+    const val ATTACHMENT_THUMBNAIL_IMAGE = "chat-composer-attachment-thumbnail-image"
+    const val ATTACHMENT_THUMBNAIL_PLACEHOLDER = "chat-composer-attachment-thumbnail-placeholder"
+    const val ATTACHMENT_THUMBNAIL_REMOVE_BUTTON = "chat-composer-attachment-thumbnail-remove"
+    const val ATTACHMENT_PREVIEW_DIALOG = "chat-composer-attachment-preview-dialog"
+    const val ATTACHMENT_PREVIEW_IMAGE = "chat-composer-attachment-preview-image"
 }
 
 /**
@@ -383,7 +383,7 @@ private fun AttachmentThumbnail(
             onClick = onPreview,
             modifier = Modifier
                 .size(64.dp)
-                .testTag(ChatComposerTestTags.AttachmentThumbnail),
+                .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL),
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.surfaceVariant,
         ) {
@@ -393,14 +393,14 @@ private fun AttachmentThumbnail(
                     contentDescription = stringResource(R.string.action_preview_attachment),
                     modifier = Modifier
                         .fillMaxSize()
-                        .testTag(ChatComposerTestTags.AttachmentThumbnailImage),
+                        .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_IMAGE),
                     contentScale = ContentScale.Crop,
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .testTag(ChatComposerTestTags.AttachmentThumbnailPlaceholder),
+                        .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_PLACEHOLDER),
                 )
             }
         }
@@ -417,7 +417,7 @@ private fun AttachmentThumbnail(
                 onClick = onRemove,
                 modifier = Modifier
                     .size(20.dp)
-                    .testTag(ChatComposerTestTags.AttachmentThumbnailRemoveButton),
+                    .testTag(ChatComposerTestTags.ATTACHMENT_THUMBNAIL_REMOVE_BUTTON),
             ) {
                 Icon(
                     LettaIcons.Close,
@@ -445,7 +445,7 @@ private fun AttachmentPreviewDialog(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f))
                 .padding(24.dp)
-                .testTag(ChatComposerTestTags.AttachmentPreviewDialog),
+                .testTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_DIALOG),
             contentAlignment = Alignment.Center,
         ) {
             Surface(
@@ -459,7 +459,7 @@ private fun AttachmentPreviewDialog(
                         contentDescription = stringResource(R.string.action_preview_attachment),
                         modifier = Modifier
                             .fillMaxSize()
-                            .testTag(ChatComposerTestTags.AttachmentPreviewImage),
+                            .testTag(ChatComposerTestTags.ATTACHMENT_PREVIEW_IMAGE),
                         contentScale = ContentScale.Fit,
                     )
                 } else {

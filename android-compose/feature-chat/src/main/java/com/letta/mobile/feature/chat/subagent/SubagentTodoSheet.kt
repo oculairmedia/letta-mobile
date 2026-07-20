@@ -199,16 +199,16 @@ fun SubagentTodoSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(
-                    start = LettaSpacing.lg,
-                    end = LettaSpacing.lg,
-                    bottom = LettaSpacing.xxl,
+                    start = LettaSpacing.LG,
+                    end = LettaSpacing.LG,
+                    bottom = LettaSpacing.XXL,
                 ),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(LettaSpacing.MD),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
             ) {
                 Text(
                     text = description.ifBlank { "Subagent" },
@@ -261,12 +261,12 @@ private fun ViewConversationButton(
 ) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clip(RoundedCornerShape(LettaSpacing.BUBBLE_RADIUS))
             .clickable(onClick = onClick)
-            .padding(horizontal = LettaSpacing.sm, vertical = LettaSpacing.xs)
+            .padding(horizontal = LettaSpacing.SM, vertical = LettaSpacing.XS)
             .semantics { contentDescription = "View conversation: $description" },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
     ) {
         Icon(
             imageVector = LettaIcons.ExternalLink,
@@ -288,7 +288,7 @@ private fun SubagentTodoLoading() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = LettaSpacing.xl),
+            .padding(vertical = LettaSpacing.XL),
         contentAlignment = Alignment.Center,
     ) {
         CircularProgressIndicator(
@@ -304,7 +304,7 @@ private fun SubagentTodoMessage(text: String, color: androidx.compose.ui.graphic
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = LettaSpacing.xl),
+            .padding(vertical = LettaSpacing.XL),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -319,13 +319,13 @@ private fun SubagentTodoMessage(text: String, color: androidx.compose.ui.graphic
 private fun SubagentTodoContent(content: SubagentTodoSheetState.Content) {
     // Progress meter: "N/M done" + a thin bar.
     val progress = content.progress
-    Column(verticalArrangement = Arrangement.spacedBy(LettaSpacing.sm)) {
+    Column(verticalArrangement = Arrangement.spacedBy(LettaSpacing.SM)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics { contentDescription = "Progress: ${progress.label}" },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
         ) {
             LinearProgressIndicator(
                 progress = { progress.fraction },
@@ -344,8 +344,8 @@ private fun SubagentTodoContent(content: SubagentTodoSheetState.Content) {
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 360.dp),
-            contentPadding = PaddingValues(vertical = LettaSpacing.xs),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.xs),
+            contentPadding = PaddingValues(vertical = LettaSpacing.XS),
+            verticalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
         ) {
             items(items = content.items) { item ->
                 SubagentTodoRow(item)
@@ -362,13 +362,13 @@ private fun SubagentTodoRow(item: SubagentTodoItem) {
             .fillMaxWidth()
             .semantics { contentDescription = "$accessibilityStatus: ${item.label}" },
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier
-                .padding(top = LettaSpacing.xxxs)
+                .padding(top = LettaSpacing.XXXS)
                 .size(LettaIconSizing.Status),
             tint = tint,
         )

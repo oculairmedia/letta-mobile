@@ -194,7 +194,6 @@ class ChatPushService : Service() {
     }
 
     private fun createServiceChannelIfNeeded() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val existing = manager.getNotificationChannel(SERVICE_CHANNEL_ID)
         if (existing != null) return

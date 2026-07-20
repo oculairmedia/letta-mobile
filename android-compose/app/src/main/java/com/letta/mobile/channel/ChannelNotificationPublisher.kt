@@ -39,10 +39,6 @@ class ChannelNotificationPublisher @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : IChannelNotificationPublisher {
     fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return
-        }
-
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID,

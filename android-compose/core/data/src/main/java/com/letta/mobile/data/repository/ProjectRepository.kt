@@ -105,7 +105,7 @@ open class ProjectRepository @Inject constructor(
         _projects.update { current ->
             (current + created)
                 .distinctBy { it.identifier }
-                .sortedWith(compareBy<ProjectSummary> { it.name.lowercase() })
+                .sortedWith(compareBy { it.name.lowercase() })
         }
         lastRefreshAtMillis = System.currentTimeMillis()
         return created

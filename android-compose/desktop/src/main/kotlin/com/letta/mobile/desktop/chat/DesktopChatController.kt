@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.attachment.AttachmentLimits
-import com.letta.mobile.data.chat.runtime.ChatComposerError
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
@@ -16,21 +15,15 @@ import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
-import com.letta.mobile.data.timeline.TimelineSyncLoop
-import com.letta.mobile.data.timeline.TimelineStreamFrame
-import com.letta.mobile.data.timeline.TimelineTransport
 import com.letta.mobile.ui.chat.render.ChatTimelineProjector
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.desktop.DesktopBootstrapState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
@@ -687,7 +681,7 @@ class DesktopChatController(
         val generation = ++thinkingGeneration
         _thinkingConversationId.value = conversationId
         scope.launch {
-            kotlinx.coroutines.delay(THINKING_TIMEOUT_MS)
+            kotlinx.coroutines.delay(THINKING_TIMEOUT_MS.milliseconds)
             // Only the timer for the latest send may clear the indicator.
             if (generation == thinkingGeneration && _thinkingConversationId.value == conversationId) {
                 _thinkingConversationId.value = null

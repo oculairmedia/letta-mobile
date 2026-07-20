@@ -8,7 +8,6 @@ import com.letta.mobile.runtime.actions.MobileActionSensitivity
 import com.letta.mobile.runtime.actions.MobileActionToolResponse
 import com.letta.mobile.runtime.actions.MobileExternalToolHandler
 import com.letta.mobile.runtime.actions.newActionId
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.intOrNull
@@ -94,4 +93,3 @@ class NotificationPollTool(
 }
 
 /** Convenience factory used by Hilt to wire the real Android access check. */
-fun newActionIdForNotificationPoll(): String = newActionId()

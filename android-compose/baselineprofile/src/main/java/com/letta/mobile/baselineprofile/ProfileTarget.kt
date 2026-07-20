@@ -25,6 +25,7 @@ internal object ProfileTarget {
      * app window stays hidden, leaving framestats empty. Keep the device in a
      * normal home state before every profile capture.
      */
+    @android.annotation.SuppressLint("DiscouragedApi")
     fun prepareDevice(device: UiDevice) {
         if (!device.isScreenOn) {
             device.wakeUp()
@@ -40,10 +41,12 @@ internal object ProfileTarget {
      * notification permission is the known prompt for benchmark installs; the
      * shell command is intentionally best-effort so older devices keep working.
      */
+    @android.annotation.SuppressLint("DiscouragedApi")
     fun grantOptionalRuntimePermissions(device: UiDevice) {
         device.executeShellCommand("pm grant ${targetPackageName()} android.permission.POST_NOTIFICATIONS")
     }
 
+    @android.annotation.SuppressLint("DiscouragedApi")
     fun startActivityAndWait(scope: MacrobenchmarkScope) {
         prepareDevice(scope.device)
         val automationPayload = InstrumentationRegistry.getArguments()

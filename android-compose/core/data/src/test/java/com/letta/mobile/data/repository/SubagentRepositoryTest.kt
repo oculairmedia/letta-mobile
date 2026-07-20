@@ -21,6 +21,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-73o2h.3 acceptance for the active-subagent registry repo:
  * dedup, push folds-by-replacement, todos round-trip, reconnect resilience.
@@ -62,7 +64,7 @@ class SubagentRepositoryTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"), running("toolu_2"))))
         val repo = SubagentRepository(transport, backgroundScope)
 
-        val subagents = withTimeout(5_000) {
+        val subagents = withTimeout(5.seconds) {
             repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         }
         assertEquals(setOf("toolu_1", "toolu_2"), subagents.map { it.toolCallId }.toSet())
@@ -89,7 +91,7 @@ class SubagentRepositoryTest {
             )
         )
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
+        val after = withTimeout(2.seconds) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
         // Folded by replacement — NO additional subagent_list round-trip.
         assertEquals(1, transport.subagentListCalls.size)
@@ -112,7 +114,7 @@ class SubagentRepositoryTest {
             )
         )
 
-        val after = withTimeout(2_000) {
+        val after = withTimeout(2.seconds) {
             repo.activeSubagentsFlow(parentScope).first { it.singleOrNull()?.status == SubagentStatus.COMPLETED }
         }
         assertEquals(listOf(SubagentStatus.COMPLETED), after.map { it.status })
@@ -136,7 +138,7 @@ class SubagentRepositoryTest {
             )
         )
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
+        val after = withTimeout(2.seconds) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
     }
 
@@ -269,10 +271,10 @@ class SubagentRepositoryTest {
 
         // Simulate a WS drop + reconnect.
         transport.state.value = ChannelTransportState.Disconnected(1000, "idle timeout")
-        delay(10)
+        delay(10.milliseconds)
         transport.state.value = connectedState()
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
+        val after = withTimeout(2.seconds) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         assertEquals(2, after.size)
         assertEquals(2, transport.subagentListCalls.size)
     }

@@ -68,7 +68,7 @@ class ShimBackendDetector internal constructor(
         // Iroh check first — must run before the cache lookup, because a
         // stale cached false from a pre-fix probe would short-circuit.
         if (config.mode != LettaConfig.Mode.LOCAL && config.isIrohBackend()) {
-            _states.value = _states.value + (config.id to true)
+            _states.value += (config.id to true)
             Telemetry.event("Backend", "shim_probe.result",
                 "configId" to config.id, "serverUrl" to config.serverUrl, "isShim" to true)
             return@withLock true
@@ -76,14 +76,14 @@ class ShimBackendDetector internal constructor(
 
         _states.value[config.id]?.let { return@withLock it }
         if (config.mode == LettaConfig.Mode.LOCAL) {
-            _states.value = _states.value + (config.id to false)
+            _states.value += (config.id to false)
             return@withLock false
         }
 
         // Iroh QUIC transport — has no HTTP health endpoint but is a
         // valid remote backend. Treat as a shim for send strategy selection.
         if (config.isIrohBackend()) {
-            _states.value = _states.value + (config.id to true)
+            _states.value += (config.id to true)
             return@withLock true
         }
 
@@ -96,7 +96,7 @@ class ShimBackendDetector internal constructor(
             }
         }.getOrElse { false }
 
-        _states.value = _states.value + (config.id to detected)
+        _states.value += (config.id to detected)
         Telemetry.event(
             "Backend", "shim_probe.result",
             "configId" to config.id,

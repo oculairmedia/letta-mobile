@@ -25,6 +25,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-r3i1z (MOBILE observer ingestion).
  *
@@ -109,8 +111,8 @@ class IrohObserverIngestionTest {
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             // Let the observer collector subscribe to the stream before we emit.
-            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
-            delay(100)
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(100.milliseconds)
 
             // A full fanned-out turn the client did NOT initiate: user echo,
             // cumulative assistant deltas, then a terminal stop_reason.
@@ -119,8 +121,8 @@ class IrohObserverIngestionTest {
             stream.emit(streamDelta("agent-1", "conv-obs", 3, assistantDelta("cm-stream-x", "Hi there")))
             stream.emit(streamDelta("agent-1", "conv-obs", 4, stopReasonDelta("end_turn")))
 
-            withTimeout(5_000) {
-                while (frames.none { it is ServerFrame.TurnDone }) delay(20)
+            withTimeout(5.seconds) {
+                while (frames.none { it is ServerFrame.TurnDone }) delay(20.milliseconds)
             }
 
             val user = frames.filterIsInstance<ServerFrame.UserMessage>()
@@ -157,12 +159,12 @@ class IrohObserverIngestionTest {
         val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
-            delay(100)
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(100.milliseconds)
 
             // Start a LOCAL turn on conv-local; activeTurn is set synchronously.
             assertTrue(transport.send("agent-1", "conv-local", "hi", "otid-local", null, false))
-            withTimeout(2_000) { while (!engine.isBusy) delay(10) }
+            withTimeout(2.seconds) { while (!engine.isBusy) delay(10.milliseconds) }
 
             // Frames for the ACTIVE-turn conversation arrive on the fanout stream:
             // the engine owns them — observer MUST NOT emit them.
@@ -171,10 +173,10 @@ class IrohObserverIngestionTest {
             stream.emit(streamDelta("agent-1", "conv-other", 11, userEchoDelta("otid-other", "other convo")))
             stream.emit(streamDelta("agent-1", "conv-other", 12, assistantDelta("cm-stream-other", "other reply")))
 
-            withTimeout(5_000) {
-                while (frames.none { it is ServerFrame.AssistantMessage && it.content == "other reply" }) delay(20)
+            withTimeout(5.seconds) {
+                while (frames.none { it is ServerFrame.AssistantMessage && it.content == "other reply" }) delay(20.milliseconds)
             }
-            delay(200) // give any (erroneous) engine-owned emit a chance to appear
+            delay(200.milliseconds) // give any (erroneous) engine-owned emit a chance to appear
 
             // The observer emitted conv-other frames...
             assertTrue(
@@ -227,21 +229,21 @@ class IrohObserverIngestionTest {
         val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
-            delay(100)
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(100.milliseconds)
 
             // One frame while connected — ingested.
             stream.emit(streamDelta("agent-1", "conv-obs", 1, assistantDelta("cm-stream-live", "live")))
-            withTimeout(3_000) { while (frames.none { it is ServerFrame.AssistantMessage && it.content == "live" }) delay(20) }
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.AssistantMessage && it.content == "live" }) delay(20.milliseconds) }
 
             // Disconnect stops the observer collector.
             transport.disconnect()
-            delay(150)
+            delay(150.milliseconds)
             val before = frames.size
 
             // Frames after disconnect must NOT be ingested.
             stream.emit(streamDelta("agent-1", "conv-obs", 2, assistantDelta("cm-stream-dead", "dropped")))
-            delay(300)
+            delay(300.milliseconds)
 
             assertEquals(before, frames.size, "no frames ingested after disconnect")
             assertTrue(frames.none { it is ServerFrame.AssistantMessage && it.content == "dropped" }, "post-disconnect frame dropped")
@@ -289,8 +291,8 @@ class IrohObserverIngestionTest {
         val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
-            delay(100)
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(100.milliseconds)
 
             // Sanity: the FIRST connection's observer collector ingests.
             stream1.emit(streamDelta("agent-1", "conv-obs", 1, assistantDelta("cm-before", "before redial")))
@@ -299,11 +301,11 @@ class IrohObserverIngestionTest {
             // REDIAL: connection-lost-class admin_rpc failures on handle1
             // (original + same-connection retry) invalidate the supervisor and
             // redial to handle2. The call itself succeeds on the new handle.
-            val response = withTimeout(10_000) { transport.adminRpc("message.list", "/v1/messages", null) }
+            val response = withTimeout(10.seconds) { transport.adminRpc("message.list", "/v1/messages", null) }
             assertTrue(response.success, "admin_rpc must succeed on the redialed handle")
             assertEquals(2, dials, "escalation must have redialed")
-            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
-            delay(150) // let the re-armed collector subscribe to stream2
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(150.milliseconds) // let the re-armed collector subscribe to stream2
 
             // THE redial-survival assertion: a fanned-out frame arriving on the
             // NEW connection's stream channel is ingested — the observer
@@ -315,7 +317,7 @@ class IrohObserverIngestionTest {
             // a frame on the old stream is neither ingested nor double-consumed.
             val sizeAfterRedialIngest = frames.size
             stream1.emit(streamDelta("agent-1", "conv-obs", 3, assistantDelta("cm-stale", "stale flow")))
-            delay(300)
+            delay(300.milliseconds)
             assertTrue(
                 frames.none { it is ServerFrame.AssistantMessage && it.content == "stale flow" },
                 "stale handle1 collector must not consume after redial",
@@ -335,17 +337,17 @@ class IrohObserverIngestionTest {
         val frames = java.util.concurrent.CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            withTimeout(2_000) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10) }
-            delay(100)
+            withTimeout(2.seconds) { while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds) }
+            delay(100.milliseconds)
 
             stream.emit(streamDelta("agent-1", "conv-red", 1, userEchoDelta("otid-u", "the question")))
             stream.emit(streamDelta("agent-1", "conv-red", 2, assistantDelta("cm-stream-r", "Ans")))
             stream.emit(streamDelta("agent-1", "conv-red", 3, assistantDelta("cm-stream-r", "Answer done")))
             stream.emit(streamDelta("agent-1", "conv-red", 4, stopReasonDelta("end_turn")))
 
-            withTimeout(5_000) { while (frames.none { it is ServerFrame.TurnDone }) delay(20) }
+            withTimeout(5.seconds) { while (frames.none { it is ServerFrame.TurnDone }) delay(20.milliseconds) }
             collector.cancel()
-            delay(50)
+            delay(50.milliseconds)
             val emitted = frames.toList()
 
             // Feed the OBSERVER-emitted ServerFrames through the real reducer path,
@@ -391,7 +393,7 @@ class IrohObserverIngestionTest {
         frames: List<ServerFrame>,
         content: String,
         timeoutMs: Long = 5_000,
-    ) = withTimeout(timeoutMs) {
-        while (frames.none { it is ServerFrame.AssistantMessage && it.content == content }) delay(20)
+    ) = withTimeout(timeoutMs.milliseconds) {
+        while (frames.none { it is ServerFrame.AssistantMessage && it.content == content }) delay(20.milliseconds)
     }
 }

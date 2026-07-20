@@ -121,12 +121,12 @@ private fun unescapeJsonStringLiteral(source: String, startIndex: Int): String =
     var index = startIndex
     while (index < source.length) {
         val char = source[index]
-        when {
-            char == '\\' && index + 1 < source.length -> {
+        when (char) {
+            '\\' if index + 1 < source.length -> {
                 appendEscapedJsonChar(source[index + 1])
                 index += 2
             }
-            char == '"' -> return@buildString
+            '"' -> return@buildString
             else -> {
                 append(char)
                 index++

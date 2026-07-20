@@ -18,6 +18,8 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-d52f.2 acceptance: dedup, push refresh, response-bound
  * mutations, reconnect resilience. Uses [FakeChannelTransport] so tests
@@ -60,7 +62,7 @@ class CronRepositoryTest {
         )
         val repo = CronRepository(transport, backgroundScope)
 
-        val tasks = withTimeout(5_000) {
+        val tasks = withTimeout(5.seconds) {
             repo.schedulesFlow("agent-y").first { it.isNotEmpty() }
         }
         assertEquals(setOf("t1", "t2"), tasks.map { it.id }.toSet())
@@ -103,8 +105,8 @@ class CronRepositoryTest {
         )
 
         // Both scopes should refresh — wait until the second emission arrives.
-        val agentA = withTimeout(2_000) { repo.schedulesFlow("agent-a").first { it.size == 2 } }
-        val agentB = withTimeout(2_000) { repo.schedulesFlow("agent-b").first { it.size == 2 } }
+        val agentA = withTimeout(2.seconds) { repo.schedulesFlow("agent-a").first { it.size == 2 } }
+        val agentB = withTimeout(2.seconds) { repo.schedulesFlow("agent-b").first { it.size == 2 } }
         assertEquals(2, agentA.size)
         assertEquals(2, agentB.size)
 
@@ -212,10 +214,10 @@ class CronRepositoryTest {
         // Simulate a WS drop + reconnect.
         transport.state.value = ChannelTransportState.Disconnected(1000, "idle timeout")
         // Yield once so the observer sees the Disconnected state.
-        delay(10)
+        delay(10.milliseconds)
         transport.state.value = connectedState()
 
-        val after = withTimeout(2_000) { repo.schedulesFlow("agent-x").first { it.size == 2 } }
+        val after = withTimeout(2.seconds) { repo.schedulesFlow("agent-x").first { it.size == 2 } }
         assertEquals(2, after.size)
         assertEquals(2, transport.cronListCalls.count { it.agentId == "agent-x" })
     }

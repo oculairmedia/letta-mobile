@@ -1,10 +1,13 @@
 package com.letta.mobile.util
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -27,6 +30,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import kotlin.time.Duration.Companion.milliseconds
 internal fun defaultConnectivityScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -93,8 +97,16 @@ class ConnectivityMonitor(
         stopMonitoring()
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun startMonitoring() {
         if (isMonitoring) return
+        // ACCESS_NETWORK_STATE is a normal (install-time) permission declared on the
+        // app and this library manifest. Explicit check keeps the contract obvious.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         isMonitoring = true
 
         val request = NetworkRequest.Builder()
@@ -144,7 +156,7 @@ class ConnectivityMonitor(
         lastPingTime = now
 
         scope.launch {
-            delay(200)
+            delay(200.milliseconds)
             
             if (settingsRepository.activeConfig.value == null) return@launch
             val url = "${apiClient.getBaseUrl().trimEnd('/')}/v1/agents?limit=1"

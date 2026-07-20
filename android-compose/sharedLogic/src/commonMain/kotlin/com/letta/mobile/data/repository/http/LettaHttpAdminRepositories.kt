@@ -10,7 +10,6 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.model.LettaConfig
-import com.letta.mobile.data.model.ProjectId
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage

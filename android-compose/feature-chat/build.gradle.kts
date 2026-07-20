@@ -50,7 +50,7 @@ android {
                 // Memory caps follow the app/core test-worker defaults.
                 it.maxHeapSize = "1536m"
                 it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
-                it.setForkEvery(100L)
+                it.forkEvery = 100L
             }
         }
     }

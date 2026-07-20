@@ -28,11 +28,7 @@ data class RootShellAvailability(
     val status: RootShellAvailabilityStatus,
     val providerHint: String? = null,
     val reason: String,
-) {
-    val mayRequestGrant: Boolean
-        get() = status == RootShellAvailabilityStatus.SuAvailable ||
-            status == RootShellAvailabilityStatus.NeedsDetection
-}
+)
 
 enum class RootShellAvailabilityStatus {
     UnsupportedBuild,

@@ -32,8 +32,6 @@ data class A2uiSurfaceState(
     val dataModel: A2uiDataModel = A2uiDataModel(),
     val dataModelRevision: Long = 0L,
 ) {
-    val rootComponent: A2uiComponent?
-        get() = rootComponentId?.let(components::get)
 }
 
 class A2uiSurfaceManager(
@@ -102,12 +100,6 @@ object A2uiBindingResolver {
         path: String,
         value: JsonElement?,
     ): A2uiDataModel = dataModel.apply { applyPatch(path, value) }
-
-    fun applyDataModelPatch(
-        dataModel: JsonElement,
-        path: String,
-        value: JsonElement?,
-    ): JsonElement = A2uiJsonPointer.applyPatch(dataModel, path, value)
 
     fun displayText(value: JsonElement): String = when (value) {
         JsonNull -> ""

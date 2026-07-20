@@ -6,7 +6,7 @@ import android.content.Context
 import javax.inject.Inject
 
 class AndroidClipboardProvider @Inject constructor(
-    private val context: Context,
+    context: Context,
 ) : ClipboardProvider {
     private val appContext = context.applicationContext
 

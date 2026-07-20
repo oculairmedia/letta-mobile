@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Owns the transport-level resources the desktop App Server gateway wires at
  * create() time — the iroh endpoint+transport pair, or the WebSocket
@@ -38,7 +39,7 @@ internal class DesktopTransportResources internal constructor(
         if (!closed.compareAndSet(false, true)) return
         runBlocking {
             teardownSteps.forEach { step ->
-                runCatching { withTimeoutOrNull(stepTimeoutMs) { step() } }
+                runCatching { withTimeoutOrNull(stepTimeoutMs.milliseconds) { step() } }
             }
         }
     }

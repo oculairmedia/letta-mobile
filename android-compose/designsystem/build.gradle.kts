@@ -45,7 +45,7 @@ android {
                 // Memory caps — see core/build.gradle.kts for rationale.
                 it.maxHeapSize = "1024m"
                 it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=256m")
-                it.setForkEvery(100L)
+                it.forkEvery = 100L
             }
         }
     }

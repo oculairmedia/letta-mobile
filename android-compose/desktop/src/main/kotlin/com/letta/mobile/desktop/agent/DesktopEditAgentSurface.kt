@@ -197,7 +197,7 @@ internal fun DesktopEditAgentSurface(
                 // and each block is its own round-trip, so doing them in series is
                 // the save lag. Unchanged fields cost nothing.
                 coroutineScope {
-                    buildList<Deferred<Unit>> {
+                    buildList {
                         if (nameChanged || modelValue != loadedModel) add(
                             async {
                                 agentRepository.updateAgent(

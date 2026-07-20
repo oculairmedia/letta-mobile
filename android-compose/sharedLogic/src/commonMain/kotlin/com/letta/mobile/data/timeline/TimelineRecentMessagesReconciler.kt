@@ -62,7 +62,7 @@ class TimelineRecentMessagesReconciler(
         allowWhileStreamActive: Boolean = false,
     ): Int {
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
-        var appended = 0
+        var appended: Int
         try {
             if (streamSubscriberActive.value && !allowWhileStreamActive) {
                 Telemetry.event(

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.core.net.toUri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -44,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -261,8 +263,9 @@ private fun SystemAccessSummaryCard(state: SystemAccessDashboardUiState) {
             headlineContent = { Text(stringResource(R.string.screen_system_access_summary_headline)) },
             supportingContent = {
                 Text(
-                    text = stringResource(
-                        R.string.screen_system_access_summary_body,
+                    text = pluralStringResource(
+                        R.plurals.screen_system_access_summary_body,
+                        state.grantedCount,
                         state.grantedCount,
                         state.visibleCount,
                         state.flavor.label,
@@ -401,7 +404,7 @@ private fun SystemAccessPermissionIntent.toAndroidIntent(context: Context): Inte
         when (action) {
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
             Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-            -> data = Uri.parse("package:${context.packageName}")
+            -> data = "package:${context.packageName}".toUri()
         }
         if (context !is Activity) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

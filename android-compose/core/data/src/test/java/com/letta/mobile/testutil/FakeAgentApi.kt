@@ -13,6 +13,7 @@ import com.letta.mobile.data.model.ProjectId
 import io.mockk.mockk
 import kotlinx.coroutines.delay
 
+import kotlin.time.Duration.Companion.milliseconds
 class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
     var agents = mutableListOf<Agent>()
     var shouldFail = false
@@ -31,7 +32,7 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         calls.add("listAgentsSlim")
         slimLimits.add(limit)
         slimOffsets.add(offset)
-        if (listDelayMillis > 0L) delay(listDelayMillis)
+        if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
         if (shouldFail) throw ApiException(failCode, failMessage)
         val filtered = tags?.takeIf { it.isNotEmpty() }?.let { requiredTags ->
             agents.filter { agent -> requiredTags.all { it in agent.tags } }
@@ -45,7 +46,7 @@ class FakeAgentApi : AgentApi(mockk(relaxed = true)) {
         calls.add("listAgents")
         listLimits.add(limit)
         listOffsets.add(offset)
-        if (listDelayMillis > 0L) delay(listDelayMillis)
+        if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
         if (shouldFail) throw ApiException(failCode, failMessage)
         val filtered = tags?.takeIf { it.isNotEmpty() }?.let { requiredTags ->
             agents.filter { agent -> requiredTags.all { it in agent.tags } }

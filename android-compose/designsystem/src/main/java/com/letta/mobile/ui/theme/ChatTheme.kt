@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.theme
 
-import com.letta.mobile.ui.theme.LettaCodeFont
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -143,13 +142,17 @@ fun LettaChatTheme(
 }
 
 val MaterialTheme.chatColors: ChatColors
+    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatColors.current
 
 val MaterialTheme.chatTypography: ChatTypography
+    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatTypography.current
 
 val MaterialTheme.chatShapes: ChatShapes
+    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatShapes.current
 
 val MaterialTheme.chatDimens: ChatDimens
+    @Suppress("UnusedReceiverParameter")
     @Composable @ReadOnlyComposable get() = LocalChatDimens.current

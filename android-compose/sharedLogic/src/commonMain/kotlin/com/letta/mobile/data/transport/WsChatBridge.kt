@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.mapNotNull
@@ -57,8 +58,8 @@ class WsChatBridge(
     fun isConnected(): Boolean = transport.state.value is ChannelTransportState.Connected
 
     suspend fun awaitConnected(): WsConnectionState.Connected = transport.state
-        .filter { it is ChannelTransportState.Connected }
-        .map { state -> (state as ChannelTransportState.Connected).toConnectionState() }
+        .filterIsInstance<ChannelTransportState.Connected>()
+        .map { it.toConnectionState() }
         .first()
 
     /** High-level event stream tailored for chat consumers. */

@@ -1,5 +1,8 @@
+@file:SuppressLint("RestrictedApi")
+
 package com.letta.mobile.ui.theme
 
+import android.annotation.SuppressLint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
@@ -13,6 +16,9 @@ import com.google.android.material.color.utilities.Hct
  * toward the seed while preserving tone and chroma as much as the sRGB gamut
  * allows. Container harmonization can additionally move tone just far enough to
  * keep the paired content color above the requested contrast floor.
+ *
+ * Material ships HCT/Blend as `@RestrictTo(LIBRARY_GROUP)` helpers; suppress
+ * RestrictedApi for this intentional theme-harmonization use.
  */
 object HctColorHarmonizer {
     fun harmonize(
@@ -92,7 +98,7 @@ object HctColorHarmonizer {
     private fun contrastRatio(foreground: Color, background: Color): Double =
         ColorUtils.calculateContrast(foreground.toOpaqueArgb(), background.toOpaqueArgb())
 
-    private fun Color.toOpaqueArgb(): Int = ColorUtils.setAlphaComponent(toArgb(), OpaqueAlpha)
+    private fun Color.toOpaqueArgb(): Int = ColorUtils.setAlphaComponent(toArgb(), OPAQUE_ALPHA)
 
     private fun Hct.toComposeColor(alpha: Float = 1f): Color = Color(toInt()).copy(alpha = alpha)
 
@@ -103,7 +109,7 @@ object HctColorHarmonizer {
 
     private const val DEFAULT_STRENGTH = 0.15f
     private const val MIN_CONTENT_CONTRAST_RATIO = 4.5
-    private const val OpaqueAlpha = 255
+    private const val OPAQUE_ALPHA = 255
     private const val MIN_TONE = 0.0
     private const val MAX_TONE = 100.0
     private const val MAX_TONE_SEARCH_STEPS = 100

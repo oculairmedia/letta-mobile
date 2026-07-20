@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonArray
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Hand-written fake for [IChannelTransport]. It keeps tests away from
  * MockK bytecode instrumentation on the stateful concrete WebSocket
@@ -163,7 +164,7 @@ class FakeChannelTransport(
         conversationId: String?,
         timeoutMs: Long,
     ): ServerFrame.CronListResponse {
-        if (cronListDelayMs > 0) delay(cronListDelayMs)
+        if (cronListDelayMs > 0) delay(cronListDelayMs.milliseconds)
         val call = CronListCall(agentId, conversationId)
         cronListCalls += call
         return cronListResponses[call]?.removeFirstOrNull()
@@ -230,7 +231,7 @@ class FakeChannelTransport(
         all: Boolean,
         timeoutMs: Long,
     ): ServerFrame.SubagentListResponse {
-        if (subagentListDelayMs > 0) delay(subagentListDelayMs)
+        if (subagentListDelayMs > 0) delay(subagentListDelayMs.milliseconds)
         subagentListCalls += all
         return subagentListResponses.removeFirstOrNull()
             ?: error("No fake subagent_list response queued")

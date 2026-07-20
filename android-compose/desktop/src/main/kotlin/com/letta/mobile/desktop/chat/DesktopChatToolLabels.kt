@@ -68,7 +68,7 @@ internal fun UiToolCall.stepSummary(): String {
     val resultLine = result?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotBlank() }
     return when {
         !resultLine.isNullOrBlank() && resultLine.length <= 28 -> resultLine
-        executionTimeMs != null -> "${executionTimeMs} ms"
+        executionTimeMs != null -> "$executionTimeMs ms"
         else -> ""
     }
 }

@@ -26,6 +26,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * P3 client residuals over a fake in-process App Server engine (no QUIC):
  *  - real cancel: abort_message is sent, and a cancelled terminal is emitted
@@ -67,21 +69,21 @@ class IrohChannelTransportCancelTest {
         val frames = mutableListOf<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            delay(150) // let the SharedFlow collector subscribe before frames are emitted
+            delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
             transport.send("agent-1", "conv-1", "hi", "otid-1", null, false)
             // Wait until the turn is streaming (TurnStarted observed) AND the
             // runtime is established so abort has a scope to address.
-            withTimeout(3_000) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10) }
-            withTimeout(3_000) { while (!client.inputReceived) delay(10) }
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds) }
+            withTimeout(3.seconds) { while (!client.inputReceived) delay(10.milliseconds) }
 
             assertTrue(transport.cancel("conv-1"))
 
             // The server never emits a terminal, so the synthetic fallback fires.
-            withTimeout(3_000) {
-                while (frames.none { it is ServerFrame.TurnDone && it.status == "cancelled" }) delay(10)
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.TurnDone && it.status == "cancelled" }) delay(10.milliseconds)
             }
             // Let any (incorrect) duplicate terminal race in.
-            delay(300)
+            delay(300.milliseconds)
 
             assertTrue(client.abortCommands.isNotEmpty(), "cancel must send an abort_message")
             assertEquals(
@@ -104,15 +106,15 @@ class IrohChannelTransportCancelTest {
         val frames = mutableListOf<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            delay(150) // let the SharedFlow collector subscribe before frames are emitted
+            delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
             transport.send("agent-1", "conv-1", "hi", "otid-1", null, false)
-            withTimeout(3_000) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10) }
-            withTimeout(3_000) { while (!client.inputReceived) delay(10) }
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds) }
+            withTimeout(3.seconds) { while (!client.inputReceived) delay(10.milliseconds) }
 
             assertTrue(transport.cancel("conv-1"))
 
-            withTimeout(3_000) { while (frames.none { it is ServerFrame.TurnDone }) delay(10) }
-            delay(400) // longer than serverTerminalWaitMs to expose a stray synthetic
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.TurnDone }) delay(10.milliseconds) }
+            delay(400.milliseconds) // longer than serverTerminalWaitMs to expose a stray synthetic
 
             assertTrue(client.abortCommands.isNotEmpty())
             assertEquals(
@@ -133,9 +135,9 @@ class IrohChannelTransportCancelTest {
         val frames = mutableListOf<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
-            delay(150) // let the SharedFlow collector subscribe before frames are emitted
+            delay(150.milliseconds) // let the SharedFlow collector subscribe before frames are emitted
             transport.send("agent-1", "conv-1", "hi", "otid-1", null, false)
-            withTimeout(3_000) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10) }
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds) }
             // TurnStarted is emitted by the transport BEFORE the engine subscribes
             // to client.events (subscription happens inside runTurn's collector,
             // after runtimeStart). Gate on inputReceived — set once the engine has
@@ -144,17 +146,17 @@ class IrohChannelTransportCancelTest {
             // emitted into a subscriber-less (replay=0) flow and dropped. Without
             // this gate the assistant frame races the subscription and is lost under
             // CPU load, timing out the "hello" await.
-            withTimeout(3_000) { while (!client.inputReceived) delay(10) }
-            withTimeout(3_000) { while (!client.hasEventSubscriber) delay(10) }
+            withTimeout(3.seconds) { while (!client.inputReceived) delay(10.milliseconds) }
+            withTimeout(3.seconds) { while (!client.hasEventSubscriber) delay(10.milliseconds) }
 
             // The first assistant frame carries the real server run id.
             client.emitAssistant(messageId = "letta-msg-1", content = "hello", runId = REAL_RUN_ID)
-            withTimeout(3_000) {
-                while (frames.none { it is ServerFrame.AssistantMessage && it.content.contains("hello") }) delay(10)
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.AssistantMessage && it.content.contains("hello") }) delay(10.milliseconds)
             }
             // Terminal so the turn resolves with the promoted run id.
             client.emitStopReason(runId = REAL_RUN_ID)
-            withTimeout(3_000) { while (frames.none { it is ServerFrame.TurnDone }) delay(10) }
+            withTimeout(3.seconds) { while (frames.none { it is ServerFrame.TurnDone }) delay(10.milliseconds) }
 
             val turnStarts = frames.filterIsInstance<ServerFrame.TurnStarted>()
             assertTrue(turnStarts.size >= 2, "expected a re-emitted TurnStarted after promotion, got ${turnStarts.size}")

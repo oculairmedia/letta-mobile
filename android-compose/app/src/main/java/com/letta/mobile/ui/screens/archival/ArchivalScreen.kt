@@ -276,7 +276,7 @@ private fun PassageDetailDialog(
                 Text(stringResource(R.string.screen_archival_created_label, it), style = MaterialTheme.typography.bodySmall)
             }
             val meta = passage.metadata
-            if (!meta.isNullOrEmpty()) {
+            if (meta.isNotEmpty()) {
                 Text(stringResource(R.string.screen_archival_metadata_title), style = MaterialTheme.typography.labelLarge)
                 meta.entries.forEach { (key, value) ->
                     Text(
