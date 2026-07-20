@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import com.autonomousapps.DependencyAnalysisExtension
 import io.gitlab.arturbosch.detekt.Detekt
 
