@@ -25,6 +25,7 @@ import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.ui.test.setLettaTestContent
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.feature.chat.screen.AgentScaffoldContent
+import com.letta.mobile.feature.chat.screen.AgentScaffoldNavigationCallbacks
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -81,6 +82,14 @@ class AgentScaffoldHiltTest {
         lastMessageAt = "2026-05-01T12:00:00Z",
     )
 
+    private fun testNavigation(
+        onNavigateBack: () -> Unit = {},
+        onNavigateToSettings: (String) -> Unit = {},
+    ) = AgentScaffoldNavigationCallbacks(
+        onNavigateBack = onNavigateBack,
+        onNavigateToSettings = onNavigateToSettings,
+    )
+
     @Before
     fun setup() {
         viewModel = mockk(relaxed = true)
@@ -107,8 +116,7 @@ class AgentScaffoldHiltTest {
     fun drawerOpensWhenMenuIconTapped() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -123,8 +131,7 @@ class AgentScaffoldHiltTest {
         var settingsCalledWith = ""
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = { settingsCalledWith = it },
+                navigation = testNavigation(onNavigateToSettings = { settingsCalledWith = it }),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -141,8 +148,7 @@ class AgentScaffoldHiltTest {
     fun drawerResetMessagesCallsViewModel() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -157,8 +163,7 @@ class AgentScaffoldHiltTest {
     fun menuClickRefreshesContextWindowAndOpensDrawer() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -173,8 +178,7 @@ class AgentScaffoldHiltTest {
     fun searchActionShowsGlobalSearchFieldAndForwardsQuery() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -215,8 +219,7 @@ class AgentScaffoldHiltTest {
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -245,8 +248,7 @@ class AgentScaffoldHiltTest {
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -270,8 +272,7 @@ class AgentScaffoldHiltTest {
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
@@ -287,8 +288,7 @@ class AgentScaffoldHiltTest {
 
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
-                onNavigateBack = {},
-                onNavigateToSettings = {},
+                navigation = testNavigation(),
                 conversationRepository = conversationRepository,
                 viewModel = viewModel,
             )
