@@ -111,7 +111,11 @@ if [[ -n "$base_ref" ]]; then
 else
   changed_files="$(git -C "$REPO_ROOT" diff --name-only HEAD)"
 fi
-if printf '%s\n' "$changed_files" | rg -v \
+architecture_changes="$(printf '%s\n' "$changed_files" | rg \
+  '^(\.github/workflows/architecture-graph\.yml|\.github/workflows/qodana_code_quality\.yml|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$' || true)"
+if [[ -z "$architecture_changes" ]]; then
+  pass 'Code-intelligence boundary check skipped for unrelated changes'
+elif printf '%s\n' "$changed_files" | rg -v \
   '^(\.github/workflows/architecture-graph\.yml|\.github/workflows/qodana_code_quality\.yml|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$' | rg -q .; then
   fail 'Code-intelligence stack changes stay within declared boundaries'
 else
