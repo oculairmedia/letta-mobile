@@ -99,7 +99,7 @@ class RouteSerializationTest {
             projectGitUrl = "https://github.com/test/repo",
             projectLastSyncAt = "2024-01-01T00:00:00Z",
             projectActiveCodingAgents = "agent-a,agent-b",
-            projectStartAction = ProjectChatStartAction.BugReport,
+            projectStartAction = ProjectChatStartAction.BUG_REPORT,
         )
         verifyRoundTrip(route)
     }

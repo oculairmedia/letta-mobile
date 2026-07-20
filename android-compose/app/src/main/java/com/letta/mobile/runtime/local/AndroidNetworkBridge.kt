@@ -492,7 +492,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
                         write(buffer, 0, allowed)
                         flush()
                     }
-                    throw IllegalStateException("Response body exceeds ${limit} bytes.")
+                    throw IllegalStateException("Response body exceeds $limit bytes.")
                 }
                 write(buffer, 0, read)
                 flush()

@@ -112,7 +112,7 @@ class TagDrillInViewModel @Inject constructor(
                     source?.let { it.entityType == item.entityType && it.entityId == item.id } == true
                 }
                 .distinctBy { "${it.entityType}:${it.id}" }
-                .sortedWith(compareBy<TagDrillInItem>({ it.entityType.ordinal }, { it.title.lowercase() }))
+                .sortedWith(compareBy({ it.entityType.ordinal }, { it.title.lowercase() }))
                 .toImmutableList()
 
             _uiState.value = TagDrillInUiState(

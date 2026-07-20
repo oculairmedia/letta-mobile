@@ -212,7 +212,7 @@ class AgentRepositoryTest {
             id = "local-agent-1",
             model = "anthropic/claude-3-5-sonnet",
         ).copy(
-            metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+            metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
         )
 
         assertFalse(AgentRuntimeBinding.isLocalBound(agent))
@@ -344,7 +344,7 @@ class AgentRepositoryTest {
             AgentCreateParams(
                 name = "Local",
                 model = "google/gemma-3n-E2B-it-litert-lm",
-                metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+                metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
                 toolIds = listOf(com.letta.mobile.data.model.ToolId("tool-1")),
                 includeBaseTools = true,
             )
@@ -356,7 +356,7 @@ class AgentRepositoryTest {
         assertTrue(agent.tools.isEmpty())
         assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
         assertEquals(listOf(agent.id.value), fakeDao.getAllOnce().map { it.id })
-        assertEquals(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime, fakeDao.getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RuntimeKey]?.jsonPrimitive?.contentOrNull)
+        assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, fakeDao.getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RUNTIME_KEY]?.jsonPrimitive?.contentOrNull)
         assertFalse(fakeApi.calls.any { it.startsWith("createAgent") })
     }
 

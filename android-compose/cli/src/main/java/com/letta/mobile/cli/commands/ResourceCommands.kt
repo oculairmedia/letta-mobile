@@ -275,7 +275,7 @@ private data class ResourceEndpoint(
 
     private fun valueCountError(): UsageError {
         val expected = if (argumentNames.isEmpty()) "no path values" else argumentNames.joinToString(" ")
-        return UsageError("${name} expects $expected")
+        return UsageError("$name expects $expected")
     }
 }
 

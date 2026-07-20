@@ -167,23 +167,23 @@ class AgentListViewModelTest {
         val captured = paramsSlot.captured
         assertEquals(AgentId("local-agent-test"), createdId)
         assertEquals("google/gemma-test-litert-lm", captured.model)
-        assertEquals(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime, captured.modelSettings?.providerType)
+        assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, captured.modelSettings?.providerType)
         assertEquals(false, captured.modelSettings?.parallelToolCalls)
         assertNull(captured.toolIds)
         assertEquals(false, captured.includeBaseTools)
         assertEquals(false, captured.enableSleeptime)
         assertEquals(false, captured.parallelToolCalls)
         assertEquals(
-            LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
-            captured.metadata?.get(LocalAgentRuntimeMetadata.RuntimeKey)?.jsonPrimitive?.contentOrNull,
+            LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME,
+            captured.metadata?.get(LocalAgentRuntimeMetadata.RUNTIME_KEY)?.jsonPrimitive?.contentOrNull,
         )
         assertEquals(
-            "${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:local-config",
-            captured.metadata?.get(LocalAgentRuntimeMetadata.RuntimeIdKey)?.jsonPrimitive?.contentOrNull,
+            "${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:local-config",
+            captured.metadata?.get(LocalAgentRuntimeMetadata.RUNTIME_ID_KEY)?.jsonPrimitive?.contentOrNull,
         )
         assertEquals(
             "google/gemma-test-litert-lm",
-            captured.metadata?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
+            captured.metadata?.get(LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY)?.jsonPrimitive?.contentOrNull,
         )
         coVerify(exactly = 0) { agentRepository.createAgent(any()) }
         coVerify(exactly = 1) { agentRepository.createLocalAgent(any()) }
@@ -207,7 +207,7 @@ class AgentListViewModelTest {
         assertEquals(
             "MiniMax-M3",
             paramsSlot.captured.metadata
-                ?.get(LocalAgentRuntimeMetadata.LocalModelHandleKey)?.jsonPrimitive?.contentOrNull,
+                ?.get(LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY)?.jsonPrimitive?.contentOrNull,
         )
     }
 
@@ -468,7 +468,7 @@ class AgentListViewModelTest {
                 Agent(
                     id = AgentId("metadata-local"),
                     name = "Local metadata",
-                    metadata = mapOf(LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime)),
+                    metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
                 ),
             )
         )

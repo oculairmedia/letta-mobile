@@ -180,7 +180,7 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
         )
         toolCall.executionTimeMs?.let { ms ->
             Text(
-                text = "${toolCall.status?.replaceFirstChar { it.uppercase() } ?: "Done"} · ${ms} ms",
+                text = "${toolCall.status?.replaceFirstChar { it.uppercase() } ?: "Done"} · $ms ms",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

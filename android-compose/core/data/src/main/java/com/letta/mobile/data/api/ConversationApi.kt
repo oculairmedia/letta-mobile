@@ -143,7 +143,7 @@ open class ConversationApi @Inject constructor(
             contentType(ContentType.Application.Json)
             parameter("dry_run", dryRun)
             setBody(
-                buildMap<String, String?> {
+                buildMap {
                     put("agent_id", agentId?.value)
                 }.filterValues { it != null }
             )

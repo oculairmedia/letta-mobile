@@ -240,8 +240,8 @@ fun ProjectHomeScreen(
                     modifier = Modifier
                         .padding(paddingValues)
                         .fillMaxSize()
-                        .padding(LettaSpacing.screenHorizontal),
-                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                        .padding(LettaSpacing.SCREEN_HORIZONTAL),
+                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                 ) {
                     for (i in 0..5) {
                         ShimmerBox(height = 120.dp, widthFraction = 1f)
@@ -301,9 +301,9 @@ fun ProjectHomeScreen(
                         LazyVerticalGrid(
                             modifier = Modifier.fillMaxSize(),
                             columns = GridCells.Adaptive(minSize = minTileWidth),
-                            contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
-                            verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-                            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                            contentPadding = PaddingValues(LettaSpacing.SCREEN_HORIZONTAL),
+                            verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+                            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                         ) {
                             items(filteredProjects, key = { it.identifier }) { project ->
                                 ProjectTile(
@@ -495,17 +495,17 @@ fun ProjectHomeScreen(
                     ActionSheetItem(
                         text = stringResource(R.string.screen_projects_active_agents_action),
                         icon = LettaIcons.People,
-                        onClick = { openProjectChat(ProjectChatStartAction.ActiveAgents) },
+                        onClick = { openProjectChat(ProjectChatStartAction.ACTIVE_AGENTS) },
                     )
                     ActionSheetItem(
                         text = stringResource(R.string.screen_projects_project_brief_action),
                         icon = LettaIcons.FileOpen,
-                        onClick = { openProjectChat(ProjectChatStartAction.ProjectBrief) },
+                        onClick = { openProjectChat(ProjectChatStartAction.PROJECT_BRIEF) },
                     )
                     ActionSheetItem(
                         text = stringResource(R.string.screen_project_bug_report_open),
                         icon = LettaIcons.Error,
-                        onClick = { openProjectChat(ProjectChatStartAction.BugReport) },
+                        onClick = { openProjectChat(ProjectChatStartAction.BUG_REPORT) },
                     )
                     ActionSheetItem(
                         text = stringResource(R.string.screen_projects_open_chat_action),

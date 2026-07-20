@@ -220,8 +220,8 @@ fun ProjectIssuesScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
-                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                        contentPadding = PaddingValues(LettaSpacing.SCREEN_HORIZONTAL),
+                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                     ) {
                         item {
                             IssueFilterRow(
@@ -351,8 +351,8 @@ fun ProjectIssueDetailScreen(
                     modifier = Modifier
                         .padding(paddingValues)
                         .fillMaxSize(),
-                    contentPadding = PaddingValues(LettaSpacing.screenHorizontal),
-                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                    contentPadding = PaddingValues(LettaSpacing.SCREEN_HORIZONTAL),
+                    verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                 ) {
                     item { ProjectIssueHeader(issue = state.data.issue) }
                     item { ProjectIssueBody(issue = state.data.issue) }
@@ -422,8 +422,8 @@ private fun ProjectIssuesLoading(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(LettaSpacing.screenHorizontal),
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+            .padding(LettaSpacing.SCREEN_HORIZONTAL),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
     ) {
         repeat(5) { ShimmerBox(height = 104.dp, widthFraction = 1f) }
     }

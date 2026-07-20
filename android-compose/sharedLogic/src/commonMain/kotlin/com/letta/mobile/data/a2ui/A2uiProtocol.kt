@@ -323,9 +323,9 @@ fun decodeA2uiMessagesLenient(json: Json, raw: String): List<A2uiMessage>? {
         substr += "\""
     }
 
-    var openBraces = substr.count { it == '{' }
+    val openBraces = substr.count { it == '{' }
     var closeBraces = substr.count { it == '}' }
-    var openBrackets = substr.count { it == '[' }
+    val openBrackets = substr.count { it == '[' }
     var closeBrackets = substr.count { it == ']' }
 
     while (openBrackets > closeBrackets) {

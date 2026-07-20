@@ -37,9 +37,9 @@ private fun repairOpenCodeFence(text: String): String? {
 private fun repairOpenDisplayMath(text: String): String? {
     if (!hasOpenDisplayMathFence(text)) return null
     return if (text.endsWith('$')) {
-        text + "$"
+        "${text}$"
     } else {
-        text + "$$"
+        "${text}$$"
     }
 }
 

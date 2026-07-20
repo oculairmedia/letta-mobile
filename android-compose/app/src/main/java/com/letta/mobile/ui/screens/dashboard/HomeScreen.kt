@@ -312,8 +312,8 @@ private fun HomeContent(
                 color = MaterialTheme.colorScheme.errorContainer,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = LettaSpacing.screenHorizontal)
-                    .padding(bottom = LettaSpacing.cardGap),
+                    .padding(horizontal = LettaSpacing.SCREEN_HORIZONTAL)
+                    .padding(bottom = LettaSpacing.CARD_GAP),
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
@@ -351,17 +351,17 @@ private fun HomeContent(
         } else {
             Column(
                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
             ) {
                 if (state.isPinnedItemsLoading) {
                     Column(
-                        modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
-                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                        modifier = Modifier.padding(horizontal = LettaSpacing.SCREEN_HORIZONTAL),
+                        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                     ) {
                         for (row in 0..2) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                             ) {
                                 for (col in 0..2) {
                                     ShimmerBox(
@@ -383,7 +383,7 @@ private fun HomeContent(
                         onConfigureAgent = { onNavigateToEditAgent(it.id) },
                         onReorder = onReorderPinnedItems,
                         columns = 3,
-                        modifier = Modifier.padding(horizontal = LettaSpacing.screenHorizontal),
+                        modifier = Modifier.padding(horizontal = LettaSpacing.SCREEN_HORIZONTAL),
                     )
                 }
             }

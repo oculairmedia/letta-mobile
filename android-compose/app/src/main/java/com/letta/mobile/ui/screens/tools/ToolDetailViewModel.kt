@@ -43,7 +43,7 @@ class ToolDetailViewModel @Inject constructor(
     private val _deleteState = MutableStateFlow<UiState<Unit>?>(null)
     val deleteState: StateFlow<UiState<Unit>?> = _deleteState.asStateFlow()
 
-    private val _agentState = MutableStateFlow<ToolAgentAttachmentUiState>(ToolAgentAttachmentUiState())
+    private val _agentState = MutableStateFlow(ToolAgentAttachmentUiState())
     val agentState: StateFlow<ToolAgentAttachmentUiState> = _agentState.asStateFlow()
 
     init {

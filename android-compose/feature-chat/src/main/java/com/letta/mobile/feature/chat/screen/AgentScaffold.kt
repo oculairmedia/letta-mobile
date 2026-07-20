@@ -153,7 +153,7 @@ internal fun AgentScaffoldContent(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showBugReportSheet by rememberSaveable { mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BugReport) }
+    var showBugReportSheet by rememberSaveable { mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BUG_REPORT) }
     var showAgentSwitcher by remember { mutableStateOf(false) }
     var isChatSearchExpanded by rememberSaveable { mutableStateOf(false) }
     val chatSearchFocusRequester = remember { FocusRequester() }

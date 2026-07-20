@@ -344,7 +344,7 @@ internal fun ReorderableWidgetGrid(
             }
     }
 
-    val gap = LettaSpacing.cardGap
+    val gap = LettaSpacing.CARD_GAP
     val rows = (currentList.size + columns - 1) / columns
     // Tile content (icon + optional contextual text + label + padding) lands
     // around ~96-100dp. Pad to 108 so wider text doesn't clip. Items inside
@@ -421,7 +421,7 @@ internal fun ReorderablePinnedItemsGrid(
             }
     }
 
-    val gap = LettaSpacing.cardGap
+    val gap = LettaSpacing.CARD_GAP
     val rows = (currentList.size + columns - 1) / columns
     // Tile content (icon + 1-2 text lines + padding) lands around 96-100dp
     // for both shortcut and agent tiles. Pad to 108 so wider text doesn't
@@ -508,7 +508,7 @@ internal fun ReorderableAgentGrid(
             }
     }
 
-    val gap = LettaSpacing.cardGap
+    val gap = LettaSpacing.CARD_GAP
     val rows = (currentList.size + columns - 1) / columns
     // Agent tile content (icon + name + subtitle + padding) is similar to
     // shortcut tiles — ~90dp. Pad to 100 for safety.

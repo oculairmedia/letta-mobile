@@ -335,13 +335,13 @@ fun AgentListScreen(
                                 state = gridState,
                                 columns = GridCells.Adaptive(minSize = minTileWidth),
                                 contentPadding = PaddingValues(
-                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
-                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
+                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
                                 ),
-                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+                                horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                             ) {
                                 if (uiState.isHydrating) {
                                     item(
@@ -385,12 +385,12 @@ fun AgentListScreen(
                             LazyColumn(
                                 state = listState,
                                 contentPadding = PaddingValues(
-                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
-                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+                                    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
+                                    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+                                    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
                                 ),
-                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
+                                verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
                             ) {
                                 if (uiState.isHydrating) {
                                     item(key = "agent-hydrating-banner") {
@@ -533,7 +533,7 @@ internal fun AgentHydratingBanner(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = LettaSpacing.cardGap),
+            .padding(bottom = LettaSpacing.CARD_GAP),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
         ),

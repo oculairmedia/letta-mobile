@@ -450,7 +450,7 @@ data class Timeline(
                 events = events.filterNot { event ->
                     event is TimelineEvent.Confirmed && event.serverId in removeServerIds
                 }.toPersistentList(),
-                abandonedAssistantFragmentSuppressions = buildList<AbandonedAssistantFragmentSuppression> {
+                abandonedAssistantFragmentSuppressions = buildList {
                     addAll(abandonedAssistantFragmentSuppressions)
                     addAll(suppressions)
                 }.takeLast(MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS).toPersistentSet(),
