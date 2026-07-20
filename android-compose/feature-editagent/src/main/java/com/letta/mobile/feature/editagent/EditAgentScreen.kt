@@ -1,9 +1,12 @@
 package com.letta.mobile.feature.editagent
 
+import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -13,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,12 +32,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.data.model.EmbeddingModel
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
+import com.letta.mobile.ui.common.SnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -245,11 +253,7 @@ internal fun EditAgentScreenContent(
     val snackbar = LocalSnackbarDispatcher.current
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    var showActionSheet by remember { mutableStateOf(false) }
-    var showCloneDialog by remember { mutableStateOf(false) }
-    var showResetDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var showSectionIndex by remember { mutableStateOf(false) }
+    val dialogState = rememberEditAgentDialogState()
     val lazyListState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -257,151 +261,208 @@ internal fun EditAgentScreenContent(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
-            val agentName = (uiState as? UiState.Success)?.data?.name?.takeIf { it.isNotBlank() }
-            LargeFlexibleTopAppBar(
-                title = {
-                    if (agentName != null) {
-                        Row(
-                            modifier = Modifier.clickable { showSectionIndex = true },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            Text(
-                                text = agentName,
-                                style = MaterialTheme.typography.titleLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            Icon(
-                                LettaIcons.ExpandMore,
-                                contentDescription = stringResource(R.string.screen_agent_edit_jump_to_section),
-                            )
-                        }
+            EditAgentTopBar(
+                uiState = uiState,
+                scrollBehavior = scrollBehavior,
+                dialogState = dialogState,
+                onNavigateBack = onNavigateBack,
+                onSave = {
+                    viewModel.saveAgent {
+                        snackbar.dispatch(context.getString(R.string.screen_agent_edit_agent_saved))
                     }
                 },
-                colors = LettaTopBarDefaults.largeTopAppBarColors(),
-                scrollBehavior = scrollBehavior,
-                actions = topBarActions,
             )
-        }
+        },
     ) { paddingValues ->
-        when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
-            is UiState.Error -> ErrorContent(
-                message = state.message,
-                onRetry = { viewModel.loadAgent() },
-                modifier = Modifier.padding(paddingValues)
-            )
-            is UiState.Success -> {
-                val callbacks = viewModel.contentCallbacks(
-                    onResetMessages = { showResetDialog = true },
-                    onDeleteAgent = { showDeleteDialog = true },
-                )
-                EditAgentContent(
-                    state = state.data,
-                    llmModels = llmModels,
-                    embeddingModels = embeddingModels,
-                    onNameChange = callbacks.onNameChange,
-                    onDescriptionChange = callbacks.onDescriptionChange,
-                    onModelChange = callbacks.onModelChange,
-                    onEmbeddingChange = callbacks.onEmbeddingChange,
-                    onLoadModels = callbacks.onLoadModels,
-                    onBlockValueChange = callbacks.onBlockValueChange,
-                    onBlockDescriptionChange = callbacks.onBlockDescriptionChange,
-                    onBlockLimitChange = callbacks.onBlockLimitChange,
-                    onAddBlock = callbacks.onAddBlock,
-                    onAttachExistingBlock = callbacks.onAttachExistingBlock,
-                    onAttachExistingBlocks = callbacks.onAttachExistingBlocks,
-                    onDeleteBlock = callbacks.onDeleteBlock,
-                    onAddTag = callbacks.onAddTag,
-                    onRemoveTag = callbacks.onRemoveTag,
-                    onAttachTool = callbacks.onAttachTool,
-                    onAttachTools = callbacks.onAttachTools,
-                    onDetachTool = callbacks.onDetachTool,
-                    onToolRulesJsonChange = callbacks.onToolRulesJsonChange,
-                    onAddAgentSecret = callbacks.onAddAgentSecret,
-                    onAgentSecretKeyChange = callbacks.onAgentSecretKeyChange,
-                    onAgentSecretValueChange = callbacks.onAgentSecretValueChange,
-                    onRemoveAgentSecret = callbacks.onRemoveAgentSecret,
-                    onAddToolEnvironmentVariable = callbacks.onAddToolEnvironmentVariable,
-                    onToolEnvironmentVariableKeyChange = callbacks.onToolEnvironmentVariableKeyChange,
-                    onToolEnvironmentVariableValueChange = callbacks.onToolEnvironmentVariableValueChange,
-                    onRemoveToolEnvironmentVariable = callbacks.onRemoveToolEnvironmentVariable,
-                    onSystemPromptChange = callbacks.onSystemPromptChange,
-                    onProviderTypeChange = callbacks.onProviderTypeChange,
-                    onTemperatureChange = callbacks.onTemperatureChange,
-                    onMaxOutputTokensChange = callbacks.onMaxOutputTokensChange,
-                    onParallelToolCallsChange = callbacks.onParallelToolCallsChange,
-                    onModelProviderNameChange = callbacks.onModelProviderNameChange,
-                    onModelProviderCategoryChange = callbacks.onModelProviderCategoryChange,
-                    onModelEnableReasonerChange = callbacks.onModelEnableReasonerChange,
-                    onModelReasoningEffortChange = callbacks.onModelReasoningEffortChange,
-                    onModelMaxReasoningTokensChange = callbacks.onModelMaxReasoningTokensChange,
-                    onModelReasoningJsonChange = callbacks.onModelReasoningJsonChange,
-                    onModelFrequencyPenaltyChange = callbacks.onModelFrequencyPenaltyChange,
-                    onModelVerbosityChange = callbacks.onModelVerbosityChange,
-                    onModelStrictToolCallingChange = callbacks.onModelStrictToolCallingChange,
-                    onModelResponseFormatJsonChange = callbacks.onModelResponseFormatJsonChange,
-                    onModelResponseSchemaJsonChange = callbacks.onModelResponseSchemaJsonChange,
-                    onModelThinkingConfigJsonChange = callbacks.onModelThinkingConfigJsonChange,
-                    onModelPutInnerThoughtsInKwargsChange = callbacks.onModelPutInnerThoughtsInKwargsChange,
-                    onModelToolCallParserChange = callbacks.onModelToolCallParserChange,
-                    onModelAnthropicEffortChange = callbacks.onModelAnthropicEffortChange,
-                    onContextWindowChange = callbacks.onContextWindowChange,
-                    onEnableSleeptimeChange = callbacks.onEnableSleeptimeChange,
-                    onSummarizationPromptChange = callbacks.onSummarizationPromptChange,
-                    onCompactionClipCharsChange = callbacks.onCompactionClipCharsChange,
-                    onSlidingWindowPercentageChange = callbacks.onSlidingWindowPercentageChange,
-                    onPromptAcknowledgementChange = callbacks.onPromptAcknowledgementChange,
-                    onCompactionModeChange = callbacks.onCompactionModeChange,
-                    onCompactionModelChange = callbacks.onCompactionModelChange,
-                    onCompactionModelSettingsJsonChange = callbacks.onCompactionModelSettingsJsonChange,
-                    onResetMessages = callbacks.onResetMessages,
-                    onDeleteAgent = callbacks.onDeleteAgent,
-                    contentPadding = paddingValues,
-                    lazyListState = lazyListState,
-                )
-
-                if (showSectionIndex) {
-                    SectionIndexSheet(
-                        onDismiss = { showSectionIndex = false },
-                        onSelect = { targetKey ->
-                            showSectionIndex = false
-                            coroutineScope.launch {
-                                lazyListState.animateScrollToKey(targetKey)
-                            }
-                        },
-                    )
-                }
-
-                EditAgentDialogs(
-                    visibility = EditAgentDialogVisibility(
-                        actionSheet = EditAgentDialogToggle(
-                            visible = showActionSheet,
-                            onVisibleChange = { showActionSheet = it },
-                        ),
-                        resetDialog = EditAgentDialogToggle(
-                            visible = showResetDialog,
-                            onVisibleChange = { showResetDialog = it },
-                        ),
-                        deleteDialog = EditAgentDialogToggle(
-                            visible = showDeleteDialog,
-                            onVisibleChange = { showDeleteDialog = it },
-                        ),
-                        cloneDialog = EditAgentDialogToggle(
-                            visible = showCloneDialog,
-                            onVisibleChange = { showCloneDialog = it },
-                        ),
-                    ),
-                    host = EditAgentDialogsHost(
-                        agentState = state.data,
-                        viewModel = viewModel,
-                        snackbar = snackbar,
-                        context = context,
-                        onNavigateBack = onNavigateBack,
-                    ),
-                )
-            }
-        }
+        EditAgentScreenBody(
+            uiState = uiState,
+            llmModels = llmModels,
+            embeddingModels = embeddingModels,
+            viewModel = viewModel,
+            paddingValues = paddingValues,
+            lazyListState = lazyListState,
+            dialogState = dialogState,
+            snackbar = snackbar,
+            context = context,
+            onNavigateBack = onNavigateBack,
+            coroutineScope = coroutineScope,
+        )
     }
 }
+
+private class EditAgentDialogState {
+    var showActionSheet by mutableStateOf(false)
+    var showCloneDialog by mutableStateOf(false)
+    var showResetDialog by mutableStateOf(false)
+    var showDeleteDialog by mutableStateOf(false)
+    var showSectionIndex by mutableStateOf(false)
+}
+
+@Composable
+private fun rememberEditAgentDialogState(): EditAgentDialogState = remember { EditAgentDialogState() }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditAgentTopBar(
+    uiState: UiState<EditAgentUiState>,
+    scrollBehavior: TopAppBarScrollBehavior,
+    dialogState: EditAgentDialogState,
+    onNavigateBack: () -> Unit,
+    onSave: () -> Unit,
+) {
+    val agentName = (uiState as? UiState.Success)?.data?.name?.takeIf { it.isNotBlank() }
+    LargeFlexibleTopAppBar(
+        title = {
+            if (agentName != null) {
+                EditAgentTitleJumpControl(
+                    agentName = agentName,
+                    onClick = { dialogState.showSectionIndex = true },
+                )
+            }
+        },
+        colors = LettaTopBarDefaults.largeTopAppBarColors(),
+        scrollBehavior = scrollBehavior,
+        navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+            }
+        },
+        actions = {
+            IconButton(onClick = onSave) {
+                Icon(LettaIcons.Save, contentDescription = stringResource(R.string.action_save_changes))
+            }
+            IconButton(onClick = { dialogState.showActionSheet = true }) {
+                Icon(LettaIcons.MoreVert, contentDescription = "More actions")
+            }
+        },
+    )
+}
+
+@Composable
+private fun EditAgentTitleJumpControl(
+    agentName: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = agentName,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Icon(
+            LettaIcons.ExpandMore,
+            contentDescription = stringResource(R.string.screen_agent_edit_jump_to_section),
+        )
+    }
+}
+
+@Composable
+private fun EditAgentScreenBody(
+    uiState: UiState<EditAgentUiState>,
+    llmModels: List<LlmModel>,
+    embeddingModels: List<EmbeddingModel>,
+    viewModel: EditAgentViewModel,
+    paddingValues: PaddingValues,
+    lazyListState: LazyListState,
+    dialogState: EditAgentDialogState,
+    snackbar: SnackbarDispatcher,
+    context: Context,
+    onNavigateBack: () -> Unit,
+    coroutineScope: CoroutineScope,
+) {
+    when (val state = uiState) {
+        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+        is UiState.Error -> ErrorContent(
+            message = state.message,
+            onRetry = { viewModel.loadAgent() },
+            modifier = Modifier.padding(paddingValues),
+        )
+        is UiState.Success -> EditAgentLoadedContent(
+            agentState = state.data,
+            llmModels = llmModels,
+            embeddingModels = embeddingModels,
+            viewModel = viewModel,
+            paddingValues = paddingValues,
+            lazyListState = lazyListState,
+            dialogState = dialogState,
+            snackbar = snackbar,
+            context = context,
+            onNavigateBack = onNavigateBack,
+            coroutineScope = coroutineScope,
+        )
+    }
+}
+
+@Composable
+private fun EditAgentLoadedContent(
+    agentState: EditAgentUiState,
+    llmModels: List<LlmModel>,
+    embeddingModels: List<EmbeddingModel>,
+    viewModel: EditAgentViewModel,
+    paddingValues: PaddingValues,
+    lazyListState: LazyListState,
+    dialogState: EditAgentDialogState,
+    snackbar: SnackbarDispatcher,
+    context: Context,
+    onNavigateBack: () -> Unit,
+    coroutineScope: CoroutineScope,
+) {
+    val callbacks = viewModel.contentCallbacks(
+        onResetMessages = { dialogState.showResetDialog = true },
+        onDeleteAgent = { dialogState.showDeleteDialog = true },
+    )
+    EditAgentContent(
+        state = agentState,
+        llmModels = llmModels,
+        embeddingModels = embeddingModels,
+        callbacks = callbacks,
+        contentPadding = paddingValues,
+        lazyListState = lazyListState,
+    )
+    if (dialogState.showSectionIndex) {
+        SectionIndexSheet(
+            onDismiss = { dialogState.showSectionIndex = false },
+            onSelect = { targetKey ->
+                dialogState.showSectionIndex = false
+                coroutineScope.launch {
+                    lazyListState.animateScrollToKey(targetKey)
+                }
+            },
+        )
+    }
+    EditAgentDialogs(
+        visibility = dialogState.toVisibility(),
+        host = EditAgentDialogsHost(
+            agentState = agentState,
+            viewModel = viewModel,
+            snackbar = snackbar,
+            context = context,
+            onNavigateBack = onNavigateBack,
+        ),
+    )
+}
+
+private fun EditAgentDialogState.toVisibility(): EditAgentDialogVisibility =
+    EditAgentDialogVisibility(
+        actionSheet = EditAgentDialogToggle(
+            visible = showActionSheet,
+            onVisibleChange = { showActionSheet = it },
+        ),
+        resetDialog = EditAgentDialogToggle(
+            visible = showResetDialog,
+            onVisibleChange = { showResetDialog = it },
+        ),
+        deleteDialog = EditAgentDialogToggle(
+            visible = showDeleteDialog,
+            onVisibleChange = { showDeleteDialog = it },
+        ),
+        cloneDialog = EditAgentDialogToggle(
+            visible = showCloneDialog,
+            onVisibleChange = { showCloneDialog = it },
+        ),
+    )
