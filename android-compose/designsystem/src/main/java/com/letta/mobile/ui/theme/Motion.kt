@@ -30,49 +30,49 @@ import androidx.compose.ui.unit.IntSize
  * easing used for readable local state changes.
  */
 object LettaMotion {
-    const val StreamingSizeMillis = LettaMotionTokens.StreamingSizeMillis
-    const val ContentSizeMillis = LettaMotionTokens.ContentSizeMillis
-    const val EnterMillis = LettaMotionTokens.EnterMillis
-    const val ExitMillis = LettaMotionTokens.ExitMillis
-    const val FastFadeInMillis = LettaMotionTokens.FastFadeInMillis
-    const val FastFadeOutMillis = LettaMotionTokens.FastFadeOutMillis
-    const val ChipMillis = LettaMotionTokens.ChipMillis
+    const val STREAMING_SIZE_MILLIS = LettaMotionTokens.STREAMING_SIZE_MILLIS
+    const val CONTENT_SIZE_MILLIS = LettaMotionTokens.CONTENT_SIZE_MILLIS
+    const val ENTER_MILLIS = LettaMotionTokens.ENTER_MILLIS
+    const val EXIT_MILLIS = LettaMotionTokens.EXIT_MILLIS
+    const val FAST_FADE_IN_MILLIS = LettaMotionTokens.FAST_FADE_IN_MILLIS
+    const val FAST_FADE_OUT_MILLIS = LettaMotionTokens.FAST_FADE_OUT_MILLIS
+    const val CHIP_MILLIS = LettaMotionTokens.CHIP_MILLIS
 
     val streamingSizeSpec: FiniteAnimationSpec<IntSize> =
-        tween(durationMillis = StreamingSizeMillis, easing = LinearEasing)
+        tween(durationMillis = STREAMING_SIZE_MILLIS, easing = LinearEasing)
 
     val contentSizeSpec: FiniteAnimationSpec<IntSize> =
-        tween(durationMillis = ContentSizeMillis, easing = FastOutSlowInEasing)
+        tween(durationMillis = CONTENT_SIZE_MILLIS, easing = FastOutSlowInEasing)
 
     val instantSizeSpec: FiniteAnimationSpec<IntSize> = snap()
 
     val chipSizeSpec: FiniteAnimationSpec<IntSize> =
-        tween(durationMillis = ChipMillis, easing = LinearOutSlowInEasing)
+        tween(durationMillis = CHIP_MILLIS, easing = LinearOutSlowInEasing)
 
     val chipFadeInSpec: FiniteAnimationSpec<Float> =
-        tween(durationMillis = FastFadeInMillis, easing = LinearOutSlowInEasing)
+        tween(durationMillis = FAST_FADE_IN_MILLIS, easing = LinearOutSlowInEasing)
 
     val chipFadeOutSpec: FiniteAnimationSpec<Float> =
-        tween(durationMillis = FastFadeOutMillis, easing = FastOutLinearInEasing)
+        tween(durationMillis = FAST_FADE_OUT_MILLIS, easing = FastOutLinearInEasing)
 
     val chipCrossfadeSpec: FiniteAnimationSpec<Float> =
-        tween(durationMillis = ChipMillis, easing = FastOutSlowInEasing)
+        tween(durationMillis = CHIP_MILLIS, easing = FastOutSlowInEasing)
 
     fun expandEnter(
         expandFrom: Alignment.Vertical = Alignment.Top,
     ): EnterTransition =
-        fadeIn(animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing)) +
+        fadeIn(animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing)) +
             expandVertically(
-                animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing),
                 expandFrom = expandFrom,
             )
 
     fun expandExit(
         shrinkTowards: Alignment.Vertical = Alignment.Top,
     ): ExitTransition =
-        fadeOut(animationSpec = tween(durationMillis = FastFadeOutMillis, easing = FastOutLinearInEasing)) +
+        fadeOut(animationSpec = tween(durationMillis = FAST_FADE_OUT_MILLIS, easing = FastOutLinearInEasing)) +
             shrinkVertically(
-                animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                animationSpec = tween(durationMillis = EXIT_MILLIS, easing = FastOutLinearInEasing),
                 shrinkTowards = shrinkTowards,
             )
 
@@ -82,24 +82,24 @@ object LettaMotion {
     // fadeIn. Visually communicates 'the card is opening' rather than
     // 'content appeared.' Mirrored cleanly on collapse.
     fun unfurlEnter(): EnterTransition =
-        fadeIn(animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing)) +
+        fadeIn(animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing)) +
             expandHorizontally(
-                animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing),
                 expandFrom = Alignment.Start,
             ) +
             expandVertically(
-                animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing),
                 expandFrom = Alignment.Top,
             )
 
     fun unfurlExit(): ExitTransition =
-        fadeOut(animationSpec = tween(durationMillis = FastFadeOutMillis, easing = FastOutLinearInEasing)) +
+        fadeOut(animationSpec = tween(durationMillis = FAST_FADE_OUT_MILLIS, easing = FastOutLinearInEasing)) +
             shrinkHorizontally(
-                animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                animationSpec = tween(durationMillis = EXIT_MILLIS, easing = FastOutLinearInEasing),
                 shrinkTowards = Alignment.Start,
             ) +
             shrinkVertically(
-                animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                animationSpec = tween(durationMillis = EXIT_MILLIS, easing = FastOutLinearInEasing),
                 shrinkTowards = Alignment.Top,
             )
 
@@ -111,13 +111,13 @@ object LettaMotion {
         slideDivisor: Int = 5,
         expandFrom: Alignment.Vertical = Alignment.Top,
     ): EnterTransition =
-        fadeIn(animationSpec = tween(durationMillis = FastFadeInMillis, easing = LinearOutSlowInEasing)) +
+        fadeIn(animationSpec = tween(durationMillis = FAST_FADE_IN_MILLIS, easing = LinearOutSlowInEasing)) +
             slideInVertically(
-                animationSpec = tween<IntOffset>(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing),
                 initialOffsetY = { it / slideDivisor },
             ) +
             expandVertically(
-                animationSpec = tween(durationMillis = EnterMillis, easing = LinearOutSlowInEasing),
+                animationSpec = tween(durationMillis = ENTER_MILLIS, easing = LinearOutSlowInEasing),
                 expandFrom = expandFrom,
             )
 
@@ -125,13 +125,13 @@ object LettaMotion {
         slideDivisor: Int = 5,
         shrinkTowards: Alignment.Vertical = Alignment.Top,
     ): ExitTransition =
-        fadeOut(animationSpec = tween(durationMillis = FastFadeOutMillis, easing = FastOutLinearInEasing)) +
+        fadeOut(animationSpec = tween(durationMillis = FAST_FADE_OUT_MILLIS, easing = FastOutLinearInEasing)) +
             slideOutVertically(
-                animationSpec = tween<IntOffset>(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                animationSpec = tween(durationMillis = EXIT_MILLIS, easing = FastOutLinearInEasing),
                 targetOffsetY = { it / slideDivisor },
             ) +
             shrinkVertically(
-                animationSpec = tween(durationMillis = ExitMillis, easing = FastOutLinearInEasing),
+                animationSpec = tween(durationMillis = EXIT_MILLIS, easing = FastOutLinearInEasing),
                 shrinkTowards = shrinkTowards,
             )
 

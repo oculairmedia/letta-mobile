@@ -158,7 +158,7 @@ internal fun Modifier.chatFadingEdges(
  * scale (letta-mobile-awbf) so the fade reads as a deliberate, tokenized
  * polish detail rather than a magic number.
  */
-internal val ChatFadeEdgeLength: Dp = LettaSpacing.xxl // 32.dp
+internal val ChatFadeEdgeLength: Dp = LettaSpacing.XXL // 32.dp
 
 /**
  * Composable convenience wrapper that boxes [content] with the fading-edge

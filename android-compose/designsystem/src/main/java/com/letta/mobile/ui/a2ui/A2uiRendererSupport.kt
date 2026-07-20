@@ -555,13 +555,13 @@ internal enum class ScheduleSelectorMode(
 }
 
 internal enum class A2uiBooleanInputKind(val testTag: String) {
-    Checkbox(A2uiTestTags.Checkbox),
-    Switch(A2uiTestTags.Switch),
+    Checkbox(A2uiTestTags.CHECKBOX),
+    Switch(A2uiTestTags.SWITCH),
 }
 
 internal enum class A2uiMediaKind(val testTag: String) {
-    Video(A2uiTestTags.Video),
-    Audio(A2uiTestTags.AudioPlayer),
+    Video(A2uiTestTags.VIDEO),
+    Audio(A2uiTestTags.AUDIO_PLAYER),
 }
 
 internal data class A2uiRadioOption(

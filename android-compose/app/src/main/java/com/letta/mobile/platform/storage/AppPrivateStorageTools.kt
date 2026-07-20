@@ -35,7 +35,7 @@ class AppPrivateStorageTools @Inject constructor(
         root: AppPrivateStorageRoot,
         path: String = ".",
         limit: Int = StorageAccessLimits.DEFAULT_MAX_DIRECTORY_ENTRIES,
-    ): StorageToolResult<StorageListResponse> = withToolAccess(AndroidStorageToolIds.AppPrivateRead) {
+    ): StorageToolResult<StorageListResponse> = withToolAccess(AndroidStorageToolIds.APP_PRIVATE_READ) {
         val safeLimit = limit.coerceIn(1, StorageAccessLimits.DEFAULT_MAX_DIRECTORY_ENTRIES)
         val directory = resolveContained(root, path).getOrElse { exception ->
             return@withToolAccess invalidPathFailure(exception)
@@ -65,7 +65,7 @@ class AppPrivateStorageTools @Inject constructor(
         root: AppPrivateStorageRoot,
         path: String,
         maxBytes: Long = StorageAccessLimits.DEFAULT_MAX_READ_BYTES,
-    ): StorageToolResult<StorageReadResponse> = withToolAccess(AndroidStorageToolIds.AppPrivateRead) {
+    ): StorageToolResult<StorageReadResponse> = withToolAccess(AndroidStorageToolIds.APP_PRIVATE_READ) {
         val safeMaxBytes = maxBytes.coerceIn(1, StorageAccessLimits.DEFAULT_MAX_READ_BYTES)
         val file = resolveContained(root, path).getOrElse { exception ->
             return@withToolAccess invalidPathFailure(exception)
@@ -100,7 +100,7 @@ class AppPrivateStorageTools @Inject constructor(
         path: String,
         content: ByteArray,
         overwrite: Boolean = false,
-    ): StorageToolResult<StorageWriteResponse> = withToolAccess(AndroidStorageToolIds.AppPrivateWrite) {
+    ): StorageToolResult<StorageWriteResponse> = withToolAccess(AndroidStorageToolIds.APP_PRIVATE_WRITE) {
         if (content.size > StorageAccessLimits.DEFAULT_MAX_WRITE_BYTES) {
             return@withToolAccess storageFailure(
                 StorageToolErrorCode.TooLarge,

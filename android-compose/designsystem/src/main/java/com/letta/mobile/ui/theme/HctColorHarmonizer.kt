@@ -98,7 +98,7 @@ object HctColorHarmonizer {
     private fun contrastRatio(foreground: Color, background: Color): Double =
         ColorUtils.calculateContrast(foreground.toOpaqueArgb(), background.toOpaqueArgb())
 
-    private fun Color.toOpaqueArgb(): Int = ColorUtils.setAlphaComponent(toArgb(), OpaqueAlpha)
+    private fun Color.toOpaqueArgb(): Int = ColorUtils.setAlphaComponent(toArgb(), OPAQUE_ALPHA)
 
     private fun Hct.toComposeColor(alpha: Float = 1f): Color = Color(toInt()).copy(alpha = alpha)
 
@@ -109,7 +109,7 @@ object HctColorHarmonizer {
 
     private const val DEFAULT_STRENGTH = 0.15f
     private const val MIN_CONTENT_CONTRAST_RATIO = 4.5
-    private const val OpaqueAlpha = 255
+    private const val OPAQUE_ALPHA = 255
     private const val MIN_TONE = 0.0
     private const val MAX_TONE = 100.0
     private const val MAX_TONE_SEARCH_STEPS = 100

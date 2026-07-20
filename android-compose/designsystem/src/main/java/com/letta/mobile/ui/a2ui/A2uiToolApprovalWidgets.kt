@@ -55,7 +55,7 @@ internal fun A2uiToolApprovalCard(
 ) {
     val props = remember(component.raw) { component.toolApprovalProps() }
     if (props == null) {
-        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+        A2uiSkeletonCard(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
         return
     }
 
@@ -104,7 +104,7 @@ internal fun A2uiToolApprovalCard(
                 contentDescription = "Tool approval for ${props.toolName}, ${props.risk.label} risk"
                 stateDescription = result?.statusLabel() ?: "Awaiting approval"
             }
-            .testTag(A2uiTestTags.ToolApprovalCard),
+            .testTag(A2uiTestTags.TOOL_APPROVAL_CARD),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -330,7 +330,7 @@ internal fun ToolApprovalArgumentRow(
         val valueModifier = if (argument.isSensitive && !revealed) {
             Modifier
                 .clickable(onClickLabel = "Reveal value for ${argument.key}") { onReveal() }
-                .testTag(A2uiTestTags.ToolApprovalSensitiveValue)
+                .testTag(A2uiTestTags.TOOL_APPROVAL_SENSITIVE_VALUE)
         } else {
             Modifier
         }
@@ -353,7 +353,7 @@ internal fun ToolApprovalStatusLine(
     val text = result?.statusLabel() ?: "Auto-denies in ${remainingSeconds}s"
     Text(
         text = text,
-        modifier = Modifier.testTag(A2uiTestTags.ToolApprovalCountdown),
+        modifier = Modifier.testTag(A2uiTestTags.TOOL_APPROVAL_COUNTDOWN),
         style = MaterialTheme.typography.labelMedium,
         color = when (result?.decision) {
             "deny", "timeout" -> MaterialTheme.colorScheme.error

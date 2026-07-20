@@ -147,7 +147,7 @@ internal fun ChatMessageItem(
         ) {
             if (showAvatar) {
                 MessageAvatar(role = "assistant")
-                Spacer(modifier = Modifier.height(LettaSpacing.xxs))
+                Spacer(modifier = Modifier.height(LettaSpacing.XXS))
             }
             MessageReasoning(
                 message = message,
@@ -165,7 +165,7 @@ internal fun ChatMessageItem(
     ) {
         if (showAvatar) {
             MessageAvatar(role = message.role)
-            Spacer(modifier = Modifier.height(LettaSpacing.xxs))
+            Spacer(modifier = Modifier.height(LettaSpacing.XXS))
         }
 
         // Assistant / tool bubbles take the full content-area width so code
@@ -211,7 +211,7 @@ internal fun MessageAvatar(
     // outline for the assistant (matches the leading AI-app convention of a
     // ringed sparkle/icon floating above the response) and a filled pill for
     // the user / tool roles (preserves the current visual weight for those).
-    val avatarSize = LettaSpacing.avatarSize
+    val avatarSize = LettaSpacing.AVATAR_SIZE
 
     if (isUser || icon == null) {
         // Filled pill for user (and any unknown roles): preserves the current
@@ -241,7 +241,7 @@ internal fun MessageAvatar(
                 .clip(MaterialTheme.shapes.small)
                 .background(Color.Transparent)
                 .border(
-                    width = LettaSpacing.borderWidthThin,
+                    width = LettaSpacing.BORDER_WIDTH_THIN,
                     color = ringColor,
                     shape = MaterialTheme.shapes.small,
                 ),
@@ -251,7 +251,7 @@ internal fun MessageAvatar(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(LettaSpacing.iconSizeSmall),
+                modifier = Modifier.size(LettaSpacing.ICON_SIZE_SMALL),
             )
         }
     }

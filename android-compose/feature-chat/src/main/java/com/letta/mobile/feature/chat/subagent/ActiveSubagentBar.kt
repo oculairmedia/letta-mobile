@@ -124,10 +124,10 @@ fun ActiveSubagentBar(
         val terminalEntries = subagentEntries.filter { it.isTerminal }
         LazyRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.chipGap),
+            horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CHIP_GAP),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                horizontal = LettaSpacing.screenHorizontal,
-                vertical = LettaSpacing.xs,
+                horizontal = LettaSpacing.SCREEN_HORIZONTAL,
+                vertical = LettaSpacing.XS,
             ),
         ) {
             if (selfEntry != null) {
@@ -212,22 +212,22 @@ private fun ActiveBarChip(
     val ringState = subagent.ringState(now)
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clip(RoundedCornerShape(LettaSpacing.BUBBLE_RADIUS))
             .clickable(onClick = onClick)
             .background(palette.container)
             // letta-mobile-xrth2: homogeneous min-height + SYMMETRIC vertical
             // padding so the chip is not bottom-heavy and matches other tool
             // chips.
-            .heightIn(min = LettaSpacing.chipMinHeight)
+            .heightIn(min = LettaSpacing.CHIP_MIN_HEIGHT)
             .padding(
-                horizontal = LettaSpacing.chipPaddingHorizontal,
-                vertical = LettaSpacing.chipPaddingVertical,
+                horizontal = LettaSpacing.CHIP_PADDING_HORIZONTAL,
+                vertical = LettaSpacing.CHIP_PADDING_VERTICAL,
             )
             .semantics {
                 contentDescription = subagent.chipSemanticLabel()
             },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
     ) {
         ProgressRing(
             fraction = subagent.ringFraction,
@@ -314,9 +314,9 @@ private fun ViewConversationAction(
         imageVector = LettaIcons.ExternalLink,
         contentDescription = "View conversation: $description",
         modifier = Modifier
-            .clip(RoundedCornerShape(LettaSpacing.sm))
+            .clip(RoundedCornerShape(LettaSpacing.SM))
             .clickable(onClick = onClick)
-            .padding(LettaSpacing.xxxs)
+            .padding(LettaSpacing.XXXS)
             .size(LettaIconSizing.Inline),
         tint = tint,
     )
@@ -330,18 +330,18 @@ private fun CondensedSubagentChip(
 ) {
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(LettaSpacing.bubbleRadius))
+            .clip(RoundedCornerShape(LettaSpacing.BUBBLE_RADIUS))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .heightIn(min = LettaSpacing.chipMinHeight)
+            .heightIn(min = LettaSpacing.CHIP_MIN_HEIGHT)
             .padding(
-                horizontal = LettaSpacing.chipPaddingHorizontal,
-                vertical = LettaSpacing.chipPaddingVertical,
+                horizontal = LettaSpacing.CHIP_PADDING_HORIZONTAL,
+                vertical = LettaSpacing.CHIP_PADDING_VERTICAL,
             )
             .semantics {
                 contentDescription = "$count subagents running"
             },
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
     ) {
         // Condensed summary has no single fraction — render an indeterminate
         // ring around the agent glyph (still reduced-motion aware).
@@ -391,7 +391,7 @@ private fun ProgressRing(
     val color = ringColor(ringState)
     val track = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
     val stroke = with(androidx.compose.ui.platform.LocalDensity.current) {
-        LettaSpacing.chipRingStroke.toPx()
+        LettaSpacing.CHIP_RING_STROKE.toPx()
     }
     val safeFraction = fraction.coerceIn(0f, 1f)
 
@@ -413,12 +413,12 @@ private fun ProgressRing(
     }
 
     Box(
-        modifier = modifier.size(LettaSpacing.chipRingSize),
+        modifier = modifier.size(LettaSpacing.CHIP_RING_SIZE),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.foundation.Canvas(
             modifier = Modifier
-                .size(LettaSpacing.chipRingSize)
+                .size(LettaSpacing.CHIP_RING_SIZE)
                 .graphicsLayer { rotationZ = sweepRotation },
         ) {
             val inset = stroke / 2f

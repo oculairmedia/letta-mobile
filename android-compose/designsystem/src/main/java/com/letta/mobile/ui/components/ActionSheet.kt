@@ -105,15 +105,15 @@ fun ActionSheetItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val corner by animateDpAsState(
-        targetValue = if (isPressed) LettaShapeTokens.listRadius.dp else LettaShapeTokens.actionRadius.dp,
+        targetValue = if (isPressed) LettaShapeTokens.LIST_RADIUS.dp else LettaShapeTokens.ACTION_RADIUS.dp,
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "actionSheetItemCorner",
     )
     val elevation by animateDpAsState(
         targetValue = if (isPressed) {
-            LettaElevationTokens.actionSheetItemPressed.dp
+            LettaElevationTokens.ACTION_SHEET_ITEM_PRESSED.dp
         } else {
-            LettaElevationTokens.actionSheetItemResting.dp
+            LettaElevationTokens.ACTION_SHEET_ITEM_RESTING.dp
         },
         animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "actionSheetItemElevation",

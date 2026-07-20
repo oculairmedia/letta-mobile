@@ -19,8 +19,8 @@ import com.letta.mobile.ui.theme.LettaShapeTokens
  * not as decorative cards. Keep richer motion and emphasis inside the row.
  */
 object LettaCardDefaults {
-    val listShape: Shape = RoundedCornerShape(LettaShapeTokens.listRadius.dp)
-    val prominentListShape: Shape = RoundedCornerShape(LettaShapeTokens.prominentListRadius.dp)
+    val listShape: Shape = RoundedCornerShape(LettaShapeTokens.LIST_RADIUS.dp)
+    val prominentListShape: Shape = RoundedCornerShape(LettaShapeTokens.PROMINENT_LIST_RADIUS.dp)
 
     val listContainerColor: Color
         @Composable get() = MaterialTheme.colorScheme.surfaceContainerLow

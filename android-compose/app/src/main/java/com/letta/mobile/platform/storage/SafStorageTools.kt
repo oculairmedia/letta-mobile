@@ -73,7 +73,7 @@ class SafStorageTools @Inject constructor(
     private val grantStore: SafStorageGrantStore,
     private val capabilityRegistry: SystemAccessCapabilityRegistry,
 ) {
-    fun listGrants(): StorageToolResult<List<SafStorageGrant>> = withToolAccess(AndroidStorageToolIds.SafRead) {
+    fun listGrants(): StorageToolResult<List<SafStorageGrant>> = withToolAccess(AndroidStorageToolIds.SAF_READ) {
         StorageToolResult.Success(grantStore.listGrants())
     }
 
@@ -82,7 +82,7 @@ class SafStorageTools @Inject constructor(
     fun read(
         uri: Uri,
         maxBytes: Long = StorageAccessLimits.DEFAULT_MAX_READ_BYTES,
-    ): StorageToolResult<StorageReadResponse> = withToolAccess(AndroidStorageToolIds.SafRead) {
+    ): StorageToolResult<StorageReadResponse> = withToolAccess(AndroidStorageToolIds.SAF_READ) {
         if (!grantStore.hasReadGrant(uri)) {
             return@withToolAccess storageFailure(StorageToolErrorCode.MissingGrant, "No persisted read grant for URI")
         }
@@ -111,7 +111,7 @@ class SafStorageTools @Inject constructor(
     fun write(
         uri: Uri,
         content: ByteArray,
-    ): StorageToolResult<StorageWriteResponse> = withToolAccess(AndroidStorageToolIds.SafWrite) {
+    ): StorageToolResult<StorageWriteResponse> = withToolAccess(AndroidStorageToolIds.SAF_WRITE) {
         if (content.size > StorageAccessLimits.DEFAULT_MAX_WRITE_BYTES) {
             return@withToolAccess storageFailure(
                 StorageToolErrorCode.TooLarge,
@@ -143,7 +143,7 @@ class SafStorageTools @Inject constructor(
     fun searchTree(
         uri: Uri,
         query: String,
-    ): StorageToolResult<Nothing> = withToolAccess(AndroidStorageToolIds.SafSearch) {
+    ): StorageToolResult<Nothing> = withToolAccess(AndroidStorageToolIds.SAF_SEARCH) {
         val boundedQuery = query.take(MAX_SAF_SEARCH_QUERY_LENGTH)
         if (!grantStore.hasReadGrant(uri)) {
             return@withToolAccess storageFailure(StorageToolErrorCode.MissingGrant, "No persisted read grant for URI")

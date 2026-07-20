@@ -38,9 +38,9 @@ fun FloatingBanner(
         Surface(
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            shape = RoundedCornerShape(LettaShapeTokens.listRadius.dp),
-            tonalElevation = LettaElevationTokens.floatingBannerTonal.dp,
-            shadowElevation = LettaElevationTokens.floatingBannerShadow.dp,
+            shape = RoundedCornerShape(LettaShapeTokens.LIST_RADIUS.dp),
+            tonalElevation = LettaElevationTokens.FLOATING_BANNER_TONAL.dp,
+            shadowElevation = LettaElevationTokens.FLOATING_BANNER_SHADOW.dp,
         ) {
             Text(
                 text = text,

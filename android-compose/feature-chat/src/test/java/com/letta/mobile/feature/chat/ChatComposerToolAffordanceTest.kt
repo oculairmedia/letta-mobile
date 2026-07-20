@@ -52,10 +52,10 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag(ToolAffordanceRowTestTags.Container)
+            .onNodeWithTag(ToolAffordanceRowTestTags.CONTAINER)
             .assertIsDisplayed()
         composeRule
-            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}tool-1")
+            .onNodeWithTag("${ToolAffordanceRowTestTags.CHIP_PREFIX}tool-1")
             .assertIsDisplayed()
     }
 
@@ -78,7 +78,7 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag(ToolAffordanceRowTestTags.Container)
+            .onNodeWithTag(ToolAffordanceRowTestTags.CONTAINER)
             .assertDoesNotExist()
     }
 
@@ -101,7 +101,7 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag(ToolAffordanceRowTestTags.Container)
+            .onNodeWithTag(ToolAffordanceRowTestTags.CONTAINER)
             .assertDoesNotExist()
     }
 
@@ -125,7 +125,7 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}tool-1")
+            .onNodeWithTag("${ToolAffordanceRowTestTags.CHIP_PREFIX}tool-1")
             .performClick()
         assertEquals("Call tool: fetch_url with parameters: ", captured)
     }
@@ -166,7 +166,7 @@ class ChatComposerToolAffordanceTest {
             }
         }
         composeRule
-            .onNodeWithTag("${ToolAffordanceRowTestTags.ChipPrefix}tool-3")
+            .onNodeWithTag("${ToolAffordanceRowTestTags.CHIP_PREFIX}tool-3")
             .performClick()
         assertTrue("expected multi-line block, got '$captured'", captured.contains("\n"))
         assertTrue(captured.contains("Call tool: send_email"))

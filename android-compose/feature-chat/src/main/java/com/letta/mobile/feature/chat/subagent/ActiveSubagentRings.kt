@@ -120,8 +120,8 @@ fun ActiveSubagentRings(
         modifier = modifier,
     ) {
         Column(
-            modifier = Modifier.padding(LettaSpacing.sm),
-            verticalArrangement = Arrangement.spacedBy(LettaSpacing.xs),
+            modifier = Modifier.padding(LettaSpacing.SM),
+            verticalArrangement = Arrangement.spacedBy(LettaSpacing.XS),
             horizontalAlignment = Alignment.End,
         ) {
             // letta-mobile-w8mog: overflow constraint — >3 rings → show 3 + a

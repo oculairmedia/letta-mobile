@@ -105,7 +105,7 @@ class A2uiToolApprovalRoundTripTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.ToolApprovalCard).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.TOOL_APPROVAL_CARD).assertIsDisplayed()
         composeRule.onNodeWithText("bash").assertIsDisplayed()
         composeRule.onNodeWithText("rm -rf /tmp/junk").assertIsDisplayed()
         assertTrue("ToolApprovalCard should render inside the 2s budget", elapsedMs(renderedAt) < 2_000)
@@ -347,9 +347,9 @@ class A2uiToolApprovalRoundTripTest {
             )
         }
 
-        composeRule.onNodeWithTag(A2uiTestTags.ScheduleCard).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.SCHEDULE_CARD).assertIsDisplayed()
         composeRule.onNodeWithText("Morning check-in").assertIsDisplayed()
-        composeRule.onNodeWithTag(A2uiTestTags.ScheduleSelectorInput).assertIsDisplayed()
+        composeRule.onNodeWithTag(A2uiTestTags.SCHEDULE_SELECTOR_INPUT).assertIsDisplayed()
 
         composeRule.onAllNodes(hasText("Run now") and hasClickAction())[0].performClick()
         withRealTimeout { server.actions.receive() }.assertScheduleAction(
