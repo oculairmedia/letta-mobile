@@ -513,8 +513,6 @@ internal fun LettaConfig?.localLettaCodeCreateReadiness(
     )
 }
 
-private fun LettaConfig?.isLocalRuntimeConfig(): Boolean = AgentRuntimeBinding.isLocalRuntime(this)
-
 private fun LettaConfig.selectedLocalModelHandle(): String? = localModelHandle
     ?.trim()
     ?.takeIf { it.isNotBlank() && it != EmbeddedLettaCodeModelSelection.DEFAULT_MODEL_HANDLE }

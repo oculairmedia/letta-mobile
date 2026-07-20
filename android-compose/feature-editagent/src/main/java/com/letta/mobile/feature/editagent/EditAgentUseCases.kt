@@ -12,7 +12,6 @@ import com.letta.mobile.data.modelvalidation.ModelHandleValidator
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.MessageRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
 import kotlinx.coroutines.CancellationException
@@ -28,7 +27,6 @@ internal class EditAgentUseCases(
     private val agentRepository: IAgentRepository,
     private val blockRepository: IBlockRepository,
     private val messageRepository: MessageRepository,
-    private val settingsRepository: ISettingsRepository,
     private val uiState: MutableStateFlow<UiState<EditAgentUiState>>,
     private val originalBlocks: Map<String, EditableBlock>,
     private val originalEmbedding: String,
@@ -36,8 +34,6 @@ internal class EditAgentUseCases(
     private val servedModelIds: () -> Collection<String>,
 ) {
     companion object {
-        private const val DEFAULT_COMPACTION_CLIP_CHARS = 50_000
-        private const val DEFAULT_SLIDING_WINDOW_PERCENTAGE = 0.3f
         private const val DEFAULT_COMPACTION_MODE = "sliding_window"
         private val advancedSettingsJson = Json { prettyPrint = true }
 
@@ -209,10 +205,6 @@ internal class EditAgentUseCases(
 
     private fun EditAgentUiState.toToolRules(): List<JsonObject>? {
         return parseOptionalJsonObjectArray(toolRulesJson, "Tool rules")
-    }
-
-    private fun JsonElement.toSettingsJson(): String {
-        return advancedSettingsJson.encodeToString(JsonElement.serializer(), this)
     }
 
     private fun Boolean.toNullableOverride(original: Boolean?): Boolean? {

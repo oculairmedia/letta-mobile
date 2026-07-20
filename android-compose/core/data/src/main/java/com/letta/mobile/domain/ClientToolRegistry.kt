@@ -1,6 +1,5 @@
 package com.letta.mobile.domain
 
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
@@ -10,8 +9,6 @@ class UnknownClientToolException(toolName: String) : Exception("Unknown client t
 
 @Singleton
 class ClientToolRegistry @Inject constructor() {
-    private val json = Json { ignoreUnknownKeys = true }
-    
     private val tools: Map<String, suspend (String) -> String> = mapOf(
         "get_device_info" to ::getDeviceInfo
     )

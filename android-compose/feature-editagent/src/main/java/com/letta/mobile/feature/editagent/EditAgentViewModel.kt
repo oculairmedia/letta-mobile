@@ -120,7 +120,6 @@ internal class EditAgentViewModel @Inject constructor(
                     agentRepository = agentRepository,
                     blockRepository = blockRepository,
                     messageRepository = messageRepository,
-                    settingsRepository = settingsRepository,
                     uiState = _uiState,
                     originalBlocks = originalBlocks,
                     originalEmbedding = originalEmbedding,

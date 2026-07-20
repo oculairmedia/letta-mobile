@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import app.cash.molecule.RecompositionMode.Immediate
 import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.a2ui.A2uiAction
-import com.letta.mobile.data.channel.NotificationDelivery
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -27,7 +26,6 @@ import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.api.IBugReportRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.data.repository.api.IFolderRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -127,13 +125,11 @@ internal class AdminChatViewModel @Inject constructor(
     private val agentRepository: IAgentRepository,
     private val blockRepository: IBlockRepository,
     private val bugReportRepository: IBugReportRepository,
-    private val folderRepository: IFolderRepository,
     private val conversationRepository: IConversationRepository,
     private val settingsRepository: ISettingsRepository,
     private val sessionManager: SessionManager,
     private val runtimeEventOutbox: RuntimeEventOutbox,
     private val currentConversationTracker: com.letta.mobile.data.channel.CurrentConversationTracker,
-    private val notificationDeliveryCoordinator: NotificationDelivery,
     private val shimBackendDetector: ShimBackendDetector,
     private val wsChatBridge: WsChatBridge,
     private val subagentRepository: ISubagentRepository,
@@ -145,7 +141,6 @@ internal class AdminChatViewModel @Inject constructor(
         com.letta.mobile.data.attachment.AttachmentLimits.Default,
 ) : ViewModel() {
     companion object {
-        private const val MESSAGE_SYNC_INTERVAL_MS = 5_000L
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
         private const val TAG = "AdminChatViewModel"
     }

@@ -6,7 +6,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -31,7 +30,6 @@ import kotlin.time.Duration.Companion.milliseconds
 class IrohAdminRpcClient(
     private val controlFrames: Flow<AppServerReceivedFrame>,
     private val send: suspend (AppServerCommand.AdminRpc) -> Unit,
-    private val json: Json = Json { ignoreUnknownKeys = true },
     private val timeoutMs: Long = DEFAULT_RPC_TIMEOUT_MS,
 ) {
     /**

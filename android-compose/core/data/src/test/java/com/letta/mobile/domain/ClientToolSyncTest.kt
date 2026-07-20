@@ -14,7 +14,7 @@ class ClientToolSyncTest {
     @Test
     fun `syncTools attaches returned tool id`() = runTest {
         val fakeToolApi = FakeToolApi()
-        val sync = ClientToolSync(fakeToolApi, ClientToolRegistry())
+        val sync = ClientToolSync(fakeToolApi)
 
         sync.syncTools(agentId = "agent-1")
 

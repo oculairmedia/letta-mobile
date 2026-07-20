@@ -562,17 +562,3 @@ private fun HttpURLConnection.useResponse(block: (InputStream) -> Unit) {
         disconnect()
     }
 }
-
-private fun readLimitedBytes(input: InputStream, limit: Int): ByteArray {
-    val output = java.io.ByteArrayOutputStream()
-    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-    while (true) {
-        val read = input.read(buffer)
-        if (read < 0) break
-        if (output.size() + read > limit) {
-            throw IllegalStateException("Response body exceeds ${limit} bytes.")
-        }
-        output.write(buffer, 0, read)
-    }
-    return output.toByteArray()
-}
