@@ -111,8 +111,15 @@ if [[ -n "$base_ref" ]]; then
 else
   changed_files="$(git -C "$REPO_ROOT" diff --name-only HEAD)"
 fi
-if printf '%s\n' "$changed_files" | rg -v \
-  '^(\.github/workflows/architecture-graph\.yml|\.github/workflows/qodana_code_quality\.yml|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$' | rg -q .; then
+
+# Isolation only applies when this change set actually touches the
+# code-intelligence stack. App-only PRs still run architecture export, but
+# must not fail this gate just because they change Kotlin outside the stack.
+stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$'
+stack_allowlist_pattern='^(\.github/workflows/architecture-graph\.yml|\.github/workflows/qodana_code_quality\.yml|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$'
+if ! printf '%s\n' "$changed_files" | rg -q "$stack_touch_pattern"; then
+  pass 'Code-intelligence stack changes stay within declared boundaries'
+elif printf '%s\n' "$changed_files" | rg -v "$stack_allowlist_pattern" | rg -q .; then
   fail 'Code-intelligence stack changes stay within declared boundaries'
 else
   pass 'Code-intelligence stack changes stay within declared boundaries'
