@@ -98,9 +98,13 @@ else
   pass 'config examples contain no apparent literal secrets'
 fi
 
-base_ref="${GITHUB_BASE_REF:+origin/$GITHUB_BASE_REF}"
-if [[ -n "$base_ref" ]] && ! git -C "$REPO_ROOT" rev-parse --verify "$base_ref" >/dev/null 2>&1; then
-  git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF:$base_ref"
+base_ref=""
+if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+  # Fetch into a dedicated remote-tracking ref. A refspec such as
+  # `main:origin/main` creates an ambiguous local branch named origin/main,
+  # and depth=1 can omit the PR merge base entirely.
+  base_ref="refs/remotes/origin/$GITHUB_BASE_REF"
+  git -C "$REPO_ROOT" fetch --no-tags origin "+refs/heads/$GITHUB_BASE_REF:$base_ref"
 fi
 if [[ -n "$base_ref" ]]; then
   changed_files="$(git -C "$REPO_ROOT" diff --name-only "$base_ref...HEAD")"

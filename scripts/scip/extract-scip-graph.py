@@ -75,40 +75,38 @@ def parse_documents(raw_json):
     return documents
 
 
-def emit_symbols(handle, file_id, symbols, declared, state):
-    """Emit unique symbol nodes and declaration edges for one document."""
+def symbol_records(file_id, symbols, declared):
+    """Yield unique symbol nodes and declaration edges for one document."""
     for symbol in symbols:
         symbol_id = first(symbol, "symbol", default="")
         if not symbol_id or symbol_id in declared:
             continue
-        emit(handle, {
+        declared.add(symbol_id)
+        yield {
             "schema": SCHEMA,
             "type": "node",
             "id": symbol_id,
             "kind": "symbol",
             "display": first(symbol, "displayName", "display_name", default=symbol_id),
-        }, state)
-        emit(handle, {
-            "schema": SCHEMA, "type": "edge", "from": file_id, "to": symbol_id, "kind": "declares",
-        }, state)
-        declared.add(symbol_id)
+        }
+        yield {"schema": SCHEMA, "type": "edge", "from": file_id, "to": symbol_id, "kind": "declares"}
 
 
-def emit_references(handle, file_id, occurrences, state):
-    """Emit reference edges while excluding SCIP declaration occurrences."""
+def reference_records(file_id, occurrences):
+    """Yield reference edges while excluding SCIP declaration occurrences."""
     for occurrence in occurrences:
         symbol_id = first(occurrence, "symbol", default="")
         roles = int(first(occurrence, "symbolRoles", "symbol_roles", default=0))
         if not symbol_id or roles & 1:
             continue
-        emit(handle, {
+        yield {
             "schema": SCHEMA,
             "type": "edge",
             "from": file_id,
             "to": symbol_id,
             "kind": "references",
             "range": first(occurrence, "range", default=[]),
-        }, state)
+        }
 
 
 def emit_documents(handle, documents, state):
@@ -121,8 +119,11 @@ def emit_documents(handle, documents, state):
         emit(handle, {
             "schema": SCHEMA, "type": "node", "id": file_id, "kind": "file", "path": path,
         }, state)
-        emit_symbols(handle, file_id, first(document, "symbols", default=[]), declared, state)
-        emit_references(handle, file_id, first(document, "occurrences", default=[]), state)
+        records = symbol_records(file_id, first(document, "symbols", default=[]), declared)
+        for record in records:
+            emit(handle, record, state)
+        for record in reference_records(file_id, first(document, "occurrences", default=[])):
+            emit(handle, record, state)
 
 
 def write_graph(output, documents, max_records):
