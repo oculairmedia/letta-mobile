@@ -27,6 +27,10 @@ CONTRACT_FILES = (
 )
 MODULE_KEYS = ("module", "module_path", "project", "project_path", "path", "id")
 SOURCE_SET_KEYS = ("source_set", "sourceSet", "name", "id")
+PROJECT_DEPS_SQL = {
+    False: "SELECT target,configuration FROM project_edges WHERE source=? ORDER BY target,configuration",
+    True: "SELECT source,configuration FROM project_edges WHERE target=? ORDER BY source,configuration",
+}
 
 SCHEMA = """
 CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -70,6 +74,7 @@ CREATE INDEX source_sets_module_idx ON source_sets(module, source_set);
 
 
 def _first(record: dict[str, Any], keys: Iterable[str], *, required: bool = False) -> Any:
+    """Return the first populated alias in a contract record."""
     for key in keys:
         value = record.get(key)
         if value is not None and value != "":
@@ -80,6 +85,7 @@ def _first(record: dict[str, Any], keys: Iterable[str], *, required: bool = Fals
 
 
 def _module_id(record: dict[str, Any]) -> str:
+    """Return and validate a Gradle module identifier from a record."""
     value = str(_first(record, MODULE_KEYS, required=True))
     if not value.startswith(":"):
         raise ValueError(f"invalid module id {value!r}: expected Gradle path beginning with ':'")
@@ -87,22 +93,27 @@ def _module_id(record: dict[str, Any]) -> str:
 
 
 def _edge_source(record: dict[str, Any]) -> str:
+    """Return an edge's source module across supported field aliases."""
     return str(_first(record, ("source", "from", "source_module", "sourceModule", "module"), required=True))
 
 
 def _edge_target(record: dict[str, Any]) -> str:
+    """Return an edge's target module across supported field aliases."""
     return str(_first(record, ("target", "to", "target_module", "targetModule", "dependency"), required=True))
 
 
 def _configuration(record: dict[str, Any]) -> str:
+    """Return an edge's optional dependency configuration."""
     return str(_first(record, ("configuration", "scope", "bucket")) or "")
 
 
 def _compact(value: Any) -> str:
+    """Serialize a value as deterministic compact JSON."""
     return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True)
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read JSON objects from a JSONL file with actionable line errors."""
     records: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as stream:
         for line_number, line in enumerate(stream, 1):
@@ -119,6 +130,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def validate_contract_dir(value: str) -> Path:
+    """Resolve a contract directory and ensure all inputs are contained files."""
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError("contract directory must be an absolute path")
@@ -135,120 +147,205 @@ def validate_contract_dir(value: str) -> Path:
     return path
 
 
+def _validate_existing_db(path: Path) -> Path:
+    """Resolve an existing database while rejecting symbolic links."""
+    if path.is_symlink():
+        raise ValueError(f"database must not be a symbolic link: {path}")
+    resolved = path.resolve(strict=True)
+    if not resolved.is_file():
+        raise ValueError(f"database must be a regular file: {resolved}")
+    return resolved
+
+
+def _validate_output_db(path: Path) -> Path:
+    """Resolve a database output against an existing real directory."""
+    parent = path.parent.resolve(strict=True)
+    if not parent.is_dir():
+        raise ValueError(f"database parent is not a directory: {parent}")
+    resolved = parent / path.name
+    if resolved.is_symlink() or (resolved.exists() and not resolved.is_file()):
+        raise ValueError(f"database must be a regular file: {resolved}")
+    return resolved
+
+
 def validate_db_path(value: str, *, must_exist: bool) -> Path:
+    """Validate an absolute SQLite input or output path without following file symlinks."""
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError("database path must be absolute")
-    if must_exist:
-        if path.is_symlink():
-            raise ValueError(f"database must not be a symbolic link: {path}")
-        path = path.resolve(strict=True)
-        if not path.is_file():
-            raise ValueError(f"database must be a regular file: {path}")
-    else:
-        parent = path.parent.resolve(strict=True)
-        if not parent.is_dir():
-            raise ValueError(f"database parent is not a directory: {parent}")
-        path = parent / path.name
-        if path.exists() and (path.is_symlink() or not path.is_file()):
-            raise ValueError(f"database must be a regular file: {path}")
-    return path
+    return _validate_existing_db(path) if must_exist else _validate_output_db(path)
+
+
+def _contract_digest(contract: Path) -> str:
+    """Hash contract filenames and bytes in their canonical order."""
+    digest = hashlib.sha256()
+    for name in CONTRACT_FILES:
+        digest.update(name.encode("utf-8"))
+        digest.update((contract / name).read_bytes())
+    return digest.hexdigest()
+
+
+def _insert_modules(conn: sqlite3.Connection, records: dict[str, dict[str, Any]]) -> None:
+    """Insert normalized module rows while retaining source payloads."""
+    for module, record in sorted(records.items()):
+        name = str(_first(record, ("name",)) or module.rsplit(":", 1)[-1])
+        directory = _first(record, ("directory", "project_dir", "projectDir"))
+        kind = _first(record, ("kind", "type", "plugin"))
+        conn.execute(
+            "INSERT INTO modules VALUES (?, ?, ?, ?, ?)",
+            (module, name, directory, kind, _compact(record)),
+        )
+
+
+def _insert_source_sets(conn: sqlite3.Connection, records: list[dict[str, Any]]) -> None:
+    """Normalize source paths and insert source-set rows."""
+    for record in records:
+        module = _module_id(record)
+        source_set = str(_first(record, SOURCE_SET_KEYS, required=True))
+        raw_paths = _first(record, ("paths", "source_dirs", "sourceDirs", "directories")) or []
+        if isinstance(raw_paths, str):
+            raw_paths = [path for path in raw_paths.split(",") if path]
+        conn.execute(
+            "INSERT INTO source_sets VALUES (?, ?, ?, ?)",
+            (module, source_set, _compact(sorted(set(map(str, raw_paths)))), _compact(record)),
+        )
+
+
+def _insert_variants(conn: sqlite3.Connection, records: list[dict[str, Any]]) -> None:
+    """Insert variant rows from supported contract aliases."""
+    for record in records:
+        conn.execute(
+            "INSERT INTO variants VALUES (?, ?, ?)",
+            (_module_id(record), str(_first(record, ("variant", "name", "id"), required=True)), _compact(record)),
+        )
+
+
+def _insert_project_edges(conn: sqlite3.Connection, records: list[dict[str, Any]]) -> None:
+    """Insert project dependency edges."""
+    for record in records:
+        conn.execute(
+            "INSERT INTO project_edges VALUES (?, ?, ?, ?)",
+            (_edge_source(record), _edge_target(record), _configuration(record), _compact(record)),
+        )
+
+
+def _external_coordinate(record: dict[str, Any]) -> str:
+    """Build an external coordinate from either a coordinate or Maven fields."""
+    coordinate = _first(record, ("coordinate", "target", "to", "dependency", "module_id"))
+    if coordinate is not None:
+        return str(coordinate)
+    group = str(record.get("group") or "")
+    name = str(record.get("name") or "")
+    version = str(record.get("version") or "")
+    if not name:
+        raise ValueError("external dependency is missing coordinate/name")
+    return ":".join(part for part in (group, name, version) if part)
+
+
+def _insert_external_edges(conn: sqlite3.Connection, records: list[dict[str, Any]]) -> None:
+    """Insert external dependency edges with normalized coordinates."""
+    for record in records:
+        conn.execute(
+            "INSERT INTO external_edges VALUES (?, ?, ?, ?)",
+            (_edge_source(record), _external_coordinate(record), _configuration(record), _compact(record)),
+        )
+
+
+def _populate_database(
+    conn: sqlite3.Connection,
+    contract: Path,
+    data: dict[str, list[dict[str, Any]]],
+    modules: dict[str, dict[str, Any]],
+) -> None:
+    """Create and populate the imported database inside one transaction."""
+    conn.execute("PRAGMA foreign_keys=ON")
+    conn.executescript(SCHEMA)
+    conn.executemany(
+        "INSERT INTO metadata VALUES (?, ?)",
+        [("schema_version", str(SCHEMA_VERSION)), ("contract_sha256", _contract_digest(contract))],
+    )
+    _insert_modules(conn, modules)
+    _insert_source_sets(conn, data["source_sets.jsonl"])
+    _insert_variants(conn, data["variants.jsonl"])
+    _insert_project_edges(conn, data["project_edges.jsonl"])
+    _insert_external_edges(conn, data["external_edges.jsonl"])
+    conn.commit()
+
+
+def _write_database(
+    db_path: Path,
+    contract: Path,
+    data: dict[str, list[dict[str, Any]]],
+    modules: dict[str, dict[str, Any]],
+) -> None:
+    """Populate a temporary SQLite file and atomically replace the destination."""
+    temporary = db_path.with_name(f".{db_path.name}.{os.getpid()}.tmp")
+    temporary.unlink(missing_ok=True)
+    conn = sqlite3.connect(temporary)
+    try:
+        try:
+            _populate_database(conn, contract, data, modules)
+        finally:
+            conn.close()
+        os.replace(temporary, db_path)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
 
 def import_contract(contract_value: str, db_value: str) -> dict[str, Any]:
+    """Validate and atomically import the five-file architecture contract."""
     contract = validate_contract_dir(contract_value)
     db_path = validate_db_path(db_value, must_exist=False)
     data = {name: _read_jsonl(contract / name) for name in CONTRACT_FILES}
     modules = {_module_id(record): record for record in data["modules.jsonl"]}
     if len(modules) != len(data["modules.jsonl"]):
         raise ValueError("modules.jsonl contains duplicate module ids")
-
-    temp = db_path.with_name(f".{db_path.name}.{os.getpid()}.tmp")
-    if temp.exists():
-        temp.unlink()
-    conn = sqlite3.connect(temp)
-    try:
-        conn.execute("PRAGMA foreign_keys=ON")
-        conn.executescript(SCHEMA)
-        digest = hashlib.sha256()
-        for name in CONTRACT_FILES:
-            digest.update(name.encode("utf-8"))
-            digest.update((contract / name).read_bytes())
-        conn.executemany("INSERT INTO metadata VALUES (?, ?)", [
-            ("schema_version", str(SCHEMA_VERSION)),
-            ("contract_sha256", digest.hexdigest()),
-        ])
-        for module, record in sorted(modules.items()):
-            name = str(_first(record, ("name",)) or module.rsplit(":", 1)[-1])
-            directory = _first(record, ("directory", "project_dir", "projectDir"))
-            kind = _first(record, ("kind", "type", "plugin"))
-            conn.execute("INSERT INTO modules VALUES (?, ?, ?, ?, ?)",
-                         (module, name, directory, kind, _compact(record)))
-        for record in data["source_sets.jsonl"]:
-            module = _module_id(record)
-            source_set = str(_first(record, SOURCE_SET_KEYS, required=True))
-            raw_paths = _first(record, ("paths", "source_dirs", "sourceDirs", "directories")) or []
-            if isinstance(raw_paths, str):
-                raw_paths = [path for path in raw_paths.split(",") if path]
-            conn.execute("INSERT INTO source_sets VALUES (?, ?, ?, ?)",
-                         (module, source_set, _compact(sorted(set(map(str, raw_paths)))), _compact(record)))
-        for record in data["variants.jsonl"]:
-            module = _module_id(record)
-            variant = str(_first(record, ("variant", "name", "id"), required=True))
-            conn.execute("INSERT INTO variants VALUES (?, ?, ?)", (module, variant, _compact(record)))
-        for record in data["project_edges.jsonl"]:
-            source, target = _edge_source(record), _edge_target(record)
-            conn.execute("INSERT INTO project_edges VALUES (?, ?, ?, ?)",
-                         (source, target, _configuration(record), _compact(record)))
-        for record in data["external_edges.jsonl"]:
-            source = _edge_source(record)
-            coordinate_value = _first(record, ("coordinate", "target", "to", "dependency", "module_id"))
-            if coordinate_value is None:
-                group = str(record.get("group") or "")
-                name = str(record.get("name") or "")
-                version = str(record.get("version") or "")
-                if not name:
-                    raise ValueError("external dependency is missing coordinate/name")
-                coordinate_value = ":".join(part for part in (group, name, version) if part)
-            coordinate = str(coordinate_value)
-            conn.execute("INSERT INTO external_edges VALUES (?, ?, ?, ?)",
-                         (source, coordinate, _configuration(record), _compact(record)))
-        conn.commit()
-        conn.close()
-        os.replace(temp, db_path)
-    except Exception:
-        conn.close()
-        temp.unlink(missing_ok=True)
-        raise
+    _write_database(db_path, contract, data, modules)
     return {"schema_version": SCHEMA_VERSION, "database": str(db_path),
             "counts": {name.removesuffix(".jsonl"): len(records) for name, records in data.items()}}
 
 
 class ArchitectureQuery:
+    """Read-only query interface for an imported architecture database."""
+
     def __init__(self, db_value: str):
+        """Open a validated database and reject unsupported schemas."""
         self.path = validate_db_path(db_value, must_exist=True)
-        self.db = sqlite3.connect(f"file:{self.path}?mode=ro", uri=True)
-        self.db.row_factory = sqlite3.Row
-        version = self.db.execute("SELECT value FROM metadata WHERE key='schema_version'").fetchone()
-        if not version or int(version[0]) != SCHEMA_VERSION:
-            actual = version[0] if version else "missing"
-            raise ValueError(f"unsupported database schema {actual}; expected {SCHEMA_VERSION}; re-import the contract")
+        self.db = sqlite3.connect(f"{self.path.as_uri()}?mode=ro", uri=True)
+        try:
+            self.db.row_factory = sqlite3.Row
+            version = self.db.execute(
+                "SELECT value FROM metadata WHERE key=?", ("schema_version",)
+            ).fetchone()
+            if not version or int(version[0]) != SCHEMA_VERSION:
+                actual = version[0] if version else "missing"
+                raise ValueError(
+                    f"unsupported database schema {actual}; expected {SCHEMA_VERSION}; re-import the contract"
+                )
+        except Exception:
+            self.db.close()
+            raise
 
     def close(self) -> None:
+        """Close the underlying read-only SQLite connection."""
         self.db.close()
 
     @staticmethod
     def limit(value: Any) -> int:
+        """Coerce and bound a caller-provided result limit."""
         limit = DEFAULT_LIMIT if value is None else int(value)
         if not 1 <= limit <= MAX_LIMIT:
             raise ValueError(f"limit must be between 1 and {MAX_LIMIT}")
         return limit
 
     def _module_exists(self, module: str) -> None:
+        """Raise when a module is absent from the imported contract."""
         if not self.db.execute("SELECT 1 FROM modules WHERE module=?", (module,)).fetchone():
             raise ValueError(f"unknown module: {module}")
 
     def get_module(self, module: str) -> dict[str, Any]:
+        """Return one module with its source sets and variants."""
         row = self.db.execute("SELECT module,name,directory,kind,payload FROM modules WHERE module=?", (module,)).fetchone()
         if not row:
             raise ValueError(f"unknown module: {module}")
@@ -262,19 +359,16 @@ class ArchitectureQuery:
 
     def module_deps(self, module: str, *, reverse: bool = False, transitive: bool = False,
                     limit: Any = None) -> dict[str, Any]:
+        """Return bounded forward or reverse project dependencies."""
         self._module_exists(module)
         bound = self.limit(limit)
-        left, right = ("target", "source") if reverse else ("source", "target")
         queue = deque([(module, 0)])
         seen = {module}
         results: list[dict[str, Any]] = []
         truncated = False
         while queue:
             current, depth = queue.popleft()
-            rows = self.db.execute(
-                f"SELECT {right},configuration FROM project_edges WHERE {left}=? ORDER BY {right},configuration",
-                (current,),
-            ).fetchall()
+            rows = self.db.execute(PROJECT_DEPS_SQL[reverse], (current,)).fetchall()
             for neighbor, configuration in rows:
                 if neighbor in seen:
                     continue
@@ -292,6 +386,7 @@ class ArchitectureQuery:
                 "transitive": transitive, "items": results, "truncated": truncated}
 
     def source_set_owners(self, path: str, *, limit: Any = None) -> dict[str, Any]:
+        """Find source sets whose roots contain a repository-relative path."""
         normalized = normalize_repo_path(path)
         bound = self.limit(limit)
         matches: list[dict[str, Any]] = []
@@ -304,6 +399,7 @@ class ArchitectureQuery:
         return {"path": normalized, "items": matches[:bound], "truncated": len(matches) > bound}
 
     def change_impact(self, paths: list[str], *, transitive: bool = True, limit: Any = None) -> dict[str, Any]:
+        """Return modules owning or reverse-dependent on changed paths."""
         bound = self.limit(limit)
         if not paths:
             raise ValueError("paths must contain at least one repository-relative path")
@@ -320,6 +416,7 @@ class ArchitectureQuery:
                 "transitive": transitive, "truncated": len(items) > bound}
 
     def architecture_violations(self, *, limit: Any = None) -> dict[str, Any]:
+        """List dependency edges explicitly marked as architecture violations."""
         bound = self.limit(limit)
         violations: list[dict[str, Any]] = []
         rows = self.db.execute("SELECT source,target,configuration,payload FROM project_edges ORDER BY source,target,configuration")
@@ -333,6 +430,7 @@ class ArchitectureQuery:
         return {"items": violations[:bound], "truncated": len(violations) > bound}
 
     def lookup(self, query: str, *, kind: str = "text", limit: Any = None) -> dict[str, Any]:
+        """Search module contract payloads through the future SCIP lookup seam."""
         bound = self.limit(limit)
         if kind not in ("text", "symbol"):
             raise ValueError("kind must be 'text' or 'symbol'")
@@ -350,6 +448,7 @@ class ArchitectureQuery:
 
 
 def normalize_repo_path(value: str) -> str:
+    """Normalize a repository-relative path and reject traversal or absolutes."""
     if not isinstance(value, str) or not value.strip() or "\x00" in value:
         raise ValueError("path must be a non-empty repository-relative string")
     value = value.replace("\\", "/")
@@ -374,6 +473,7 @@ TOOLS: dict[str, dict[str, Any]] = {
 
 
 def tool_definitions() -> list[dict[str, Any]]:
+    """Build MCP tool definitions from the shared tool registry."""
     properties = {
         "module": {"type": "string"}, "path": {"type": "string"},
         "paths": {"type": "array", "items": {"type": "string"}},
@@ -389,6 +489,14 @@ def tool_definitions() -> list[dict[str, Any]]:
 
 
 def call_tool(query: ArchitectureQuery, name: str, args: dict[str, Any]) -> dict[str, Any]:
+    """Validate and dispatch an MCP or CLI tool call."""
+    if name not in TOOLS:
+        raise ValueError(f"unknown tool: {name}")
+    if not isinstance(args, dict):
+        raise ValueError("tool arguments must be a JSON object")
+    missing = [key for key in TOOLS[name]["required"] if key not in args]
+    if missing:
+        raise ValueError(f"missing required tool argument(s): {', '.join(missing)}")
     if name == "get_module":
         return query.get_module(args["module"])
     if name in ("module_deps", "module_reverse_deps"):
@@ -402,10 +510,11 @@ def call_tool(query: ArchitectureQuery, name: str, args: dict[str, Any]) -> dict
         return query.architecture_violations(limit=args.get("limit"))
     if name == "lookup":
         return query.lookup(args["query"], kind=args.get("kind", "text"), limit=args.get("limit"))
-    raise ValueError(f"unknown tool: {name}")
+    raise AssertionError(f"tool has no dispatcher: {name}")
 
 
 def serve_mcp(db_value: str) -> int:
+    """Serve newline-delimited MCP JSON-RPC requests over standard I/O."""
     query = ArchitectureQuery(db_value)
     try:
         for line in sys.stdin:
@@ -455,6 +564,7 @@ def serve_mcp(db_value: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construct the command-line parser for import, query, and MCP modes."""
     parser = argparse.ArgumentParser(description="Local SQLite query layer and stdio MCP server for architecture JSONL.")
     sub = parser.add_subparsers(dest="command", required=True)
     importer = sub.add_parser("import", help="validate and import the five-file JSONL contract")
@@ -470,6 +580,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the architecture query command-line interface."""
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

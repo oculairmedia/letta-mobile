@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -57,17 +58,53 @@ class ArchitectureQueryTest(unittest.TestCase):
         self.assertEqual(1, len(result["items"]))
         self.assertTrue(result["truncated"])
 
-    def test_schema_version_mismatch_is_rejected(self):
+    def test_schema_version_mismatch_is_rejected_and_connection_is_closed(self):
         self.query.close()
-        import sqlite3
         db = sqlite3.connect(self.db)
         db.execute("UPDATE metadata SET value='999' WHERE key='schema_version'")
         db.commit()
         db.close()
-        with self.assertRaisesRegex(ValueError, "unsupported database schema"):
-            architecture_query.ArchitectureQuery(str(self.db))
+        real_connect = architecture_query.sqlite3.connect
+        opened = []
+
+        def tracked_connect(*args, **kwargs):
+            connection = real_connect(*args, **kwargs)
+            opened.append(connection)
+            return connection
+
+        architecture_query.sqlite3.connect = tracked_connect
+        try:
+            with self.assertRaisesRegex(ValueError, "unsupported database schema"):
+                architecture_query.ArchitectureQuery(str(self.db))
+        finally:
+            architecture_query.sqlite3.connect = real_connect
+        with self.assertRaisesRegex(sqlite3.ProgrammingError, "closed database"):
+            opened[0].execute("SELECT 1")
         self.query = architecture_query.ArchitectureQuery.__new__(architecture_query.ArchitectureQuery)
         self.query.close = lambda: None
+
+    def test_database_uri_encodes_reserved_path_characters(self):
+        self.query.close()
+        encoded_dir = Path(self.temp.name) / "architecture?#"
+        encoded_dir.mkdir()
+        encoded_db = encoded_dir / "contract db.sqlite"
+        architecture_query.import_contract(str(FIXTURE), str(encoded_db))
+        self.query = architecture_query.ArchitectureQuery(str(encoded_db))
+        self.assertEqual(":app", self.query.get_module(":app")["module"])
+
+    def test_call_tool_reports_missing_required_argument(self):
+        with self.assertRaisesRegex(ValueError, "missing required tool argument.*module"):
+            architecture_query.call_tool(self.query, "get_module", {})
+        with self.assertRaisesRegex(ValueError, "tool arguments must be a JSON object"):
+            architecture_query.call_tool(self.query, "get_module", [])
+
+    def test_output_database_symlink_is_rejected(self):
+        target = Path(self.temp.name) / "target.db"
+        target.touch()
+        link = Path(self.temp.name) / "link.db"
+        link.symlink_to(target)
+        with self.assertRaisesRegex(ValueError, "regular file"):
+            architecture_query.validate_db_path(str(link), must_exist=False)
 
     def test_mcp_lists_and_calls_tools(self):
         requests = "\n".join([

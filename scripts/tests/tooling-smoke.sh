@@ -77,6 +77,19 @@ extract_status=$?
 set -e
 [[ $extract_status -eq 75 ]] && pass 'SCIP extraction enforces record limit' || fail 'SCIP extraction enforces record limit'
 [[ "$(<"$fixture_root/limited.jsonl")" == preserve ]] && pass 'SCIP extraction failure is atomic' || fail 'SCIP extraction failure is atomic'
+cat >"$fixture_root/invalid-scip" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '{"documents":{}}'
+EOF
+chmod +x "$fixture_root/invalid-scip"
+set +e
+invalid_output="$($REPO_ROOT/scripts/scip/extract-scip-graph.py "$fixture_root/index.scip" \
+  "$fixture_root/invalid.jsonl" --scip-command "$fixture_root/invalid-scip" 2>&1)"
+invalid_status=$?
+set -e
+[[ $invalid_status -eq 65 ]] && pass 'SCIP extraction rejects malformed document containers' || fail 'SCIP extraction rejects malformed document containers'
+[[ "$invalid_output" == *'documents must be an array'* ]] && pass 'SCIP extraction explains malformed input' || fail 'SCIP extraction explains malformed input'
+[[ ! -e "$fixture_root/invalid.jsonl" ]] && pass 'SCIP validation does not create output' || fail 'SCIP validation does not create output'
 
 if rg -q -S '(token|secret|password)["[:space:]]*[:=]["[:space:]]*[^$<{[:space:]]+' \
   "$REPO_ROOT/config/mcp" "$REPO_ROOT/config/scip-java"; then

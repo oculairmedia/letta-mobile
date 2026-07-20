@@ -12,6 +12,7 @@ SCHEMA = "letta.architecture.graph.v1"
 
 
 def emit(handle, record, state):
+    """Write one deterministic JSONL record while enforcing the output bound."""
     if state[0] >= state[1]:
         raise RuntimeError(f"record limit exceeded ({state[1]})")
     handle.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
@@ -19,92 +20,148 @@ def emit(handle, record, state):
 
 
 def first(value, *names, default=None):
+    """Return the first present field among SCIP JSON naming variants."""
     for name in names:
         if name in value:
             return value[name]
     return default
 
 
-def main():
+def parse_args(argv=None):
+    """Parse and validate extractor command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument("index", type=pathlib.Path)
     parser.add_argument("output", type=pathlib.Path)
     parser.add_argument("--max-records", type=int, default=20000)
     parser.add_argument("--scip-command", default="scip")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.max_records <= 0:
         parser.error("--max-records must be positive")
     if not args.index.is_file():
         parser.error(f"index does not exist: {args.index}")
+    return args
 
+
+def run_scip(command, index):
+    """Run the SCIP printer and return its completed process and exit status."""
     try:
         result = subprocess.run(
-            [args.scip_command, "print", "--json", str(args.index)],
+            [command, "print", "--json", str(index)],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
+        return result, 0
     except FileNotFoundError:
         print("extract-scip-graph: scip CLI is required on PATH", file=sys.stderr)
-        return 69
+        return None, 69
     except subprocess.CalledProcessError as error:
         print(error.stderr.rstrip(), file=sys.stderr)
-        return error.returncode
+        return None, error.returncode
 
+
+def parse_documents(raw_json):
+    """Decode SCIP JSON and validate the container types used by extraction."""
     try:
-        payload = json.loads(result.stdout)
+        payload = json.loads(raw_json)
     except json.JSONDecodeError as error:
-        print(f"extract-scip-graph: invalid scip JSON: {error}", file=sys.stderr)
-        return 65
+        raise ValueError(f"invalid scip JSON: {error}") from error
     if not isinstance(payload, dict):
-        print("extract-scip-graph: scip JSON root must be an object", file=sys.stderr)
-        return 65
+        raise ValueError("scip JSON root must be an object")
     documents = first(payload, "documents", default=[])
     if not isinstance(documents, list):
-        print("extract-scip-graph: scip JSON documents must be an array", file=sys.stderr)
-        return 65
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    state = [0, args.max_records]
+        raise ValueError("scip JSON documents must be an array")
+    return documents
+
+
+def emit_symbols(handle, file_id, symbols, declared, state):
+    """Emit unique symbol nodes and declaration edges for one document."""
+    for symbol in symbols:
+        symbol_id = first(symbol, "symbol", default="")
+        if not symbol_id or symbol_id in declared:
+            continue
+        emit(handle, {
+            "schema": SCHEMA,
+            "type": "node",
+            "id": symbol_id,
+            "kind": "symbol",
+            "display": first(symbol, "displayName", "display_name", default=symbol_id),
+        }, state)
+        emit(handle, {
+            "schema": SCHEMA, "type": "edge", "from": file_id, "to": symbol_id, "kind": "declares",
+        }, state)
+        declared.add(symbol_id)
+
+
+def emit_references(handle, file_id, occurrences, state):
+    """Emit reference edges while excluding SCIP declaration occurrences."""
+    for occurrence in occurrences:
+        symbol_id = first(occurrence, "symbol", default="")
+        roles = int(first(occurrence, "symbolRoles", "symbol_roles", default=0))
+        if not symbol_id or roles & 1:
+            continue
+        emit(handle, {
+            "schema": SCHEMA,
+            "type": "edge",
+            "from": file_id,
+            "to": symbol_id,
+            "kind": "references",
+            "range": first(occurrence, "range", default=[]),
+        }, state)
+
+
+def emit_documents(handle, documents, state):
+    """Emit graph records for all SCIP documents."""
+    emit(handle, {"schema": SCHEMA, "type": "meta", "source": "scip-java", "advisory": True}, state)
+    declared = set()
+    for document in documents:
+        path = first(document, "relativePath", "relative_path", default="")
+        file_id = f"file:{path}"
+        emit(handle, {
+            "schema": SCHEMA, "type": "node", "id": file_id, "kind": "file", "path": path,
+        }, state)
+        emit_symbols(handle, file_id, first(document, "symbols", default=[]), declared, state)
+        emit_references(handle, file_id, first(document, "occurrences", default=[]), state)
+
+
+def write_graph(output, documents, max_records):
+    """Write graph JSONL to a temporary file and atomically replace output."""
+    output.parent.mkdir(parents=True, exist_ok=True)
+    state = [0, max_records]
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
-            dir=args.output.parent,
-            prefix=f".{args.output.name}.",
+            dir=output.parent,
+            prefix=f".{output.name}.",
             suffix=".tmp",
             delete=False,
         ) as handle:
             temporary = pathlib.Path(handle.name)
-            emit(handle, {"schema": SCHEMA, "type": "meta", "source": "scip-java", "advisory": True}, state)
-            declared = set()
-            for document in documents:
-                path = first(document, "relativePath", "relative_path", default="")
-                file_id = f"file:{path}"
-                emit(handle, {"schema": SCHEMA, "type": "node", "id": file_id, "kind": "file", "path": path}, state)
-                for symbol in first(document, "symbols", default=[]):
-                    symbol_id = first(symbol, "symbol", default="")
-                    if symbol_id and symbol_id not in declared:
-                        emit(handle, {"schema": SCHEMA, "type": "node", "id": symbol_id, "kind": "symbol", "display": first(symbol, "displayName", "display_name", default=symbol_id)}, state)
-                        emit(handle, {"schema": SCHEMA, "type": "edge", "from": file_id, "to": symbol_id, "kind": "declares"}, state)
-                        declared.add(symbol_id)
-                for occurrence in first(document, "occurrences", default=[]):
-                    symbol_id = first(occurrence, "symbol", default="")
-                    if not symbol_id:
-                        continue
-                    roles = int(first(occurrence, "symbolRoles", "symbol_roles", default=0))
-                    if roles & 1:
-                        continue
-                    emit(handle, {"schema": SCHEMA, "type": "edge", "from": file_id, "to": symbol_id, "kind": "references", "range": first(occurrence, "range", default=[])}, state)
-        temporary.replace(args.output)
-    except (OSError, RuntimeError, TypeError, ValueError) as error:
+            emit_documents(handle, documents, state)
+        temporary.replace(output)
+    except (OSError, RuntimeError, TypeError, ValueError):
         if temporary is not None:
             temporary.unlink(missing_ok=True)
-        print(f"extract-scip-graph: {error}", file=sys.stderr)
-        return 75
+        raise
+    return state[0]
 
-    print(f"extract-scip-graph: wrote {state[0]} advisory records to {args.output}")
+
+def main(argv=None):
+    """Extract an advisory bounded JSONL graph from a SCIP index."""
+    args = parse_args(argv)
+    result, status = run_scip(args.scip_command, args.index)
+    if result is None:
+        return status
+    try:
+        documents = parse_documents(result.stdout)
+        count = write_graph(args.output, documents, args.max_records)
+    except (OSError, RuntimeError, TypeError, ValueError) as error:
+        print(f"extract-scip-graph: {error}", file=sys.stderr)
+        return 75 if not isinstance(error, ValueError) or "scip JSON" not in str(error) else 65
+    print(f"extract-scip-graph: wrote {count} advisory records to {args.output}")
     return 0
 
 
