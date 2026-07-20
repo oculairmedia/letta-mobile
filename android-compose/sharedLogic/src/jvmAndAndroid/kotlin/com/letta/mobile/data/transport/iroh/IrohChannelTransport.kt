@@ -141,6 +141,15 @@ class IrohChannelTransport(
     @Volatile
     private var activeTurn: ActiveTurn? = null
 
+    /**
+     * A nonterminal turn whose connection died before its send job could emit a
+     * terminal. Closing the stale handle cancels that job and clears
+     * [activeTurn], so retain only the immutable identity needed to trigger the
+     * existing reconcile-and-settle path after redial.
+     */
+    @Volatile
+    private var interruptedTurn: RedialWhileTurnActive? = null
+
     override val hasActiveChatTurn: Boolean
         get() = activeTurn?.terminalReached?.isCompleted == false
 
@@ -229,6 +238,14 @@ class IrohChannelTransport(
                 // AND reconciles frames missed during the dead window.
                 reSubscribeViewedConversation()
             } else {
+                // Snapshot turn identity before a degraded handle is closed and
+                // its send job clears activeTurn. Intentional disconnects and
+                // config replacement must not synthesize redial recovery.
+                if (supervisorState is IrohConnectionState.Degraded && supervisorState.reason != "config_changed") {
+                    rememberInterruptedTurn()
+                } else if (supervisorState is IrohConnectionState.Degraded) {
+                    interruptedTurn = null
+                }
                 // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
                 // stops observer ingestion. On redial a fresh Ready fires and the
                 // collector restarts against the new handle above.
@@ -552,16 +569,39 @@ class IrohChannelTransport(
         )
 
     private fun notifyRedialIfTurnActive() {
+        val interrupted = interruptedTurn
+        val turn = activeTurn
+        val recovery = interrupted ?: turn
+            ?.takeUnless { it.hasTerminal }
+            ?.let {
+                RedialWhileTurnActive(
+                    agentId = it.agentId,
+                    conversationId = it.conversationId,
+                    turnId = it.turnId,
+                    runId = it.runId,
+                )
+            }
+            ?: return
+        if (_redialWhileTurnActive.tryEmit(recovery) && interrupted === recovery) {
+            interruptedTurn = null
+        }
+    }
+
+    private fun rememberInterruptedTurn() {
         val turn = activeTurn ?: return
         if (turn.hasTerminal) return
-        _redialWhileTurnActive.tryEmit(
-            RedialWhileTurnActive(
-                agentId = turn.agentId,
-                conversationId = turn.conversationId,
-                turnId = turn.turnId,
-                runId = turn.runId,
-            )
+        interruptedTurn = RedialWhileTurnActive(
+            agentId = turn.agentId,
+            conversationId = turn.conversationId,
+            turnId = turn.turnId,
+            runId = turn.runId,
         )
+    }
+
+    private fun clearInterruptedTurn(conversationId: String) {
+        if (interruptedTurn?.conversationId == conversationId) {
+            interruptedTurn = null
+        }
     }
 
     // letta-mobile-34xoj: track consecutive admin_rpc failures and last stream frame
@@ -880,6 +920,9 @@ class IrohChannelTransport(
                 )
                 return
             }
+            if (interruptedTurn?.turnId == turn.turnId) {
+                interruptedTurn = null
+            }
             emitBoth(frame)
             turn.terminalReached.complete(frame.status)
             return
@@ -986,6 +1029,7 @@ class IrohChannelTransport(
     override fun cancel(conversationId: String): Boolean {
         val turn = activeTurn
         if (turn == null) {
+            clearInterruptedTurn(conversationId)
             // Nothing streaming: preserve the "cancel always yields a terminal"
             // contract so the UI can never get stuck streaming, but there is no
             // run to abort server-side.
@@ -1162,6 +1206,7 @@ class IrohChannelTransport(
     }
 
     override suspend fun disconnect() {
+        interruptedTurn = null
         stopObserverIngest("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
