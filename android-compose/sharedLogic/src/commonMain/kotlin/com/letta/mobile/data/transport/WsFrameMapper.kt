@@ -50,6 +50,7 @@ object WsFrameMapper {
             runId = frame.runId,
             otid = frame.otid,
             seqId = frame.seqId ?: frame.seq.toSeqId(),
+            streamMode = frame.streamMode,
         )
 
         is ServerFrame.ReasoningMessage -> ReasoningMessage(
@@ -59,6 +60,7 @@ object WsFrameMapper {
             runId = frame.runId,
             signature = frame.signature,
             seqId = frame.seqId ?: frame.seq.toSeqId(),
+            streamMode = frame.streamMode,
         )
 
         is ServerFrame.ToolCallMessage -> frame.toLettaToolMessage()

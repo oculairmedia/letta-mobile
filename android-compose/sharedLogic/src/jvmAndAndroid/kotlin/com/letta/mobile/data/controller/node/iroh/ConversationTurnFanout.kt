@@ -69,6 +69,7 @@ internal class ConversationTurnFanout(
     private val remoteEndpointId: String,
     /** Snapshot source of every viewer of [conversationId] (incl. the initiator). */
     private val viewersFor: suspend (conversationId: String) -> Set<ViewerHandle>,
+    private val registrationEpoch: suspend (conversationId: String, connectionId: String) -> Long = { _, _ -> 0L },
     /**
      * The initiator's own viewer handle. Used as the sole fanout target when
      * there is no registry (legacy path), and — importantly — the identity whose
@@ -100,11 +101,17 @@ internal class ConversationTurnFanout(
 ) {
     private val openToolCalls = OpenToolCallTracker()
     private val incrementalText = IncrementalStreamText()
-    private val deliveredTextKeysByViewer = mutableMapOf<String, MutableSet<String>>()
+    private val deliveredTextSubscriptions = mutableSetOf<DeliveredTextSubscription>()
     private var terminalWritten = false
 
     /** Whether a terminal frame has already been broadcast for this turn. */
     val anyTerminalWritten: Boolean get() = terminalWritten
+
+    private data class DeliveredTextSubscription(
+        val connectionId: String,
+        val registrationEpoch: Long,
+        val streamKey: String,
+    )
 
     /** True when this payload is a failure/cancel lifecycle (needs dangling flush first). */
     fun isFailureOrCancelLifecycle(payload: RuntimeEventPayload): Boolean =
@@ -300,7 +307,7 @@ internal class ConversationTurnFanout(
         // Initiator-only redial parking (q71yi): record the untagged-equivalent
         // delta JSON once, matching the pre-fanout writeStreamDelta which tracked
         // the delta it was handed. Never runs per-observer.
-        trackInitiatorFrame(delta.toString())
+        trackInitiatorFrame(checkpoint.toString())
         broadcastDeltaBodyNoPark(delta, streamKey, checkpoint)
     }
 
@@ -350,13 +357,17 @@ internal class ConversationTurnFanout(
             "initiatorId" to (initiatorViewer?.connectionId?.take(12) ?: "none"),
         )
         if (viewers.isEmpty()) return
+        val deliveries = viewers.map { viewer ->
+            val epoch = registrationEpoch(conversationId, viewer.connectionId)
+            val subscription = DeliveredTextSubscription(viewer.connectionId, epoch, streamKey)
+            val viewerDelta = if (streamKey.isNotEmpty() && deliveredTextSubscriptions.add(subscription)) checkpoint else delta
+            viewer to viewerDelta
+        }
         supervisorScope {
-            viewers.map { viewer ->
+            deliveries.map { (viewer, viewerDelta) ->
                 async {
                     val isInitiator = viewer === initiatorViewer ||
                         (initiatorViewer != null && viewer.connectionId == initiatorViewer.connectionId)
-                    val viewerKeys = deliveredTextKeysByViewer.getOrPut(viewer.connectionId) { mutableSetOf() }
-                    val viewerDelta = if (streamKey.isNotEmpty() && viewerKeys.add(streamKey)) checkpoint else delta
                     writeToViewerIsolated(viewer, viewerDelta, isInitiator)
                 }
             }.awaitAll()

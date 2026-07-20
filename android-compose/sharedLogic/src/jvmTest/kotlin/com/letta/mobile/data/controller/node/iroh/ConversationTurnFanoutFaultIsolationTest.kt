@@ -107,6 +107,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         runtime = runtime,
         remoteEndpointId = "conn-init",
         viewersFor = { conv -> registry.viewersFor(conv) },
+        registrationEpoch = registry::registrationEpoch,
         initiatorViewer = initiator,
         trackInitiatorFrame = {},
         unregisterViewer = { conv, v -> registry.unregister(conv, v) },

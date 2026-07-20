@@ -653,6 +653,9 @@ class IrohNodeConnection(
             runtime = input.runtime,
             remoteEndpointId = remoteEndpointId,
             viewersFor = { conv -> connectionRegistry?.viewersFor(conv) ?: emptySet() },
+            registrationEpoch = { conv, connectionId ->
+                connectionRegistry?.registrationEpoch(conv, connectionId) ?: 0L
+            },
             initiatorViewer = ensureSelfViewer(streamSend),
             trackInitiatorFrame = { deltaJson ->
                 // INITIATOR-ONLY: matches the pre-fanout writeStreamDelta, which

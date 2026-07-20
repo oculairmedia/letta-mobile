@@ -154,6 +154,7 @@ class ConversationTurnFanoutTest {
         runtime = runtime,
         remoteEndpointId = "conn-init",
         viewersFor = { conv -> registry?.viewersFor(conv) ?: emptySet() },
+        registrationEpoch = { conv, connectionId -> registry?.registrationEpoch(conv, connectionId) ?: 0L },
         initiatorViewer = initiator,
         trackInitiatorFrame = { parked.add(it) },
     )
