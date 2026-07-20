@@ -4,15 +4,19 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.coroutines.flow.Flow
 
+/** Authoritative parent scope for active-subagent projection. */
+data class SubagentParentScope(
+    val parentAgentId: String,
+    val parentConversationId: String,
+)
+
 /**
  * letta-mobile-73o2h.3: single source of truth for the active-subagent
  * registry carried over the shim's mobile WS (MOBILE_WS_PROTOCOL.md §13).
  *
- * The registry is per-socket (NOT per-agent): there is one shared snapshot
- * of active subagents for the live connection. [activeSubagentsFlow] emits
- * the full current set on every change (snapshot-by-replacement), so the
- * UI reduces without per-frame rebuilds — matching the cron convention and
- * the rmzmo perf constraints.
+ * The wire registry is per-socket, but consumers must project it through an
+ * explicit parent agent + conversation scope. This prevents two agents whose
+ * conversation ids are both `default` from consuming each other's chips.
  */
 interface ISubagentRepository {
     /**
@@ -21,7 +25,10 @@ interface ISubagentRepository {
      * the same flow so no duplicate fetches fire. `subagents_updated`
      * pushes fold in by replacement.
      */
-    fun activeSubagentsFlow(): Flow<List<SubagentEntry>>
+    fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>>
+
+    /** Synchronous cache projection used to avoid an empty initial emission. */
+    fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry>
 
     /** Force a fresh `subagent_list` round-trip. */
     suspend fun refresh(): Result<List<SubagentEntry>>

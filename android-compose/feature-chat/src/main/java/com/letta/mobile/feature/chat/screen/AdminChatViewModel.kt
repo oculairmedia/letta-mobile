@@ -169,6 +169,9 @@ internal class AdminChatViewModel @Inject constructor(
     // through on remote/shim. `by lazy` because the gate reads [activeAgent]
     // (declared below), so construction must happen after field init.
     val activeSubagentSource: ActiveSubagentSource by lazy {
+        val parentConversationId = _uiState
+            .map { state -> (state.conversationState as? ConversationState.Ready)?.conversationId }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, conversationId?.value)
         val localBound: StateFlow<Boolean> = activeAgent
             .map { AgentRuntimeBinding.isLocalBound(it) }
             .stateIn(
@@ -177,7 +180,12 @@ internal class AdminChatViewModel @Inject constructor(
                 AgentRuntimeBinding.isLocalBound(activeAgent.value),
             )
         LocalAwareActiveSubagentSource(
-            delegate = WsActiveSubagentSource(subagentRepository, viewModelScope),
+            delegate = WsActiveSubagentSource(
+                repository = subagentRepository,
+                scope = viewModelScope,
+                parentAgentId = agentId.value,
+                parentConversationId = parentConversationId,
+            ),
             isLocalBoundFlow = localBound,
             scope = viewModelScope,
         )

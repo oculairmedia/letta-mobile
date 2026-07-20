@@ -3,14 +3,16 @@ package com.letta.mobile.feature.chat.subagent
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.api.ISubagentRepository
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -47,10 +49,12 @@ import kotlinx.coroutines.flow.stateIn
  * expires. letta-mobile-sqdqe: omission alone is not terminal; an omitted
  * RUNNING task remains visible until an explicit terminal status arrives.
  */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class WsActiveSubagentSource(
     private val repository: ISubagentRepository,
     scope: CoroutineScope,
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val parentAgentId: String,
+    private val parentConversationId: StateFlow<String?>,
 ) : ActiveSubagentSource {
 
     override suspend fun todos(toolCallId: String) = repository.todos(toolCallId)
@@ -58,7 +62,7 @@ class WsActiveSubagentSource(
     override suspend fun resolveConversationId(subagent: ActiveSubagent): Result<String?> {
         subagent.subagentNavigationConversationId?.let { return Result.success(it) }
         return repository.refresh().map { entries ->
-            entries.firstOrNull { entry ->
+            entries.inCurrentParentScope().firstOrNull { entry ->
                 entry.toolCallId == subagent.id || entry.taskId == subagent.id
             }?.subagentConversationId?.takeIf { it.isNotBlank() }
         }
@@ -68,21 +72,35 @@ class WsActiveSubagentSource(
         val local = activeSubagents.value.firstOrNull { it.id == id }
         if (local?.subagentNavigationConversationId != null) return Result.success(local)
         return repository.refresh().map { entries ->
-            entries.firstOrNull { entry ->
+            entries.inCurrentParentScope().firstOrNull { entry ->
                 entry.toolCallId == id || entry.taskId == id
             }?.toActiveSubagent()
         }
     }
 
+    private fun List<SubagentEntry>.inCurrentParentScope(): List<SubagentEntry> {
+        val conversationId = parentConversationId.value ?: return emptyList()
+        return filter { entry ->
+            entry.parentAgentId == parentAgentId &&
+                entry.parentConversationId == conversationId
+        }
+    }
+
     override val activeSubagents: StateFlow<ImmutableList<ActiveSubagent>> =
-        repository.activeSubagentsFlow()
-            .map { entries -> entries.map { it.toActiveSubagent() } }
-            .scan(LingerAccumulator()) { acc, snapshot -> acc.fold(snapshot, clock()) }
-            .map { it.emitted }
+        parentConversationId
+            .filterNotNull()
+            .flatMapLatest { conversationId ->
+                repository.activeSubagentsFlow(SubagentParentScope(parentAgentId, conversationId))
+            }
+            .map { entries -> entries.map { it.toActiveSubagent() }.toImmutableList() }
             .stateIn(
                 scope = scope,
                 started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-                initialValue = persistentListOf(),
+                initialValue = parentConversationId.value?.let { conversationId ->
+                    repository.currentActiveSubagents(SubagentParentScope(parentAgentId, conversationId))
+                        .map { it.toActiveSubagent() }
+                        .toImmutableList()
+                } ?: persistentListOf(),
             )
 
     /**
@@ -172,6 +190,7 @@ class WsActiveSubagentSource(
             // (shim): emit last-todo-change so "stuck" reflects real stalls,
             // not just long total runtime.
             lastUpdateAt = startedAt?.let(::parseIsoMillis),
+            terminalAt = terminalAtEpochMs,
         )
 
         /**

@@ -5,14 +5,17 @@ import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.model.SubagentTodoProgressWire
 import com.letta.mobile.data.repository.api.ISubagentRepository
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource.Companion.activeOnly
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource.Companion.toActiveSubagent
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource.Companion.toActiveSubagentStatus
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -36,7 +39,12 @@ class WsActiveSubagentSourceTest {
         val state = MutableStateFlow(initial)
         var refreshResult: Result<List<SubagentEntry>>? = null
         var refreshCalls = 0
-        override fun activeSubagentsFlow(): Flow<List<SubagentEntry>> = state
+        override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> =
+            state.map { entries -> entries.filter { it.inScope(scope) } }
+        override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
+            state.value.filter { it.inScope(scope) }
+        private fun SubagentEntry.inScope(scope: SubagentParentScope): Boolean =
+            parentAgentId == scope.parentAgentId && parentConversationId == scope.parentConversationId
         override suspend fun refresh(): Result<List<SubagentEntry>> {
             refreshCalls += 1
             return refreshResult ?: Result.success(state.value)
@@ -50,6 +58,9 @@ class WsActiveSubagentSourceTest {
         taskId: String? = null,
         subagentAgentId: String? = null,
         subagentConversationId: String? = null,
+        parentAgentId: String = "agent-parent",
+        parentConversationId: String = "default",
+        terminalAtEpochMs: Long? = null,
     ) = SubagentEntry(
         toolCallId = toolCallId,
         description = "desc $toolCallId",
@@ -58,7 +69,16 @@ class WsActiveSubagentSourceTest {
         taskId = taskId,
         subagentAgentId = subagentAgentId,
         subagentConversationId = subagentConversationId,
+        parentAgentId = parentAgentId,
+        parentConversationId = parentConversationId,
+        terminalAtEpochMs = terminalAtEpochMs,
     )
+
+    private fun source(
+        repo: ISubagentRepository,
+        scope: CoroutineScope,
+        conversationId: MutableStateFlow<String?> = MutableStateFlow("default"),
+    ) = WsActiveSubagentSource(repo, scope, "agent-parent", conversationId)
 
     @Test
     fun `status strings map to ActiveSubagent Status`() {
@@ -130,7 +150,7 @@ class WsActiveSubagentSourceTest {
     @Test
     fun `resolveConversationId uses existing actual conversation id without refresh`() = runTest {
         val repo = FakeSubagentRepository()
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val source = source(repo, backgroundScope)
         val subagent = entry(
             "toolu_1",
             subagentAgentId = "agent-local-abc",
@@ -153,7 +173,7 @@ class WsActiveSubagentSourceTest {
                 ),
             ),
         )
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val source = source(repo, backgroundScope)
         val subagent = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
 
         assertEquals("conv-subagent-456", source.resolveConversationId(subagent).getOrNull())
@@ -164,7 +184,7 @@ class WsActiveSubagentSourceTest {
     fun `resolveConversationId returns null instead of default when lookup fails`() = runTest {
         val repo = FakeSubagentRepository()
         repo.refreshResult = Result.success(listOf(entry("toolu_other", subagentConversationId = "default")))
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val source = source(repo, backgroundScope)
         val subagent = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
 
         assertNull(source.resolveConversationId(subagent).getOrNull())
@@ -172,25 +192,21 @@ class WsActiveSubagentSourceTest {
     }
 
     @Test
-    fun `retains running entry omitted from later non-terminal snapshot`() = runTest {
+    fun `maps each durable repository snapshot without local lifecycle state`() = runTest {
         val repo = FakeSubagentRepository(listOf(entry("toolu_1"), entry("toolu_2")))
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val source = source(repo, backgroundScope)
 
         val mapped = source.activeSubagents.first { it.size == 2 }
         assertEquals(listOf("toolu_1", "toolu_2"), mapped.map { it.id })
         assertEquals(listOf("general-purpose", "general-purpose"), mapped.map { it.subagentType })
 
-        // A later refresh/push can be incomplete during reconnect or registry
-        // gaps. Omitted running entries must remain visible, not be converted
-        // to terminal linger entries, until an explicit terminal state arrives.
+        // The durable repository owns omission retention. This source only
+        // projects the already-reduced, parent-scoped snapshot.
         repo.state.value = listOf(entry("toolu_3"))
         val after = source.activeSubagents.first { snapshot ->
             snapshot.any { it.id == "toolu_3" }
         }
-        assertEquals(
-            setOf("toolu_1", "toolu_2", "toolu_3"),
-            after.filter { it.isActive }.map { it.id }.toSet(),
-        )
+        assertEquals(setOf("toolu_3"), after.filter { it.isActive }.map { it.id }.toSet())
         assertTrue(after.none { it.isTerminal })
     }
 
@@ -206,7 +222,7 @@ class WsActiveSubagentSourceTest {
         // Pin the clock so the terminal entries are freshly stamped (not yet
         // expired) and would linger; activeOnly still strips them, proving the
         // strict rule is independent of the lingering one.
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 0L })
+        val source = source(repo, backgroundScope)
 
         val active = source.activeSubagents.activeOnly().first { it.isNotEmpty() }
         assertEquals(listOf("toolu_1"), active.map { it.id })
@@ -218,12 +234,12 @@ class WsActiveSubagentSourceTest {
         // visible (stamped with terminalAt) for review, not vanish.
         val repo = FakeSubagentRepository(listOf(entry("toolu_1", SubagentStatus.RUNNING)))
         var nowMs = 1_000L
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { nowMs })
+        val source = source(repo, backgroundScope)
 
         source.activeSubagents.first { it.singleOrNull()?.isActive == true }
 
         // Flip to completed at t=1000.
-        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED))
+        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED, terminalAtEpochMs = nowMs))
         val lingering = source.activeSubagents.first { it.singleOrNull()?.isTerminal == true }
         assertEquals("toolu_1", lingering.single().id)
         assertEquals(ActiveSubagent.Status.COMPLETED, lingering.single().status)
@@ -240,11 +256,11 @@ class WsActiveSubagentSourceTest {
     @Test
     fun `explicit terminal state clears retained running entry into linger`() = runTest {
         val repo = FakeSubagentRepository(listOf(entry("toolu_1", SubagentStatus.RUNNING)))
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 5_000L })
+        val source = source(repo, backgroundScope)
 
         source.activeSubagents.first { it.singleOrNull()?.isActive == true }
 
-        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED))
+        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED, terminalAtEpochMs = 5_000L))
         val lingering = source.activeSubagents.first { it.any { e -> e.isTerminal } }
         val done = lingering.single { it.id == "toolu_1" }
         assertEquals(ActiveSubagent.Status.COMPLETED, done.status)
@@ -254,7 +270,7 @@ class WsActiveSubagentSourceTest {
     @Test
     fun `omitted background task id remains visible until explicit terminal`() = runTest {
         val repo = FakeSubagentRepository(listOf(entry("", taskId = "task_1")))
-        val source = WsActiveSubagentSource(repo, backgroundScope, clock = { 9_000L })
+        val source = source(repo, backgroundScope)
 
         val initial = source.activeSubagents.first { it.singleOrNull()?.id == "task_1" }
         assertEquals(ActiveSubagent.Kind.BACKGROUND_TASK, initial.single().kind)
@@ -266,11 +282,42 @@ class WsActiveSubagentSourceTest {
         }
         assertEquals(listOf("task_1"), retained.map { it.id })
 
-        repo.state.value = listOf(entry("", status = SubagentStatus.COMPLETED, taskId = "task_1"))
+        repo.state.value = listOf(entry("", status = SubagentStatus.COMPLETED, taskId = "task_1", terminalAtEpochMs = 9_000L))
         val terminal = source.activeSubagents.first { snapshot ->
             snapshot.singleOrNull()?.id == "task_1" && snapshot.single().isTerminal
         }
         assertEquals(ActiveSubagent.Status.COMPLETED, terminal.single().status)
+    }
+
+    @Test
+    fun `conversation switch does not retain chips from previous scope`() = runTest {
+        val repo = FakeSubagentRepository(
+            listOf(
+                entry("toolu-a", parentConversationId = "conv-a"),
+                entry("toolu-b", parentConversationId = "conv-b"),
+            )
+        )
+        val conversationId = MutableStateFlow<String?>("conv-a")
+        val source = source(repo, backgroundScope, conversationId)
+
+        assertEquals(listOf("toolu-a"), source.activeSubagents.first { it.isNotEmpty() }.map { it.id })
+        conversationId.value = "conv-b"
+        assertEquals(listOf("toolu-b"), source.activeSubagents.first { it.singleOrNull()?.id == "toolu-b" }.map { it.id })
+    }
+
+    @Test
+    fun `source starts from durable terminal cache without empty flash`() = runTest {
+        val terminal = entry(
+            "toolu-terminal",
+            status = SubagentStatus.COMPLETED,
+            terminalAtEpochMs = 1_000L,
+        )
+        val repo = FakeSubagentRepository(listOf(terminal))
+
+        val recreated = source(repo, backgroundScope)
+
+        assertEquals(listOf("toolu-terminal"), recreated.activeSubagents.value.map { it.id })
+        assertEquals(1_000L, recreated.activeSubagents.value.single().terminalAt)
     }
 
     // ── i2f23: todo_progress mapping ──────────────────────────────────────

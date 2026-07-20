@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
@@ -14,6 +15,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,6 +28,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -77,6 +80,36 @@ class ChatSendCoordinatorConversationSwitchTest {
         assertEquals(listOf("conv-a"), transport.sentConversationIds)
     }
 
+    @Test
+    fun `passive message delta prefers frame conversation during switch`() = runTest {
+        val timeline = RecordingTimelineWriter()
+        var activeConversation: String? = "conv-new"
+        val coordinator = ChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = AGENT_ID,
+            activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
+            wsChatBridge = WsChatBridge(RecordingChannelTransport()),
+            timelineRepository = timeline,
+            conversationRepository = FakeConversationRepository(),
+            ui = NoopUiSink(),
+            clearComposerAfterSend = {},
+            activeConversationId = { activeConversation },
+            setActiveConversationId = { activeConversation = it },
+            startTimelineObserver = {},
+            clientVersion = { "test" },
+            otidGenerator = { "otid-passive" },
+        )
+
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                message = AssistantMessage(id = "message-passive", contentRaw = JsonPrimitive("hello")),
+                conversationId = "conv-old",
+            )
+        )
+
+        assertEquals(listOf("conv-old"), timeline.ingestedConversationIds)
+    }
+
     private class NoopUiSink : ChatSendUiSink {
         override fun currentError(): String? = null
         override fun isStreaming(): Boolean = false
@@ -120,10 +153,13 @@ class ChatSendCoordinatorConversationSwitchTest {
     }
 
     private class RecordingTimelineWriter : TimelineExternalTransportWriter {
+        val ingestedConversationIds = mutableListOf<String>()
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = otid
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = otid
         override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) = Unit
-        override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) = Unit
+        override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) {
+            ingestedConversationIds += conversationId
+        }
         override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) = Unit
         override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) = Unit
         override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) = Unit

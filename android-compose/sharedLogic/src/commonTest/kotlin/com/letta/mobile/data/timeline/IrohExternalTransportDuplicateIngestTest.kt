@@ -12,6 +12,12 @@ import kotlinx.serialization.json.JsonPrimitive
 
 class IrohExternalTransportDuplicateIngestTest {
     @Test
+    fun `external frame dedupe scope includes agent for bare default conversations`() {
+        assertEquals("agent-a|default", externalConversationDedupeKey("agent-a", "default"))
+        assertEquals("agent-b|default", externalConversationDedupeKey("agent-b", "default"))
+    }
+
+    @Test
     fun duplicate_external_paths_reduce_one_stream_frame_once() = runTest {
         val loop = TimelineSyncLoop(
             messageApi = EmptyTimelineTransport,
