@@ -439,12 +439,14 @@ fun AgentListScreen(
     if (uiState.showCreateDialog) {
         CreateAgentDialog(
             onDismiss = { viewModel.hideCreateDialog() },
-            availableTools = uiState.availableTools,
-            llmModels = uiState.llmModels,
-            embeddingModels = uiState.embeddingModels,
-            onLoadModels = { viewModel.loadAvailableModels() },
-            localReadiness = uiState.localLettaCodeReadiness,
-            onOpenLocalSettings = onNavigateToSettings,
+            inputs = CreateAgentDialogInputs(
+                availableTools = uiState.availableTools,
+                llmModels = uiState.llmModels,
+                embeddingModels = uiState.embeddingModels,
+                onLoadModels = { viewModel.loadAvailableModels() },
+                localReadiness = uiState.localLettaCodeReadiness,
+                onOpenLocalSettings = onNavigateToSettings,
+            ),
             onCreate = { params, runtimeOption ->
                 viewModel.createAgent(params, runtimeOption) { agentId ->
                     viewModel.hideCreateDialog()

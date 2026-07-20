@@ -55,6 +55,15 @@ internal data class CreateAgentFormState(
     val showToolPicker: Boolean = false,
 )
 
+internal data class CreateAgentDialogInputs(
+    val availableTools: List<Tool> = emptyList(),
+    val llmModels: List<LlmModel> = emptyList(),
+    val embeddingModels: List<EmbeddingModel> = emptyList(),
+    val onLoadModels: () -> Unit = {},
+    val localReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
+    val onOpenLocalSettings: () -> Unit = {},
+)
+
 internal data class CreateAgentDialogResources(
     val localReadiness: LocalLettaCodeCreateReadiness,
     val llmModels: List<LlmModel>,
@@ -64,17 +73,10 @@ internal data class CreateAgentDialogResources(
     val validation: CreateAgentValidation,
 )
 
-@Composable
-internal fun CreateAgentDialog(
-    onDismiss: () -> Unit,
-    availableTools: List<Tool> = emptyList(),
-    llmModels: List<LlmModel> = emptyList(),
-    embeddingModels: List<EmbeddingModel> = emptyList(),
-    onLoadModels: () -> Unit = {},
-    localReadiness: LocalLettaCodeCreateReadiness = LocalLettaCodeCreateReadiness(),
-    onOpenLocalSettings: () -> Unit = {},
-    onCreate: (AgentCreateParams, AgentCreateRuntimeOption) -> Unit
-) {
+
+private fun initialCreateAgentFormState(
+    localReadiness: LocalLettaCodeCreateReadiness,
+): CreateAgentFormState {
     // letta-mobile-vc680: under a local config the dialog used to default to
     // REMOTE, presenting a remote model picker that can never list on-device
     // models — users concluded their downloaded model was missing.
@@ -83,18 +85,23 @@ internal fun CreateAgentDialog(
     } else {
         AgentCreateRuntimeOption.REMOTE
     }
-    var formState by remember {
-        mutableStateOf(CreateAgentFormState(runtimeOption = defaultRuntime))
-    }
-    val validation = remember(formState.name, formState.runtimeOption, localReadiness) {
+    return CreateAgentFormState(runtimeOption = defaultRuntime)
+}
+
+@Composable
+private fun rememberCreateAgentDialogResources(
+    formState: CreateAgentFormState,
+    inputs: CreateAgentDialogInputs,
+): CreateAgentDialogResources {
+    val validation = remember(formState.name, formState.runtimeOption, inputs.localReadiness) {
         validateCreateAgentForm(
             name = formState.name,
             runtimeOption = formState.runtimeOption,
-            localReadiness = localReadiness,
+            localReadiness = inputs.localReadiness,
         )
     }
-    val embeddingDropdownModels = remember(embeddingModels) {
-        embeddingModels.map {
+    val embeddingDropdownModels = remember(inputs.embeddingModels) {
+        inputs.embeddingModels.map {
             LlmModel(
                 id = it.id,
                 name = it.name,
@@ -103,14 +110,26 @@ internal fun CreateAgentDialog(
             )
         }
     }
-    val resources = CreateAgentDialogResources(
-        localReadiness = localReadiness,
-        llmModels = llmModels,
+    return CreateAgentDialogResources(
+        localReadiness = inputs.localReadiness,
+        llmModels = inputs.llmModels,
         embeddingDropdownModels = embeddingDropdownModels,
-        onOpenLocalSettings = onOpenLocalSettings,
-        onLoadModels = onLoadModels,
+        onOpenLocalSettings = inputs.onOpenLocalSettings,
+        onLoadModels = inputs.onLoadModels,
         validation = validation,
     )
+}
+
+@Composable
+internal fun CreateAgentDialog(
+    onDismiss: () -> Unit,
+    inputs: CreateAgentDialogInputs = CreateAgentDialogInputs(),
+    onCreate: (AgentCreateParams, AgentCreateRuntimeOption) -> Unit,
+) {
+    var formState by remember {
+        mutableStateOf(initialCreateAgentFormState(inputs.localReadiness))
+    }
+    val resources = rememberCreateAgentDialogResources(formState, inputs)
 
     MultiFieldInputDialog(
         show = true,
@@ -135,7 +154,7 @@ internal fun CreateAgentDialog(
 
     if (formState.showToolPicker) {
         ToolPickerDialog(
-            tools = availableTools,
+            tools = inputs.availableTools,
             selectedToolIds = formState.selectedToolIds,
             title = stringResource(R.string.screen_agents_create_select_tools),
             onDismiss = { formState = formState.copy(showToolPicker = false) },

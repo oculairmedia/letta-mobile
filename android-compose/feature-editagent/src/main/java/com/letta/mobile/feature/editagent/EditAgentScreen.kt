@@ -57,6 +57,13 @@ internal object EditAgentTestTags {
     fun tab(label: String): String = TAB_PREFIX + label.lowercase(Locale.US)
 }
 
+internal data class EditAgentActionsSheetActions(
+    val onDismiss: () -> Unit,
+    val onSave: () -> Unit,
+    val onExport: () -> Unit,
+    val onClone: () -> Unit,
+)
+
 internal data class EditAgentTopBarActions(
     val onNavigateBack: () -> Unit,
     val onTitleClick: () -> Unit,
@@ -499,10 +506,12 @@ private fun EditAgentLoadedContent(
 
     EditAgentActionsSheet(
         show = overlayState.showActionSheet,
-        onDismiss = overlayCallbacks.onDismissActionSheet,
-        onSave = overlayCallbacks.onSave,
-        onExport = overlayCallbacks.onExport,
-        onClone = overlayCallbacks.onClone,
+        actions = EditAgentActionsSheetActions(
+            onDismiss = overlayCallbacks.onDismissActionSheet,
+            onSave = overlayCallbacks.onSave,
+            onExport = overlayCallbacks.onExport,
+            onClone = overlayCallbacks.onClone,
+        ),
     )
 
     ConfirmDialog(
@@ -540,38 +549,35 @@ private fun EditAgentLoadedContent(
 @Composable
 private fun EditAgentActionsSheet(
     show: Boolean,
-    onDismiss: () -> Unit,
-    onSave: () -> Unit,
-    onExport: () -> Unit,
-    onClone: () -> Unit,
+    actions: EditAgentActionsSheetActions,
 ) {
     ActionSheet(
         show = show,
-        onDismiss = onDismiss,
+        onDismiss = actions.onDismiss,
         title = "Actions",
     ) {
         ActionSheetItem(
             text = stringResource(R.string.action_save_settings),
             icon = LettaIcons.Check,
             onClick = {
-                onDismiss()
-                onSave()
+                actions.onDismiss()
+                actions.onSave()
             },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_export_agent),
             icon = LettaIcons.Share,
             onClick = {
-                onDismiss()
-                onExport()
+                actions.onDismiss()
+                actions.onExport()
             },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_clone_agent),
             icon = LettaIcons.Copy,
             onClick = {
-                onDismiss()
-                onClone()
+                actions.onDismiss()
+                actions.onClone()
             },
         )
         // letta-mobile-cygd: Reset Messages and Delete Agent
