@@ -316,11 +316,14 @@ data class ToolReturnMessage(
 ) : LettaMessage {
     val toolReturn: ToolReturn
         get() {
+            val contentPartResponse = extractContentPartResponse(toolReturnRaw)
+            val parsedStringPayload = toolReturnRaw.parseJsonStringPayload()
             val rawFuncResponse = when {
-                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && toolReturnRaw.parseJsonStringPayload() == null -> toolReturnRaw.content
+                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && parsedStringPayload == null -> toolReturnRaw.content
+                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString &&
+                    parsedStringPayload.isSubagentDispatchResult() -> toolReturnRaw.content
                 else -> null
             }
-            val contentPartResponse = extractContentPartResponse(toolReturnRaw)
             val fromList = toolReturns?.firstOrNull()
             if (fromList != null) {
                 // Enrich with funcResponse from tool_return raw if missing
@@ -348,6 +351,12 @@ data class ToolReturnMessage(
 
     val attachments: List<MessageContentPart.Image>
         get() = extractAttachments(toolReturnRaw)
+}
+
+private fun JsonElement?.isSubagentDispatchResult(): Boolean {
+    val obj = this as? JsonObject ?: return false
+    return listOf("task_id", "taskId", "subagent_agent_id", "subagentAgentId", "agent_id", "agentId")
+        .any(obj::containsKey)
 }
 
 private fun JsonObject.looksLikeToolReturnEnvelope(): Boolean {
