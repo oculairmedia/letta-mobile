@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -35,6 +36,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -230,6 +232,7 @@ class IrohNodeConnection(
             firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
             maxFrameBytes = MAX_FRAME_BYTES,
             peerSupportsFrameParts = { peerSupportsFrameParts() },
+            requestContextProvider = ::currentAdminRpcRequestContext,
             // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
             // so the shared message.list handler has no connection identity —
             // associate it HERE, where remoteEndpointId + selfViewer are in
@@ -247,6 +250,67 @@ class IrohNodeConnection(
             },
         )
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
+    }
+
+    /**
+     * Conversation-scoped auth context for both admin_rpc BiStreams and
+     * control-channel admin_rpc frames. Empty authorized set when the peer
+     * has not hydrated a conversation yet (denies scoped methods).
+     */
+    private fun currentAdminRpcRequestContext(): AdminRpcRequestContext =
+        AdminRpcRequestContext(
+            authenticated = authenticated.get(),
+            authorizedConversationIds = viewerSubscription?.currentConversation
+                ?.let(::setOf)
+                ?: emptySet(),
+        )
+
+    /** Control-channel admin_rpc: parse + dispatch with scoped auth context. */
+    private suspend fun handleControlAdminRpc(obj: JsonObject): String {
+        val requestId = obj["request_id"]?.jsonPrimitive?.content
+        val method = obj["method"]?.jsonPrimitive?.content
+        if (method == null || requestId == null) {
+            return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
+        }
+        return adminRpcRouter.dispatch(
+            AdminRpcInvocation(
+                requestId = requestId,
+                method = method,
+                params = obj["params"]?.jsonObject,
+                context = currentAdminRpcRequestContext(),
+            ),
+        )
+    }
+
+    /** Control-channel sync frame — kept out of [handleControlFrame] for complexity. */
+    private suspend fun handleControlSync(obj: JsonObject): String {
+        val requestId = obj["request_id"]?.jsonPrimitive?.content
+        if (requestId == null) {
+            return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
+        }
+        return try {
+            val agentId = obj["agent_id"]?.jsonPrimitive?.content
+            val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
+            if (agentId == null || conversationId == null) {
+                """{"type":"sync_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id required for sync"}"""
+            } else {
+                val runtime = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
+                    agentId = agentId, conversationId = conversationId
+                )
+                val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
+                val forceDeviceStatus = obj["force_device_status"]?.jsonPrimitive?.booleanOrNull ?: false
+                val response = controller.sync(runtime, recoverApprovals, forceDeviceStatus)
+                if (response.success) {
+                    """{"type":"sync_response","request_id":"$requestId","success":true}"""
+                } else {
+                    val error = response.error?.replace("\"", "\\\"") ?: "sync failed"
+                    """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
+                }
+            }
+        } catch (e: Exception) {
+            val error = e.message?.replace("\"", "\\\"") ?: "sync error"
+            """{"type":"sync_response","request_id":"$requestId","success":false,"error":"$error"}"""
+        }
     }
 
     private suspend fun serveControlChannel(
@@ -328,43 +392,8 @@ class IrohNodeConnection(
                     )
                     null
                 }
-                "admin_rpc" -> ifAuthorized(requestId) {
-                    val method = obj["method"]?.jsonPrimitive?.content
-                    if (method == null || requestId == null) {
-                        """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
-                    } else {
-                        adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
-                    }
-                }
-                "sync" -> ifAuthorized(requestId) {
-                    if (requestId == null) {
-                        """{"type":"sync_response","success":false,"error":"request_id is required"}"""
-                    } else {
-                        try {
-                            val agentId = obj["agent_id"]?.jsonPrimitive?.content
-                            val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
-                            if (agentId == null || conversationId == null) {
-                                """{"type":"sync_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id required for sync"}"""
-                            } else {
-                                val runtime = com.letta.mobile.data.transport.appserver.AppServerRuntimeScope(
-                                    agentId = agentId, conversationId = conversationId
-                                )
-                                val recoverApprovals = obj["recover_approvals"]?.jsonPrimitive?.booleanOrNull ?: false
-                                val forceDeviceStatus = obj["force_device_status"]?.jsonPrimitive?.booleanOrNull ?: false
-                                val response = controller.sync(runtime, recoverApprovals, forceDeviceStatus)
-                                val success = response.success
-                                val error = response.error
-                                if (success) {
-                                    """{"type":"sync_response","request_id":"$requestId","success":true}"""
-                                } else {
-                                    """{"type":"sync_response","request_id":"$requestId","success":false,"error":"${error?.replace("\"", "\\\"") ?: "sync failed"}"}"""
-                                }
-                            }
-                        } catch (e: Exception) {
-                            """{"type":"sync_response","request_id":"$requestId","success":false,"error":"${e.message?.replace("\"", "\\\"") ?: "sync error"}"}"""
-                        }
-                    }
-                }
+                "admin_rpc" -> ifAuthorized(requestId) { handleControlAdminRpc(obj) }
+                "sync" -> ifAuthorized(requestId) { handleControlSync(obj) }
                 "abort_message" -> ifAuthorized(requestId) { handleAbort(frameJson, requestId) }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
             }
@@ -453,7 +482,7 @@ class IrohNodeConnection(
                 "remoteEndpointId" to remoteEndpointId,
                 "peerCapabilities" to advertised.sorted().joinToString(","),
             )
-            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}"]}"""
+            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}","${IrohChannelTransport.SUBAGENT_RPC_CAPABILITY}"]}"""
         } else {
             val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
             Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)

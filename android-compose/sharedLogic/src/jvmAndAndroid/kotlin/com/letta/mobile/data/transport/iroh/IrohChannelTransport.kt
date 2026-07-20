@@ -42,11 +42,18 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
@@ -662,6 +669,7 @@ class IrohChannelTransport(
                 sessionId = ticket.hashCode().toString(),
                 transport = transport,
                 turnEngine = engine,
+                serverCapabilities = auth.capabilities?.toSet(),
                 close = { reason ->
                     closeIrohResources(reason, transport, localEndpoint)
                 },
@@ -1198,13 +1206,149 @@ class IrohChannelTransport(
         ServerFrame.CronDeleteResponse(id = frameId("cron_delete"), ts = nowIso(), requestId = "iroh-cron-delete", success = false, error = "cron over iroh not implemented")
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
         ServerFrame.CronDeleteAllResponse(id = frameId("cron_delete_all"), ts = nowIso(), requestId = "iroh-cron-delete-all", success = false, error = "cron over iroh not implemented")
-    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
-        ServerFrame.SubagentListResponse(id = frameId("subagent_list"), ts = nowIso(), requestId = "iroh-subagent-list", success = false, error = "subagents over iroh not implemented")
-    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
-        ServerFrame.SubagentTodosResponse(id = frameId("subagent_todos"), ts = nowIso(), requestId = "iroh-subagent-todos", success = false, error = "subagents over iroh not implemented")
+    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
+        val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
+        val scope = currentSubagentScope()
+            ?: return subagentListFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
+        return invokeScopedSubagent(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = SubagentRpcLabels(
+                unsupported = SUBAGENT_RPC_UNSUPPORTED,
+                timedOut = "subagent.list timed out",
+                failed = "subagent.list failed",
+            ),
+            call = {
+                callScopedSubagentRpc(
+                    method = "subagent.list",
+                    scope = scope,
+                    body = buildJsonObject { put("all", all) }.toString(),
+                )
+            },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result)
+                ServerFrame.SubagentListResponse(
+                    id = frameId("subagent_list"),
+                    ts = nowIso(),
+                    requestId = requestId,
+                    success = true,
+                    subagents = decoded.subagents,
+                )
+            },
+            onFailure = ::subagentListFailure,
+        )
+    }
+
+    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
+        val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
+        val scope = currentSubagentScope()
+            ?: return subagentTodosFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
+        return invokeScopedSubagent(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = SubagentRpcLabels(
+                unsupported = SUBAGENT_RPC_UNSUPPORTED,
+                timedOut = "subagent.todos timed out",
+                failed = "subagent.todos failed",
+            ),
+            call = {
+                callScopedSubagentRpc(
+                    method = "subagent.todos",
+                    scope = scope,
+                    body = buildJsonObject { put("tool_call_id", toolCallId) }.toString(),
+                )
+            },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(result)
+                ServerFrame.SubagentTodosResponse(
+                    id = frameId("subagent_todos"),
+                    ts = nowIso(),
+                    requestId = requestId,
+                    success = true,
+                    found = decoded.found,
+                    subagent = decoded.subagent,
+                    todos = decoded.todos,
+                    todosFound = decoded.todosFound,
+                )
+            },
+            onFailure = ::subagentTodosFailure,
+        )
+    }
+
+    private data class SubagentRpcLabels(
+        val unsupported: String,
+        val timedOut: String,
+        val failed: String,
+    )
+
+    private suspend fun <T> invokeScopedSubagent(
+        requestId: String,
+        timeoutMs: Long,
+        labels: SubagentRpcLabels,
+        call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
+        mapSuccess: (kotlinx.serialization.json.JsonElement) -> T,
+        onFailure: (String, String) -> T,
+    ): T = try {
+        withTimeoutOrNull(timeoutMs) {
+            val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
+            if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
+            val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")
+            mapSuccess(result)
+        } ?: onFailure(requestId, labels.timedOut)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        onFailure(requestId, error.message ?: labels.failed)
+    }
+
+    private suspend fun callScopedSubagentRpc(
+        method: String,
+        scope: SubagentRpcScope,
+        body: String,
+    ): AppServerInboundFrame.AdminRpcResponse? {
+        val handle = supervisor.ready()
+        val advertised = handle.serverCapabilities
+        if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
+        val scopedBody = buildJsonObject {
+            put("conversation_id", scope.conversationId)
+            scope.agentId?.let { put("agent_id", it) }
+            subagentJson.parseToJsonElement(body).jsonObject.forEach { (key, value) -> put(key, value) }
+        }.toString()
+        val response = adminRpc(method, "/v1/conversations/${scope.conversationId}/subagents", scopedBody)
+        return response.takeUnless {
+            !it.success && AdminRpcErrors.isUnknownMethod(it.error)
+        }
+    }
+
+    private fun currentSubagentScope(): SubagentRpcScope? {
+        val conversationId = viewedConversationId ?: return null
+        val agentId = activeTurn?.takeIf { it.conversationId == conversationId }?.agentId
+        return SubagentRpcScope(conversationId, agentId)
+    }
+
+    private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(
+        id = frameId("subagent_list"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
+
+    private fun subagentTodosFailure(requestId: String, error: String) = ServerFrame.SubagentTodosResponse(
+        id = frameId("subagent_todos"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
 
     private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
     private fun nowIso(): String = Instant.now().toString()
+
+    @Serializable
+    private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())
+
+    @Serializable
+    private data class SubagentTodosRpcResult(
+        val found: Boolean = false,
+        val subagent: SubagentEntry? = null,
+        val todos: List<SubagentTodo> = emptyList(),
+        @kotlinx.serialization.SerialName("todos_found") val todosFound: Boolean = false,
+    )
+
+    private data class SubagentRpcScope(val conversationId: String, val agentId: String?)
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
@@ -1217,6 +1361,9 @@ class IrohChannelTransport(
         // Bounded window to let the server's own terminal (from abort) arrive
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
+        internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
+        private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
+        private val subagentJson = Json { ignoreUnknownKeys = true }
         // letta-mobile-34xoj: admin_rpc retry thresholds
         private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
         private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
@@ -1242,6 +1389,8 @@ class IrohChannelTransport(
             "agent.get",
             "agent.list",
             "agent.context",
+            "subagent.list",
+            "subagent.todos",
             "schedule.get",
             "schedule.list",
             "skill.list",

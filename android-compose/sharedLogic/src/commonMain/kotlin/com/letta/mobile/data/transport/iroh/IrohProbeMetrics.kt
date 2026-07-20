@@ -132,7 +132,7 @@ object IrohProbeAssertions {
         error: String?,
     ): String? = when {
         !success -> "admin_rpc_method_missing:$method"
-        error?.contains("Unknown method", ignoreCase = true) == true -> "admin_rpc_method_missing:$method"
+        AdminRpcErrors.isUnknownMethod(error) -> "admin_rpc_method_missing:$method"
         !resultIsArray -> "admin_rpc_method_missing:$method"
         else -> null
     }

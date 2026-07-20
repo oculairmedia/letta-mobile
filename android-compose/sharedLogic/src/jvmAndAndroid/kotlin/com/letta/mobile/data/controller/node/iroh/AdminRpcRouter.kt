@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -26,10 +27,31 @@ fun adminError(message: String): Nothing = throw IllegalArgumentException(messag
  * @param controller The App Server controller for runtime management
  * @param json JSON instance for parsing
  */
+data class AdminRpcRequestContext(
+    val authenticated: Boolean,
+    val authorizedConversationIds: Set<String>? = null,
+) {
+    fun canAccessConversation(conversationId: String): Boolean =
+        authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)
+
+    companion object {
+        val Authenticated = AdminRpcRequestContext(authenticated = true)
+        val Unauthenticated = AdminRpcRequestContext(authenticated = false, authorizedConversationIds = emptySet())
+    }
+}
+
+/** Bundles dispatch inputs so the router API stays free of multi-string arity. */
+data class AdminRpcInvocation(
+    val requestId: String,
+    val method: String,
+    val params: JsonObject?,
+    val context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
+)
+
 class AdminRpcRouter(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
-    private val handlers = mutableMapOf<String, suspend (JsonObject?) -> JsonElement>()
+    private val handlers = mutableMapOf<String, suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement>()
 
     val methodCount: Int
         get() = handlers.size
@@ -42,6 +64,13 @@ class AdminRpcRouter(
      * Method names should use dot-notation: "agent.list", "conversation.get", etc.
      */
     fun register(method: String, handler: suspend (JsonObject?) -> JsonElement) {
+        registerScoped(method) { params, _ -> handler(params) }
+    }
+
+    fun registerScoped(
+        method: String,
+        handler: suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement,
+    ) {
         handlers[method] = handler
         Telemetry.event("AdminRpc", "handler.registered", "method" to method)
     }
@@ -64,26 +93,31 @@ class AdminRpcRouter(
      * Returns the JSON response frame or an error frame if the method is unknown
      * or the handler throws.
      */
-    suspend fun dispatch(requestId: String, method: String, params: JsonObject?): String {
-        val handler = handlers[method]
+    suspend fun dispatch(invocation: AdminRpcInvocation): String {
+        val handler = handlers[invocation.method]
         if (handler == null) {
-            Telemetry.event("AdminRpc", "method.not_found", "method" to method)
-            return encodeFailure(requestId, "Unknown method: $method")
+            Telemetry.event("AdminRpc", "method.not_found", "method" to invocation.method)
+            return encodeFailure(invocation.requestId, AdminRpcErrors.unknownMethod(invocation.method))
         }
         return try {
-            val result = handler(params)
+            val result = handler(invocation.params, invocation.context)
             json.encodeToString(
                 kotlinx.serialization.serializer(),
                 buildJsonObject {
                     put("type", "admin_rpc_response")
-                    put("request_id", requestId)
+                    put("request_id", invocation.requestId)
                     put("success", true)
                     put("result", result)
                 },
             )
         } catch (e: Exception) {
-            Telemetry.event("AdminRpc", "handler.error", "method" to method, "error" to (e.message ?: ""))
-            encodeFailure(requestId, e.message ?: "Internal error")
+            Telemetry.event(
+                "AdminRpc",
+                "handler.error",
+                "method" to invocation.method,
+                "error" to (e.message ?: ""),
+            )
+            encodeFailure(invocation.requestId, e.message ?: "Internal error")
         }
     }
 
