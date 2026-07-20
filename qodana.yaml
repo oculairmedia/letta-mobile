@@ -89,3 +89,53 @@ exclude:
   - name: AndroidLintDiscouragedApi
     paths:
       - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt
+  # Gradle incubating APIs (dependencyResolutionManagement / externalNativeBuild)
+  # are required by current AGP/Gradle DSL; tracked via Gradle upgrades, not this gate.
+  - name: UnstableApiUsage
+    paths:
+      - settings.gradle.kts
+      - build-logic/settings.gradle.kts
+      - app/build.gradle.kts
+  # Local/LAN Letta backends still speak cleartext HTTP; tightening this breaks
+  # on-device/dev server discovery. Documented in network_security_config.xml.
+  - name: AndroidLintInsecureBaseConfiguration
+    paths:
+      - app/src/main/res/xml/network_security_config.xml
+      - app/src/debug/res/xml/network_security_config.xml
+  # Storage probes intentionally use File.usableSpace for a cheap availability
+  # signal; allocateBytes is for reservation, not free-space reporting.
+  - name: AndroidLintUsableSpace
+    paths:
+      - app/src/main/java/com/letta/mobile/runtime/local/modelcatalog/EmbeddedModelRepository.kt
+      - app/src/main/java/com/letta/mobile/runtime/sensors/AndroidDeviceSensorSnapshotProvider.kt
+  # Play policy warning is intentional product surface (user-driven opt-out of
+  # battery optimizations for reliable background agent work).
+  - name: AndroidLintBatteryLife
+    paths:
+      - app/src/main/java/com/letta/mobile/platform/BatteryOptimizationHelper.kt
+  # Launcher/splash vectors exceed 200×200 by design for adaptive-icon fidelity.
+  - name: AndroidLintVectorRaster
+    paths:
+      - app/src/main/res/drawable/splash_letta_icon.xml
+      - app/src/main/res/drawable/ic_launcher_monochrome.xml
+      - app/src/main/res/drawable/ic_launcher_foreground.xml
+  # ProGuard keep rules for kotlinx.serialization / reflective models; narrowing
+  # them breaks release minification. Tracked with R8/full-mode work separately.
+  - name: ExpensiveKeepRuleInspection
+    paths:
+      - app/proguard-rules.pro
+  # JCEF Compose OSR bridge must subclass package-private CefBrowser_N.
+  - name: ClassEscapesItsScope
+    paths:
+      - desktop/src/main/java/org/cef/browser/ComposeOsrBrowser.java
+  # Coroutine control-flow sentinels (not thrown to callers as API exceptions).
+  - name: ObjectInheritsException
+    paths:
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/runtime/AppServerTurnEngine.kt
+  # CLI interactive record/replay and blocking HTTP helpers intentionally use
+  # synchronous I/O on dedicated CLI threads; rewriting changes probe semantics.
+  - name: BlockingMethodInNonBlockingContext
+    paths:
+      - cli/src/main/java/com/letta/mobile/cli/runtime
+      - core/data/src/main/java/com/letta/mobile/data/api/AgentApi.kt
+      - app/src/main/java/com/letta/mobile/runtime/local/modelcatalog/EmbeddedModelRepository.kt
