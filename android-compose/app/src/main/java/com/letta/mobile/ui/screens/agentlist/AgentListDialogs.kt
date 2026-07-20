@@ -596,3 +596,69 @@ internal fun ImportAgentDialog(
         }
     }
 }
+
+/**
+ * Bundle of collaborators required by [AgentListDialogHost].
+ *
+ * Extracting a holder keeps the host at a single argument, which is what
+ * makes CodeScene stop counting the create/import dialog wiring as an
+ * "Excess Number of Function Arguments" hotspot.
+ */
+internal data class AgentListDialogHostParams(
+    val uiState: AgentListUiState,
+    val viewModel: AgentListViewModel,
+    val onNavigateToSettings: () -> Unit,
+    val onNavigateToAgent: (String, String?, String?) -> Unit,
+    val onImport: (
+        overrideName: String?,
+        overrideExistingTools: Boolean,
+        stripMessages: Boolean,
+    ) -> Unit,
+)
+
+@Composable
+internal fun AgentListDialogHost(params: AgentListDialogHostParams) {
+    val uiState = params.uiState
+    val viewModel = params.viewModel
+    if (uiState.showCreateDialog) {
+        CreateAgentDialog(
+            onDismiss = { viewModel.hideCreateDialog() },
+            inputs = CreateAgentDialogInputs(
+                availableTools = uiState.availableTools,
+                llmModels = uiState.llmModels,
+                embeddingModels = uiState.embeddingModels,
+                onLoadModels = { viewModel.loadAvailableModels() },
+                localReadiness = uiState.localLettaCodeReadiness,
+                onOpenLocalSettings = params.onNavigateToSettings,
+            ),
+            onCreate = { createParams, runtimeOption ->
+                viewModel.createAgent(createParams, runtimeOption) { agentId ->
+                    viewModel.hideCreateDialog()
+                    val conversationId = if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+                        // Stable per agent: every embedded session is the same
+                        // on-disk default conversation; a random suffix would
+                        // fragment the timeline and never match list rows.
+                        "local-conv-${agentId.value}"
+                    } else {
+                        null
+                    }
+                    params.onNavigateToAgent(agentId.value, createParams.name, conversationId)
+                }
+            },
+        )
+    }
+
+    if (uiState.showImportDialog) {
+        ImportAgentDialog(
+            isImporting = uiState.isImporting,
+            onDismiss = { viewModel.hideImportDialog() },
+            onImport = { overrideName, overrideExistingTools, stripMessages ->
+                viewModel.setPendingImportName(overrideName)
+                viewModel.setPendingImportOverrideTools(overrideExistingTools)
+                viewModel.setPendingImportStripMessages(stripMessages)
+                params.onImport(overrideName, overrideExistingTools, stripMessages)
+                viewModel.hideImportDialog()
+            },
+        )
+    }
+}

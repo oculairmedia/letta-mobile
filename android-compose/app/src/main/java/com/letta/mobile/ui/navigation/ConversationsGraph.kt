@@ -9,6 +9,7 @@ import androidx.navigation.toRoute
 import com.letta.mobile.feature.chat.route.AgentChatRoute
 import com.letta.mobile.feature.editagent.EditAgentRoute
 import com.letta.mobile.ui.screens.agentlist.AgentListScreen
+import com.letta.mobile.ui.screens.agentlist.AgentListScreenNavigation
 import com.letta.mobile.ui.screens.conversations.ConversationsScreen
 import com.letta.mobile.ui.screens.conversations.TwoPaneConversationsLayout
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
@@ -97,22 +98,24 @@ fun NavGraphBuilder.conversationsGraph(
         val route = backStackEntry.toRoute<AgentListRoute>()
         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
             AgentListScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToAgent = { agentId, agentName, conversationId ->
-                    navController.navigate(
-                        AgentChatRoute(
-                            agentId = agentId,
-                            agentName = agentName,
-                            conversationId = conversationId,
-                            freshRouteKey = conversationId?.let { System.currentTimeMillis() },
+                navigation = AgentListScreenNavigation(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToAgent = { agentId, agentName, conversationId ->
+                        navController.navigate(
+                            AgentChatRoute(
+                                agentId = agentId,
+                                agentName = agentName,
+                                conversationId = conversationId,
+                                freshRouteKey = conversationId?.let { System.currentTimeMillis() },
+                            )
                         )
-                    )
-                },
-                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                onNavigateToEditAgent = { agentId ->
-                    navController.navigate(EditAgentRoute(agentId))
-                },
-                openCreateOnStart = route.openCreate,
+                    },
+                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+                    onNavigateToEditAgent = { agentId ->
+                        navController.navigate(EditAgentRoute(agentId))
+                    },
+                    openCreateOnStart = route.openCreate,
+                ),
             )
         }
     }
@@ -126,25 +129,27 @@ fun NavGraphBuilder.conversationsGraph(
         val route = backStackEntry.toRoute<ShareToAgentRoute>()
         CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
             AgentListScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToAgent = { agentId, agentName, conversationId ->
-                    navController.navigate(
-                        AgentChatRoute(
-                            agentId = agentId,
-                            agentName = agentName,
-                            conversationId = conversationId,
-                            freshRouteKey = conversationId?.let { System.currentTimeMillis() },
-                            initialMessage = route.sharedText,
-                        ),
-                    ) {
-                        popUpTo<ShareToAgentRoute> { inclusive = true }
-                    }
-                },
-                onNavigateToSettings = { navController.navigate(ConfigRoute()) },
-                onNavigateToEditAgent = { agentId ->
-                    navController.navigate(EditAgentRoute(agentId))
-                },
-                shareContentPreview = route.sharedText,
+                navigation = AgentListScreenNavigation(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToAgent = { agentId, agentName, conversationId ->
+                        navController.navigate(
+                            AgentChatRoute(
+                                agentId = agentId,
+                                agentName = agentName,
+                                conversationId = conversationId,
+                                freshRouteKey = conversationId?.let { System.currentTimeMillis() },
+                                initialMessage = route.sharedText,
+                            ),
+                        ) {
+                            popUpTo<ShareToAgentRoute> { inclusive = true }
+                        }
+                    },
+                    onNavigateToSettings = { navController.navigate(ConfigRoute()) },
+                    onNavigateToEditAgent = { agentId ->
+                        navController.navigate(EditAgentRoute(agentId))
+                    },
+                    shareContentPreview = route.sharedText,
+                ),
             )
         }
     }
