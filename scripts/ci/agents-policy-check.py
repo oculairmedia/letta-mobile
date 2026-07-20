@@ -17,12 +17,13 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCAN_ROOT = REPO_ROOT / "android-compose"
+SKIP_DIRS = frozenset({".git", "build", ".gradle", ".kotlin", "node_modules"})
 
 # ---------------------------------------------------------------------------
 # Findings
@@ -57,11 +58,6 @@ def norm_parts(rel: str) -> list[str]:
     return [p for p in rel.replace("\\", "/").split("/") if p and p != "."]
 
 
-def under_android_compose(rel: str) -> bool:
-    parts = norm_parts(rel)
-    return bool(parts) and parts[0] == "android-compose"
-
-
 def module_segment(rel: str) -> str | None:
     """Return the top module under android-compose/ (e.g. app, feature-chat)."""
     parts = norm_parts(rel)
@@ -77,29 +73,74 @@ def is_kotlin(path: Path) -> bool:
 def basename_matches(name: str, patterns: Iterable[str]) -> bool:
     """Simple glob-ish match: exact name, or prefix*/suffix* wildcards only."""
     for pat in patterns:
-        if "*" not in pat:
+        stars = pat.count("*")
+        if stars == 0:
             if name == pat:
                 return True
             continue
-        if pat.startswith("*") and pat.endswith("*") and pat.count("*") == 2:
+        if stars == 2 and pat.startswith("*") and pat.endswith("*"):
             mid = pat[1:-1]
             if mid and mid in name:
                 return True
             continue
-        if pat.startswith("*") and pat.count("*") == 1:
-            if name.endswith(pat[1:]):
-                return True
-            continue
-        if pat.endswith("*") and pat.count("*") == 1:
-            if name.startswith(pat[:-1]):
-                return True
-            continue
+        if stars == 1 and pat.startswith("*") and name.endswith(pat[1:]):
+            return True
+        if stars == 1 and pat.endswith("*") and name.startswith(pat[:-1]):
+            return True
     return False
+
+
+def is_sharedlogic_commonmain(rel: str) -> bool:
+    parts = norm_parts(rel)
+    try:
+        idx = parts.index("sharedLogic")
+    except ValueError:
+        return False
+    return "commonMain" in parts[idx + 1 :]
+
+
+def is_hex_color_scope(mod: str) -> bool:
+    return mod in {"app", "designsystem"} or mod.startswith("feature-")
+
+
+def is_app_or_feature_module(mod: str) -> bool:
+    return mod == "app" or mod.startswith("feature-")
+
+
+# ---------------------------------------------------------------------------
+# Line iteration helpers (shared by rule checks)
+# ---------------------------------------------------------------------------
+
+
+def iter_scoped_lines(
+    lines: list[str], line_filter: set[int] | None
+) -> Iterator[tuple[int, str]]:
+    for lineno, text in enumerate(lines, start=1):
+        if line_filter is not None and lineno not in line_filter:
+            continue
+        yield lineno, text
+
+
+def warn_on_regex(
+    rel: str,
+    lines: list[str],
+    line_filter: set[int] | None,
+    pattern: re.Pattern[str],
+    rule: str,
+    message: str,
+) -> list[Finding]:
+    return [
+        Finding("WARN", rule, rel, lineno, message)
+        for lineno, text in iter_scoped_lines(lines, line_filter)
+        if pattern.search(text)
+    ]
 
 
 # ---------------------------------------------------------------------------
 # Diff mode: map path -> set of added/changed line numbers
 # ---------------------------------------------------------------------------
+
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 
 
 def parse_unified_diff_added_lines(diff_text: str) -> dict[str, set[int]]:
@@ -108,11 +149,8 @@ def parse_unified_diff_added_lines(diff_text: str) -> dict[str, set[int]]:
     current: str | None = None
     new_line = 0
 
-    hunk_re = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
-
     for raw in diff_text.splitlines():
         if raw.startswith("+++ "):
-            # +++ b/path or +++ /dev/null
             token = raw[4:].strip()
             if token == "/dev/null":
                 current = None
@@ -123,7 +161,7 @@ def parse_unified_diff_added_lines(diff_text: str) -> dict[str, set[int]]:
             result.setdefault(current, set())
             continue
 
-        m = hunk_re.match(raw)
+        m = _HUNK_RE.match(raw)
         if m:
             new_line = int(m.group(1))
             continue
@@ -135,49 +173,43 @@ def parse_unified_diff_added_lines(diff_text: str) -> dict[str, set[int]]:
             result.setdefault(current, set()).add(new_line)
             new_line += 1
         elif raw.startswith("-") and not raw.startswith("---"):
-            # deleted line — does not advance new-file line counter
             continue
         elif raw.startswith("\\"):
-            # "\ No newline at end of file"
             continue
         else:
-            # context (shouldn't appear with -U0, but be safe)
             new_line += 1
 
     return result
 
 
+def _run_git_diff(args: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def git_diff_added_lines(diff_base: str) -> dict[str, set[int]]:
-    cmd = ["git", "diff", "-U0", "--no-color", f"{diff_base}...HEAD"]
+    three_dot = ["git", "diff", "-U0", "--no-color", f"{diff_base}...HEAD"]
     try:
-        proc = subprocess.run(
-            cmd,
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        proc = _run_git_diff(three_dot)
     except OSError as exc:
         raise RuntimeError(f"failed to run git diff: {exc}") from exc
 
-    if proc.returncode != 0:
-        # Fallback without three-dot if merge-base unavailable
-        cmd2 = ["git", "diff", "-U0", "--no-color", diff_base]
-        proc2 = subprocess.run(
-            cmd2,
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if proc2.returncode != 0:
-            err = (proc.stderr or proc2.stderr or "").strip()
-            raise RuntimeError(
-                f"git diff against {diff_base!r} failed: {err or 'unknown error'}"
-            )
-        return parse_unified_diff_added_lines(proc2.stdout)
+    if proc.returncode == 0:
+        return parse_unified_diff_added_lines(proc.stdout)
 
-    return parse_unified_diff_added_lines(proc.stdout)
+    two_dot = ["git", "diff", "-U0", "--no-color", diff_base]
+    proc2 = _run_git_diff(two_dot)
+    if proc2.returncode != 0:
+        err = (proc.stderr or proc2.stderr or "").strip()
+        raise RuntimeError(
+            f"git diff against {diff_base!r} failed: {err or 'unknown error'}"
+        )
+    return parse_unified_diff_added_lines(proc2.stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -195,15 +227,49 @@ def iter_kotlin_files(roots: list[Path]) -> Iterator[Path]:
         if not root.is_dir():
             continue
         for dirpath, dirnames, filenames in os.walk(root):
-            # Skip build outputs and VCS
-            dirnames[:] = [
-                d
-                for d in dirnames
-                if d not in {".git", "build", ".gradle", ".kotlin", "node_modules"}
-            ]
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for name in filenames:
                 if name.endswith(".kt"):
                     yield Path(dirpath) / name
+
+
+def path_under_root(path: Path, root: Path) -> bool:
+    base = root if root.is_dir() else root.parent
+    try:
+        path.relative_to(base)
+        return True
+    except ValueError:
+        return False
+
+
+def path_under_any_root(path: Path, roots: list[Path]) -> bool:
+    return any(path_under_root(path, root) for root in roots)
+
+
+def collect_diff_files(
+    line_map: dict[str, set[int]], roots: list[Path]
+) -> list[Path]:
+    root_resolved = [r.resolve() for r in roots]
+    files: list[Path] = []
+    for rel, changed_lines in sorted(line_map.items()):
+        if not changed_lines:
+            continue
+        path = (REPO_ROOT / rel).resolve()
+        if not is_kotlin(path) or not path.is_file():
+            continue
+        if not path_under_any_root(path, root_resolved):
+            continue
+        files.append(path)
+    return files
+
+
+def lookup_line_filter(rel: str, line_map: dict[str, set[int]]) -> set[int] | None:
+    if rel in line_map:
+        return line_map[rel]
+    for key, lines in line_map.items():
+        if key.replace("\\", "/") == rel:
+            return lines
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -230,59 +296,36 @@ HEX_ALLOW_BASENAMES = (
 
 
 def allow_raw_hex(rel: str) -> bool:
-    name = Path(rel).name
-    if basename_matches(name, HEX_ALLOW_BASENAMES):
+    if basename_matches(Path(rel).name, HEX_ALLOW_BASENAMES):
         return True
-    # paths containing /theme/
-    parts = norm_parts(rel)
-    return "theme" in parts
+    return "theme" in norm_parts(rel)
 
 
 def check_no_raw_hex_color(
     rel: str, lines: list[str], line_filter: set[int] | None
 ) -> list[Finding]:
     mod = module_segment(rel)
-    if mod is None:
-        return []
-    in_scope = mod == "app" or mod == "designsystem" or mod.startswith("feature-")
-    if not in_scope:
-        return []
-    if allow_raw_hex(rel):
+    if mod is None or not is_hex_color_scope(mod) or allow_raw_hex(rel):
         return []
 
-    findings: list[Finding] = []
-    for i, text in enumerate(lines, start=1):
-        if line_filter is not None and i not in line_filter:
-            continue
-        if HEX_COLOR_RE.search(text):
-            findings.append(
-                Finding(
-                    "WARN",
-                    "no-raw-hex-color",
-                    rel,
-                    i,
-                    "raw Color(0x...) — use theme/color roles instead of hardcoded hex",
-                )
-            )
-    return findings
+    return warn_on_regex(
+        rel,
+        lines,
+        line_filter,
+        HEX_COLOR_RE,
+        "no-raw-hex-color",
+        "raw Color(0x...) — use theme/color roles instead of hardcoded hex",
+    )
 
 
 def check_sharedlogic_jvm_api(
     rel: str, lines: list[str], line_filter: set[int] | None
 ) -> list[Finding]:
-    parts = norm_parts(rel)
-    # sharedLogic/**/commonMain/**
-    try:
-        sl = parts.index("sharedLogic")
-    except ValueError:
-        return []
-    if "commonMain" not in parts[sl + 1 :]:
+    if not is_sharedlogic_commonmain(rel):
         return []
 
     findings: list[Finding] = []
-    for i, text in enumerate(lines, start=1):
-        if line_filter is not None and i not in line_filter:
-            continue
+    for lineno, text in iter_scoped_lines(lines, line_filter):
         for regex, label in JVM_APIS:
             if regex.search(text):
                 findings.append(
@@ -290,7 +333,7 @@ def check_sharedlogic_jvm_api(
                         "WARN",
                         "sharedlogic-jvm-api",
                         rel,
-                        i,
+                        lineno,
                         f"forbidden JVM-only API in commonMain: {label}",
                     )
                 )
@@ -305,9 +348,6 @@ def check_platform_repo_duplication(
     Simple basename heuristic for PR diffs — full scans skip this rule to avoid
     permanent noise from existing thin platform bindings.
     """
-    # Only meaningful for new/edited files (diff mode).
-    if line_filter is None:
-        return []
     if not line_filter:
         return []
 
@@ -317,8 +357,7 @@ def check_platform_repo_duplication(
     mod = module_segment(rel)
     if mod not in {"desktop", "app"}:
         return []
-    name = Path(rel).name
-    if not name.endswith("Repository.kt"):
+    if not Path(rel).name.endswith("Repository.kt"):
         return []
 
     return [
@@ -336,49 +375,32 @@ def check_raw_alertdialog(
     rel: str, lines: list[str], line_filter: set[int] | None
 ) -> list[Finding]:
     mod = module_segment(rel)
-    if mod is None:
-        return []
-    # designsystem allowed; only app/ and feature-*/
-    if not (mod == "app" or mod.startswith("feature-")):
+    if mod is None or not is_app_or_feature_module(mod):
         return []
 
-    findings: list[Finding] = []
-    for i, text in enumerate(lines, start=1):
-        if line_filter is not None and i not in line_filter:
-            continue
-        if ALERT_DIALOG_RE.search(text):
-            findings.append(
-                Finding(
-                    "WARN",
-                    "raw-alertdialog",
-                    rel,
-                    i,
-                    "AlertDialog( in feature UI — prefer ConfirmDialog / designsystem wrappers",
-                )
-            )
-    return findings
+    return warn_on_regex(
+        rel,
+        lines,
+        line_filter,
+        ALERT_DIALOG_RE,
+        "raw-alertdialog",
+        "AlertDialog( in feature UI — prefer ConfirmDialog / designsystem wrappers",
+    )
 
 
-def scan_file(
-    path: Path, line_filter: set[int] | None
-) -> list[Finding]:
+def scan_file(path: Path, line_filter: set[int] | None) -> list[Finding]:
     rel = repo_rel(path)
-    if not under_android_compose(rel) and not rel.startswith("android-compose"):
-        # Still allow explicit paths outside default root if under android-compose
-        pass
-
     try:
-        content = path.read_text(encoding="utf-8", errors="replace")
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError as exc:
         raise RuntimeError(f"cannot read {rel}: {exc}") from exc
 
-    lines = content.splitlines()
-    findings: list[Finding] = []
-    findings.extend(check_no_raw_hex_color(rel, lines, line_filter))
-    findings.extend(check_sharedlogic_jvm_api(rel, lines, line_filter))
-    findings.extend(check_platform_repo_duplication(rel, line_filter))
-    findings.extend(check_raw_alertdialog(rel, lines, line_filter))
-    return findings
+    return [
+        *check_no_raw_hex_color(rel, lines, line_filter),
+        *check_sharedlogic_jvm_api(rel, lines, line_filter),
+        *check_platform_repo_duplication(rel, line_filter),
+        *check_raw_alertdialog(rel, lines, line_filter),
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -431,15 +453,50 @@ def resolve_roots(path_args: list[str]) -> list[Path]:
     return roots
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+def normalize_diff_base(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    stripped = raw.strip()
+    return stripped or None
 
-    diff_base = args.diff_base
-    if diff_base is not None:
-        diff_base = diff_base.strip()
-        if not diff_base:
-            diff_base = None
+
+def collect_files_to_scan(
+    roots: list[Path], line_map: dict[str, set[int]] | None
+) -> list[Path]:
+    if line_map is not None:
+        return collect_diff_files(line_map, roots)
+    return sorted(set(iter_kotlin_files(roots)))
+
+
+def print_findings_and_summary(
+    findings: list[Finding],
+    diff_base: str | None,
+    file_count: int,
+) -> None:
+    findings.sort(key=lambda f: (f.path, f.line, f.rule))
+    for finding in findings:
+        print(finding.format())
+
+    by_rule: dict[str, int] = {}
+    for finding in findings:
+        by_rule[finding.rule] = by_rule.get(finding.rule, 0) + 1
+
+    mode = f"diff vs {diff_base}" if diff_base else "full scan"
+    print()
+    print(
+        f"agents-policy-check: {len(findings)} finding(s) "
+        f"({mode}, {file_count} file(s) checked)"
+    )
+    if by_rule:
+        for rule, count in sorted(by_rule.items()):
+            print(f"  {rule}: {count}")
+    else:
+        print("  (no findings)")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    diff_base = normalize_diff_base(args.diff_base)
 
     line_map: dict[str, set[int]] | None = None
     if diff_base:
@@ -450,78 +507,19 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     roots = resolve_roots(args.paths)
-
-    # If diff mode, restrict to changed kotlin files that intersect scan roots
-    files: list[Path]
-    if line_map is not None:
-        root_resolved = [r.resolve() for r in roots]
-        files = []
-        for rel, lines in sorted(line_map.items()):
-            if not lines:
-                continue
-            path = (REPO_ROOT / rel).resolve()
-            if not is_kotlin(path):
-                continue
-            if not path.is_file():
-                continue
-            # Must be under at least one scan root
-            if not any(
-                path == r or r in path.parents or (r.is_file() and path == r)
-                for r in root_resolved
-            ):
-                # Also accept when root is a parent dir
-                ok = False
-                for r in root_resolved:
-                    try:
-                        path.relative_to(r if r.is_dir() else r.parent)
-                        ok = True
-                        break
-                    except ValueError:
-                        continue
-                if not ok:
-                    continue
-            files.append(path)
-    else:
-        files = sorted(set(iter_kotlin_files(roots)))
+    files = collect_files_to_scan(roots, line_map)
 
     all_findings: list[Finding] = []
     try:
         for path in files:
             rel = repo_rel(path)
-            lf = line_map.get(rel) if line_map is not None else None
-            # Also try path as stored in diff (already repo-rel)
-            if line_map is not None and lf is None:
-                # normalize keys
-                for k, v in line_map.items():
-                    if k.replace("\\", "/") == rel:
-                        lf = v
-                        break
-            all_findings.extend(scan_file(path, lf))
+            line_filter = lookup_line_filter(rel, line_map) if line_map else None
+            all_findings.extend(scan_file(path, line_filter))
     except RuntimeError as exc:
         print(f"ERROR|script|-:|{exc}", file=sys.stderr)
         return 1
 
-    all_findings.sort(key=lambda f: (f.path, f.line, f.rule))
-
-    for f in all_findings:
-        print(f.format())
-
-    by_rule: dict[str, int] = {}
-    for f in all_findings:
-        by_rule[f.rule] = by_rule.get(f.rule, 0) + 1
-
-    mode = f"diff vs {diff_base}" if diff_base else "full scan"
-    print()
-    print(
-        f"agents-policy-check: {len(all_findings)} finding(s) "
-        f"({mode}, {len(files)} file(s) checked)"
-    )
-    if by_rule:
-        for rule, count in sorted(by_rule.items()):
-            print(f"  {rule}: {count}")
-    else:
-        print("  (no findings)")
-
+    print_findings_and_summary(all_findings, diff_base, len(files))
     return 0
 
 
