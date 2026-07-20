@@ -376,14 +376,22 @@ internal fun EditAgentScreenContent(
 
                 EditAgentDialogs(
                     visibility = EditAgentDialogVisibility(
-                        showActionSheet = showActionSheet,
-                        onShowActionSheetChange = { showActionSheet = it },
-                        showResetDialog = showResetDialog,
-                        onShowResetDialogChange = { showResetDialog = it },
-                        showDeleteDialog = showDeleteDialog,
-                        onShowDeleteDialogChange = { showDeleteDialog = it },
-                        showCloneDialog = showCloneDialog,
-                        onShowCloneDialogChange = { showCloneDialog = it },
+                        actionSheet = EditAgentDialogToggle(
+                            visible = showActionSheet,
+                            onVisibleChange = { showActionSheet = it },
+                        ),
+                        resetDialog = EditAgentDialogToggle(
+                            visible = showResetDialog,
+                            onVisibleChange = { showResetDialog = it },
+                        ),
+                        deleteDialog = EditAgentDialogToggle(
+                            visible = showDeleteDialog,
+                            onVisibleChange = { showDeleteDialog = it },
+                        ),
+                        cloneDialog = EditAgentDialogToggle(
+                            visible = showCloneDialog,
+                            onVisibleChange = { showCloneDialog = it },
+                        ),
                     ),
                     host = EditAgentDialogsHost(
                         agentState = state.data,

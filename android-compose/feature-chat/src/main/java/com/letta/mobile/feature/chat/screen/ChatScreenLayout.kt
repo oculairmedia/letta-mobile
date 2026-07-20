@@ -101,41 +101,49 @@ internal fun ChatScreenLayout(
             openSubagentTarget = localState.openSubagentTarget,
         )
         ChatScreenSubagentRingsOverlay(
-            params = params,
-            openSubagentTarget = localState.openSubagentTarget,
-            onTargetChange = localState.onTappedSubagentTargetChange,
-            subagentNavigationScope = localState.subagentNavigationScope,
-            haptic = haptic,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = params.contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
+            params = ChatScreenSubagentRingsOverlayParams(
+                layoutParams = params,
+                openSubagentTarget = localState.openSubagentTarget,
+                onTargetChange = localState.onTappedSubagentTargetChange,
+                subagentNavigationScope = localState.subagentNavigationScope,
+                haptic = haptic,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = params.contentPadding.calculateTopPadding() + 8.dp, end = 8.dp),
+            ),
         )
         ChatScreenComposerColumn(
-            state = params.state,
-            composerState = params.composerState,
-            viewModel = params.viewModel,
-            navigation = params.navigation,
-            reducedMotion = reducedMotion,
-            bottomInsetDp = params.bottomInsetDp,
-            onComposerHeightChange = localState.onComposerHeightChange,
-            modifier = Modifier.align(Alignment.BottomCenter),
+            params = ChatScreenComposerColumnParams(
+                state = params.state,
+                composerState = params.composerState,
+                viewModel = params.viewModel,
+                navigation = params.navigation,
+                reducedMotion = reducedMotion,
+                bottomInsetDp = params.bottomInsetDp,
+                onComposerHeightChange = localState.onComposerHeightChange,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ),
         )
         ChatScreenSubagentTodoSheet(
-            target = localState.tappedSubagentTarget,
-            resolvedSubagentSource = params.resolvedSubagentSource,
-            resolvedSelfTodoSource = params.viewModel.selfTodoSource,
-            currentConversationId = localState.currentConversationId,
-            navigation = params.navigation,
-            onDismiss = { localState.onTappedSubagentTargetChange(null) },
-            onTargetUpdate = localState.onTappedSubagentTargetChange,
+            params = ChatScreenSubagentTodoSheetParams(
+                target = localState.tappedSubagentTarget,
+                resolvedSubagentSource = params.resolvedSubagentSource,
+                resolvedSelfTodoSource = params.viewModel.selfTodoSource,
+                currentConversationId = localState.currentConversationId,
+                navigation = params.navigation,
+                onDismiss = { localState.onTappedSubagentTargetChange(null) },
+                onTargetUpdate = localState.onTappedSubagentTargetChange,
+            ),
         )
         ChatScreenFloatingOverlays(
-            floatingBannerMessage = params.floatingBannerMessage,
-            imageViewerState = localState.imageViewerState,
-            onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
-            chatMode = params.chatMode,
-            a2uiDebugFrames = params.state.a2uiDebugFrames,
-            modifier = Modifier.fillMaxSize(),
+            params = ChatScreenFloatingOverlaysParams(
+                floatingBannerMessage = params.floatingBannerMessage,
+                imageViewerState = localState.imageViewerState,
+                onImageViewerDismiss = { localState.onImageViewerStateChange(null) },
+                chatMode = params.chatMode,
+                a2uiDebugFrames = params.state.a2uiDebugFrames,
+                modifier = Modifier.fillMaxSize(),
+            ),
         )
     }
 }
@@ -245,21 +253,53 @@ private fun ChatScreenErrorPhase(
     )
 }
 
+private data class ChatScreenSubagentRingsOverlayParams(
+    val layoutParams: ChatScreenLayoutParams,
+    val openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
+    val onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
+    val subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
+    val haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    val modifier: Modifier = Modifier,
+)
+
+private data class ChatScreenComposerColumnParams(
+    val state: ChatUiState,
+    val composerState: ChatComposerState,
+    val viewModel: AdminChatViewModel,
+    val navigation: ChatScreenNavigationCallbacks,
+    val reducedMotion: Boolean,
+    val bottomInsetDp: Dp,
+    val onComposerHeightChange: (Dp) -> Unit,
+    val modifier: Modifier = Modifier,
+)
+
+private data class ChatScreenSubagentTodoSheetParams(
+    val target: SubagentTodoSheetTarget?,
+    val resolvedSubagentSource: ActiveSubagentSource,
+    val resolvedSelfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource,
+    val currentConversationId: String?,
+    val navigation: ChatScreenNavigationCallbacks,
+    val onDismiss: () -> Unit,
+    val onTargetUpdate: (SubagentTodoSheetTarget?) -> Unit,
+)
+
+private data class ChatScreenFloatingOverlaysParams(
+    val floatingBannerMessage: String,
+    val imageViewerState: Pair<ImmutableList<UiImageAttachment>, Int>?,
+    val onImageViewerDismiss: () -> Unit,
+    val chatMode: String,
+    val a2uiDebugFrames: List<com.letta.mobile.ui.chat.render.A2uiDebugFrameUi>,
+    val modifier: Modifier = Modifier,
+)
+
 @Composable
-private fun BoxScope.ChatScreenSubagentRingsOverlay(
-    params: ChatScreenLayoutParams,
-    openSubagentTarget: (SubagentTodoSheetTarget) -> Unit,
-    onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
-    subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
-    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
-    modifier: Modifier = Modifier,
-) {
-    CompositionLocalProvider(LocalSubagentTodoSheetOpener provides openSubagentTarget) {
+private fun BoxScope.ChatScreenSubagentRingsOverlay(params: ChatScreenSubagentRingsOverlayParams) {
+    CompositionLocalProvider(LocalSubagentTodoSheetOpener provides params.openSubagentTarget) {
         ActiveSubagentRings(
-            subagents = params.subagentBarState.activeSubagents,
-            now = params.subagentBarState.lingerTick,
+            subagents = params.layoutParams.subagentBarState.activeSubagents,
+            now = params.layoutParams.subagentBarState.lingerTick,
             onRingClick = { subagent ->
-                onTargetChange(
+                params.onTargetChange(
                     SubagentTodoSheetTarget(
                         toolCallId = subagent.id,
                         description = subagent.description,
@@ -272,16 +312,16 @@ private fun BoxScope.ChatScreenSubagentRingsOverlay(
                 handleSubagentViewConversation(
                     SubagentViewConversationParams(
                         subagent = subagent,
-                        resolvedSubagentSource = params.resolvedSubagentSource,
-                        navigation = params.navigation,
-                        subagentNavigationScope = subagentNavigationScope,
-                        haptic = haptic,
-                        onTargetChange = onTargetChange,
-                        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
+                        resolvedSubagentSource = params.layoutParams.resolvedSubagentSource,
+                        navigation = params.layoutParams.navigation,
+                        subagentNavigationScope = params.subagentNavigationScope,
+                        haptic = params.haptic,
+                        onTargetChange = params.onTargetChange,
+                        onFloatingBannerMessageChange = params.layoutParams.onFloatingBannerMessageChange,
                     ),
                 )
             },
-            modifier = modifier,
+            modifier = params.modifier,
         )
     }
 }
@@ -342,34 +382,27 @@ private fun openSubagentTodoFallback(params: SubagentViewConversationParams) {
 }
 
 @Composable
-private fun ChatScreenFloatingOverlays(
-    floatingBannerMessage: String,
-    imageViewerState: Pair<ImmutableList<UiImageAttachment>, Int>?,
-    onImageViewerDismiss: () -> Unit,
-    chatMode: String,
-    a2uiDebugFrames: List<com.letta.mobile.ui.chat.render.A2uiDebugFrameUi>,
-    modifier: Modifier = Modifier,
-) {
-    Box(modifier = modifier) {
+private fun ChatScreenFloatingOverlays(params: ChatScreenFloatingOverlaysParams) {
+    Box(modifier = params.modifier) {
         FloatingBanner(
-            visible = floatingBannerMessage.isNotBlank(),
-            text = floatingBannerMessage,
+            visible = params.floatingBannerMessage.isNotBlank(),
+            text = params.floatingBannerMessage,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(LettaSpacing.lg),
         )
-        imageViewerState?.let { (viewerAttachments, initialIndex) ->
+        params.imageViewerState?.let { (viewerAttachments, initialIndex) ->
             ChatImageViewer(
                 attachments = viewerAttachments,
                 initialPage = initialIndex,
-                onDismiss = onImageViewerDismiss,
+                onDismiss = params.onImageViewerDismiss,
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        if (chatMode == "debug" && a2uiDebugFrames.isNotEmpty()) {
+        if (params.chatMode == "debug" && params.a2uiDebugFrames.isNotEmpty()) {
             A2uiDebugOverlay(
-                frames = a2uiDebugFrames,
+                frames = params.a2uiDebugFrames,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.md),
@@ -380,32 +413,23 @@ private fun ChatScreenFloatingOverlays(
 }
 
 @Composable
-private fun ChatScreenComposerColumn(
-    state: ChatUiState,
-    composerState: ChatComposerState,
-    viewModel: AdminChatViewModel,
-    navigation: ChatScreenNavigationCallbacks,
-    reducedMotion: Boolean,
-    bottomInsetDp: Dp,
-    onComposerHeightChange: (Dp) -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
     val density = LocalDensity.current
     Column(
-        modifier = modifier
+        modifier = params.modifier
             .fillMaxWidth()
-            .padding(bottom = bottomInsetDp)
+            .padding(bottom = params.bottomInsetDp)
             .onSizeChanged { size ->
-                onComposerHeightChange(with(density) { size.height.toDp() })
+                params.onComposerHeightChange(with(density) { size.height.toDp() })
             },
     ) {
-        ChatScreenGoalStatusSection(state, viewModel)
-        ChatScreenThinkingTokenSection(state, reducedMotion)
+        ChatScreenGoalStatusSection(params.state, params.viewModel)
+        ChatScreenThinkingTokenSection(params.state, params.reducedMotion)
         ChatScreenComposerInputSection(
-            state = state,
-            composerState = composerState,
-            viewModel = viewModel,
-            navigation = navigation,
+            state = params.state,
+            composerState = params.composerState,
+            viewModel = params.viewModel,
+            navigation = params.navigation,
         )
     }
 }
@@ -490,38 +514,35 @@ private fun ChatScreenComposerInputSection(
 }
 
 @Composable
-private fun ChatScreenSubagentTodoSheet(
-    target: SubagentTodoSheetTarget?,
-    resolvedSubagentSource: ActiveSubagentSource,
-    resolvedSelfTodoSource: com.letta.mobile.feature.chat.subagent.SelfTodoSource,
-    currentConversationId: String?,
-    navigation: ChatScreenNavigationCallbacks,
-    onDismiss: () -> Unit,
-    onTargetUpdate: (SubagentTodoSheetTarget?) -> Unit,
-) {
-    target?.let { sheetTarget ->
+private fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParams) {
+    params.target?.let { sheetTarget ->
         var todoState by remember(sheetTarget.toolCallId) {
             mutableStateOf<SubagentTodoSheetState>(SubagentTodoSheetState.Loading)
         }
-        LaunchedEffect(resolvedSubagentSource, resolvedSelfTodoSource, sheetTarget.toolCallId, currentConversationId) {
+        LaunchedEffect(
+            params.resolvedSubagentSource,
+            params.resolvedSelfTodoSource,
+            sheetTarget.toolCallId,
+            params.currentConversationId,
+        ) {
             val todos = if (sheetTarget.toolCallId == ActiveSubagent.SELF_ID) {
-                Result.success(resolvedSelfTodoSource.todos(currentConversationId.orEmpty()))
+                Result.success(params.resolvedSelfTodoSource.todos(params.currentConversationId.orEmpty()))
             } else {
-                resolvedSubagentSource.todos(sheetTarget.toolCallId)
+                params.resolvedSubagentSource.todos(sheetTarget.toolCallId)
             }
             todoState = subagentTodoSheetStateFrom(todos)
         }
         SubagentTodoSheet(
             description = sheetTarget.description,
             state = todoState,
-            onDismiss = onDismiss,
+            onDismiss = params.onDismiss,
             onViewConversation = sheetTarget.subagentAgentId
-                ?.takeIf { it.isNotBlank() && navigation.onViewSubagentConversation != null }
+                ?.takeIf { it.isNotBlank() && params.navigation.onViewSubagentConversation != null }
                 ?.let { agentId ->
                     sheetTarget.subagentNavigationConversationId?.let { conversationId ->
                         {
-                            onTargetUpdate(null)
-                            navigation.onViewSubagentConversation?.invoke(agentId, conversationId)
+                            params.onTargetUpdate(null)
+                            params.navigation.onViewSubagentConversation?.invoke(agentId, conversationId)
                         }
                     }
                 },

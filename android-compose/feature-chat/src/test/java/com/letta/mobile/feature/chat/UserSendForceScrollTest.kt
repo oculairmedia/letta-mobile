@@ -11,7 +11,7 @@ class UserSendForceScrollTest {
     @Test
     fun `force scroll on user send brings new user bubble into view from any position`() {
         val signature = newestMessageAutoScrollSignature(
-            listOf(scrollTestMessage(id = "u-new", role = "user", content = "hello there")),
+            listOf(scrollTestMessage(ScrollTestMessageSpec(id = "u-new", content = "hello there", role = ScrollTestMessageRole(value = "user")))),
         )!!
 
         assertTrue(
@@ -25,7 +25,7 @@ class UserSendForceScrollTest {
     @Test
     fun `force scroll on user send does not retrigger for same user message`() {
         val signature = newestMessageAutoScrollSignature(
-            listOf(scrollTestMessage(id = "u-new", role = "user", content = "hello there")),
+            listOf(scrollTestMessage(ScrollTestMessageSpec(id = "u-new", content = "hello there", role = ScrollTestMessageRole(value = "user")))),
         )!!
 
         assertFalse(
@@ -39,7 +39,7 @@ class UserSendForceScrollTest {
     @Test
     fun `force scroll on user send ignores assistant streaming updates`() {
         val signature = newestMessageAutoScrollSignature(
-            listOf(scrollTestMessage(id = "assistant-new", role = "assistant", content = "streaming")),
+            listOf(scrollTestMessage(ScrollTestMessageSpec(id = "assistant-new", content = "streaming"))),
         )!!
 
         assertFalse(

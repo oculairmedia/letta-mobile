@@ -108,3 +108,11 @@ internal data class ChatMessageListRenderRunBlockItemParams(
     val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
     val isStreamingRenderItem: Boolean,
 )
+
+internal data class ChatMessageListPinchIndicatorEffectParams(
+    val pinchTick: Long,
+    val pinchAnimationSuppressionTick: Long,
+    val isPinching: Boolean,
+    val onShowFontIndicator: (Boolean) -> Unit,
+    val onSuppressPinchLayoutAnimations: (Boolean) -> Unit,
+)

@@ -43,20 +43,28 @@ data class ConversationCardCallbacks(
     val onFork: () -> Unit,
 )
 
-private data class ConversationCardMenuState(
-    val show: Boolean,
-    val title: String,
-    val display: ConversationDisplay,
+private data class ConversationCardMenuActions(
     val onDismiss: () -> Unit,
     val onRequestRename: () -> Unit,
     val onRequestDelete: () -> Unit,
 )
 
+private data class ConversationCardMenuState(
+    val show: Boolean,
+    val title: String,
+    val display: ConversationDisplay,
+    val actions: ConversationCardMenuActions,
+)
+
+private data class ConversationCardSurfaceClickCallbacks(
+    val onClick: () -> Unit,
+    val onLongClick: () -> Unit,
+)
+
 private data class ConversationCardSurfaceParams(
     val title: String,
     val display: ConversationDisplay,
-    val onClick: () -> Unit,
-    val onLongClick: () -> Unit,
+    val clicks: ConversationCardSurfaceClickCallbacks,
     val modifier: Modifier = Modifier,
 )
 
@@ -78,11 +86,13 @@ fun ConversationCard(
         params = ConversationCardSurfaceParams(
             title = title,
             display = display,
-            onClick = callbacks.onClick,
-            onLongClick = {
-                HapticEffects.longPress(haptic)
-                showContextMenu = true
-            },
+            clicks = ConversationCardSurfaceClickCallbacks(
+                onClick = callbacks.onClick,
+                onLongClick = {
+                    HapticEffects.longPress(haptic)
+                    showContextMenu = true
+                },
+            ),
             modifier = modifier,
         ),
     )
@@ -92,9 +102,11 @@ fun ConversationCard(
             show = showContextMenu,
             title = title,
             display = display,
-            onDismiss = { showContextMenu = false },
-            onRequestRename = { showRenameDialog = true },
-            onRequestDelete = { showDeleteDialog = true },
+            actions = ConversationCardMenuActions(
+                onDismiss = { showContextMenu = false },
+                onRequestRename = { showRenameDialog = true },
+                onRequestDelete = { showDeleteDialog = true },
+            ),
         ),
         callbacks = callbacks,
     )
@@ -114,12 +126,16 @@ fun ConversationCard(
     )
 
     ConversationCardTextInputDialog(
-        show = showRenameDialog,
-        title = stringResource(R.string.screen_conversations_dialog_rename_title),
-        label = stringResource(R.string.common_name),
-        initialValue = conversation.summary ?: "",
-        onConfirm = callbacks.onRename,
-        onDismiss = { showRenameDialog = false },
+        params = ConversationCardTextInputDialogParams(
+            show = showRenameDialog,
+            fields = ConversationCardTextInputFields(
+                title = stringResource(R.string.screen_conversations_dialog_rename_title),
+                label = stringResource(R.string.common_name),
+                initialValue = conversation.summary ?: "",
+            ),
+            onConfirm = callbacks.onRename,
+            onDismiss = { showRenameDialog = false },
+        ),
     )
 }
 
@@ -133,8 +149,8 @@ private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
         modifier = params.modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = params.onClick,
-                onLongClick = params.onLongClick,
+                onClick = params.clicks.onClick,
+                onLongClick = params.clicks.onLongClick,
             ),
         shape = RoundedCornerShape(12.dp),
         colors = LettaCardDefaults.listCardColors(),
@@ -181,33 +197,33 @@ private fun ConversationCardContextMenu(
 ) {
     ActionSheet(
         show = state.show,
-        onDismiss = state.onDismiss,
+        onDismiss = state.actions.onDismiss,
         title = state.title,
     ) {
         ActionSheetItem(
             text = stringResource(R.string.screen_conversations_admin_details),
             icon = LettaIcons.ManageSearch,
-            onClick = { state.onDismiss(); callbacks.onOpenAdmin() },
+            onClick = { state.actions.onDismiss(); callbacks.onOpenAdmin() },
         )
         ActionSheetItem(
             text = conversationPinActionLabel(state.display.isPinned),
             icon = LettaIcons.Star,
-            onClick = { state.onDismiss(); callbacks.onTogglePinned() },
+            onClick = { state.actions.onDismiss(); callbacks.onTogglePinned() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_rename),
             icon = LettaIcons.Edit,
-            onClick = { state.onDismiss(); state.onRequestRename() },
+            onClick = { state.actions.onDismiss(); state.actions.onRequestRename() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_fork),
             icon = LettaIcons.ForkRight,
-            onClick = { state.onDismiss(); callbacks.onFork() },
+            onClick = { state.actions.onDismiss(); callbacks.onFork() },
         )
         ActionSheetItem(
             text = stringResource(R.string.action_delete),
             icon = LettaIcons.Delete,
-            onClick = { state.onDismiss(); state.onRequestDelete() },
+            onClick = { state.actions.onDismiss(); state.actions.onRequestDelete() },
             destructive = true,
         )
     }
@@ -248,24 +264,30 @@ private fun ConversationCardConfirmDialog(
     )
 }
 
+private data class ConversationCardTextInputFields(
+    val title: String,
+    val label: String,
+    val initialValue: String,
+)
+
+private data class ConversationCardTextInputDialogParams(
+    val show: Boolean,
+    val fields: ConversationCardTextInputFields,
+    val onConfirm: (String) -> Unit,
+    val onDismiss: () -> Unit,
+)
+
 @Composable
-private fun ConversationCardTextInputDialog(
-    show: Boolean,
-    title: String,
-    label: String,
-    initialValue: String,
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun ConversationCardTextInputDialog(params: ConversationCardTextInputDialogParams) {
     TextInputDialog(
-        show = show,
-        title = title,
-        label = label,
+        show = params.show,
+        title = params.fields.title,
+        label = params.fields.label,
         confirmText = stringResource(R.string.action_save),
         dismissText = stringResource(R.string.action_cancel),
-        onConfirm = { onDismiss(); onConfirm(it) },
-        onDismiss = onDismiss,
-        initialValue = initialValue,
+        onConfirm = { params.onDismiss(); params.onConfirm(it) },
+        onDismiss = params.onDismiss,
+        initialValue = params.fields.initialValue,
     )
 }
 

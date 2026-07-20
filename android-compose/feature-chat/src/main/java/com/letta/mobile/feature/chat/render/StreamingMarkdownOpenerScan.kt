@@ -3,14 +3,29 @@ package com.letta.mobile.feature.chat.render
 import androidx.annotation.VisibleForTesting
 
 private sealed interface OpenerScanStep {
-    data class Continue(val nextIndex: Int) : OpenerScanStep
-    data class Unmatched(val index: Int) : OpenerScanStep
+    data class Continue(val nextIndex: MarkdownOpenerScanIndex) : OpenerScanStep
+    data class Unmatched(val index: MarkdownOpenerScanIndex) : OpenerScanStep
 }
 
 internal data class MarkdownOpenerScanLine(val raw: String) {
-    val length: Int get() = raw.length
-    operator fun get(index: Int): Char = raw[index]
+    val length: MarkdownOpenerScanIndex get() = MarkdownOpenerScanIndex(raw.length)
+    operator fun get(index: MarkdownOpenerScanIndex): Char = raw[index.value]
 }
+
+internal data class MarkdownOpenerScanIndex(val value: Int)
+
+internal data class MarkdownEmphasisMarker(val value: Char)
+
+internal data class MarkdownOpenerScanCursor(
+    val line: MarkdownOpenerScanLine,
+    val index: MarkdownOpenerScanIndex,
+)
+
+internal data class MarkdownOpenerScanBounds(
+    val line: MarkdownOpenerScanLine,
+    val start: MarkdownOpenerScanIndex,
+    val end: MarkdownOpenerScanIndex,
+)
 
 /**
  * Returns the index (relative to [line]) of the FIRST unmatched
@@ -19,82 +34,119 @@ internal data class MarkdownOpenerScanLine(val raw: String) {
  */
 @VisibleForTesting
 internal fun findUnmatchedOpenerInLine(line: MarkdownOpenerScanLine): Int {
-    var i = 0
-    val len = line.length
-    while (i < len) {
-        when (val step = scanOpenerStep(line, i, len)) {
-            is OpenerScanStep.Unmatched -> return step.index
-            is OpenerScanStep.Continue -> i = step.nextIndex
+    var cursor = MarkdownOpenerScanCursor(line, MarkdownOpenerScanIndex(0))
+    val end = line.length
+    while (cursor.index.value < end.value) {
+        when (val step = scanOpenerStep(cursor, end)) {
+            is OpenerScanStep.Unmatched -> return step.index.value
+            is OpenerScanStep.Continue -> cursor = cursor.at(step.nextIndex)
         }
     }
     return -1
 }
 
-private fun scanOpenerStep(line: MarkdownOpenerScanLine, index: Int, len: Int): OpenerScanStep =
-    when (line[index]) {
-        '`' -> scanBacktickOpener(line, index)
-        '*', '_' -> scanEmphasisOpener(line, index, len, line[index])
-        '~' -> scanStrikethroughOpener(line, index, len)
-        '[' -> scanLinkOpener(line, index, len)
-        else -> OpenerScanStep.Continue(index + 1)
+private fun scanOpenerStep(
+    cursor: MarkdownOpenerScanCursor,
+    end: MarkdownOpenerScanIndex,
+): OpenerScanStep =
+    when (cursor.line[cursor.index]) {
+        '`' -> scanBacktickOpener(cursor)
+        '*', '_' -> scanEmphasisOpener(cursor, end, MarkdownEmphasisMarker(cursor.line[cursor.index]))
+        '~' -> scanStrikethroughOpener(cursor, end)
+        '[' -> scanLinkOpener(cursor, end)
+        else -> OpenerScanStep.Continue(MarkdownOpenerScanIndex(cursor.index.value + 1))
     }
 
-private fun scanBacktickOpener(line: MarkdownOpenerScanLine, index: Int): OpenerScanStep {
-    val close = line.raw.indexOf('`', startIndex = index + 1)
-    if (close < 0) return OpenerScanStep.Unmatched(index)
-    return OpenerScanStep.Continue(close + 1)
+private fun scanBacktickOpener(cursor: MarkdownOpenerScanCursor): OpenerScanStep {
+    val close = cursor.line.raw.indexOf('`', startIndex = cursor.index.value + 1)
+    if (close < 0) return OpenerScanStep.Unmatched(cursor.index)
+    return OpenerScanStep.Continue(MarkdownOpenerScanIndex(close + 1))
 }
 
 private fun scanEmphasisOpener(
-    line: MarkdownOpenerScanLine,
-    index: Int,
-    len: Int,
-    marker: Char,
+    cursor: MarkdownOpenerScanCursor,
+    end: MarkdownOpenerScanIndex,
+    marker: MarkdownEmphasisMarker,
 ): OpenerScanStep {
     var run = 1
-    while (index + run < len && line[index + run] == marker) run++
-    val closerIdx = findEmphasisCloser(line, index + run, marker, run)
-    if (closerIdx < 0) return OpenerScanStep.Unmatched(index)
-    return OpenerScanStep.Continue(closerIdx + run)
-}
-
-private fun scanStrikethroughOpener(line: MarkdownOpenerScanLine, index: Int, len: Int): OpenerScanStep {
-    if (index + 1 >= len) return OpenerScanStep.Continue(index + 1)
-    if (line[index + 1] != '~') return OpenerScanStep.Continue(index + 1)
-    val close = line.raw.indexOf("~~", startIndex = index + 2)
-    if (close < 0) return OpenerScanStep.Unmatched(index)
-    return OpenerScanStep.Continue(close + 2)
-}
-
-private fun scanLinkOpener(line: MarkdownOpenerScanLine, index: Int, len: Int): OpenerScanStep {
-    val closeBracket = line.raw.indexOf(']', startIndex = index + 1)
-    if (closeBracket < 0) return OpenerScanStep.Unmatched(index)
-    if (!hasLinkOpenParen(line, closeBracket, len)) {
-        return OpenerScanStep.Unmatched(index)
+    while (cursor.index.value + run < end.value && cursor.line[MarkdownOpenerScanIndex(cursor.index.value + run)] == marker.value) {
+        run++
     }
-    val closeParen = line.raw.indexOf(')', startIndex = closeBracket + 2)
-    if (closeParen < 0) return OpenerScanStep.Unmatched(index)
-    return OpenerScanStep.Continue(closeParen + 1)
+    val closerIdx = findEmphasisCloser(
+        MarkdownOpenerScanBounds(
+            line = cursor.line,
+            start = MarkdownOpenerScanIndex(cursor.index.value + run),
+            end = end,
+        ),
+        marker = marker,
+        runLen = run,
+    )
+    if (closerIdx.value < 0) return OpenerScanStep.Unmatched(cursor.index)
+    return OpenerScanStep.Continue(MarkdownOpenerScanIndex(closerIdx.value + run))
 }
 
-private fun hasLinkOpenParen(line: MarkdownOpenerScanLine, closeBracket: Int, len: Int): Boolean {
-    val parenIndex = closeBracket + 1
-    if (parenIndex >= len) return false
+private fun scanStrikethroughOpener(
+    cursor: MarkdownOpenerScanCursor,
+    end: MarkdownOpenerScanIndex,
+): OpenerScanStep {
+    if (cursor.index.value + 1 >= end.value) {
+        return OpenerScanStep.Continue(MarkdownOpenerScanIndex(cursor.index.value + 1))
+    }
+    if (cursor.line[MarkdownOpenerScanIndex(cursor.index.value + 1)] != '~') {
+        return OpenerScanStep.Continue(MarkdownOpenerScanIndex(cursor.index.value + 1))
+    }
+    val close = cursor.line.raw.indexOf("~~", startIndex = cursor.index.value + 2)
+    if (close < 0) return OpenerScanStep.Unmatched(cursor.index)
+    return OpenerScanStep.Continue(MarkdownOpenerScanIndex(close + 2))
+}
+
+private fun scanLinkOpener(
+    cursor: MarkdownOpenerScanCursor,
+    end: MarkdownOpenerScanIndex,
+): OpenerScanStep {
+    val closeBracket = cursor.line.raw.indexOf(']', startIndex = cursor.index.value + 1)
+    if (closeBracket < 0) return OpenerScanStep.Unmatched(cursor.index)
+    val closeBracketIndex = MarkdownOpenerScanIndex(closeBracket)
+    if (!hasLinkOpenParen(cursor.line, closeBracketIndex, end)) {
+        return OpenerScanStep.Unmatched(cursor.index)
+    }
+    val closeParen = cursor.line.raw.indexOf(')', startIndex = closeBracket + 2)
+    if (closeParen < 0) return OpenerScanStep.Unmatched(cursor.index)
+    return OpenerScanStep.Continue(MarkdownOpenerScanIndex(closeParen + 1))
+}
+
+private fun hasLinkOpenParen(
+    line: MarkdownOpenerScanLine,
+    closeBracket: MarkdownOpenerScanIndex,
+    end: MarkdownOpenerScanIndex,
+): Boolean {
+    val parenIndex = MarkdownOpenerScanIndex(closeBracket.value + 1)
+    if (parenIndex.value >= end.value) return false
     return line[parenIndex] == '('
 }
 
-private fun findEmphasisCloser(line: MarkdownOpenerScanLine, from: Int, marker: Char, runLen: Int): Int {
-    var i = from
-    val len = line.length
-    while (i < len) {
-        if (line[i] != marker) {
-            i++
+private fun findEmphasisCloser(
+    bounds: MarkdownOpenerScanBounds,
+    marker: MarkdownEmphasisMarker,
+    runLen: Int,
+): MarkdownOpenerScanIndex {
+    var cursor = MarkdownOpenerScanCursor(bounds.line, bounds.start)
+    while (cursor.index.value < bounds.end.value) {
+        if (cursor.line[cursor.index] != marker.value) {
+            cursor = cursor.at(MarkdownOpenerScanIndex(cursor.index.value + 1))
             continue
         }
         var run = 1
-        while (i + run < len && line[i + run] == marker) run++
-        if (run >= runLen) return i
-        i += run
+        while (cursor.index.value + run < bounds.end.value &&
+            cursor.line[MarkdownOpenerScanIndex(cursor.index.value + run)] == marker.value
+        ) {
+            run++
+        }
+        if (run >= runLen) return cursor.index
+        cursor = cursor.at(MarkdownOpenerScanIndex(cursor.index.value + run))
     }
-    return -1
+    return MarkdownOpenerScanIndex(-1)
 }
+
+private fun MarkdownOpenerScanCursor.at(index: MarkdownOpenerScanIndex): MarkdownOpenerScanCursor =
+    copy(index = index)

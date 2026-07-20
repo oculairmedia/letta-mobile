@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import com.letta.mobile.feature.chat.render.MAX_HELD_TAIL_CHARS
+import com.letta.mobile.feature.chat.render.MarkdownClampSource
 import com.letta.mobile.feature.chat.render.clampToStableMarkdown
 import com.letta.mobile.feature.chat.render.clampToWordBoundary
 import com.letta.mobile.feature.chat.render.MarkdownOpenerScanLine
@@ -249,92 +250,92 @@ class StreamingDisplayTextTest {
 
     @Test
     fun `clampToStableMarkdown balanced returns full`() {
-        assertEquals("Hello world", clampToStableMarkdown("Hello world"))
+        assertEquals("Hello world", clampToStableMarkdown(MarkdownClampSource("Hello world")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched star-star clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown("Hello **wor"))
+        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello **wor")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched star clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown("Hello *wor"))
+        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello *wor")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched underscore clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown("Hello _wor"))
+        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello _wor")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched double-underscore clips before`() {
-        assertEquals("Hello ", clampToStableMarkdown("Hello __wor"))
+        assertEquals("Hello ", clampToStableMarkdown(MarkdownClampSource("Hello __wor")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched backtick clips before`() {
-        assertEquals("Run ", clampToStableMarkdown("Run `ls /tmp/so"))
+        assertEquals("Run ", clampToStableMarkdown(MarkdownClampSource("Run `ls /tmp/so")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched strikethrough clips before`() {
-        assertEquals("This is ", clampToStableMarkdown("This is ~~wr"))
+        assertEquals("This is ", clampToStableMarkdown(MarkdownClampSource("This is ~~wr")))
     }
 
     @Test
     fun `clampToStableMarkdown unmatched bracket clips before`() {
-        assertEquals("See ", clampToStableMarkdown("See [the docs"))
+        assertEquals("See ", clampToStableMarkdown(MarkdownClampSource("See [the docs")))
     }
 
     @Test
     fun `clampToStableMarkdown bracket closed no paren clips before bracket`() {
-        assertEquals("See ", clampToStableMarkdown("See [the docs] f"))
+        assertEquals("See ", clampToStableMarkdown(MarkdownClampSource("See [the docs] f")))
     }
 
     @Test
     fun `clampToStableMarkdown bracket with paren no close-paren clips before bracket`() {
-        assertEquals("See ", clampToStableMarkdown("See [docs](https://ex"))
+        assertEquals("See ", clampToStableMarkdown(MarkdownClampSource("See [docs](https://ex")))
     }
 
     @Test
     fun `clampToStableMarkdown balanced bold returns full`() {
-        assertEquals("**bold** here", clampToStableMarkdown("**bold** here"))
+        assertEquals("**bold** here", clampToStableMarkdown(MarkdownClampSource("**bold** here")))
     }
 
     @Test
     fun `clampToStableMarkdown balanced backtick returns full`() {
-        assertEquals("Run `ls` now", clampToStableMarkdown("Run `ls` now"))
+        assertEquals("Run `ls` now", clampToStableMarkdown(MarkdownClampSource("Run `ls` now")))
     }
 
     @Test
     fun `clampToStableMarkdown balanced link returns full`() {
-        assertEquals("See [d](https://x.com)", clampToStableMarkdown("See [d](https://x.com)"))
+        assertEquals("See [d](https://x.com)", clampToStableMarkdown(MarkdownClampSource("See [d](https://x.com)")))
     }
 
     @Test
     fun `clampToStableMarkdown balanced strikethrough returns full`() {
-        assertEquals("~~done~~ here", clampToStableMarkdown("~~done~~ here"))
+        assertEquals("~~done~~ here", clampToStableMarkdown(MarkdownClampSource("~~done~~ here")))
     }
 
     @Test
     fun `clampToStableMarkdown multiple unmatched earliest wins`() {
-        assertEquals("a ", clampToStableMarkdown("a *b `c"))
+        assertEquals("a ", clampToStableMarkdown(MarkdownClampSource("a *b `c")))
     }
 
     @Test
     fun `clampToStableMarkdown mixed underscore and star`() {
-        assertEquals("__bold__ and ", clampToStableMarkdown("__bold__ and *italic text "))
+        assertEquals("__bold__ and ", clampToStableMarkdown(MarkdownClampSource("__bold__ and *italic text ")))
     }
 
     @Test
     fun `clampToStableMarkdown text ending at newline returns full`() {
-        assertEquals("Hello\n", clampToStableMarkdown("Hello\n"))
+        assertEquals("Hello\n", clampToStableMarkdown(MarkdownClampSource("Hello\n")))
     }
 
     @Test
     fun `clampToStableMarkdown multi-line only last line scanned`() {
-        val result = clampToStableMarkdown("**done** here\n**open")
+        val result = clampToStableMarkdown(MarkdownClampSource("**done** here\n**open"))
         assertEquals("**done** here\n", result)
     }
 

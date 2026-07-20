@@ -217,20 +217,24 @@ private fun ChatMessageListRenderSingleItem(
             onApprovalDecision = context.callbacks.onSubmitApproval,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
-                message = message,
-                position = position,
-                context = context,
-                isStreamingRenderItem = isStreamingRenderItem,
+                params = RenderChatMessageRowParams(
+                    message = message,
+                    position = position,
+                    context = context,
+                    isStreamingRenderItem = isStreamingRenderItem,
+                ),
                 modifier = rowModifier,
             )
         }
         return
     }
     RenderChatMessageRow(
-        message = msg,
-        position = renderItem.groupPosition,
-        context = context,
-        isStreamingRenderItem = isStreamingRenderItem,
+        params = RenderChatMessageRowParams(
+            message = msg,
+            position = renderItem.groupPosition,
+            context = context,
+            isStreamingRenderItem = isStreamingRenderItem,
+        ),
     )
 }
 
@@ -260,27 +264,35 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         onApprovalDecision = context.callbacks.onSubmitApproval,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
-            message = message,
-            position = position,
-            context = context,
-            isStreamingRenderItem = params.isStreamingRenderItem,
+            params = RenderChatMessageRowParams(
+                message = message,
+                position = position,
+                context = context,
+                isStreamingRenderItem = params.isStreamingRenderItem,
+            ),
             modifier = rowModifier,
         )
     }
 }
 
+private data class RenderChatMessageRowParams(
+    val message: com.letta.mobile.data.model.UiMessage,
+    val position: com.letta.mobile.ui.common.GroupPosition,
+    val context: ChatMessageListLazyContext,
+    val isStreamingRenderItem: Boolean,
+)
+
 @Composable
 private fun RenderChatMessageRow(
-    message: com.letta.mobile.data.model.UiMessage,
-    position: com.letta.mobile.ui.common.GroupPosition,
-    context: ChatMessageListLazyContext,
-    isStreamingRenderItem: Boolean,
+    params: RenderChatMessageRowParams,
     modifier: Modifier = Modifier,
 ) {
+    val message = params.message
+    val context = params.context
     RenderChatMessage(
         message = message,
-        position = position,
-        isStreaming = isStreamingRenderItem && message.id == context.newestMessageId,
+        position = params.position,
+        isStreaming = params.isStreamingRenderItem && message.id == context.newestMessageId,
         rerunEnabled = !context.state.isStreaming,
         approvalInFlight = context.state.activeApprovalRequestId == message.approvalRequest?.requestId,
         chatMode = context.chatMode,

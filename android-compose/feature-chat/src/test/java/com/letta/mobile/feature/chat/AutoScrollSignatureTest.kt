@@ -10,10 +10,10 @@ class AutoScrollSignatureTest {
     @Test
     fun `auto-scroll signature changes when newest message content grows`() {
         val before = newestMessageAutoScrollSignature(
-            listOf(scrollTestMessage(id = "assistant", content = "hel")),
+            listOf(scrollTestMessage(ScrollTestMessageSpec(id = "assistant", content = "hel"))),
         )
         val after = newestMessageAutoScrollSignature(
-            listOf(scrollTestMessage(id = "assistant", content = "hello")),
+            listOf(scrollTestMessage(ScrollTestMessageSpec(id = "assistant", content = "hello"))),
         )
 
         assertNotEquals(before, after)
@@ -22,12 +22,12 @@ class AutoScrollSignatureTest {
     @Test
     fun `auto-scroll signature ignores older page additions when newest message is unchanged`() {
         val before = newestMessageAutoScrollSignature(
-            listOf(scrollTestMessage(id = "newest", content = "hello")),
+            listOf(scrollTestMessage(ScrollTestMessageSpec(id = "newest", content = "hello"))),
         )
         val after = newestMessageAutoScrollSignature(
             listOf(
-                scrollTestMessage(id = "older", content = "old"),
-                scrollTestMessage(id = "newest", content = "hello"),
+                scrollTestMessage(ScrollTestMessageSpec(id = "older", content = "old")),
+                scrollTestMessage(ScrollTestMessageSpec(id = "newest", content = "hello")),
             ),
         )
 

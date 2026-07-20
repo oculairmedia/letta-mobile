@@ -16,9 +16,9 @@ internal data class EditAgentMapperInput(
 
 internal object EditAgentUiStateMapper {
     fun fromAgent(input: EditAgentMapperInput): EditAgentUiState {
-        val modelFields = EditAgentUiStateFieldMapping.modelSettingsFields(input.agent)
-        val compaction = EditAgentUiStateFieldMapping.compactionFields(input.agent)
-        return EditAgentUiStateFieldMapping.baseUiState(input).copy(
+        val modelFields = input.agent.modelSettingsFields()
+        val compaction = input.agent.compactionFields()
+        return input.baseUiState().copy(
             temperature = modelFields.temperature,
             maxOutputTokens = modelFields.maxOutputTokens,
             parallelToolCalls = modelFields.parallelToolCalls,

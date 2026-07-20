@@ -13,6 +13,7 @@ import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListCallbacks
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListEffects
 import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchGestureBoxParams
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchGestureBox
+import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffectParams
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffects
 import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchFrameBudgetSampler
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
@@ -137,11 +138,13 @@ internal fun ChatMessageList(
     }
 
     ChatMessageListPinchIndicatorEffects(
-        pinchTick = pinchTick,
-        pinchAnimationSuppressionTick = pinchAnimationSuppressionTick,
-        isPinching = pinchFontScaleController.isPinching,
-        onShowFontIndicator = { showFontIndicator = it },
-        onSuppressPinchLayoutAnimations = { suppressPinchLayoutAnimations = it },
+        params = ChatMessageListPinchIndicatorEffectParams(
+            pinchTick = pinchTick,
+            pinchAnimationSuppressionTick = pinchAnimationSuppressionTick,
+            isPinching = pinchFontScaleController.isPinching,
+            onShowFontIndicator = { showFontIndicator = it },
+            onSuppressPinchLayoutAnimations = { suppressPinchLayoutAnimations = it },
+        ),
     )
 
     val loadPressureSummary = remember(

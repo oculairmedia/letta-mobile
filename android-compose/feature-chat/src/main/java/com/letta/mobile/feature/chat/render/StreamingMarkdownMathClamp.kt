@@ -4,81 +4,101 @@ import androidx.annotation.VisibleForTesting
 
 private const val MAX_SIMPLE_INLINE_MATH_CHARS = 3
 
-@JvmInline
-internal value class MarkdownMathScanLine(val raw: String)
+internal data class MarkdownMathScanLine(val raw: String)
+
+internal data class MarkdownMathScanIndex(val value: Int)
+
+internal data class MarkdownMathScanCursor(
+    val line: MarkdownMathScanLine,
+    val index: MarkdownMathScanIndex,
+)
+
+internal data class MarkdownMathInlineBodySpan(
+    val line: MarkdownMathScanLine,
+    val start: MarkdownMathScanIndex,
+)
 
 @VisibleForTesting
 internal fun findUnmatchedMathOpenerInLine(line: MarkdownMathScanLine): Int {
     val displayOpenIdx = findUnmatchedDisplayMathOpenerInLine(line)
     val inlineOpenIdx = findUnmatchedInlineMathOpenerInLine(line)
     return when {
-        displayOpenIdx < 0 -> inlineOpenIdx
-        inlineOpenIdx < 0 -> displayOpenIdx
-        else -> minOf(displayOpenIdx, inlineOpenIdx)
+        displayOpenIdx.value < 0 -> inlineOpenIdx.value
+        inlineOpenIdx.value < 0 -> displayOpenIdx.value
+        else -> minOf(displayOpenIdx.value, inlineOpenIdx.value)
     }
 }
 
-private fun findUnmatchedDisplayMathOpenerInLine(line: MarkdownMathScanLine): Int {
-    var openIdx = -1
-    var i = 0
-    while (i <= line.raw.length - 2) {
-        if (line.raw[i] == '\\') {
-            i += 2
+private fun findUnmatchedDisplayMathOpenerInLine(line: MarkdownMathScanLine): MarkdownMathScanIndex {
+    var openIdx = MarkdownMathScanIndex(-1)
+    var cursor = MarkdownMathScanCursor(line, MarkdownMathScanIndex(0))
+    while (cursor.index.value <= line.raw.length - 2) {
+        if (line.raw[cursor.index.value] == '\\') {
+            cursor = cursor.advanceBy(2)
             continue
         }
-        if (!isDisplayMathDelimiterAt(line, i)) {
-            i++
+        if (!isDisplayMathDelimiterAt(cursor)) {
+            cursor = cursor.advanceBy(1)
             continue
         }
-        openIdx = if (openIdx >= 0) -1 else i
-        i += 2
+        openIdx = if (openIdx.value >= 0) MarkdownMathScanIndex(-1) else cursor.index
+        cursor = cursor.advanceBy(2)
     }
     return openIdx
 }
 
-private fun isDisplayMathDelimiterAt(line: MarkdownMathScanLine, index: Int): Boolean =
-    line.raw[index] == '$' && line.raw[index + 1] == '$'
-
-private fun findUnmatchedInlineMathOpenerInLine(line: MarkdownMathScanLine): Int {
-    val opener = findLastInlineMathOpener(line)
-    if (opener < 0) return -1
-    val body = line.raw.substring(opener + 1)
-    return if (isLikelyIncompleteInlineMathBody(body)) opener else -1
+private fun isDisplayMathDelimiterAt(cursor: MarkdownMathScanCursor): Boolean {
+    val index = cursor.index.value
+    return cursor.line.raw[index] == '$' && cursor.line.raw[index + 1] == '$'
 }
 
-private fun findLastInlineMathOpener(line: MarkdownMathScanLine): Int {
-    var opener = -1
-    var i = 0
-    while (i < line.raw.length) {
-        if (line.raw.isSingleDollarAt(i) && !line.raw.isInsideInlineCodeAt(i)) {
-            opener = resolveInlineMathOpener(line, i, opener)
+private fun findUnmatchedInlineMathOpenerInLine(line: MarkdownMathScanLine): MarkdownMathScanIndex {
+    val opener = findLastInlineMathOpener(line)
+    if (opener.value < 0) return opener
+    val body = MarkdownMathInlineBodySpan(line, MarkdownMathScanIndex(opener.value + 1))
+    return if (isLikelyIncompleteInlineMathBody(body)) opener else MarkdownMathScanIndex(-1)
+}
+
+private fun findLastInlineMathOpener(line: MarkdownMathScanLine): MarkdownMathScanIndex {
+    var opener = MarkdownMathScanIndex(-1)
+    var cursor = MarkdownMathScanCursor(line, MarkdownMathScanIndex(0))
+    while (cursor.index.value < line.raw.length) {
+        if (line.isSingleDollarAt(cursor.index) && !line.isInsideInlineCodeAt(cursor.index)) {
+            opener = resolveInlineMathOpener(cursor, opener)
         }
-        i++
+        cursor = cursor.advanceBy(1)
     }
     return opener
 }
 
-private fun resolveInlineMathOpener(line: MarkdownMathScanLine, index: Int, currentOpener: Int): Int {
-    if (closesPriorInlineMathOpener(line, index, currentOpener)) return -1
-    return if (canOpenInlineMathAt(line, index)) index else currentOpener
+private fun resolveInlineMathOpener(
+    cursor: MarkdownMathScanCursor,
+    currentOpener: MarkdownMathScanIndex,
+): MarkdownMathScanIndex {
+    if (closesPriorInlineMathOpener(cursor, currentOpener)) return MarkdownMathScanIndex(-1)
+    return if (canOpenInlineMathAt(cursor)) cursor.index else currentOpener
 }
 
-private fun closesPriorInlineMathOpener(line: MarkdownMathScanLine, index: Int, currentOpener: Int): Boolean {
-    if (currentOpener < 0) return false
-    if (index <= 0) return false
-    return !line.raw[index - 1].isWhitespace()
+private fun closesPriorInlineMathOpener(
+    cursor: MarkdownMathScanCursor,
+    currentOpener: MarkdownMathScanIndex,
+): Boolean {
+    if (currentOpener.value < 0) return false
+    if (cursor.index.value <= 0) return false
+    return !cursor.line.raw[cursor.index.value - 1].isWhitespace()
 }
 
-private fun canOpenInlineMathAt(line: MarkdownMathScanLine, index: Int): Boolean {
+private fun canOpenInlineMathAt(cursor: MarkdownMathScanCursor): Boolean {
+    val index = cursor.index.value
     val next = index + 1
-    if (next >= line.raw.length) return false
-    if (line.raw[next].isWhitespace()) return false
-    if (line.raw[next].isDigit()) return false
-    if (index > 0 && line.raw[index - 1].isWordChar()) return false
+    if (next >= cursor.line.raw.length) return false
+    if (cursor.line.raw[next].isWhitespace()) return false
+    if (cursor.line.raw[next].isDigit()) return false
+    if (index > 0 && cursor.line.raw[index - 1].isWordChar()) return false
     return true
 }
 
-private fun isLikelyIncompleteInlineMathBody(body: String): Boolean {
+private fun isLikelyIncompleteInlineMathBody(body: MarkdownMathInlineBodySpan): Boolean {
     if (!hasNonBlankNonWhitespaceTail(body)) return false
     if (bodyContainsMathTerminator(body)) return false
     if (bodyContainsMathSyntax(body)) return true
@@ -86,31 +106,54 @@ private fun isLikelyIncompleteInlineMathBody(body: String): Boolean {
     return isSimpleInlineMathToken(body)
 }
 
-private fun hasNonBlankNonWhitespaceTail(body: String): Boolean {
-    if (body.isBlank()) return false
-    return !body.last().isWhitespace()
+private fun hasNonBlankNonWhitespaceTail(body: MarkdownMathInlineBodySpan): Boolean {
+    val raw = body.line.raw
+    if (raw.substring(body.start.value).isBlank()) return false
+    return !raw[raw.lastIndex].isWhitespace()
 }
 
-private fun bodyContainsMathTerminator(body: String): Boolean {
-    for (ch in body) {
+private fun bodyContainsMathTerminator(body: MarkdownMathInlineBodySpan): Boolean {
+    for (index in body.start.value until body.line.raw.length) {
+        val ch = body.line.raw[index]
         if (ch == '$' || ch == '\n') return true
     }
     return false
 }
 
-private fun bodyContainsMathSyntax(body: String): Boolean {
-    for (ch in body) {
+private fun bodyContainsMathSyntax(body: MarkdownMathInlineBodySpan): Boolean {
+    for (index in body.start.value until body.line.raw.length) {
+        val ch = body.line.raw[index]
         if (ch in "\\^_{}=+-*/<>(),[]") return true
     }
     return false
 }
 
-private fun isShellLikeVariable(body: String): Boolean =
-    body.all { it.isUpperCase() || it.isDigit() || it == '_' }
-
-private fun isSimpleInlineMathToken(body: String): Boolean {
-    if (body.length > MAX_SIMPLE_INLINE_MATH_CHARS) return false
-    if (!body.all { it.isLetter() }) return false
-    if (body.length == 1) return true
-    return body.any { it.isLowerCase() }
+private fun isShellLikeVariable(body: MarkdownMathInlineBodySpan): Boolean {
+    for (index in body.start.value until body.line.raw.length) {
+        val ch = body.line.raw[index]
+        if (!(ch.isUpperCase() || ch.isDigit() || ch == '_')) return false
+    }
+    return true
 }
+
+private fun isSimpleInlineMathToken(body: MarkdownMathInlineBodySpan): Boolean {
+    val length = body.line.raw.length - body.start.value
+    if (length > MAX_SIMPLE_INLINE_MATH_CHARS) return false
+    for (index in body.start.value until body.line.raw.length) {
+        if (!body.line.raw[index].isLetter()) return false
+    }
+    if (length == 1) return true
+    for (index in body.start.value until body.line.raw.length) {
+        if (body.line.raw[index].isLowerCase()) return true
+    }
+    return false
+}
+
+private fun MarkdownMathScanCursor.advanceBy(delta: Int): MarkdownMathScanCursor =
+    copy(index = MarkdownMathScanIndex(index.value + delta))
+
+private fun MarkdownMathScanLine.isSingleDollarAt(index: MarkdownMathScanIndex): Boolean =
+    raw.isSingleDollarAt(index.value)
+
+private fun MarkdownMathScanLine.isInsideInlineCodeAt(index: MarkdownMathScanIndex): Boolean =
+    raw.isInsideInlineCodeAt(index.value)
