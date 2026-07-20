@@ -32,6 +32,3 @@ val Typography.chatBubbleSender: TextStyle
 
 val Typography.statValue: TextStyle
     get() = headlineMedium
-
-val Typography.countBadge: TextStyle
-    get() = labelSmall.copy(fontWeight = FontWeight.SemiBold)
