@@ -132,7 +132,7 @@ internal fun ChatContent(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
+                            .padding(horizontal = LettaSpacing.LG, vertical = LettaSpacing.SM),
                     )
                 }
             }
@@ -221,7 +221,7 @@ internal fun A2uiSurfaceStack(
     }
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.SM),
     ) {
         orderedSurfaces.forEach { surface ->
             key(surface.surfaceId) {
@@ -312,12 +312,12 @@ internal fun ChatScreenErrorContent(
         Icon(
             imageVector = LettaIcons.Error,
             contentDescription = "Error",
-            modifier = Modifier.size(LettaSpacing.xxxl),
+            modifier = Modifier.size(LettaSpacing.XXXL),
             tint = MaterialTheme.colorScheme.error
         )
-        Spacer(modifier = Modifier.height(LettaSpacing.lg))
+        Spacer(modifier = Modifier.height(LettaSpacing.LG))
         Text(text = message, style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(LettaSpacing.lg))
+        Spacer(modifier = Modifier.height(LettaSpacing.LG))
         Button(onClick = onRetry) {
             Text(stringResource(R.string.action_retry))
         }
@@ -435,15 +435,15 @@ internal fun A2uiDebugOverlay(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
                 shape = MaterialTheme.shapes.small,
             )
-            .padding(LettaSpacing.sm),
+            .padding(LettaSpacing.SM),
     ) {
         Text(
             text = "A2UI frames",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.tertiary,
         )
-        HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.xs))
-        LazyColumn(modifier = Modifier.height(LettaSpacing.xxxl.times(2))) {
+        HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.XS))
+        LazyColumn(modifier = Modifier.height(LettaSpacing.XXXL.times(2))) {
             items(frames.takeLast(8).asReversed(), key = { it.id }) { frame ->
                 Text(
                     text = buildString {

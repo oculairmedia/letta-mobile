@@ -96,7 +96,7 @@ internal fun LazyListScope.chatMessageListItems(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = LettaSpacing.innerPaddingSmall),
+                    .padding(vertical = LettaSpacing.INNER_PADDING_SMALL),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()

@@ -29,9 +29,9 @@ internal class AdminChatModelCoordinator(
     private val bannerController: ChatBannerController,
 ) {
     private val localRuntimeModelSwitchMetadataKeys: Set<String> = LocalAgentRuntimeMetadata.bindingKeys + setOf(
-        LocalAgentRuntimeMetadata.LocalModelHandleKey,
-        LocalAgentRuntimeMetadata.LocalModelRuntimeKey,
-        LocalAgentRuntimeMetadata.LocalModelAcceleratorKey,
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY,
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY,
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY,
     )
 
     fun refreshModels() {
@@ -111,18 +111,18 @@ private fun buildLocalModelUpdateParams(
     val accelerator = config.localModelAccelerator?.trim()?.takeIf { it.isNotBlank() } ?: "gpu"
     val maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: 4096
     val localMetadata = mapOf(
-        LocalAgentRuntimeMetadata.RuntimeKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
-        LocalAgentRuntimeMetadata.RuntimeProviderKey to JsonPrimitive(LocalAgentRuntimeMetadata.LocalLettaCodeRuntime),
-        LocalAgentRuntimeMetadata.RuntimeIdKey to JsonPrimitive("${LocalAgentRuntimeMetadata.LocalLettaCodeRuntime}:${config.id}"),
-        LocalAgentRuntimeMetadata.LocalModelHandleKey to JsonPrimitive(effectiveLocalModelHandle),
-        LocalAgentRuntimeMetadata.LocalModelRuntimeKey to JsonPrimitive(runtime.lowercase()),
-        LocalAgentRuntimeMetadata.LocalModelAcceleratorKey to JsonPrimitive(accelerator.lowercase()),
+        LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
+        LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
+        LocalAgentRuntimeMetadata.RUNTIME_ID_KEY to JsonPrimitive("${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:${config.id}"),
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY to JsonPrimitive(effectiveLocalModelHandle),
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY to JsonPrimitive(runtime.lowercase()),
+        LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY to JsonPrimitive(accelerator.lowercase()),
     )
     return AgentUpdateParams(
         model = effectiveLocalModelHandle,
         metadata = baseMetadata + localMetadata,
         modelSettings = (agent?.modelSettings ?: ModelSettings()).copy(
-            providerType = LocalAgentRuntimeMetadata.LocalLettaCodeRuntime,
+            providerType = LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME,
             parallelToolCalls = false,
             maxOutputTokens = maxTokens,
         ),

@@ -75,10 +75,10 @@ internal fun AgentListTopBar(
             actions = actions,
         )
         ExpandableSearchField(
-            query = params.uiState.searchQuery,
-            onQueryChange = params.actions.onUpdateSearchQuery,
-            onClear = { params.actions.onUpdateSearchQuery("") },
-            expanded = params.uiState.isSearchExpanded,
+            query = uiState.searchQuery,
+            onQueryChange = actions.onUpdateSearchQuery,
+            onClear = { actions.onUpdateSearchQuery("") },
+            expanded = uiState.isSearchExpanded,
             placeholder = stringResource(R.string.screen_agents_search_hint),
         )
         AgentListViewModeToggle(

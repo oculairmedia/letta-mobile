@@ -180,12 +180,9 @@ private fun EditAgentCloneDialog(
                 stripMessages = stripMessages,
             ) { response ->
                 host.snackbar.dispatch(
-                    host.context.getString(
-                        if (response.agentIds.size == 1) {
-                            R.string.screen_settings_clone_success_single
-                        } else {
-                            R.string.screen_settings_clone_success_multiple
-                        },
+                    host.context.resources.getQuantityString(
+                        R.plurals.screen_settings_clone_success,
+                        response.agentIds.size,
                         response.agentIds.size,
                     )
                 )

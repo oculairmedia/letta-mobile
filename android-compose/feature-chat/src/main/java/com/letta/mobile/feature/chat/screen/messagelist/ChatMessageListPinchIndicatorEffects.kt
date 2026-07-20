@@ -17,7 +17,7 @@ internal fun ChatMessageListPinchIndicatorEffects(params: ChatMessageListPinchIn
 
     LaunchedEffect(params.pinchAnimationSuppressionTick) {
         if (params.pinchAnimationSuppressionTick > 0) {
-            delay(ChatMotion.ContentSizeMillis.toLong())
+            delay(ChatMotion.CONTENT_SIZE_MILLIS.toLong())
             if (!params.isPinching) {
                 params.onSuppressPinchLayoutAnimations(false)
             }

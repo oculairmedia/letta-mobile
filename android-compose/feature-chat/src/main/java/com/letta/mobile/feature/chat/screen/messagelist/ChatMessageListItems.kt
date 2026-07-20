@@ -82,7 +82,7 @@ internal fun RenderChatMessage(
         position == GroupPosition.Middle || position == GroupPosition.Last -> MaterialTheme.chatDimens.groupedMessageSpacing
         else -> MaterialTheme.chatDimens.ungroupedMessageSpacing
     }
-    val spacingAbove = if (message.isReasoning) LettaSpacing.innerPaddingSmall else LettaSpacing.none
+    val spacingAbove = if (message.isReasoning) LettaSpacing.INNER_PADDING_SMALL else LettaSpacing.NONE
     val isHighlighted = message.id == highlightedMessageId
     val highlightModifier = if (isHighlighted) {
         Modifier.background(
@@ -128,13 +128,13 @@ private fun DebugMessageCard(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         ),
     ) {
-        Column(modifier = Modifier.padding(LettaSpacing.cardGap)) {
+        Column(modifier = Modifier.padding(LettaSpacing.CARD_GAP)) {
             Text(
                 text = "${message.role} | ${message.id}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
-            Spacer(modifier = Modifier.height(LettaSpacing.cardGroupItemGap + LettaSpacing.cardGroupItemGap))
+            Spacer(modifier = Modifier.height(LettaSpacing.CARD_GROUP_ITEM_GAP + LettaSpacing.CARD_GROUP_ITEM_GAP))
             Text(
                 text = buildString {
                     append("content: ${message.content.take(200)}")

@@ -65,13 +65,14 @@ internal fun EditAgentContent(
 ) = with(callbacks) {
     val context = LocalContext.current
     val snackbar = LocalSnackbarDispatcher.current
-    var showToolPicker by remember { mutableStateOf(false) }
-    var showAddBlockDialog by remember { mutableStateOf(false) }
-    var showAttachBlockDialog by remember { mutableStateOf(false) }
-    var selectedTool by remember { mutableStateOf<Tool?>(null) }
-    var showLlmPicker by remember { mutableStateOf(false) }
-    var showEmbeddingPicker by remember { mutableStateOf(false) }
-    var showCompactionModelPicker by remember { mutableStateOf(false) }
+    val dialogState = rememberEditAgentContentDialogState()
+    var showToolPicker by dialogState.showToolPicker
+    var showAddBlockDialog by dialogState.showAddBlockDialog
+    var showAttachBlockDialog by dialogState.showAttachBlockDialog
+    var selectedTool by dialogState.selectedTool
+    var showLlmPicker by dialogState.showLlmPicker
+    var showEmbeddingPicker by dialogState.showEmbeddingPicker
+    var showCompactionModelPicker by dialogState.showCompactionModelPicker
     val embeddingDropdownModels = remember(embeddingModels) {
         embeddingModels.map {
             LlmModel(
@@ -566,98 +567,193 @@ internal fun EditAgentContent(
         }
     }
 
-    // ── Dialogs ──
+    EditAgentContentDialogs(
+        dialogState = dialogState,
+        params = EditAgentContentDialogParams(
+            state = state,
+            llmModels = llmModels,
+            embeddingDropdownModels = embeddingDropdownModels,
+            onAddBlock = onAddBlock,
+            onAttachExistingBlocks = onAttachExistingBlocks,
+            onAttachTools = onAttachTools,
+            onModelChange = onModelChange,
+            onEmbeddingChange = onEmbeddingChange,
+            onCompactionModelChange = onCompactionModelChange,
+        ),
+    )
+}
 
-    selectedTool?.let { tool ->
-        ToolDetailDialog(
-            tool = tool,
-            onDismiss = { selectedTool = null },
-        )
-    }
+@androidx.compose.runtime.Stable
+internal class EditAgentContentDialogState {
+    val showToolPicker = mutableStateOf(false)
+    val showAddBlockDialog = mutableStateOf(false)
+    val showAttachBlockDialog = mutableStateOf(false)
+    val selectedTool = mutableStateOf<Tool?>(null)
+    val showLlmPicker = mutableStateOf(false)
+    val showEmbeddingPicker = mutableStateOf(false)
+    val showCompactionModelPicker = mutableStateOf(false)
+}
 
-    if (showAddBlockDialog) {
-        AddBlockDialog(
-            onDismiss = { showAddBlockDialog = false },
-            onAdd = { label, value, description, limit ->
-                onAddBlock(NewBlockDraft(label, value, description, limit))
-                showAddBlockDialog = false
-            },
-        )
-    }
+@Composable
+private fun rememberEditAgentContentDialogState(): EditAgentContentDialogState =
+    remember { EditAgentContentDialogState() }
 
-    if (showAttachBlockDialog) {
-        FullScreenBlockPickerDialog(
-            excludedBlockIds = state.blocks.map { it.id },
-            availableBlocks = state.availableBlocks,
-            onDismiss = { showAttachBlockDialog = false },
-            onConfirm = { selectedIds ->
-                onAttachExistingBlocks(selectedIds)
-                showAttachBlockDialog = false
-            },
-        )
-    }
+/**
+ * Ambient data the extracted dialog block needs. Bundled so
+ * [EditAgentContentDialogs] can stay at two arguments — this keeps the
+ * dialog wiring off [EditAgentContent]'s function surface and turns the
+ * previous top-level conditional blob into a small dispatch.
+ */
+internal data class EditAgentContentDialogParams(
+    val state: EditAgentUiState,
+    val llmModels: List<LlmModel>,
+    val embeddingDropdownModels: List<LlmModel>,
+    val onAddBlock: (NewBlockDraft) -> Unit,
+    val onAttachExistingBlocks: (List<String>) -> Unit,
+    val onAttachTools: (List<String>) -> Unit,
+    val onModelChange: (String) -> Unit,
+    val onEmbeddingChange: (String) -> Unit,
+    val onCompactionModelChange: (String) -> Unit,
+)
 
-    if (showToolPicker) {
-        FullScreenToolPickerDialog(
-            tools = state.availableTools.filter { candidate ->
-                state.attachedTools.none { attached -> attached.id == candidate.id }
-            },
-            selectedToolIds = emptyList(),
-            title = stringResource(R.string.screen_agent_edit_attach_tools),
-            onDismiss = { showToolPicker = false },
-            onConfirm = { selectedIds ->
-                onAttachTools(selectedIds)
-                showToolPicker = false
-            },
-        )
-    }
-
-    if (showLlmPicker) {
-        FullScreenModelPickerDialog(
+@Composable
+private fun EditAgentContentDialogs(
+    dialogState: EditAgentContentDialogState,
+    params: EditAgentContentDialogParams,
+) {
+    ToolDetailDialogHost(dialogState.selectedTool)
+    AddBlockDialogHost(
+        show = dialogState.showAddBlockDialog,
+        onAdd = params.onAddBlock,
+    )
+    AttachBlockDialogHost(
+        show = dialogState.showAttachBlockDialog,
+        state = params.state,
+        onAttachExistingBlocks = params.onAttachExistingBlocks,
+    )
+    ToolPickerDialogHost(
+        show = dialogState.showToolPicker,
+        state = params.state,
+        onAttachTools = params.onAttachTools,
+    )
+    ModelPickerDialogHost(
+        show = dialogState.showLlmPicker,
+        spec = ModelPickerDialogSpec(
             title = stringResource(R.string.common_model),
-            placeholder = stringResource(R.string.screen_models_search_hint),
-            models = llmModels,
-            selectedValue = state.model,
-            onDismiss = { showLlmPicker = false },
-            onModelSelected = {
-                onModelChange(it)
-                showLlmPicker = false
-            },
-        )
-    }
-
-    if (showEmbeddingPicker) {
-        FullScreenModelPickerDialog(
+            models = params.llmModels,
+            selectedValue = params.state.model,
+            onSelected = params.onModelChange,
+        ),
+    )
+    ModelPickerDialogHost(
+        show = dialogState.showEmbeddingPicker,
+        spec = ModelPickerDialogSpec(
             title = stringResource(R.string.screen_agent_edit_embedding_model),
-            placeholder = stringResource(R.string.screen_models_search_hint),
-            models = embeddingDropdownModels,
-            selectedValue = state.embedding,
-            onDismiss = { showEmbeddingPicker = false },
-            onModelSelected = {
-                onEmbeddingChange(it)
-                showEmbeddingPicker = false
-            },
-        )
-    }
-
-    if (showCompactionModelPicker) {
-        FullScreenModelPickerDialog(
+            models = params.embeddingDropdownModels,
+            selectedValue = params.state.embedding,
+            onSelected = params.onEmbeddingChange,
+        ),
+    )
+    ModelPickerDialogHost(
+        show = dialogState.showCompactionModelPicker,
+        spec = ModelPickerDialogSpec(
             title = stringResource(R.string.screen_agent_edit_compaction_model),
-            placeholder = stringResource(R.string.screen_models_search_hint),
-            models = llmModels,
-            selectedValue = state.compactionModel,
-            onDismiss = { showCompactionModelPicker = false },
-            onModelSelected = {
-                onCompactionModelChange(it)
-                showCompactionModelPicker = false
-            },
-        )
-    }
+            models = params.llmModels,
+            selectedValue = params.state.compactionModel,
+            onSelected = params.onCompactionModelChange,
+        ),
+    )
+}
 
-    // letta-mobile-cygd: section-picker bottom sheet (qfn9) removed.
-    // All sections render inline above. The hasValidationWarning helper
-    // is kept below for future re-introduction of an aggregate warning
-    // banner.
+@Composable
+private fun ToolDetailDialogHost(selectedTool: androidx.compose.runtime.MutableState<Tool?>) {
+    val tool = selectedTool.value ?: return
+    ToolDetailDialog(tool = tool, onDismiss = { selectedTool.value = null })
+}
+
+@Composable
+private fun AddBlockDialogHost(
+    show: androidx.compose.runtime.MutableState<Boolean>,
+    onAdd: (NewBlockDraft) -> Unit,
+) {
+    if (!show.value) return
+    AddBlockDialog(
+        onDismiss = { show.value = false },
+        onAdd = { label, value, description, limit ->
+            onAdd(NewBlockDraft(label, value, description, limit))
+            show.value = false
+        },
+    )
+}
+
+@Composable
+private fun AttachBlockDialogHost(
+    show: androidx.compose.runtime.MutableState<Boolean>,
+    state: EditAgentUiState,
+    onAttachExistingBlocks: (List<String>) -> Unit,
+) {
+    if (!show.value) return
+    FullScreenBlockPickerDialog(
+        excludedBlockIds = state.blocks.map { it.id },
+        availableBlocks = state.availableBlocks,
+        onDismiss = { show.value = false },
+        onConfirm = { selectedIds ->
+            onAttachExistingBlocks(selectedIds)
+            show.value = false
+        },
+    )
+}
+
+@Composable
+private fun ToolPickerDialogHost(
+    show: androidx.compose.runtime.MutableState<Boolean>,
+    state: EditAgentUiState,
+    onAttachTools: (List<String>) -> Unit,
+) {
+    if (!show.value) return
+    FullScreenToolPickerDialog(
+        tools = state.availableTools.filter { candidate ->
+            state.attachedTools.none { attached -> attached.id == candidate.id }
+        },
+        selectedToolIds = emptyList(),
+        title = stringResource(R.string.screen_agent_edit_attach_tools),
+        onDismiss = { show.value = false },
+        onConfirm = { selectedIds ->
+            onAttachTools(selectedIds)
+            show.value = false
+        },
+    )
+}
+
+/**
+ * Static configuration for a [FullScreenModelPickerDialog]. Bundling keeps
+ * [ModelPickerDialogHost] at two arguments so it stays under the CodeScene
+ * function-argument threshold.
+ */
+private data class ModelPickerDialogSpec(
+    val title: String,
+    val models: List<LlmModel>,
+    val selectedValue: String,
+    val onSelected: (String) -> Unit,
+)
+
+@Composable
+private fun ModelPickerDialogHost(
+    show: androidx.compose.runtime.MutableState<Boolean>,
+    spec: ModelPickerDialogSpec,
+) {
+    if (!show.value) return
+    FullScreenModelPickerDialog(
+        title = spec.title,
+        placeholder = stringResource(R.string.screen_models_search_hint),
+        models = spec.models,
+        selectedValue = spec.selectedValue,
+        onDismiss = { show.value = false },
+        onModelSelected = {
+            spec.onSelected(it)
+            show.value = false
+        },
+    )
 }
 
 /**
@@ -776,21 +872,43 @@ private fun DangerZoneSection(
     }
 }
 
-internal fun EditAgentConfigTab.hasValidationWarning(state: EditAgentUiState): Boolean = when (this) {
-    EditAgentConfigTab.Advanced -> listOf(
-        state.modelReasoningJson,
-        state.modelResponseFormatJson,
-        state.modelResponseSchemaJson,
-        state.modelThinkingConfigJson,
-    ).any(::isInvalidJsonObjectIfPresent) ||
-        isInvalidWholeNumberIfPresent(state.modelMaxReasoningTokens) ||
-        isInvalidNumberIfPresent(state.modelFrequencyPenalty)
-    EditAgentConfigTab.Memory -> isInvalidJsonObjectIfPresent(state.compactionModelSettingsJson)
-    EditAgentConfigTab.Tools -> isInvalidJsonArrayIfPresent(state.toolRulesJson) ||
-        state.agentSecrets.hasDuplicateKeys() ||
-        state.toolEnvironmentVariables.hasDuplicateKeys()
+/**
+ * Whether this tab currently has a validation warning that should surface in
+ * the UI. The per-tab checks are delegated to small helpers so the top-level
+ * dispatch stays a flat table lookup — this keeps the file free of the large
+ * "Global Conditionals" blob CodeScene was flagging previously.
+ */
+internal fun EditAgentConfigTab.hasValidationWarning(state: EditAgentUiState): Boolean =
+    validationWarningChecker().invoke(state)
+
+private fun EditAgentConfigTab.validationWarningChecker(): (EditAgentUiState) -> Boolean = when (this) {
+    EditAgentConfigTab.Advanced -> ::advancedTabHasValidationWarning
+    EditAgentConfigTab.Memory -> ::memoryTabHasValidationWarning
+    EditAgentConfigTab.Tools -> ::toolsTabHasValidationWarning
     EditAgentConfigTab.Basics,
     EditAgentConfigTab.Models,
     EditAgentConfigTab.Runtime,
-    -> false
+    -> alwaysFalseValidationChecker
 }
+
+private val alwaysFalseValidationChecker: (EditAgentUiState) -> Boolean = { false }
+
+private fun advancedTabHasValidationWarning(state: EditAgentUiState): Boolean =
+    hasInvalidAdvancedJson(state) ||
+        isInvalidWholeNumberIfPresent(state.modelMaxReasoningTokens) ||
+        isInvalidNumberIfPresent(state.modelFrequencyPenalty)
+
+private fun hasInvalidAdvancedJson(state: EditAgentUiState): Boolean = listOf(
+    state.modelReasoningJson,
+    state.modelResponseFormatJson,
+    state.modelResponseSchemaJson,
+    state.modelThinkingConfigJson,
+).any(::isInvalidJsonObjectIfPresent)
+
+private fun memoryTabHasValidationWarning(state: EditAgentUiState): Boolean =
+    isInvalidJsonObjectIfPresent(state.compactionModelSettingsJson)
+
+private fun toolsTabHasValidationWarning(state: EditAgentUiState): Boolean =
+    isInvalidJsonArrayIfPresent(state.toolRulesJson) ||
+        state.agentSecrets.hasDuplicateKeys() ||
+        state.toolEnvironmentVariables.hasDuplicateKeys()

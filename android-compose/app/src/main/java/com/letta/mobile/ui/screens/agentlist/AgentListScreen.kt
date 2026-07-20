@@ -59,8 +59,10 @@ fun AgentListScreen(
     viewModel: AgentListViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val isShareMode = shareContentPreview != null
-    var shareNavigationConsumed by rememberSaveable(shareContentPreview) { mutableStateOf(false) }
+    val isShareMode = navigation.shareContentPreview != null
+    var shareNavigationConsumed by rememberSaveable(navigation.shareContentPreview) {
+        mutableStateOf(false)
+    }
 
     LaunchedEffect(navigation.openCreateOnStart, isShareMode) {
         if (navigation.openCreateOnStart && !isShareMode) {
@@ -71,28 +73,26 @@ fun AgentListScreen(
     val selectAgent: (String, String?) -> Unit = { agentId, agentName ->
         if (!(isShareMode && shareNavigationConsumed)) {
             if (isShareMode) shareNavigationConsumed = true
-            onNavigateToAgent(agentId, agentName, null)
+            navigation.onNavigateToAgent(agentId, agentName, null)
         }
     }
     val onImportLaunch = rememberAgentImportLauncher(
         viewModel = viewModel,
         uiState = uiState,
-        onNavigateToAgent = onNavigateToAgent,
+        onNavigateToAgent = navigation.onNavigateToAgent,
     )
     val display = rememberAgentListScreenDisplay(viewModel = viewModel, uiState = uiState)
 
     AgentListScreenBody(
-        uiState = uiState,
-        viewModel = viewModel,
-        isShareMode = isShareMode,
-        shareContentPreview = shareContentPreview,
-        display = display,
-        onNavigateBack = onNavigateBack,
-        onNavigateToSettings = onNavigateToSettings,
-        onNavigateToAgent = onNavigateToAgent,
-        onNavigateToEditAgent = onNavigateToEditAgent,
-        onSelectAgent = selectAgent,
-        onImportLaunch = onImportLaunch,
+        params = AgentListScreenBodyParams(
+            uiState = uiState,
+            viewModel = viewModel,
+            isShareMode = isShareMode,
+            navigation = navigation,
+            display = display,
+            onSelectAgent = selectAgent,
+            onImportLaunch = onImportLaunch,
+        ),
     )
 }
 
@@ -115,35 +115,46 @@ private fun rememberAgentImportLauncher(
                 file = file,
                 viewModel = viewModel,
                 uiState = uiState,
-                onReadFailed = {
-                    snackbar.dispatch(context.getString(R.string.screen_agents_import_read_failed))
-                },
-                onImported = { importedCount, importedId ->
-                    snackbar.dispatch(
-                        context.resources.getQuantityString(
-                            R.plurals.screen_agents_import_success,
-                            importedCount,
-                            importedCount,
-                        ),
-                    )
-                    importedId?.let { onNavigateToAgent(it, uiState.pendingImportName, null) }
-                },
+                callbacks = AgentImportCallbacks(
+                    onReadFailed = {
+                        snackbar.dispatch(context.getString(R.string.screen_agents_import_read_failed))
+                    },
+                    onImported = { importedCount, importedId ->
+                        snackbar.dispatch(
+                            context.resources.getQuantityString(
+                                R.plurals.screen_agents_import_success,
+                                importedCount,
+                                importedCount,
+                            ),
+                        )
+                        importedId?.let { onNavigateToAgent(it, uiState.pendingImportName, null) }
+                    },
+                ),
             )
         }
     }
     return remember(launcher) { { launcher.launch() } }
 }
 
+/**
+ * Callbacks routed to [importSelectedAgentFile]. Bundling them keeps that
+ * suspend helper at three arguments so no function on this screen exceeds
+ * the 4-argument CodeScene threshold.
+ */
+private data class AgentImportCallbacks(
+    val onReadFailed: () -> Unit,
+    val onImported: (importedCount: Int, importedId: String?) -> Unit,
+)
+
 private suspend fun importSelectedAgentFile(
     file: PlatformFile,
     viewModel: AgentListViewModel,
     uiState: AgentListUiState,
-    onReadFailed: () -> Unit,
-    onImported: (importedCount: Int, importedId: String?) -> Unit,
+    callbacks: AgentImportCallbacks,
 ) {
     val bytes = runCatching { file.readBytes() }.getOrNull()
     if (bytes == null) {
-        onReadFailed()
+        callbacks.onReadFailed()
         return
     }
     viewModel.importAgent(
@@ -153,11 +164,11 @@ private suspend fun importSelectedAgentFile(
         overrideExistingTools = uiState.pendingImportOverrideTools,
         stripMessages = uiState.pendingImportStripMessages,
     ) { response ->
-        onImported(response.agentIds.size, response.agentIds.firstOrNull())
+        callbacks.onImported(response.agentIds.size, response.agentIds.firstOrNull())
     }
 }
 
-private data class AgentListScreenDisplay(
+internal data class AgentListScreenDisplay(
     val filteredAgents: List<Agent>,
     val displayAgents: AgentListDisplayAgents,
 )
@@ -186,6 +197,16 @@ private fun rememberAgentListScreenDisplay(
     )
 }
 
+internal data class AgentListScreenBodyParams(
+    val uiState: AgentListUiState,
+    val viewModel: AgentListViewModel,
+    val isShareMode: Boolean,
+    val navigation: AgentListScreenNavigation,
+    val display: AgentListScreenDisplay,
+    val onSelectAgent: (String, String?) -> Unit,
+    val onImportLaunch: () -> Unit,
+)
+
 private data class AgentListScreenBindings(
     val topBarActions: AgentListTopBarActions,
     val contentState: AgentListContentState,
@@ -194,44 +215,38 @@ private data class AgentListScreenBindings(
 
 @Composable
 private fun rememberAgentListScreenBindings(
-    uiState: AgentListUiState,
-    viewModel: AgentListViewModel,
-    isShareMode: Boolean,
-    display: AgentListScreenDisplay,
-    onNavigateBack: () -> Unit,
-    onNavigateToEditAgent: (String) -> Unit,
-    onSelectAgent: (String, String?) -> Unit,
+    params: AgentListScreenBodyParams,
 ): AgentListScreenBindings {
-    val topBarActions = remember(onNavigateBack, viewModel) {
+    val topBarActions = remember(params.navigation.onNavigateBack, params.viewModel) {
         AgentListTopBarActions(
-            onNavigateBack = navigation.onNavigateBack,
-            onShowImportDialog = viewModel::showImportDialog,
-            onUpdateSearchQuery = viewModel::updateSearchQuery,
-            onSetSearchExpanded = viewModel::setSearchExpanded,
-            onSetShowGrid = viewModel::setShowGrid,
-            onClearTags = viewModel::clearTags,
-            onToggleTag = viewModel::toggleTag,
-            getAllTags = viewModel::getAllTags,
+            onNavigateBack = params.navigation.onNavigateBack,
+            onShowImportDialog = params.viewModel::showImportDialog,
+            onUpdateSearchQuery = params.viewModel::updateSearchQuery,
+            onSetSearchExpanded = params.viewModel::setSearchExpanded,
+            onSetShowGrid = params.viewModel::setShowGrid,
+            onClearTags = params.viewModel::clearTags,
+            onToggleTag = params.viewModel::toggleTag,
+            getAllTags = params.viewModel::getAllTags,
         )
     }
-    val contentState = remember(uiState, isShareMode, display) {
+    val contentState = remember(params.uiState, params.isShareMode, params.display) {
         AgentListContentState(
-            uiState = uiState,
-            isShareMode = isShareMode,
-            filteredAgents = display.filteredAgents,
-            visibleFavoriteAgent = display.displayAgents.visibleFavoriteAgent,
-            gridAgents = display.displayAgents.listAgents,
+            uiState = params.uiState,
+            isShareMode = params.isShareMode,
+            filteredAgents = params.display.filteredAgents,
+            visibleFavoriteAgent = params.display.displayAgents.visibleFavoriteAgent,
+            gridAgents = params.display.displayAgents.listAgents,
         )
     }
     val contentActions = AgentListContentActions(
-        onSelectAgent = onSelectAgent,
-        onNavigateToEditAgent = onNavigateToEditAgent,
-        onDeleteAgent = viewModel::deleteAgent,
-        onToggleFavorite = viewModel::toggleFavorite,
-        onTogglePinned = viewModel::togglePinned,
-        onRefresh = viewModel::refresh,
-        onRetry = viewModel::loadAgents,
-        onCreateAgent = viewModel::showCreateDialog,
+        onSelectAgent = params.onSelectAgent,
+        onNavigateToEditAgent = params.navigation.onNavigateToEditAgent,
+        onDeleteAgent = params.viewModel::deleteAgent,
+        onToggleFavorite = params.viewModel::toggleFavorite,
+        onTogglePinned = params.viewModel::togglePinned,
+        onRefresh = params.viewModel::refresh,
+        onRetry = params.viewModel::loadAgents,
+        onCreateAgent = params.viewModel::showCreateDialog,
     )
     return AgentListScreenBindings(
         topBarActions = topBarActions,
@@ -242,78 +257,48 @@ private fun rememberAgentListScreenBindings(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AgentListScreenBody(
-    uiState: AgentListUiState,
-    viewModel: AgentListViewModel,
-    isShareMode: Boolean,
-    shareContentPreview: String?,
-    display: AgentListScreenDisplay,
-    onNavigateBack: () -> Unit,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToAgent: (String, String?, String?) -> Unit,
-    onNavigateToEditAgent: (String) -> Unit,
-    onSelectAgent: (String, String?) -> Unit,
-    onImportLaunch: () -> Unit,
-) {
+private fun AgentListScreenBody(params: AgentListScreenBodyParams) {
     val haptic = LocalHapticFeedback.current
-    val bindings = rememberAgentListScreenBindings(
-        uiState = uiState,
-        viewModel = viewModel,
-        isShareMode = isShareMode,
-        display = display,
-        onNavigateBack = onNavigateBack,
-        onNavigateToEditAgent = onNavigateToEditAgent,
-        onSelectAgent = onSelectAgent,
-    )
+    val bindings = rememberAgentListScreenBindings(params)
 
     AgentListScaffold(
-        uiState = uiState,
-        viewModel = viewModel,
-        isShareMode = isShareMode,
-        shareContentPreview = shareContentPreview,
-        haptic = haptic,
-        bindings = bindings,
+        params = AgentListScaffoldParams(
+            uiState = params.uiState,
+            viewModel = params.viewModel,
+            isShareMode = params.isShareMode,
+            shareContentPreview = params.navigation.shareContentPreview,
+            haptic = haptic,
+            bindings = bindings,
+        ),
     )
 
     AgentListDialogHost(
-        uiState = uiState,
-        viewModel = viewModel,
-        onNavigateToSettings = onNavigateToSettings,
-        onNavigateToAgent = onNavigateToAgent,
-        onImport = { _, _, _ -> onImportLaunch() },
+        params = AgentListDialogHostParams(
+            uiState = params.uiState,
+            viewModel = params.viewModel,
+            onNavigateToSettings = params.navigation.onNavigateToSettings,
+            onNavigateToAgent = params.navigation.onNavigateToAgent,
+            onImport = { _, _, _ -> params.onImportLaunch() },
+        ),
     )
 }
 
+private data class AgentListScaffoldParams(
+    val uiState: AgentListUiState,
+    val viewModel: AgentListViewModel,
+    val isShareMode: Boolean,
+    val shareContentPreview: String?,
+    val haptic: HapticFeedback,
+    val bindings: AgentListScreenBindings,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AgentListScaffold(
-    uiState: AgentListUiState,
-    viewModel: AgentListViewModel,
-    isShareMode: Boolean,
-    shareContentPreview: String?,
-    haptic: HapticFeedback,
-    bindings: AgentListScreenBindings,
-) {
+private fun AgentListScaffold(params: AgentListScaffoldParams) {
     val listState = rememberLazyListState()
     val gridState = rememberLazyGridState()
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(state = topAppBarState)
-
-    val topBarParams = AgentListTopBarParams(
-        uiState = uiState,
-        isShareMode = isShareMode,
-        shareContentPreview = navigation.shareContentPreview,
-        scrollBehavior = scrollBehavior,
-        actions = topBarActions,
-        haptic = haptic,
-    )
-    val contentParams = AgentListContentParams(
-        state = contentState,
-        actions = contentActions,
-        listState = listState,
-        gridState = gridState,
-        haptic = haptic,
-    )
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -321,31 +306,31 @@ private fun AgentListScaffold(
         topBar = {
             AgentListTopBar(
                 state = AgentListTopBarState(
-                    uiState = uiState,
-                    isShareMode = isShareMode,
-                    shareContentPreview = shareContentPreview,
+                    uiState = params.uiState,
+                    isShareMode = params.isShareMode,
+                    shareContentPreview = params.shareContentPreview,
                     scrollBehavior = scrollBehavior,
                 ),
-                actions = bindings.topBarActions,
-                haptic = haptic,
+                actions = params.bindings.topBarActions,
+                haptic = params.haptic,
             )
         },
         floatingActionButton = {
-            if (!isShareMode) {
-                FloatingActionButton(onClick = { viewModel.showCreateDialog() }) {
+            if (!params.isShareMode) {
+                FloatingActionButton(onClick = { params.viewModel.showCreateDialog() }) {
                     Icon(LettaIcons.Add, "Create Agent")
                 }
             }
         },
     ) { paddingValues ->
         AgentListContent(
-            state = bindings.contentState,
-            actions = bindings.contentActions,
+            state = params.bindings.contentState,
+            actions = params.bindings.contentActions,
             layout = AgentListContentLayout(
                 paddingValues = paddingValues,
                 listState = listState,
                 gridState = gridState,
-                haptic = haptic,
+                haptic = params.haptic,
             ),
         )
     }

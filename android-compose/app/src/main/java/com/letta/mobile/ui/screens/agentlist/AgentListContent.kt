@@ -32,6 +32,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
@@ -66,6 +67,11 @@ internal data class AgentListContentActions(
     val onCreateAgent: () -> Unit,
 )
 
+/**
+ * Bundles the surface handles (padding, list/grid state, haptics) the list
+ * body needs. Keeping this as one holder is what lets the row and grid
+ * composables stay under the 4-argument CodeScene threshold.
+ */
 internal data class AgentListContentLayout(
     val paddingValues: PaddingValues,
     val listState: LazyListState,
@@ -79,7 +85,7 @@ internal fun AgentListContent(
     actions: AgentListContentActions,
     layout: AgentListContentLayout,
 ) {
-    val uiState = params.state.uiState
+    val uiState = state.uiState
     val agentError = uiState.error
     when {
         uiState.isLoading -> ShimmerGrid(modifier = Modifier.padding(layout.paddingValues))
@@ -88,11 +94,7 @@ internal fun AgentListContent(
             onRetry = actions.onRetry,
             modifier = Modifier.padding(layout.paddingValues),
         )
-        else -> AgentListRefreshableContent(
-            state = state,
-            actions = actions,
-            layout = layout,
-        )
+        else -> AgentListRefreshableContent(state = state, actions = actions, layout = layout)
     }
 }
 
@@ -102,7 +104,7 @@ private fun AgentListRefreshableContent(
     actions: AgentListContentActions,
     layout: AgentListContentLayout,
 ) {
-    val uiState = params.state.uiState
+    val uiState = state.uiState
     val view = LocalView.current
     PullToRefreshBox(
         isRefreshing = uiState.isRefreshing,
@@ -112,11 +114,7 @@ private fun AgentListRefreshableContent(
         },
         modifier = Modifier.fillMaxSize(),
     ) {
-        AgentListBody(
-            state = state,
-            actions = actions,
-            layout = layout,
-        )
+        AgentListBody(state = state, actions = actions, layout = layout)
     }
 }
 
@@ -144,19 +142,76 @@ private fun AgentListBody(
     }
 
     if (uiState.showGrid) {
-        AgentListGridContent(
-            state = state,
-            actions = actions,
-            paddingValues = layout.paddingValues,
-            gridState = layout.gridState,
-        )
+        AgentListGridContent(state = state, actions = actions, layout = layout)
     } else {
-        AgentListListContent(
-            state = state,
-            actions = actions,
-            paddingValues = layout.paddingValues,
-            listState = layout.listState,
-        )
+        AgentListListContent(state = state, actions = actions, layout = layout)
+    }
+}
+
+@Composable
+private fun agentListEmptyMessage(uiState: AgentListUiState): String {
+    if (uiState.searchQuery.isNotBlank() && uiState.isHydrating) {
+        return "Still loading agents while searching for \"${uiState.searchQuery}\""
+    }
+    if (uiState.searchQuery.isBlank()) {
+        return stringResource(R.string.screen_agents_empty)
+    }
+    return "No agents matching \"${uiState.searchQuery}\""
+}
+
+@Composable
+private fun AgentListGridContent(
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+    layout: AgentListContentLayout,
+) {
+    val layoutDirection = LocalLayoutDirection.current
+    val minTileWidth = if (LocalWindowSizeClass.current.isExpandedWidth) 220.dp else 150.dp
+    LazyVerticalGrid(
+        state = layout.gridState,
+        columns = GridCells.Adaptive(minSize = minTileWidth),
+        contentPadding = agentListContentPadding(layout.paddingValues, layoutDirection),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+    ) {
+        agentListSharedPrefixItems(state = state, actions = actions)
+
+        items(state.gridAgents, key = { it.id.value }) { agent ->
+            AgentListAgentCard(
+                rowModel = state.agentRowModel(agent),
+                actions = actions,
+                variant = AgentListCardVariant.Compact,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AgentListListContent(
+    state: AgentListContentState,
+    actions: AgentListContentActions,
+    layout: AgentListContentLayout,
+) {
+    val layoutDirection = LocalLayoutDirection.current
+    LazyColumn(
+        state = layout.listState,
+        contentPadding = agentListContentPadding(layout.paddingValues, layoutDirection),
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.CARD_GAP),
+    ) {
+        agentListSharedPrefixItems(state = state, actions = actions)
+
+        lazyItemsIndexed(
+            items = state.gridAgents,
+            key = { _, agent -> agent.id.value },
+        ) { index, agent ->
+            StaggeredListItem(index = index) {
+                AgentListAgentCard(
+                    rowModel = state.agentRowModel(agent),
+                    actions = actions,
+                    variant = AgentListCardVariant.Standard,
+                )
+            }
+        }
     }
 }
 
@@ -178,72 +233,6 @@ private fun AgentListFavoriteAgentItem(
         onUnfavorite = { actions.onToggleFavorite(favoriteAgent.id) },
         contextualActionsEnabled = !isShareMode,
     )
-}
-
-@Composable
-private fun agentListEmptyMessage(uiState: AgentListUiState): String {
-    if (uiState.searchQuery.isNotBlank() && uiState.isHydrating) {
-        return "Still loading agents while searching for \"${uiState.searchQuery}\""
-    }
-    if (uiState.searchQuery.isBlank()) {
-        return stringResource(R.string.screen_agents_empty)
-    }
-    return "No agents matching \"${uiState.searchQuery}\""
-}
-
-@Composable
-private fun AgentListGridContent(
-    params: AgentListContentParams,
-    paddingValues: PaddingValues,
-) {
-    val uiState = params.state.uiState
-    val layoutDirection = LocalLayoutDirection.current
-    val minTileWidth = if (LocalWindowSizeClass.current.isExpandedWidth) 220.dp else 150.dp
-    LazyVerticalGrid(
-        state = params.gridState,
-        columns = GridCells.Adaptive(minSize = minTileWidth),
-        contentPadding = agentListContentPadding(paddingValues, layoutDirection),
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-        horizontalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-    ) {
-        agentListSharedPrefixItems(state = state, actions = actions)
-
-        items(state.gridAgents, key = { it.id.value }) { agent ->
-            AgentListAgentCard(
-                rowModel = state.agentRowModel(agent),
-                actions = actions,
-                variant = AgentListCardVariant.Compact,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AgentListListContent(
-    params: AgentListContentParams,
-    paddingValues: PaddingValues,
-) {
-    val layoutDirection = LocalLayoutDirection.current
-    LazyColumn(
-        state = listState,
-        contentPadding = agentListContentPadding(paddingValues, layoutDirection),
-        verticalArrangement = Arrangement.spacedBy(LettaSpacing.cardGap),
-    ) {
-        agentListSharedPrefixItems(state = state, actions = actions)
-
-        lazyItemsIndexed(
-            items = params.state.gridAgents,
-            key = { _, agent -> agent.id.value },
-        ) { index, agent ->
-            StaggeredListItem(index = index) {
-                AgentListAgentCard(
-                    rowModel = state.agentRowModel(agent),
-                    actions = actions,
-                    variant = AgentListCardVariant.Standard,
-                )
-            }
-        }
-    }
 }
 
 private sealed interface AgentListPrefixItem {
@@ -333,11 +322,11 @@ private fun AgentListAgentRowModel.toBindModel(actions: AgentListContentActions)
         isFavorite = isFavorite,
         isPinned = isPinned,
         contextualActionsEnabled = contextualActionsEnabled,
-        onClick = selectAction(actions),
-        onLongPress = editAction(actions),
-        onDelete = deleteAction(actions),
-        onToggleFavorite = toggleFavoriteAction(actions),
-        onTogglePinned = togglePinnedAction(actions),
+        onClick = { actions.onSelectAgent(agent.id.value, agent.name) },
+        onLongPress = { actions.onNavigateToEditAgent(agent.id.value) },
+        onDelete = { actions.onDeleteAgent(agent.id) },
+        onToggleFavorite = { actions.onToggleFavorite(agent.id) },
+        onTogglePinned = { actions.onTogglePinned(agent.id) },
     )
 
 private data class AgentListAgentRowModel(
@@ -355,30 +344,14 @@ private fun AgentListContentState.agentRowModel(agent: Agent): AgentListAgentRow
         contextualActionsEnabled = !isShareMode,
     )
 
-private fun AgentListAgentRowModel.selectAction(actions: AgentListContentActions): () -> Unit =
-    { actions.onSelectAgent(agent.id.value, agent.name) }
-
-private fun AgentListAgentRowModel.editAction(actions: AgentListContentActions): () -> Unit =
-    { actions.onNavigateToEditAgent(agent.id.value) }
-
-private fun AgentListAgentRowModel.deleteAction(actions: AgentListContentActions): () -> Unit =
-    { actions.onDeleteAgent(agent.id) }
-
-private fun AgentListAgentRowModel.toggleFavoriteAction(actions: AgentListContentActions): () -> Unit =
-    { actions.onToggleFavorite(agent.id) }
-
-private fun AgentListAgentRowModel.togglePinnedAction(actions: AgentListContentActions): () -> Unit =
-    { actions.onTogglePinned(agent.id) }
-
-@Composable
 private fun agentListContentPadding(
     paddingValues: PaddingValues,
-    layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+    layoutDirection: LayoutDirection,
 ): PaddingValues = PaddingValues(
-    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-    top = paddingValues.calculateTopPadding() + LettaSpacing.screenHorizontal,
-    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.screenHorizontal,
-    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.screenHorizontal,
+    start = paddingValues.calculateStartPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+    top = paddingValues.calculateTopPadding() + LettaSpacing.SCREEN_HORIZONTAL,
+    end = paddingValues.calculateEndPadding(layoutDirection) + LettaSpacing.SCREEN_HORIZONTAL,
+    bottom = paddingValues.calculateBottomPadding() + LettaSpacing.SCREEN_HORIZONTAL,
 )
 
 @Composable

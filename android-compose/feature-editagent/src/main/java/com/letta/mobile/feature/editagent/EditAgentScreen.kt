@@ -68,13 +68,6 @@ internal data class EditAgentActionsSheetActions(
     val onClone: () -> Unit,
 )
 
-internal data class EditAgentTopBarActions(
-    val onNavigateBack: () -> Unit,
-    val onTitleClick: () -> Unit,
-    val onSave: () -> Unit,
-    val onOpenActions: () -> Unit,
-)
-
 internal data class EditAgentOverlayState(
     val showSectionIndex: Boolean,
     val showActionSheet: Boolean,
@@ -100,134 +93,10 @@ internal data class EditAgentOverlayCallbacks(
 
 internal data class EditAgentLoadedData(
     val state: EditAgentUiState,
-    val llmModels: List<com.letta.mobile.data.model.LlmModel>,
-    val embeddingModels: List<com.letta.mobile.data.model.EmbeddingModel>,
-    val contentPadding: androidx.compose.foundation.layout.PaddingValues,
-    val lazyListState: androidx.compose.foundation.lazy.LazyListState,
-)
-
-internal data class EditAgentContentCallbacks(
-    val onNameChange: (String) -> Unit,
-    val onDescriptionChange: (String) -> Unit,
-    val onModelChange: (String) -> Unit,
-    val onEmbeddingChange: (String) -> Unit,
-    val onLoadModels: () -> Unit,
-    val onBlockValueChange: (String, String) -> Unit,
-    val onBlockDescriptionChange: (String, String) -> Unit,
-    val onBlockLimitChange: (String, Int?) -> Unit,
-    val onAddBlock: (String, String, String, Int?) -> Unit,
-    val onAttachExistingBlock: (String) -> Unit,
-    val onAttachExistingBlocks: (List<String>) -> Unit,
-    val onDeleteBlock: (String) -> Unit,
-    val onAddTag: (String) -> Unit,
-    val onRemoveTag: (String) -> Unit,
-    val onAttachTool: (String) -> Unit,
-    val onAttachTools: (List<String>) -> Unit,
-    val onDetachTool: (String) -> Unit,
-    val onToolRulesJsonChange: (String) -> Unit,
-    val onAddAgentSecret: () -> Unit,
-    val onAgentSecretKeyChange: (Int, String) -> Unit,
-    val onAgentSecretValueChange: (Int, String) -> Unit,
-    val onRemoveAgentSecret: (Int) -> Unit,
-    val onAddToolEnvironmentVariable: () -> Unit,
-    val onToolEnvironmentVariableKeyChange: (Int, String) -> Unit,
-    val onToolEnvironmentVariableValueChange: (Int, String) -> Unit,
-    val onRemoveToolEnvironmentVariable: (Int) -> Unit,
-    val onSystemPromptChange: (String) -> Unit,
-    val onProviderTypeChange: (String) -> Unit,
-    val onTemperatureChange: (Float) -> Unit,
-    val onMaxOutputTokensChange: (Int) -> Unit,
-    val onParallelToolCallsChange: (Boolean) -> Unit,
-    val onModelProviderNameChange: (String) -> Unit,
-    val onModelProviderCategoryChange: (String) -> Unit,
-    val onModelEnableReasonerChange: (Boolean) -> Unit,
-    val onModelReasoningEffortChange: (String) -> Unit,
-    val onModelMaxReasoningTokensChange: (String) -> Unit,
-    val onModelReasoningJsonChange: (String) -> Unit,
-    val onModelFrequencyPenaltyChange: (String) -> Unit,
-    val onModelVerbosityChange: (String) -> Unit,
-    val onModelStrictToolCallingChange: (Boolean) -> Unit,
-    val onModelResponseFormatJsonChange: (String) -> Unit,
-    val onModelResponseSchemaJsonChange: (String) -> Unit,
-    val onModelThinkingConfigJsonChange: (String) -> Unit,
-    val onModelPutInnerThoughtsInKwargsChange: (Boolean) -> Unit,
-    val onModelToolCallParserChange: (String) -> Unit,
-    val onModelAnthropicEffortChange: (String) -> Unit,
-    val onContextWindowChange: (Int) -> Unit,
-    val onEnableSleeptimeChange: (Boolean) -> Unit,
-    val onSummarizationPromptChange: (String) -> Unit,
-    val onCompactionClipCharsChange: (Int) -> Unit,
-    val onSlidingWindowPercentageChange: (Float) -> Unit,
-    val onPromptAcknowledgementChange: (Boolean) -> Unit,
-    val onCompactionModeChange: (String) -> Unit,
-    val onCompactionModelChange: (String) -> Unit,
-    val onCompactionModelSettingsJsonChange: (String) -> Unit,
-    val onResetMessages: () -> Unit,
-    val onDeleteAgent: () -> Unit,
-)
-
-internal fun editAgentContentCallbacks(
-    viewModel: EditAgentViewModel,
-    onRequestResetDialog: () -> Unit,
-    onRequestDeleteDialog: () -> Unit,
-): EditAgentContentCallbacks = EditAgentContentCallbacks(
-    onNameChange = viewModel::updateName,
-    onDescriptionChange = viewModel::updateDescription,
-    onModelChange = viewModel::updateModel,
-    onEmbeddingChange = viewModel::updateEmbedding,
-    onLoadModels = viewModel::loadModels,
-    onBlockValueChange = viewModel::updateBlockValue,
-    onBlockDescriptionChange = viewModel::updateBlockDescription,
-    onBlockLimitChange = viewModel::updateBlockLimit,
-    onAddBlock = viewModel::addBlock,
-    onAttachExistingBlock = viewModel::attachExistingBlock,
-    onAttachExistingBlocks = viewModel::attachExistingBlocks,
-    onDeleteBlock = viewModel::deleteBlock,
-    onAddTag = viewModel::addTag,
-    onRemoveTag = viewModel::removeTag,
-    onAttachTool = viewModel::attachTool,
-    onAttachTools = viewModel::attachTools,
-    onDetachTool = viewModel::detachTool,
-    onToolRulesJsonChange = viewModel::updateToolRulesJson,
-    onAddAgentSecret = viewModel::addAgentSecret,
-    onAgentSecretKeyChange = viewModel::updateAgentSecretKey,
-    onAgentSecretValueChange = viewModel::updateAgentSecretValue,
-    onRemoveAgentSecret = viewModel::removeAgentSecret,
-    onAddToolEnvironmentVariable = viewModel::addToolEnvironmentVariable,
-    onToolEnvironmentVariableKeyChange = viewModel::updateToolEnvironmentVariableKey,
-    onToolEnvironmentVariableValueChange = viewModel::updateToolEnvironmentVariableValue,
-    onRemoveToolEnvironmentVariable = viewModel::removeToolEnvironmentVariable,
-    onSystemPromptChange = viewModel::updateSystemPrompt,
-    onProviderTypeChange = viewModel::updateProviderType,
-    onTemperatureChange = viewModel::updateTemperature,
-    onMaxOutputTokensChange = viewModel::updateMaxOutputTokens,
-    onParallelToolCallsChange = viewModel::updateParallelToolCalls,
-    onModelProviderNameChange = viewModel::updateModelProviderName,
-    onModelProviderCategoryChange = viewModel::updateModelProviderCategory,
-    onModelEnableReasonerChange = viewModel::updateModelEnableReasoner,
-    onModelReasoningEffortChange = viewModel::updateModelReasoningEffort,
-    onModelMaxReasoningTokensChange = viewModel::updateModelMaxReasoningTokens,
-    onModelReasoningJsonChange = viewModel::updateModelReasoningJson,
-    onModelFrequencyPenaltyChange = viewModel::updateModelFrequencyPenalty,
-    onModelVerbosityChange = viewModel::updateModelVerbosity,
-    onModelStrictToolCallingChange = viewModel::updateModelStrictToolCalling,
-    onModelResponseFormatJsonChange = viewModel::updateModelResponseFormatJson,
-    onModelResponseSchemaJsonChange = viewModel::updateModelResponseSchemaJson,
-    onModelThinkingConfigJsonChange = viewModel::updateModelThinkingConfigJson,
-    onModelPutInnerThoughtsInKwargsChange = viewModel::updateModelPutInnerThoughtsInKwargs,
-    onModelToolCallParserChange = viewModel::updateModelToolCallParser,
-    onModelAnthropicEffortChange = viewModel::updateModelAnthropicEffort,
-    onContextWindowChange = viewModel::updateContextWindow,
-    onEnableSleeptimeChange = viewModel::updateEnableSleeptime,
-    onSummarizationPromptChange = viewModel::updateSummarizationPrompt,
-    onCompactionClipCharsChange = viewModel::updateCompactionClipChars,
-    onSlidingWindowPercentageChange = viewModel::updateSlidingWindowPercentage,
-    onPromptAcknowledgementChange = viewModel::updatePromptAcknowledgement,
-    onCompactionModeChange = viewModel::updateCompactionMode,
-    onCompactionModelChange = viewModel::updateCompactionModel,
-    onCompactionModelSettingsJsonChange = viewModel::updateCompactionModelSettingsJson,
-    onResetMessages = onRequestResetDialog,
-    onDeleteAgent = onRequestDeleteDialog,
+    val llmModels: List<LlmModel>,
+    val embeddingModels: List<EmbeddingModel>,
+    val contentPadding: PaddingValues,
+    val lazyListState: LazyListState,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -262,35 +131,42 @@ internal fun EditAgentScreenContent(
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
             EditAgentTopBar(
-                uiState = uiState,
-                scrollBehavior = scrollBehavior,
-                dialogState = dialogState,
-                onNavigateBack = onNavigateBack,
-                onSave = {
-                    viewModel.saveAgent {
-                        snackbar.dispatch(context.getString(R.string.screen_agent_edit_agent_saved))
-                    }
-                },
+                params = EditAgentTopBarParams(
+                    uiState = uiState,
+                    scrollBehavior = scrollBehavior,
+                    dialogState = dialogState,
+                    onNavigateBack = onNavigateBack,
+                    onSave = {
+                        viewModel.saveAgent {
+                            snackbar.dispatch(context.getString(R.string.screen_agent_edit_agent_saved))
+                        }
+                    },
+                ),
             )
         },
     ) { paddingValues ->
         EditAgentScreenBody(
-            uiState = uiState,
-            llmModels = llmModels,
-            embeddingModels = embeddingModels,
-            viewModel = viewModel,
-            paddingValues = paddingValues,
-            lazyListState = lazyListState,
-            dialogState = dialogState,
-            snackbar = snackbar,
-            context = context,
-            onNavigateBack = onNavigateBack,
-            coroutineScope = coroutineScope,
+            params = EditAgentScreenBodyParams(
+                uiState = uiState,
+                models = EditAgentModelsBundle(llmModels = llmModels, embeddingModels = embeddingModels),
+                viewModel = viewModel,
+                layout = EditAgentLayoutBundle(
+                    paddingValues = paddingValues,
+                    lazyListState = lazyListState,
+                    coroutineScope = coroutineScope,
+                ),
+                environment = EditAgentEnvironmentBundle(
+                    snackbar = snackbar,
+                    context = context,
+                    onNavigateBack = onNavigateBack,
+                ),
+                dialogState = dialogState,
+            ),
         )
     }
 }
 
-private class EditAgentDialogState {
+internal class EditAgentDialogState {
     var showActionSheet by mutableStateOf(false)
     var showCloneDialog by mutableStateOf(false)
     var showResetDialog by mutableStateOf(false)
@@ -301,37 +177,44 @@ private class EditAgentDialogState {
 @Composable
 private fun rememberEditAgentDialogState(): EditAgentDialogState = remember { EditAgentDialogState() }
 
+/**
+ * Everything [EditAgentTopBar] needs. Bundling the state, dialog handles, and
+ * navigation callbacks keeps the composable at a single argument and clears
+ * the CodeScene "Excess Number of Function Arguments" advisory.
+ */
+internal data class EditAgentTopBarParams(
+    val uiState: UiState<EditAgentUiState>,
+    val scrollBehavior: TopAppBarScrollBehavior,
+    val dialogState: EditAgentDialogState,
+    val onNavigateBack: () -> Unit,
+    val onSave: () -> Unit,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EditAgentTopBar(
-    uiState: UiState<EditAgentUiState>,
-    scrollBehavior: TopAppBarScrollBehavior,
-    dialogState: EditAgentDialogState,
-    onNavigateBack: () -> Unit,
-    onSave: () -> Unit,
-) {
-    val agentName = (uiState as? UiState.Success)?.data?.name?.takeIf { it.isNotBlank() }
+private fun EditAgentTopBar(params: EditAgentTopBarParams) {
+    val agentName = (params.uiState as? UiState.Success)?.data?.name?.takeIf { it.isNotBlank() }
     LargeFlexibleTopAppBar(
         title = {
             if (agentName != null) {
                 EditAgentTitleJumpControl(
                     agentName = agentName,
-                    onClick = { dialogState.showSectionIndex = true },
+                    onClick = { params.dialogState.showSectionIndex = true },
                 )
             }
         },
         colors = LettaTopBarDefaults.largeTopAppBarColors(),
-        scrollBehavior = scrollBehavior,
+        scrollBehavior = params.scrollBehavior,
         navigationIcon = {
-            IconButton(onClick = onNavigateBack) {
+            IconButton(onClick = params.onNavigateBack) {
                 Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
             }
         },
         actions = {
-            IconButton(onClick = onSave) {
+            IconButton(onClick = params.onSave) {
                 Icon(LettaIcons.Save, contentDescription = stringResource(R.string.action_save_changes))
             }
-            IconButton(onClick = { dialogState.showActionSheet = true }) {
+            IconButton(onClick = { params.dialogState.showActionSheet = true }) {
                 Icon(LettaIcons.MoreVert, contentDescription = "More actions")
             }
         },
@@ -361,88 +244,109 @@ private fun EditAgentTitleJumpControl(
     }
 }
 
+/** LLM and embedding model catalogues rendered on the edit screen. */
+internal data class EditAgentModelsBundle(
+    val llmModels: List<LlmModel>,
+    val embeddingModels: List<EmbeddingModel>,
+)
+
+/** Surface handles (padding, list state, coroutine scope) for the loaded UI. */
+internal data class EditAgentLayoutBundle(
+    val paddingValues: PaddingValues,
+    val lazyListState: LazyListState,
+    val coroutineScope: CoroutineScope,
+)
+
+/** Ambient environment (snackbar, context, back-navigation) used by dialogs. */
+internal data class EditAgentEnvironmentBundle(
+    val snackbar: SnackbarDispatcher,
+    val context: Context,
+    val onNavigateBack: () -> Unit,
+)
+
+/**
+ * Bundle of everything [EditAgentScreenBody] needs. Keeping this as one holder
+ * lets the composable stay at a single argument, satisfying the CodeScene
+ * "Excess Number of Function Arguments" advisory.
+ */
+internal data class EditAgentScreenBodyParams(
+    val uiState: UiState<EditAgentUiState>,
+    val models: EditAgentModelsBundle,
+    val viewModel: EditAgentViewModel,
+    val layout: EditAgentLayoutBundle,
+    val environment: EditAgentEnvironmentBundle,
+    val dialogState: EditAgentDialogState,
+)
+
 @Composable
-private fun EditAgentScreenBody(
-    uiState: UiState<EditAgentUiState>,
-    llmModels: List<LlmModel>,
-    embeddingModels: List<EmbeddingModel>,
-    viewModel: EditAgentViewModel,
-    paddingValues: PaddingValues,
-    lazyListState: LazyListState,
-    dialogState: EditAgentDialogState,
-    snackbar: SnackbarDispatcher,
-    context: Context,
-    onNavigateBack: () -> Unit,
-    coroutineScope: CoroutineScope,
-) {
-    when (val state = uiState) {
+private fun EditAgentScreenBody(params: EditAgentScreenBodyParams) {
+    when (val state = params.uiState) {
         is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
         is UiState.Error -> ErrorContent(
             message = state.message,
-            onRetry = { viewModel.loadAgent() },
-            modifier = Modifier.padding(paddingValues),
+            onRetry = { params.viewModel.loadAgent() },
+            modifier = Modifier.padding(params.layout.paddingValues),
         )
         is UiState.Success -> EditAgentLoadedContent(
-            agentState = state.data,
-            llmModels = llmModels,
-            embeddingModels = embeddingModels,
-            viewModel = viewModel,
-            paddingValues = paddingValues,
-            lazyListState = lazyListState,
-            dialogState = dialogState,
-            snackbar = snackbar,
-            context = context,
-            onNavigateBack = onNavigateBack,
-            coroutineScope = coroutineScope,
+            params = EditAgentLoadedContentParams(
+                agentState = state.data,
+                models = params.models,
+                viewModel = params.viewModel,
+                layout = params.layout,
+                environment = params.environment,
+                dialogState = params.dialogState,
+            ),
         )
     }
 }
 
+/**
+ * Parameters bundled for the loaded-agent branch of the screen. Bundling keeps
+ * [EditAgentLoadedContent] at a single argument and clears the CodeScene
+ * "Excess Number of Function Arguments" advisory.
+ */
+internal data class EditAgentLoadedContentParams(
+    val agentState: EditAgentUiState,
+    val models: EditAgentModelsBundle,
+    val viewModel: EditAgentViewModel,
+    val layout: EditAgentLayoutBundle,
+    val environment: EditAgentEnvironmentBundle,
+    val dialogState: EditAgentDialogState,
+)
+
 @Composable
-private fun EditAgentLoadedContent(
-    agentState: EditAgentUiState,
-    llmModels: List<LlmModel>,
-    embeddingModels: List<EmbeddingModel>,
-    viewModel: EditAgentViewModel,
-    paddingValues: PaddingValues,
-    lazyListState: LazyListState,
-    dialogState: EditAgentDialogState,
-    snackbar: SnackbarDispatcher,
-    context: Context,
-    onNavigateBack: () -> Unit,
-    coroutineScope: CoroutineScope,
-) {
-    val callbacks = viewModel.contentCallbacks(
-        onResetMessages = { dialogState.showResetDialog = true },
-        onDeleteAgent = { dialogState.showDeleteDialog = true },
+private fun EditAgentLoadedContent(params: EditAgentLoadedContentParams) {
+    val callbacks = params.viewModel.contentCallbacks(
+        onResetMessages = { params.dialogState.showResetDialog = true },
+        onDeleteAgent = { params.dialogState.showDeleteDialog = true },
     )
     EditAgentContent(
-        state = agentState,
-        llmModels = llmModels,
-        embeddingModels = embeddingModels,
+        state = params.agentState,
+        llmModels = params.models.llmModels,
+        embeddingModels = params.models.embeddingModels,
         callbacks = callbacks,
-        contentPadding = paddingValues,
-        lazyListState = lazyListState,
+        contentPadding = params.layout.paddingValues,
+        lazyListState = params.layout.lazyListState,
     )
-    if (dialogState.showSectionIndex) {
+    if (params.dialogState.showSectionIndex) {
         SectionIndexSheet(
-            onDismiss = { dialogState.showSectionIndex = false },
+            onDismiss = { params.dialogState.showSectionIndex = false },
             onSelect = { targetKey ->
-                dialogState.showSectionIndex = false
-                coroutineScope.launch {
-                    lazyListState.animateScrollToKey(targetKey)
+                params.dialogState.showSectionIndex = false
+                params.layout.coroutineScope.launch {
+                    params.layout.lazyListState.animateScrollToKey(targetKey)
                 }
             },
         )
     }
     EditAgentDialogs(
-        visibility = dialogState.toVisibility(),
+        visibility = params.dialogState.toVisibility(),
         host = EditAgentDialogsHost(
-            agentState = agentState,
-            viewModel = viewModel,
-            snackbar = snackbar,
-            context = context,
-            onNavigateBack = onNavigateBack,
+            agentState = params.agentState,
+            viewModel = params.viewModel,
+            snackbar = params.environment.snackbar,
+            context = params.environment.context,
+            onNavigateBack = params.environment.onNavigateBack,
         ),
     )
 }

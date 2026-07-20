@@ -77,7 +77,7 @@ internal fun AgentScaffoldContent(
     viewModel: AdminChatViewModel,
 ) {
     var showBugReportSheet by rememberSaveable {
-        mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BugReport)
+        mutableStateOf(initialProjectStartAction == ProjectChatStartAction.BUG_REPORT)
     }
     var showAgentSwitcher by remember { mutableStateOf(false) }
     var isChatSearchExpanded by rememberSaveable { mutableStateOf(false) }

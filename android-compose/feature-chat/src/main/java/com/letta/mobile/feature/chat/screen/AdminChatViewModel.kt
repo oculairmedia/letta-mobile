@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import app.cash.molecule.RecompositionMode.Immediate
 import app.cash.molecule.launchMolecule
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.attachment.AttachmentLimits
+import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
@@ -692,7 +694,7 @@ internal class AdminChatViewModel @Inject constructor(
                     messageListChange = ChatMessageListChange.Full,
                 )
             } catch (e: Exception) {
-                Log.w("AdminChatViewModel", "Failed to reset messages", e)
+                android.util.Log.w("AdminChatViewModel", "Failed to reset messages", e)
             }
         }
     }

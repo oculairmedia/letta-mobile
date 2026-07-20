@@ -199,8 +199,8 @@ private fun ChatMessageListLazyColumn(params: ChatMessageListLazyColumnParams) {
         contentPadding = PaddingValues(
             start = params.chatDimens.contentPaddingHorizontal,
             end = params.chatDimens.contentPaddingHorizontal,
-            top = LettaSpacing.cardGap + bodyParams.appearance.topPadding,
-            bottom = LettaSpacing.cardGap + bodyParams.appearance.bottomPadding,
+            top = LettaSpacing.CARD_GAP + bodyParams.appearance.topPadding,
+            bottom = LettaSpacing.CARD_GAP + bodyParams.appearance.bottomPadding,
         ),
         reverseLayout = true,
         modifier = Modifier.graphicsLayer { },
@@ -236,8 +236,8 @@ private fun BoxScope.ChatMessageListScrollFab(params: ChatMessageListBodyParams)
         modifier = Modifier
             .align(Alignment.BottomEnd)
             .padding(
-                end = LettaSpacing.innerPadding,
-                bottom = LettaSpacing.innerPadding + params.appearance.bottomPadding,
+                end = LettaSpacing.INNER_PADDING,
+                bottom = LettaSpacing.INNER_PADDING + params.appearance.bottomPadding,
             ),
     )
 }
@@ -256,8 +256,8 @@ private fun BoxScope.ChatMessageListFontIndicator(params: ChatMessageListBodyPar
                 RoundedCornerShape(MaterialTheme.chatShapes.bubbleRadius),
             )
             .padding(
-                horizontal = LettaSpacing.innerPadding + LettaSpacing.cardGap,
-                vertical = LettaSpacing.innerPaddingSmall,
+                horizontal = LettaSpacing.INNER_PADDING + LettaSpacing.CARD_GAP,
+                vertical = LettaSpacing.INNER_PADDING_SMALL,
             ),
     )
 }

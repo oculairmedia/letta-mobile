@@ -390,7 +390,7 @@ private fun ChatScreenFloatingOverlays(params: ChatScreenFloatingOverlaysParams)
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(LettaSpacing.lg),
+                .padding(LettaSpacing.LG),
         )
         params.imageViewerState?.let { (viewerAttachments, initialIndex) ->
             ChatImageViewer(
@@ -405,7 +405,7 @@ private fun ChatScreenFloatingOverlays(params: ChatScreenFloatingOverlaysParams)
                 frames = params.a2uiDebugFrames,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.md),
+                    .padding(horizontal = LettaSpacing.LG, vertical = LettaSpacing.MD),
             )
         }
         ChatScreenVoiceOverlay(modifier = Modifier.fillMaxSize())
