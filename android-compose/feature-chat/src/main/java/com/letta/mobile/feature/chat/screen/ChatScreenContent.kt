@@ -1,0 +1,407 @@
+package com.letta.mobile.feature.chat.screen
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.a2ui.A2uiSurfaceState
+import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
+import com.letta.mobile.data.chat.projection.toChatDisplayMode
+import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
+import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
+import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.GoalStatusUi
+import com.letta.mobile.ui.components.StarterPrompts
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.ChatBackground
+import com.letta.mobile.ui.theme.LettaSpacing
+import kotlinx.collections.immutable.ImmutableMap
+
+internal fun shouldShowStarterPromptsForNoConversation(state: ChatUiState): Boolean =
+    state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()
+
+@Composable
+internal fun NoConversationChatContent(
+    state: ChatUiState,
+    callbacks: ChatContentCallbacks,
+    appearance: ChatContentAppearance,
+    modifier: Modifier = Modifier,
+) {
+    if (shouldShowStarterPromptsForNoConversation(state)) {
+        StarterPrompts(
+            onPromptClick = callbacks.onSendMessage,
+            modifier = modifier.padding(
+                top = appearance.topPadding,
+                bottom = appearance.bottomPadding,
+            ),
+        )
+    } else {
+        ChatContent(
+            state = state,
+            callbacks = callbacks,
+            appearance = appearance,
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+internal fun ChatContent(
+    state: ChatUiState,
+    callbacks: ChatContentCallbacks,
+    appearance: ChatContentAppearance,
+    modifier: Modifier = Modifier,
+) {
+    val renderItemsCache = remember { IncrementalChatRenderItemsCache() }
+    val chatDisplayMode = appearance.chatMode.toChatDisplayMode()
+    val renderItems = remember(state.messages, appearance.chatMode, state.messageListChange) {
+        renderItemsCache.renderItems(
+            messages = state.messages,
+            mode = chatDisplayMode,
+            change = state.messageListChange,
+            activeAgentId = state.agentId,
+        ).also { built ->
+            com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderItemsBuilt(
+                conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
+                path = state.messageListChange.toString(),
+                items = built,
+            )
+            com.letta.mobile.ui.chat.render.RenderDiagnostics.onRenderScopeProjection(
+                activeAgentId = state.agentId,
+                conversationId = (state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
+                items = built,
+            )
+        }
+    }
+
+    var a2uiStackHeightDp by remember { mutableStateOf(0.dp) }
+    val density = LocalDensity.current
+
+    Box(modifier = modifier.fillMaxSize()) {
+        if (state.messages.isEmpty() && !state.isStreaming && state.a2uiSurfaces.isEmpty()) {
+            StarterPrompts(
+                onPromptClick = callbacks.onSendMessage,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = appearance.topPadding, bottom = appearance.bottomPadding),
+            )
+        } else {
+            val listBottomPadding = appearance.bottomPadding +
+                if (state.a2uiSurfaces.isNotEmpty()) a2uiStackHeightDp else 0.dp
+            if (state.messages.isEmpty() && !state.isStreaming) {
+                // List is empty but A2UI is shown
+            } else {
+                ChatMessageList(
+                    state = state,
+                    renderItems = renderItems,
+                    chatMode = appearance.chatMode,
+                    scrollToMessageId = appearance.scrollToMessageId,
+                    activeFontScale = appearance.activeFontScale,
+                    onActiveFontScaleChange = callbacks.onActiveFontScaleChange,
+                    onFontScaleChange = callbacks.onFontScaleChange,
+                    onLoadOlderMessages = callbacks.onLoadOlderMessages,
+                    onSendMessage = callbacks.onSendMessage,
+                    onRerunMessage = callbacks.onRerunMessage,
+                    onSubmitApproval = callbacks.onSubmitApproval,
+                    onToggleRunCollapsed = callbacks.onToggleRunCollapsed,
+                    onToggleReasoningExpanded = callbacks.onToggleReasoningExpanded,
+                    onAttachmentImageTap = callbacks.onAttachmentImageTap,
+                    modifier = Modifier.fillMaxSize(),
+                    chatBackground = appearance.chatBackground,
+                    topPadding = appearance.topPadding,
+                    bottomPadding = listBottomPadding,
+                )
+            }
+            if (state.a2uiSurfaces.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(bottom = appearance.bottomPadding)
+                        .onSizeChanged { size ->
+                            a2uiStackHeightDp = with(density) { size.height.toDp() }
+                        }
+                ) {
+                    A2uiSurfaceStack(
+                        surfaces = state.a2uiSurfaces,
+                        resolvedActionCounters = state.a2uiResolvedActionCounters,
+                        onAction = callbacks.onA2uiAction,
+                        onDismissSurface = callbacks.onDismissA2uiSurface,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun A2uiSurfaceStack(
+    surfaces: ImmutableMap<String, A2uiSurfaceState>,
+    resolvedActionCounters: Map<String, Int>,
+    onAction: (A2uiAction) -> Unit,
+    onDismissSurface: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (surfaces.isEmpty()) return
+    val orderedSurfaces = remember(surfaces) {
+        surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
+    }
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(LettaSpacing.sm),
+    ) {
+        orderedSurfaces.forEach { surface ->
+            key(surface.surfaceId) {
+                DismissibleA2uiSurface(
+                    surfaceId = surface.surfaceId,
+                    onDismissSurface = onDismissSurface,
+                ) {
+                    A2uiSurfaceRenderer(
+                        surface = surface,
+                        modifier = Modifier.fillMaxWidth(),
+                        onAction = onAction,
+                        actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DismissibleA2uiSurface(
+    surfaceId: String,
+    onDismissSurface: (String) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    var menuExpanded by remember(surfaceId) { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                customActions = listOf(
+                    CustomAccessibilityAction("Delete A2UI surface") {
+                        onDismissSurface(surfaceId)
+                        true
+                    }
+                )
+            }
+            .longPressPassthrough { menuExpanded = true },
+    ) {
+        content()
+        androidx.compose.material3.IconButton(
+            onClick = { onDismissSurface(surfaceId) },
+            modifier = Modifier.align(Alignment.TopEnd)
+        ) {
+            Icon(
+                imageVector = LettaIcons.Close,
+                contentDescription = "Close A2UI surface",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = LettaIcons.Delete,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                onClick = {
+                    try {
+                        onDismissSurface(surfaceId)
+                    } finally {
+                        menuExpanded = false
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ChatScreenErrorContent(
+    message: String,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = LettaIcons.Error,
+            contentDescription = "Error",
+            modifier = Modifier.size(LettaSpacing.xxxl),
+            tint = MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.height(LettaSpacing.lg))
+        Text(text = message, style = MaterialTheme.typography.bodyLarge)
+        Spacer(modifier = Modifier.height(LettaSpacing.lg))
+        Button(onClick = onRetry) {
+            Text(stringResource(R.string.action_retry))
+        }
+    }
+}
+
+@Composable
+internal fun GoalStatusCard(
+    goal: GoalStatusUi?,
+    loading: Boolean,
+    onRefresh: () -> Unit,
+    onContinue: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onComplete: () -> Unit,
+    onClear: () -> Unit,
+) {
+    if (goal == null && !loading) return
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 3.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (loading) "Goal" else "Goal • ${goal?.status.orEmpty()}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onRefresh) { Text("Refresh") }
+            }
+            if (goal != null) {
+                Text(
+                    text = goal.objective,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val budget = goal.tokenBudget?.let { " / $it" }.orEmpty()
+                Text(
+                    text = "Tokens ${goal.tokensUsed}$budget • active ${goal.activeTimeSeconds}s",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (goal.status == "complete") {
+                        TextButton(onClick = onClear) { Text("Clear") }
+                    } else {
+                        Button(onClick = onContinue, enabled = goal.status == "active") { Text("Continue") }
+                        if (goal.status == "paused") TextButton(onClick = onResume) { Text("Resume") }
+                        else TextButton(onClick = onPause, enabled = goal.status == "active") { Text("Pause") }
+                        TextButton(onClick = onComplete) { Text("Done") }
+                        TextButton(onClick = onClear) { Text("Clear") }
+                    }
+                }
+            } else {
+                Text(
+                    text = "Loading goal status…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun A2uiDebugOverlay(
+    frames: List<A2uiDebugFrameUi>,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                shape = MaterialTheme.shapes.small,
+            )
+            .padding(LettaSpacing.sm),
+    ) {
+        Text(
+            text = "A2UI frames",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+        HorizontalDivider(modifier = Modifier.padding(vertical = LettaSpacing.xs))
+        LazyColumn(modifier = Modifier.height(LettaSpacing.xxxl.times(2))) {
+            items(frames.takeLast(8).asReversed(), key = { it.id }) { frame ->
+                Text(
+                    text = buildString {
+                        append(frame.messageType)
+                        frame.surfaceId?.let { append(" / ").append(it) }
+                        frame.conversationId?.takeLast(6)?.let { append(" / conv:").append(it) }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}

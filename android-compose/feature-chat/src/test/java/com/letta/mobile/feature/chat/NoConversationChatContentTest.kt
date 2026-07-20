@@ -1,4 +1,5 @@
 package com.letta.mobile.feature.chat
+
 import com.letta.mobile.ui.chat.render.*
 
 import androidx.compose.runtime.getValue
@@ -15,7 +16,6 @@ import androidx.compose.ui.test.performTouchInput
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
 import kotlinx.collections.immutable.ImmutableMap
@@ -28,6 +28,8 @@ import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import com.letta.mobile.feature.chat.screen.ChatContentAppearance
+import com.letta.mobile.feature.chat.screen.ChatContentCallbacks
 import com.letta.mobile.feature.chat.screen.NoConversationChatContent
 
 @RunWith(RobolectricTestRunner::class)
@@ -36,6 +38,19 @@ import com.letta.mobile.feature.chat.screen.NoConversationChatContent
 class NoConversationChatContentTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private fun testCallbacks(
+        onDismissA2uiSurface: (String) -> Unit = {},
+    ) = ChatContentCallbacks(
+        onSendMessage = {},
+        onRerunMessage = {},
+        onLoadOlderMessages = {},
+        onSubmitApproval = { _, _, _, _ -> },
+        onToggleRunCollapsed = {},
+        onToggleReasoningExpanded = {},
+        onDismissA2uiSurface = onDismissA2uiSurface,
+        onAttachmentImageTap = null,
+    )
 
     @Test
     fun freshClientModeOptimisticPromptIsVisibleWhileConversationIdIsPending() {
@@ -52,7 +67,7 @@ class NoConversationChatContentTest {
                         state = ChatUiState(
                             conversationState = ConversationState.NoConversation,
                             messages = persistentListOf(
-                                UiMessage(
+                                com.letta.mobile.data.model.UiMessage(
                                     id = "client-user-qkct",
                                     role = "user",
                                     content = prompt,
@@ -62,13 +77,8 @@ class NoConversationChatContentTest {
                             isStreaming = true,
                             isAgentTyping = true,
                         ),
-                        onSendMessage = {},
-                        onRerunMessage = {},
-                        onLoadOlderMessages = {},
-                        onSubmitApproval = { _, _, _, _ -> },
-                        onToggleRunCollapsed = {},
-                        onToggleReasoningExpanded = {},
-                        onAttachmentImageTap = null,
+                        callbacks = testCallbacks(),
+                        appearance = ChatContentAppearance(),
                         modifier = Modifier,
                     )
                 }
@@ -100,13 +110,8 @@ class NoConversationChatContentTest {
                             isAgentTyping = false,
                             a2uiSurfaces = surfaces,
                         ),
-                        onSendMessage = {},
-                        onRerunMessage = {},
-                        onLoadOlderMessages = {},
-                        onSubmitApproval = { _, _, _, _ -> },
-                        onToggleRunCollapsed = {},
-                        onToggleReasoningExpanded = {},
-                        onAttachmentImageTap = null,
+                        callbacks = testCallbacks(),
+                        appearance = ChatContentAppearance(),
                         modifier = Modifier,
                     )
                 }
@@ -145,17 +150,13 @@ class NoConversationChatContentTest {
                             isAgentTyping = false,
                             a2uiSurfaces = surfaces,
                         ),
-                        onSendMessage = {},
-                        onRerunMessage = {},
-                        onLoadOlderMessages = {},
-                        onSubmitApproval = { _, _, _, _ -> },
-                        onToggleRunCollapsed = {},
-                        onToggleReasoningExpanded = {},
-                        onDismissA2uiSurface = { surfaceId ->
-                            dismissedSurfaceId = surfaceId
-                            surfaces = persistentMapOf()
-                        },
-                        onAttachmentImageTap = null,
+                        callbacks = testCallbacks(
+                            onDismissA2uiSurface = { surfaceId ->
+                                dismissedSurfaceId = surfaceId
+                                surfaces = persistentMapOf()
+                            },
+                        ),
+                        appearance = ChatContentAppearance(),
                         modifier = Modifier,
                     )
                 }
