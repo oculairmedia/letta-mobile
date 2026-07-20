@@ -231,14 +231,7 @@ class IrohNodeConnection(
             firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
             maxFrameBytes = MAX_FRAME_BYTES,
             peerSupportsFrameParts = { peerSupportsFrameParts() },
-            requestContextProvider = {
-                AdminRpcRequestContext(
-                    authenticated = authenticated.get(),
-                    authorizedConversationIds = viewerSubscription?.currentConversation
-                        ?.let(::setOf)
-                        ?: emptySet(),
-                )
-            },
+            requestContextProvider = ::currentAdminRpcRequestContext,
             // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
             // so the shared message.list handler has no connection identity —
             // associate it HERE, where remoteEndpointId + selfViewer are in
@@ -257,6 +250,19 @@ class IrohNodeConnection(
         )
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
+
+    /**
+     * Conversation-scoped auth context for both admin_rpc BiStreams and
+     * control-channel admin_rpc frames. Empty authorized set when the peer
+     * has not hydrated a conversation yet (denies scoped methods).
+     */
+    private fun currentAdminRpcRequestContext(): AdminRpcRequestContext =
+        AdminRpcRequestContext(
+            authenticated = authenticated.get(),
+            authorizedConversationIds = viewerSubscription?.currentConversation
+                ?.let(::setOf)
+                ?: emptySet(),
+        )
 
     private suspend fun serveControlChannel(
         biStream: BiStream,
@@ -342,7 +348,12 @@ class IrohNodeConnection(
                     if (method == null || requestId == null) {
                         """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
                     } else {
-                        adminRpcRouter.dispatch(requestId, method, obj["params"]?.jsonObject)
+                        adminRpcRouter.dispatch(
+                            requestId,
+                            method,
+                            obj["params"]?.jsonObject,
+                            currentAdminRpcRequestContext(),
+                        )
                     }
                 }
                 "sync" -> ifAuthorized(requestId) {

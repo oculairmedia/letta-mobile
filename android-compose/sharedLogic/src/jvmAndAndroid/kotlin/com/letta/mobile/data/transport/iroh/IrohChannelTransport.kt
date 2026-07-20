@@ -1274,7 +1274,7 @@ class IrohChannelTransport(
         }.toString()
         val response = adminRpc(method, "/v1/conversations/${scope.conversationId}/subagents", scopedBody)
         return response.takeUnless {
-            !it.success && it.error.orEmpty().contains("Unknown method", ignoreCase = true)
+            !it.success && AdminRpcErrors.isUnknownMethod(it.error)
         }
     }
 

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.transport.iroh.AdminRpcErrors
 import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -93,7 +94,7 @@ class AdminRpcRouter(
         val handler = handlers[method]
         if (handler == null) {
             Telemetry.event("AdminRpc", "method.not_found", "method" to method)
-            return encodeFailure(requestId, "Unknown method: $method")
+            return encodeFailure(requestId, AdminRpcErrors.unknownMethod(method))
         }
         return try {
             val result = handler(params, context)
