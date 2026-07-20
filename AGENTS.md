@@ -398,6 +398,10 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   DISPLAY=:1 JAVA_TOOL_OPTIONS="-Dskiko.renderApi=SOFTWARE" ./gradlew :desktop:run
   ```
 - `:desktop:run` needs JDK 25+ at runtime (Jewel ships class-file v69); JDK 26 satisfies this.
+- The desktop build compiles a Rust native lib via `:desktop:buildDesktopMermaidNative`
+  (`native/mermaid_renderer`), whose `Cargo.toml` requires **`edition2024`** → Rust/Cargo **≥ 1.85**.
+  A current stable toolchain is provisioned via rustup (`rustup default stable`); if a fresh VM only
+  has an older default (e.g. 1.83), run `rustup toolchain install stable && rustup default stable`.
 - To connect to a backend: in the running app click **Settings** → set **Server URL**, pick a
   **Mode** (Cloud / Self-hosted / Local runtime), and paste an **Access token** if required, then
   **Save**. With no token, `https://api.letta.com` returns HTTP 401 (expected). The client makes a
