@@ -289,10 +289,16 @@ private fun CreateAgentRuntimeSection(
     onFormStateChange: (CreateAgentFormState) -> Unit,
     resources: CreateAgentDialogResources,
 ) {
-    Text(
-        text = "Runtime",
-        style = MaterialTheme.typography.titleSmall,
-    )
+    Text(text = "Runtime", style = MaterialTheme.typography.titleSmall)
+    CreateAgentRuntimeSwitches(formState = formState, onFormStateChange = onFormStateChange)
+    CreateAgentRuntimeModels(formState = formState, onFormStateChange = onFormStateChange, resources = resources)
+}
+
+@Composable
+private fun CreateAgentRuntimeSwitches(
+    formState: CreateAgentFormState,
+    onFormStateChange: (CreateAgentFormState) -> Unit,
+) {
     FormItem(
         label = {
             Column {
@@ -333,15 +339,20 @@ private fun CreateAgentRuntimeSection(
             )
         },
     )
+}
+
+@Composable
+private fun CreateAgentRuntimeModels(
+    formState: CreateAgentFormState,
+    onFormStateChange: (CreateAgentFormState) -> Unit,
+    resources: CreateAgentDialogResources,
+) {
     if (formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
         LocalLettaCodeReadinessCard(
             readiness = resources.localReadiness,
             onOpenLocalSettings = resources.onOpenLocalSettings,
         )
         if (resources.localReadiness.ready) {
-            // Local-mode model options: the custom endpoint's models
-            // and downloaded on-device models, via repository routing
-            // (letta-mobile-3icw7). Blank = config/seed default.
             ModelDropdown(
                 selectedModel = formState.model,
                 models = resources.llmModels,
@@ -351,29 +362,25 @@ private fun CreateAgentRuntimeSection(
                 label = stringResource(R.string.common_model),
             )
         }
-    } else {
-        ModelDropdown(
-            selectedModel = formState.model,
-            models = resources.llmModels,
-            onModelSelected = { onFormStateChange(formState.copy(model = it)) },
-            onLoadModels = resources.onLoadModels,
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.common_model),
-        )
-        ModelDropdown(
-            selectedModel = formState.embedding,
-            models = resources.embeddingDropdownModels,
-            onModelSelected = { onFormStateChange(formState.copy(embedding = it)) },
-            onLoadModels = resources.onLoadModels,
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.screen_agent_edit_embedding_model),
-        )
-        Text(
-            text = remoteCreateAgentModelHelp(model = formState.model, embedding = formState.embedding),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        return
     }
+    ModelDropdown(
+        selectedModel = formState.model,
+        models = resources.llmModels,
+        onModelSelected = { onFormStateChange(formState.copy(model = it)) },
+        onLoadModels = resources.onLoadModels,
+        modifier = Modifier.fillMaxWidth(),
+        label = stringResource(R.string.common_model),
+    )
+    ModelDropdown(
+        selectedModel = formState.embedding,
+        models = resources.embeddingDropdownModels,
+        onModelSelected = { onFormStateChange(formState.copy(embedding = it)) },
+        onLoadModels = resources.onLoadModels,
+        modifier = Modifier.fillMaxWidth(),
+        label = stringResource(R.string.common_embedding),
+        supportingText = remoteCreateAgentModelHelp(formState.model, formState.embedding),
+    )
 }
 
 @Composable
