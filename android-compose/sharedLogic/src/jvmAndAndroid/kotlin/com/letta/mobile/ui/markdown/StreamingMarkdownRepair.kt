@@ -23,6 +23,9 @@ fun repairIncompleteMarkdownForStreaming(text: String): String {
     return linkRepaired + inlineMarkdownClosersForLastLine(linkRepaired)
 }
 
+/** True when [text] still has an unclosed fenced code block (streaming tail). */
+fun hasOpenMarkdownCodeFence(text: String): Boolean = hasOpenCodeFence(text)
+
 private fun repairOpenCodeFence(text: String): String? {
     if (!hasOpenCodeFence(text)) return null
     val builder = StringBuilder(text)

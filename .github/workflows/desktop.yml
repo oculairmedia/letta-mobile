@@ -11,6 +11,7 @@ on:
     paths:
       - ".github/workflows/desktop.yml"
       - "android-compose/desktop/**"
+      - "android-compose/native/**"
       - "android-compose/sharedLogic/**"
       - "android-compose/gradle/**"
       - "android-compose/settings.gradle.kts"
@@ -21,6 +22,7 @@ on:
     paths:
       - ".github/workflows/desktop.yml"
       - "android-compose/desktop/**"
+      - "android-compose/native/**"
       - "android-compose/sharedLogic/**"
       - "android-compose/gradle/**"
       - "android-compose/settings.gradle.kts"

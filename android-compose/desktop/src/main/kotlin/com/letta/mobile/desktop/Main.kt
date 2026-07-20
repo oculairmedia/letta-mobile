@@ -13,6 +13,8 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
+import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
 import java.awt.Dimension
 import javax.swing.JOptionPane
 import kotlin.system.exitProcess
@@ -41,6 +43,7 @@ private fun runDesktopApplication(
             var windowTitle by remember { mutableStateOf("Letta Desktop") }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
+                LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
             ) {
                 DesktopJewelWindow(
                     onCloseRequest = ::exitApplication,
