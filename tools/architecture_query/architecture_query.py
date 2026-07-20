@@ -129,21 +129,30 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _require_contract_files(path: Path) -> None:
+    """Ensure the complete contract exists as regular contained files."""
+    missing = [name for name in CONTRACT_FILES if not (path / name).is_file()]
+    if missing:
+        raise ValueError(f"contract directory is missing: {', '.join(missing)}")
+    invalid = [
+        name for name in CONTRACT_FILES
+        if (path / name).is_symlink() or (path / name).resolve().parent != path
+    ]
+    if invalid:
+        raise ValueError(
+            f"contract file must be a regular file inside the contract directory: {invalid[0]}",
+        )
+
+
 def validate_contract_dir(value: str) -> Path:
-    """Resolve a contract directory and ensure all inputs are contained files."""
+    """Resolve and validate an absolute architecture-contract directory."""
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise ValueError("contract directory must be an absolute path")
     path = path.resolve(strict=True)
     if not path.is_dir():
         raise ValueError(f"contract path is not a directory: {path}")
-    missing = [name for name in CONTRACT_FILES if not (path / name).is_file()]
-    if missing:
-        raise ValueError(f"contract directory is missing: {', '.join(missing)}")
-    for name in CONTRACT_FILES:
-        candidate = path / name
-        if candidate.is_symlink() or candidate.resolve().parent != path:
-            raise ValueError(f"contract file must be a regular file inside the contract directory: {name}")
+    _require_contract_files(path)
     return path
 
 
