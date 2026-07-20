@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -12,14 +11,9 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
-import com.letta.mobile.data.model.GoalStatus
-import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
-import com.letta.mobile.data.model.LocalAgentRuntimeMetadata
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -33,10 +27,6 @@ import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.ui.theme.ChatBackground
-import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
-import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
-import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
-import com.letta.mobile.feature.chat.send.WsChatSendStrategy
 import com.letta.mobile.feature.chat.route.ChatRouteArgs
 import com.letta.mobile.feature.chat.session.ChatSessionInitializer
 import com.letta.mobile.feature.chat.state.ChatBannerController
@@ -44,31 +34,30 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.LocalAwareActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
-import com.letta.mobile.data.transport.WsConnectionState
-import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.runtime.RuntimeEventOutbox
-import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.letta.mobile.feature.chat.coordination.AdminChatAgentSelectionCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatA2uiCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatComposerCoordinator
-import com.letta.mobile.data.attachment.AttachmentLimits
-import com.letta.mobile.data.channel.CurrentConversationTracker
+import com.letta.mobile.feature.chat.coordination.AdminChatGoalCoordinator
+import com.letta.mobile.feature.chat.coordination.AdminChatModelCoordinator
+import com.letta.mobile.feature.chat.coordination.AdminChatScreenLifecycleCoordinator
+import com.letta.mobile.feature.chat.coordination.AdminChatSendPipeline
+import com.letta.mobile.feature.chat.coordination.AdminChatSlashCommandsCoordinator
+import com.letta.mobile.feature.chat.coordination.AdminChatTransportCoordinator
+import com.letta.mobile.feature.chat.coordination.AdminChatTruncatedToolReturnCoordinator
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
@@ -89,20 +78,14 @@ import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatSessionResolver
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
-import com.letta.mobile.feature.chat.coordination.LocalRuntimeChatSendCoordinator
 import com.letta.mobile.feature.chat.coordination.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.coordination.ProjectChatCoordinator
-import com.letta.mobile.feature.chat.coordination.TimelineSendCoordinator
-import com.letta.mobile.feature.chat.coordination.WsChatSendCoordinator
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
-import com.letta.mobile.ui.chat.render.ChatTransport
 import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
-import com.letta.mobile.data.chat.runtime.ChatConnectionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 
 
@@ -154,8 +137,6 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
-    private var slashCommandsLoadVersion: Long = 0L
-
     /**
      * letta-mobile-73o2h.3: WS-backed feed for the active-subagent status
      * bar. Bound here (rather than at the [ChatScreen] call site) so the
@@ -268,6 +249,122 @@ internal class AdminChatViewModel @Inject constructor(
     private val composerController: ChatComposerController = ChatComposerController(limits = attachmentLimits)
     private val chatBannerController: ChatBannerController = ChatBannerController(_uiState, composerController)
 
+    private val sendPipeline: AdminChatSendPipeline by lazy {
+        AdminChatSendPipeline(
+            scope = viewModelScope,
+            agentId = agentId,
+            isFreshRoute = isFreshRoute,
+            explicitConversationId = explicitConversationId,
+            projectContextAvailable = projectContext != null,
+            conversationRepository = conversationRepository,
+            timelineRepository = timelineRepository,
+            settingsRepository = settingsRepository,
+            sessionManager = sessionManager,
+            messageRepository = messageRepository,
+            slashCommandRepository = slashCommandRepository,
+            wsChatBridge = wsChatBridge,
+            runtimeEventOutbox = runtimeEventOutbox,
+            clientVersionProvider = clientVersionProvider,
+            uiState = _uiState,
+            composerController = composerController,
+            chatBannerController = chatBannerController,
+            isShimBackend = {
+                isShimBackend.value || settingsRepository.activeConfig.value?.serverUrl
+                    ?.trimStart()
+                    ?.removePrefix("https://")
+                    ?.removePrefix("http://")
+                    ?.startsWith("iroh://") == true
+            },
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
+            startTimelineObserver = ::startTimelineObserver,
+        )
+    }
+
+    private val composerCoordinator: AdminChatComposerCoordinator
+        get() = sendPipeline.composerCoordinator
+
+    private val modelCoordinator: AdminChatModelCoordinator by lazy {
+        AdminChatModelCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            agentRepository = agentRepository,
+            modelRepository = modelRepository,
+            settingsRepository = settingsRepository,
+            activeAgent = activeAgent,
+            bannerController = chatBannerController,
+        )
+    }
+
+    private val goalCoordinator: AdminChatGoalCoordinator by lazy {
+        AdminChatGoalCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            slashCommandRepository = slashCommandRepository,
+            wsChatBridge = wsChatBridge,
+            uiState = _uiState,
+            bannerController = chatBannerController,
+            isShimBackend = isShimBackend,
+            localRuntimeRouting = ::localRuntimeRouting,
+            onGoalSlashCommandsDetected = ::refreshGoalStatus,
+        )
+    }
+
+    private val slashCommandsCoordinator: AdminChatSlashCommandsCoordinator by lazy {
+        AdminChatSlashCommandsCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            slashCommandRepository = slashCommandRepository,
+            composerCoordinator = composerCoordinator,
+            uiState = _uiState,
+            projectContext = projectContext,
+            localRuntimeRouting = ::localRuntimeRouting,
+            goalCoordinator = goalCoordinator,
+        )
+    }
+
+    private val transportCoordinator: AdminChatTransportCoordinator by lazy {
+        AdminChatTransportCoordinator(
+            scope = viewModelScope,
+            isShimBackend = isShimBackend,
+            wsChatBridge = wsChatBridge,
+            uiState = _uiState,
+        )
+    }
+
+    private val agentSelectionCoordinator: AdminChatAgentSelectionCoordinator by lazy {
+        AdminChatAgentSelectionCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            initialAgentName = initialAgentName,
+            settingsRepository = settingsRepository,
+            chatSessionResolver = chatSessionResolver,
+            uiState = uiState,
+            uiStateMutable = _uiState,
+            conversationId = { conversationId?.value },
+        )
+    }
+
+    private val truncatedToolReturnCoordinator: AdminChatTruncatedToolReturnCoordinator by lazy {
+        AdminChatTruncatedToolReturnCoordinator(
+            scope = viewModelScope,
+            agentId = agentId,
+            timelineRepository = timelineRepository,
+            activeConversationId = { chatConversationCoordinator.activeConversationId },
+            fallbackConversationId = { conversationId?.value },
+        )
+    }
+
+    private val screenLifecycleCoordinator: AdminChatScreenLifecycleCoordinator by lazy {
+        AdminChatScreenLifecycleCoordinator(
+            currentConversationTracker = currentConversationTracker,
+            conversationId = { conversationId },
+            sessionState = _sessionState,
+            resolveConversationAndLoad = ::resolveConversationAndLoad,
+            updateSessionState = ::updateSessionState,
+        )
+    }
+
     private val chatApprovalController: ChatApprovalController = ChatApprovalController(
         scope = viewModelScope,
         coordinator = chatApprovalCoordinator,
@@ -285,96 +382,6 @@ internal class AdminChatViewModel @Inject constructor(
             chatBannerController = chatBannerController,
             activeConversationId = { chatConversationCoordinator.activeConversationId ?: conversationId?.value },
             chatApprovalController = chatApprovalController,
-        )
-    }
-
-    private val timelineSendCoordinator: TimelineSendCoordinator by lazy {
-        TimelineSendCoordinator(
-            scope = viewModelScope,
-            agentId = agentId.value,
-            isFreshRoute = isFreshRoute,
-            explicitConversationId = explicitConversationId,
-            conversationRepository = conversationRepository,
-            timelineRepository = timelineRepository,
-            uiState = _uiState,
-            clearComposerAfterSend = { composerController.clearAfterSend() },
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
-            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
-            startTimelineObserver = ::startTimelineObserver,
-        )
-    }
-    private val timelineChatSendStrategy: TimelineChatSendStrategy by lazy {
-        TimelineChatSendStrategy(timelineSendCoordinator)
-    }
-    private val wsChatSendCoordinator: WsChatSendCoordinator by lazy {
-        WsChatSendCoordinator(
-            scope = viewModelScope,
-            agentId = agentId.value,
-            activeConfig = { settingsRepository.activeConfig.value },
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = conversationRepository,
-            uiState = _uiState,
-            clearComposerAfterSend = { composerController.clearAfterSend() },
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
-            isFreshRoute = isFreshRoute,
-            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
-            startTimelineObserver = ::startTimelineObserver,
-            clientVersionProvider = clientVersionProvider,
-            backendDescriptor = { sessionManager.current.backendDescriptor },
-            runtimeEventSink = { drafts ->
-                drafts.forEach { draft -> runtimeEventOutbox.append(draft) }
-            },
-        )
-    }
-    private val wsChatSendStrategy: WsChatSendStrategy by lazy {
-        WsChatSendStrategy(wsChatSendCoordinator)
-    }
-    private val localRuntimeChatSendCoordinator: LocalRuntimeChatSendCoordinator by lazy {
-        LocalRuntimeChatSendCoordinator(
-            scope = viewModelScope,
-            agentId = agentId.value,
-            localBackend = { sessionManager.current.localRuntimeBackend },
-            timelineRepository = timelineRepository,
-            uiState = _uiState,
-            clearComposerAfterSend = { composerController.clearAfterSend() },
-            activeConversationId = { chatConversationCoordinator.activeConversationId },
-            setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
-            startTimelineObserver = ::startTimelineObserver,
-        )
-    }
-    private val localRuntimeChatSendStrategy: LocalRuntimeChatSendStrategy by lazy {
-        LocalRuntimeChatSendStrategy(localRuntimeChatSendCoordinator)
-    }
-    private val chatSendStrategySelector: ChatSendStrategySelector by lazy {
-        ChatSendStrategySelector(
-            timelineStrategy = timelineChatSendStrategy,
-            wsStrategy = wsChatSendStrategy,
-            localStrategy = localRuntimeChatSendStrategy,
-        )
-    }
-
-    private val composerCoordinator: AdminChatComposerCoordinator by lazy {
-        AdminChatComposerCoordinator(
-            scope = viewModelScope,
-            composerController = composerController,
-            chatSendStrategySelector = chatSendStrategySelector,
-            chatBannerController = chatBannerController,
-            uiState = _uiState,
-            agentId = agentId,
-            explicitConversationId = explicitConversationId,
-            isShimBackend = {
-                isShimBackend.value || settingsRepository.activeConfig.value?.serverUrl
-                    ?.trimStart()
-                    ?.removePrefix("https://")
-                    ?.removePrefix("http://")
-                    ?.startsWith("iroh://") == true
-            },
-            sessionManager = sessionManager,
-            messageRepository = messageRepository,
-            slashCommandRepository = slashCommandRepository,
-            isStreaming = { _uiState.value.isStreaming },
-            projectContextAvailable = projectContext != null,
         )
     }
 
@@ -430,73 +437,9 @@ internal class AdminChatViewModel @Inject constructor(
     val llmModels: StateFlow<List<LlmModel>> = modelRepository.llmModels
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun refreshModels() {
-        viewModelScope.launch {
-            runCatching { modelRepository.refreshLlmModels() }
-        }
-    }
+    fun refreshModels() = modelCoordinator.refreshModels()
 
-    fun updateActiveAgentModel(handle: String) {
-        viewModelScope.launch {
-            try {
-                val config = settingsRepository.activeConfig.firstOrNull()
-                agentRepository.updateAgent(agentId, modelSwitchUpdateParams(handle, config, activeAgent.value))
-                refreshModels()
-            } catch (e: Exception) {
-                // Surface the failure to the user and re-sync the displayed model state
-                val currentModel = activeAgent.value?.model ?: "unknown"
-                chatBannerController.showError("Couldn't switch model — still on $currentModel")
-                // Re-sync the active agent record so the drawer reflects reality
-                runCatching { agentRepository.refreshAgents() }
-            }
-        }
-    }
-
-    private fun modelSwitchUpdateParams(handle: String, config: LettaConfig?, agent: Agent?): AgentUpdateParams {
-        val normalizedHandle = handle.trim()
-        val configuredLocalModelHandle = config?.localModelHandle?.trim()?.takeIf { it.isNotBlank() }
-        val normalizedLower = normalizedHandle.lowercase()
-        val knownGemmaLocalHandle = when (normalizedLower) {
-            "google/gemma-3n-e2b-it-litert-lm",
-            "lmstudio/google/gemma-3n-e2b-it-litert-lm" -> "google/gemma-3n-E2B-it-litert-lm"
-            else -> null
-        }
-        val effectiveLocalModelHandle = knownGemmaLocalHandle ?: configuredLocalModelHandle
-        val localLeattaCodeHandle = effectiveLocalModelHandle?.let { "lmstudio/${it.removePrefix("lmstudio/")}" }
-        val localSelected = AgentRuntimeBinding.isLocalRuntime(config) &&
-            effectiveLocalModelHandle != null &&
-            (knownGemmaLocalHandle != null || normalizedHandle in setOf(effectiveLocalModelHandle, localLeattaCodeHandle))
-        val baseMetadata = agent?.metadata.orEmpty().filterKeys { it !in localRuntimeModelSwitchMetadataKeys }
-        if (!localSelected || config == null) {
-            return AgentUpdateParams(model = normalizedHandle, metadata = baseMetadata)
-        }
-        val runtime = config.localModelRuntime?.trim()?.takeIf { it.isNotBlank() } ?: "litert-lm"
-        val accelerator = config.localModelAccelerator?.trim()?.takeIf { it.isNotBlank() } ?: "gpu"
-        val maxTokens = config.localModelMaxTokens?.takeIf { it > 0 } ?: 4096
-        val localMetadata = mapOf(
-            LocalAgentRuntimeMetadata.RUNTIME_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
-            LocalAgentRuntimeMetadata.RUNTIME_PROVIDER_KEY to JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME),
-            LocalAgentRuntimeMetadata.RUNTIME_ID_KEY to JsonPrimitive("${LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME}:${config.id}"),
-            LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY to JsonPrimitive(effectiveLocalModelHandle),
-            LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY to JsonPrimitive(runtime.lowercase()),
-            LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY to JsonPrimitive(accelerator.lowercase()),
-        )
-        return AgentUpdateParams(
-            model = effectiveLocalModelHandle,
-            metadata = baseMetadata + localMetadata,
-            modelSettings = (agent?.modelSettings ?: ModelSettings()).copy(
-                providerType = LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME,
-                parallelToolCalls = false,
-                maxOutputTokens = maxTokens,
-            ),
-        )
-    }
-
-    private val localRuntimeModelSwitchMetadataKeys: Set<String> = LocalAgentRuntimeMetadata.bindingKeys + setOf(
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_HANDLE_KEY,
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_RUNTIME_KEY,
-        LocalAgentRuntimeMetadata.LOCAL_MODEL_ACCELERATOR_KEY,
-    )
+    fun updateActiveAgentModel(handle: String) = modelCoordinator.updateActiveAgentModel(handle)
 
     fun refreshAvailableAgents() {
         viewModelScope.launch {
@@ -534,38 +477,8 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun toggleReasoningExpanded(messageId: String) = runExpansionState.toggleReasoningExpanded(messageId)
 
-    // letta-mobile-fe51r (P2b pointer diet): tool-return message ids we've
-    // already asked the transport to resolve, so repeated expand/collapse of
-    // the same card doesn't refetch a body that is in flight or already
-    // resolved. Entries are removed on failure so a later expand can retry.
-    private val requestedTruncatedToolReturnIds = mutableSetOf<String>()
-
-    /**
-     * Called when the user expands a tool card whose result is a
-     * server-projected preview (iroh pointer diet). Fetches the full body via
-     * `tool_return.get` and folds it into the timeline; the card recomposes
-     * with the full output once the fetch lands.
-     */
-    fun onTruncatedToolResultExpanded(messageId: String) {
-        val convId = chatConversationCoordinator.activeConversationId ?: conversationId?.value ?: return
-        synchronized(requestedTruncatedToolReturnIds) {
-            if (!requestedTruncatedToolReturnIds.add(messageId)) return
-        }
-        viewModelScope.launch {
-            val resolved = runCatching {
-                timelineRepository.resolveTruncatedToolReturn(agentId.value, convId, messageId)
-            }.onFailure { t ->
-                Telemetry.error(
-                    "AdminChat", "truncatedToolReturn.resolveFailed", t,
-                    "conversationId" to convId,
-                    "messageId" to messageId,
-                )
-            }.getOrDefault(false)
-            if (!resolved) {
-                synchronized(requestedTruncatedToolReturnIds) { requestedTruncatedToolReturnIds.remove(messageId) }
-            }
-        }
-    }
+    fun onTruncatedToolResultExpanded(messageId: String) =
+        truncatedToolReturnCoordinator.onTruncatedToolResultExpanded(messageId)
 
     private fun collapseCompletedRunsIfStreamingFinished(
         previous: ChatUiState,
@@ -625,14 +538,14 @@ internal class AdminChatViewModel @Inject constructor(
             timelineRepository.reconcileRecentMessages(agentId.value, convId, reason)
         },
         sendMessageViaClientMode = { message ->
-            timelineChatSendStrategy.send(
+            sendPipeline.timelineChatSendStrategy.send(
                 text = message,
                 attachments = emptyList(),
                 context = composerCoordinator.chatSendContext(),
             )
         },
         sendMessageViaTimeline = { message ->
-            timelineChatSendStrategy.send(
+            sendPipeline.timelineChatSendStrategy.send(
                 text = message,
                 attachments = emptyList(),
                 context = composerCoordinator.chatSendContext(),
@@ -685,57 +598,15 @@ internal class AdminChatViewModel @Inject constructor(
             bannerController = chatBannerController,
             setClientModeConversationId = { },
             refreshAvailableAgents = ::refreshAvailableAgents,
-            observeLastChatSelection = ::observeLastChatSelection,
-            seedAgentNameFromMemoryCache = ::seedAgentNameFromMemoryCache,
-            observeAgentNameCache = ::observeAgentNameCache,
+            observeLastChatSelection = agentSelectionCoordinator::observeLastChatSelection,
+            seedAgentNameFromMemoryCache = agentSelectionCoordinator::seedAgentNameFromMemoryCache,
+            observeAgentNameCache = agentSelectionCoordinator::observeAgentNameCache,
             refreshClientModeLocation = { },
             loadProjectAgents = { projectChatCoordinator.loadProjectAgents() },
             loadProjectBrief = { projectChatCoordinator.loadProjectBrief() },
             loadRecentBugReports = { projectChatCoordinator.loadRecentBugReports() },
             resolveConversationAndLoad = ::resolveConversationAndLoad,
         )
-    }
-
-    private fun seedAgentNameFromMemoryCache() {
-        val cachedName = chatSessionResolver.cachedAgentName(agentId.value) ?: return
-        _uiState.update { current ->
-            if (current.agentName.isBlank()) current.copy(agentName = cachedName) else current
-        }
-    }
-
-    private fun observeAgentNameCache() {
-        viewModelScope.launch {
-            chatSessionResolver.observeCachedAgentName(agentId.value)
-                .collect { cachedName ->
-                    if (cachedName.isBlank()) return@collect
-                    _uiState.update { current ->
-                        if (current.agentName.isBlank()) current.copy(agentName = cachedName) else current
-                    }
-                }
-        }
-    }
-
-    private fun observeLastChatSelection() {
-        settingsRepository.setLastChatSelection(
-            agentId = agentId.value,
-            agentName = initialAgentName,
-            conversationId = conversationId?.value,
-        )
-        viewModelScope.launch {
-            uiState
-                .map { state ->
-                    val readyConversationId = (state.conversationState as? ConversationState.Ready)?.conversationId
-                    state.agentName.takeIf { it.isNotBlank() } to readyConversationId
-                }
-                .distinctUntilChanged()
-                .collect { (resolvedAgentName, resolvedConversationId) ->
-                    settingsRepository.setLastChatSelection(
-                        agentId = agentId.value,
-                        agentName = resolvedAgentName,
-                        conversationId = resolvedConversationId,
-                    )
-                }
-        }
     }
 
     init {
@@ -745,111 +616,13 @@ internal class AdminChatViewModel @Inject constructor(
                 shimBackendDetector.refresh(config)
             }
         }
-        observeTransportState()
-        observeGoalPushEvents()
-        observeGoalStatusRefreshes()
-        loadSlashCommands()
+        transportCoordinator.startObserving()
+        goalCoordinator.startObserving()
+        slashCommandsCoordinator.loadSlashCommands()
         refreshGoalStatus()
-        // Force eager initialization of lazy coordinators to start flow subscriptions
         adminChatA2uiCoordinator
-        composerCoordinator
+        sendPipeline.ensureEagerInit()
         chatSessionInitializer.run()
-    }
-
-    private fun loadSlashCommands() {
-        viewModelScope.launch {
-            val loadVersion = ++slashCommandsLoadVersion
-            val builtIns = buildList {
-                if (projectContext != null) {
-                    add(
-                        SlashCommand(
-                            name = "bug",
-                            command = "/bug",
-                            description = "Open a project bug report",
-                            source = "local",
-                            installed = true,
-                        )
-                    )
-                }
-            }
-            if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-                Log.d(TAG, "Slash commands skipped for local runtime agent=${agentId.value}")
-                if (loadVersion == slashCommandsLoadVersion) {
-                    composerCoordinator.setSlashCommands(builtIns)
-                    _uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
-                }
-                return@launch
-            }
-            // Always expose the FULL global catalog for discovery, marking
-            // which are already installed on this agent. Installed ones appear
-            // first and styled differently; selecting an uninstalled one
-            // installs it to the agent (see selectSlashCommand).
-            val agentCommands = slashCommandRepository.listForAgent(agentId.value)
-                .getOrElse { e ->
-                    Log.d(TAG, "Agent slash commands unavailable: ${e.message}")
-                    emptyList()
-                }
-            val installedNames = agentCommands.map { it.skillName ?: it.name }.toSet()
-            val globalCommands = slashCommandRepository.listGlobal()
-                .getOrElse { e ->
-                    Log.d(TAG, "Global slash commands unavailable: ${e.message}")
-                    emptyList()
-                }
-                .map { it.copy(installed = (it.skillName ?: it.name) in installedNames) }
-            // Merge: built-ins + agent-installed + global discovery, deduped by
-            // command (installed entries win so the flag stays true).
-            val merged = (builtIns + agentCommands + globalCommands)
-                .groupBy { it.command }
-                .map { (_, dupes) -> dupes.maxByOrNull { it.installed } ?: dupes.first() }
-                .sortedWith(compareByDescending<SlashCommand> { it.installed }
-                    .thenBy { it.command })
-            Log.d(TAG, "Slash commands loaded: total=${merged.size} installed=${merged.count { it.installed }}")
-            if (loadVersion == slashCommandsLoadVersion) {
-                composerCoordinator.setSlashCommands(merged)
-                if (merged.any { it.source == "builtin_goal" || it.command.startsWith("/goal") }) {
-                    refreshGoalStatus()
-                }
-            }
-        }
-    }
-
-    private fun observeGoalPushEvents() {
-        viewModelScope.launch {
-            wsChatBridge.events.collect { event ->
-                if (event is WsTimelineEvent.GoalsUpdated) refreshGoalStatus()
-            }
-        }
-    }
-
-    private fun observeGoalStatusRefreshes() {
-        viewModelScope.launch {
-            isShimBackend
-                .filter { it }
-                .distinctUntilChanged()
-                .collect { refreshGoalStatus() }
-        }
-    }
-
-    private fun observeTransportState() {
-        viewModelScope.launch {
-            combine(isShimBackend, wsChatBridge.connection) { isShim, wsState ->
-                if (!isShim) return@combine ChatTransport.Rest
-                when (wsState) {
-                    is WsConnectionState.Idle -> ChatTransport.WsIdle
-                    is WsConnectionState.Connecting -> ChatTransport.WsConnecting
-                    is WsConnectionState.Connected -> ChatTransport.WsConnected(
-                        a2uiEnabled = wsState.a2uiEnabled,
-                        catalog = wsState.catalog,
-                    )
-                    is WsConnectionState.Disconnected -> ChatTransport.WsDisconnected(
-                        code = wsState.code,
-                        reason = wsState.reason,
-                    )
-                }
-            }.distinctUntilChanged().collect { transport ->
-                _uiState.update { it.copy(transport = transport) }
-            }
-        }
     }
 
     private fun resolveConversationAndLoad(
@@ -929,117 +702,40 @@ internal class AdminChatViewModel @Inject constructor(
     val canSendMessages: Boolean
         get() = ChatSessionReducer.canSend(_sessionState.value)
 
-    fun onScreenPaused() {
-        currentConversationTracker.setCurrent(null)
-    }
+    fun onScreenPaused() = screenLifecycleCoordinator.onScreenPaused()
 
-    private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
-
-    fun onScreenResumed() {
-        val now = SystemClock.elapsedRealtime()
-        if (now - lastScreenResumedAtMs < 200) return
-        lastScreenResumedAtMs = now
-        val currentId = conversationId?.value
-        if (currentId != null) {
-            currentConversationTracker.setCurrent(currentId)
-            val conn = _sessionState.value.connectionState
-            if (conn == ChatConnectionState.Offline || conn == ChatConnectionState.StreamDisconnected) {
-                updateSessionState { current ->
-                    ChatSessionReducer.retryConnection(
-                        current = current,
-                        initial = ChatSessionState(),
-                    )
-                }
-                resolveConversationAndLoad()
-            }
-        }
-    }
+    fun onScreenResumed() = screenLifecycleCoordinator.onScreenResumed()
 
     override fun onCleared() {
         adminChatA2uiCoordinator.release()
-        currentConversationTracker.setCurrent(null)
+        screenLifecycleCoordinator.onCleared()
+        super.onCleared()
     }
 
     // --- Composer coordination delegates ---
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
 
-    fun selectSlashCommand(command: SlashCommand) {
-        composerCoordinator.insertSlashCommand(command)
-        // Tapping an uninstalled skill command installs it to this agent so
-        // the skill becomes available, then refreshes the picker.
-        val skillName = command.skillName
-        if (skillName != null && !command.installed) {
-            viewModelScope.launch {
-                slashCommandRepository.installToAgent(agentId.value, skillName)
-                    .onSuccess {
-                        Log.d(TAG, "Installed skill $skillName to ${agentId.value}")
-                        loadSlashCommands()
-                    }
-                    .onFailure { e -> Log.d(TAG, "Skill install failed for $skillName: ${e.message}") }
-            }
-        }
-    }
+    fun selectSlashCommand(command: com.letta.mobile.data.model.SlashCommand) =
+        slashCommandsCoordinator.selectSlashCommand(command)
 
-    fun uninstallSlashCommand(command: SlashCommand) {
-        val skillName = command.skillName ?: return
-        if (!command.installed) return
-        viewModelScope.launch {
-            slashCommandRepository.uninstallFromAgent(agentId.value, skillName)
-                .onSuccess {
-                    Log.d(TAG, "Uninstalled skill $skillName from ${agentId.value}")
-                    loadSlashCommands()
-                }
-                .onFailure { e -> Log.d(TAG, "Skill uninstall failed for $skillName: ${e.message}") }
-        }
-    }
+    fun uninstallSlashCommand(command: com.letta.mobile.data.model.SlashCommand) =
+        slashCommandsCoordinator.uninstallSlashCommand(command)
 
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
         composerCoordinator.submitComposer(text)
 
     fun sendMessage(text: String) = composerCoordinator.sendMessage(text)
 
-    fun refreshGoalStatus() {
-        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
-            _uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isGoalStatusLoading = true) }
-            slashCommandRepository.getGoalStatus(agentId.value)
-                .onSuccess { status -> _uiState.update { it.copy(goalStatus = status.goal?.toUi(), isGoalStatusLoading = false) } }
-                .onFailure { _uiState.update { it.copy(isGoalStatusLoading = false) } }
-        }
-    }
+    fun refreshGoalStatus() = goalCoordinator.refreshGoalStatus()
 
-    fun sendGoalCommand(command: String) {
-        if (!isShimBackend.value) return
-        viewModelScope.launch {
-            slashCommandRepository.executeGoalCommand(agentId.value, command)
-                .onSuccess { message ->
-                    chatBannerController.showComposerError("Goal: $message")
-                    refreshGoalStatus()
-                }
-                .onFailure { error -> chatBannerController.showComposerError(error.message ?: "Goal command failed") }
-        }
-    }
+    fun sendGoalCommand(command: String) = goalCoordinator.sendGoalCommand(command)
 
-    fun continueGoal() {
-        val objective = _uiState.value.goalStatus?.objective?.takeIf { it.isNotBlank() } ?: return
-        composerCoordinator.sendMessage("Continue working on the active goal: $objective. Take the next concrete step, and update or complete the goal when appropriate.")
-    }
+    fun continueGoal() = goalCoordinator.continueGoal(::sendMessage)
 
     fun rerunMessage(message: UiMessage) = composerCoordinator.rerunMessage(message)
 
     fun interruptRun() = composerCoordinator.interruptRun { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() }
-
-    private fun GoalStatus.toUi() = GoalStatusUi(
-        objective = objective,
-        status = status,
-        activeTimeSeconds = activeTimeSeconds,
-        tokensUsed = tokensUsed,
-        tokenBudget = tokenBudget,
-    )
 
     // --- A2UI coordination delegates ---
     fun dismissA2uiSurface(surfaceId: String) = adminChatA2uiCoordinator.dismissA2uiSurface(surfaceId)
