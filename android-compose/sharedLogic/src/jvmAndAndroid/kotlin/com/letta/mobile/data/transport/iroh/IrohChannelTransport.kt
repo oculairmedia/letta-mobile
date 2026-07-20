@@ -598,6 +598,12 @@ class IrohChannelTransport(
         )
     }
 
+    private fun clearInterruptedTurn(conversationId: String) {
+        if (interruptedTurn?.conversationId == conversationId) {
+            interruptedTurn = null
+        }
+    }
+
     // letta-mobile-34xoj: track consecutive admin_rpc failures and last stream frame
     // time to decide retry-on-same-connection vs. escalate-to-reconnect.
     private val adminRpcRetryState = AdminRpcRetryState()
@@ -1023,9 +1029,7 @@ class IrohChannelTransport(
     override fun cancel(conversationId: String): Boolean {
         val turn = activeTurn
         if (turn == null) {
-            if (interruptedTurn?.conversationId == conversationId) {
-                interruptedTurn = null
-            }
+            clearInterruptedTurn(conversationId)
             // Nothing streaming: preserve the "cancel always yields a terminal"
             // contract so the UI can never get stuck streaming, but there is no
             // run to abort server-side.
