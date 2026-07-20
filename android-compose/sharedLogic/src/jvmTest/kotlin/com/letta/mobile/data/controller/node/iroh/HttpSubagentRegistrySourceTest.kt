@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class HttpSubagentRegistrySourceTest {
     @Test
-    fun discoveryRequiresExplicitRestCapability() {
+    fun discoveryRequiresExplicitRestCapability() = runTest {
         withTransport(
             response("""{"subagent_registry_v1":{"available":true,"transport":"rest"}}"""),
         ) {
@@ -68,7 +68,7 @@ class HttpSubagentRegistrySourceTest {
         assertTrue("subagent.list" in withSource.registeredMethods)
     }
 
-    private fun withTransport(response: AdminProxyTransportResponse, block: () -> Unit) {
+    private suspend fun withTransport(response: AdminProxyTransportResponse, block: suspend () -> Unit) {
         val original = AdminProxyClient.defaultTransportFactory
         AdminProxyClient.defaultTransportFactory = { AdminProxyTransport { _, _, _ -> response } }
         try {

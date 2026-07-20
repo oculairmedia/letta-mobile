@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.SubagentEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,6 +18,18 @@ class AdminRpcContractTest {
         )
     }
 
+    @Test
+    fun subagentMethodsRequireUsableSource() {
+        val router = AdminRpcRegistry.buildRouter("http://localhost:8080", subagentRegistrySource = EmptySource)
+
+        assertEquals(AdminRpcRegistry.subagentMethods, router.registeredMethods.intersect(AdminRpcRegistry.subagentMethods))
+    }
+
+    private object EmptySource : SubagentRegistrySource {
+        override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> = emptyList()
+        override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? = null
+    }
+
     private companion object {
         fun expectedRegisteredMethods(): Set<String> =
             agentMethods() +
@@ -24,8 +37,7 @@ class AdminRpcContractTest {
                 conversationMethods() +
                 projectMethods() +
                 toolMethods() +
-                miscMethods() +
-                subagentMethods()
+                miscMethods()
 
         fun agentMethods() = setOf(
             "agent.context", "agent.create", "agent.delete", "agent.get", "agent.list", "agent.update",
@@ -51,8 +63,6 @@ class AdminRpcContractTest {
             "tool.attach", "tool.create", "tool.delete", "tool.detach",
             "tool.get", "tool.list", "tool.update", "tool_return.get",
         )
-
-        fun subagentMethods() = setOf("subagent.list", "subagent.todos")
 
         fun miscMethods() = setOf(
             "approval.submit",

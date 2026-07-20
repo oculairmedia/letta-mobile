@@ -4,7 +4,10 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
@@ -37,6 +40,12 @@ import kotlin.system.exitProcess
  * [iroh-app-server] Listening on Iroh... (Ctrl+C to stop)
  * ```
  */
+internal fun buildProductionAdminRouter(
+    adminBaseUrl: String,
+    controller: DefaultAppServerController,
+    subagentRegistrySource: SubagentRegistrySource?,
+): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource)
+
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
 ) {
@@ -136,11 +145,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val rpcBase = adminBaseUrl.trimEnd('/')
             val subagentRegistrySource =
                 com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
-            val adminRpcRouter = com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry.buildRouter(
-                rpcBase,
-                controller,
-                subagentRegistrySource,
-            )
+            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +

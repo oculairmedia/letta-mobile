@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
@@ -18,21 +20,25 @@ class HttpSubagentRegistrySource internal constructor(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) : SubagentRegistrySource {
     override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> {
-        val response = proxy.get(
-            AdminPath.shim("v1", "subagents").builder()
-                .query("conversation_id", conversationId)
-                .query("all", includeTerminal.toString())
-                .build(),
-        )
+        val response = withContext(Dispatchers.IO) {
+            proxy.get(
+                AdminPath.shim("v1", "subagents").builder()
+                    .query("conversation_id", conversationId)
+                    .query("all", includeTerminal.toString())
+                    .build(),
+            )
+        }
         return json.decodeFromJsonElement(SubagentListResponse.serializer(), response).subagents
     }
 
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
-        val response = proxy.get(
-            AdminPath.shim("v1", "subagents", toolCallId, "todos").builder()
-                .query("conversation_id", conversationId)
-                .build(),
-        )
+        val response = withContext(Dispatchers.IO) {
+            proxy.get(
+                AdminPath.shim("v1", "subagents", toolCallId, "todos").builder()
+                    .query("conversation_id", conversationId)
+                    .build(),
+            )
+        }
         val decoded = json.decodeFromJsonElement(SubagentTodosResponse.serializer(), response)
         if (!decoded.found || decoded.subagent == null) return null
         return SubagentTodosSnapshot(decoded.subagent, decoded.todos, decoded.todosFound)
@@ -42,11 +48,12 @@ class HttpSubagentRegistrySource internal constructor(
         const val CAPABILITY = "subagent_registry_v1"
 
         /** Returns null until the shim explicitly advertises the HTTP contract. */
-        fun discover(adminBaseUrl: String): HttpSubagentRegistrySource? {
+        suspend fun discover(adminBaseUrl: String): HttpSubagentRegistrySource? {
             val proxy = AdminProxyClient(adminBaseUrl)
             return runCatching {
-                val capability = proxy.get(AdminPath.shim("v1", "capabilities").build())
-                    .jsonObject[CAPABILITY]?.jsonObject
+                val capability = withContext(Dispatchers.IO) {
+                    proxy.get(AdminPath.shim("v1", "capabilities").build())
+                }.jsonObject[CAPABILITY]?.jsonObject
                 val available = capability?.get("available")?.jsonPrimitive?.booleanOrNull == true
                 val transport = capability?.get("transport")?.jsonPrimitive?.content
                 if (available && transport == "rest") HttpSubagentRegistrySource(proxy) else null

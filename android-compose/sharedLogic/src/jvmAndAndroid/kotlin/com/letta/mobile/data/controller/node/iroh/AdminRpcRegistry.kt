@@ -66,7 +66,7 @@ object AdminRpcRegistry {
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {
-            canonicalMethods - SUBAGENT_METHODS
+            canonicalMethods - subagentMethods
         } else {
             canonicalMethods
         }
@@ -78,5 +78,5 @@ object AdminRpcRegistry {
         return router
     }
 
-    private val SUBAGENT_METHODS = setOf("subagent.list", "subagent.todos")
+    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
 }
