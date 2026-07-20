@@ -1,0 +1,82 @@
+name: Agents Policy Check
+
+# Advisory semantic lint for greppable AGENTS.md rules (raw hex colors,
+# sharedLogic JVM APIs, platform Repository duplication, raw AlertDialog).
+# Findings never fail the job (continue-on-error); they surface in the
+# GitHub Actions job summary for PR review.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android-compose/**"
+      - "scripts/ci/**"
+      - "AGENTS.md"
+      - ".github/workflows/agents-policy.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "android-compose/**"
+      - "scripts/ci/**"
+      - "AGENTS.md"
+      - ".github/workflows/agents-policy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: agents-policy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  agents-policy:
+    name: Advisory AGENTS.md policy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so --diff-base origin/main can resolve on PRs.
+          fetch-depth: 0
+
+      - name: Ensure origin/main is available
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main 2>/dev/null \
+            || git fetch --no-tags origin main
+
+      - name: Run agents policy check
+        id: policy
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/agents-policy
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 scripts/ci/agents-policy-check.py --diff-base origin/main \
+              | tee /tmp/agents-policy/findings.txt
+          else
+            # Full scan on main push / workflow_dispatch
+            python3 scripts/ci/agents-policy-check.py \
+              | tee /tmp/agents-policy/findings.txt
+          fi
+
+      - name: Publish findings to job summary
+        if: always()
+        run: |
+          set -euo pipefail
+          {
+            echo "## Agents policy check (advisory)"
+            echo
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "Mode: diff vs \`origin/main\` (changed lines only)"
+            else
+              echo "Mode: full scan of \`android-compose/\`"
+            fi
+            echo
+            echo '```'
+            if [ -f /tmp/agents-policy/findings.txt ]; then
+              cat /tmp/agents-policy/findings.txt
+            else
+              echo "(no output — check may have failed before writing findings)"
+            fi
+            echo '```'
+            echo
+            echo "_Exit code is always 0 for findings; this job uses \`continue-on-error: true\`._"
+          } >> "$GITHUB_STEP_SUMMARY"
