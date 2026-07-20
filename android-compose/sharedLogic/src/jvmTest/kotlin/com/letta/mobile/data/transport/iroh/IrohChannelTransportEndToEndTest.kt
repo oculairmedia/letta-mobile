@@ -417,7 +417,7 @@ class IrohChannelTransportEndToEndTest {
             return flow {
                 delay(delayMs.milliseconds)
                 emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RemoteStreamFrame("f-$turnN", "msg-$turnN", "assistant_message", "reply-for-turn-$turnN")))
-                delay(delayMs / 2)
+                delay((delayMs / 2).milliseconds)
                 emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
             }
         }

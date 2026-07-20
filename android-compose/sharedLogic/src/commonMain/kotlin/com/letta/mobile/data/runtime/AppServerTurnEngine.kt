@@ -359,7 +359,7 @@ class AppServerTurnEngine(
                 if (remaining <= 0) {
                     throw TurnIdleTimedOut
                 }
-                delay(remaining)
+                delay(remaining.milliseconds)
             }
         }
         var pendingCompleted: RuntimeEventDraft? = null

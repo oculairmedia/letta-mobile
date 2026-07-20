@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Desktop "pet mode" v1: hosts the avatar-web renderer on the loopback
  * [AvatarWebHost], opens it in the default browser, and drives it with an
@@ -125,7 +126,7 @@ class DesktopAvatarCompanion(
             val timeSource = TimeSource.Monotonic
             var lastMark = timeSource.markNow()
             while (isActive) {
-                delay(TICK_MILLIS)
+                delay(TICK_MILLIS.milliseconds)
                 val delta = lastMark.elapsedNow().inWholeMicroseconds / 1_000_000f
                 lastMark = timeSource.markNow()
                 director?.tick(delta)

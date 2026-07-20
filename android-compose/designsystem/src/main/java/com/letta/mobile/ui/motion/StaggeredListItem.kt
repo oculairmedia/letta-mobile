@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 
+import kotlin.time.Duration.Companion.milliseconds
 /** Per-index stagger delay. Single source of truth for the entrance cadence. */
 const val StaggerDelayPerIndexMs: Long = 30L
 
@@ -55,7 +56,7 @@ fun LazyItemScope.StaggeredListItem(
     LaunchedEffect(Unit) {
         if (!entranceCompleted) {
             if (withinViewport) {
-                delay(index * StaggerDelayPerIndexMs)
+                delay((index * StaggerDelayPerIndexMs).milliseconds)
             }
             isVisible = true
             entranceCompleted = true

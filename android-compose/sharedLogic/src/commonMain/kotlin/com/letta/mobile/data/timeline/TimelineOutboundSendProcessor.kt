@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.serialization.json.JsonPrimitive
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Handles serializing, sending, streaming, and post-send reconciliation of outbound messages.
  */
@@ -231,7 +232,7 @@ internal class TimelineOutboundSendProcessor(
                     "otid" to otid,
                     "attempt" to attempt + 1,
                 )
-                delay(RECONCILE_RETRY_BACKOFF_MS shl attempt)
+                delay((RECONCILE_RETRY_BACKOFF_MS shl attempt).milliseconds)
             }
         }
         throw lastError ?: IllegalStateException("listMessagesWithRetry exhausted without error")

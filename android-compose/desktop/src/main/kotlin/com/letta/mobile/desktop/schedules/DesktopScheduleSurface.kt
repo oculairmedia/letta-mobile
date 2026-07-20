@@ -42,6 +42,7 @@ import kotlinx.datetime.plus
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 
+import kotlin.time.Duration.Companion.milliseconds
 /** The four schedule views (Penpot "Desktop · Schedules (week/timeline)"). */
 internal enum class ScheduleView(val label: String) {
     Week("Week"),
@@ -91,7 +92,7 @@ fun DesktopScheduleSurface(
     var now by remember { mutableStateOf(Clock.System.now()) }
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(NOW_TICK_MILLIS)
+            kotlinx.coroutines.delay(NOW_TICK_MILLIS.milliseconds)
             now = Clock.System.now()
         }
     }

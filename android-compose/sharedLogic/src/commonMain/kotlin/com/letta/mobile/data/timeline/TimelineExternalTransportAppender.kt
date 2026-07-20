@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Handles appending local events from external transport (admin-shim WS),
  * marking them as sent/failed, and doing agent-specific reconciliation.
@@ -139,7 +140,7 @@ class TimelineExternalTransportAppender(
                     "conversationId" to externalConversationId,
                     "attempt" to attempt + 1,
                 )
-                delay(RECONCILE_RETRY_BACKOFF_MS shl attempt)
+                delay((RECONCILE_RETRY_BACKOFF_MS shl attempt).milliseconds)
             }
         }
         throw lastError ?: IllegalStateException("listAgentMessagesWithRetry exhausted without error")
