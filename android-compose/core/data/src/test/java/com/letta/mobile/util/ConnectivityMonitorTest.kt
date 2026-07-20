@@ -1,5 +1,6 @@
 package com.letta.mobile.util
 
+import android.Manifest
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.letta.mobile.data.api.LettaApiClient
@@ -21,9 +22,12 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -35,6 +39,14 @@ import org.junit.jupiter.api.Tag
 class ConnectivityMonitorTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
+
+    @Before
+    fun grantNetworkStatePermission() {
+        // ConnectivityMonitor guards registerNetworkCallback behind ACCESS_NETWORK_STATE.
+        // Config.NONE means the library manifest permission is not auto-granted.
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+            .grantPermissions(Manifest.permission.ACCESS_NETWORK_STATE)
+    }
 
     @Test
     fun `stopMonitoring cancels active config collector and restart creates a single replacement`() {
