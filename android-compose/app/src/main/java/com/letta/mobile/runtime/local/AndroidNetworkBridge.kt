@@ -143,21 +143,15 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 socket.outputStream.writeJsonResponse(401, errorBody("unauthorized", "Android bridge authorization token is missing or invalid."))
                 return
             }
-            when (method) {
-                "POST" -> when {
-                    path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
-                    path == "/fetch" -> handleFetch(socket.outputStream, body)
-                    path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
-                    path == "/device/actions/command" -> handleDeviceActionCommand(socket.outputStream, body)
-                    path == "/device/mobile-actions/execute" -> handleMobileActionExecute(socket.outputStream, body)
-                    path == "/device/mobile-actions/intent" -> handleMobileIntentAction(socket.outputStream, body)
-                    path.startsWith("/device/hardware/") -> handleHardwareControl(socket.outputStream, path, body)
-                    else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                }
-                "GET" -> when (path) {
-                    "/device/mobile-actions/capabilities" -> handleMobileActionCapabilities(socket.outputStream)
-                    else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                }
+            when {
+                method == "POST" && path == "/dns/lookup" -> handleDnsLookup(socket.outputStream, body)
+                method == "POST" && path == "/fetch" -> handleFetch(socket.outputStream, body)
+                method == "POST" && path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
+                method == "POST" && path == "/device/actions/command" -> handleDeviceActionCommand(socket.outputStream, body)
+                method == "POST" && path == "/device/mobile-actions/execute" -> handleMobileActionExecute(socket.outputStream, body)
+                method == "POST" && path == "/device/mobile-actions/intent" -> handleMobileIntentAction(socket.outputStream, body)
+                method == "POST" && path.startsWith("/device/hardware/") -> handleHardwareControl(socket.outputStream, path, body)
+                method == "GET" && path == "/device/mobile-actions/capabilities" -> handleMobileActionCapabilities(socket.outputStream)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
         }

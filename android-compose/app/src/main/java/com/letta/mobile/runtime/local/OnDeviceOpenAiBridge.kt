@@ -184,15 +184,9 @@ class LocalOpenAiOnDeviceBridge @Inject constructor(
                 return
             }
             android.util.Log.d("OnDeviceOpenAiBridge", "request: $method $path bodyBytes=$resolvedContentLength")
-            when (method) {
-                "GET" -> when (path) {
-                    "/v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
-                    else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                }
-                "POST" -> when (path) {
-                    "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
-                    else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
-                }
+            when {
+                method == "GET" && path == "/v1/models" -> socket.outputStream.writeJsonResponse(200, modelsBody())
+                method == "POST" && path == "/v1/chat/completions" -> handleChatCompletion(socket.outputStream, body)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
         }
