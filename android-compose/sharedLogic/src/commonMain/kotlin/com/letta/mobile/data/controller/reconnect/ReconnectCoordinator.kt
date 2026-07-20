@@ -53,7 +53,6 @@ class ReconnectCoordinator(
             ),
 ) {
     private val reconnectMutex = Mutex()
-    private var lastReconnectState: AppServerControllerState? = null
 
     /**
      * Executes the reconnect/replay flow.

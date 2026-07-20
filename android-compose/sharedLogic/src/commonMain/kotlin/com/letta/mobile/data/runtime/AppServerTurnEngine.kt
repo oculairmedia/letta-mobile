@@ -105,14 +105,6 @@ class AppServerTurnEngine(
     val isBusy: Boolean get() = !activeTurn.tryLock().also { if (it) activeTurn.unlock() }
 
     /**
-     * The runtime scope for the most recently started/cached runtime, or null if
-     * no runtime has been started on this engine yet. Exposed so the transport
-     * can build an `abort_message` addressed to the exact agent/conversation the
-     * active turn is running against.
-     */
-    val currentRuntime: AppServerRuntimeScope? get() = runtime
-
-    /**
      * Sends an `abort_message` for the active runtime so the server tears down
      * the in-flight run and emits its own terminal frame. Returns null when no
      * runtime has been started yet (nothing to abort). [runId] should be the

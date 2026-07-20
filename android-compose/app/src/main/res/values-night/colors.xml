@@ -4,7 +4,7 @@
       Mirror of the design-system color tokens used by the system splash
       and the activity window background. The splash window runs before
       Compose, so it cannot read LettaTheme.Color values at runtime; these
-      XML resources must match the LightBackground / DarkBackground and
+      XML resources must match LettaColorTokens.LIGHT_BACKGROUND / DarkBackground and
       LightOnSurface / DarkOnSurface tokens defined in
       designsystem/.../theme/Color.kt. Keep them in sync.
     -->

@@ -31,14 +31,6 @@ sealed class ChatBackground(val key: String, val label: String) {
         val gradientPresets: List<Gradient> =
             ChatBackgroundToken.gradientPresets.map { it.toChatBackground() }
 
-        // Build with a cast through Any? so the Kotlin compiler retains
-        // null-safety checks - R8 can produce JVM-level nulls for object
-        // singletons on some Android configurations.
-        val allPresets: List<ChatBackground> by lazy {
-            val raw: List<Any?> = listOf(Default) + solidPresets + gradientPresets
-            raw.filterNotNull().filterIsInstance<ChatBackground>()
-        }
-
         fun fromKey(key: String): ChatBackground {
             return try {
                 ChatBackgroundToken.fromKey(key).toChatBackground()

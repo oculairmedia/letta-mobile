@@ -108,7 +108,6 @@ class DeviceSensorReadTool(
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     companion object {
-        const val TOOL_NAME = "read_sensors"
         const val DEFAULT_SENSOR_LIMIT = 64
         const val MAX_SENSOR_RESULTS = 256
         const val DEFAULT_SAMPLE_TIMEOUT_MS = 2_000L

@@ -1553,10 +1553,6 @@ internal fun shouldRunToolCallEntranceAnimation(
 ): Boolean =
     animateEntrance && toolCallEntranceAnimationHistory.addIfAbsent(key)
 
-internal fun recordToolCallEntranceAnimationRun(key: String) {
-    toolCallEntranceAnimationHistory.addIfAbsent(key)
-}
-
 internal fun clearToolCallEntranceAnimationHistoryForTest() {
     toolCallEntranceAnimationHistory.clear()
 }

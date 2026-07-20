@@ -59,9 +59,7 @@ internal class ChatConversationCoordinator(
     private val updateSessionState: ((ChatSessionState) -> ChatSessionState) -> Unit,
     private val pendingClientModeBootstrapMessages: () -> kotlinx.collections.immutable.ImmutableList<UiMessage>,
     private val setPendingClientModeBootstrapUserMessage: (UiMessage) -> Unit,
-    private val clearPendingClientModeBootstrapUserMessage: () -> Unit,
     private val currentClientModeConversationId: () -> String?,
-    private val setClientModeConversationId: (String?) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
     private val stopTimelineObserver: () -> Unit,
     // letta-mobile-ork1: invoked from loadMessagesInternal so opening a

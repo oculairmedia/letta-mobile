@@ -128,9 +128,3 @@ internal class CliProfileStore(
         fun default(): CliProfileStore = CliProfileStore(defaultPath())
     }
 }
-
-private val prettyJson = kotlinx.serialization.json.Json {
-    prettyPrint = true
-    explicitNulls = false
-    encodeDefaults = true
-}

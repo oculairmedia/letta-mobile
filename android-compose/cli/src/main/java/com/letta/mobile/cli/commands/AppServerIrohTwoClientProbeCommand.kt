@@ -75,8 +75,6 @@ internal class AppServerIrohTwoClientProbeCommand : CliktCommand(
         help = "Shared conversation id both clients view. Defaults to 2client-conv-<epoch>.",
     )
 
-    private val message by option("--message", help = "User message text sent each round.").default("two-client ping")
-
     private val timeoutMs by option(
         "--timeout-ms",
         help = "Per-round wall budget for the observer to receive the full turn.",

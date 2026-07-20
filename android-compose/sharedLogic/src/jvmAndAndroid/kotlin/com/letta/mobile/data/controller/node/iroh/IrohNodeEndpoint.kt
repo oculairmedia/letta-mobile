@@ -231,10 +231,8 @@ class IrohNodeEndpoint(
                                 IrohNodeConnection(
                                     connection = connection,
                                     controller = controller,
-                                    alpn = alpn,
                                     adminRpcRouter = adminRpcRouter,
                                     requiredBearerToken = requiredBearerToken,
-                                    allowedPeerIds = allowedPeerIds,
                                     remoteEndpointId = remoteId,
                                     connectionRegistry = connectionRegistry,
                                 ).serve()

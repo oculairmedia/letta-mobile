@@ -53,22 +53,6 @@ object ScheduleFormat {
     }
 
     /**
-     * Heading for a day relative to [now]: `Today` / `Tomorrow` / `Yesterday`,
-     * else a `Mon, Jun 24` date label.
-     */
-    fun dayHeading(instant: Instant, zone: TimeZone, now: Instant): String {
-        val day = instant.toLocalDateTime(zone).date
-        val today = now.toLocalDateTime(zone).date
-        val delta = (day.toEpochDays() - today.toEpochDays()).toInt()
-        return when (delta) {
-            0 -> "Today"
-            1 -> "Tomorrow"
-            -1 -> "Yesterday"
-            else -> dateLabel(instant, zone)
-        }
-    }
-
-    /**
      * Compact signed countdown between [now] and [target]: `in 2h 14m`,
      * `5m ago`, `in 3d`, `now`. Shows at most two units.
      */

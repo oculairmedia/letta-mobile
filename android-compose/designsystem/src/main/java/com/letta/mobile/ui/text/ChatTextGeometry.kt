@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.isSpecified
 import java.util.LinkedHashMap
-import kotlin.math.ceil
 import kotlin.math.floor
 
 private const val CONTENT_FINGERPRINT_CHARS = 96
@@ -57,8 +56,6 @@ data class ChatTextGeometryKey(
 
 class ChatTextGeometry(
     val lineCount: Int,
-    val heightPx: Int,
-    val maxLineWidthPx: Int,
     private val visibleLineEndOffsets: IntArray,
 ) {
     fun visibleEndForLine(lineIndex: Int): Int? =
@@ -246,13 +243,8 @@ private fun TextLayoutResult.toChatTextGeometry(): ChatTextGeometry {
     val lineEnds = IntArray(lineCount) { lineIndex ->
         getLineEnd(lineIndex, visibleEnd = true)
     }
-    val maxLineWidthPx = (0 until lineCount).maxOfOrNull { lineIndex ->
-        ceil(getLineRight(lineIndex) - getLineLeft(lineIndex)).toInt()
-    } ?: 0
     return ChatTextGeometry(
         lineCount = lineCount,
-        heightPx = size.height,
-        maxLineWidthPx = maxLineWidthPx,
         visibleLineEndOffsets = lineEnds,
     )
 }

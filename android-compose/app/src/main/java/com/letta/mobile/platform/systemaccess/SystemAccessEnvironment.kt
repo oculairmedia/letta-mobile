@@ -4,11 +4,9 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
 import com.letta.mobile.platform.ManifestCapabilityProbe
 import com.letta.mobile.platform.SystemAccessBuild
 import com.letta.mobile.platform.SystemAccessFlavor
@@ -121,6 +119,4 @@ internal object AndroidSettingsActions {
     const val ACTION_NOTIFICATION_LISTENER_SETTINGS = Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
     const val ACTION_ACCESSIBILITY_SETTINGS = Settings.ACTION_ACCESSIBILITY_SETTINGS
     const val ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION = "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION"
-
-    fun appDetailsUri(packageName: String): Uri = "package:$packageName".toUri()
 }

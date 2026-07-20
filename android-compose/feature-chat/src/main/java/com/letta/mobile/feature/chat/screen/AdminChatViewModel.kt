@@ -132,7 +132,6 @@ internal class AdminChatViewModel @Inject constructor(
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
-        private const val TAG = "AdminChatViewModel"
     }
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
@@ -385,11 +384,6 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     val composerState: StateFlow<ChatComposerState> by lazy { composerCoordinator.state }
-    val inputText: StateFlow<String> by lazy {
-        composerState
-            .map { it.inputText }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-    }
 
     val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
         .map { ChatBackground.fromKey(it) }
@@ -458,12 +452,6 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun clearChatSearch() = chatSearchCoordinator.clear()
 
-    fun setChatBackground(background: ChatBackground) {
-        viewModelScope.launch {
-            settingsRepository.setChatBackgroundKey(background.key)
-        }
-    }
-
     fun setChatFontScale(scale: Float) {
         viewModelScope.launch {
             settingsRepository.setChatFontScale(scale)
@@ -528,9 +516,7 @@ internal class AdminChatViewModel @Inject constructor(
         updateSessionState = ::updateSessionState,
         pendingClientModeBootstrapMessages = { persistentListOf() },
         setPendingClientModeBootstrapUserMessage = { },
-        clearPendingClientModeBootstrapUserMessage = { },
         currentClientModeConversationId = { null },
-        setClientModeConversationId = { },
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
         reconcileRecentMessages = { convId, reason ->
@@ -696,8 +682,6 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun updateInputText(text: String) = composerCoordinator.updateInputText(text)
-
     val canSendMessages: Boolean
         get() = ChatSessionReducer.canSend(_sessionState.value)
 
@@ -741,6 +725,4 @@ internal class AdminChatViewModel @Inject constructor(
     fun submitA2uiAction(action: A2uiAction) = adminChatA2uiCoordinator.submitA2uiAction(action)
 
     fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
-
-    fun markA2uiThinkingDelayMessageShown() = adminChatA2uiCoordinator.markA2uiThinkingDelayMessageShown()
 }
