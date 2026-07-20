@@ -1,5 +1,6 @@
 package com.letta.mobile.data.mapper
 
+import com.letta.mobile.data.chat.projection.extractSubagentDispatch
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiImageAttachment
