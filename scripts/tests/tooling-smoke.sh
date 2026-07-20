@@ -85,11 +85,20 @@ else
   pass 'config examples contain no apparent literal secrets'
 fi
 
-if git -C "$REPO_ROOT" diff --name-only -- scripts/mcp scripts/scip config/mcp config/scip-java .serena docs/tooling | rg -v \
-  '^(.serena/|config/mcp/|config/scip-java/|docs/tooling/|scripts/mcp/|scripts/scip/|scripts/tests/tooling-smoke.sh$)' | rg -q .; then
-  fail 'Serena and SCIP pilot changes stay within tooling boundaries'
+base_ref="${GITHUB_BASE_REF:+origin/$GITHUB_BASE_REF}"
+if [[ -n "$base_ref" ]] && ! git -C "$REPO_ROOT" rev-parse --verify "$base_ref" >/dev/null 2>&1; then
+  git -C "$REPO_ROOT" fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF:$base_ref"
+fi
+if [[ -n "$base_ref" ]]; then
+  changed_files="$(git -C "$REPO_ROOT" diff --name-only "$base_ref...HEAD")"
 else
-  pass 'Serena and SCIP pilot changes stay within tooling boundaries'
+  changed_files="$(git -C "$REPO_ROOT" diff --name-only HEAD)"
+fi
+if printf '%s\n' "$changed_files" | rg -v \
+  '^(\.github/workflows/architecture-graph\.yml|\.github/workflows/qodana_code_quality\.yml|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$' | rg -q .; then
+  fail 'Code-intelligence stack changes stay within declared boundaries'
+else
+  pass 'Code-intelligence stack changes stay within declared boundaries'
 fi
 
 (( failures == 0 )) || exit 1
