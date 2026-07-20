@@ -51,51 +51,56 @@ class ArchitectureGraphPlugin : Plugin<Project> {
     private fun collectRecords(
         root: Project,
         androidVariants: Set<Pair<String, String>>,
-    ): List<String> = buildList {
-        root.allprojects.sortedBy(Project::getPath).forEach { project ->
-            add(
-                JsonLine.record(
-                    "module",
-                    "path" to project.path,
-                    "directory" to project.projectDir.relativeTo(root.projectDir).invariantSeparatorsPath.ifEmpty { "." },
-                    "kind" to projectKind(project),
-                ),
-            )
+    ): List<String> = ArchitectureRecordCollector(root, androidVariants).collect()
+}
 
-            project.extensions.findByType(KotlinMultiplatformExtension::class.java)?.let { kotlin ->
-                kotlin.targets.sortedBy { it.name }.forEach { target ->
-                    add(JsonLine.record("target", "module" to project.path, "name" to target.name, "platform" to target.platformType.name))
-                }
-                kotlin.sourceSets.sortedBy { it.name }.forEach { sourceSet ->
-                    val sourceDirectories = sourceSet.kotlin.sourceDirectories.files
-                        .map { directory -> directory.relativeTo(root.projectDir).invariantSeparatorsPath }
-                        .sorted()
-                        .joinToString(",")
-                    add(
-                        JsonLine.record(
-                            "sourceSet",
-                            "module" to project.path,
-                            "name" to sourceSet.name,
-                            "paths" to sourceDirectories,
-                        ),
-                    )
-                    sourceSet.dependsOn.sortedBy { it.name }.forEach { parent ->
-                        add(
-                            JsonLine.record(
-                                "sourceSetEdge",
-                                "module" to project.path,
-                                "from" to sourceSet.name,
-                                "to" to parent.name,
-                            ),
-                        )
-                    }
+private class ArchitectureRecordCollector(
+    private val root: Project,
+    private val androidVariants: Set<Pair<String, String>>,
+) {
+    fun collect(): List<String> = buildList {
+        root.allprojects.sortedBy(Project::getPath).forEach { project ->
+            add(moduleRecord(project))
+            addAll(multiplatformRecords(project))
+            addAll(dependencyRecords(project))
+        }
+        androidVariants.forEach { (path, variant) ->
+            add(JsonLine.record("variant", "module" to path, "name" to variant, "platform" to "android"))
+        }
+    }
+
+    private fun moduleRecord(project: Project): String = JsonLine.record(
+        "module",
+        "path" to project.path,
+        "directory" to project.projectDir.relativeTo(root.projectDir).invariantSeparatorsPath.ifEmpty { "." },
+        "kind" to projectKind(project),
+    )
+
+    private fun multiplatformRecords(project: Project): List<String> {
+        val kotlin = project.extensions.findByType(KotlinMultiplatformExtension::class.java) ?: return emptyList()
+        return buildList {
+            kotlin.targets.sortedBy { it.name }.forEach { target ->
+                add(JsonLine.record("target", "module" to project.path, "name" to target.name, "platform" to target.platformType.name))
+            }
+            kotlin.sourceSets.sortedBy { it.name }.forEach { sourceSet ->
+                val sourceDirectories = sourceSet.kotlin.sourceDirectories.files
+                    .map { directory -> directory.relativeTo(root.projectDir).invariantSeparatorsPath }
+                    .sorted()
+                    .joinToString(",")
+                add(JsonLine.record("sourceSet", "module" to project.path, "name" to sourceSet.name, "paths" to sourceDirectories))
+                sourceSet.dependsOn.sortedBy { it.name }.forEach { parent ->
+                    add(JsonLine.record("sourceSetEdge", "module" to project.path, "from" to sourceSet.name, "to" to parent.name))
                 }
             }
+        }
+    }
 
-            project.configurations.sortedBy { it.name }
-                .filter { it.dependencies.isNotEmpty() && isArchitectureConfiguration(it.name) }
-                .forEach { configuration ->
-                configuration.dependencies.sortedWith(compareBy({ it.group.orEmpty() }, { it.name }, { it.version.orEmpty() }))
+    private fun dependencyRecords(project: Project): List<String> = buildList {
+        project.configurations.sortedBy { it.name }
+            .filter { it.dependencies.isNotEmpty() && isArchitectureConfiguration(it.name) }
+            .forEach { configuration ->
+                configuration.dependencies
+                    .sortedWith(compareBy({ it.group.orEmpty() }, { it.name }, { it.version.orEmpty() }))
                     .forEach { dependency ->
                         when (dependency) {
                             is ProjectDependency -> add(
@@ -119,11 +124,6 @@ class ArchitectureGraphPlugin : Plugin<Project> {
                         }
                     }
             }
-        }
-
-        androidVariants.forEach { (path, variant) ->
-            add(JsonLine.record("variant", "module" to path, "name" to variant, "platform" to "android"))
-        }
     }
 
     private fun projectKind(project: Project): String = when {
@@ -142,7 +142,7 @@ class ArchitectureGraphPlugin : Plugin<Project> {
             name == "implementation" ||
             name == "compileOnly" ||
             name == "runtimeOnly" ||
-            name == "ksp" ||
+            name.startsWith("ksp") ||
             name.endsWith("Api") ||
             name.endsWith("Implementation") ||
             name.endsWith("CompileOnly") ||

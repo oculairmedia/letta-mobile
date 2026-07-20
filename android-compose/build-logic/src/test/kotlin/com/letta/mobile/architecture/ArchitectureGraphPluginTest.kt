@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class ArchitectureGraphPluginTest {
     @TempDir
@@ -27,6 +28,8 @@ class ArchitectureGraphPluginTest {
         val first = output.readText()
         assertEquals(first.lines().filter(String::isNotEmpty).sorted(), first.lines().filter(String::isNotEmpty))
         assertEquals(resource("expected.jsonl"), first)
+        assertFalse(first.contains("org.example:ignored"))
+        assertContractFiles(first)
 
         GradleRunner.create()
             .withProjectDir(projectDir)
@@ -34,6 +37,23 @@ class ArchitectureGraphPluginTest {
             .withArguments(arguments)
             .build()
         assertEquals(first, output.readText())
+        assertContractFiles(first)
+    }
+
+    private fun assertContractFiles(graph: String) {
+        val records = graph.lineSequence().filter(String::isNotEmpty).toList()
+        val contractDirectory = projectDir.resolve("build/reports/architecture/contract")
+        mapOf(
+            "modules.jsonl" to setOf("module"),
+            "source_sets.jsonl" to setOf("sourceSet"),
+            "variants.jsonl" to setOf("variant"),
+            "project_edges.jsonl" to setOf("projectEdge"),
+            "external_edges.jsonl" to setOf("externalDependency"),
+        ).forEach { (fileName, types) ->
+            val expected = records.filter { record -> types.any { type -> record.contains("\"type\":\"$type\"") } }
+            val contractFile = contractDirectory.resolve(fileName)
+            assertEquals(expected, contractFile.readLines(), fileName)
+        }
     }
 
     private fun fixture(resource: String, destination: String) {
