@@ -1,44 +1,40 @@
 package com.letta.mobile.feature.editagent
 
-import android.content.ActivityNotFoundException
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.launch
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
-import com.letta.mobile.ui.components.ActionSheet
-import com.letta.mobile.ui.components.ActionSheetItem
-import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 internal enum class EditAgentConfigTab(val label: String) {
@@ -253,29 +249,37 @@ internal fun EditAgentScreenContent(
     var showCloneDialog by remember { mutableStateOf(false) }
     var showResetDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    // letta-mobile-mpr4: section-jump Index. Title tap opens a sheet
-    // that lists every section; selecting one animateScrollToItems the
-    // shared LazyListState in EditAgentContent.
     var showSectionIndex by remember { mutableStateOf(false) }
-    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
-    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
-    val topBarActions = EditAgentTopBarActions(
-        onNavigateBack = onNavigateBack,
-        onTitleClick = { showSectionIndex = true },
-        onSave = {
-            viewModel.saveAgent {
-                snackbar.dispatch(context.getString(R.string.screen_agent_edit_agent_saved))
-            }
-        },
-        onOpenActions = { showActionSheet = true },
-    )
+    val lazyListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
-            EditAgentTopBar(
-                uiState = uiState,
+            val agentName = (uiState as? UiState.Success)?.data?.name?.takeIf { it.isNotBlank() }
+            LargeFlexibleTopAppBar(
+                title = {
+                    if (agentName != null) {
+                        Row(
+                            modifier = Modifier.clickable { showSectionIndex = true },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = agentName,
+                                style = MaterialTheme.typography.titleLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Icon(
+                                LettaIcons.ExpandMore,
+                                contentDescription = stringResource(R.string.screen_agent_edit_jump_to_section),
+                            )
+                        }
+                    }
+                },
+                colors = LettaTopBarDefaults.largeTopAppBarColors(),
                 scrollBehavior = scrollBehavior,
                 actions = topBarActions,
             )
@@ -289,408 +293,103 @@ internal fun EditAgentScreenContent(
                 modifier = Modifier.padding(paddingValues)
             )
             is UiState.Success -> {
-                EditAgentLoadedContent(
-                    data = EditAgentLoadedData(
-                        state = state.data,
-                        llmModels = llmModels,
-                        embeddingModels = embeddingModels,
-                        contentPadding = paddingValues,
-                        lazyListState = lazyListState,
-                    ),
-                    contentCallbacks = editAgentContentCallbacks(
-                        viewModel = viewModel,
-                        onRequestResetDialog = { showResetDialog = true },
-                        onRequestDeleteDialog = { showDeleteDialog = true },
-                    ),
-                    overlayState = EditAgentOverlayState(
-                        showSectionIndex = showSectionIndex,
-                        showActionSheet = showActionSheet,
-                        showResetDialog = showResetDialog,
-                        showDeleteDialog = showDeleteDialog,
-                        showCloneDialog = showCloneDialog,
-                    ),
-                    overlayCallbacks = EditAgentOverlayCallbacks(
-                        onDismissSectionIndex = { showSectionIndex = false },
-                        onSectionSelected = { targetKey ->
+                val callbacks = viewModel.contentCallbacks(
+                    onResetMessages = { showResetDialog = true },
+                    onDeleteAgent = { showDeleteDialog = true },
+                )
+                EditAgentContent(
+                    state = state.data,
+                    llmModels = llmModels,
+                    embeddingModels = embeddingModels,
+                    onNameChange = callbacks.onNameChange,
+                    onDescriptionChange = callbacks.onDescriptionChange,
+                    onModelChange = callbacks.onModelChange,
+                    onEmbeddingChange = callbacks.onEmbeddingChange,
+                    onLoadModels = callbacks.onLoadModels,
+                    onBlockValueChange = callbacks.onBlockValueChange,
+                    onBlockDescriptionChange = callbacks.onBlockDescriptionChange,
+                    onBlockLimitChange = callbacks.onBlockLimitChange,
+                    onAddBlock = callbacks.onAddBlock,
+                    onAttachExistingBlock = callbacks.onAttachExistingBlock,
+                    onAttachExistingBlocks = callbacks.onAttachExistingBlocks,
+                    onDeleteBlock = callbacks.onDeleteBlock,
+                    onAddTag = callbacks.onAddTag,
+                    onRemoveTag = callbacks.onRemoveTag,
+                    onAttachTool = callbacks.onAttachTool,
+                    onAttachTools = callbacks.onAttachTools,
+                    onDetachTool = callbacks.onDetachTool,
+                    onToolRulesJsonChange = callbacks.onToolRulesJsonChange,
+                    onAddAgentSecret = callbacks.onAddAgentSecret,
+                    onAgentSecretKeyChange = callbacks.onAgentSecretKeyChange,
+                    onAgentSecretValueChange = callbacks.onAgentSecretValueChange,
+                    onRemoveAgentSecret = callbacks.onRemoveAgentSecret,
+                    onAddToolEnvironmentVariable = callbacks.onAddToolEnvironmentVariable,
+                    onToolEnvironmentVariableKeyChange = callbacks.onToolEnvironmentVariableKeyChange,
+                    onToolEnvironmentVariableValueChange = callbacks.onToolEnvironmentVariableValueChange,
+                    onRemoveToolEnvironmentVariable = callbacks.onRemoveToolEnvironmentVariable,
+                    onSystemPromptChange = callbacks.onSystemPromptChange,
+                    onProviderTypeChange = callbacks.onProviderTypeChange,
+                    onTemperatureChange = callbacks.onTemperatureChange,
+                    onMaxOutputTokensChange = callbacks.onMaxOutputTokensChange,
+                    onParallelToolCallsChange = callbacks.onParallelToolCallsChange,
+                    onModelProviderNameChange = callbacks.onModelProviderNameChange,
+                    onModelProviderCategoryChange = callbacks.onModelProviderCategoryChange,
+                    onModelEnableReasonerChange = callbacks.onModelEnableReasonerChange,
+                    onModelReasoningEffortChange = callbacks.onModelReasoningEffortChange,
+                    onModelMaxReasoningTokensChange = callbacks.onModelMaxReasoningTokensChange,
+                    onModelReasoningJsonChange = callbacks.onModelReasoningJsonChange,
+                    onModelFrequencyPenaltyChange = callbacks.onModelFrequencyPenaltyChange,
+                    onModelVerbosityChange = callbacks.onModelVerbosityChange,
+                    onModelStrictToolCallingChange = callbacks.onModelStrictToolCallingChange,
+                    onModelResponseFormatJsonChange = callbacks.onModelResponseFormatJsonChange,
+                    onModelResponseSchemaJsonChange = callbacks.onModelResponseSchemaJsonChange,
+                    onModelThinkingConfigJsonChange = callbacks.onModelThinkingConfigJsonChange,
+                    onModelPutInnerThoughtsInKwargsChange = callbacks.onModelPutInnerThoughtsInKwargsChange,
+                    onModelToolCallParserChange = callbacks.onModelToolCallParserChange,
+                    onModelAnthropicEffortChange = callbacks.onModelAnthropicEffortChange,
+                    onContextWindowChange = callbacks.onContextWindowChange,
+                    onEnableSleeptimeChange = callbacks.onEnableSleeptimeChange,
+                    onSummarizationPromptChange = callbacks.onSummarizationPromptChange,
+                    onCompactionClipCharsChange = callbacks.onCompactionClipCharsChange,
+                    onSlidingWindowPercentageChange = callbacks.onSlidingWindowPercentageChange,
+                    onPromptAcknowledgementChange = callbacks.onPromptAcknowledgementChange,
+                    onCompactionModeChange = callbacks.onCompactionModeChange,
+                    onCompactionModelChange = callbacks.onCompactionModelChange,
+                    onCompactionModelSettingsJsonChange = callbacks.onCompactionModelSettingsJsonChange,
+                    onResetMessages = callbacks.onResetMessages,
+                    onDeleteAgent = callbacks.onDeleteAgent,
+                    contentPadding = paddingValues,
+                    lazyListState = lazyListState,
+                )
+
+                if (showSectionIndex) {
+                    SectionIndexSheet(
+                        onDismiss = { showSectionIndex = false },
+                        onSelect = { targetKey ->
                             showSectionIndex = false
                             coroutineScope.launch {
                                 lazyListState.animateScrollToKey(targetKey)
                             }
                         },
-                        onDismissActionSheet = { showActionSheet = false },
-                        onSave = topBarActions.onSave,
-                        onExport = {
-                            viewModel.exportAgent { exportData ->
-                                val exported = shareAgentExport(context, exportData)
-                                snackbar.dispatch(
-                                    context.getString(
-                                        if (exported) {
-                                            R.string.screen_settings_export_ready
-                                        } else {
-                                            R.string.screen_settings_export_unavailable
-                                        }
-                                    )
-                                )
-                            }
-                        },
-                        onClone = { showCloneDialog = true },
-                        onDismissResetDialog = { showResetDialog = false },
-                        onConfirmReset = {
-                            showResetDialog = false
-                            viewModel.resetMessages {
-                                snackbar.dispatch(context.getString(R.string.screen_settings_messages_reset))
-                            }
-                        },
-                        onDismissDeleteDialog = { showDeleteDialog = false },
-                        onConfirmDelete = {
-                            showDeleteDialog = false
-                            viewModel.deleteAgent(onNavigateBack)
-                        },
-                        onDismissCloneDialog = { showCloneDialog = false },
-                        onCloneAgent = { cloneName, overrideExistingTools, stripMessages ->
-                            showCloneDialog = false
-                            viewModel.cloneAgent(
-                                cloneName = cloneName,
-                                overrideExistingTools = overrideExistingTools,
-                                stripMessages = stripMessages,
-                            ) { response ->
-                                snackbar.dispatch(
-                                    context.resources.getQuantityString(
-                                        R.plurals.screen_settings_clone_success,
-                                        response.agentIds.size,
-                                        response.agentIds.size,
-                                    )
-                                )
-                            }
-                        },
-                    ),
-                )
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditAgentTopBar(
-    uiState: UiState<EditAgentUiState>,
-    scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
-    actions: EditAgentTopBarActions,
-) {
-    val agentName = (uiState as? UiState.Success)?.data?.name?.takeIf { it.isNotBlank() }
-    LargeFlexibleTopAppBar(
-        title = {
-            if (agentName != null) {
-                // letta-mobile-mpr4: tap title to open the
-                // section-jump Index. Chevron advertises that
-                // it's interactive — without it the affordance
-                // is invisible.
-                androidx.compose.foundation.layout.Row(
-                    modifier = Modifier.clickable(onClick = actions.onTitleClick),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = agentName,
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                    Icon(
-                        LettaIcons.ExpandMore,
-                        contentDescription = stringResource(R.string.screen_agent_edit_jump_to_section),
                     )
                 }
-            }
-        },
-        colors = LettaTopBarDefaults.largeTopAppBarColors(),
-        scrollBehavior = scrollBehavior,
-        navigationIcon = {
-            IconButton(onClick = actions.onNavigateBack) {
-                Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-            }
-        },
-        actions = {
-            IconButton(onClick = actions.onSave) {
-                Icon(LettaIcons.Save, contentDescription = stringResource(R.string.action_save_changes))
-            }
-            IconButton(onClick = actions.onOpenActions) {
-                Icon(LettaIcons.MoreVert, contentDescription = "More actions")
-            }
-        },
-    )
-}
 
-@Composable
-private fun EditAgentLoadedContent(
-    data: EditAgentLoadedData,
-    contentCallbacks: EditAgentContentCallbacks,
-    overlayState: EditAgentOverlayState,
-    overlayCallbacks: EditAgentOverlayCallbacks,
-) {
-    EditAgentContent(
-        state = data.state,
-        llmModels = data.llmModels,
-        embeddingModels = data.embeddingModels,
-        onNameChange = contentCallbacks.onNameChange,
-        onDescriptionChange = contentCallbacks.onDescriptionChange,
-        onModelChange = contentCallbacks.onModelChange,
-        onEmbeddingChange = contentCallbacks.onEmbeddingChange,
-        onLoadModels = contentCallbacks.onLoadModels,
-        onBlockValueChange = contentCallbacks.onBlockValueChange,
-        onBlockDescriptionChange = contentCallbacks.onBlockDescriptionChange,
-        onBlockLimitChange = contentCallbacks.onBlockLimitChange,
-        onAddBlock = contentCallbacks.onAddBlock,
-        onAttachExistingBlock = contentCallbacks.onAttachExistingBlock,
-        onAttachExistingBlocks = contentCallbacks.onAttachExistingBlocks,
-        onDeleteBlock = contentCallbacks.onDeleteBlock,
-        onAddTag = contentCallbacks.onAddTag,
-        onRemoveTag = contentCallbacks.onRemoveTag,
-        onAttachTool = contentCallbacks.onAttachTool,
-        onAttachTools = contentCallbacks.onAttachTools,
-        onDetachTool = contentCallbacks.onDetachTool,
-        onToolRulesJsonChange = contentCallbacks.onToolRulesJsonChange,
-        onAddAgentSecret = contentCallbacks.onAddAgentSecret,
-        onAgentSecretKeyChange = contentCallbacks.onAgentSecretKeyChange,
-        onAgentSecretValueChange = contentCallbacks.onAgentSecretValueChange,
-        onRemoveAgentSecret = contentCallbacks.onRemoveAgentSecret,
-        onAddToolEnvironmentVariable = contentCallbacks.onAddToolEnvironmentVariable,
-        onToolEnvironmentVariableKeyChange = contentCallbacks.onToolEnvironmentVariableKeyChange,
-        onToolEnvironmentVariableValueChange = contentCallbacks.onToolEnvironmentVariableValueChange,
-        onRemoveToolEnvironmentVariable = contentCallbacks.onRemoveToolEnvironmentVariable,
-        onSystemPromptChange = contentCallbacks.onSystemPromptChange,
-        onProviderTypeChange = contentCallbacks.onProviderTypeChange,
-        onTemperatureChange = contentCallbacks.onTemperatureChange,
-        onMaxOutputTokensChange = contentCallbacks.onMaxOutputTokensChange,
-        onParallelToolCallsChange = contentCallbacks.onParallelToolCallsChange,
-        onModelProviderNameChange = contentCallbacks.onModelProviderNameChange,
-        onModelProviderCategoryChange = contentCallbacks.onModelProviderCategoryChange,
-        onModelEnableReasonerChange = contentCallbacks.onModelEnableReasonerChange,
-        onModelReasoningEffortChange = contentCallbacks.onModelReasoningEffortChange,
-        onModelMaxReasoningTokensChange = contentCallbacks.onModelMaxReasoningTokensChange,
-        onModelReasoningJsonChange = contentCallbacks.onModelReasoningJsonChange,
-        onModelFrequencyPenaltyChange = contentCallbacks.onModelFrequencyPenaltyChange,
-        onModelVerbosityChange = contentCallbacks.onModelVerbosityChange,
-        onModelStrictToolCallingChange = contentCallbacks.onModelStrictToolCallingChange,
-        onModelResponseFormatJsonChange = contentCallbacks.onModelResponseFormatJsonChange,
-        onModelResponseSchemaJsonChange = contentCallbacks.onModelResponseSchemaJsonChange,
-        onModelThinkingConfigJsonChange = contentCallbacks.onModelThinkingConfigJsonChange,
-        onModelPutInnerThoughtsInKwargsChange = contentCallbacks.onModelPutInnerThoughtsInKwargsChange,
-        onModelToolCallParserChange = contentCallbacks.onModelToolCallParserChange,
-        onModelAnthropicEffortChange = contentCallbacks.onModelAnthropicEffortChange,
-        onContextWindowChange = contentCallbacks.onContextWindowChange,
-        onEnableSleeptimeChange = contentCallbacks.onEnableSleeptimeChange,
-        onSummarizationPromptChange = contentCallbacks.onSummarizationPromptChange,
-        onCompactionClipCharsChange = contentCallbacks.onCompactionClipCharsChange,
-        onSlidingWindowPercentageChange = contentCallbacks.onSlidingWindowPercentageChange,
-        onPromptAcknowledgementChange = contentCallbacks.onPromptAcknowledgementChange,
-        onCompactionModeChange = contentCallbacks.onCompactionModeChange,
-        onCompactionModelChange = contentCallbacks.onCompactionModelChange,
-        onCompactionModelSettingsJsonChange = contentCallbacks.onCompactionModelSettingsJsonChange,
-        onResetMessages = contentCallbacks.onResetMessages,
-        onDeleteAgent = contentCallbacks.onDeleteAgent,
-        contentPadding = data.contentPadding,
-        lazyListState = data.lazyListState,
-    )
-
-    if (overlayState.showSectionIndex) {
-        SectionIndexSheet(
-            onDismiss = overlayCallbacks.onDismissSectionIndex,
-            onSelect = overlayCallbacks.onSectionSelected,
-        )
-    }
-
-    EditAgentActionsSheet(
-        show = overlayState.showActionSheet,
-        actions = EditAgentActionsSheetActions(
-            onDismiss = overlayCallbacks.onDismissActionSheet,
-            onSave = overlayCallbacks.onSave,
-            onExport = overlayCallbacks.onExport,
-            onClone = overlayCallbacks.onClone,
-        ),
-    )
-
-    ConfirmDialog(
-        show = overlayState.showResetDialog,
-        title = stringResource(R.string.screen_settings_reset_messages_title),
-        message = stringResource(R.string.screen_settings_reset_messages_confirm),
-        confirmText = stringResource(R.string.action_reset_messages),
-        dismissText = stringResource(R.string.action_cancel),
-        onConfirm = overlayCallbacks.onConfirmReset,
-        onDismiss = overlayCallbacks.onDismissResetDialog,
-        destructive = true,
-    )
-
-    ConfirmDialog(
-        show = overlayState.showDeleteDialog,
-        title = stringResource(R.string.screen_agents_dialog_delete_title),
-        message = stringResource(R.string.screen_agents_dialog_delete_confirm_permanent),
-        confirmText = stringResource(R.string.action_delete),
-        dismissText = stringResource(R.string.action_cancel),
-        onConfirm = overlayCallbacks.onConfirmDelete,
-        onDismiss = overlayCallbacks.onDismissDeleteDialog,
-        destructive = true,
-    )
-
-    if (overlayState.showCloneDialog) {
-        CloneAgentDialog(
-            initialName = data.state.name,
-            isCloning = data.state.isCloning,
-            onDismiss = overlayCallbacks.onDismissCloneDialog,
-            onClone = overlayCallbacks.onCloneAgent,
-        )
-    }
-}
-
-@Composable
-private fun EditAgentActionsSheet(
-    show: Boolean,
-    actions: EditAgentActionsSheetActions,
-) {
-    ActionSheet(
-        show = show,
-        onDismiss = actions.onDismiss,
-        title = "Actions",
-    ) {
-        ActionSheetItem(
-            text = stringResource(R.string.action_save_settings),
-            icon = LettaIcons.Check,
-            onClick = {
-                actions.onDismiss()
-                actions.onSave()
-            },
-        )
-        ActionSheetItem(
-            text = stringResource(R.string.action_export_agent),
-            icon = LettaIcons.Share,
-            onClick = {
-                actions.onDismiss()
-                actions.onExport()
-            },
-        )
-        ActionSheetItem(
-            text = stringResource(R.string.action_clone_agent),
-            icon = LettaIcons.Copy,
-            onClick = {
-                actions.onDismiss()
-                actions.onClone()
-            },
-        )
-        // letta-mobile-cygd: Reset Messages and Delete Agent
-        // moved to EditAgentContent's bottom Danger Zone so
-        // destructive actions live in one unmistakable spot
-        // instead of being a long-press away in the overflow.
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SectionIndexSheet(
-    onDismiss: () -> Unit,
-    onSelect: (anchorKey: String) -> Unit,
-) {
-    val sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val entries = listOf(
-        SectionAnchors.BASICS to R.string.screen_agent_edit_section_basics,
-        SectionAnchors.MODELS to R.string.screen_agent_edit_section_models,
-        SectionAnchors.MEMORY to R.string.screen_agent_edit_section_memory,
-        SectionAnchors.TOOLS to R.string.screen_agent_edit_section_tools,
-        SectionAnchors.RUNTIME to R.string.screen_agent_edit_section_runtime,
-        SectionAnchors.ADVANCED to R.string.screen_agent_edit_section_advanced,
-        SectionAnchors.DANGER to R.string.screen_create_project_danger_zone_title,
-    )
-    androidx.compose.material3.ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-    ) {
-        androidx.compose.foundation.layout.Column(
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                text = stringResource(R.string.screen_agent_edit_jump_to_section),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-            entries.forEach { (anchorKey, labelRes) ->
-                val isDanger = anchorKey == SectionAnchors.DANGER
-                androidx.compose.material3.ListItem(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelect(anchorKey) },
-                    headlineContent = {
-                        Text(
-                            text = stringResource(labelRes),
-                            color = if (isDanger) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
-                    },
+                EditAgentDialogs(
+                    showActionSheet = showActionSheet,
+                    onShowActionSheetChange = { showActionSheet = it },
+                    showResetDialog = showResetDialog,
+                    onShowResetDialogChange = { showResetDialog = it },
+                    showDeleteDialog = showDeleteDialog,
+                    onShowDeleteDialogChange = { showDeleteDialog = it },
+                    showCloneDialog = showCloneDialog,
+                    onShowCloneDialogChange = { showCloneDialog = it },
+                    agentState = state.data,
+                    viewModel = viewModel,
+                    snackbar = snackbar,
+                    context = context,
+                    onNavigateBack = onNavigateBack,
                 )
             }
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
         }
-    }
-}
-
-/**
- * letta-mobile-mpr4: scroll a [LazyListState] to the item that matches
- * [targetKey]. If the item is currently visible, animate to it
- * directly; otherwise, sweep forward in chunks until it appears (or we
- * hit the end of the list). LazyListState exposes keys only for
- * visible items, so a sweep is unavoidable for off-screen targets —
- * the agent config has ~21 items so two or three sweep iterations
- * cover any jump.
- */
-private suspend fun androidx.compose.foundation.lazy.LazyListState.animateScrollToKey(
-    targetKey: Any,
-) {
-    val visible = layoutInfo.visibleItemsInfo
-    val direct = visible.firstOrNull { it.key == targetKey }?.index
-    if (direct != null) {
-        animateScrollToItem(direct)
-        return
-    }
-    val total = layoutInfo.totalItemsCount
-    if (total == 0) return
-
-    var lastSeenIndex = visible.lastOrNull()?.index ?: 0
-    var safety = 0
-    while (lastSeenIndex < total - 1 && safety < 16) {
-        val nextStart = (lastSeenIndex + 1).coerceAtMost(total - 1)
-        scrollToItem(nextStart)
-        val found = layoutInfo.visibleItemsInfo.firstOrNull { it.key == targetKey }?.index
-        if (found != null) {
-            animateScrollToItem(found)
-            return
-        }
-        val newLast = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: break
-        if (newLast <= lastSeenIndex) break
-        lastSeenIndex = newLast
-        safety++
-    }
-}
-
-private fun shareAgentExport(context: Context, exportData: String): Boolean {
-    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-        type = "text/plain"
-        putExtra(Intent.EXTRA_TEXT, exportData)
-        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.screen_settings_export_subject))
-    }
-
-    val chooser = Intent.createChooser(shareIntent, context.getString(R.string.action_export_agent))
-        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-    try {
-        context.startActivity(chooser)
-        return true
-    } catch (_: ActivityNotFoundException) {
-        return false
     }
 }
