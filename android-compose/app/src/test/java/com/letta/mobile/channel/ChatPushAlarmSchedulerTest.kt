@@ -4,7 +4,6 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import com.letta.mobile.util.Telemetry
 import io.mockk.every
 import io.mockk.mockk
@@ -19,7 +18,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -48,18 +46,12 @@ class ChatPushAlarmSchedulerTest {
         } returns pendingIntent
 
         Telemetry.clear()
-
-        ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", Build.VERSION_CODES.M)
     }
 
     @After
     fun tearDown() {
         unmockkStatic(PendingIntent::class)
         Telemetry.clear()
-    }
-
-    private fun setSdkInt(version: Int) {
-        ReflectionHelpers.setStaticField(Build.VERSION::class.java, "SDK_INT", version)
     }
 
     @Test
@@ -89,33 +81,12 @@ class ChatPushAlarmSchedulerTest {
     }
 
     @Test
-    fun `schedule uses setAndAllowWhileIdle on M and above`() {
-        setSdkInt(Build.VERSION_CODES.M)
-
+    fun `schedule uses setAndAllowWhileIdle`() {
+        // minSdk is 26 (M+), so the pre-M AlarmManager.set branch is gone.
         ChatPushAlarmScheduler.schedule(context)
 
         verify {
             alarmManager.setAndAllowWhileIdle(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                any(),
-                pendingIntent
-            )
-        }
-
-        val events = Telemetry.snapshot()
-        val event = events.firstOrNull { it.tag == "ChatPushAlarm" && it.name == "scheduled" }
-        assertNotNull(event)
-        assertEquals(15L, event!!.attrs["intervalMinutes"])
-    }
-
-    @Test
-    fun `schedule uses set on pre-M`() {
-        setSdkInt(Build.VERSION_CODES.LOLLIPOP_MR1)
-
-        ChatPushAlarmScheduler.schedule(context)
-
-        verify {
-            alarmManager.set(
                 AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 any(),
                 pendingIntent

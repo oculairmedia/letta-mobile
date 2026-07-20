@@ -55,5 +55,14 @@ exclude:
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatUiStateProvider.kt
       - app/src/main/java/com/letta/mobile/ui/screens/agentlist/AgentListUiStateProvider.kt
-  # Style notes (const naming) are not merge blockers; rename waves are separate.
-  - name: ConstPropertyName
+  # Adaptive icons must stay in mipmap-anydpi-v26 (API 26+). Renaming to
+  # mipmap-anydpi to silence ObsoleteSdkInt breaks AAPT linking for play builds.
+  - name: AndroidLintObsoleteSdkInt
+    paths:
+      - app/src/main/res/mipmap-anydpi-v26
+  # SentryInitializer must use Resources.getIdentifier so missing optional
+  # strings (DSN/env/sample-rate) soft-fail; R.string lookups throw and break
+  # App Startup / unit tests when resources are absent.
+  - name: AndroidLintDiscouragedApi
+    paths:
+      - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt
