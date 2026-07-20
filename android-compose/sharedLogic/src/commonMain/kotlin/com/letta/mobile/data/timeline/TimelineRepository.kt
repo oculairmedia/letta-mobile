@@ -336,12 +336,6 @@ open class TimelineRepository(
         loop?.postHandlerCollapse()
     }
 
-    suspend fun postHandlerCollapse(agentId: String?, conversationId: String) {
-        val key = TimelineCacheKey(agentId, conversationId)
-        val loop = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }
-        loop?.postHandlerCollapse()
-    }
-
     /**
      * Pull recent server messages into an existing or newly-created timeline loop.
      *

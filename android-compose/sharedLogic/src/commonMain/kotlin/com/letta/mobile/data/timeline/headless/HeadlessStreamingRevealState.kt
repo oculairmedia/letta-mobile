@@ -148,16 +148,6 @@ private fun String.takePrefixCodePoints(maxCodePoints: Int): String {
     return substring(0, index)
 }
 
-private fun String.codePointCount(): Int {
-    var count = 0
-    var index = 0
-    while (index < length) {
-        index += codePointWidthAt(index)
-        count += 1
-    }
-    return count
-}
-
 private fun String.codePointWidthAt(index: Int): Int =
     if (this[index].isHighSurrogate() && index + 1 < length && this[index + 1].isLowSurrogate()) 2 else 1
 

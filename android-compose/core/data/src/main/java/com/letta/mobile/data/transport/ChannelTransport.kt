@@ -757,8 +757,6 @@ class ChannelTransport internal constructor(
         const val KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE = 4001
         private val AUTH_FAILURE_CLOSE_CODES = setOf(4003, 4401, 4403)
 
-        const val DEFAULT_CRON_TIMEOUT_MS: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS
-
         internal fun nowIso(): String = Instant.now().toString()
 
         private fun ServerFrame.runIdOrNull(): String? = when (this) {

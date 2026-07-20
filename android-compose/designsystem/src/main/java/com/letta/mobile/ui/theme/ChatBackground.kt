@@ -25,12 +25,6 @@ sealed class ChatBackground(val key: String, val label: String) {
     }
 
     companion object {
-        val solidPresets: List<SolidColor> =
-            ChatBackgroundToken.solidPresets.map { it.toChatBackground() }
-
-        val gradientPresets: List<Gradient> =
-            ChatBackgroundToken.gradientPresets.map { it.toChatBackground() }
-
         fun fromKey(key: String): ChatBackground {
             return try {
                 ChatBackgroundToken.fromKey(key).toChatBackground()

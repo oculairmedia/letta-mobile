@@ -237,9 +237,6 @@ internal class ConnectionEventSeq(base: Long) {
 
     /** Strictly-monotonic next value for this connection. */
     fun next(): Long = counter.getAndIncrement()
-
-    /** The next value that [next] would return, without consuming it. */
-    val peek: Long get() = counter.value
 }
 
 internal object IrohEventSeqAllocator {
