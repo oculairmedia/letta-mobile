@@ -22,6 +22,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import java.util.concurrent.CopyOnWriteArrayList
 
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -119,7 +120,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
     @Test
     fun `dispatch emits a SubagentsUpdated with the running entry and full snapshot`() = runBlocking {
         val transport = transport()
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")
@@ -152,7 +153,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
     @Test
     fun `idempotent re-observe of the same dispatch does not emit a duplicate`() = runBlocking {
         val transport = transport()
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")
@@ -186,7 +187,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
     @Test
     fun `return emits a SubagentsUpdated marking the entry completed`() = runBlocking {
         val transport = transport()
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")
@@ -221,7 +222,7 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
     @Test
     fun `return for an unknown tool call id emits nothing`() = runBlocking {
         val transport = transport()
-        val frames = mutableListOf<ServerFrame>()
+        val frames = CopyOnWriteArrayList<ServerFrame>()
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")

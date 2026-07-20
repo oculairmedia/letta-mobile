@@ -13,6 +13,10 @@ on:
       # required perf-gate check (see android.yml for the deadlock rationale).
       - ".github/workflows/**"
       - "android-compose/**"
+      - "scripts/tests/**"
+      - "scripts/mcp/**"
+      - "scripts/scip/**"
+      - "tools/architecture_query/**"
   workflow_dispatch:
     inputs:
       rebaseline:
