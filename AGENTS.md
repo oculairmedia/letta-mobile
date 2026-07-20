@@ -388,8 +388,9 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 ### Running the app on this VM
 
-- Only the **Compose Desktop** client (`:desktop:run`) is runnable here — there is no Android
-  emulator (no nested KVM), so the Android `:app` can be built/tested but not launched.
+- Both clients are runnable here: the **Compose Desktop** app (`:desktop:run`) and the **Android**
+  `:app` in the emulator (see the Android emulator subsection below). They can run side by side on
+  the same VNC display (`:1`).
 - The desktop app renders through Skiko, which **cannot create a GL context on the VNC X server**
   (`RenderException: Cannot create Linux GL context`). Force software rendering and target the
   VNC display:
@@ -405,6 +406,30 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 - An `iroh://<nodeId>@<host>:<port>` ticket in the Server URL field switches the client to the
   Iroh QUIC P2P transport automatically (scheme-detected — Mode does not matter); admin/agent
   traffic then flows over QUIC instead of HTTP.
+
+### Running the Android app (`:app`) in the emulator
+
+- There is **no KVM** on this VM (`/dev/kvm` absent), so the emulator runs under **software (TCG)
+  emulation** — functional but slow. The SDK `emulator`, an `x86_64` system image, and an AVD named
+  `letta_test` are provisioned in the snapshot.
+- Launch on the VNC display with software GPU + no acceleration:
+  ```bash
+  DISPLAY=:1 emulator -avd letta_test -accel off -gpu swiftshader_indirect \
+    -no-snapshot -no-boot-anim -no-audio -memory 3072 -partition-size 4096 -no-metrics &
+  adb wait-for-device
+  # boot is slow under TCG (several minutes); poll until it prints 1:
+  until [ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 10; done
+  ```
+- Install + launch the debug build (the app id is `com.letta.mobile.dev`, and debug builds also
+  register a LeakCanary launcher — start `MainActivity` explicitly, not via the launcher):
+  ```bash
+  adb -s emulator-5554 install -r android-compose/app/build/outputs/apk/root/debug/app-root-debug.apk
+  adb -s emulator-5554 shell am start -n com.letta.mobile.dev/com.letta.mobile.MainActivity
+  ```
+- Under TCG the OS is slow enough that Android may show "System/Process isn't responding" ANR
+  dialogs during startup — tap **Wait** (or `adb shell input tap`) and give it time; these are
+  emulation-speed artifacts, not app bugs. `adb exec-out screencap -p > out.png` is the most
+  reliable way to capture the app's screen.
 
 ### Persisting the desktop backend config (without committing the URL)
 
