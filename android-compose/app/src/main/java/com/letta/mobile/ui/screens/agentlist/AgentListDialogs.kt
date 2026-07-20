@@ -137,7 +137,7 @@ internal fun CreateAgentDialog(
         confirmText = stringResource(R.string.action_create),
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
-        confirmEnabled = validation.enabled,
+        confirmEnabled = resources.validation.enabled,
         onConfirm = {
             onCreate(
                 buildAgentCreateParams(formState),
