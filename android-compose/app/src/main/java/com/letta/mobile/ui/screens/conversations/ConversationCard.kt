@@ -1,0 +1,303 @@
+package com.letta.mobile.ui.screens.conversations
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.R
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.LettaCardDefaults
+import com.letta.mobile.ui.components.TextInputDialog
+import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.theme.listItemHeadline
+import com.letta.mobile.ui.theme.listItemSupporting
+import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.util.formatRelativeTime
+
+data class ConversationCardCallbacks(
+    val onClick: () -> Unit,
+    val onOpenAdmin: () -> Unit,
+    val onDelete: () -> Unit,
+    val onRename: (String) -> Unit,
+    val onTogglePinned: () -> Unit,
+    val onFork: () -> Unit,
+)
+
+private data class ConversationCardMenuActions(
+    val onDismiss: () -> Unit,
+    val onRequestRename: () -> Unit,
+    val onRequestDelete: () -> Unit,
+)
+
+private data class ConversationCardMenuState(
+    val show: Boolean,
+    val title: String,
+    val display: ConversationDisplay,
+    val actions: ConversationCardMenuActions,
+)
+
+private data class ConversationCardSurfaceClickCallbacks(
+    val onClick: () -> Unit,
+    val onLongClick: () -> Unit,
+)
+
+private data class ConversationCardSurfaceParams(
+    val title: String,
+    val display: ConversationDisplay,
+    val clicks: ConversationCardSurfaceClickCallbacks,
+    val modifier: Modifier = Modifier,
+)
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun ConversationCard(
+    display: ConversationDisplay,
+    callbacks: ConversationCardCallbacks,
+    modifier: Modifier = Modifier,
+) {
+    val conversation = display.conversation
+    var showContextMenu by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+    val title = conversationCardTitle(display)
+
+    ConversationCardSurface(
+        params = ConversationCardSurfaceParams(
+            title = title,
+            display = display,
+            clicks = ConversationCardSurfaceClickCallbacks(
+                onClick = callbacks.onClick,
+                onLongClick = {
+                    HapticEffects.longPress(haptic)
+                    showContextMenu = true
+                },
+            ),
+            modifier = modifier,
+        ),
+    )
+
+    ConversationCardContextMenu(
+        state = ConversationCardMenuState(
+            show = showContextMenu,
+            title = title,
+            display = display,
+            actions = ConversationCardMenuActions(
+                onDismiss = { showContextMenu = false },
+                onRequestRename = { showRenameDialog = true },
+                onRequestDelete = { showDeleteDialog = true },
+            ),
+        ),
+        callbacks = callbacks,
+    )
+
+    ConversationCardConfirmDialog(
+        show = showDeleteDialog,
+        content = ConversationCardConfirmDialogContent(
+            title = stringResource(R.string.screen_conversations_dialog_delete_title),
+            message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
+            confirmText = stringResource(R.string.action_delete),
+            destructive = true,
+        ),
+        callbacks = ConversationCardConfirmDialogCallbacks(
+            onConfirm = callbacks.onDelete,
+            onDismiss = { showDeleteDialog = false },
+        ),
+    )
+
+    ConversationCardTextInputDialog(
+        params = ConversationCardTextInputDialogParams(
+            show = showRenameDialog,
+            fields = ConversationCardTextInputFields(
+                title = stringResource(R.string.screen_conversations_dialog_rename_title),
+                label = stringResource(R.string.common_name),
+                initialValue = conversation.summary ?: "",
+            ),
+            onConfirm = callbacks.onRename,
+            onDismiss = { showRenameDialog = false },
+        ),
+    )
+}
+
+private fun conversationCardTitle(display: ConversationDisplay): String =
+    display.conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
+    Card(
+        modifier = params.modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = params.clicks.onClick,
+                onLongClick = params.clicks.onLongClick,
+            ),
+        shape = RoundedCornerShape(12.dp),
+        colors = LettaCardDefaults.listCardColors(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = params.title,
+                style = MaterialTheme.typography.listItemHeadline,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = conversationCardMetadata(params.display),
+                style = MaterialTheme.typography.listItemSupporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun conversationCardMetadata(display: ConversationDisplay): String {
+    val timeText = conversationActivityText(display.conversation)
+    return buildString {
+        if (display.isPinned) {
+            append("Pinned • ")
+        }
+        append(display.agentName)
+        if (timeText != null) {
+            append(" • ")
+            append(timeText)
+        }
+    }
+}
+
+@Composable
+private fun ConversationCardContextMenu(
+    state: ConversationCardMenuState,
+    callbacks: ConversationCardCallbacks,
+) {
+    ActionSheet(
+        show = state.show,
+        onDismiss = state.actions.onDismiss,
+        title = state.title,
+    ) {
+        ActionSheetItem(
+            text = stringResource(R.string.screen_conversations_admin_details),
+            icon = LettaIcons.ManageSearch,
+            onClick = { state.actions.onDismiss(); callbacks.onOpenAdmin() },
+        )
+        ActionSheetItem(
+            text = conversationPinActionLabel(state.display.isPinned),
+            icon = LettaIcons.Star,
+            onClick = { state.actions.onDismiss(); callbacks.onTogglePinned() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_rename),
+            icon = LettaIcons.Edit,
+            onClick = { state.actions.onDismiss(); state.actions.onRequestRename() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_fork),
+            icon = LettaIcons.ForkRight,
+            onClick = { state.actions.onDismiss(); callbacks.onFork() },
+        )
+        ActionSheetItem(
+            text = stringResource(R.string.action_delete),
+            icon = LettaIcons.Delete,
+            onClick = { state.actions.onDismiss(); state.actions.onRequestDelete() },
+            destructive = true,
+        )
+    }
+}
+
+@Composable
+private fun conversationPinActionLabel(isPinned: Boolean): String {
+    return if (isPinned) "Unpin" else "Pin"
+}
+
+private data class ConversationCardConfirmDialogContent(
+    val title: String,
+    val message: String,
+    val confirmText: String,
+    val destructive: Boolean,
+)
+
+private data class ConversationCardConfirmDialogCallbacks(
+    val onConfirm: () -> Unit,
+    val onDismiss: () -> Unit,
+)
+
+@Composable
+private fun ConversationCardConfirmDialog(
+    show: Boolean,
+    content: ConversationCardConfirmDialogContent,
+    callbacks: ConversationCardConfirmDialogCallbacks,
+) {
+    ConfirmDialog(
+        show = show,
+        title = content.title,
+        message = content.message,
+        confirmText = content.confirmText,
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { callbacks.onDismiss(); callbacks.onConfirm() },
+        onDismiss = callbacks.onDismiss,
+        destructive = content.destructive,
+    )
+}
+
+private data class ConversationCardTextInputFields(
+    val title: String,
+    val label: String,
+    val initialValue: String,
+)
+
+private data class ConversationCardTextInputDialogParams(
+    val show: Boolean,
+    val fields: ConversationCardTextInputFields,
+    val onConfirm: (String) -> Unit,
+    val onDismiss: () -> Unit,
+)
+
+@Composable
+private fun ConversationCardTextInputDialog(params: ConversationCardTextInputDialogParams) {
+    TextInputDialog(
+        show = params.show,
+        title = params.fields.title,
+        label = params.fields.label,
+        confirmText = stringResource(R.string.action_save),
+        dismissText = stringResource(R.string.action_cancel),
+        onConfirm = { params.onDismiss(); params.onConfirm(it) },
+        onDismiss = params.onDismiss,
+        initialValue = params.fields.initialValue,
+    )
+}
+
+@Composable
+private fun conversationActivityText(conversation: com.letta.mobile.data.model.Conversation): String? {
+    val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
+    val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
+    return if (conversation.lastMessageAt != null) {
+        stringResource(R.string.screen_conversations_last_activity_format, relative)
+    } else {
+        stringResource(R.string.screen_conversations_created_format, relative)
+    }
+}

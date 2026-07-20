@@ -3,10 +3,9 @@ package com.letta.mobile.feature.editagent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.modelvalidation.ModelHandleValidator
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.MessageRepository
@@ -19,10 +18,7 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import javax.inject.Inject
 
 @HiltViewModel
@@ -44,7 +40,36 @@ internal class EditAgentViewModel @Inject constructor(
     val uiState: StateFlow<UiState<EditAgentUiState>> = _uiState.asStateFlow()
 
     val llmModels: StateFlow<List<LlmModel>> = modelRepository.llmModels
-    val embeddingModels: StateFlow<List<com.letta.mobile.data.model.EmbeddingModel>> = modelRepository.embeddingModels
+    val embeddingModels: StateFlow<List<EmbeddingModel>> = modelRepository.embeddingModels
+
+    private val state = EditAgentViewModelState(_uiState)
+    private val agentLoader = EditAgentAgentLoader(
+        agentId = agentId,
+        agentRepository = agentRepository,
+        blockRepository = blockRepository,
+        toolRepository = toolRepository,
+    )
+    private val blockEditor = EditAgentBlockEditor(
+        deps = EditAgentBlockEditorDeps(
+            agentId = agentId,
+            blockRepository = blockRepository,
+            state = state,
+            scope = viewModelScope,
+            reload = { loadAgentSnapshot() },
+        ),
+    )
+    private val environmentEditor = EditAgentEnvironmentEditor(state)
+    private val toolAttachment = EditAgentToolAttachment(
+        agentId = agentId,
+        toolRepository = toolRepository,
+        state = state,
+        scope = viewModelScope,
+        reload = { loadAgentSnapshot() },
+    )
+    private val modelSelection = EditAgentModelSelection(
+        state = state,
+        llmModels = { llmModels.value },
+    )
 
     @Volatile private var originalBlocks: Map<String, EditableBlock> = emptyMap()
     @Volatile private var originalEmbedding: String = ""
@@ -75,557 +100,167 @@ internal class EditAgentViewModel @Inject constructor(
 
     fun loadAgent() {
         viewModelScope.launch {
-            _uiState.value = UiState.Loading
+            state.setLoading()
             try {
-                val agent = agentRepository.getAgent(AgentId(agentId)).first()
-                val editableBlocks = agent.blocks.map { block ->
-                    EditableBlock(
-                        id = block.id.value,
-                        label = block.label ?: "",
-                        value = block.value ?: "",
-                        description = block.description,
-                        limit = block.limit,
-                        isTemplate = block.isTemplate ?: false,
-                        readOnly = block.readOnly ?: false,
-                    )
-                }
-                // Tolerate tool-list failures like blocks below: local-runtime
-                // agents have no remote tool API (and tools are disabled), and
-                // a transient remote failure should not kill the whole pane.
-                runCatching { toolRepository.refreshTools() }
-                    .onFailure { android.util.Log.w("EditAgentVM", "Failed to load tools", it) }
-                val availableTools = toolRepository.getTools().value
-                val availableBlocks = runCatching { blockRepository.listAllBlocks() }
-                    .onFailure { android.util.Log.w("EditAgentVM", "Failed to load available blocks", it) }
-                    .getOrDefault(emptyList())
-                originalBlocks = editableBlocks.associateBy { it.label }
-                val resolvedEmbedding = agent.embedding
-                    ?: agent.embeddingConfig?.handle
-                    ?: agent.embeddingConfig?.embeddingModel
-                    ?: ""
-                originalEmbedding = resolvedEmbedding
-                val resolvedProviderType = agent.modelSettings?.providerType
-                    ?: agent.llmConfig?.modelEndpointType
-                    ?: agent.llmConfig?.providerName
-                    ?: ""
-                val normalizedProviderType = EditAgentUseCases.normalizeModelSettingsProviderType(
-                    providerType = resolvedProviderType,
-                    modelHandle = agent.model ?: agent.llmConfig?.handle ?: agent.llmConfig?.model,
-                ).orEmpty()
-                val compactionSettings = agent.compactionSettings
-                val modelSettings = agent.modelSettings
-                originalProviderType = normalizedProviderType
-                useCases = EditAgentUseCases(
-                    agentId = agentId,
-                    agentRepository = agentRepository,
-                    blockRepository = blockRepository,
-                    messageRepository = messageRepository,
-                    uiState = _uiState,
-                    originalBlocks = originalBlocks,
-                    originalEmbedding = originalEmbedding,
-                    originalProviderType = originalProviderType,
-                    servedModelIds = { llmModels.value.map { model -> model.handle ?: model.name.ifBlank { model.id } } },
-                )
-                _uiState.value = UiState.Success(
-                    EditAgentUiState(
-                        agent = agent,
-                        agentId = agent.id.value,
-                        name = agent.name,
-                        description = agent.description ?: "",
-                        model = agent.model ?: "",
-                        embedding = resolvedEmbedding,
-                        blocks = editableBlocks.toImmutableList(),
-                        systemPrompt = agent.system ?: "",
-                        tags = agent.tags.toImmutableList(),
-                        attachedTools = agent.tools.toImmutableList(),
-                        availableTools = availableTools.toImmutableList(),
-                        availableBlocks = availableBlocks.toImmutableList(),
-                        toolRulesJson = agent.toolRules
-                            .takeIf { it.isNotEmpty() }
-                            ?.let { JsonArray(it).toSettingsJson() }
-                            .orEmpty(),
-                        agentSecrets = agent.secrets.toEditableEnvironmentVariables(),
-                        toolEnvironmentVariables = agent.toolExecEnvironmentVariables.toEditableEnvironmentVariables(),
-                        providerType = normalizedProviderType,
-                        temperature = modelSettings?.temperature?.toFloat() ?: agent.llmConfig?.temperature?.toFloat() ?: 1.0f,
-                        maxOutputTokens = modelSettings?.maxOutputTokens ?: agent.llmConfig?.maxTokens ?: 4096,
-                        parallelToolCalls = modelSettings?.parallelToolCalls ?: agent.llmConfig?.parallelToolCalls ?: true,
-                        modelProviderName = modelSettings?.providerName ?: agent.llmConfig?.providerName.orEmpty(),
-                        modelProviderCategory = modelSettings?.providerCategory ?: agent.llmConfig?.providerCategory.orEmpty(),
-                        modelEnableReasoner = modelSettings?.enableReasoner ?: agent.llmConfig?.enableReasoner ?: false,
-                        modelReasoningEffort = modelSettings?.reasoningEffort ?: agent.llmConfig?.reasoningEffort.orEmpty(),
-                        modelMaxReasoningTokens = (modelSettings?.maxReasoningTokens ?: agent.llmConfig?.maxReasoningTokens)
-                            ?.toString()
-                            .orEmpty(),
-                        modelReasoningJson = modelSettings?.reasoning?.toSettingsJson().orEmpty(),
-                        modelFrequencyPenalty = (modelSettings?.frequencyPenalty ?: agent.llmConfig?.frequencyPenalty)
-                            ?.toString()
-                            .orEmpty(),
-                        modelVerbosity = modelSettings?.verbosity ?: agent.llmConfig?.verbosity.orEmpty(),
-                        modelStrictToolCalling = modelSettings?.strict ?: false,
-                        modelResponseFormatJson = (modelSettings?.responseFormat ?: agent.responseFormat)
-                            ?.toSettingsJson()
-                            .orEmpty(),
-                        modelResponseSchemaJson = modelSettings?.responseSchema?.toSettingsJson().orEmpty(),
-                        modelThinkingConfigJson = modelSettings?.thinkingConfig?.toSettingsJson().orEmpty(),
-                        modelPutInnerThoughtsInKwargs = modelSettings?.putInnerThoughtsInKwargs
-                            ?: agent.llmConfig?.putInnerThoughtsInKwargs
-                            ?: false,
-                        modelToolCallParser = modelSettings?.toolCallParser.orEmpty(),
-                        modelAnthropicEffort = modelSettings?.effort.orEmpty(),
-                        contextWindow = agent.contextWindowLimit ?: agent.llmConfig?.contextWindow ?: 0,
-                        enableSleeptime = agent.enableSleeptime ?: false,
-                        agentType = agent.agentType ?: "",
-                        embeddingDim = agent.embeddingConfig?.embeddingDim,
-                        embeddingChunkSize = agent.embeddingConfig?.embeddingChunkSize,
-                        summarizationPrompt = compactionSettings?.prompt.orEmpty(),
-                        compactionClipChars = compactionSettings?.clipChars ?: 50_000,
-                        slidingWindowPercentage = compactionSettings
-                            ?.slidingWindowPercentage
-                            ?.toFloat()
-                            ?.coerceIn(0f, 1f)
-                            ?: 0.3f,
-                        promptAcknowledgement = compactionSettings?.promptAcknowledgement ?: false,
-                        compactionMode = compactionSettings?.mode ?: "sliding_window",
-                        compactionModel = compactionSettings?.model.orEmpty(),
-                        compactionModelSettingsJson = compactionSettings
-                            ?.modelSettings
-                            ?.toSettingsJson()
-                            .orEmpty(),
-                    )
-                )
+                applyLoadSnapshot(agentLoader.load(llmModels.value))
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load agent")
+                state.setError(e.message ?: "Failed to load agent")
             }
         }
     }
 
-    fun updateName(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(name = value))
-        }
+    private suspend fun loadAgentSnapshot() {
+        applyLoadSnapshot(agentLoader.load(llmModels.value))
     }
 
-    fun updateDescription(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(description = value))
-        }
+    private fun applyLoadSnapshot(snapshot: EditAgentLoadSnapshot) {
+        originalBlocks = snapshot.originalBlocks
+        originalEmbedding = snapshot.originalEmbedding
+        originalProviderType = snapshot.originalProviderType
+        useCases = EditAgentUseCases(
+            agentId = agentId,
+            agentRepository = agentRepository,
+            blockRepository = blockRepository,
+            messageRepository = messageRepository,
+            uiState = _uiState,
+            originalBlocks = originalBlocks,
+            originalEmbedding = originalEmbedding,
+            originalProviderType = originalProviderType,
+            servedModelIds = { llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } } },
+        )
+        state.setSuccess(snapshot.uiState)
     }
 
-    fun updateModel(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            val selectedModel = llmModels.value.firstOrNull { model ->
-                model.handle.equals(value, ignoreCase = true) ||
-                    model.name.equals(value, ignoreCase = true) ||
-                    model.displayName.equals(value, ignoreCase = true)
-            }
-            val normalizedProviderType = selectedModel?.let { model ->
-                EditAgentUseCases.normalizeModelSettingsProviderType(
-                    providerType = model.providerType,
-                    modelHandle = model.handle ?: value,
-                )
-            }
-            val selectedContextWindow = selectedModel?.contextWindow?.takeIf { it > 0 }
-            val selectedHandle = selectedModel?.handle ?: value
-            val validation = ModelHandleValidator.validate(
-                handle = selectedHandle,
-                backend = if (selectedHandle.startsWith("lmstudio/", ignoreCase = true)) {
-                    ModelHandleValidator.Backend.REMOTE
-                } else {
-                    ModelHandleValidator.Backend.ON_DEVICE
-                },
-                servedModels = llmModels.value.map { model -> model.handle ?: model.name.ifBlank { model.id } },
-            )
-            if (validation is ModelHandleValidator.Result.Invalid) {
-                _uiState.value = UiState.Error(validation.reason)
-                return
-            }
-            _uiState.value = UiState.Success(
-                currentState.copy(
-                    model = selectedHandle,
-                    providerType = normalizedProviderType.orEmpty(),
-                    contextWindow = selectedContextWindow
-                        ?.let { maxContextWindow -> currentState.contextWindow.coerceIn(0, maxContextWindow) }
-                        ?: currentState.contextWindow,
-                )
-            )
-        }
-    }
+    fun updateName(value: String) = state.updateField { copy(name = value) }
 
-    fun updateSystemPrompt(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(systemPrompt = value))
-        }
-    }
+    fun updateDescription(value: String) = state.updateField { copy(description = value) }
 
-    fun updateBlockValue(blockLabel: String, value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(
-            blocks = currentState.blocks.map {
-                if (it.label == blockLabel) it.copy(value = value) else it
-            }.toImmutableList()
-        ))
-    }
+    fun updateModel(value: String) = modelSelection.updateModel(value)
 
-    fun updateBlockDescription(blockLabel: String, description: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(
-            blocks = currentState.blocks.map {
-                if (it.label == blockLabel) it.copy(description = description) else it
-            }.toImmutableList()
-        ))
-    }
+    fun updateSystemPrompt(value: String) = state.updateField { copy(systemPrompt = value) }
 
-    fun updateBlockLimit(blockLabel: String, limit: Int?) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(
-            blocks = currentState.blocks.map {
-                if (it.label == blockLabel) it.copy(limit = limit) else it
-            }.toImmutableList()
-        ))
-    }
+    fun updateBlockValue(blockLabel: String, value: String) =
+        blockEditor.updateBlockValue(BlockValueUpdate(EditableBlockLabel(blockLabel), value))
 
-    fun addBlock(label: String, value: String, description: String, limit: Int?) {
-        viewModelScope.launch {
-            try {
-                val block = blockRepository.createBlock(
-                    com.letta.mobile.data.model.BlockCreateParams(
-                        label = label,
-                        value = value,
-                        description = description.ifBlank { null },
-                        limit = limit,
-                    )
-                )
-                blockRepository.attachBlock(agentId, block.id.value)
-                loadAgent()
-            } catch (e: Exception) {
-                android.util.Log.w("EditAgentVM", "Failed to create block", e)
-            }
-        }
-    }
+    fun updateBlockDescription(blockLabel: String, description: String) =
+        blockEditor.updateBlockDescription(BlockDescriptionUpdate(EditableBlockLabel(blockLabel), description))
 
-    fun attachExistingBlock(blockId: String) {
-        viewModelScope.launch {
-            try {
-                blockRepository.attachBlock(agentId, blockId)
-                loadAgent()
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to attach block")
-            }
-        }
-    }
+    fun updateBlockLimit(blockLabel: String, limit: Int?) =
+        blockEditor.updateBlockLimit(BlockLimitUpdate(EditableBlockLabel(blockLabel), limit))
 
-    fun attachExistingBlocks(blockIds: List<String>) {
-        viewModelScope.launch {
-            try {
-                blockIds.forEach { blockRepository.attachBlock(agentId, it) }
-                loadAgent()
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to attach blocks")
-            }
-        }
-    }
+    fun addBlock(draft: NewBlockDraft) = blockEditor.addBlock(draft)
 
-    fun deleteBlock(blockId: String) {
-        viewModelScope.launch {
-            try {
-                blockRepository.detachBlock(agentId, blockId)
-                val currentState = (_uiState.value as? UiState.Success)?.data ?: return@launch
-                _uiState.value = UiState.Success(currentState.copy(
-                    blocks = currentState.blocks.filter { it.id != blockId }.toImmutableList()
-                ))
-            } catch (e: Exception) {
-                android.util.Log.w("EditAgentVM", "Failed to delete block", e)
-            }
-        }
-    }
+    fun attachExistingBlock(blockId: String) = blockEditor.attachExistingBlock(AttachedBlockId(blockId))
+
+    fun attachExistingBlocks(blockIds: List<String>) =
+        blockEditor.attachExistingBlocks(BlockAttachRequest(blockIds.map(::AttachedBlockId)))
+
+    fun deleteBlock(blockId: String) = blockEditor.deleteBlock(AttachedBlockId(blockId))
 
     fun addTag(tag: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
+        val currentState = state.successData() ?: return
         if (tag.isBlank() || currentState.tags.contains(tag)) return
-        _uiState.value = UiState.Success(currentState.copy(tags = (currentState.tags + tag).toImmutableList()))
+        state.updateField { copy(tags = (tags + tag).toImmutableList()) }
     }
 
-    fun removeTag(tag: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(tags = (currentState.tags - tag).toImmutableList()))
-    }
+    fun removeTag(tag: String) = state.updateField { copy(tags = (tags - tag).toImmutableList()) }
 
-    fun updateEmbedding(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(embedding = value))
-        }
-    }
+    fun updateEmbedding(value: String) = state.updateField { copy(embedding = value) }
 
-    fun updateTemperature(value: Float) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(temperature = value.coerceIn(0f, 2f)))
-        }
-    }
+    fun updateTemperature(value: Float) = state.updateField { copy(temperature = value.coerceIn(0f, 2f)) }
 
-    fun updateProviderType(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(providerType = value))
-        }
-    }
+    fun updateProviderType(value: String) = state.updateField { copy(providerType = value) }
 
-    fun updateMaxOutputTokens(value: Int) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(maxOutputTokens = value.coerceAtLeast(1)))
-        }
-    }
+    fun updateMaxOutputTokens(value: Int) = state.updateField { copy(maxOutputTokens = value.coerceAtLeast(1)) }
 
-    fun updateParallelToolCalls(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(parallelToolCalls = value))
-        }
-    }
+    fun updateParallelToolCalls(value: Boolean) = state.updateField { copy(parallelToolCalls = value) }
 
-    fun updateModelProviderName(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelProviderName = value))
-    }
+    fun updateModelProviderName(value: String) = state.updateField { copy(modelProviderName = value) }
 
-    fun updateModelProviderCategory(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelProviderCategory = value))
-    }
+    fun updateModelProviderCategory(value: String) = state.updateField { copy(modelProviderCategory = value) }
 
-    fun updateModelEnableReasoner(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelEnableReasoner = value))
-    }
+    fun updateModelEnableReasoner(value: Boolean) = state.updateField { copy(modelEnableReasoner = value) }
 
-    fun updateModelReasoningEffort(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelReasoningEffort = value))
-    }
+    fun updateModelReasoningEffort(value: String) = state.updateField { copy(modelReasoningEffort = value) }
 
-    fun updateModelMaxReasoningTokens(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelMaxReasoningTokens = value))
-    }
+    fun updateModelMaxReasoningTokens(value: String) = state.updateField { copy(modelMaxReasoningTokens = value) }
 
-    fun updateModelReasoningJson(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelReasoningJson = value))
-    }
+    fun updateModelReasoningJson(value: String) = state.updateField { copy(modelReasoningJson = value) }
 
-    fun updateModelFrequencyPenalty(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelFrequencyPenalty = value))
-    }
+    fun updateModelFrequencyPenalty(value: String) = state.updateField { copy(modelFrequencyPenalty = value) }
 
-    fun updateModelVerbosity(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelVerbosity = value))
-    }
+    fun updateModelVerbosity(value: String) = state.updateField { copy(modelVerbosity = value) }
 
-    fun updateModelStrictToolCalling(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelStrictToolCalling = value))
-    }
+    fun updateModelStrictToolCalling(value: Boolean) = state.updateField { copy(modelStrictToolCalling = value) }
 
-    fun updateModelResponseFormatJson(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelResponseFormatJson = value))
-    }
+    fun updateModelResponseFormatJson(value: String) = state.updateField { copy(modelResponseFormatJson = value) }
 
-    fun updateModelResponseSchemaJson(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelResponseSchemaJson = value))
-    }
+    fun updateModelResponseSchemaJson(value: String) = state.updateField { copy(modelResponseSchemaJson = value) }
 
-    fun updateModelThinkingConfigJson(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelThinkingConfigJson = value))
-    }
+    fun updateModelThinkingConfigJson(value: String) = state.updateField { copy(modelThinkingConfigJson = value) }
 
-    fun updateModelPutInnerThoughtsInKwargs(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelPutInnerThoughtsInKwargs = value))
-    }
+    fun updateModelPutInnerThoughtsInKwargs(value: Boolean) =
+        state.updateField { copy(modelPutInnerThoughtsInKwargs = value) }
 
-    fun updateModelToolCallParser(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelToolCallParser = value))
-    }
+    fun updateModelToolCallParser(value: String) = state.updateField { copy(modelToolCallParser = value) }
 
-    fun updateModelAnthropicEffort(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(modelAnthropicEffort = value))
-    }
+    fun updateModelAnthropicEffort(value: String) = state.updateField { copy(modelAnthropicEffort = value) }
 
-    fun addAgentSecret() {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            currentState.copy(agentSecrets = (currentState.agentSecrets + EditableAgentEnvironmentVariable()).toImmutableList())
-        )
-    }
+    fun addAgentSecret() = environmentEditor.add(EditAgentEnvironmentVariableTarget.AGENT_SECRETS)
 
-    fun updateAgentSecretKey(index: Int, value: String) {
-        updateAgentSecret(index) { it.copy(key = value) }
-    }
+    fun updateAgentSecretKey(index: Int, value: String) =
+        environmentEditor.updateKey(EditAgentEnvironmentVariableTarget.AGENT_SECRETS, index, value)
 
-    fun updateAgentSecretValue(index: Int, value: String) {
-        updateAgentSecret(index) { it.copy(value = value) }
-    }
+    fun updateAgentSecretValue(index: Int, value: String) =
+        environmentEditor.updateValue(EditAgentEnvironmentVariableTarget.AGENT_SECRETS, index, value)
 
-    fun removeAgentSecret(index: Int) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        if (index !in currentState.agentSecrets.indices) return
-        _uiState.value = UiState.Success(
-            currentState.copy(agentSecrets = currentState.agentSecrets.filterIndexed { i, _ -> i != index }.toImmutableList())
-        )
-    }
+    fun removeAgentSecret(index: Int) =
+        environmentEditor.remove(EditAgentEnvironmentVariableTarget.AGENT_SECRETS, index)
 
-    private fun updateAgentSecret(index: Int, transform: (EditableAgentEnvironmentVariable) -> EditableAgentEnvironmentVariable) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        if (index !in currentState.agentSecrets.indices) return
-        _uiState.value = UiState.Success(
-            currentState.copy(
-                agentSecrets = currentState.agentSecrets
-                    .mapIndexed { i, variable -> if (i == index) transform(variable) else variable }
-                    .toImmutableList()
-            )
-        )
-    }
+    fun addToolEnvironmentVariable() = environmentEditor.add(EditAgentEnvironmentVariableTarget.TOOL_ENVIRONMENT)
 
-    fun addToolEnvironmentVariable() {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(
-            currentState.copy(toolEnvironmentVariables = (currentState.toolEnvironmentVariables + EditableAgentEnvironmentVariable()).toImmutableList())
-        )
-    }
+    fun updateToolEnvironmentVariableKey(index: Int, value: String) =
+        environmentEditor.updateKey(EditAgentEnvironmentVariableTarget.TOOL_ENVIRONMENT, index, value)
 
-    fun updateToolEnvironmentVariableKey(index: Int, value: String) {
-        updateToolEnvironmentVariable(index) { it.copy(key = value) }
-    }
+    fun updateToolEnvironmentVariableValue(index: Int, value: String) =
+        environmentEditor.updateValue(EditAgentEnvironmentVariableTarget.TOOL_ENVIRONMENT, index, value)
 
-    fun updateToolEnvironmentVariableValue(index: Int, value: String) {
-        updateToolEnvironmentVariable(index) { it.copy(value = value) }
-    }
+    fun removeToolEnvironmentVariable(index: Int) =
+        environmentEditor.remove(EditAgentEnvironmentVariableTarget.TOOL_ENVIRONMENT, index)
 
-    fun removeToolEnvironmentVariable(index: Int) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        if (index !in currentState.toolEnvironmentVariables.indices) return
-        _uiState.value = UiState.Success(
-            currentState.copy(toolEnvironmentVariables = currentState.toolEnvironmentVariables.filterIndexed { i, _ -> i != index }.toImmutableList())
-        )
-    }
+    fun updateContextWindow(value: Int) = state.updateField { copy(contextWindow = value.coerceAtLeast(0)) }
 
-    private fun updateToolEnvironmentVariable(index: Int, transform: (EditableAgentEnvironmentVariable) -> EditableAgentEnvironmentVariable) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        if (index !in currentState.toolEnvironmentVariables.indices) return
-        _uiState.value = UiState.Success(
-            currentState.copy(
-                toolEnvironmentVariables = currentState.toolEnvironmentVariables
-                    .mapIndexed { i, variable -> if (i == index) transform(variable) else variable }
-                    .toImmutableList()
-            )
-        )
-    }
+    fun updateEnableSleeptime(value: Boolean) = state.updateField { copy(enableSleeptime = value) }
 
-    fun updateContextWindow(value: Int) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(contextWindow = value.coerceAtLeast(0)))
-        }
-    }
+    fun updateSummarizationPrompt(value: String) = state.updateField { copy(summarizationPrompt = value) }
 
-    fun updateEnableSleeptime(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data
-        if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(enableSleeptime = value))
-        }
-    }
+    fun updateCompactionClipChars(value: Int) = state.updateField { copy(compactionClipChars = value.coerceAtLeast(1)) }
 
-    fun updateSummarizationPrompt(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(summarizationPrompt = value))
-    }
+    fun updateSlidingWindowPercentage(value: Float) =
+        state.updateField { copy(slidingWindowPercentage = value.coerceIn(0f, 1f)) }
 
-    fun updateCompactionClipChars(value: Int) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(compactionClipChars = value.coerceAtLeast(1)))
-    }
+    fun updatePromptAcknowledgement(value: Boolean) = state.updateField { copy(promptAcknowledgement = value) }
 
-    fun updateSlidingWindowPercentage(value: Float) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(slidingWindowPercentage = value.coerceIn(0f, 1f)))
-    }
+    fun updateCompactionMode(value: String) =
+        state.updateField { copy(compactionMode = value.ifBlank { "sliding_window" }) }
 
-    fun updatePromptAcknowledgement(value: Boolean) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(promptAcknowledgement = value))
-    }
+    fun updateCompactionModel(value: String) = state.updateField { copy(compactionModel = value) }
 
-    fun updateCompactionMode(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(compactionMode = value.ifBlank { "sliding_window" }))
-    }
+    fun updateCompactionModelSettingsJson(value: String) =
+        state.updateField { copy(compactionModelSettingsJson = value) }
 
-    fun updateCompactionModel(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(compactionModel = value))
-    }
+    fun attachTool(toolId: String) = toolAttachment.attachTool(toolId)
 
-    fun updateCompactionModelSettingsJson(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(compactionModelSettingsJson = value))
-    }
+    fun attachTools(toolIds: List<String>) = toolAttachment.attachTools(toolIds)
 
-    fun attachTool(toolId: String) {
-        viewModelScope.launch {
-            try {
-                toolRepository.attachTool(agentId, toolId)
-                loadAgent()
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to attach tool")
-            }
-        }
-    }
+    fun detachTool(toolId: String) = toolAttachment.detachTool(toolId)
 
-    fun attachTools(toolIds: List<String>) {
-        viewModelScope.launch {
-            try {
-                toolIds.forEach { toolRepository.attachTool(agentId, it) }
-                loadAgent()
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to attach tools")
-            }
-        }
-    }
-
-    fun detachTool(toolId: String) {
-        viewModelScope.launch {
-            try {
-                toolRepository.detachTool(agentId, toolId)
-                loadAgent()
-            } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to detach tool")
-            }
-        }
-    }
-
-    fun updateToolRulesJson(value: String) {
-        val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(toolRulesJson = value))
-    }
+    fun updateToolRulesJson(value: String) = state.updateField { copy(toolRulesJson = value) }
 
     private fun requireUseCasesOrError(): EditAgentUseCases? {
         val cases = useCases
         if (cases == null) {
-            _uiState.value = UiState.Error("Agent is still loading. Please try again.")
+            state.setError("Agent is still loading. Please try again.")
         }
         return cases
     }
@@ -663,9 +298,5 @@ internal class EditAgentViewModel @Inject constructor(
         viewModelScope.launch {
             requireUseCasesOrError()?.deleteAgent(onSuccess)
         }
-    }
-
-    private fun JsonElement.toSettingsJson(): String {
-        return kotlinx.serialization.json.Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), this)
     }
 }

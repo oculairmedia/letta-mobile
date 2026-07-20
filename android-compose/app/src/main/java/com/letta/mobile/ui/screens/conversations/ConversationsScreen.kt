@@ -1,44 +1,12 @@
 package com.letta.mobile.ui.screens.conversations
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,47 +15,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
-import com.letta.mobile.data.model.Agent
-import com.letta.mobile.data.repository.ConversationInspectorMessage
-import com.letta.mobile.ui.components.ActionSheet
-import com.letta.mobile.ui.components.ActionSheetItem
-import com.letta.mobile.ui.components.CardGroup
-import com.letta.mobile.ui.components.ConfirmDialog
-import com.letta.mobile.ui.components.FormItem
-import com.letta.mobile.ui.components.DateSeparator
-import com.letta.mobile.ui.components.EmptyState
-import com.letta.mobile.ui.components.ExpandableSearchField
-import com.letta.mobile.ui.components.ExpandableTitleSearch
-import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerConversationList
-import com.letta.mobile.ui.components.ShimmerBox
-import com.letta.mobile.ui.components.TextInputDialog
-import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
-import com.letta.mobile.ui.haptics.HapticEffects
-import com.letta.mobile.ui.theme.dialogSectionHeading
-import com.letta.mobile.ui.theme.listItemHeadline
-import com.letta.mobile.ui.theme.listItemMetadata
-import com.letta.mobile.ui.theme.listItemMetadataMonospace
-import com.letta.mobile.ui.theme.listItemSupporting
-import com.letta.mobile.ui.motion.StaggeredListItem
-import com.letta.mobile.ui.theme.sectionTitle
-import com.letta.mobile.ui.icons.LettaIconSizing
-import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.icons.LettaIcons
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +49,7 @@ fun ConversationsScreen(
     activeBackendLabel: String? = null,
     onNavigateToBackendSwitcher: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    viewModel: ConversationsViewModel = hiltViewModel()
+    viewModel: ConversationsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showNewChat by rememberSaveable { mutableStateOf(false) }
@@ -123,6 +58,39 @@ fun ConversationsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val navigation = remember(
+        onNavigateToTemplates,
+        onNavigateToArchives,
+        onNavigateToFolders,
+        onNavigateToGroups,
+        onNavigateToProviders,
+        onNavigateToBlocks,
+        onNavigateToIdentities,
+        onNavigateToSchedules,
+        onNavigateToRuns,
+        onNavigateToJobs,
+        onNavigateToMessageBatches,
+        onNavigateToMcp,
+        onNavigateToProjects,
+        onNavigateToAbout,
+    ) {
+        ConversationsNavigation(
+            onNavigateToTemplates = onNavigateToTemplates,
+            onNavigateToArchives = onNavigateToArchives,
+            onNavigateToFolders = onNavigateToFolders,
+            onNavigateToGroups = onNavigateToGroups,
+            onNavigateToProviders = onNavigateToProviders,
+            onNavigateToBlocks = onNavigateToBlocks,
+            onNavigateToIdentities = onNavigateToIdentities,
+            onNavigateToSchedules = onNavigateToSchedules,
+            onNavigateToRuns = onNavigateToRuns,
+            onNavigateToJobs = onNavigateToJobs,
+            onNavigateToMessageBatches = onNavigateToMessageBatches,
+            onNavigateToMcp = onNavigateToMcp,
+            onNavigateToProjects = onNavigateToProjects,
+            onNavigateToAbout = onNavigateToAbout,
+        )
+    }
 
     if (showNewChat) {
         NewChatAgentScreen(
@@ -154,934 +122,114 @@ fun ConversationsScreen(
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-            TopAppBar(
-                title = {
-                    ExpandableTitleSearch(
-                        query = uiState.searchQuery,
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onClear = { viewModel.updateSearchQuery("") },
-                        expanded = isSearchExpanded,
-                        onExpandedChange = { isSearchExpanded = it },
-                        placeholder = stringResource(R.string.screen_conversations_search_hint),
-                        autoFocus = false,
-                        showCollapseButton = false,
-                        titleContent = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.common_conversations))
-                                if (activeBackendLabel != null && onNavigateToBackendSwitcher != null) {
-                                    AssistChip(
-                                        onClick = onNavigateToBackendSwitcher,
-                                        label = { Text(activeBackendLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                    )
-                                }
-                            }
-                        },
-                    )
-                },
-                scrollBehavior = scrollBehavior,
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.topAppBarColors(),
-                actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(LettaIcons.Settings, stringResource(R.string.common_settings))
-                    }
-                    DropdownMenu(
-                        expanded = showOverflowMenu,
-                        onDismissRequest = { showOverflowMenu = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_templates)) },
-                            onClick = { showOverflowMenu = false; onNavigateToTemplates() },
-                            leadingIcon = { Icon(LettaIcons.Dashboard, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_archives)) },
-                            onClick = { showOverflowMenu = false; onNavigateToArchives() },
-                            leadingIcon = { Icon(LettaIcons.Storage, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_folders)) },
-                            onClick = { showOverflowMenu = false; onNavigateToFolders() },
-                            leadingIcon = { Icon(LettaIcons.ManageSearch, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_groups)) },
-                            onClick = { showOverflowMenu = false; onNavigateToGroups() },
-                            leadingIcon = { Icon(LettaIcons.ForkRight, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_providers)) },
-                            onClick = { showOverflowMenu = false; onNavigateToProviders() },
-                            leadingIcon = { Icon(LettaIcons.Cloud, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_blocks)) },
-                            onClick = { showOverflowMenu = false; onNavigateToBlocks() },
-                            leadingIcon = { Icon(LettaIcons.Storage, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_identities)) },
-                            onClick = { showOverflowMenu = false; onNavigateToIdentities() },
-                            leadingIcon = { Icon(LettaIcons.AccountCircle, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_schedules)) },
-                            onClick = { showOverflowMenu = false; onNavigateToSchedules() },
-                            leadingIcon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_runs)) },
-                            onClick = { showOverflowMenu = false; onNavigateToRuns() },
-                            leadingIcon = { Icon(LettaIcons.ChatOutline, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_jobs)) },
-                            onClick = { showOverflowMenu = false; onNavigateToJobs() },
-                            leadingIcon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_message_batches)) },
-                            onClick = { showOverflowMenu = false; onNavigateToMessageBatches() },
-                            leadingIcon = { Icon(LettaIcons.ChatOutline, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_nav_mcp_servers)) },
-                            onClick = { showOverflowMenu = false; onNavigateToMcp() },
-                            leadingIcon = { Icon(LettaIcons.Cloud, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_projects_title)) },
-                            onClick = { showOverflowMenu = false; onNavigateToProjects() },
-                            leadingIcon = { Icon(LettaIcons.Apps, contentDescription = null) },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.screen_about_title)) },
-                            onClick = { showOverflowMenu = false; onNavigateToAbout() },
-                            leadingIcon = { Icon(LettaIcons.Info, contentDescription = null) },
-                        )
-                    }
-                }
+            ConversationsTopBar(
+                state = ConversationsTopBarState(
+                    searchQuery = uiState.searchQuery,
+                    isSearchExpanded = isSearchExpanded,
+                    activeBackendLabel = activeBackendLabel,
+                    showOverflowMenu = showOverflowMenu,
+                    scrollBehavior = scrollBehavior,
+                ),
+                callbacks = ConversationsTopBarCallbacks(
+                    onSearchQueryChange = viewModel::updateSearchQuery,
+                    onSearchExpandedChange = { isSearchExpanded = it },
+                    onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
+                    onNavigateToSettings = onNavigateToSettings,
+                    onShowOverflowMenuChange = { showOverflowMenu = it },
+                ),
+                navigation = navigation,
             )
-            ExpandableSearchField(
-                query = uiState.searchQuery,
-                onQueryChange = viewModel::updateSearchQuery,
-                onClear = { viewModel.updateSearchQuery("") },
-                expanded = isSearchExpanded,
-                placeholder = stringResource(R.string.screen_conversations_search_hint),
-                autoFocus = false,
-            )
-            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showNewChat = true }) {
                 Icon(LettaIcons.Add, stringResource(R.string.screen_conversations_new_action))
             }
-        }
+        },
     ) { paddingValues ->
         val convError = uiState.error
         when {
-            uiState.isLoading && uiState.conversations.isEmpty() -> ShimmerConversationList(modifier = Modifier.padding(paddingValues))
-            convError != null && uiState.conversations.isEmpty() -> ErrorContent(
-                message = convError,
-                onRetry = { viewModel.loadConversations() },
-                modifier = Modifier.padding(paddingValues)
-            )
+            uiState.isLoading && uiState.conversations.isEmpty() -> {
+                ShimmerConversationList(modifier = Modifier.padding(paddingValues))
+            }
+            convError != null && uiState.conversations.isEmpty() -> {
+                ConversationsErrorContent(
+                    message = convError,
+                    onRetry = { viewModel.loadConversations() },
+                    modifier = Modifier.padding(paddingValues),
+                )
+            }
             else -> {
                 val filteredConversations = remember(uiState.conversations, uiState.searchQuery) {
                     viewModel.getFilteredConversations()
                 }
-                ConversationsContent(
-                    conversations = filteredConversations,
-                    isRefreshing = uiState.isRefreshing,
-                    isSearchActive = uiState.searchQuery.isNotBlank(),
-                    showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
-                    localReadiness = uiState.localLettaCodeReadiness,
-                    onCreateFirstAgent = onCreateFirstAgent,
-                    onOpenLocalSettings = onNavigateToSettings,
-                    onConversationClick = { display ->
-                        onNavigateToChat(display.conversation.agentId.value, display.conversation.id.value, display.routeAgentName())
-                    },
-                onOpenAdmin = { display -> viewModel.openConversationAdmin(display) },
-                onDeleteConversation = { viewModel.deleteConversation(it.conversation.id) },
-                onRenameConversation = { display, newName ->
-                    viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
-                },
-                onTogglePinned = viewModel::toggleConversationPinned,
-                onForkConversation = { display ->
-                    viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { newConvId ->
-                        onNavigateToChat(display.conversation.agentId.value, newConvId.value, display.routeAgentName())
-                    }
-                },
-                onRefresh = { viewModel.refresh() },
-                modifier = Modifier.padding(paddingValues)
-            )
+                val listActions = remember(onNavigateToChat, viewModel) {
+                    ConversationListActions(
+                        onConversationClick = { display ->
+                            onNavigateToChat(
+                                display.conversation.agentId.value,
+                                display.conversation.id.value,
+                                display.routeAgentName(),
+                            )
+                        },
+                        onOpenAdmin = viewModel::openConversationAdmin,
+                        onDeleteConversation = { viewModel.deleteConversation(it.conversation.id) },
+                        onRenameConversation = { display, newName ->
+                            viewModel.renameConversation(
+                                display.conversation.id,
+                                display.conversation.agentId,
+                                newName,
+                            )
+                        },
+                        onTogglePinned = viewModel::toggleConversationPinned,
+                        onForkConversation = { display ->
+                            viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { newConvId ->
+                                onNavigateToChat(
+                                    display.conversation.agentId.value,
+                                    newConvId.value,
+                                    display.routeAgentName(),
+                                )
+                            }
+                        },
+                        onRefresh = viewModel::refresh,
+                    )
+                }
+                ConversationListContent(
+                    state = ConversationListContentState(
+                        conversations = filteredConversations,
+                        isRefreshing = uiState.isRefreshing,
+                        isSearchActive = uiState.searchQuery.isNotBlank(),
+                        showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
+                        localReadiness = uiState.localLettaCodeReadiness,
+                        onCreateFirstAgent = onCreateFirstAgent,
+                        onOpenLocalSettings = onNavigateToSettings,
+                    ),
+                    actions = listActions,
+                    modifier = Modifier.padding(paddingValues),
+                )
             }
         }
     }
 
     uiState.selectedConversation?.let { display ->
         ConversationAdminDialog(
-            display = display,
-            recompilePreview = uiState.recompilePreview,
-            onDismiss = { viewModel.closeConversationAdmin() },
-            onRename = { newName -> viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName) },
-            onToggleArchived = { archived -> viewModel.setConversationArchived(display, archived) },
-            onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
-            onCancelRuns = { viewModel.cancelConversationRuns(display) },
-            inspectorMessages = uiState.inspectorMessages,
-            isInspectorLoading = uiState.isInspectorLoading,
-            inspectorError = uiState.inspectorError,
-            onRecompile = { viewModel.recompileConversation(display) },
-            onDelete = { viewModel.deleteConversation(display.conversation.id) },
-        )
-    }
-}
-
-private fun ConversationDisplay.routeAgentName(): String? =
-    agentName.takeIf { it.isNotBlank() && it != conversation.agentId.value.take(8) }
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun ConversationsContent(
-    conversations: List<ConversationDisplay>,
-    isRefreshing: Boolean,
-    isSearchActive: Boolean,
-    showFirstRunOnboarding: Boolean,
-    localReadiness: LocalLettaCodeCreateReadiness,
-    onCreateFirstAgent: () -> Unit,
-    onOpenLocalSettings: () -> Unit,
-    onConversationClick: (ConversationDisplay) -> Unit,
-    onOpenAdmin: (ConversationDisplay) -> Unit,
-    onDeleteConversation: (ConversationDisplay) -> Unit,
-    onRenameConversation: (ConversationDisplay, String) -> Unit,
-    onTogglePinned: (ConversationDisplay) -> Unit,
-    onForkConversation: (ConversationDisplay) -> Unit,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    if (conversations.isEmpty()) {
-        if (showFirstRunOnboarding) {
-            FirstRunWelcomeCard(
-                localReadiness = localReadiness,
-                onCreateFirstAgent = onCreateFirstAgent,
-                onOpenLocalSettings = onOpenLocalSettings,
-                modifier = modifier.fillMaxSize(),
-            )
-        } else {
-            EmptyState(
-                icon = LettaIcons.ChatOutline,
-                message = stringResource(
-                    if (isSearchActive) R.string.screen_conversations_search_empty
-                    else R.string.screen_conversations_empty
-                ),
-                modifier = modifier.fillMaxSize()
-            )
-        }
-    } else {
-        @OptIn(ExperimentalMaterial3Api::class)
-        PullToRefreshBox(
-            isRefreshing = isRefreshing,
-            onRefresh = {
-                HapticEffects.confirm(haptic, view)
-                onRefresh()
-            },
-            modifier = modifier.fillMaxSize(),
-        ) {
-            val sections = remember(conversations) {
-                buildConversationSections(conversations)
-            }
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                var runningIndex = 0
-                sections.forEach { section ->
-                    val sectionBaseIndex = runningIndex
-                    item(key = section.key) {
-                        when {
-                            section.isPinned -> ConversationPinnedHeader()
-                            section.date != null -> DateSeparator(date = section.date)
-                        }
-                    }
-                    itemsIndexed(
-                        items = section.items,
-                        // Index-suffixed so a residual duplicate id can never
-                        // collide the LazyColumn key and crash the render thread
-                        // (dedupe above is the primary guard; this is defense).
-                        key = { index, display -> "${section.key}:${display.conversation.id}:$index" },
-                    ) { index, display ->
-                        StaggeredListItem(index = sectionBaseIndex + index) {
-                            ConversationCard(
-                                display = display,
-                                onClick = { onConversationClick(display) },
-                                onOpenAdmin = { onOpenAdmin(display) },
-                                onDelete = { onDeleteConversation(display) },
-                                onRename = { newName -> onRenameConversation(display, newName) },
-                                onTogglePinned = { onTogglePinned(display) },
-                                onFork = { onForkConversation(display) },
-                            )
-                        }
-                    }
-                    runningIndex += section.items.size
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FirstRunWelcomeCard(
-    localReadiness: LocalLettaCodeCreateReadiness,
-    onCreateFirstAgent: () -> Unit,
-    onOpenLocalSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier = modifier.padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 520.dp),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            state = ConversationAdminDialogState(
+                display = display,
+                recompilePreview = uiState.recompilePreview,
+                inspectorMessages = uiState.inspectorMessages,
+                isInspectorLoading = uiState.isInspectorLoading,
+                inspectorError = uiState.inspectorError,
             ),
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Icon(
-                    imageVector = LettaIcons.Agent,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(40.dp),
-                )
-                Text(
-                    text = stringResource(R.string.screen_conversations_first_run_title),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.screen_conversations_first_run_body),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                FirstRunStep(text = stringResource(R.string.screen_conversations_first_run_step_create))
-                FirstRunStep(text = stringResource(R.string.screen_conversations_first_run_step_runtime))
-                FirstRunStep(text = stringResource(R.string.screen_conversations_first_run_step_chat))
-                Button(
-                    onClick = onCreateFirstAgent,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_conversations_first_run_create_agent))
-                }
-                if (localReadiness.activeConfigIsLocal && !localReadiness.ready) {
-                    Text(
-                        text = localReadiness.setupMessage.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedButton(
-                        onClick = onOpenLocalSettings,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(localReadiness.setupActionLabel)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FirstRunStep(text: String) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = LettaIcons.Check,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-        )
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun ConversationCard(
-    display: ConversationDisplay,
-    onClick: () -> Unit,
-    onOpenAdmin: () -> Unit,
-    onDelete: () -> Unit,
-    onRename: (String) -> Unit,
-    onTogglePinned: () -> Unit,
-    onFork: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val conversation = display.conversation
-    var showContextMenu by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var showRenameDialog by remember { mutableStateOf(false) }
-    val haptic = LocalHapticFeedback.current
-
-    val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
-
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = {
-                    HapticEffects.longPress(haptic)
-                    showContextMenu = true
-                }
-            ),
-        shape = RoundedCornerShape(12.dp),
-        colors = LettaCardDefaults.listCardColors(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.listItemHeadline,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            val timeText = conversationActivityText(conversation)
-            val metadataText = buildString {
-                if (display.isPinned) {
-                    append("Pinned • ")
-                }
-                append(display.agentName)
-                if (timeText != null) {
-                    append(" • ")
-                    append(timeText)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = metadataText,
-                style = MaterialTheme.typography.listItemSupporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-
-    }
-
-    ActionSheet(
-        show = showContextMenu,
-        onDismiss = { showContextMenu = false },
-        title = title,
-    ) {
-        ActionSheetItem(
-            text = stringResource(R.string.screen_conversations_admin_details),
-            icon = LettaIcons.ManageSearch,
-            onClick = { showContextMenu = false; onOpenAdmin() },
-        )
-        ActionSheetItem(
-            text = if (display.isPinned) "Unpin" else "Pin",
-            icon = LettaIcons.Star,
-            onClick = { showContextMenu = false; onTogglePinned() },
-        )
-        ActionSheetItem(
-            text = stringResource(R.string.action_rename),
-            icon = LettaIcons.Edit,
-            onClick = { showContextMenu = false; showRenameDialog = true },
-        )
-        ActionSheetItem(
-            text = stringResource(R.string.action_fork),
-            icon = LettaIcons.ForkRight,
-            onClick = { showContextMenu = false; onFork() },
-        )
-        ActionSheetItem(
-            text = stringResource(R.string.action_delete),
-            icon = LettaIcons.Delete,
-            onClick = { showContextMenu = false; showDeleteDialog = true },
-            destructive = true,
-        )
-    }
-
-    ConfirmDialog(
-        show = showDeleteDialog,
-        title = stringResource(R.string.screen_conversations_dialog_delete_title),
-        message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
-        confirmText = stringResource(R.string.action_delete),
-        dismissText = stringResource(R.string.action_cancel),
-        onConfirm = { showDeleteDialog = false; onDelete() },
-        onDismiss = { showDeleteDialog = false },
-        destructive = true,
-    )
-
-    TextInputDialog(
-        show = showRenameDialog,
-        title = stringResource(R.string.screen_conversations_dialog_rename_title),
-        label = stringResource(R.string.common_name),
-        confirmText = stringResource(R.string.action_save),
-        dismissText = stringResource(R.string.action_cancel),
-        onConfirm = { showRenameDialog = false; onRename(it) },
-        onDismiss = { showRenameDialog = false },
-        initialValue = conversation.summary ?: "",
-    )
-}
-
-@Composable
-private fun conversationActivityText(conversation: com.letta.mobile.data.model.Conversation): String? {
-    val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: return null
-    val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
-    return if (conversation.lastMessageAt != null) {
-        stringResource(R.string.screen_conversations_last_activity_format, relative)
-    } else {
-        stringResource(R.string.screen_conversations_created_format, relative)
-    }
-}
-
-@Composable
-private fun ConversationPinnedHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = LettaIcons.Star,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(LettaIconSizing.Inline),
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = "Pinned",
-            style = MaterialTheme.typography.sectionTitle,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    }
-}
-
-private data class ConversationSection(
-    val key: String,
-    val date: LocalDate? = null,
-    val isPinned: Boolean = false,
-    val items: List<ConversationDisplay>,
-)
-
-private fun buildConversationSections(conversations: List<ConversationDisplay>): List<ConversationSection> {
-    if (conversations.isEmpty()) return emptyList()
-
-    // Defensive dedupe by conversation id: a duplicated conversation row (e.g.
-    // from concurrent list refreshes / admin_rpc churn) would otherwise produce
-    // two LazyColumn items with the same "date_<date>:conv-<id>" key and crash
-    // the render thread with IllegalArgumentException "Key ... was already used"
-    // (letta-mobile conversations-list duplicate-key crash class).
-    val deduped = conversations.distinctBy { it.conversation.id }
-
-    val pinned = deduped.filter { it.isPinned }
-    val regular = deduped.filterNot { it.isPinned }
-
-    val sections = mutableListOf<ConversationSection>()
-    if (pinned.isNotEmpty()) {
-        sections += ConversationSection(
-            key = "pinned",
-            isPinned = true,
-            items = pinned,
-        )
-    }
-
-    regular
-        .groupBy { conversationLocalDate(it.conversation) }
-        .forEach { (date, items) ->
-            sections += ConversationSection(
-                key = "date_$date",
-                date = date,
-                items = items,
-            )
-        }
-
-    return sections
-}
-
-private fun conversationLocalDate(conversation: com.letta.mobile.data.model.Conversation): LocalDate {
-    val timestamp = conversation.lastMessageAt ?: conversation.createdAt ?: Instant.EPOCH.toString()
-    return runCatching {
-        Instant.parse(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-    }.getOrDefault(LocalDate.now())
-}
-
-@Composable
-private fun ConversationAdminDialog(
-    display: ConversationDisplay,
-    recompilePreview: String?,
-    inspectorMessages: List<ConversationInspectorMessage>,
-    isInspectorLoading: Boolean,
-    inspectorError: String?,
-    onDismiss: () -> Unit,
-    onRename: (String) -> Unit,
-    onToggleArchived: (Boolean) -> Unit,
-    onFork: () -> Unit,
-    onCancelRuns: () -> Unit,
-    onRecompile: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    var renameText by remember(display.conversation.id) { mutableStateOf(display.conversation.summary ?: "") }
-    val conversation = display.conversation
-
-    ConfirmDialog(
-        show = true,
-        title = stringResource(R.string.screen_conversations_admin_details),
-        confirmText = stringResource(R.string.action_close),
-        dismissText = stringResource(R.string.action_close),
-        onConfirm = onDismiss,
-        onDismiss = onDismiss,
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            CardGroup(title = { Text(stringResource(R.string.common_details)) }) {
-                item(
-                    headlineContent = { Text(stringResource(R.string.common_id)) },
-                    supportingContent = { Text(conversation.id.value, style = MaterialTheme.typography.listItemMetadataMonospace) }
-                )
-                item(
-                    headlineContent = { Text(stringResource(R.string.common_agents)) },
-                    supportingContent = { Text(display.agentName, style = MaterialTheme.typography.listItemSupporting) }
-                )
-                item(
-                    headlineContent = { Text(stringResource(R.string.common_status)) },
-                    supportingContent = {
-                        Text(
-                            text = if (conversation.archived == true) stringResource(R.string.screen_conversations_archived_label)
-                            else stringResource(R.string.screen_conversations_active_label),
-                            style = MaterialTheme.typography.listItemMetadata
-                        )
-                    }
-                )
-                conversation.createdAt?.let {
-                    item(
-                        headlineContent = { Text(stringResource(R.string.common_created)) },
-                        supportingContent = { Text(formatRelativeTime(it), style = MaterialTheme.typography.listItemMetadata) }
-                    )
-                }
-            }
-
-            CardGroup(title = { Text("Rename") }) {
-                item(
-                    headlineContent = {
-                        FormItem(label = { Text(stringResource(R.string.common_name)) }) {
-                            OutlinedTextField(
-                                value = renameText,
-                                onValueChange = { renameText = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                            )
-                        }
-                    },
-                    trailingContent = {
-                        TextButton(onClick = { if (renameText.isNotBlank()) onRename(renameText) }) {
-                            Text(stringResource(R.string.action_save))
-                        }
-                    }
-                )
-            }
-
-            CardGroup(title = { Text("Actions") }) {
-                item(
-                    onClick = { onToggleArchived(conversation.archived != true) },
-                    headlineContent = {
-                        Text(
-                            if (conversation.archived == true) stringResource(R.string.screen_conversations_unarchive_action)
-                            else stringResource(R.string.screen_conversations_archive_action)
-                        )
-                    },
-                    leadingContent = {
-                        Icon(
-                            imageVector = LettaIcons.Archive,
-                            contentDescription = null
-                        )
-                    }
-                )
-                item(
-                    onClick = onFork,
-                    headlineContent = { Text(stringResource(R.string.action_fork)) },
-                    leadingContent = { Icon(imageVector = LettaIcons.ForkRight, contentDescription = null) }
-                )
-                item(
-                    onClick = onCancelRuns,
-                    headlineContent = { Text(stringResource(R.string.screen_conversations_cancel_runs_action)) },
-                    leadingContent = { Icon(imageVector = LettaIcons.Close, contentDescription = null) }
-                )
-                item(
-                    onClick = onRecompile,
-                    headlineContent = { Text(stringResource(R.string.screen_conversations_recompile_action)) },
-                    leadingContent = { Icon(imageVector = LettaIcons.Refresh, contentDescription = null) }
-                )
-                item(
-                    onClick = onDelete,
-                    headlineContent = { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) },
-                    leadingContent = { Icon(imageVector = LettaIcons.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) }
-                )
-            }
-
-            Text(
-                text = stringResource(R.string.screen_conversations_message_inspector_title),
-                style = MaterialTheme.typography.dialogSectionHeading,
-            )
-            if (isInspectorLoading) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    for (i in 0..3) {
-                        ShimmerBox(height = 80.dp, widthFraction = 1f)
-                    }
-                }
-            } else if (!inspectorError.isNullOrBlank()) {
-                Text(
-                    text = inspectorError,
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            } else if (inspectorMessages.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.screen_conversations_message_inspector_empty),
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(260.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(inspectorMessages, key = { it.id }) { message ->
-                        ConversationInspectorCard(message = message)
-                    }
-                }
-            }
-            if (!recompilePreview.isNullOrBlank()) {
-                Text(stringResource(R.string.screen_conversations_recompile_preview_title), style = MaterialTheme.typography.dialogSectionHeading)
-                Text(recompilePreview, style = MaterialTheme.typography.listItemSupporting)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConversationInspectorCard(message: ConversationInspectorMessage) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = LettaCardDefaults.listCardColors(),
-    ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = message.messageType,
-                    style = MaterialTheme.typography.listItemMetadata,
-                )
-                Text(
-                    text = message.id,
-                    style = MaterialTheme.typography.listItemMetadataMonospace,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = message.summary,
-                style = MaterialTheme.typography.listItemSupporting,
-            )
-            message.detailLines.forEach { (label, value) ->
-                Text(
-                    text = "$label: $value",
-                    style = MaterialTheme.typography.listItemSupporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ErrorContent(
-    message: String,
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = LettaIcons.Error,
-            contentDescription = "Error",
-            tint = MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(text = message, style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = onRetry) {
-            Text(stringResource(R.string.action_retry))
-        }
-    }
-}
-
-@Composable
-private fun NewChatAgentScreen(
-    agents: List<Agent>,
-    onBack: () -> Unit,
-    onAgentSelected: (Agent) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var query by rememberSaveable { mutableStateOf("") }
-    val filteredAgents = remember(agents, query) {
-        val needle = query.trim()
-        if (needle.isBlank()) agents else agents.filter { agent ->
-            agent.name.contains(needle, ignoreCase = true) ||
-                agent.description.orEmpty().contains(needle, ignoreCase = true) ||
-                agent.model.orEmpty().contains(needle, ignoreCase = true)
-        }
-    }
-
-    Scaffold(
-        modifier = modifier,
-        containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
-        topBar = {
-            TopAppBar(
-                title = { Text("New chat") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(LettaIcons.ArrowBack, contentDescription = "Back")
-                    }
+            callbacks = ConversationAdminDialogCallbacks(
+                onDismiss = { viewModel.closeConversationAdmin() },
+                onRename = { newName ->
+                    viewModel.renameConversation(display.conversation.id, display.conversation.agentId, newName)
                 },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.topAppBarColors(),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                placeholder = { Text("Type an agent name or model") },
-                leadingIcon = { Icon(LettaIcons.Search, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-            )
-
-            when {
-                agents.isEmpty() -> EmptyState(
-                    icon = LettaIcons.AccountCircle,
-                    message = "Create an agent before starting a new chat.",
-                    modifier = Modifier.fillMaxSize(),
-                )
-                filteredAgents.isEmpty() -> EmptyState(
-                    icon = LettaIcons.Search,
-                    message = "No matching agents. Try another name, description, or model.",
-                    modifier = Modifier.fillMaxSize(),
-                )
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    item {
-                        Text(
-                            text = "Agents",
-                            style = MaterialTheme.typography.sectionTitle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
-                    }
-                    items(filteredAgents, key = { it.id.value }) { agent ->
-                        Card(
-                            onClick = { onAgentSelected(agent) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(4.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            ),
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            ) {
-                                AgentInitialAvatar(agent.name)
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = agent.name.ifBlank { "Unnamed agent" },
-                                        style = MaterialTheme.typography.listItemHeadline,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        text = agent.description?.takeIf(String::isNotBlank)
-                                            ?: agent.model?.takeIf(String::isNotBlank)
-                                            ?: agent.id.value,
-                                        style = MaterialTheme.typography.listItemSupporting,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    val model = agent.model
-                                    if (!agent.description.isNullOrBlank() && !model.isNullOrBlank()) {
-                                        Text(
-                                            text = model,
-                                            style = MaterialTheme.typography.listItemMetadataMonospace,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentInitialAvatar(name: String) {
-    val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    androidx.compose.material3.Surface(
-        modifier = Modifier.size(48.dp),
-        shape = androidx.compose.foundation.shape.CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(initial, style = MaterialTheme.typography.titleLarge)
-        }
+                onToggleArchived = { archived -> viewModel.setConversationArchived(display, archived) },
+                onFork = { viewModel.forkConversation(display.conversation.id, display.conversation.agentId) { } },
+                onCancelRuns = { viewModel.cancelConversationRuns(display) },
+                onRecompile = { viewModel.recompileConversation(display) },
+                onDelete = { viewModel.deleteConversation(display.conversation.id) },
+            ),
+        )
     }
 }
