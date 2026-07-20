@@ -12,6 +12,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
+internal fun externalConversationDedupeKey(agentId: String?, conversationId: String): String =
+    "${agentId.orEmpty()}|$conversationId"
+
 /**
  * Per-conversation [TimelineSyncLoop] registry.
  *
@@ -295,7 +298,7 @@ open class TimelineRepository(
         message: LettaMessage,
         source: String,
     ) {
-        if (markExternalFrameDuplicate(conversationId, message, source)) return
+        if (markExternalFrameDuplicate(null, conversationId, message, source)) return
         getOrCreate(conversationId).ingestStreamEvent(message, source)
     }
 
@@ -312,7 +315,7 @@ open class TimelineRepository(
             "messageId" to message.id,
             "messageType" to message.messageType,
         )
-        if (markExternalFrameDuplicate(conversationId, message, source)) return
+        if (markExternalFrameDuplicate(agentId, conversationId, message, source)) return
         getOrCreate(agentId, conversationId).ingestStreamEvent(message, source)
     }
 
@@ -536,10 +539,16 @@ open class TimelineRepository(
         }
     }
 
-    private suspend fun markExternalFrameDuplicate(conversationId: String, message: LettaMessage, source: String): Boolean {
+    private suspend fun markExternalFrameDuplicate(
+        agentId: String?,
+        conversationId: String,
+        message: LettaMessage,
+        source: String,
+    ): Boolean {
         val key = externalFrameKey(message) ?: return false
+        val scopedConversationKey = externalConversationDedupeKey(agentId, conversationId)
         val duplicate = externalSeenMutex.withLock {
-            val keys = externalSeenByConversation.getOrPut(conversationId) { LinkedHashSet() }
+            val keys = externalSeenByConversation.getOrPut(scopedConversationKey) { LinkedHashSet() }
             val added = keys.add(key)
             while (keys.size > MAX_SEEN_EXTERNAL_FRAMES_PER_CONVERSATION) {
                 val oldest = keys.firstOrNull() ?: break

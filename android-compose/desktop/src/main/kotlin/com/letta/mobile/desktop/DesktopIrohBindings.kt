@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.repository.SubagentRepository
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -210,6 +211,7 @@ internal fun rememberSubagentRegistry(
     activeConfig: LettaConfig,
     irohMode: Boolean,
     chatScope: CoroutineScope,
+    parentScope: SubagentParentScope?,
 ): DesktopSubagentRegistry {
     val subagentTransport = remember(activeConfig, irohMode) {
         createSubagentTransport(activeConfig, irohMode, chatScope)
@@ -228,8 +230,39 @@ internal fun rememberSubagentRegistry(
             ),
         ),
     )
-    val activeSubagents = produceState(emptyList<SubagentEntry>(), subagentRepository) {
-        subagentRepository?.activeSubagentsFlow()?.collect { value = it } ?: run { value = emptyList() }
+    val activeSubagents = produceState(
+        initialValue = emptyList<SubagentEntry>(),
+        subagentRepository,
+        parentScope,
+    ) {
+        collectScopedActiveSubagents(subagentRepository, parentScope) { value = it }
     }
     return DesktopSubagentRegistry(subagentRepository, activeSubagents)
+}
+
+/** Resolve parent scope only when both conversation coordinates are present. */
+internal fun subagentParentScope(
+    parentAgentId: String?,
+    parentConversationId: String?,
+): SubagentParentScope? =
+    parentAgentId?.let { agentId ->
+        parentConversationId?.let { conversationId ->
+            SubagentParentScope(agentId, conversationId)
+        }
+    }
+
+private suspend fun collectScopedActiveSubagents(
+    repository: SubagentRepository?,
+    parentScope: SubagentParentScope?,
+    emit: (List<SubagentEntry>) -> Unit,
+) {
+    val scopedRepository = repository ?: run {
+        emit(emptyList())
+        return
+    }
+    val scope = parentScope ?: run {
+        emit(emptyList())
+        return
+    }
+    scopedRepository.activeSubagentsFlow(scope).collect { emit(it) }
 }

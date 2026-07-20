@@ -225,7 +225,7 @@ fun LettaDesktopApp(
     val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
     val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
     var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
-    val subagents = rememberSubagentRegistry(activeConfig, irohMode, chatScope)
+    val subagents = rememberSubagentRegistry(activeConfig, irohMode, chatScope, subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId))
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
     var showBackgroundTasks by remember { mutableStateOf(false) }

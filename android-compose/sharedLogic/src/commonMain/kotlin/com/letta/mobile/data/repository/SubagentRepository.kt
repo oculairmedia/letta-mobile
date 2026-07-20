@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISubagentRepository
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
@@ -15,6 +16,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -64,6 +66,7 @@ open class SubagentRepository(
     // tasks panel also has a "Finished" section, so it requests all=true to
     // include recently-terminal entries in the initial snapshot.
     private val includeAll: Boolean = false,
+    private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 ) : ISubagentRepository {
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
     private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
@@ -81,12 +84,15 @@ open class SubagentRepository(
      * subscribers; only the first subscription triggers the initial
      * `subagent_list` round-trip.
      */
-    override fun activeSubagentsFlow(): Flow<List<SubagentEntry>> {
+    override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> {
         if (initialized.compareAndSet(false, true)) {
-            scope.launch { refresh() }
+            this.scope.launch { refresh() }
         }
-        return state.asStateFlow()
+        return state.asStateFlow().map { entries -> entries.inParentScope(scope) }
     }
+
+    override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
+        state.value.inParentScope(scope)
 
     /**
      * Force a fresh `subagent_list` round-trip. Parallel callers (e.g. the
@@ -134,22 +140,39 @@ open class SubagentRepository(
         incoming: List<SubagentEntry>,
         terminal: SubagentEntry? = null,
     ): List<SubagentEntry> {
-        val incomingByKey = incoming.associateBy { it.cacheKey() }
-        val terminalKey = terminal
+        val stampedTerminal = terminal
             ?.takeIf { it.status in TERMINAL_STATUSES }
-            ?.cacheKey()
+            ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: clock()) }
+        val completeIncoming = if (stampedTerminal == null) incoming else incoming + stampedTerminal
+        val incomingByKey = completeIncoming.associateBy { it.cacheKey() }
+        val terminalKey = stampedTerminal?.cacheKey()
         val retained = state.value.filter { previous ->
             val key = previous.cacheKey()
             previous.status == SubagentStatus.RUNNING &&
                 key !in incomingByKey &&
                 key != terminalKey
         }
-        return incoming + retained
+        val previousTerminals = state.value.filter { previous ->
+            previous.status in TERMINAL_STATUSES &&
+                previous.cacheKey() !in incomingByKey &&
+                previous.terminalAtEpochMs?.let { clock() - it < TERMINAL_LINGER_MS } == true
+        }
+        return (completeIncoming + retained + previousTerminals).distinctBy { it.cacheKey() }
     }
 
-    private fun SubagentEntry.cacheKey(): String = toolCallId.takeIf { it.isNotBlank() }
-        ?: taskId?.takeIf { it.isNotBlank() }
-        ?: hashCode().toString()
+    private fun SubagentEntry.cacheKey(): String = listOf(
+        parentAgentId.orEmpty(),
+        parentConversationId.orEmpty(),
+        toolCallId.takeIf { it.isNotBlank() }
+            ?: taskId?.takeIf { it.isNotBlank() }
+            ?: hashCode().toString(),
+    ).joinToString("|")
+
+    private fun List<SubagentEntry>.inParentScope(scope: SubagentParentScope): List<SubagentEntry> =
+        filter { entry ->
+            entry.parentAgentId == scope.parentAgentId &&
+                entry.parentConversationId == scope.parentConversationId
+        }
 
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
@@ -175,6 +198,7 @@ open class SubagentRepository(
     }
 
     companion object {
+        private const val TERMINAL_LINGER_MS = 8_000L
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,

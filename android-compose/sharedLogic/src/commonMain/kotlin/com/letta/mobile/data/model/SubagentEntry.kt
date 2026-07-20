@@ -2,6 +2,7 @@ package com.letta.mobile.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * letta-mobile-73o2h.1: wire shape of a single registered subagent as
@@ -62,6 +63,8 @@ data class SubagentEntry(
     @SerialName("parentConversationId") val parentConversationId: String? = null,
     @SerialName("startedAt") val startedAt: String? = null,
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
+    /** Client-owned lifecycle timestamp; never encoded onto the wire. */
+    @Transient val terminalAtEpochMs: Long? = null,
 )
 
 object SubagentStatus {

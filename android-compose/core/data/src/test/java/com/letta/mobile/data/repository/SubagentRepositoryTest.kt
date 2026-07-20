@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
@@ -30,6 +31,8 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 class SubagentRepositoryTest {
 
+    private val parentScope = SubagentParentScope("agent-parent", "default")
+
     private lateinit var transport: FakeChannelTransport
 
     @Before
@@ -42,9 +45,9 @@ class SubagentRepositoryTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
         val repo = SubagentRepository(transport, backgroundScope)
 
-        val s1 = repo.activeSubagentsFlow().first { it.isNotEmpty() }
-        val s2 = repo.activeSubagentsFlow().first { it.isNotEmpty() }
-        val s3 = repo.activeSubagentsFlow().first { it.isNotEmpty() }
+        val s1 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+        val s2 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+        val s3 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         assertEquals(listOf("toolu_1"), s1.map { it.toolCallId })
         assertEquals(listOf("toolu_1"), s2.map { it.toolCallId })
@@ -60,7 +63,7 @@ class SubagentRepositoryTest {
         val repo = SubagentRepository(transport, backgroundScope)
 
         val subagents = withTimeout(5_000) {
-            repo.activeSubagentsFlow().first { it.isNotEmpty() }
+            repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         }
         assertEquals(setOf("toolu_1", "toolu_2"), subagents.map { it.toolCallId }.toSet())
         assertEquals(1, transport.subagentListCalls.size)
@@ -71,7 +74,7 @@ class SubagentRepositoryTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
         val repo = SubagentRepository(transport, backgroundScope)
 
-        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         assertEquals(1, transport.subagentListCalls.size)
 
         // Push a subagents_updated with a fresh canonical active set.
@@ -86,17 +89,17 @@ class SubagentRepositoryTest {
             )
         )
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow().first { it.size == 2 } }
+        val after = withTimeout(2_000) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
         // Folded by replacement — NO additional subagent_list round-trip.
         assertEquals(1, transport.subagentListCalls.size)
     }
 
     @Test
-    fun `subagents_updated with empty active set clears the snapshot after explicit terminal`() = runTest {
+    fun `subagents_updated with explicit terminal replaces running entry with durable terminal`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
         val repo = SubagentRepository(transport, backgroundScope)
-        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
             ServerFrame.SubagentsUpdated(
@@ -109,15 +112,18 @@ class SubagentRepositoryTest {
             )
         )
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow().first { it.isEmpty() } }
-        assertEquals(emptyList<SubagentEntry>(), after)
+        val after = withTimeout(2_000) {
+            repo.activeSubagentsFlow(parentScope).first { it.singleOrNull()?.status == SubagentStatus.COMPLETED }
+        }
+        assertEquals(listOf(SubagentStatus.COMPLETED), after.map { it.status })
+        assertTrue(after.single().terminalAtEpochMs != null)
     }
 
     @Test
     fun `subagents_updated partial snapshot retains omitted running entries`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
         val repo = SubagentRepository(transport, backgroundScope)
-        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
             ServerFrame.SubagentsUpdated(
@@ -130,7 +136,7 @@ class SubagentRepositoryTest {
             )
         )
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow().first { it.size == 2 } }
+        val after = withTimeout(2_000) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
     }
 
@@ -141,12 +147,69 @@ class SubagentRepositoryTest {
             successList(listOf(running("toolu_2"))),
         )
         val repo = SubagentRepository(transport, backgroundScope)
-        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         repo.refresh().getOrThrow()
 
-        val after = repo.activeSubagentsFlow().first { it.size == 2 }
+        val after = repo.activeSubagentsFlow(parentScope).first { it.size == 2 }
         assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `two agents sharing default conversation receive isolated snapshots`() = runTest {
+        val agentOne = running("toolu-agent-1")
+        val agentTwo = running("toolu-agent-2").copy(parentAgentId = "agent-other")
+        transport.enqueueSubagentList(successList(listOf(agentOne, agentTwo)))
+        val repo = SubagentRepository(transport, backgroundScope)
+
+        val first = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+        val second = repo.activeSubagentsFlow(SubagentParentScope("agent-other", "default"))
+            .first { it.isNotEmpty() }
+
+        assertEquals(listOf("toolu-agent-1"), first.map { it.toolCallId })
+        assertEquals(listOf("toolu-agent-2"), second.map { it.toolCallId })
+    }
+
+    @Test
+    fun `conversation switch projects only the selected parent conversation`() = runTest {
+        val firstConversation = running("toolu-conv-a").copy(parentConversationId = "conv-a")
+        val secondConversation = running("toolu-conv-b").copy(parentConversationId = "conv-b")
+        transport.enqueueSubagentList(successList(listOf(firstConversation, secondConversation)))
+        val repo = SubagentRepository(transport, backgroundScope)
+
+        val first = repo.activeSubagentsFlow(SubagentParentScope("agent-parent", "conv-a"))
+            .first { it.isNotEmpty() }
+        val second = repo.activeSubagentsFlow(SubagentParentScope("agent-parent", "conv-b"))
+            .first { it.isNotEmpty() }
+
+        assertEquals(listOf("toolu-conv-a"), first.map { it.toolCallId })
+        assertEquals(listOf("toolu-conv-b"), second.map { it.toolCallId })
+    }
+
+    @Test
+    fun `terminal lifecycle remains cached after resubscribe beyond sharing timeout`() = runTest {
+        var now = 1_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu-terminal"))))
+        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "terminal",
+                ts = "t",
+                reason = "completed",
+                subagent = running("toolu-terminal").copy(status = SubagentStatus.COMPLETED),
+                subagentsActive = emptyList(),
+                at = "t",
+            )
+        )
+        val terminal = repo.activeSubagentsFlow(parentScope).first { it.singleOrNull()?.status == SubagentStatus.COMPLETED }
+        assertEquals(1_000L, terminal.single().terminalAtEpochMs)
+
+        now += 6_000L
+        val resubscribed = repo.currentActiveSubagents(parentScope)
+        assertEquals(listOf("toolu-terminal"), resubscribed.map { it.toolCallId })
+        assertEquals(1_000L, resubscribed.single().terminalAtEpochMs)
     }
 
     @Test
@@ -201,7 +264,7 @@ class SubagentRepositoryTest {
         )
         val repo = SubagentRepository(transport, backgroundScope)
 
-        repo.activeSubagentsFlow().first { it.isNotEmpty() }
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         assertEquals(1, transport.subagentListCalls.size)
 
         // Simulate a WS drop + reconnect.
@@ -209,7 +272,7 @@ class SubagentRepositoryTest {
         delay(10)
         transport.state.value = connectedState()
 
-        val after = withTimeout(2_000) { repo.activeSubagentsFlow().first { it.size == 2 } }
+        val after = withTimeout(2_000) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         assertEquals(2, after.size)
         assertEquals(2, transport.subagentListCalls.size)
     }
@@ -221,7 +284,7 @@ class SubagentRepositoryTest {
         val repo = SubagentRepository(transport, backgroundScope)
 
         val initial = async(start = CoroutineStart.UNDISPATCHED) {
-            repo.activeSubagentsFlow().first { it.isNotEmpty() }
+            repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         }
         val manual = async(start = CoroutineStart.UNDISPATCHED) { repo.refresh() }
 
@@ -284,6 +347,8 @@ class SubagentRepositoryTest {
         taskId = null,
         subagentAgentId = null,
         parentRunId = "run-1",
+        parentAgentId = "agent-parent",
+        parentConversationId = "default",
         startedAt = "2026-06-01T00:00:00Z",
     )
 
