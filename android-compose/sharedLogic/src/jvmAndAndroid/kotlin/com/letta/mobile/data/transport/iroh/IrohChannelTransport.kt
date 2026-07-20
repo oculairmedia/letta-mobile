@@ -241,8 +241,10 @@ class IrohChannelTransport(
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send job clears activeTurn. Intentional disconnects and
                 // config replacement must not synthesize redial recovery.
-                if (supervisorState is IrohConnectionState.Degraded) {
+                if (supervisorState is IrohConnectionState.Degraded && supervisorState.reason != "config_changed") {
                     rememberInterruptedTurn()
+                } else if (supervisorState is IrohConnectionState.Degraded) {
+                    interruptedTurn = null
                 }
                 // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
                 // stops observer ingestion. On redial a fresh Ready fires and the
@@ -912,7 +914,7 @@ class IrohChannelTransport(
                 )
                 return
             }
-            interruptedTurn?.takeIf { it.turnId == turn.turnId }?.let {
+            if (interruptedTurn?.turnId == turn.turnId) {
                 interruptedTurn = null
             }
             emitBoth(frame)
@@ -1021,6 +1023,9 @@ class IrohChannelTransport(
     override fun cancel(conversationId: String): Boolean {
         val turn = activeTurn
         if (turn == null) {
+            if (interruptedTurn?.conversationId == conversationId) {
+                interruptedTurn = null
+            }
             // Nothing streaming: preserve the "cancel always yields a terminal"
             // contract so the UI can never get stuck streaming, but there is no
             // run to abort server-side.
@@ -1197,6 +1202,7 @@ class IrohChannelTransport(
     }
 
     override suspend fun disconnect() {
+        interruptedTurn = null
         stopObserverIngest("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
