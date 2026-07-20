@@ -92,6 +92,9 @@ internal class AdminRpcStreamServer(
      * never break the request — the caller swallows failures.
      */
     private val onMethodObserved: (suspend (method: String, params: JsonObject?) -> Unit)? = null,
+    private val requestContextProvider: () -> AdminRpcRequestContext = {
+        AdminRpcRequestContext(authenticated = authenticated.get())
+    },
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val permits = Semaphore(maxActiveHandlers)
@@ -266,7 +269,7 @@ internal class AdminRpcStreamServer(
             } else {
                 val params = obj["params"]?.jsonObject
                 notifyMethodObserved(method, params)
-                router.dispatch(requestId, method, params)
+                router.dispatch(requestId, method, params, requestContextProvider())
             }
         } catch (ce: CancellationException) {
             throw ce

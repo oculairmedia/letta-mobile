@@ -26,10 +26,23 @@ fun adminError(message: String): Nothing = throw IllegalArgumentException(messag
  * @param controller The App Server controller for runtime management
  * @param json JSON instance for parsing
  */
+data class AdminRpcRequestContext(
+    val authenticated: Boolean,
+    val authorizedConversationIds: Set<String>? = null,
+) {
+    fun canAccessConversation(conversationId: String): Boolean =
+        authenticated && (authorizedConversationIds == null || conversationId in authorizedConversationIds)
+
+    companion object {
+        val Authenticated = AdminRpcRequestContext(authenticated = true)
+        val Unauthenticated = AdminRpcRequestContext(authenticated = false, authorizedConversationIds = emptySet())
+    }
+}
+
 class AdminRpcRouter(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
-    private val handlers = mutableMapOf<String, suspend (JsonObject?) -> JsonElement>()
+    private val handlers = mutableMapOf<String, suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement>()
 
     val methodCount: Int
         get() = handlers.size
@@ -42,6 +55,13 @@ class AdminRpcRouter(
      * Method names should use dot-notation: "agent.list", "conversation.get", etc.
      */
     fun register(method: String, handler: suspend (JsonObject?) -> JsonElement) {
+        registerScoped(method) { params, _ -> handler(params) }
+    }
+
+    fun registerScoped(
+        method: String,
+        handler: suspend (JsonObject?, AdminRpcRequestContext) -> JsonElement,
+    ) {
         handlers[method] = handler
         Telemetry.event("AdminRpc", "handler.registered", "method" to method)
     }
@@ -64,14 +84,19 @@ class AdminRpcRouter(
      * Returns the JSON response frame or an error frame if the method is unknown
      * or the handler throws.
      */
-    suspend fun dispatch(requestId: String, method: String, params: JsonObject?): String {
+    suspend fun dispatch(
+        requestId: String,
+        method: String,
+        params: JsonObject?,
+        context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
+    ): String {
         val handler = handlers[method]
         if (handler == null) {
             Telemetry.event("AdminRpc", "method.not_found", "method" to method)
             return encodeFailure(requestId, "Unknown method: $method")
         }
         return try {
-            val result = handler(params)
+            val result = handler(params, context)
             json.encodeToString(
                 kotlinx.serialization.serializer(),
                 buildJsonObject {

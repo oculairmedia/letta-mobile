@@ -82,6 +82,8 @@ class AdminRpcContractTest {
                 "schedule.get",
                 "schedule.list",
                 "step.list",
+                "subagent.list",
+                "subagent.todos",
                 "tool.attach",
                 "tool.create",
                 "tool.delete",

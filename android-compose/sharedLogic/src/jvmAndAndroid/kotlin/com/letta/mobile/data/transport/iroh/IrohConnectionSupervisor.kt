@@ -32,6 +32,7 @@ data class IrohConnectionHandle(
     val transport: IrohAppServerTransport? = null,
     val turnEngine: AppServerTurnEngine? = null,
     val adminRpcCall: (suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse)? = null,
+    val serverCapabilities: Set<String>? = null,
     /**
      * letta-mobile-r3i1z: the stream-channel frame flow the passive observer
      * ingestion loop subscribes to. Defaults to the live transport's

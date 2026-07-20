@@ -8,6 +8,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -230,6 +231,14 @@ class IrohNodeConnection(
             firstFrameTimeoutMs = ADMIN_RPC_REQUEST_TIMEOUT_MS,
             maxFrameBytes = MAX_FRAME_BYTES,
             peerSupportsFrameParts = { peerSupportsFrameParts() },
+            requestContextProvider = {
+                AdminRpcRequestContext(
+                    authenticated = authenticated.get(),
+                    authorizedConversationIds = viewerSubscription?.currentConversation
+                        ?.let(::setOf)
+                        ?: emptySet(),
+                )
+            },
             // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
             // so the shared message.list handler has no connection identity —
             // associate it HERE, where remoteEndpointId + selfViewer are in
@@ -453,7 +462,7 @@ class IrohNodeConnection(
                 "remoteEndpointId" to remoteEndpointId,
                 "peerCapabilities" to advertised.sorted().joinToString(","),
             )
-            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}"]}"""
+            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}","${IrohChannelTransport.SUBAGENT_RPC_CAPABILITY}"]}"""
         } else {
             val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
             Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)

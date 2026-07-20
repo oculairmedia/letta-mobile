@@ -24,6 +24,8 @@ object AdminRpcRegistry {
         "tool.attach",
         "tool.detach",
         "agent.list",
+        "subagent.list",
+        "subagent.todos",
         "health.check",
         "approval.submit",
         "project.list",
@@ -37,12 +39,17 @@ object AdminRpcRegistry {
         "project.delete",
     )
 
-    fun buildRouter(adminBaseUrl: String, controller: AppServerController? = null): AdminRpcRouter {
+    fun buildRouter(
+        adminBaseUrl: String,
+        controller: AppServerController? = null,
+        subagentRegistrySource: SubagentRegistrySource? = null,
+    ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val router = AdminRpcRouter()
 
         HealthAdminHandlers.register(router, rpcBase)
         AgentAdminHandlers.register(router, rpcBase, controller)
+        SubagentAdminHandlers.register(router, subagentRegistrySource)
         ConversationAdminHandlers.register(router, rpcBase)
         ProjectAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
