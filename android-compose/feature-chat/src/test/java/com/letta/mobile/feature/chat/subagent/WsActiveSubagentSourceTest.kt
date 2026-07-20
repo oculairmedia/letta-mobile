@@ -33,6 +33,20 @@ import org.junit.jupiter.api.Test
 @Tag("unit")
 class WsActiveSubagentSourceTest {
 
+    @JvmInline private value class ToolCallRef(val value: String)
+    @JvmInline private value class TaskRef(val value: String)
+    @JvmInline private value class AgentRef(val value: String)
+    @JvmInline private value class ConversationRef(val value: String)
+
+    private data class EntryRefs(
+        val toolCallId: ToolCallRef = ToolCallRef(""),
+        val taskId: TaskRef? = null,
+        val subagentAgentId: AgentRef? = null,
+        val subagentConversationId: ConversationRef? = null,
+        val parentAgentId: AgentRef = AgentRef("agent-parent"),
+        val parentConversationId: ConversationRef = ConversationRef("default"),
+    )
+
     private class FakeSubagentRepository(
         initial: List<SubagentEntry> = emptyList(),
     ) : ISubagentRepository {
@@ -53,24 +67,19 @@ class WsActiveSubagentSourceTest {
     }
 
     private fun entry(
-        toolCallId: String,
+        refs: EntryRefs,
         status: String = SubagentStatus.RUNNING,
-        taskId: String? = null,
-        subagentAgentId: String? = null,
-        subagentConversationId: String? = null,
-        parentAgentId: String = "agent-parent",
-        parentConversationId: String = "default",
         terminalAtEpochMs: Long? = null,
     ) = SubagentEntry(
-        toolCallId = toolCallId,
-        description = "desc $toolCallId",
+        toolCallId = refs.toolCallId.value,
+        description = "desc ${refs.toolCallId.value}",
         subagentType = "general-purpose",
         status = status,
-        taskId = taskId,
-        subagentAgentId = subagentAgentId,
-        subagentConversationId = subagentConversationId,
-        parentAgentId = parentAgentId,
-        parentConversationId = parentConversationId,
+        taskId = refs.taskId?.value,
+        subagentAgentId = refs.subagentAgentId?.value,
+        subagentConversationId = refs.subagentConversationId?.value,
+        parentAgentId = refs.parentAgentId.value,
+        parentConversationId = refs.parentConversationId.value,
         terminalAtEpochMs = terminalAtEpochMs,
     )
 
@@ -96,8 +105,8 @@ class WsActiveSubagentSourceTest {
 
     @Test
     fun `id prefers toolCallId then falls back to taskId`() {
-        assertEquals("toolu_1", entry("toolu_1").toActiveSubagent().id)
-        assertEquals("task_2", entry("", taskId = "task_2").toActiveSubagent().id)
+        assertEquals("toolu_1", entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"))).toActiveSubagent().id)
+        assertEquals("task_2", entry(EntryRefs(toolCallId = ToolCallRef(""), taskId = TaskRef("task_2"))).toActiveSubagent().id)
     }
 
     @Test
@@ -105,12 +114,12 @@ class WsActiveSubagentSourceTest {
         // letta-mobile-pvrrm: tool_call_id present -> a dispatched subagent.
         assertEquals(
             ActiveSubagent.Kind.SUBAGENT,
-            entry("toolu_1").toActiveSubagent().kind,
+            entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"))).toActiveSubagent().kind,
         )
         // Only a task_id (no tool_call_id) -> a background tool task.
         assertEquals(
             ActiveSubagent.Kind.BACKGROUND_TASK,
-            entry("", taskId = "task_2").toActiveSubagent().kind,
+            entry(EntryRefs(toolCallId = ToolCallRef(""), taskId = TaskRef("task_2"))).toActiveSubagent().kind,
         )
     }
 
@@ -138,24 +147,20 @@ class WsActiveSubagentSourceTest {
     @Test
     fun `subagentAgentId is carried through for view-conversation`() {
         // letta-mobile-vo9y1: present -> canViewConversation true.
-        val mapped = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
+        val mapped = entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"))).toActiveSubagent()
         assertEquals("agent-local-abc", mapped.subagentAgentId)
         assertTrue(mapped.canViewConversation)
 
         // Absent / blank -> no affordance.
-        assertNull(entry("toolu_2").toActiveSubagent().subagentAgentId)
-        assertFalse(entry("toolu_3", subagentAgentId = "").toActiveSubagent().canViewConversation)
+        assertNull(entry(EntryRefs(toolCallId = ToolCallRef("toolu_2"))).toActiveSubagent().subagentAgentId)
+        assertFalse(entry(EntryRefs(toolCallId = ToolCallRef("toolu_3"), subagentAgentId = AgentRef(""))).toActiveSubagent().canViewConversation)
     }
 
     @Test
     fun `resolveConversationId uses existing actual conversation id without refresh`() = runTest {
         val repo = FakeSubagentRepository()
         val source = source(repo, backgroundScope)
-        val subagent = entry(
-            "toolu_1",
-            subagentAgentId = "agent-local-abc",
-            subagentConversationId = "conv-subagent-123",
-        ).toActiveSubagent()
+        val subagent = entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"), subagentConversationId = ConversationRef("conv-subagent-123"))).toActiveSubagent()
 
         assertEquals("conv-subagent-123", source.resolveConversationId(subagent).getOrNull())
         assertEquals(0, repo.refreshCalls)
@@ -166,15 +171,11 @@ class WsActiveSubagentSourceTest {
         val repo = FakeSubagentRepository()
         repo.refreshResult = Result.success(
             listOf(
-                entry(
-                    "toolu_1",
-                    subagentAgentId = "agent-local-abc",
-                    subagentConversationId = "conv-subagent-456",
-                ),
+                entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"), subagentConversationId = ConversationRef("conv-subagent-456"))),
             ),
         )
         val source = source(repo, backgroundScope)
-        val subagent = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
+        val subagent = entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"))).toActiveSubagent()
 
         assertEquals("conv-subagent-456", source.resolveConversationId(subagent).getOrNull())
         assertEquals(1, repo.refreshCalls)
@@ -183,9 +184,9 @@ class WsActiveSubagentSourceTest {
     @Test
     fun `resolveConversationId returns null instead of default when lookup fails`() = runTest {
         val repo = FakeSubagentRepository()
-        repo.refreshResult = Result.success(listOf(entry("toolu_other", subagentConversationId = "default")))
+        repo.refreshResult = Result.success(listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_other"), subagentConversationId = ConversationRef("default")))))
         val source = source(repo, backgroundScope)
-        val subagent = entry("toolu_1", subagentAgentId = "agent-local-abc").toActiveSubagent()
+        val subagent = entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"), subagentAgentId = AgentRef("agent-local-abc"))).toActiveSubagent()
 
         assertNull(source.resolveConversationId(subagent).getOrNull())
         assertEquals(1, repo.refreshCalls)
@@ -193,7 +194,7 @@ class WsActiveSubagentSourceTest {
 
     @Test
     fun `maps each durable repository snapshot without local lifecycle state`() = runTest {
-        val repo = FakeSubagentRepository(listOf(entry("toolu_1"), entry("toolu_2")))
+        val repo = FakeSubagentRepository(listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_1"))), entry(EntryRefs(toolCallId = ToolCallRef("toolu_2")))))
         val source = source(repo, backgroundScope)
 
         val mapped = source.activeSubagents.first { it.size == 2 }
@@ -202,7 +203,7 @@ class WsActiveSubagentSourceTest {
 
         // The durable repository owns omission retention. This source only
         // projects the already-reduced, parent-scoped snapshot.
-        repo.state.value = listOf(entry("toolu_3"))
+        repo.state.value = listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_3"))))
         val after = source.activeSubagents.first { snapshot ->
             snapshot.any { it.id == "toolu_3" }
         }
@@ -214,9 +215,9 @@ class WsActiveSubagentSourceTest {
     fun `terminal entries are dropped by the activeOnly host rule`() = runTest {
         val repo = FakeSubagentRepository(
             listOf(
-                entry("toolu_1", SubagentStatus.RUNNING),
-                entry("toolu_2", SubagentStatus.COMPLETED),
-                entry("toolu_3", SubagentStatus.FAILED),
+                entry(EntryRefs(toolCallId = ToolCallRef("toolu_1")), status = SubagentStatus.RUNNING),
+                entry(EntryRefs(toolCallId = ToolCallRef("toolu_2")), status = SubagentStatus.COMPLETED),
+                entry(EntryRefs(toolCallId = ToolCallRef("toolu_3")), status = SubagentStatus.FAILED),
             ),
         )
         // Pin the clock so the terminal entries are freshly stamped (not yet
@@ -232,14 +233,14 @@ class WsActiveSubagentSourceTest {
     fun `terminal entry in snapshot is stamped and lingers`() = runTest {
         // letta-mobile-29h9u: a status flip to completed should keep the chip
         // visible (stamped with terminalAt) for review, not vanish.
-        val repo = FakeSubagentRepository(listOf(entry("toolu_1", SubagentStatus.RUNNING)))
+        val repo = FakeSubagentRepository(listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_1")), status = SubagentStatus.RUNNING)))
         var nowMs = 1_000L
         val source = source(repo, backgroundScope)
 
         source.activeSubagents.first { it.singleOrNull()?.isActive == true }
 
         // Flip to completed at t=1000.
-        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED, terminalAtEpochMs = nowMs))
+        repo.state.value = listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_1")), status = SubagentStatus.COMPLETED, terminalAtEpochMs = nowMs))
         val lingering = source.activeSubagents.first { it.singleOrNull()?.isTerminal == true }
         assertEquals("toolu_1", lingering.single().id)
         assertEquals(ActiveSubagent.Status.COMPLETED, lingering.single().status)
@@ -255,12 +256,12 @@ class WsActiveSubagentSourceTest {
 
     @Test
     fun `explicit terminal state clears retained running entry into linger`() = runTest {
-        val repo = FakeSubagentRepository(listOf(entry("toolu_1", SubagentStatus.RUNNING)))
+        val repo = FakeSubagentRepository(listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_1")), status = SubagentStatus.RUNNING)))
         val source = source(repo, backgroundScope)
 
         source.activeSubagents.first { it.singleOrNull()?.isActive == true }
 
-        repo.state.value = listOf(entry("toolu_1", SubagentStatus.COMPLETED, terminalAtEpochMs = 5_000L))
+        repo.state.value = listOf(entry(EntryRefs(toolCallId = ToolCallRef("toolu_1")), status = SubagentStatus.COMPLETED, terminalAtEpochMs = 5_000L))
         val lingering = source.activeSubagents.first { it.any { e -> e.isTerminal } }
         val done = lingering.single { it.id == "toolu_1" }
         assertEquals(ActiveSubagent.Status.COMPLETED, done.status)
@@ -269,7 +270,7 @@ class WsActiveSubagentSourceTest {
 
     @Test
     fun `omitted background task id remains visible until explicit terminal`() = runTest {
-        val repo = FakeSubagentRepository(listOf(entry("", taskId = "task_1")))
+        val repo = FakeSubagentRepository(listOf(entry(EntryRefs(toolCallId = ToolCallRef(""), taskId = TaskRef("task_1")))))
         val source = source(repo, backgroundScope)
 
         val initial = source.activeSubagents.first { it.singleOrNull()?.id == "task_1" }
@@ -282,7 +283,7 @@ class WsActiveSubagentSourceTest {
         }
         assertEquals(listOf("task_1"), retained.map { it.id })
 
-        repo.state.value = listOf(entry("", status = SubagentStatus.COMPLETED, taskId = "task_1", terminalAtEpochMs = 9_000L))
+        repo.state.value = listOf(entry(EntryRefs(toolCallId = ToolCallRef(""), taskId = TaskRef("task_1")), status = SubagentStatus.COMPLETED, terminalAtEpochMs = 9_000L))
         val terminal = source.activeSubagents.first { snapshot ->
             snapshot.singleOrNull()?.id == "task_1" && snapshot.single().isTerminal
         }
@@ -293,8 +294,8 @@ class WsActiveSubagentSourceTest {
     fun `conversation switch does not retain chips from previous scope`() = runTest {
         val repo = FakeSubagentRepository(
             listOf(
-                entry("toolu-a", parentConversationId = "conv-a"),
-                entry("toolu-b", parentConversationId = "conv-b"),
+                entry(EntryRefs(toolCallId = ToolCallRef("toolu-a"), parentConversationId = ConversationRef("conv-a"))),
+                entry(EntryRefs(toolCallId = ToolCallRef("toolu-b"), parentConversationId = ConversationRef("conv-b"))),
             )
         )
         val conversationId = MutableStateFlow<String?>("conv-a")
@@ -307,11 +308,7 @@ class WsActiveSubagentSourceTest {
 
     @Test
     fun `source starts from durable terminal cache without empty flash`() = runTest {
-        val terminal = entry(
-            "toolu-terminal",
-            status = SubagentStatus.COMPLETED,
-            terminalAtEpochMs = 1_000L,
-        )
+        val terminal = entry(EntryRefs(toolCallId = ToolCallRef("toolu-terminal")), status = SubagentStatus.COMPLETED, terminalAtEpochMs = 1_000L)
         val repo = FakeSubagentRepository(listOf(terminal))
 
         val recreated = source(repo, backgroundScope)
@@ -340,7 +337,7 @@ class WsActiveSubagentSourceTest {
 
     @Test
     fun `null todo_progress maps to null progress on ActiveSubagent`() {
-        val wire = entry("toolu_1")
+        val wire = entry(EntryRefs(toolCallId = ToolCallRef("toolu_1")))
         // entry() helper doesn't set todoProgress, so it defaults to null
         val mapped = wire.toActiveSubagent()
 
