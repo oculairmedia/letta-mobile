@@ -78,6 +78,11 @@ exclude:
       - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/CronTask.kt # status constants used via serialization/API
       - sharedLogic/src/hostNativeMain/kotlin/com/letta/mobile/data/timeline # KMP actual logger implementation
       - sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/timeline # KMP actual logger implementation
+      - app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeViewModel.kt # Hilt ViewModel constructor
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/AdminChatA2uiCoordinator.kt # coordinator hooks wired from ViewModel
+      - app/src/main/java/com/letta/mobile/platform/root/RootShellBridge.kt # root/IPC bridge surface
+      - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/markdown/StreamingMarkdownParser.kt # streaming markdown helpers kept for parser evolution
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/channel/NotificationDelivery.kt # @Preview + delivery stream contracts
   # Adaptive icons must stay in mipmap-anydpi-v26 (API 26+). Renaming to
   # mipmap-anydpi to silence ObsoleteSdkInt breaks AAPT linking for play builds.
   - name: AndroidLintObsoleteSdkInt
@@ -89,6 +94,11 @@ exclude:
   - name: AndroidLintDiscouragedApi
     paths:
       - app/src/main/java/com/letta/mobile/crash/SentryInitializer.kt
+  # Baseline Profile non-shipping merge-manifest; Qodana's Android model does
+  # not resolve MainActivity for this synthetic variant even with an FQCN.
+  - name: AndroidDomInspection
+    paths:
+      - app/src/playNonMinifiedRelease/AndroidManifest.xml
   # Gradle incubating APIs (dependencyResolutionManagement / externalNativeBuild)
   # are required by current AGP/Gradle DSL; tracked via Gradle upgrades, not this gate.
   - name: UnstableApiUsage
