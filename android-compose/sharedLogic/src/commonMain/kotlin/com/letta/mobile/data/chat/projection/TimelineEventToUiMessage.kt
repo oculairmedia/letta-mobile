@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.model.UiToolResultTruncation
@@ -164,6 +165,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             executionTimeMs = executionTimeMs,
                             toolCallId = callId,
                             approvalDecision = chip,
+                            subagentDispatch = tc.toSubagentDispatch(result),
                         )
                     }
                 } else null
@@ -288,6 +290,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             },
                             toolCallId = callId,
                             approvalDecision = chip,
+                            subagentDispatch = tc.toSubagentDispatch(result),
                             resultTruncation = truncation?.let {
                                 UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
                             },
@@ -369,3 +372,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
         }
     }
 }
+
+private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: String?): UiSubagentDispatch? =
+    if (name == "Agent") {
+        extractSubagentDispatch(
+            toolCallId = effectiveId.takeIf { it.isNotBlank() },
+            arguments = arguments.orEmpty(),
+            returnContent = result,
+        )
+    } else {
+        null
+    }

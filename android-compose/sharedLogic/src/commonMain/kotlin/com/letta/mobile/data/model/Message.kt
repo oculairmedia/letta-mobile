@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonArray
@@ -316,11 +317,18 @@ data class ToolReturnMessage(
 ) : LettaMessage {
     val toolReturn: ToolReturn
         get() {
+            val contentPartResponse = extractContentPartResponse(toolReturnRaw)
+            val parsedStringPayload = toolReturnRaw.parseJsonStringPayload()
             val rawFuncResponse = when {
-                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && toolReturnRaw.parseJsonStringPayload() == null -> toolReturnRaw.content
+                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && parsedStringPayload == null -> toolReturnRaw.content
+                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString &&
+                    parsedStringPayload.isSubagentDispatchResult() -> toolReturnRaw.content
+                // Structured (non-stringified) Agent return objects must keep
+                // their JSON body so hydration can recover taskId/agentId.
+                toolReturnRaw is JsonObject && toolReturnRaw.isSubagentDispatchResult() ->
+                    Json.encodeToString(JsonElement.serializer(), toolReturnRaw)
                 else -> null
             }
-            val contentPartResponse = extractContentPartResponse(toolReturnRaw)
             val fromList = toolReturns?.firstOrNull()
             if (fromList != null) {
                 // Enrich with funcResponse from tool_return raw if missing
@@ -348,6 +356,19 @@ data class ToolReturnMessage(
 
     val attachments: List<MessageContentPart.Image>
         get() = extractAttachments(toolReturnRaw)
+}
+
+/**
+ * True for Agent-tool return payloads that carry subagent correlation ids.
+ * Bare `agent_id` alone is too broad (admin/API tools also return it) — require
+ * an explicit task id or subagent-scoped agent id field.
+ */
+private fun JsonElement?.isSubagentDispatchResult(): Boolean {
+    val obj = this as? JsonObject ?: return false
+    return obj.containsKey("task_id") ||
+        obj.containsKey("taskId") ||
+        obj.containsKey("subagent_agent_id") ||
+        obj.containsKey("subagentAgentId")
 }
 
 private fun JsonObject.looksLikeToolReturnEnvelope(): Boolean {
