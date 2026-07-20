@@ -24,6 +24,13 @@ class AdminRpcRegistryTest {
     }
 
     @Test
+    fun registryDoesNotRegisterSubagentMethodsWithoutSource() {
+        val router = AdminRpcRegistry.buildRouter("http://127.0.0.1:8291")
+
+        assertTrue(AdminRpcRegistry.subagentMethods.none { it in router.registeredMethods })
+    }
+
+    @Test
     fun unknownMethodReturnsStandardErrorEnvelope() = runTest {
         val router = AdminRpcRegistry.buildRouter("http://127.0.0.1:8291")
 

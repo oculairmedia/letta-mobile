@@ -65,11 +65,18 @@ object AdminRpcRegistry {
         ApprovalAdminHandlers.register(router, rpcBase, controller)
 
         router.requireNonEmpty()
-        val missingMethods = canonicalMethods - router.registeredMethods
+        val enabledMethods = if (subagentRegistrySource == null) {
+            canonicalMethods - subagentMethods
+        } else {
+            canonicalMethods
+        }
+        val missingMethods = enabledMethods - router.registeredMethods
         check(missingMethods.isEmpty()) {
             "Admin RPC registry missing canonical methods: ${missingMethods.sorted().joinToString(", ")}"
         }
 
         return router
     }
+
+    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
 }

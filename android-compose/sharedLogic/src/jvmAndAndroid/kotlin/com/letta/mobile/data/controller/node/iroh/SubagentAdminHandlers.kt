@@ -25,17 +25,18 @@ internal object SubagentAdminHandlers {
     private val json = Json { ignoreUnknownKeys = true }
 
     fun register(router: AdminRpcRouter, source: SubagentRegistrySource?) {
+        if (source == null) return
         router.registerScoped("subagent.list") { params, context ->
             val scope = requireScope(params, context)
             val includeTerminal = param(params, AdminParamKey("all"))?.toBooleanStrictOrNull() ?: false
-            val entries = source.requireSource().list(scope.conversationId, includeTerminal)
+            val entries = source.list(scope.conversationId, includeTerminal)
                 .filter { it.belongsTo(scope) }
             json.encodeToJsonElement(SubagentListResult(subagents = entries))
         }
         router.registerScoped("subagent.todos") { params, context ->
             val scope = requireScope(params, context)
             val toolCallId = params.requireParam(AdminParamKey("tool_call_id"))
-            val snapshot = source.requireSource().todos(scope.conversationId, toolCallId)
+            val snapshot = source.todos(scope.conversationId, toolCallId)
                 ?.takeIf { it.subagent.toolCallId == toolCallId && it.subagent.belongsTo(scope) }
             json.encodeToJsonElement(
                 if (snapshot == null) {
@@ -61,9 +62,6 @@ internal object SubagentAdminHandlers {
             agentId = param(params, AdminParamKey("agent_id"))?.takeIf { it.isNotBlank() },
         )
     }
-
-    private fun SubagentRegistrySource?.requireSource(): SubagentRegistrySource =
-        this ?: adminError("subagent registry unavailable")
 
     private fun SubagentEntry.belongsTo(scope: SubagentRequestScope): Boolean =
         parentConversationId == scope.conversationId &&
