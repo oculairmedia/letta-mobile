@@ -443,11 +443,6 @@ class ProjectHomeViewModel private constructor(
         )
     }
 
-    fun dismissCreateProjectOptions() {
-        val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(showCreateOptions = false))
-    }
-
     fun startManualProjectCreation() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(

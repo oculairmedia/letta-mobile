@@ -342,14 +342,14 @@ private fun EmbeddingModelCard(
                 AssistChip(onClick = {}, label = { Text(model.providerType) })
                 model.embeddingDim?.let { dim ->
                     Text(
-                        text = "${dim}d",
+                        text = "$dim",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 model.embeddingChunkSize?.let { chunk ->
                     Text(
-                        text = "${chunk} chunk",
+                        text = "$chunk chunk",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -530,7 +530,7 @@ private fun formatNumber(value: Int): String {
     return if (value >= 1000) {
         val thousands = value / 1000
         val remainder = value % 1000
-        if (remainder == 0) "${thousands},000" else "$thousands,${remainder.toString().padStart(3, '0')}"
+        if (remainder == 0) "$thousands,000" else "$thousands,${remainder.toString().padStart(3, '0')}"
     } else {
         value.toString()
     }

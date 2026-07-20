@@ -45,13 +45,17 @@ exclude:
   - name: AndroidLintUnusedResources
     paths:
       - app/src/main/res/values/sentry.xml
-  # Hilt @Binds/@Provides, Room @TypeConverter, and Compose @Preview entry
+  # Hilt @Binds/@Provides, Room @Dao/@TypeConverter, and Compose @Preview entry
   # points look "unused" to static analysis but are required by frameworks.
   - name: UnusedSymbol
     paths:
-      - app/src/main/java/com/letta/mobile/di
-      - core/data/src/main/java/com/letta/mobile/data/model/DomainIdConverters.kt
-      - designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt
+      - app/src/main/java/com/letta/mobile/di # Hilt @Module/@Binds/@Provides wiring
+      - app/src/play/java/com/letta/mobile/di # play-flavor Hilt modules (RootShellBridgeModule)
+      - core/data/src/main/java/com/letta/mobile/data/local # Room @Dao query methods
+      - core/data/src/main/java/com/letta/mobile/data/session # SessionScoped Hilt factory bindings
+      - core/data/src/main/java/com/letta/mobile/data/model/DomainIdConverters.kt # Room @TypeConverter
+      - designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt # @Preview composables
+      - desktop/src/main/kotlin/com/letta/mobile/desktop # @Composable surfaces wired from LettaDesktopApp/Main
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatUiStateProvider.kt
       - app/src/main/java/com/letta/mobile/ui/screens/agentlist/AgentListUiStateProvider.kt

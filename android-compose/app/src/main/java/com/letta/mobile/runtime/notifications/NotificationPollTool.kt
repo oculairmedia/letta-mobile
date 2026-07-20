@@ -93,4 +93,3 @@ class NotificationPollTool(
 }
 
 /** Convenience factory used by Hilt to wire the real Android access check. */
-fun newActionIdForNotificationPoll(): String = newActionId()

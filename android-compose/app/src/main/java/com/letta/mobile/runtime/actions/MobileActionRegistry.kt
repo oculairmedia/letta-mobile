@@ -66,8 +66,6 @@ class MobileActionRegistry @Inject constructor(
         return response
     }
 
-    fun auditEvents(): List<MobileActionAuditEvent> = auditSink.recent()
-
     private fun record(response: MobileActionToolResponse) {
         val capability = matrix().capabilities.firstOrNull { it.id == response.capabilityId }
         auditSink.record(

@@ -28,16 +28,6 @@ open class McpServerApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun getMcpServer(serverId: String): McpServer {
-        val (client, baseUrl) = apiClient.session()
-
-        val response = client.get("$baseUrl/v1/mcp-servers/$serverId")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
-    }
-
     open suspend fun createMcpServer(params: McpServerCreateParams): McpServer {
         val (client, baseUrl) = apiClient.session()
 

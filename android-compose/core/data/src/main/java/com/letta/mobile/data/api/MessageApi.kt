@@ -78,7 +78,7 @@ open class MessageApi @Inject constructor(
         // Take the most recent N messages (first N in desc order)
         // Then sort chronologically by date, using otid as tiebreaker for same-date messages
         return allMessages.take(messageLimit).sortedWith(
-            compareBy<LettaMessage>(
+            compareBy(
                 { it.date ?: "" },       // Primary: chronological date
                 { it.otid ?: it.id }      // Tiebreaker: otid (increments within a run) or id
             )
@@ -90,51 +90,6 @@ open class MessageApi @Inject constructor(
         messageLimit: Int = 20,
         beforeMessageId: String? = null,
     ): List<LettaMessage> = fetchRecentMessages(ConversationId(conversationId), messageLimit, beforeMessageId)
-
-    /**
-     * Fetch messages after a specific message ID (for incremental sync).
-     *
-     * @param conversationId The conversation to fetch messages from
-     * @param afterMessageId Fetch messages after this message ID
-     * @param messageLimit Max number of messages to return
-     * @return List of new messages in chronological order (oldest first)
-     */
-    open suspend fun fetchMessagesAfter(
-        conversationId: ConversationId,
-        afterMessageId: String?,
-        messageLimit: Int = 50,
-    ): List<LettaMessage> {
-        val (client, baseUrl) = apiClient.session()
-
-        // Over-fetch to account for runs containing multiple messages
-        val runLimit = ((messageLimit * RUN_TO_MESSAGE_MULTIPLIER) / 4).coerceIn(messageLimit, MAX_OVER_FETCH_LIMIT)
-
-        val response = client.get("$baseUrl/v1/conversations/${conversationId.value}/messages") {
-            parameter("limit", runLimit)
-            parameter("after", afterMessageId)
-            parameter("order", "asc")
-        }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-
-        val allMessages: List<LettaMessage> = response.body()
-
-        // Messages are in asc order (oldest first), take the limit
-        // Apply same stable sort as fetchRecentMessages for consistent ordering
-        return allMessages.take(messageLimit).sortedWith(
-            compareBy<LettaMessage>(
-                { it.date ?: "" },
-                { it.otid ?: it.id }
-            )
-        )
-    }
-
-    open suspend fun fetchMessagesAfter(
-        conversationId: String,
-        afterMessageId: String?,
-        messageLimit: Int = 50,
-    ): List<LettaMessage> = fetchMessagesAfter(ConversationId(conversationId), afterMessageId, messageLimit)
 
     open suspend fun sendMessage(agentId: AgentId, request: MessageCreateRequest): LettaResponse {
         val (client, baseUrl) = apiClient.session()

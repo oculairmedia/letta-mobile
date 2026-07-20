@@ -174,15 +174,6 @@ fun DesktopChatSurfaceState.withComposerText(text: String): DesktopChatSurfaceSt
 fun DesktopChatSurfaceState.withImageAttachment(image: MessageContentPart.Image): DesktopChatSurfaceState =
     withRuntimeState(ChatSessionReducer.attachImage(runtimeState, image))
 
-fun DesktopChatSurfaceState.withoutImageAttachment(index: Int): DesktopChatSurfaceState =
-    withRuntimeState(ChatSessionReducer.removeImageAttachment(runtimeState, index))
-
-fun DesktopChatSurfaceState.withComposer(composer: ChatComposerState): DesktopChatSurfaceState =
-    copy(
-        composerText = composer.text,
-        pendingImageAttachments = composer.pendingImageAttachments,
-    )
-
 fun DesktopChatSurfaceState.withRuntimeState(runtimeState: ChatSessionState): DesktopChatSurfaceState =
     copy(
         conversations = runtimeState.conversations,

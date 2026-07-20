@@ -4,8 +4,6 @@ package com.letta.mobile.platform.storage
 object AndroidStorageToolIds {
     const val APP_PRIVATE_READ = "storage.app_private.read"
     const val APP_PRIVATE_WRITE = "storage.app_private.write"
-    const val APP_PRIVATE_EXPORT = "storage.app_private.export"
-    const val APP_PRIVATE_CACHE = "storage.app_private.cache"
     const val SAF_READ = "storage.saf.read"
     const val SAF_WRITE = "storage.saf.write"
     const val SAF_SEARCH = "storage.saf.search"

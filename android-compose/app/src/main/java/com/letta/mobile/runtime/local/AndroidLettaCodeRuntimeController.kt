@@ -538,8 +538,3 @@ private fun encodeUserContentArray(
 
 private fun String.toLettaCodeProviderModelHandle(): String =
     if (startsWith("lmstudio/")) this else "lmstudio/${removePrefix("local/")}"
-
-private fun String.isLiteRtLmModelHandle(): Boolean =
-    removePrefix("lmstudio/")
-        .removePrefix("local/")
-        .contains("litert", ignoreCase = true)

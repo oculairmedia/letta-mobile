@@ -63,12 +63,6 @@ open class ToolRepository @Inject constructor(
         return toolApi.listTools(limit = limit, offset = offset)
     }
 
-    fun refreshAgentTools(agentId: String, tools: List<Tool>) {
-        _toolsByAgent.update { current -> current.toMutableMap().apply {
-                    put(agentId, tools)
-                } }
-    }
-
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
         val irohSource = irohToolSource
         if (irohSource != null && irohSource.shouldUseIroh()) {

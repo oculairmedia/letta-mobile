@@ -35,15 +35,11 @@ object LettaSpacing {
     val CHIP_GAP: Dp = LettaSpacingTokens.CHIP_GAP.dp
 
     // Chat-specific semantic tokens (awbf.1 extraction)
-    val BUBBLE_PADDING_HORIZONTAL: Dp = LettaSpacingTokens.BUBBLE_PADDING_HORIZONTAL.dp
-    val BUBBLE_PADDING_VERTICAL: Dp = LettaSpacingTokens.BUBBLE_PADDING_VERTICAL.dp
-    val MESSAGE_SPACING: Dp = LettaSpacingTokens.MESSAGE_SPACING.dp
     val COMPOSER_ATTACH_ICON_SIZE: Dp = LettaSpacingTokens.COMPOSER_ATTACH_ICON_SIZE.dp
     val COMPOSER_ATTACH_BUTTON_SIZE: Dp = LettaSpacingTokens.COMPOSER_ATTACH_BUTTON_SIZE.dp
 
     // Corner radii (chat bubble and code blocks)
     val BUBBLE_RADIUS: Dp = LettaSpacingTokens.BUBBLE_RADIUS.dp
-    val CODE_BLOCK_RADIUS: Dp = LettaSpacingTokens.CODE_BLOCK_RADIUS.dp
 
     // Avatar and icon sizing
     val AVATAR_SIZE: Dp = LettaSpacingTokens.AVATAR_SIZE.dp

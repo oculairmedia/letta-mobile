@@ -1,9 +1,6 @@
 package com.letta.mobile.data.repository
 
 import android.util.Log
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import com.letta.mobile.data.api.AgentApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.AgentEntity
@@ -30,7 +27,6 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -41,7 +37,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-import kotlin.time.Duration.Companion.seconds
 internal fun defaultAgentRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -86,17 +81,6 @@ open class AgentRepository(
             repositoryScope.launch { observeAgentUpdated(channelTransport) }
             repositoryScope.launch { observeReconnects(channelTransport) }
         }
-    }
-
-    fun getAgentsPaged(tags: List<String>? = null): Flow<PagingData<Agent>> {
-        return Pager(
-            config = PagingConfig(
-                pageSize = AgentPagingSource.PAGE_SIZE,
-                enablePlaceholders = false,
-                initialLoadSize = AgentPagingSource.PAGE_SIZE * 2
-            ),
-            pagingSourceFactory = { AgentPagingSource(agentApi, tags) }
-        ).flow
     }
 
     override suspend fun countAgents(): Int = agentApi.countAgents()
@@ -370,15 +354,6 @@ open class AgentRepository(
             return irohSource.getContextWindow(agentId, conversationId)
         }
         return agentApi.getContextWindow(agentId, conversationId)
-    }
-
-    fun getAgentPolling(id: AgentId): Flow<Agent> = flow {
-        while (true) {
-            val agent = fetchAgentRemote(id)
-            emit(agent)
-            updateAgentInCache(agent)
-            delay(3.seconds)
-        }
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent {

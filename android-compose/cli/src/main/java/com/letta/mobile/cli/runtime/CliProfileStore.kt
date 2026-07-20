@@ -116,8 +116,6 @@ internal class CliProfileStore(
         )
     }
 
-    fun exportJson(): String = prettyJson.encodeToString(CliProfileDocument.serializer(), load())
-
     companion object {
         const val DEFAULT_BASE_URL = "https://letta.oculair.ca"
 

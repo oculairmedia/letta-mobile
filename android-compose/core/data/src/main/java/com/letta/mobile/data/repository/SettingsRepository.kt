@@ -174,8 +174,6 @@ class SettingsRepository internal constructor(
         }
     }
 
-    fun getConfigs(): Flow<List<LettaConfig>> = configs
-
     override fun getActiveConfig(): Flow<LettaConfig?> = activeConfig
 
     // EncryptedSharedPreferences runs AES-GCM on the calling thread when it
@@ -247,10 +245,6 @@ class SettingsRepository internal constructor(
         prefs[Keys.DYNAMIC_COLOR]
             ?: ((prefs[Keys.THEME_PRESET] ?: ThemePreset.DEFAULT.name) == ThemePreset.DEFAULT.name &&
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-    }
-
-    fun getAmoledDarkMode(): Flow<Boolean> = dataStore.data.map { prefs ->
-        prefs[Keys.AMOLED_DARK_MODE] ?: false
     }
 
     fun setAdminAgentId(agentId: String?) {
@@ -590,12 +584,6 @@ class SettingsRepository internal constructor(
      */
     override fun observeResumeRecentConversation(): Flow<Boolean> = dataStore.data.map { prefs ->
         prefs[Keys.RESUME_RECENT_CONVERSATION] ?: BuildConfig.DEBUG
-    }
-
-    suspend fun setResumeRecentConversation(enabled: Boolean) {
-        dataStore.edit { prefs ->
-            prefs[Keys.RESUME_RECENT_CONVERSATION] = enabled
-        }
     }
 
     override suspend fun setEnableProjects(enabled: Boolean) {

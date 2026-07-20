@@ -92,15 +92,6 @@ internal class WebSocketConnection(
     }
 
     /**
-     * Clears the client-initiated close flag and returns its previous value.
-     */
-    fun clearClientInitiatedClose(): Boolean {
-        val wasClientClose = clientInitiatedClose
-        clientInitiatedClose = false
-        return wasClientClose
-    }
-
-    /**
      * Helper to tear down the current WebSocket socket and mark it as client-initiated.
      */
     fun teardown(reason: String): Boolean {

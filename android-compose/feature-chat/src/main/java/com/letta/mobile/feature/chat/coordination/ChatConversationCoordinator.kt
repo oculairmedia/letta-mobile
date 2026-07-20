@@ -496,27 +496,4 @@ internal class ChatConversationCoordinator(
         }
         scope.launch { loadMessagesInternal() }
     }
-
-    fun resetClientModeConversationState() {
-        setClientModeConversationId(null)
-        setRouteConversationId(null)
-        clientModeBootstrapState = if (isFreshRoute) {
-            ClientModeBootstrapState.NewConversationPending
-        } else {
-            ClientModeBootstrapState.Idle
-        }
-        clearPendingClientModeBootstrapUserMessage()
-        currentConversationTracker.setCurrent(null)
-        stopTimelineObserver()
-        updateSessionState { ChatSessionReducer.conversationsLoaded(it, emptyList()) }
-        uiState.value = uiState.value.copy(
-            conversationState = ConversationState.NoConversation,
-            messages = persistentListOf(),
-            messageListChange = ChatMessageListChange.Full,
-            isLoadingOlderMessages = false,
-            hasMoreOlderMessages = false,
-            isStreaming = false,
-            isAgentTyping = false,
-        )
-    }
 }
