@@ -98,15 +98,17 @@ internal fun ChatMessageList(
     }
 
     ChatMessageListEffects(
-        state = state,
-        renderItems = renderItems,
-        listState = listState,
-        isUserScrolling = isUserScrolling,
-        scrollToMessageId = scrollToMessageId,
-        onLoadOlderMessages = callbacks.onLoadOlderMessages,
-        onHighlightedMessageIdChange = { highlightedMessageId = it },
-        hasScrolledToTarget = hasScrolledToTarget,
-        onHasScrolledToTargetChange = { hasScrolledToTarget = it },
+        params = ChatMessageListEffectsParams(
+            state = state,
+            renderItems = renderItems,
+            listState = listState,
+            isUserScrolling = isUserScrolling,
+            scrollToMessageId = scrollToMessageId,
+            onLoadOlderMessages = callbacks.onLoadOlderMessages,
+            onHighlightedMessageIdChange = { highlightedMessageId = it },
+            hasScrolledToTarget = hasScrolledToTarget,
+            onHasScrolledToTargetChange = { hasScrolledToTarget = it },
+        ),
     )
 
     val liveFontScale = if (pinchFontScaleController.isPinching) {

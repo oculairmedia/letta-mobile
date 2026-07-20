@@ -52,6 +52,14 @@ private data class ConversationCardMenuState(
     val onRequestDelete: () -> Unit,
 )
 
+private data class ConversationCardSurfaceParams(
+    val title: String,
+    val display: ConversationDisplay,
+    val onClick: () -> Unit,
+    val onLongClick: () -> Unit,
+    val modifier: Modifier = Modifier,
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ConversationCard(
@@ -64,17 +72,19 @@ fun ConversationCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
+    val title = conversationCardTitle(display)
 
     ConversationCardSurface(
-        title = title,
-        display = display,
-        onClick = callbacks.onClick,
-        onLongClick = {
-            HapticEffects.longPress(haptic)
-            showContextMenu = true
-        },
-        modifier = modifier,
+        params = ConversationCardSurfaceParams(
+            title = title,
+            display = display,
+            onClick = callbacks.onClick,
+            onLongClick = {
+                HapticEffects.longPress(haptic)
+                showContextMenu = true
+            },
+            modifier = modifier,
+        ),
     )
 
     ConversationCardContextMenu(
@@ -89,35 +99,38 @@ fun ConversationCard(
         callbacks = callbacks,
     )
 
-    ConversationCardDeleteDialog(
+    ConversationCardConfirmDialog(
         show = showDeleteDialog,
-        onDismiss = { showDeleteDialog = false },
+        title = stringResource(R.string.screen_conversations_dialog_delete_title),
+        message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
+        confirmText = stringResource(R.string.action_delete),
+        destructive = true,
         onConfirm = callbacks.onDelete,
+        onDismiss = { showDeleteDialog = false },
     )
 
-    ConversationCardRenameDialog(
+    ConversationCardTextInputDialog(
         show = showRenameDialog,
+        title = stringResource(R.string.screen_conversations_dialog_rename_title),
+        label = stringResource(R.string.common_name),
         initialValue = conversation.summary ?: "",
-        onDismiss = { showRenameDialog = false },
         onConfirm = callbacks.onRename,
+        onDismiss = { showRenameDialog = false },
     )
 }
 
+private fun conversationCardTitle(display: ConversationDisplay): String =
+    display.conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConversationCardSurface(
-    title: String,
-    display: ConversationDisplay,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
+private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
     Card(
-        modifier = modifier
+        modifier = params.modifier
             .fillMaxWidth()
             .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
+                onClick = params.onClick,
+                onLongClick = params.onLongClick,
             ),
         shape = RoundedCornerShape(12.dp),
         colors = LettaCardDefaults.listCardColors(),
@@ -125,14 +138,14 @@ private fun ConversationCardSurface(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = title,
+                text = params.title,
                 style = MaterialTheme.typography.listItemHeadline,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = conversationCardMetadata(display),
+                text = conversationCardMetadata(params.display),
                 style = MaterialTheme.typography.listItemSupporting,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -202,34 +215,40 @@ private fun conversationPinActionLabel(isPinned: Boolean): String {
 }
 
 @Composable
-private fun ConversationCardDeleteDialog(
+private fun ConversationCardConfirmDialog(
     show: Boolean,
-    onDismiss: () -> Unit,
+    title: String,
+    message: String,
+    confirmText: String,
+    destructive: Boolean,
     onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     ConfirmDialog(
         show = show,
-        title = stringResource(R.string.screen_conversations_dialog_delete_title),
-        message = stringResource(R.string.screen_conversations_dialog_delete_confirm),
-        confirmText = stringResource(R.string.action_delete),
+        title = title,
+        message = message,
+        confirmText = confirmText,
         dismissText = stringResource(R.string.action_cancel),
         onConfirm = { onDismiss(); onConfirm() },
         onDismiss = onDismiss,
-        destructive = true,
+        destructive = destructive,
     )
 }
 
 @Composable
-private fun ConversationCardRenameDialog(
+private fun ConversationCardTextInputDialog(
     show: Boolean,
+    title: String,
+    label: String,
     initialValue: String,
-    onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     TextInputDialog(
         show = show,
-        title = stringResource(R.string.screen_conversations_dialog_rename_title),
-        label = stringResource(R.string.common_name),
+        title = title,
+        label = label,
         confirmText = stringResource(R.string.action_save),
         dismissText = stringResource(R.string.action_cancel),
         onConfirm = { onDismiss(); onConfirm(it) },

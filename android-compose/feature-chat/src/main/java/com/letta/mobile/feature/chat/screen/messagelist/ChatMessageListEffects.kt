@@ -4,12 +4,12 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.feature.chat.screen.ChatAutoScrollSignature
 import com.letta.mobile.feature.chat.screen.ChatFadeEdgeLength
+import com.letta.mobile.feature.chat.screen.ChatMessageRoles
 import com.letta.mobile.feature.chat.screen.StreamingAutoScrollSnapThrottleMs
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
 import com.letta.mobile.feature.chat.screen.newestMessageAutoScrollSignature
 import com.letta.mobile.feature.chat.screen.shouldForceScrollOnUserSend
 import com.letta.mobile.feature.chat.screen.toChatViewportSnapshot
-import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.ConversationState
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyListState
@@ -26,7 +26,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import androidx.compose.runtime.snapshotFlow
 
 @Composable
 internal fun ChatMessageListEffects(params: ChatMessageListEffectsParams) {
@@ -122,7 +121,8 @@ private fun shouldAutoScrollToLatest(
     renderItemCount: Int,
 ): Boolean {
     if (!ChatViewportFollowPolicy.shouldAutoFollow(followLatest, renderItemCount)) return false
-    return signature.role != "user" || signature.messageId != previousSignature?.messageId
+    return signature.role != ChatMessageRoles.User ||
+        signature.messageId != previousSignature?.messageId
 }
 
 private suspend fun performAutoScrollToLatest(
@@ -168,48 +168,43 @@ private fun shouldLoadOlderMessages(params: ChatMessageListEffectsParams): Boole
 @Composable
 private fun ChatMessageListScrollToMessageEffect(params: ChatMessageListEffectsParams) {
     LaunchedEffect(params.scrollToMessageId, params.renderItems.size) {
-        if (params.scrollToMessageId == null || params.hasScrolledToTarget || params.renderItems.isEmpty()) {
-            return@LaunchedEffect
-        }
-        val targetIdx = params.renderItems.indexOfFirst { it.containsMessageId(params.scrollToMessageId) }
-        if (targetIdx < 0) return@LaunchedEffect
+        val target = resolveScrollToMessageTarget(
+            scrollToMessageId = params.scrollToMessageId,
+            hasScrolledToTarget = params.hasScrolledToTarget,
+            renderItems = params.renderItems,
+        ) ?: return@LaunchedEffect
+
         params.listState.scrollToItem(
             calculateLazyIndexForRenderItem(
-                targetRenderIndex = targetIdx,
-                renderItems = params.renderItems,
+                targetRenderIndex = target.renderIndex,
+                renderItems = target.renderItems,
             ),
         )
-        params.onHighlightedMessageIdChange(params.scrollToMessageId)
+        params.onHighlightedMessageIdChange(target.messageId)
         params.onHasScrolledToTargetChange(true)
         delay(2000)
         params.onHighlightedMessageIdChange(null)
     }
 }
 
-@Composable
-internal fun ChatMessageListEffects(
-    state: ChatUiState,
-    renderItems: List<ChatRenderItem>,
-    listState: LazyListState,
-    isUserScrolling: Boolean,
+private data class ResolvedScrollToMessageTarget(
+    val messageId: String,
+    val renderIndex: Int,
+    val renderItems: List<ChatRenderItem>,
+)
+
+private fun resolveScrollToMessageTarget(
     scrollToMessageId: String?,
-    onLoadOlderMessages: () -> Unit,
-    onHighlightedMessageIdChange: (String?) -> Unit,
     hasScrolledToTarget: Boolean,
-    onHasScrolledToTargetChange: (Boolean) -> Unit,
-) {
-    ChatMessageListEffects(
-        params = ChatMessageListEffectsParams(
-            state = state,
-            renderItems = renderItems,
-            listState = listState,
-            isUserScrolling = isUserScrolling,
-            scrollToMessageId = scrollToMessageId,
-            onLoadOlderMessages = onLoadOlderMessages,
-            onHighlightedMessageIdChange = onHighlightedMessageIdChange,
-            hasScrolledToTarget = hasScrolledToTarget,
-            onHasScrolledToTargetChange = onHasScrolledToTargetChange,
-        ),
+    renderItems: List<ChatRenderItem>,
+): ResolvedScrollToMessageTarget? {
+    if (scrollToMessageId == null || hasScrolledToTarget || renderItems.isEmpty()) return null
+    val targetIdx = renderItems.indexOfFirst { it.containsMessageId(scrollToMessageId) }
+    if (targetIdx < 0) return null
+    return ResolvedScrollToMessageTarget(
+        messageId = scrollToMessageId,
+        renderIndex = targetIdx,
+        renderItems = renderItems,
     )
 }
 

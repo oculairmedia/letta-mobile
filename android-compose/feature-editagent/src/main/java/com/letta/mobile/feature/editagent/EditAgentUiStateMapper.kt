@@ -112,35 +112,101 @@ internal object EditAgentUiStateMapper {
     private fun modelSettingsFields(agent: Agent): ModelSettingsFields {
         val modelSettings = agent.modelSettings
         val llmConfig = agent.llmConfig
+        val core = coreModelSettingsFields(modelSettings, llmConfig)
+        val reasoning = reasoningModelSettingsFields(modelSettings, llmConfig)
+        val response = responseModelSettingsFields(modelSettings, agent)
         return ModelSettingsFields(
-            temperature = modelSettings?.temperature?.toFloat() ?: llmConfig?.temperature?.toFloat() ?: 1.0f,
-            maxOutputTokens = modelSettings?.maxOutputTokens ?: llmConfig?.maxTokens ?: 4096,
-            parallelToolCalls = modelSettings?.parallelToolCalls ?: llmConfig?.parallelToolCalls ?: true,
-            modelProviderName = modelSettings?.providerName ?: llmConfig?.providerName.orEmpty(),
-            modelProviderCategory = modelSettings?.providerCategory ?: llmConfig?.providerCategory.orEmpty(),
-            modelEnableReasoner = modelSettings?.enableReasoner ?: llmConfig?.enableReasoner ?: false,
-            modelReasoningEffort = modelSettings?.reasoningEffort ?: llmConfig?.reasoningEffort.orEmpty(),
-            modelMaxReasoningTokens = (modelSettings?.maxReasoningTokens ?: llmConfig?.maxReasoningTokens)
-                ?.toString()
-                .orEmpty(),
-            modelReasoningJson = modelSettings?.reasoning?.toSettingsJson().orEmpty(),
-            modelFrequencyPenalty = (modelSettings?.frequencyPenalty ?: llmConfig?.frequencyPenalty)
-                ?.toString()
-                .orEmpty(),
-            modelVerbosity = modelSettings?.verbosity ?: llmConfig?.verbosity.orEmpty(),
-            modelStrictToolCalling = modelSettings?.strict ?: false,
-            modelResponseFormatJson = (modelSettings?.responseFormat ?: agent.responseFormat)
-                ?.toSettingsJson()
-                .orEmpty(),
-            modelResponseSchemaJson = modelSettings?.responseSchema?.toSettingsJson().orEmpty(),
-            modelThinkingConfigJson = modelSettings?.thinkingConfig?.toSettingsJson().orEmpty(),
-            modelPutInnerThoughtsInKwargs = modelSettings?.putInnerThoughtsInKwargs
-                ?: llmConfig?.putInnerThoughtsInKwargs
-                ?: false,
-            modelToolCallParser = modelSettings?.toolCallParser.orEmpty(),
-            modelAnthropicEffort = modelSettings?.effort.orEmpty(),
+            temperature = core.temperature,
+            maxOutputTokens = core.maxOutputTokens,
+            parallelToolCalls = core.parallelToolCalls,
+            modelProviderName = core.modelProviderName,
+            modelProviderCategory = core.modelProviderCategory,
+            modelEnableReasoner = reasoning.modelEnableReasoner,
+            modelReasoningEffort = reasoning.modelReasoningEffort,
+            modelMaxReasoningTokens = reasoning.modelMaxReasoningTokens,
+            modelReasoningJson = reasoning.modelReasoningJson,
+            modelFrequencyPenalty = core.modelFrequencyPenalty,
+            modelVerbosity = core.modelVerbosity,
+            modelStrictToolCalling = response.modelStrictToolCalling,
+            modelResponseFormatJson = response.modelResponseFormatJson,
+            modelResponseSchemaJson = response.modelResponseSchemaJson,
+            modelThinkingConfigJson = response.modelThinkingConfigJson,
+            modelPutInnerThoughtsInKwargs = reasoning.modelPutInnerThoughtsInKwargs,
+            modelToolCallParser = response.modelToolCallParser,
+            modelAnthropicEffort = response.modelAnthropicEffort,
         )
     }
+
+    private data class CoreModelSettingsFields(
+        val temperature: Float,
+        val maxOutputTokens: Int,
+        val parallelToolCalls: Boolean,
+        val modelProviderName: String,
+        val modelProviderCategory: String,
+        val modelFrequencyPenalty: String,
+        val modelVerbosity: String,
+    )
+
+    private data class ReasoningModelSettingsFields(
+        val modelEnableReasoner: Boolean,
+        val modelReasoningEffort: String,
+        val modelMaxReasoningTokens: String,
+        val modelReasoningJson: String,
+        val modelPutInnerThoughtsInKwargs: Boolean,
+    )
+
+    private data class ResponseModelSettingsFields(
+        val modelStrictToolCalling: Boolean,
+        val modelResponseFormatJson: String,
+        val modelResponseSchemaJson: String,
+        val modelThinkingConfigJson: String,
+        val modelToolCallParser: String,
+        val modelAnthropicEffort: String,
+    )
+
+    private fun coreModelSettingsFields(
+        modelSettings: com.letta.mobile.data.model.ModelSettings?,
+        llmConfig: com.letta.mobile.data.model.LlmConfig?,
+    ): CoreModelSettingsFields = CoreModelSettingsFields(
+        temperature = modelSettings?.temperature?.toFloat() ?: llmConfig?.temperature?.toFloat() ?: 1.0f,
+        maxOutputTokens = modelSettings?.maxOutputTokens ?: llmConfig?.maxTokens ?: 4096,
+        parallelToolCalls = modelSettings?.parallelToolCalls ?: llmConfig?.parallelToolCalls ?: true,
+        modelProviderName = modelSettings?.providerName ?: llmConfig?.providerName.orEmpty(),
+        modelProviderCategory = modelSettings?.providerCategory ?: llmConfig?.providerCategory.orEmpty(),
+        modelFrequencyPenalty = (modelSettings?.frequencyPenalty ?: llmConfig?.frequencyPenalty)
+            ?.toString()
+            .orEmpty(),
+        modelVerbosity = modelSettings?.verbosity ?: llmConfig?.verbosity.orEmpty(),
+    )
+
+    private fun reasoningModelSettingsFields(
+        modelSettings: com.letta.mobile.data.model.ModelSettings?,
+        llmConfig: com.letta.mobile.data.model.LlmConfig?,
+    ): ReasoningModelSettingsFields = ReasoningModelSettingsFields(
+        modelEnableReasoner = modelSettings?.enableReasoner ?: llmConfig?.enableReasoner ?: false,
+        modelReasoningEffort = modelSettings?.reasoningEffort ?: llmConfig?.reasoningEffort.orEmpty(),
+        modelMaxReasoningTokens = (modelSettings?.maxReasoningTokens ?: llmConfig?.maxReasoningTokens)
+            ?.toString()
+            .orEmpty(),
+        modelReasoningJson = modelSettings?.reasoning?.toSettingsJson().orEmpty(),
+        modelPutInnerThoughtsInKwargs = modelSettings?.putInnerThoughtsInKwargs
+            ?: llmConfig?.putInnerThoughtsInKwargs
+            ?: false,
+    )
+
+    private fun responseModelSettingsFields(
+        modelSettings: com.letta.mobile.data.model.ModelSettings?,
+        agent: Agent,
+    ): ResponseModelSettingsFields = ResponseModelSettingsFields(
+        modelStrictToolCalling = modelSettings?.strict ?: false,
+        modelResponseFormatJson = (modelSettings?.responseFormat ?: agent.responseFormat)
+            ?.toSettingsJson()
+            .orEmpty(),
+        modelResponseSchemaJson = modelSettings?.responseSchema?.toSettingsJson().orEmpty(),
+        modelThinkingConfigJson = modelSettings?.thinkingConfig?.toSettingsJson().orEmpty(),
+        modelToolCallParser = modelSettings?.toolCallParser.orEmpty(),
+        modelAnthropicEffort = modelSettings?.effort.orEmpty(),
+    )
 
     private fun compactionFields(agent: Agent): CompactionFields {
         val compactionSettings = agent.compactionSettings

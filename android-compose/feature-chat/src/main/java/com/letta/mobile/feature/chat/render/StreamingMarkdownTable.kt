@@ -57,37 +57,50 @@ internal fun String.containsMarkdownTable(): Boolean {
 
 private class MarkdownTableScan(private val text: String) {
     fun containsTable(): Boolean {
-        var previousLine: TextLineSlice? = null
+        var previousContentLine: TextLineSlice? = null
         var lineStart = 0
 
         while (lineStart <= text.length) {
-            val newlineIndex = text.indexOf('\n', startIndex = lineStart)
-            val rawEnd = if (newlineIndex >= 0) newlineIndex else text.length
-            val line = TextLineSlice(text, lineStart, rawEnd)
-            val contentStart = line.firstNonWhitespaceIndex()
-            if (contentStart < rawEnd) {
-                val contentEnd = line.lastNonWhitespaceExclusive(contentStart)
-                if (isTableHeaderSeparatorPair(previousLine, line, contentStart, contentEnd)) {
-                    return true
-                }
-                previousLine = TextLineSlice(text, contentStart, contentEnd)
+            val lineBounds = nextLineBounds(lineStart) ?: break
+            val contentLine = trimContentSlice(lineBounds)
+            if (contentLine != null && isTableHeaderSeparatorPair(previousContentLine, contentLine)) {
+                return true
             }
-            if (newlineIndex < 0) break
-            lineStart = newlineIndex + 1
+            if (contentLine != null) {
+                previousContentLine = contentLine
+            }
+            lineStart = lineBounds.endExclusive + 1
         }
         return false
+    }
+
+    private data class LineBounds(val start: Int, val endExclusive: Int)
+
+    private fun nextLineBounds(lineStart: Int): LineBounds? {
+        if (lineStart > text.length) return null
+        val newlineIndex = text.indexOf('\n', startIndex = lineStart)
+        val endExclusive = if (newlineIndex >= 0) newlineIndex else text.length
+        if (newlineIndex < 0 && lineStart == text.length) return null
+        return LineBounds(lineStart, endExclusive)
+    }
+
+    private fun trimContentSlice(bounds: LineBounds): TextLineSlice? {
+        val line = TextLineSlice(text, bounds.start, bounds.endExclusive)
+        val contentStart = line.firstNonWhitespaceIndex()
+        if (contentStart >= bounds.endExclusive) return null
+        val contentEnd = line.lastNonWhitespaceExclusive(contentStart)
+        return TextLineSlice(text, contentStart, contentEnd)
     }
 
     private fun isTableHeaderSeparatorPair(
         previousLine: TextLineSlice?,
         currentLine: TextLineSlice,
-        contentStart: Int,
-        contentEnd: Int,
     ): Boolean {
         if (previousLine == null) return false
-        if (!previousLine.containsPipe(previousLine.start, previousLine.endExclusive)) {
-            return false
-        }
-        return currentLine.looksLikeMarkdownTableSeparator(contentStart, contentEnd)
+        if (!previousLine.containsPipe(previousLine.start, previousLine.endExclusive)) return false
+        return currentLine.looksLikeMarkdownTableSeparator(
+            currentLine.start,
+            currentLine.endExclusive,
+        )
     }
 }

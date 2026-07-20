@@ -84,3 +84,27 @@ internal data class ChatMessageListBodyParams(
     val onScrollToBottom: () -> Unit,
     val showFontIndicator: Boolean,
 )
+
+internal data class ChatMessageListRenderItemParams(
+    val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem,
+    val index: Int,
+    val context: ChatMessageListLazyContext,
+    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
+    val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
+)
+
+internal data class ChatMessageListRenderItemBodyParams(
+    val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem,
+    val context: ChatMessageListLazyContext,
+    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
+    val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
+    val isStreamingRenderItem: Boolean,
+)
+
+internal data class ChatMessageListRenderRunBlockItemParams(
+    val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock,
+    val context: ChatMessageListLazyContext,
+    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
+    val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
+    val isStreamingRenderItem: Boolean,
+)

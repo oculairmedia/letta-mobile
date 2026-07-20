@@ -7,13 +7,21 @@ private sealed interface OpenerScanStep {
     data class Unmatched(val index: Int) : OpenerScanStep
 }
 
+internal data class MarkdownOpenerScanLine(val raw: String) {
+    val length: Int get() = raw.length
+    operator fun get(index: Int): Char = raw[index]
+}
+
 /**
  * Returns the index (relative to [line]) of the FIRST unmatched
  * span opener — the position where a closer hasn't yet arrived.
  * Returns -1 if the line is fully balanced.
  */
 @VisibleForTesting
-internal fun findUnmatchedOpenerInLine(line: String): Int {
+internal fun findUnmatchedOpenerInLine(line: String): Int =
+    findUnmatchedOpenerInLine(MarkdownOpenerScanLine(line))
+
+private fun findUnmatchedOpenerInLine(line: MarkdownOpenerScanLine): Int {
     var i = 0
     val len = line.length
     while (i < len) {
@@ -25,7 +33,7 @@ internal fun findUnmatchedOpenerInLine(line: String): Int {
     return -1
 }
 
-private fun scanOpenerStep(line: String, index: Int, len: Int): OpenerScanStep =
+private fun scanOpenerStep(line: MarkdownOpenerScanLine, index: Int, len: Int): OpenerScanStep =
     when (line[index]) {
         '`' -> scanBacktickOpener(line, index)
         '*', '_' -> scanEmphasisOpener(line, index, len, line[index])
@@ -34,14 +42,14 @@ private fun scanOpenerStep(line: String, index: Int, len: Int): OpenerScanStep =
         else -> OpenerScanStep.Continue(index + 1)
     }
 
-private fun scanBacktickOpener(line: String, index: Int): OpenerScanStep {
-    val close = line.indexOf('`', startIndex = index + 1)
+private fun scanBacktickOpener(line: MarkdownOpenerScanLine, index: Int): OpenerScanStep {
+    val close = line.raw.indexOf('`', startIndex = index + 1)
     if (close < 0) return OpenerScanStep.Unmatched(index)
     return OpenerScanStep.Continue(close + 1)
 }
 
 private fun scanEmphasisOpener(
-    line: String,
+    line: MarkdownOpenerScanLine,
     index: Int,
     len: Int,
     marker: Char,
@@ -53,32 +61,32 @@ private fun scanEmphasisOpener(
     return OpenerScanStep.Continue(closerIdx + run)
 }
 
-private fun scanStrikethroughOpener(line: String, index: Int, len: Int): OpenerScanStep {
+private fun scanStrikethroughOpener(line: MarkdownOpenerScanLine, index: Int, len: Int): OpenerScanStep {
     if (index + 1 >= len) return OpenerScanStep.Continue(index + 1)
     if (line[index + 1] != '~') return OpenerScanStep.Continue(index + 1)
-    val close = line.indexOf("~~", startIndex = index + 2)
+    val close = line.raw.indexOf("~~", startIndex = index + 2)
     if (close < 0) return OpenerScanStep.Unmatched(index)
     return OpenerScanStep.Continue(close + 2)
 }
 
-private fun scanLinkOpener(line: String, index: Int, len: Int): OpenerScanStep {
-    val closeBracket = line.indexOf(']', startIndex = index + 1)
+private fun scanLinkOpener(line: MarkdownOpenerScanLine, index: Int, len: Int): OpenerScanStep {
+    val closeBracket = line.raw.indexOf(']', startIndex = index + 1)
     if (closeBracket < 0) return OpenerScanStep.Unmatched(index)
     if (!hasLinkOpenParen(line, closeBracket, len)) {
         return OpenerScanStep.Unmatched(index)
     }
-    val closeParen = line.indexOf(')', startIndex = closeBracket + 2)
+    val closeParen = line.raw.indexOf(')', startIndex = closeBracket + 2)
     if (closeParen < 0) return OpenerScanStep.Unmatched(index)
     return OpenerScanStep.Continue(closeParen + 1)
 }
 
-private fun hasLinkOpenParen(line: String, closeBracket: Int, len: Int): Boolean {
+private fun hasLinkOpenParen(line: MarkdownOpenerScanLine, closeBracket: Int, len: Int): Boolean {
     val parenIndex = closeBracket + 1
     if (parenIndex >= len) return false
     return line[parenIndex] == '('
 }
 
-private fun findEmphasisCloser(line: String, from: Int, marker: Char, runLen: Int): Int {
+private fun findEmphasisCloser(line: MarkdownOpenerScanLine, from: Int, marker: Char, runLen: Int): Int {
     var i = from
     val len = line.length
     while (i < len) {

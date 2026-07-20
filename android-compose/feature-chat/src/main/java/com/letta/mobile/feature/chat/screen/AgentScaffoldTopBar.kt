@@ -53,19 +53,21 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
                 )
             } else {
                 AgentScaffoldAgentTopBarTitle(
-                    agentName = state.agentName,
-                    screenTitle = state.screenTitle,
-                    currentAgentIsFavorite = state.currentAgentIsFavorite,
-                    currentAgentIsPinned = state.currentAgentIsPinned,
-                    onAgentTitleClick = {
-                        HapticEffects.contextClick(state.haptic, state.view)
-                        params.viewModel.refreshAvailableAgents()
-                        params.sheetVisibility.onShowAgentSwitcherChange(true)
-                    },
-                    onAgentTitleLongClick = {
-                        HapticEffects.longPress(state.haptic)
-                        params.viewModel.toggleCurrentAgentPinned()
-                    },
+                    params = AgentScaffoldAgentTopBarTitleParams(
+                        agentName = state.agentName,
+                        screenTitle = state.screenTitle,
+                        currentAgentIsFavorite = state.currentAgentIsFavorite,
+                        currentAgentIsPinned = state.currentAgentIsPinned,
+                        onAgentTitleClick = {
+                            HapticEffects.contextClick(state.haptic, state.view)
+                            params.viewModel.refreshAvailableAgents()
+                            params.sheetVisibility.onShowAgentSwitcherChange(true)
+                        },
+                        onAgentTitleLongClick = {
+                            HapticEffects.longPress(state.haptic)
+                            params.viewModel.toggleCurrentAgentPinned()
+                        },
+                    ),
                 )
             }
         },
@@ -119,35 +121,37 @@ private fun AgentScaffoldSearchTopBarTitle(
     )
 }
 
+internal data class AgentScaffoldAgentTopBarTitleParams(
+    val agentName: String,
+    val screenTitle: String,
+    val currentAgentIsFavorite: Boolean,
+    val currentAgentIsPinned: Boolean,
+    val onAgentTitleClick: () -> Unit,
+    val onAgentTitleLongClick: () -> Unit,
+)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AgentScaffoldAgentTopBarTitle(
-    agentName: String,
-    screenTitle: String,
-    currentAgentIsFavorite: Boolean,
-    currentAgentIsPinned: Boolean,
-    onAgentTitleClick: () -> Unit,
-    onAgentTitleLongClick: () -> Unit,
-) {
+private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleParams) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(AgentScaffoldTestTags.CONVERSATION_PICKER_TRIGGER)
             .combinedClickable(
-                onClick = onAgentTitleClick,
-                onLongClick = onAgentTitleLongClick,
+                onClick = params.onAgentTitleClick,
+                onLongClick = params.onAgentTitleLongClick,
             )
             .padding(end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
-            text = agentName.ifBlank { screenTitle },
+            text = params.agentName.ifBlank { params.screenTitle },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-        if (currentAgentIsFavorite) {
+        if (params.currentAgentIsFavorite) {
             Icon(
                 LettaIcons.Star,
                 contentDescription = "Favorite agent",
@@ -155,7 +159,7 @@ private fun AgentScaffoldAgentTopBarTitle(
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
-        if (currentAgentIsPinned) {
+        if (params.currentAgentIsPinned) {
             Icon(
                 LettaIcons.Pin,
                 contentDescription = "Pinned agent",

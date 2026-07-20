@@ -11,9 +11,14 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.screen.ChatAutoScrollAction
+import com.letta.mobile.feature.chat.screen.AutoScrollActionInput
+import com.letta.mobile.feature.chat.screen.AutoScrollClockMs
+import com.letta.mobile.feature.chat.screen.ChatMessageRole
+import com.letta.mobile.feature.chat.screen.LazyFirstVisibleIndex
+import com.letta.mobile.feature.chat.screen.LazyScrollOffsetPx
+import com.letta.mobile.feature.chat.screen.StreamingSnapTimestampMs
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
-import com.letta.mobile.feature.chat.screen.autoScrollAction
 import com.letta.mobile.feature.chat.screen.chatFadeShowBottom
 import com.letta.mobile.feature.chat.screen.chatFadeShowTop
 import com.letta.mobile.feature.chat.screen.chatFadeTargetColor
@@ -28,9 +33,27 @@ class ChatMessageListScrollTest {
 
     private fun makeSignature(role: String, messageId: String = "m1"): com.letta.mobile.feature.chat.screen.ChatAutoScrollSignature =
         com.letta.mobile.feature.chat.screen.ChatAutoScrollSignature(
-            messageId = messageId, role = role, contentLength = 0, contentHash = 0,
+            messageId = messageId, role = ChatMessageRole(role), contentLength = 0, contentHash = 0,
             latencyMs = null, toolCallsHash = 0, generatedUiHash = 0, approvalHash = 0, attachmentCount = 0
         )
+
+    private fun autoScrollAction(
+        signature: com.letta.mobile.feature.chat.screen.ChatAutoScrollSignature,
+        isStreaming: Boolean,
+        firstVisibleItemIndex: Int,
+        firstVisibleItemScrollOffset: Int,
+        lastStreamingSnapMs: Long,
+        nowMs: Long,
+    ): ChatAutoScrollAction = com.letta.mobile.feature.chat.screen.autoScrollAction(
+        AutoScrollActionInput(
+            signature = signature,
+            isStreaming = isStreaming,
+            firstVisibleItemIndex = LazyFirstVisibleIndex(firstVisibleItemIndex),
+            firstVisibleItemScrollOffset = LazyScrollOffsetPx(firstVisibleItemScrollOffset),
+            lastStreamingSnapMs = StreamingSnapTimestampMs(lastStreamingSnapMs),
+            nowMs = AutoScrollClockMs(nowMs),
+        ),
+    )
 
     @Test
     fun `autoScrollAction skips rapid streaming frames within throttle limit`() {

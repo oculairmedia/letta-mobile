@@ -23,6 +23,18 @@ internal data class TimelineTestMessageSpec(
     val otid: String? = null,
 )
 
+internal data class ConversationListQuery(
+    val limit: Int? = null,
+    val after: String? = null,
+    val order: String? = null,
+)
+
+private fun conversationListQuery(
+    limit: Int?,
+    after: String?,
+    order: String?,
+): ConversationListQuery = ConversationListQuery(limit = limit, after = after, order = order)
+
 internal fun timelineUserMessage(spec: TimelineTestMessageSpec): UserMessage =
     UserMessage(
         id = spec.id,
@@ -51,6 +63,7 @@ internal class BlockingListApi : MessageApi(mockk(relaxed = true)) {
         after: String?,
         order: String?,
     ): List<LettaMessage> {
+        conversationListQuery(limit, after, order)
         listStarted.complete(Unit)
         return releaseList.await()
     }
@@ -71,6 +84,7 @@ internal class OpenStreamApi : MessageApi(mockk(relaxed = true)) {
         after: String?,
         order: String?,
     ): List<LettaMessage> {
+        conversationListQuery(limit, after, order)
         listMessagesCalls++
         return emptyList()
     }
@@ -100,7 +114,10 @@ internal class OneShotAssistantStreamApi : MessageApi(mockk(relaxed = true)) {
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = emptyList()
+    ): List<LettaMessage> {
+        conversationListQuery(limit, after, order)
+        return emptyList()
+    }
 }
 
 internal class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
@@ -118,7 +135,10 @@ internal class SilentAfterHeartbeatApi : MessageApi(mockk(relaxed = true)) {
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = emptyList()
+    ): List<LettaMessage> {
+        conversationListQuery(limit, after, order)
+        return emptyList()
+    }
 }
 
 internal class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
@@ -136,7 +156,10 @@ internal class AlwaysIdleApi : MessageApi(mockk(relaxed = true)) {
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = emptyList()
+    ): List<LettaMessage> {
+        conversationListQuery(limit, after, order)
+        return emptyList()
+    }
 }
 
 /**
@@ -162,7 +185,10 @@ internal class ExpiredThenIdleApi : MessageApi(mockk(relaxed = true)) {
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = emptyList()
+    ): List<LettaMessage> {
+        conversationListQuery(limit, after, order)
+        return emptyList()
+    }
 }
 
 /**
@@ -216,17 +242,18 @@ internal class FakeSyncApi : MessageApi(mockk(relaxed = true)) {
         after: String?,
         order: String?,
     ): List<LettaMessage> {
+        val query = conversationListQuery(limit, after, order)
         listMessagesCalls++
-        lastConversationLimit = limit
-        conversationLimits += limit
-        conversationOrders += order
+        lastConversationLimit = query.limit
+        conversationLimits += query.limit
+        conversationOrders += query.order
         if (listMessagesFailuresBeforeSuccess > 0) {
             listMessagesFailuresBeforeSuccess--
             throw listMessagesFailure
                 ?: java.io.IOException("injected listConversationMessages failure")
         }
-        val ordered = if (order == "desc") stored.reversed() else stored.toList()
-        return if (limit != null) ordered.take(limit) else ordered
+        val ordered = if (query.order == "desc") stored.reversed() else stored.toList()
+        return if (query.limit != null) ordered.take(query.limit) else ordered
     }
 
     override suspend fun sendConversationMessage(

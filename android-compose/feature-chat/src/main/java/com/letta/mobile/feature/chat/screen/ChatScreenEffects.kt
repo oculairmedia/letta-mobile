@@ -30,6 +30,16 @@ internal data class ChatScreenAmbientState(
     val onHadActiveRunChange: (Boolean) -> Unit,
 )
 
+internal data class ChatScreenEffectsParams(
+    val state: ChatUiState,
+    val composerState: ChatComposerState,
+    val hapticsEnabled: Boolean,
+    val viewModel: AdminChatViewModel,
+    val floatingBannerMessage: String,
+    val onFloatingBannerMessageChange: (String) -> Unit,
+    val ambient: ChatScreenAmbientState,
+)
+
 @Composable
 internal fun rememberChatScreenAmbientState(): ChatScreenAmbientState {
     var ambientAgentStatus by remember { mutableStateOf("Idle") }
@@ -43,64 +53,56 @@ internal fun rememberChatScreenAmbientState(): ChatScreenAmbientState {
 }
 
 @Composable
-internal fun ChatScreenEffects(
-    state: ChatUiState,
-    composerState: ChatComposerState,
-    hapticsEnabled: Boolean,
-    viewModel: AdminChatViewModel,
-    floatingBannerMessage: String,
-    onFloatingBannerMessageChange: (String) -> Unit,
-    ambient: ChatScreenAmbientState,
-) {
+internal fun ChatScreenEffects(params: ChatScreenEffectsParams) {
     val snackbarDispatcher = LocalSnackbarDispatcher.current
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
 
     ChatScreenComposerErrorEffect(
-        composerError = composerState.error,
+        composerError = params.composerState.error,
         haptic = haptic,
         view = view,
-        onFloatingBannerMessageChange = onFloatingBannerMessageChange,
-        onClearComposerError = viewModel::clearComposerError,
+        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
+        onClearComposerError = params.viewModel::clearComposerError,
     )
 
     ChatScreenFloatingBannerDismissEffect(
-        floatingBannerMessage = floatingBannerMessage,
-        onFloatingBannerMessageChange = onFloatingBannerMessageChange,
+        floatingBannerMessage = params.floatingBannerMessage,
+        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
     )
 
     ChatScreenA2uiSnackbarEffect(
-        snackbar = state.a2uiActionSnackbar,
+        snackbar = params.state.a2uiActionSnackbar,
         snackbarDispatcher = snackbarDispatcher,
-        onMarkShown = viewModel::markA2uiActionSnackbarShown,
-        onRetry = viewModel::submitA2uiAction,
+        onMarkShown = params.viewModel::markA2uiActionSnackbarShown,
+        onRetry = params.viewModel::submitA2uiAction,
     )
 
     ChatScreenErrorSnackbarEffect(
-        error = state.error,
-        hasMessages = state.messages.isNotEmpty(),
+        error = params.state.error,
+        hasMessages = params.state.messages.isNotEmpty(),
         snackbarDispatcher = snackbarDispatcher,
-        onClearError = viewModel::clearError,
+        onClearError = params.viewModel::clearError,
     )
 
-    ChatScreenAmbientStatusEffect(state = state, ambient = ambient)
+    ChatScreenAmbientStatusEffect(state = params.state, ambient = params.ambient)
 
     ChatScreenStreamingHapticEffect(
-        isStreaming = state.isStreaming,
-        error = state.error,
-        hapticsEnabled = hapticsEnabled,
+        isStreaming = params.state.isStreaming,
+        error = params.state.error,
+        hapticsEnabled = params.hapticsEnabled,
         view = view,
     )
 
     ChatScreenPendingToolHapticEffect(
-        pendingTools = state.pendingTools,
-        hapticsEnabled = hapticsEnabled,
+        pendingTools = params.state.pendingTools,
+        hapticsEnabled = params.hapticsEnabled,
         view = view,
     )
 
     ChatScreenResolvedToolHapticEffect(
-        messages = state.messages,
-        hapticsEnabled = hapticsEnabled,
+        messages = params.state.messages,
+        hapticsEnabled = params.hapticsEnabled,
         view = view,
     )
 }

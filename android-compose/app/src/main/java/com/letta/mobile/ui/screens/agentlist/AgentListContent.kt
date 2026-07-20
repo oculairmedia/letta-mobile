@@ -159,6 +159,26 @@ private fun AgentListBody(
 }
 
 @Composable
+private fun AgentListHydratingBannerItem(loadedCount: Int) {
+    AgentHydratingBanner(loadedCount = loadedCount)
+}
+
+@Composable
+private fun AgentListFavoriteAgentItem(
+    favoriteAgent: Agent,
+    isShareMode: Boolean,
+    actions: AgentListContentActions,
+) {
+    FavoriteAgentCard(
+        agent = favoriteAgent,
+        onClick = { actions.onSelectAgent(favoriteAgent.id.value, favoriteAgent.name) },
+        onEdit = { actions.onNavigateToEditAgent(favoriteAgent.id.value) },
+        onUnfavorite = { actions.onToggleFavorite(favoriteAgent.id) },
+        contextualActionsEnabled = !isShareMode,
+    )
+}
+
+@Composable
 private fun agentListEmptyMessage(uiState: AgentListUiState): String {
     if (uiState.searchQuery.isNotBlank() && uiState.isHydrating) {
         return "Still loading agents while searching for \"${uiState.searchQuery}\""
@@ -194,7 +214,7 @@ private fun AgentListGridContent(
                 key = "agent-hydrating-banner",
                 span = { GridItemSpan(maxLineSpan) },
             ) {
-                AgentHydratingBanner(loadedCount = uiState.agents.size)
+                AgentListHydratingBannerItem(loadedCount = uiState.agents.size)
             }
         }
 
@@ -203,12 +223,10 @@ private fun AgentListGridContent(
                 key = "favorite-${favoriteAgent.id}",
                 span = { GridItemSpan(maxLineSpan) },
             ) {
-                FavoriteAgentCard(
-                    agent = favoriteAgent,
-                    onClick = { params.actions.onSelectAgent(favoriteAgent.id.value, favoriteAgent.name) },
-                    onEdit = { params.actions.onNavigateToEditAgent(favoriteAgent.id.value) },
-                    onUnfavorite = { params.actions.onToggleFavorite(favoriteAgent.id) },
-                    contextualActionsEnabled = !params.state.isShareMode,
+                AgentListFavoriteAgentItem(
+                    favoriteAgent = favoriteAgent,
+                    isShareMode = state.isShareMode,
+                    actions = actions,
                 )
             }
         }
@@ -248,18 +266,16 @@ private fun AgentListListContent(
     ) {
         if (uiState.isHydrating) {
             item(key = "agent-hydrating-banner") {
-                AgentHydratingBanner(loadedCount = uiState.agents.size)
+                AgentListHydratingBannerItem(loadedCount = uiState.agents.size)
             }
         }
 
         params.state.visibleFavoriteAgent?.let { favoriteAgent ->
             item(key = "favorite-${favoriteAgent.id}") {
-                FavoriteAgentCard(
-                    agent = favoriteAgent,
-                    onClick = { params.actions.onSelectAgent(favoriteAgent.id.value, favoriteAgent.name) },
-                    onEdit = { params.actions.onNavigateToEditAgent(favoriteAgent.id.value) },
-                    onUnfavorite = { params.actions.onToggleFavorite(favoriteAgent.id) },
-                    contextualActionsEnabled = !params.state.isShareMode,
+                AgentListFavoriteAgentItem(
+                    favoriteAgent = favoriteAgent,
+                    isShareMode = state.isShareMode,
+                    actions = actions,
                 )
             }
         }

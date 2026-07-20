@@ -106,20 +106,17 @@ private fun EditAgentResetDialog(
     visibility: EditAgentDialogVisibility,
     host: EditAgentDialogsHost,
 ) {
-    ConfirmDialog(
+    EditAgentDestructiveConfirmDialog(
         show = visibility.showResetDialog,
         title = stringResource(R.string.screen_settings_reset_messages_title),
         message = stringResource(R.string.screen_settings_reset_messages_confirm),
         confirmText = stringResource(R.string.action_reset_messages),
-        dismissText = stringResource(R.string.action_cancel),
+        onDismiss = { visibility.onShowResetDialogChange(false) },
         onConfirm = {
-            visibility.onShowResetDialogChange(false)
             host.viewModel.resetMessages {
                 host.snackbar.dispatch(host.context.getString(R.string.screen_settings_messages_reset))
             }
         },
-        onDismiss = { visibility.onShowResetDialogChange(false) },
-        destructive = true,
     )
 }
 
@@ -128,17 +125,36 @@ private fun EditAgentDeleteDialog(
     visibility: EditAgentDialogVisibility,
     host: EditAgentDialogsHost,
 ) {
-    ConfirmDialog(
+    EditAgentDestructiveConfirmDialog(
         show = visibility.showDeleteDialog,
         title = stringResource(R.string.screen_agents_dialog_delete_title),
         message = stringResource(R.string.screen_agents_dialog_delete_confirm_permanent),
         confirmText = stringResource(R.string.action_delete),
+        onDismiss = { visibility.onShowDeleteDialogChange(false) },
+        onConfirm = { host.viewModel.deleteAgent(host.onNavigateBack) },
+    )
+}
+
+@Composable
+private fun EditAgentDestructiveConfirmDialog(
+    show: Boolean,
+    title: String,
+    message: String,
+    confirmText: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    ConfirmDialog(
+        show = show,
+        title = title,
+        message = message,
+        confirmText = confirmText,
         dismissText = stringResource(R.string.action_cancel),
         onConfirm = {
-            visibility.onShowDeleteDialogChange(false)
-            host.viewModel.deleteAgent(host.onNavigateBack)
+            onDismiss()
+            onConfirm()
         },
-        onDismiss = { visibility.onShowDeleteDialogChange(false) },
+        onDismiss = onDismiss,
         destructive = true,
     )
 }

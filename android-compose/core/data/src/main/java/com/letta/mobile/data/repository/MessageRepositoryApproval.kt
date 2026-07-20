@@ -19,15 +19,25 @@ internal data class ApprovalSubmitParams(
     val reason: String?,
 )
 
+internal data class ApprovalRequestBuildParams(
+    val json: Json,
+    val approvalRequestId: String,
+    val toolCallIds: List<String>,
+    val approve: Boolean,
+    val reason: String?,
+)
+
 internal object MessageRepositoryApproval {
     suspend fun submitApproval(params: ApprovalSubmitParams) {
         val trimmedReason = params.reason?.takeIf { it.isNotBlank() }
         val request = buildApprovalRequest(
-            json = params.json,
-            approvalRequestId = params.approvalRequestId,
-            toolCallIds = params.toolCallIds,
-            approve = params.approve,
-            reason = trimmedReason,
+            ApprovalRequestBuildParams(
+                json = params.json,
+                approvalRequestId = params.approvalRequestId,
+                toolCallIds = params.toolCallIds,
+                approve = params.approve,
+                reason = trimmedReason,
+            ),
         )
 
         val irohApproval = params.irohApprovalSource
@@ -38,28 +48,22 @@ internal object MessageRepositoryApproval {
         }
     }
 
-    private fun buildApprovalRequest(
-        json: Json,
-        approvalRequestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-    ): MessageCreateRequest =
+    private fun buildApprovalRequest(params: ApprovalRequestBuildParams): MessageCreateRequest =
         MessageCreateRequest(
             messages = listOf(
-                json.encodeToJsonElement(
+                params.json.encodeToJsonElement(
                     ApprovalCreate.serializer(),
                     ApprovalCreate(
-                        approvals = toolCallIds.map { toolCallId ->
+                        approvals = params.toolCallIds.map { toolCallId ->
                             ApprovalSubmission(
                                 toolCallId = toolCallId,
-                                approve = approve,
-                                reason = reason,
+                                approve = params.approve,
+                                reason = params.reason,
                             )
                         },
-                        approve = approve,
-                        approvalRequestId = approvalRequestId,
-                        reason = reason,
+                        approve = params.approve,
+                        approvalRequestId = params.approvalRequestId,
+                        reason = params.reason,
                     )
                 )
             ),

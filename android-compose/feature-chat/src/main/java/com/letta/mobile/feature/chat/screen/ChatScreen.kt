@@ -75,13 +75,15 @@ internal fun ChatScreen(
         val streamingRevealPulse = rememberStreamingRevealHapticPulse(hapticsEnabled)
 
         ChatScreenEffects(
-            state = state,
-            composerState = composerState,
-            hapticsEnabled = hapticsEnabled,
-            viewModel = viewModel,
-            floatingBannerMessage = floatingBannerMessage,
-            onFloatingBannerMessageChange = { floatingBannerMessage = it },
-            ambient = ambient,
+            params = ChatScreenEffectsParams(
+                state = state,
+                composerState = composerState,
+                hapticsEnabled = hapticsEnabled,
+                viewModel = viewModel,
+                floatingBannerMessage = floatingBannerMessage,
+                onFloatingBannerMessageChange = { floatingBannerMessage = it },
+                ambient = ambient,
+            ),
         )
 
         AmbientShaderAgentBackground(

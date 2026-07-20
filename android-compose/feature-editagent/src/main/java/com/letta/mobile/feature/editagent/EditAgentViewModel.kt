@@ -50,11 +50,13 @@ internal class EditAgentViewModel @Inject constructor(
         toolRepository = toolRepository,
     )
     private val blockEditor = EditAgentBlockEditor(
-        agentId = agentId,
-        blockRepository = blockRepository,
-        state = state,
-        scope = viewModelScope,
-        reload = { loadAgentSnapshot() },
+        deps = EditAgentBlockEditorDeps(
+            agentId = agentId,
+            blockRepository = blockRepository,
+            state = state,
+            scope = viewModelScope,
+            reload = { loadAgentSnapshot() },
+        ),
     )
     private val environmentEditor = EditAgentEnvironmentEditor(state)
     private val toolAttachment = EditAgentToolAttachment(

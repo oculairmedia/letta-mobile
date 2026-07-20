@@ -124,10 +124,12 @@ internal fun ChatContent(
                         },
                 ) {
                     A2uiSurfaceStack(
-                        surfaces = state.a2uiSurfaces,
-                        resolvedActionCounters = state.a2uiResolvedActionCounters,
-                        onAction = callbacks.onA2uiAction,
-                        onDismissSurface = callbacks.onDismissA2uiSurface,
+                        params = A2uiSurfaceStackParams(
+                            surfaces = state.a2uiSurfaces,
+                            resolvedActionCounters = state.a2uiResolvedActionCounters,
+                            onAction = callbacks.onA2uiAction,
+                            onDismissSurface = callbacks.onDismissA2uiSurface,
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = LettaSpacing.lg, vertical = LettaSpacing.sm),
@@ -201,17 +203,21 @@ private fun ChatContentMessageArea(
     )
 }
 
+internal data class A2uiSurfaceStackParams(
+    val surfaces: ImmutableMap<String, A2uiSurfaceState>,
+    val resolvedActionCounters: Map<String, Int>,
+    val onAction: (A2uiAction) -> Unit,
+    val onDismissSurface: (String) -> Unit,
+)
+
 @Composable
 internal fun A2uiSurfaceStack(
-    surfaces: ImmutableMap<String, A2uiSurfaceState>,
-    resolvedActionCounters: Map<String, Int>,
-    onAction: (A2uiAction) -> Unit,
-    onDismissSurface: (String) -> Unit,
+    params: A2uiSurfaceStackParams,
     modifier: Modifier = Modifier,
 ) {
-    if (surfaces.isEmpty()) return
-    val orderedSurfaces = remember(surfaces) {
-        surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
+    if (params.surfaces.isEmpty()) return
+    val orderedSurfaces = remember(params.surfaces) {
+        params.surfaces.values.sortedBy(A2uiSurfaceState::surfaceId)
     }
     Column(
         modifier = modifier,
@@ -221,13 +227,13 @@ internal fun A2uiSurfaceStack(
             key(surface.surfaceId) {
                 DismissibleA2uiSurface(
                     surfaceId = surface.surfaceId,
-                    onDismissSurface = onDismissSurface,
+                    onDismissSurface = params.onDismissSurface,
                 ) {
                     A2uiSurfaceRenderer(
                         surface = surface,
                         modifier = Modifier.fillMaxWidth(),
-                        onAction = onAction,
-                        actionResolutionToken = resolvedActionCounters[surface.surfaceId] ?: 0,
+                        onAction = params.onAction,
+                        actionResolutionToken = params.resolvedActionCounters[surface.surfaceId] ?: 0,
                     )
                 }
             }

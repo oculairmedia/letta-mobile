@@ -95,11 +95,13 @@ private fun HomeDrawerShortcutRow(
                 onLongClick = {
                     HapticEffects.longPress(haptic, view)
                     toggleDrawerShortcutPin(
-                        shortcut = shortcut,
-                        isPinned = isPinned,
-                        label = label,
-                        context = context,
-                        viewModel = params.viewModel,
+                        DrawerShortcutPinAction(
+                            shortcut = shortcut,
+                            isPinned = isPinned,
+                            label = label,
+                            context = context,
+                            viewModel = params.viewModel,
+                        ),
                     )
                 },
             )
@@ -120,22 +122,24 @@ private fun HomeDrawerShortcutRow(
     }
 }
 
-private fun toggleDrawerShortcutPin(
-    shortcut: DashboardShortcut,
-    isPinned: Boolean,
-    label: String,
-    context: android.content.Context,
-    viewModel: DashboardViewModel,
-) {
-    if (isPinned) {
-        viewModel.unpinShortcut(shortcut)
+private data class DrawerShortcutPinAction(
+    val shortcut: DashboardShortcut,
+    val isPinned: Boolean,
+    val label: String,
+    val context: android.content.Context,
+    val viewModel: DashboardViewModel,
+)
+
+private fun toggleDrawerShortcutPin(action: DrawerShortcutPinAction) {
+    if (action.isPinned) {
+        action.viewModel.unpinShortcut(action.shortcut)
         android.widget.Toast
-            .makeText(context, "$label unpinned", android.widget.Toast.LENGTH_SHORT)
+            .makeText(action.context, "${action.label} unpinned", android.widget.Toast.LENGTH_SHORT)
             .show()
     } else {
-        viewModel.pinShortcut(shortcut)
+        action.viewModel.pinShortcut(action.shortcut)
         android.widget.Toast
-            .makeText(context, "$label pinned", android.widget.Toast.LENGTH_SHORT)
+            .makeText(action.context, "${action.label} pinned", android.widget.Toast.LENGTH_SHORT)
             .show()
     }
 }

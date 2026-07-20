@@ -12,9 +12,24 @@ internal data class ActivePromptState(
     val lazyIndex: Int,
 )
 
+@JvmInline
+internal value class ChatMessageRole(val raw: String)
+
+@JvmInline
+internal value class LazyFirstVisibleIndex(val value: Int)
+
+@JvmInline
+internal value class LazyScrollOffsetPx(val value: Int)
+
+@JvmInline
+internal value class StreamingSnapTimestampMs(val value: Long)
+
+@JvmInline
+internal value class AutoScrollClockMs(val value: Long)
+
 internal data class ChatAutoScrollSignature(
     val messageId: String,
-    val role: String,
+    val role: ChatMessageRole,
     val contentLength: Int,
     val contentHash: Int,
     val latencyMs: Long?,
@@ -33,11 +48,16 @@ internal enum class ChatAutoScrollAction {
 internal data class AutoScrollActionInput(
     val signature: ChatAutoScrollSignature,
     val isStreaming: Boolean,
-    val firstVisibleItemIndex: Int,
-    val firstVisibleItemScrollOffset: Int,
-    val lastStreamingSnapMs: Long,
-    val nowMs: Long,
+    val firstVisibleItemIndex: LazyFirstVisibleIndex,
+    val firstVisibleItemScrollOffset: LazyScrollOffsetPx,
+    val lastStreamingSnapMs: StreamingSnapTimestampMs,
+    val nowMs: AutoScrollClockMs,
 )
+
+internal object ChatMessageRoles {
+    val User = ChatMessageRole("user")
+    val Assistant = ChatMessageRole("assistant")
+}
 
 internal const val StreamingAutoScrollSnapThrottleMs = 96L
 
@@ -48,38 +68,22 @@ internal fun chatRenderItemSeesLiveScale(
 ): Boolean = !isPinching || scaleWindowIndexRange.isEmpty() || itemIndex in scaleWindowIndexRange
 
 internal fun autoScrollAction(input: AutoScrollActionInput): ChatAutoScrollAction {
-    if (!input.isStreaming || input.signature.role != "assistant") return ChatAutoScrollAction.Animate
-    if (input.firstVisibleItemIndex != 0) return ChatAutoScrollAction.Animate
-    if (abs(input.firstVisibleItemScrollOffset) > 12) return ChatAutoScrollAction.Animate
-    if (input.nowMs - input.lastStreamingSnapMs < StreamingAutoScrollSnapThrottleMs) {
+    if (!input.isStreaming || input.signature.role != ChatMessageRoles.Assistant) {
+        return ChatAutoScrollAction.Animate
+    }
+    if (input.firstVisibleItemIndex.value != 0) return ChatAutoScrollAction.Animate
+    if (abs(input.firstVisibleItemScrollOffset.value) > 12) return ChatAutoScrollAction.Animate
+    if (input.nowMs.value - input.lastStreamingSnapMs.value < StreamingAutoScrollSnapThrottleMs) {
         return ChatAutoScrollAction.Skip
     }
     return ChatAutoScrollAction.Snap
 }
 
-internal fun autoScrollAction(
-    signature: ChatAutoScrollSignature,
-    isStreaming: Boolean,
-    firstVisibleItemIndex: Int,
-    firstVisibleItemScrollOffset: Int,
-    lastStreamingSnapMs: Long,
-    nowMs: Long,
-): ChatAutoScrollAction = autoScrollAction(
-    AutoScrollActionInput(
-        signature = signature,
-        isStreaming = isStreaming,
-        firstVisibleItemIndex = firstVisibleItemIndex,
-        firstVisibleItemScrollOffset = firstVisibleItemScrollOffset,
-        lastStreamingSnapMs = lastStreamingSnapMs,
-        nowMs = nowMs,
-    ),
-)
-
 internal fun shouldForceScrollOnUserSend(
     signature: ChatAutoScrollSignature,
     previousNewestMessageId: String?,
 ): Boolean {
-    if (signature.role != "user") return false
+    if (signature.role != ChatMessageRoles.User) return false
     return signature.messageId != previousNewestMessageId
 }
 
@@ -87,7 +91,7 @@ internal fun newestMessageAutoScrollSignature(messages: List<UiMessage>): ChatAu
     val newest = messages.lastOrNull() ?: return null
     return ChatAutoScrollSignature(
         messageId = newest.id,
-        role = newest.role,
+        role = ChatMessageRole(newest.role),
         contentLength = newest.content.length,
         contentHash = newest.content.hashCode(),
         latencyMs = newest.latencyMs,

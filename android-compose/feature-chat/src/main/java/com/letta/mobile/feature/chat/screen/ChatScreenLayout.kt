@@ -266,13 +266,15 @@ private fun BoxScope.ChatScreenSubagentRingsOverlay(
             },
             onViewConversation = { subagent ->
                 handleSubagentViewConversation(
-                    subagent = subagent,
-                    resolvedSubagentSource = params.resolvedSubagentSource,
-                    navigation = params.navigation,
-                    subagentNavigationScope = subagentNavigationScope,
-                    haptic = haptic,
-                    onTargetChange = onTargetChange,
-                    onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
+                    SubagentViewConversationParams(
+                        subagent = subagent,
+                        resolvedSubagentSource = params.resolvedSubagentSource,
+                        navigation = params.navigation,
+                        subagentNavigationScope = subagentNavigationScope,
+                        haptic = haptic,
+                        onTargetChange = onTargetChange,
+                        onFloatingBannerMessageChange = params.onFloatingBannerMessageChange,
+                    ),
                 )
             },
             modifier = modifier,
@@ -280,35 +282,59 @@ private fun BoxScope.ChatScreenSubagentRingsOverlay(
     }
 }
 
-private fun handleSubagentViewConversation(
-    subagent: ActiveSubagent,
-    resolvedSubagentSource: ActiveSubagentSource,
-    navigation: ChatScreenNavigationCallbacks,
-    subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
-    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
-    onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
-    onFloatingBannerMessageChange: (String) -> Unit,
-) {
-    subagentNavigationScope.launch {
-        val agentId = subagent.subagentAgentId?.takeIf { it.isNotBlank() }
-        val conversationId = agentId?.let {
-            resolvedSubagentSource.resolveConversationId(subagent).getOrNull()?.takeIf { id -> id.isNotBlank() }
-        }
-        if (agentId != null && conversationId != null && navigation.onViewSubagentConversation != null) {
-            HapticEffects.longPress(haptic)
-            navigation.onViewSubagentConversation.invoke(agentId, conversationId)
+private data class SubagentViewConversationParams(
+    val subagent: ActiveSubagent,
+    val resolvedSubagentSource: ActiveSubagentSource,
+    val navigation: ChatScreenNavigationCallbacks,
+    val subagentNavigationScope: kotlinx.coroutines.CoroutineScope,
+    val haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    val onTargetChange: (SubagentTodoSheetTarget?) -> Unit,
+    val onFloatingBannerMessageChange: (String) -> Unit,
+)
+
+private fun handleSubagentViewConversation(params: SubagentViewConversationParams) {
+    params.subagentNavigationScope.launch {
+        val navigationTarget = resolveSubagentConversationNavigation(params)
+        if (navigationTarget != null) {
+            HapticEffects.longPress(params.haptic)
+            params.navigation.onViewSubagentConversation?.invoke(
+                navigationTarget.agentId,
+                navigationTarget.conversationId,
+            )
             return@launch
         }
-        onTargetChange(
-            SubagentTodoSheetTarget(
-                toolCallId = subagent.id,
-                description = subagent.description,
-                subagentAgentId = subagent.subagentAgentId,
-                subagentConversationId = subagent.subagentConversationId,
-            ),
-        )
-        onFloatingBannerMessageChange("Subagent conversation is not available yet")
+        openSubagentTodoFallback(params)
     }
+}
+
+private data class SubagentConversationNavigationTarget(
+    val agentId: String,
+    val conversationId: String,
+)
+
+private suspend fun resolveSubagentConversationNavigation(
+    params: SubagentViewConversationParams,
+): SubagentConversationNavigationTarget? {
+    val agentId = params.subagent.subagentAgentId?.takeIf { it.isNotBlank() } ?: return null
+    val conversationId = params.resolvedSubagentSource
+        .resolveConversationId(params.subagent)
+        .getOrNull()
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+    if (params.navigation.onViewSubagentConversation == null) return null
+    return SubagentConversationNavigationTarget(agentId, conversationId)
+}
+
+private fun openSubagentTodoFallback(params: SubagentViewConversationParams) {
+    params.onTargetChange(
+        SubagentTodoSheetTarget(
+            toolCallId = params.subagent.id,
+            description = params.subagent.description,
+            subagentAgentId = params.subagent.subagentAgentId,
+            subagentConversationId = params.subagent.subagentConversationId,
+        ),
+    )
+    params.onFloatingBannerMessageChange("Subagent conversation is not available yet")
 }
 
 @Composable

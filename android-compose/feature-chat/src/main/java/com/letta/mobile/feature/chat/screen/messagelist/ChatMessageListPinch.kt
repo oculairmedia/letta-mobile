@@ -208,11 +208,12 @@ private class ChatPinchVisibleContentCounts {
     }
 
     private fun countMessage(message: UiMessage) {
-        when (message.role) {
-            "user" -> userMessages++
-            "assistant" -> assistantMessages++
+        when (PinchMessageRole.from(message.role)) {
+            PinchMessageRole.User -> userMessages++
+            PinchMessageRole.Assistant -> assistantMessages++
+            PinchMessageRole.Other -> Unit
         }
-        if (message.role == "tool" || !message.toolCalls.isNullOrEmpty() || message.generatedUi != null) {
+        if (message.isPinchToolCard()) {
             toolCards++
         }
     }
@@ -224,6 +225,24 @@ private class ChatPinchVisibleContentCounts {
         runBlocks = runBlocks,
     )
 }
+
+private enum class PinchMessageRole {
+    User,
+    Assistant,
+    Other,
+    ;
+
+    companion object {
+        fun from(raw: String): PinchMessageRole = when (raw) {
+            "user" -> User
+            "assistant" -> Assistant
+            else -> Other
+        }
+    }
+}
+
+private fun UiMessage.isPinchToolCard(): Boolean =
+    role == "tool" || !toolCalls.isNullOrEmpty() || generatedUi != null
 
 internal class ChatPinchFrameBudgetSampler {
     private val frameDurationsMs = ArrayList<Long>(240)

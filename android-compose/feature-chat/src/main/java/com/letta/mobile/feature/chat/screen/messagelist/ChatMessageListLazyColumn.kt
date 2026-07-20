@@ -67,11 +67,13 @@ internal fun LazyListScope.chatMessageListItems(
             is ChatRenderItem.SkillEnvelopeChip -> "skill-envelope"
         }) {
             ChatMessageListRenderItem(
-                renderItem = renderItem,
-                index = index,
-                context = context,
-                chatDimens = chatDimens,
-                chatShapes = chatShapes,
+                params = ChatMessageListRenderItemParams(
+                    renderItem = renderItem,
+                    index = index,
+                    context = context,
+                    chatDimens = chatDimens,
+                    chatShapes = chatShapes,
+                ),
             )
         }
 
@@ -104,13 +106,9 @@ internal fun LazyListScope.chatMessageListItems(
 }
 
 @Composable
-private fun ChatMessageListRenderItem(
-    renderItem: ChatRenderItem,
-    index: Int,
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    chatShapes: ChatShapes,
-) {
+private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
+    val renderItem = params.renderItem
+    val context = params.context
     if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
         SideEffect {
             com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
@@ -138,7 +136,7 @@ private fun ChatMessageListRenderItem(
     val itemSeesLiveScale = chatRenderItemSeesLiveScale(
         isPinching = context.pinchFontScaleController.isPinching,
         scaleWindowIndexRange = context.scaleWindowIndexRange,
-        itemIndex = index,
+        itemIndex = params.index,
     )
     val perItemFontScale = if (itemSeesLiveScale) context.liveFontScale else context.activeFontScale
     CompositionLocalProvider(
@@ -151,30 +149,26 @@ private fun ChatMessageListRenderItem(
             isStreaming = isStreamingRenderItem,
         ) {
             ChatMessageListRenderItemBody(
-                renderItem = renderItem,
-                context = context,
-                chatDimens = chatDimens,
-                chatShapes = chatShapes,
-                isStreamingRenderItem = isStreamingRenderItem,
+                params = ChatMessageListRenderItemBodyParams(
+                    renderItem = renderItem,
+                    context = context,
+                    chatDimens = params.chatDimens,
+                    chatShapes = params.chatShapes,
+                    isStreamingRenderItem = isStreamingRenderItem,
+                ),
             )
         }
     }
 }
 
 @Composable
-private fun ChatMessageListRenderItemBody(
-    renderItem: ChatRenderItem,
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    chatShapes: ChatShapes,
-    isStreamingRenderItem: Boolean,
-) {
-    when (renderItem) {
+private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyParams) {
+    when (val renderItem = params.renderItem) {
         is ChatRenderItem.Single -> ChatMessageListRenderSingleItem(
             renderItem = renderItem,
-            context = context,
-            chatDimens = chatDimens,
-            isStreamingRenderItem = isStreamingRenderItem,
+            context = params.context,
+            chatDimens = params.chatDimens,
+            isStreamingRenderItem = params.isStreamingRenderItem,
         )
         is ChatRenderItem.SkillEnvelopeChip -> {
             SkillEnvelopeChip(
@@ -183,16 +177,18 @@ private fun ChatMessageListRenderItemBody(
                 description = renderItem.description,
                 args = renderItem.args,
                 rawContent = renderItem.rawContent,
-                chatMode = context.chatMode,
-                modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
+                chatMode = params.context.chatMode,
+                modifier = Modifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
             )
         }
         is ChatRenderItem.RunBlock -> ChatMessageListRenderRunBlockItem(
-            renderItem = renderItem,
-            context = context,
-            chatDimens = chatDimens,
-            chatShapes = chatShapes,
-            isStreamingRenderItem = isStreamingRenderItem,
+            params = ChatMessageListRenderRunBlockItemParams(
+                renderItem = renderItem,
+                context = params.context,
+                chatDimens = params.chatDimens,
+                chatShapes = params.chatShapes,
+                isStreamingRenderItem = params.isStreamingRenderItem,
+            ),
         )
     }
 }
@@ -239,18 +235,14 @@ private fun ChatMessageListRenderSingleItem(
 }
 
 @Composable
-private fun ChatMessageListRenderRunBlockItem(
-    renderItem: ChatRenderItem.RunBlock,
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    chatShapes: ChatShapes,
-    isStreamingRenderItem: Boolean,
-) {
+private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBlockItemParams) {
+    val renderItem = params.renderItem
+    val context = params.context
     val isHighlighted = renderItem.containsMessageId(context.highlightedMessageId.orEmpty())
     val highlightModifier = if (isHighlighted) {
         Modifier.background(
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-            RoundedCornerShape(chatShapes.bubbleRadius),
+            RoundedCornerShape(params.chatShapes.bubbleRadius),
         )
     } else {
         Modifier
@@ -262,7 +254,7 @@ private fun ChatMessageListRenderRunBlockItem(
             context.itemGeometryState.clearStreamingFloors()
             context.callbacks.onToggleRunCollapsed(renderItem.runId)
         },
-        modifier = highlightModifier.padding(top = chatDimens.ungroupedMessageSpacing),
+        modifier = highlightModifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
         isStreaming = context.state.isStreaming,
         activeApprovalRequestId = context.state.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,
@@ -271,7 +263,7 @@ private fun ChatMessageListRenderRunBlockItem(
             message = message,
             position = position,
             context = context,
-            isStreamingRenderItem = isStreamingRenderItem,
+            isStreamingRenderItem = params.isStreamingRenderItem,
             modifier = rowModifier,
         )
     }

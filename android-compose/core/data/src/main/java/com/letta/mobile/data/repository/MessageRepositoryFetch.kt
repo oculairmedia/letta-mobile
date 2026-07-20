@@ -49,26 +49,32 @@ internal object MessageRepositoryFetch {
     }
 
     suspend fun fetchMessagesUntilTarget(params: TargetedMessageFetchParams): List<AppMessage> {
-        var after: String? = null
-        var pagesFetched = 0
-        var mergedMessages: List<AppMessage> = emptyList()
-
-        while (pagesFetched < params.maxTargetedFetchPages) {
-            val page = fetchTargetedPage(params, after)
-            if (page.isEmpty()) break
-
-            mergedMessages = mergedMessages + page
-            if (containsTargetMessage(mergedMessages, params.targetMessageId)) {
-                return mergedMessages
-            }
-
-            if (page.size < params.targetedFetchLimit) break
-
-            after = page.lastOrNull()?.id ?: break
-            pagesFetched++
+        val accumulator = TargetedMessageFetchAccumulator()
+        while (accumulator.shouldFetchNextPage(params.maxTargetedFetchPages)) {
+            val page = fetchTargetedPage(params, accumulator.afterCursor)
+            if (!accumulator.appendPage(page, params)) break
         }
+        return accumulator.mergedMessages
+    }
 
-        return mergedMessages
+    private class TargetedMessageFetchAccumulator {
+        var afterCursor: String? = null
+            private set
+        var mergedMessages: List<AppMessage> = emptyList()
+            private set
+        private var pagesFetched = 0
+
+        fun shouldFetchNextPage(maxPages: Int): Boolean = pagesFetched < maxPages
+
+        fun appendPage(page: List<AppMessage>, params: TargetedMessageFetchParams): Boolean {
+            if (page.isEmpty()) return false
+            mergedMessages = mergedMessages + page
+            if (containsTargetMessage(mergedMessages, params.targetMessageId)) return false
+            if (page.size < params.targetedFetchLimit) return false
+            afterCursor = page.lastOrNull()?.id ?: return false
+            pagesFetched++
+            return true
+        }
     }
 
     suspend fun fetchOlderMessages(

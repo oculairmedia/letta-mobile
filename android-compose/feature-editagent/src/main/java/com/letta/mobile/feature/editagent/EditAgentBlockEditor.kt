@@ -13,12 +13,16 @@ internal data class NewBlockDraft(
     val limit: Int?,
 )
 
+internal data class EditAgentBlockEditorDeps(
+    val agentId: String,
+    val blockRepository: IBlockRepository,
+    val state: EditAgentViewModelState,
+    val scope: CoroutineScope,
+    val reload: suspend () -> Unit,
+)
+
 internal class EditAgentBlockEditor(
-    private val agentId: String,
-    private val blockRepository: IBlockRepository,
-    private val state: EditAgentViewModelState,
-    private val scope: CoroutineScope,
-    private val reload: suspend () -> Unit,
+    private val deps: EditAgentBlockEditorDeps,
 ) {
     fun updateBlockValue(blockLabel: String, value: String) {
         updateBlock(blockLabel) { it.copy(value = value) }
@@ -33,9 +37,9 @@ internal class EditAgentBlockEditor(
     }
 
     fun addBlock(draft: NewBlockDraft) {
-        scope.launch {
+        deps.scope.launch {
             try {
-                val block = blockRepository.createBlock(
+                val block = deps.blockRepository.createBlock(
                     BlockCreateParams(
                         label = draft.label,
                         value = draft.value,
@@ -43,8 +47,8 @@ internal class EditAgentBlockEditor(
                         limit = draft.limit,
                     )
                 )
-                blockRepository.attachBlock(agentId, block.id.value)
-                reload()
+                deps.blockRepository.attachBlock(deps.agentId, block.id.value)
+                deps.reload()
             } catch (e: Exception) {
                 android.util.Log.w("EditAgentVM", "Failed to create block", e)
             }
@@ -60,10 +64,10 @@ internal class EditAgentBlockEditor(
     }
 
     fun deleteBlock(blockId: String) {
-        scope.launch {
+        deps.scope.launch {
             try {
-                blockRepository.detachBlock(agentId, blockId)
-                state.updateField {
+                deps.blockRepository.detachBlock(deps.agentId, blockId)
+                deps.state.updateField {
                     copy(blocks = blocks.filter { it.id != blockId }.toImmutableList())
                 }
             } catch (e: Exception) {
@@ -73,7 +77,7 @@ internal class EditAgentBlockEditor(
     }
 
     private fun updateBlock(blockLabel: String, transform: (EditableBlock) -> EditableBlock) {
-        state.updateField {
+        deps.state.updateField {
             copy(
                 blocks = blocks.map { block ->
                     if (block.label == blockLabel) transform(block) else block
@@ -83,12 +87,12 @@ internal class EditAgentBlockEditor(
     }
 
     private fun attachExistingBlocks(blockIds: List<String>, errorMessage: String) {
-        scope.launch {
+        deps.scope.launch {
             try {
-                blockIds.forEach { blockRepository.attachBlock(agentId, it) }
-                reload()
+                blockIds.forEach { deps.blockRepository.attachBlock(deps.agentId, it) }
+                deps.reload()
             } catch (e: Exception) {
-                state.setError(e.message ?: errorMessage)
+                deps.state.setError(e.message ?: errorMessage)
             }
         }
     }

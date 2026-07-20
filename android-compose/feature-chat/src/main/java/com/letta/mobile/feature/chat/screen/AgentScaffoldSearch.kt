@@ -34,18 +34,24 @@ import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.util.formatRelativeTime
 
+internal data class ChatSearchResultsParams(
+    val searchQuery: String,
+    val results: List<ParsedSearchMessage>,
+    val isSearching: Boolean,
+    val conversations: List<Conversation>,
+    val currentConversationId: String?,
+    val onResultClick: (ParsedSearchMessage) -> Unit,
+)
+
 @Composable
 internal fun ChatSearchResultsContent(
-    searchQuery: String,
-    results: List<ParsedSearchMessage>,
-    isSearching: Boolean,
-    conversations: List<Conversation>,
-    currentConversationId: String?,
-    onResultClick: (ParsedSearchMessage) -> Unit,
+    params: ChatSearchResultsParams,
     modifier: Modifier = Modifier,
 ) {
     val highlightColors = rememberSearchHighlightColors()
-    val conversationsById = remember(conversations) { conversations.associateBy { it.id.value } }
+    val conversationsById = remember(params.conversations) {
+        params.conversations.associateBy { it.id.value }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -53,26 +59,26 @@ internal fun ChatSearchResultsContent(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         item(key = "chat-search-header") {
-            ChatSearchResultsHeader(isSearching = isSearching)
+            ChatSearchResultsHeader(isSearching = params.isSearching)
         }
 
-        if (!isSearching && results.isEmpty()) {
+        if (!params.isSearching && params.results.isEmpty()) {
             item(key = "chat-search-empty") {
                 ChatSearchResultsEmptyState()
             }
         }
 
         itemsIndexed(
-            items = results,
+            items = params.results,
             key = { index, result -> chatSearchResultKey(result, index) },
         ) { _, result ->
             ChatSearchResultCard(
                 result = result,
-                searchQuery = searchQuery,
+                searchQuery = params.searchQuery,
                 conversationsById = conversationsById,
-                currentConversationId = currentConversationId,
+                currentConversationId = params.currentConversationId,
                 highlightColors = highlightColors,
-                onResultClick = onResultClick,
+                onResultClick = params.onResultClick,
             )
         }
     }

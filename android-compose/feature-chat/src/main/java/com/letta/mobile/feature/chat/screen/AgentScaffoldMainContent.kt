@@ -84,22 +84,24 @@ private fun AgentScaffoldSearchResultsPane(
 ) {
     val params = state.params
     ChatSearchResultsContent(
-        searchQuery = state.uiState.searchQuery,
-        results = state.uiState.searchResults,
-        isSearching = state.uiState.isSearching,
-        conversations = state.drawerConversations,
-        currentConversationId = state.conversationId,
-        onResultClick = { result ->
-            params.searchUi.onChatSearchExpandedChange(false)
-            params.viewModel.clearChatSearch()
-            result.conversationId?.let { targetConversationId ->
-                params.navigation.onSwitchConversation?.invoke(
-                    state.agentIdValue,
-                    targetConversationId,
-                    state.agentName.takeIf { it.isNotBlank() },
-                )
-            }
-        },
+        params = ChatSearchResultsParams(
+            searchQuery = state.uiState.searchQuery,
+            results = state.uiState.searchResults,
+            isSearching = state.uiState.isSearching,
+            conversations = state.drawerConversations,
+            currentConversationId = state.conversationId,
+            onResultClick = { result ->
+                params.searchUi.onChatSearchExpandedChange(false)
+                params.viewModel.clearChatSearch()
+                result.conversationId?.let { targetConversationId ->
+                    params.navigation.onSwitchConversation?.invoke(
+                        state.agentIdValue,
+                        targetConversationId,
+                        state.agentName.takeIf { it.isNotBlank() },
+                    )
+                }
+            },
+        ),
         modifier = chatModifier.padding(top = contentTopPadding, bottom = bottomPadding),
     )
 }
