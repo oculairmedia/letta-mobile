@@ -128,25 +128,43 @@ private fun bodyContainsMathSyntax(body: MarkdownMathInlineBodySpan): Boolean {
     return false
 }
 
+private fun isShellLikeVariableChar(ch: Char): Boolean {
+    if (ch.isUpperCase()) return true
+    if (ch.isDigit()) return true
+    if (ch == '_') return true
+    return false
+}
+
 private fun isShellLikeVariable(body: MarkdownMathInlineBodySpan): Boolean {
     for (index in body.start.value until body.line.raw.length) {
-        val ch = body.line.raw[index]
-        if (!(ch.isUpperCase() || ch.isDigit() || ch == '_')) return false
+        if (!isShellLikeVariableChar(body.line.raw[index])) return false
     }
     return true
 }
 
-private fun isSimpleInlineMathToken(body: MarkdownMathInlineBodySpan): Boolean {
-    val length = body.line.raw.length - body.start.value
-    if (length > MAX_SIMPLE_INLINE_MATH_CHARS) return false
+private fun bodyLength(body: MarkdownMathInlineBodySpan): Int =
+    body.line.raw.length - body.start.value
+
+private fun bodyAllLetters(body: MarkdownMathInlineBodySpan): Boolean {
     for (index in body.start.value until body.line.raw.length) {
         if (!body.line.raw[index].isLetter()) return false
     }
-    if (length == 1) return true
+    return true
+}
+
+private fun bodyContainsLowercase(body: MarkdownMathInlineBodySpan): Boolean {
     for (index in body.start.value until body.line.raw.length) {
         if (body.line.raw[index].isLowerCase()) return true
     }
     return false
+}
+
+private fun isSimpleInlineMathToken(body: MarkdownMathInlineBodySpan): Boolean {
+    val length = bodyLength(body)
+    if (length > MAX_SIMPLE_INLINE_MATH_CHARS) return false
+    if (!bodyAllLetters(body)) return false
+    if (length == 1) return true
+    return bodyContainsLowercase(body)
 }
 
 private fun MarkdownMathScanCursor.advanceBy(delta: Int): MarkdownMathScanCursor =

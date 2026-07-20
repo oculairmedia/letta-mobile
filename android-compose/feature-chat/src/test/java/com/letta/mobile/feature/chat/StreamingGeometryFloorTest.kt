@@ -12,22 +12,24 @@ class StreamingGeometryFloorTest {
 
     @Test
     fun `streaming geometry floor follows render bucket across content growth`() {
-        val short = scrollTestGeometrySignature(content = "Hello")
-        val longer = scrollTestGeometrySignature(content = "Hello, this is still streaming")
+        val short = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "Hello"))
+        val longer = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Hello, this is still streaming"),
+        )
         runStreamingGeometryScenario(
             StreamingGeometryScenario(
                 measurements = listOf(
-                    ScrollTestGeometryMeasurement(short, heightPx = 120, isStreaming = true),
-                    ScrollTestGeometryMeasurement(longer, heightPx = 96, isStreaming = true),
+                    ScrollTestGeometryMeasurement(short, heightPx = 120, streaming = ScrollTestStreamingState.Streaming),
+                    ScrollTestGeometryMeasurement(longer, heightPx = 96, streaming = ScrollTestStreamingState.Streaming),
                 ),
                 floorAssertions = listOf(
-                    GeometryFloorAssertion(longer, isStreaming = true, expected = 120),
+                    GeometryFloorAssertion(longer, streaming = ScrollTestStreamingState.Streaming, expected = 120),
                 ),
                 followUpMeasurements = listOf(
-                    ScrollTestGeometryMeasurement(longer, heightPx = 148, isStreaming = true),
+                    ScrollTestGeometryMeasurement(longer, heightPx = 148, streaming = ScrollTestStreamingState.Streaming),
                 ),
                 followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(longer, isStreaming = true, expected = 148),
+                    GeometryFloorAssertion(longer, streaming = ScrollTestStreamingState.Streaming, expected = 148),
                 ),
             ),
         )
@@ -35,15 +37,17 @@ class StreamingGeometryFloorTest {
 
     @Test
     fun `streaming geometry floor does not constrain settled content`() {
-        val short = scrollTestGeometrySignature(content = "Hello")
-        val longer = scrollTestGeometrySignature(content = "Hello after the stream ends")
+        val short = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "Hello"))
+        val longer = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Hello after the stream ends"),
+        )
         runStreamingGeometryScenario(
             StreamingGeometryScenario(
                 measurements = listOf(
-                    ScrollTestGeometryMeasurement(short, heightPx = 120, isStreaming = true),
+                    ScrollTestGeometryMeasurement(short, heightPx = 120, streaming = ScrollTestStreamingState.Streaming),
                 ),
                 floorAssertions = listOf(
-                    GeometryFloorAssertion(longer, isStreaming = false, expected = 0),
+                    GeometryFloorAssertion(longer, streaming = ScrollTestStreamingState.Settled, expected = 0),
                 ),
             ),
         )
@@ -51,18 +55,20 @@ class StreamingGeometryFloorTest {
 
     @Test
     fun `clear streaming floors removes existing streaming bounds`() {
-        val streamingItem = scrollTestGeometrySignature(content = "Streaming response...")
+        val streamingItem = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Streaming response..."),
+        )
         runStreamingGeometryScenario(
             StreamingGeometryScenario(
                 measurements = listOf(
-                    ScrollTestGeometryMeasurement(streamingItem, heightPx = 300, isStreaming = true),
+                    ScrollTestGeometryMeasurement(streamingItem, heightPx = 300, streaming = ScrollTestStreamingState.Streaming),
                 ),
                 floorAssertions = listOf(
-                    GeometryFloorAssertion(streamingItem, isStreaming = true, expected = 300),
+                    GeometryFloorAssertion(streamingItem, streaming = ScrollTestStreamingState.Streaming, expected = 300),
                 ),
                 stateMutations = listOf(GeometryStateMutation.ClearStreamingFloors),
                 followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(streamingItem, isStreaming = true, expected = 0),
+                    GeometryFloorAssertion(streamingItem, streaming = ScrollTestStreamingState.Streaming, expected = 0),
                 ),
             ),
         )
@@ -71,22 +77,22 @@ class StreamingGeometryFloorTest {
     @Test
     fun `streaming geometry measurement does not seed settled exact height for same content`() {
         val tableMessage = scrollTestGeometrySignature(
-            content = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nAfter table",
+            ScrollTestGeometrySignatureSpec(content = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nAfter table"),
         )
         runStreamingGeometryScenario(
             StreamingGeometryScenario(
                 measurements = listOf(
-                    ScrollTestGeometryMeasurement(tableMessage, heightPx = 420, isStreaming = true),
+                    ScrollTestGeometryMeasurement(tableMessage, heightPx = 420, streaming = ScrollTestStreamingState.Streaming),
                 ),
                 floorAssertions = listOf(
-                    GeometryFloorAssertion(tableMessage, isStreaming = true, expected = 420),
-                    GeometryFloorAssertion(tableMessage, isStreaming = false, expected = 0),
+                    GeometryFloorAssertion(tableMessage, streaming = ScrollTestStreamingState.Streaming, expected = 420),
+                    GeometryFloorAssertion(tableMessage, streaming = ScrollTestStreamingState.Settled, expected = 0),
                 ),
                 followUpMeasurements = listOf(
-                    ScrollTestGeometryMeasurement(tableMessage, heightPx = 180, isStreaming = false),
+                    ScrollTestGeometryMeasurement(tableMessage, heightPx = 180, streaming = ScrollTestStreamingState.Settled),
                 ),
                 followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(tableMessage, isStreaming = false, expected = 180),
+                    GeometryFloorAssertion(tableMessage, streaming = ScrollTestStreamingState.Settled, expected = 180),
                 ),
             ),
         )
@@ -94,20 +100,28 @@ class StreamingGeometryFloorTest {
 
     @Test
     fun `inactive streaming geometry buckets are pruned`() {
-        val first = scrollTestGeometrySignature(renderKey = "msg-first", content = "first")
-        val firstGrown = scrollTestGeometrySignature(renderKey = "msg-first", content = "first after more tokens")
-        val second = scrollTestGeometrySignature(renderKey = "msg-second", content = "second")
-        val secondGrown = scrollTestGeometrySignature(renderKey = "msg-second", content = "second after more tokens")
+        val first = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(renderKey = "msg-first", content = "first"),
+        )
+        val firstGrown = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(renderKey = "msg-first", content = "first after more tokens"),
+        )
+        val second = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(renderKey = "msg-second", content = "second"),
+        )
+        val secondGrown = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(renderKey = "msg-second", content = "second after more tokens"),
+        )
         runStreamingGeometryScenario(
             StreamingGeometryScenario(
                 measurements = listOf(
-                    ScrollTestGeometryMeasurement(first, heightPx = 120, isStreaming = true),
-                    ScrollTestGeometryMeasurement(second, heightPx = 80, isStreaming = true),
+                    ScrollTestGeometryMeasurement(first, heightPx = 120, streaming = ScrollTestStreamingState.Streaming),
+                    ScrollTestGeometryMeasurement(second, heightPx = 80, streaming = ScrollTestStreamingState.Streaming),
                 ),
                 stateMutations = listOf(GeometryStateMutation.RetainStreamingBuckets(setOf(second.bucket))),
                 followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(firstGrown, isStreaming = true, expected = 0),
-                    GeometryFloorAssertion(secondGrown, isStreaming = true, expected = 80),
+                    GeometryFloorAssertion(firstGrown, streaming = ScrollTestStreamingState.Streaming, expected = 0),
+                    GeometryFloorAssertion(secondGrown, streaming = ScrollTestStreamingState.Streaming, expected = 80),
                 ),
             ),
         )
@@ -115,15 +129,19 @@ class StreamingGeometryFloorTest {
 
     @Test
     fun `render item geometry signature changes for width scale direction expansion and content`() {
-        val item = scrollTestSingle("assistant", content = "hello")
+        val item = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = "hello"))
         val base = item.scrollTestGeometrySignature()
 
         assertNotEquals(base, item.scrollTestGeometrySignature(ScrollTestGeometryOptions(widthPx = 480)))
         assertNotEquals(base, item.scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = 1.2f)))
         assertNotEquals(base, item.scrollTestGeometrySignature(ScrollTestGeometryOptions(layoutDirection = LayoutDirection.Rtl)))
-        assertNotEquals(base, scrollTestSingle("assistant", content = "hello world").scrollTestGeometrySignature())
+        assertNotEquals(
+            base,
+            scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = "hello world"))
+                .scrollTestGeometrySignature(),
+        )
 
-        val reasoning = scrollTestSingle("reasoning", content = "thinking").copy(
+        val reasoning = scrollTestSingle(ScrollTestMessageSpec(id = "reasoning", content = "thinking")).copy(
             message = scrollTestMessage(
                 ScrollTestMessageSpec(id = "reasoning", content = "thinking", role = ScrollTestMessageRole(isReasoning = true)),
             ),
@@ -141,8 +159,10 @@ class StreamingGeometryFloorTest {
         val baseContent = "a".repeat(200)
         val changedContent = baseContent.replaceRange(100, 101, "b")
 
-        val base = scrollTestSingle("assistant", content = baseContent).scrollTestGeometrySignature()
-        val changed = scrollTestSingle("assistant", content = changedContent).scrollTestGeometrySignature()
+        val base = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = baseContent))
+            .scrollTestGeometrySignature()
+        val changed = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = changedContent))
+            .scrollTestGeometrySignature()
 
         assertEquals(base.contentLength, changed.contentLength)
         assertNotEquals(base.contentHash, changed.contentHash)
@@ -153,28 +173,30 @@ class StreamingGeometryFloorTest {
         assertAllFontScaleBucketInvalidations(
             FontScaleBucketInvalidationCase(
                 content = "Streaming response...",
-                isStreaming = true,
+                streaming = ScrollTestStreamingState.Streaming,
                 heightPx = 300,
-                baseScale = 1.0f,
-                altScale = 0.8f,
+                scales = FontScaleBucketScales(base = 1.0f, alt = 0.8f),
             ),
             FontScaleBucketInvalidationCase(
                 content = "Settled response.",
-                isStreaming = false,
+                streaming = ScrollTestStreamingState.Settled,
                 heightPx = 150,
-                baseScale = 1.0f,
-                altScale = 1.5f,
+                scales = FontScaleBucketScales(base = 1.0f, alt = 1.5f),
             ),
         )
     }
 }
 
+private data class FontScaleBucketScales(
+    val base: Float,
+    val alt: Float,
+)
+
 private data class FontScaleBucketInvalidationCase(
     val content: String,
-    val isStreaming: Boolean,
+    val streaming: ScrollTestStreamingState,
     val heightPx: Int,
-    val baseScale: Float,
-    val altScale: Float,
+    val scales: FontScaleBucketScales,
 )
 
 private fun assertAllFontScaleBucketInvalidations(vararg cases: FontScaleBucketInvalidationCase) {
@@ -183,13 +205,13 @@ private fun assertAllFontScaleBucketInvalidations(vararg cases: FontScaleBucketI
 
 private fun assertFontScaleBucketInvalidation(case: FontScaleBucketInvalidationCase) {
     val harness = ScrollTestGeometryHarness()
-    val base = scrollTestSingle("assistant", content = case.content)
-        .scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = case.baseScale))
-    val alt = scrollTestSingle("assistant", content = case.content)
-        .scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = case.altScale))
-    harness.record(ScrollTestGeometryMeasurement(base, heightPx = case.heightPx, isStreaming = case.isStreaming))
-    assertEquals(case.heightPx, harness.floor(base, isStreaming = case.isStreaming))
-    assertEquals(0, harness.floor(alt, isStreaming = case.isStreaming))
+    val base = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = case.content))
+        .scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = case.scales.base))
+    val alt = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = case.content))
+        .scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = case.scales.alt))
+    harness.record(ScrollTestGeometryMeasurement(base, heightPx = case.heightPx, streaming = case.streaming))
+    assertEquals(case.heightPx, harness.floor(base, case.streaming))
+    assertEquals(0, harness.floor(alt, case.streaming))
 }
 
 private sealed interface GeometryStateMutation {

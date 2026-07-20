@@ -34,45 +34,91 @@ private fun coreModelSettingsFields(
     modelSettings: ModelSettings?,
     llmConfig: LlmConfig?,
 ): CoreModelSettingsFields = CoreModelSettingsFields(
-    temperature = modelSettings?.temperature?.toFloat() ?: llmConfig?.temperature?.toFloat() ?: 1.0f,
-    maxOutputTokens = modelSettings?.maxOutputTokens ?: llmConfig?.maxTokens ?: 4096,
-    parallelToolCalls = modelSettings?.parallelToolCalls ?: llmConfig?.parallelToolCalls ?: true,
-    modelProviderName = modelSettings?.providerName ?: llmConfig?.providerName.orEmpty(),
-    modelProviderCategory = modelSettings?.providerCategory ?: llmConfig?.providerCategory.orEmpty(),
-    modelFrequencyPenalty = (modelSettings?.frequencyPenalty ?: llmConfig?.frequencyPenalty)
-        ?.toString()
-        .orEmpty(),
-    modelVerbosity = modelSettings?.verbosity ?: llmConfig?.verbosity.orEmpty(),
+    temperature = resolveTemperature(modelSettings, llmConfig),
+    maxOutputTokens = resolveMaxOutputTokens(modelSettings, llmConfig),
+    parallelToolCalls = resolveParallelToolCalls(modelSettings, llmConfig),
+    modelProviderName = resolveProviderName(modelSettings, llmConfig),
+    modelProviderCategory = resolveProviderCategory(modelSettings, llmConfig),
+    modelFrequencyPenalty = resolveFrequencyPenalty(modelSettings, llmConfig),
+    modelVerbosity = resolveVerbosity(modelSettings, llmConfig),
 )
+
+private fun resolveTemperature(modelSettings: ModelSettings?, llmConfig: LlmConfig?): Float =
+    modelSettings?.temperature?.toFloat() ?: llmConfig?.temperature?.toFloat() ?: 1.0f
+
+private fun resolveMaxOutputTokens(modelSettings: ModelSettings?, llmConfig: LlmConfig?): Int =
+    modelSettings?.maxOutputTokens ?: llmConfig?.maxTokens ?: 4096
+
+private fun resolveParallelToolCalls(modelSettings: ModelSettings?, llmConfig: LlmConfig?): Boolean =
+    modelSettings?.parallelToolCalls ?: llmConfig?.parallelToolCalls ?: true
+
+private fun resolveProviderName(modelSettings: ModelSettings?, llmConfig: LlmConfig?): String =
+    modelSettings?.providerName ?: llmConfig?.providerName.orEmpty()
+
+private fun resolveProviderCategory(modelSettings: ModelSettings?, llmConfig: LlmConfig?): String =
+    modelSettings?.providerCategory ?: llmConfig?.providerCategory.orEmpty()
+
+private fun resolveFrequencyPenalty(modelSettings: ModelSettings?, llmConfig: LlmConfig?): String =
+    (modelSettings?.frequencyPenalty ?: llmConfig?.frequencyPenalty)?.toString().orEmpty()
+
+private fun resolveVerbosity(modelSettings: ModelSettings?, llmConfig: LlmConfig?): String =
+    modelSettings?.verbosity ?: llmConfig?.verbosity.orEmpty()
 
 private fun reasoningModelSettingsFields(
     modelSettings: ModelSettings?,
     llmConfig: LlmConfig?,
 ): ReasoningModelSettingsFields = ReasoningModelSettingsFields(
-    modelEnableReasoner = modelSettings?.enableReasoner ?: llmConfig?.enableReasoner ?: false,
-    modelReasoningEffort = modelSettings?.reasoningEffort ?: llmConfig?.reasoningEffort.orEmpty(),
-    modelMaxReasoningTokens = (modelSettings?.maxReasoningTokens ?: llmConfig?.maxReasoningTokens)
-        ?.toString()
-        .orEmpty(),
-    modelReasoningJson = modelSettings?.reasoning?.toSettingsJson().orEmpty(),
-    modelPutInnerThoughtsInKwargs = modelSettings?.putInnerThoughtsInKwargs
-        ?: llmConfig?.putInnerThoughtsInKwargs
-        ?: false,
+    modelEnableReasoner = resolveEnableReasoner(modelSettings, llmConfig),
+    modelReasoningEffort = resolveReasoningEffort(modelSettings, llmConfig),
+    modelMaxReasoningTokens = resolveMaxReasoningTokens(modelSettings, llmConfig),
+    modelReasoningJson = resolveReasoningJson(modelSettings),
+    modelPutInnerThoughtsInKwargs = resolvePutInnerThoughtsInKwargs(modelSettings, llmConfig),
 )
+
+private fun resolveEnableReasoner(modelSettings: ModelSettings?, llmConfig: LlmConfig?): Boolean =
+    modelSettings?.enableReasoner ?: llmConfig?.enableReasoner ?: false
+
+private fun resolveReasoningEffort(modelSettings: ModelSettings?, llmConfig: LlmConfig?): String =
+    modelSettings?.reasoningEffort ?: llmConfig?.reasoningEffort.orEmpty()
+
+private fun resolveMaxReasoningTokens(modelSettings: ModelSettings?, llmConfig: LlmConfig?): String =
+    (modelSettings?.maxReasoningTokens ?: llmConfig?.maxReasoningTokens)?.toString().orEmpty()
+
+private fun resolveReasoningJson(modelSettings: ModelSettings?): String =
+    modelSettings?.reasoning?.toSettingsJson().orEmpty()
+
+private fun resolvePutInnerThoughtsInKwargs(modelSettings: ModelSettings?, llmConfig: LlmConfig?): Boolean =
+    modelSettings?.putInnerThoughtsInKwargs ?: llmConfig?.putInnerThoughtsInKwargs ?: false
 
 private fun responseModelSettingsFields(
     modelSettings: ModelSettings?,
     agent: Agent,
 ): ResponseModelSettingsFields = ResponseModelSettingsFields(
-    modelStrictToolCalling = modelSettings?.strict ?: false,
-    modelResponseFormatJson = (modelSettings?.responseFormat ?: agent.responseFormat)
-        ?.toSettingsJson()
-        .orEmpty(),
-    modelResponseSchemaJson = modelSettings?.responseSchema?.toSettingsJson().orEmpty(),
-    modelThinkingConfigJson = modelSettings?.thinkingConfig?.toSettingsJson().orEmpty(),
-    modelToolCallParser = modelSettings?.toolCallParser.orEmpty(),
-    modelAnthropicEffort = modelSettings?.effort.orEmpty(),
+    modelStrictToolCalling = resolveStrictToolCalling(modelSettings),
+    modelResponseFormatJson = resolveResponseFormatJson(modelSettings, agent),
+    modelResponseSchemaJson = resolveResponseSchemaJson(modelSettings),
+    modelThinkingConfigJson = resolveThinkingConfigJson(modelSettings),
+    modelToolCallParser = resolveToolCallParser(modelSettings),
+    modelAnthropicEffort = resolveAnthropicEffort(modelSettings),
 )
+
+private fun resolveStrictToolCalling(modelSettings: ModelSettings?): Boolean =
+    modelSettings?.strict ?: false
+
+private fun resolveResponseFormatJson(modelSettings: ModelSettings?, agent: Agent): String =
+    (modelSettings?.responseFormat ?: agent.responseFormat)?.toSettingsJson().orEmpty()
+
+private fun resolveResponseSchemaJson(modelSettings: ModelSettings?): String =
+    modelSettings?.responseSchema?.toSettingsJson().orEmpty()
+
+private fun resolveThinkingConfigJson(modelSettings: ModelSettings?): String =
+    modelSettings?.thinkingConfig?.toSettingsJson().orEmpty()
+
+private fun resolveToolCallParser(modelSettings: ModelSettings?): String =
+    modelSettings?.toolCallParser.orEmpty()
+
+private fun resolveAnthropicEffort(modelSettings: ModelSettings?): String =
+    modelSettings?.effort.orEmpty()
 
 private data class CoreModelSettingsFields(
     val temperature: Float,

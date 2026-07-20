@@ -196,6 +196,50 @@ internal fun ShareContentPreviewCard(
     }
 }
 
+internal data class AgentCardBindModel(
+    val agent: Agent,
+    val isFavorite: Boolean,
+    val isPinned: Boolean,
+    val contextualActionsEnabled: Boolean,
+    val onClick: () -> Unit,
+    val onLongPress: () -> Unit,
+    val onDelete: () -> Unit,
+    val onToggleFavorite: () -> Unit,
+    val onTogglePinned: () -> Unit,
+)
+
+@Composable
+internal fun AgentCard(model: AgentCardBindModel, modifier: Modifier = Modifier) {
+    AgentCard(
+        agent = model.agent,
+        isFavorite = model.isFavorite,
+        isPinned = model.isPinned,
+        onClick = model.onClick,
+        onLongPress = model.onLongPress,
+        onDelete = model.onDelete,
+        onToggleFavorite = model.onToggleFavorite,
+        onTogglePinned = model.onTogglePinned,
+        modifier = modifier,
+        contextualActionsEnabled = model.contextualActionsEnabled,
+    )
+}
+
+@Composable
+internal fun CompactAgentCard(model: AgentCardBindModel, modifier: Modifier = Modifier) {
+    CompactAgentCard(
+        agent = model.agent,
+        isFavorite = model.isFavorite,
+        isPinned = model.isPinned,
+        onClick = model.onClick,
+        onLongPress = model.onLongPress,
+        onDelete = model.onDelete,
+        onToggleFavorite = model.onToggleFavorite,
+        onTogglePinned = model.onTogglePinned,
+        modifier = modifier,
+        contextualActionsEnabled = model.contextualActionsEnabled,
+    )
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun AgentCard(

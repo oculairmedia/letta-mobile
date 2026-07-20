@@ -209,9 +209,10 @@ private fun AgentListGridContent(
         agentListSharedPrefixItems(state = state, actions = actions)
 
         items(state.gridAgents, key = { it.id.value }) { agent ->
-            AgentListAgentGridCard(
+            AgentListAgentCard(
                 rowModel = state.agentRowModel(agent),
                 actions = actions,
+                variant = AgentListCardVariant.Compact,
             )
         }
     }
@@ -235,9 +236,10 @@ private fun AgentListListContent(
             key = { _, agent -> agent.id.value },
         ) { index, agent ->
             StaggeredListItem(index = index) {
-                AgentListStandardAgentCard(
+                AgentListAgentCard(
                     rowModel = state.agentRowModel(agent),
                     actions = actions,
+                    variant = AgentListCardVariant.Standard,
                 )
             }
         }
@@ -310,60 +312,33 @@ private fun LazyListScope.agentListSharedPrefixItems(
     }
 }
 
-private data class AgentListAgentCardCallbacks(
-    val onClick: () -> Unit,
-    val onLongPress: () -> Unit,
-    val onDelete: () -> Unit,
-    val onToggleFavorite: () -> Unit,
-    val onTogglePinned: () -> Unit,
-)
+private enum class AgentListCardVariant { Compact, Standard }
 
-private fun AgentListAgentRowModel.cardCallbacks(actions: AgentListContentActions): AgentListAgentCardCallbacks =
-    AgentListAgentCardCallbacks(
+@Composable
+private fun AgentListAgentCard(
+    rowModel: AgentListAgentRowModel,
+    actions: AgentListContentActions,
+    variant: AgentListCardVariant,
+) {
+    val model = rowModel.toBindModel(actions)
+    when (variant) {
+        AgentListCardVariant.Compact -> CompactAgentCard(model)
+        AgentListCardVariant.Standard -> AgentCard(model)
+    }
+}
+
+private fun AgentListAgentRowModel.toBindModel(actions: AgentListContentActions): AgentCardBindModel =
+    AgentCardBindModel(
+        agent = agent,
+        isFavorite = isFavorite,
+        isPinned = isPinned,
+        contextualActionsEnabled = contextualActionsEnabled,
         onClick = selectAction(actions),
         onLongPress = editAction(actions),
         onDelete = deleteAction(actions),
         onToggleFavorite = toggleFavoriteAction(actions),
         onTogglePinned = togglePinnedAction(actions),
     )
-
-@Composable
-private fun AgentListAgentGridCard(
-    rowModel: AgentListAgentRowModel,
-    actions: AgentListContentActions,
-) {
-    val callbacks = rowModel.cardCallbacks(actions)
-    CompactAgentCard(
-        agent = rowModel.agent,
-        isFavorite = rowModel.isFavorite,
-        isPinned = rowModel.isPinned,
-        onClick = callbacks.onClick,
-        onLongPress = callbacks.onLongPress,
-        onDelete = callbacks.onDelete,
-        onToggleFavorite = callbacks.onToggleFavorite,
-        onTogglePinned = callbacks.onTogglePinned,
-        contextualActionsEnabled = rowModel.contextualActionsEnabled,
-    )
-}
-
-@Composable
-private fun AgentListStandardAgentCard(
-    rowModel: AgentListAgentRowModel,
-    actions: AgentListContentActions,
-) {
-    val callbacks = rowModel.cardCallbacks(actions)
-    AgentCard(
-        agent = rowModel.agent,
-        isFavorite = rowModel.isFavorite,
-        isPinned = rowModel.isPinned,
-        onClick = callbacks.onClick,
-        onLongPress = callbacks.onLongPress,
-        onDelete = callbacks.onDelete,
-        onToggleFavorite = callbacks.onToggleFavorite,
-        onTogglePinned = callbacks.onTogglePinned,
-        contextualActionsEnabled = rowModel.contextualActionsEnabled,
-    )
-}
 
 private data class AgentListAgentRowModel(
     val agent: Agent,

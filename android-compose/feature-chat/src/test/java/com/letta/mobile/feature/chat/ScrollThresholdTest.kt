@@ -10,31 +10,31 @@ class ScrollThresholdTest {
             ScrollTestLazyIndexExpectation(
                 expected = 1,
                 targetRenderIndex = 0,
-                items = listOf(scrollTestSingle("m1", ts = "2026-04-20T12:00:00Z")),
+                items = listOf(scrollTestSingle(ScrollTestMessageSpec(id = "m1", ts = "2026-04-20T12:00:00Z"))),
             ),
             ScrollTestLazyIndexExpectation(
                 expected = 2,
                 targetRenderIndex = 1,
                 items = listOf(
-                    scrollTestSingle("newest", ts = "2026-04-20T12:00:00Z"),
-                    scrollTestSingle("older", ts = "2026-04-20T11:00:00Z"),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "newest", ts = "2026-04-20T12:00:00Z")),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "older", ts = "2026-04-20T11:00:00Z")),
                 ),
             ),
             ScrollTestLazyIndexExpectation(
                 expected = 3,
                 targetRenderIndex = 1,
                 items = listOf(
-                    scrollTestSingle("today", ts = "2026-04-20T12:00:00Z"),
-                    scrollTestSingle("yesterday", ts = "2026-04-19T12:00:00Z"),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "today", ts = "2026-04-20T12:00:00Z")),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "yesterday", ts = "2026-04-19T12:00:00Z")),
                 ),
             ),
             ScrollTestLazyIndexExpectation(
                 expected = 5,
                 targetRenderIndex = 2,
                 items = listOf(
-                    scrollTestSingle("day3", ts = "2026-04-21T12:00:00Z"),
-                    scrollTestSingle("day2", ts = "2026-04-20T12:00:00Z"),
-                    scrollTestSingle("day1", ts = "2026-04-19T12:00:00Z"),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "day3", ts = "2026-04-21T12:00:00Z")),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "day2", ts = "2026-04-20T12:00:00Z")),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "day1", ts = "2026-04-19T12:00:00Z")),
                 ),
             ),
         )
@@ -47,8 +47,8 @@ class ScrollThresholdTest {
                 expected = 3,
                 targetRenderIndex = 1,
                 items = listOf(
-                    scrollTestRunBlock("run1", ts = "2026-04-20T12:00:00Z"),
-                    scrollTestSingle("older", ts = "2026-04-19T12:00:00Z"),
+                    scrollTestRunBlock(ScrollTestRunBlockSpec(runId = "run1", ts = "2026-04-20T12:00:00Z")),
+                    scrollTestSingle(ScrollTestMessageSpec(id = "older", ts = "2026-04-19T12:00:00Z")),
                 ),
             ),
         )

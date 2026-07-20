@@ -35,14 +35,39 @@ internal data class ScrollTestMessageSpec(
     val role: ScrollTestMessageRole = ScrollTestMessageRole(),
 )
 
+internal data class ScrollTestRunBlockSpec(
+    val runId: String,
+    val ts: String,
+)
+
+internal data class ScrollTestSignatureSpec(
+    val role: String = "assistant",
+    val messageId: String = "m1",
+)
+
+internal data class ScrollTestGeometrySignatureSpec(
+    val content: String,
+    val renderKey: String = "msg-assistant",
+    val widthPx: Int = 320,
+)
+
+internal data class ScrollTestStreamingState(val isStreaming: Boolean) {
+    companion object {
+        val Streaming = ScrollTestStreamingState(true)
+        val Settled = ScrollTestStreamingState(false)
+    }
+}
+
 internal data class ScrollTestLazyViewport(
     val firstVisibleItemIndex: Int = 0,
     val firstVisibleItemScrollOffset: Int = 0,
 ) {
     companion object {
         val pinned = ScrollTestLazyViewport()
-        fun scrolledUpIndex(index: Int = 1) = ScrollTestLazyViewport(firstVisibleItemIndex = index)
-        fun scrolledUpOffset(offset: Int) = ScrollTestLazyViewport(firstVisibleItemScrollOffset = offset)
+        fun scrolledUpIndex(): ScrollTestLazyViewport =
+            ScrollTestLazyViewport(firstVisibleItemIndex = 1)
+        fun scrolledUpOffset(): ScrollTestLazyViewport =
+            ScrollTestLazyViewport(firstVisibleItemScrollOffset = 13)
     }
 }
 
@@ -51,23 +76,27 @@ internal data class ScrollTestAutoScrollTiming(
     val lastStreamingSnapMs: Long,
 ) {
     companion object {
-        fun throttled(nowMs: Long = 1000L) = ScrollTestAutoScrollTiming(nowMs, nowMs - 50L)
-        fun readyToSnap(nowMs: Long = 1000L) = ScrollTestAutoScrollTiming(nowMs, nowMs - 100L)
-        fun streamingPinned(nowMs: Long = 120L) = ScrollTestAutoScrollTiming(nowMs, 0L)
-        fun streamingThrottled(nowMs: Long = 150L) = ScrollTestAutoScrollTiming(nowMs, 100L)
+        fun throttled(): ScrollTestAutoScrollTiming =
+            ScrollTestAutoScrollTiming(nowMs = 1000L, lastStreamingSnapMs = 950L)
+        fun readyToSnap(): ScrollTestAutoScrollTiming =
+            ScrollTestAutoScrollTiming(nowMs = 1000L, lastStreamingSnapMs = 900L)
+        fun streamingPinned(): ScrollTestAutoScrollTiming =
+            ScrollTestAutoScrollTiming(nowMs = 120L, lastStreamingSnapMs = 0L)
+        fun streamingThrottled(): ScrollTestAutoScrollTiming =
+            ScrollTestAutoScrollTiming(nowMs = 150L, lastStreamingSnapMs = 100L)
     }
 }
 
 internal data class ScrollTestAutoScrollCase(
     val signature: ChatAutoScrollSignature = scrollTestSignature(),
-    val isStreaming: Boolean = true,
+    val streaming: ScrollTestStreamingState = ScrollTestStreamingState.Streaming,
     val viewport: ScrollTestLazyViewport = ScrollTestLazyViewport.pinned,
     val timing: ScrollTestAutoScrollTiming = ScrollTestAutoScrollTiming.readyToSnap(),
 )
 
 internal data class ScrollTestAutoScrollInput(
     val signature: ChatAutoScrollSignature,
-    val isStreaming: Boolean,
+    val streaming: ScrollTestStreamingState,
     val viewport: ScrollTestLazyViewport,
     val timing: ScrollTestAutoScrollTiming,
 )
@@ -81,40 +110,42 @@ internal data class ScrollTestLazyIndexExpectation(
 internal data class ScrollTestGeometryMeasurement(
     val signature: ChatRenderItemGeometrySignature,
     val heightPx: Int,
-    val isStreaming: Boolean,
+    val streaming: ScrollTestStreamingState,
 )
 
 internal data class GeometryFloorAssertion(
     val signature: ChatRenderItemGeometrySignature,
-    val isStreaming: Boolean,
+    val streaming: ScrollTestStreamingState,
     val expected: Int,
 ) {
     fun verify(harness: ScrollTestGeometryHarness) {
-        assertEquals(expected, harness.floor(signature, isStreaming = isStreaming))
+        assertEquals(expected, harness.floor(signature, streaming))
     }
 }
 
-internal class ScrollTestGeometryHarness(
-    maxEntries: Int = 8,
-) {
-    val state = ChatMessageGeometryState(maxEntries = maxEntries)
+internal class ScrollTestGeometryHarness {
+    val state = ChatMessageGeometryState(maxEntries = 8)
 
     fun record(measurement: ScrollTestGeometryMeasurement) {
         state.recordMeasuredHeight(
             signature = measurement.signature,
             heightPx = measurement.heightPx,
-            isStreaming = measurement.isStreaming,
+            isStreaming = measurement.streaming.isStreaming,
         )
     }
 
-    fun floor(signature: ChatRenderItemGeometrySignature, isStreaming: Boolean): Int =
-        state.heightFloorFor(signature, isStreaming = isStreaming)
+    fun floor(
+        signature: ChatRenderItemGeometrySignature,
+        streaming: ScrollTestStreamingState,
+    ): Int = state.heightFloorFor(signature, isStreaming = streaming.isStreaming)
 }
 
-internal fun scrollTestSignature(role: String = "assistant", messageId: String = "m1"): ChatAutoScrollSignature =
+internal fun scrollTestSignature(
+    spec: ScrollTestSignatureSpec = ScrollTestSignatureSpec(),
+): ChatAutoScrollSignature =
     ChatAutoScrollSignature(
-        messageId = messageId,
-        role = ChatMessageRole(role),
+        messageId = spec.messageId,
+        role = ChatMessageRole(spec.role),
         contentLength = 0,
         contentHash = 0,
         latencyMs = null,
@@ -128,7 +159,7 @@ internal fun scrollTestAutoScrollAction(input: ScrollTestAutoScrollInput): ChatA
     autoScrollAction(
         AutoScrollActionInput(
             signature = input.signature,
-            isStreaming = input.isStreaming,
+            isStreaming = input.streaming.isStreaming,
             firstVisibleItemIndex = LazyFirstVisibleIndex(input.viewport.firstVisibleItemIndex),
             firstVisibleItemScrollOffset = LazyScrollOffsetPx(input.viewport.firstVisibleItemScrollOffset),
             lastStreamingSnapMs = StreamingSnapTimestampMs(input.timing.lastStreamingSnapMs),
@@ -140,7 +171,7 @@ internal fun scrollTestAutoScrollAction(case: ScrollTestAutoScrollCase): ChatAut
     scrollTestAutoScrollAction(
         ScrollTestAutoScrollInput(
             signature = case.signature,
-            isStreaming = case.isStreaming,
+            streaming = case.streaming,
             viewport = case.viewport,
             timing = case.timing,
         ),
@@ -176,22 +207,21 @@ internal fun assertAllLazyIndexExpectations(vararg expectations: ScrollTestLazyI
     expectations.forEach(::assertLazyIndexForRenderItem)
 }
 
-internal fun scrollTestSingle(
-    id: String,
-    ts: String = "2026-04-20T12:00:00Z",
-    content: String = id,
-): ChatRenderItem.Single = ChatRenderItem.Single(
-    message = scrollTestMessage(ScrollTestMessageSpec(id = id, ts = ts, content = content)),
-    groupPosition = GroupPosition.None,
-)
+internal fun scrollTestSingle(spec: ScrollTestMessageSpec): ChatRenderItem.Single =
+    ChatRenderItem.Single(
+        message = scrollTestMessage(spec),
+        groupPosition = GroupPosition.None,
+    )
 
-internal fun scrollTestRunBlock(
-    runId: String,
-    ts: String,
-): ChatRenderItem.RunBlock = ChatRenderItem.RunBlock(
-    runId = runId,
-    messages = listOf(scrollTestMessage(ScrollTestMessageSpec(id = "$runId-message", ts = ts)) to GroupPosition.None),
-)
+internal fun scrollTestRunBlock(spec: ScrollTestRunBlockSpec): ChatRenderItem.RunBlock =
+    ChatRenderItem.RunBlock(
+        runId = spec.runId,
+        messages = listOf(
+            scrollTestMessage(
+                ScrollTestMessageSpec(id = "${spec.runId}-message", ts = spec.ts),
+            ) to GroupPosition.None,
+        ),
+    )
 
 internal fun scrollTestMessage(spec: ScrollTestMessageSpec): UiMessage =
     UiMessage(
@@ -203,14 +233,12 @@ internal fun scrollTestMessage(spec: ScrollTestMessageSpec): UiMessage =
     )
 
 internal fun scrollTestGeometrySignature(
-    renderKey: String = "msg-assistant",
-    content: String,
-    widthPx: Int = 320,
+    spec: ScrollTestGeometrySignatureSpec,
 ): ChatRenderItemGeometrySignature =
     ChatRenderItemGeometrySignature(
         bucket = ChatMessageGeometryBucket(
-            renderKey = renderKey,
-            widthPx = widthPx,
+            renderKey = spec.renderKey,
+            widthPx = spec.widthPx,
             densityBucket = 2000,
             fontScaleBucket = 1000,
             chatFontScaleBucket = 1000,
@@ -218,8 +246,8 @@ internal fun scrollTestGeometrySignature(
             chatMode = "interactive",
             expansionHash = 17,
         ),
-        contentLength = content.length,
-        contentHash = content.hashCode(),
+        contentLength = spec.content.length,
+        contentHash = spec.content.hashCode(),
     )
 
 internal data class ScrollTestGeometryOptions(

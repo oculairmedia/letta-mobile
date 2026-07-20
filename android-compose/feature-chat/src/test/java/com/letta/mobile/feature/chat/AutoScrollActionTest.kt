@@ -33,7 +33,7 @@ class AutoScrollActionTest {
             AutoScrollExpectation(
                 ChatAutoScrollAction.Animate,
                 ScrollTestAutoScrollCase(
-                    viewport = ScrollTestLazyViewport.scrolledUpOffset(13),
+                    viewport = ScrollTestLazyViewport.scrolledUpOffset(),
                     timing = ScrollTestAutoScrollTiming.readyToSnap(),
                 ),
             ),
@@ -46,14 +46,14 @@ class AutoScrollActionTest {
             AutoScrollExpectation(
                 ChatAutoScrollAction.Animate,
                 ScrollTestAutoScrollCase(
-                    isStreaming = false,
+                    streaming = ScrollTestStreamingState.Settled,
                     timing = ScrollTestAutoScrollTiming.readyToSnap(),
                 ),
             ),
             AutoScrollExpectation(
                 ChatAutoScrollAction.Animate,
                 ScrollTestAutoScrollCase(
-                    signature = scrollTestSignature(role = "user", messageId = "m1"),
+                    signature = scrollTestSignature(ScrollTestSignatureSpec(role = "user", messageId = "m1")),
                     timing = ScrollTestAutoScrollTiming.readyToSnap(),
                 ),
             ),
@@ -95,7 +95,7 @@ class AutoScrollActionTest {
                 ChatAutoScrollAction.Animate,
                 ScrollTestAutoScrollCase(
                     signature = streamingAssistantSignature(),
-                    isStreaming = false,
+                    streaming = ScrollTestStreamingState.Settled,
                     timing = ScrollTestAutoScrollTiming.streamingThrottled(),
                 ),
             ),
