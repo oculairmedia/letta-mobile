@@ -45,20 +45,39 @@ exclude:
   - name: AndroidLintUnusedResources
     paths:
       - app/src/main/res/values/sentry.xml
-  # Hilt @Binds/@Provides, Room @Dao/@TypeConverter, and Compose @Preview entry
-  # points look "unused" to static analysis but are required by frameworks.
+  # Hilt @Binds/@Provides/@Inject, Room @Dao/@TypeConverter, Compose @Preview,
+  # serialization contracts, plugin entry points, native bridges, and endpoint
+  # interfaces look "unused" to static analysis but are required by frameworks.
   - name: UnusedSymbol
     paths:
       - app/src/main/java/com/letta/mobile/di # Hilt @Module/@Binds/@Provides wiring
       - app/src/play/java/com/letta/mobile/di # play-flavor Hilt modules (RootShellBridgeModule)
+      - app/src/main/java/com/letta/mobile/platform/storage/StorageToolModels.kt # storage tool serialization contract variants
+      - app/src/main/java/com/letta/mobile/runtime/actions/MobileActionModels.kt # action/tool model variants kept for serialization exhaustiveness
+      - app/src/main/java/com/letta/mobile/runtime/local/LettaCodeNodeBridge.kt # JNI bridge entry points called from native code
+      - app/src/main/java/com/letta/mobile/ui/screens/memory/MemoryOverviewScreen.kt # @Preview entry points outside Previews.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/runs/RunMonitorScreen.kt # @Preview entry points outside Previews.kt
+      - build-logic/src/main/kotlin/com/letta/mobile/architecture # Gradle plugin entry loaded by plugin id
+      - core/data/src/main/java/com/letta/mobile/data/api # Retrofit/Ktor endpoint interface methods
+      - core/data/src/main/java/com/letta/mobile/data/capability # Hilt @Inject capability constructors
+      - core/data/src/main/java/com/letta/mobile/data/health # Hilt @Inject health constructors
       - core/data/src/main/java/com/letta/mobile/data/local # Room @Dao query methods
+      - core/data/src/main/java/com/letta/mobile/data/repository # Hilt @Inject repository constructors
       - core/data/src/main/java/com/letta/mobile/data/session # SessionScoped Hilt factory bindings
       - core/data/src/main/java/com/letta/mobile/data/model/DomainIdConverters.kt # Room @TypeConverter
+      - core/domain/src/main/java/com/letta/mobile/data/repository/api # domain API interface methods
+      - core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/TurnContracts.kt # sealed runtime contract variants
+      - core/testutil/src/main # test doubles and helper entry points
       - designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt # @Preview composables
       - desktop/src/main/kotlin/com/letta/mobile/desktop # @Composable surfaces wired from LettaDesktopApp/Main
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatUiStateProvider.kt
       - app/src/main/java/com/letta/mobile/ui/screens/agentlist/AgentListUiStateProvider.kt
+      - sharedLogic/src/androidMain/kotlin/com/letta/mobile/data/timeline # KMP actual logger implementation
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/Approval.kt # serialization models
+      - sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/CronTask.kt # status constants used via serialization/API
+      - sharedLogic/src/hostNativeMain/kotlin/com/letta/mobile/data/timeline # KMP actual logger implementation
+      - sharedLogic/src/jvmMain/kotlin/com/letta/mobile/data/timeline # KMP actual logger implementation
   # Adaptive icons must stay in mipmap-anydpi-v26 (API 26+). Renaming to
   # mipmap-anydpi to silence ObsoleteSdkInt breaks AAPT linking for play builds.
   - name: AndroidLintObsoleteSdkInt
