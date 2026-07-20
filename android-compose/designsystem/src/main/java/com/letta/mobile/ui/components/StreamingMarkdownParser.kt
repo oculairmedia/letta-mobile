@@ -726,7 +726,7 @@ internal fun splitMarkdownBlocks(prefix: String): List<MarkdownBlock> {
     // mirror that here: if there's a complete table run still active
     // AND there's content past the last \n that doesn't have pipes,
     // emit the table as its own block before the EOF emit.
-    if (lineStart > blockStart && lineStart < n) {
+    if (lineStart in (blockStart + 1) until n) {
         // There's content past the last \n — check if it's pipe-free.
         var hasPipeInTail = false
         for (j in lineStart until n) {

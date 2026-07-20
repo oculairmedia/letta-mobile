@@ -46,8 +46,7 @@ import com.letta.mobile.ui.theme.chatDimens
 
 internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
     val toolCall = toolCalls?.singleOrNull()
-    if (toolCall == null) {
-        return if (role == "tool") {
+        ?: return if (role == "tool") {
             if (content.isNotBlank()) {
                 "Tool output"
             } else {
@@ -56,7 +55,6 @@ internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
         } else {
             defaultLabel
         }
-    }
     return toolCall.name
 }
 

@@ -50,7 +50,7 @@ private fun repairOpenA2uiJsonTag(text: String): String? {
     val closeTagIndex = text.indexOf("</a2ui-json>", startIndex = openTagIndex, ignoreCase = true)
     if (closeTagIndex >= 0) return null
 
-    return text + "</a2ui-json>"
+    return "$text</a2ui-json>"
 }
 
 private fun hasOpenCodeFence(text: String): Boolean {
@@ -172,7 +172,7 @@ private fun repairOpenInlineMath(text: String): String? {
 
     val body = line.substring(opener + 1)
     if (!isLikelyInlineMathBody(body)) return null
-    return text + "$"
+    return "$text${'$'}"
 }
 
 private fun findUnclosedInlineMathOpener(line: String): Int {

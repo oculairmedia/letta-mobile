@@ -714,7 +714,7 @@ class ChannelTransport internal constructor(
         while (true) {
             val queuedFrame = synchronized(pendingA2uiActionLock) {
                 val pending = conversationStateManager.existingPendingA2uiActions(conversationId)
-                if (pending == null || pending.isEmpty()) null else pending.removeFirst()
+                if (pending.isNullOrEmpty()) null else pending.removeFirst()
             } ?: return
             val frame = queuedFrame.withActiveRoutingFallback(conversationId)
             if (frame.runId == null) {

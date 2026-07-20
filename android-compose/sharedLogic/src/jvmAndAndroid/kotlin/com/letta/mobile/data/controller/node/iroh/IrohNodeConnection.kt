@@ -282,9 +282,7 @@ class IrohNodeConnection(
     /** Control-channel sync frame — kept out of [handleControlFrame] for complexity. */
     private suspend fun handleControlSync(obj: JsonObject): String {
         val requestId = obj["request_id"]?.jsonPrimitive?.content
-        if (requestId == null) {
-            return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
-        }
+            ?: return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
         return try {
             val agentId = obj["agent_id"]?.jsonPrimitive?.content
             val conversationId = obj["conversation_id"]?.jsonPrimitive?.content

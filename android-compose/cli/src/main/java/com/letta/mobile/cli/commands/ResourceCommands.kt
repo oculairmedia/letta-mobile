@@ -28,6 +28,7 @@ import io.ktor.http.Headers
 import io.ktor.http.HttpHeaders
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -145,12 +146,12 @@ private class AgentImportCommand : AdminShimCommand(
     private val allowError by option("--allow-error").flag(default = false)
 
     override fun run() = runBlocking {
-        val filePath = Path.of(file)
+        val filePath = Paths.get(file)
         val bytes = Files.readAllBytes(filePath)
         val uploadName = fileName ?: filePath.fileName.toString()
         val client = cliHttpClient()
-        client.use {
-            val response = it.submitFormWithBinaryData(
+        client.use { http ->
+            val response = http.submitFormWithBinaryData(
                 url = buildRestUrl(baseUrl, "/v1/agents/import", emptyList()),
                 formData = formData {
                     append("file", bytes, Headers.build {
@@ -195,7 +196,7 @@ private class FolderUploadCommand : AdminShimCommand(
     private val allowError by option("--allow-error").flag(default = false)
 
     override fun run() = runBlocking {
-        val filePath = Path.of(file)
+        val filePath = Paths.get(file)
         val bytes = Files.readAllBytes(filePath)
         val uploadName = fileName ?: filePath.fileName.toString()
         val query = listOfNotNull(

@@ -266,7 +266,7 @@ internal class OpenToolCallTracker {
         when (DanglingToolCallSynthesizer.messageType(delta)) {
             "tool_call_message",
             "approval_request_message" -> open += DanglingToolCallSynthesizer.toolCallIds(delta)
-            "tool_return_message" -> open -= DanglingToolCallSynthesizer.toolReturnCallIds(delta)
+            "tool_return_message" -> open -= DanglingToolCallSynthesizer.toolReturnCallIds(delta).toSet()
             else -> Unit
         }
     }

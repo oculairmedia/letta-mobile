@@ -87,9 +87,8 @@ internal object MessageRepositoryFetch {
     ): List<AppMessage> {
         if (beforeMessageId.isBlank()) return emptyList()
 
-        val iroh = irohTimelineTransport
-        if (iroh?.shouldUseIroh() == true) {
-            return iroh.listOlderConversationMessages(
+        if (irohTimelineTransport?.shouldUseIroh() == true) {
+            return irohTimelineTransport.listOlderConversationMessages(
                 conversationId = conversationId.value,
                 beforeMessageId = beforeMessageId,
                 limit = olderMessagesPageSize,

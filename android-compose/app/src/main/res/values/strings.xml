@@ -271,8 +271,6 @@
     <string name="screen_agents_dialog_delete_title">Delete Agent</string>
     <string name="screen_agents_dialog_delete_confirm">Are you sure you want to delete %1$s?</string>
     <string name="screen_agents_dialog_create_title">Create Agent</string>
-    <string name="screen_tools_dialog_remove_title">Remove Tool</string>
-    <string name="screen_tools_dialog_remove_confirm">Remove %1$s from this agent?</string>
     <string name="action_remove">Remove</string>
     <string name="action_more">More</string>
     <string name="action_attach">Attach</string>
@@ -1036,7 +1034,6 @@
     <string name="screen_about_clear_data_confirm">Clear Data</string>
     <string name="action_copy">Copy</string>
     <string name="action_copied">Copied to clipboard</string>
-    <string name="action_regenerate">Regenerate</string>
     <string name="screen_models_no_models">No models available</string>
     <string name="screen_models_tab_llm">LLM Models</string>
     <string name="screen_models_tab_embedding">Embedding Models</string>

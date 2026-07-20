@@ -19,10 +19,10 @@ internal class LegacyProbeScenarios(
         if (scenarioSet.skipsLegacyProbeTurns()) return emptyList()
 
         val turns = mutableListOf<IrohProbeTurnMetrics>()
-        if ("idle-send" in scenarioSet) {
-            turns += runIdleSend(target, scenarioSet)
+        turns += if ("idle-send" in scenarioSet) {
+            runIdleSend(target, scenarioSet)
         } else {
-            turns += runDefaultTurns(target, scenarioSet)
+            runDefaultTurns(target, scenarioSet)
         }
         if (scenarioSet.includesPostIdleRestart()) {
             turns += runPostIdleRestart(target, turns.size + 1)

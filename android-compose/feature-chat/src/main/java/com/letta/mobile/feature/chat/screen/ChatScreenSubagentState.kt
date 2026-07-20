@@ -28,7 +28,7 @@ internal fun rememberChatScreenSubagentBarState(
     currentConversationId: String?,
 ): ChatScreenSubagentBarState {
     val subagentSnapshot by resolvedSubagentSource.activeSubagents
-        .collectAsStateWithLifecycle(initialValue = persistentListOf<ActiveSubagent>())
+        .collectAsStateWithLifecycle(initialValue = persistentListOf())
     var lingerTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(subagentSnapshot) {
         while (subagentSnapshot.any { it.isTerminal || it.isActive }) {

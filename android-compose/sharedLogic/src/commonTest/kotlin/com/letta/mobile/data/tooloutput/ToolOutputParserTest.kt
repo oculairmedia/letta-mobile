@@ -183,7 +183,7 @@ class ToolOutputParserTest {
 
     @Test
     fun `marks large output as truncated for structured analysis`() {
-        val raw = "x".repeat(ToolOutputParser.MaxAnalyzedChars + 10)
+        val raw = "x".repeat(ToolOutputParser.MAX_ANALYZED_CHARS + 10)
         val document = ToolOutputParser.parse(raw)
 
         assertTrue(document.isTruncated)

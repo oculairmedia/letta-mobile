@@ -83,7 +83,7 @@ class ColorHarmonizer @Inject constructor() {
         // Apply target tone if specified
         return if (targetTone != null) {
             val selectedHct = Hct.fromInt(selectedColor)
-            selectedHct.setTone(targetTone.toDouble())
+            selectedHct.tone = targetTone.toDouble()
             selectedHct.toInt()
         } else {
             selectedColor

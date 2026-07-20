@@ -320,13 +320,17 @@ internal data class TimeRowParams(
 @Composable
 internal fun TimeRow(params: TimeRowParams) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        IconBtn(Icons.Outlined.ChevronLeft, "−", { params.onChange((params.value - 1).coerceAtLeast(params.range.first)) })
+        IconBtn(Icons.Outlined.ChevronLeft, "−") {
+            params.onChange((params.value - 1).coerceAtLeast(params.range.first))
+        }
         Text(
             ScheduleFormat.pad2(params.value),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        IconBtn(Icons.Outlined.ChevronRight, "+", { params.onChange((params.value + 1).coerceAtMost(params.range.last)) })
+        IconBtn(Icons.Outlined.ChevronRight, "+") {
+            params.onChange((params.value + 1).coerceAtMost(params.range.last))
+        }
     }
 }
 

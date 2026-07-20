@@ -230,11 +230,13 @@ class IncrementalChatRenderItemsCache {
         var reusedAny = false
         val reconciled = rebuilt.map { item ->
             val prior = previousByKey[item.key]
-            if (prior != null && prior !== item && prior == item) {
-                reusedAny = true
-                prior
-            } else {
-                item
+            when {
+                prior === item -> item
+                prior == item -> {
+                    reusedAny = true
+                    prior
+                }
+                else -> item
             }
         }
         return if (reusedAny) reconciled else rebuilt

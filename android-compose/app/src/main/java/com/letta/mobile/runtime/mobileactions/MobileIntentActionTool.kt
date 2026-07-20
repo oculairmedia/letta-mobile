@@ -223,8 +223,7 @@ private fun Intent.toMapping(): IntentMapping = IntentMapping(
     type = type,
     flags = flags,
     extras = extras?.keySet()?.sorted()?.associateWith { key ->
-        val value = extras?.get(key)
-        when (value) {
+        when (val value = extras?.get(key)) {
             is Array<*> -> value.filterIsInstance<String>().joinToString(",")
             else -> value?.toString().orEmpty()
         }

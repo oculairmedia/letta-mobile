@@ -31,8 +31,7 @@ data class A2uiSurfaceState(
     val components: Map<String, A2uiComponent> = emptyMap(),
     val dataModel: A2uiDataModel = A2uiDataModel(),
     val dataModelRevision: Long = 0L,
-) {
-}
+)
 
 class A2uiSurfaceManager(
     initialSurfaces: Map<String, A2uiSurfaceState> = emptyMap(),

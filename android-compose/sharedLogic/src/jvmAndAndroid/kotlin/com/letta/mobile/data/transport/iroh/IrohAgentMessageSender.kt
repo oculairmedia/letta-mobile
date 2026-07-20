@@ -37,8 +37,7 @@ class IrohAgentMessageSender(
     ) : this({ endpoint }, resolver, connectTimeoutMs, ackTimeoutMs)
 
     suspend fun send(message: IrohAgentMessage): AgentSendResult {
-        val resolution = resolver.resolve(message.toAgentId)
-        val address = when (resolution) {
+        val address = when (val resolution = resolver.resolve(message.toAgentId)) {
             is AddressResolution.Found -> resolution.address
             is AddressResolution.Unavailable ->
                 return AgentSendResult.Unaddressable(message.toAgentId, resolution.reason)

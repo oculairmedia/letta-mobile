@@ -3,9 +3,11 @@ package com.letta.mobile.cli.runtime
 import com.letta.mobile.data.timeline.headless.HeadlessTimelineReplaySession
 import com.letta.mobile.data.timeline.headless.TimelineAssertionOptions
 import java.io.BufferedReader
+import java.io.Closeable
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
@@ -26,16 +28,14 @@ internal class ReplayInteractiveShell(
     suspend fun run() {
         resetReader()
         println("[replay] interactive session started; type help for commands")
-        try {
+        readerSession().use {
             while (true) {
                 print("replay> ")
-                val line = readLine() ?: break
+                val line = readlnOrNull() ?: break
                 val trimmed = line.trim()
                 if (trimmed.isEmpty()) continue
                 if (!handle(trimmed)) break
             }
-        } finally {
-            reader?.close()
         }
     }
 
@@ -82,8 +82,7 @@ internal class ReplayInteractiveShell(
 
     private suspend fun ingest(line: String, synthetic: Boolean) {
         previousTimelineJson = currentTimelineJson
-        val step = session.ingestLine(line, captureTimeline = true)
-        if (step == null) return
+        val step = session.ingestLine(line, captureTimeline = true) ?: return
         fixtureLines += line.trim()
         currentTimelineJson = step.snapshot?.timeline?.let { prettyJson.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), it) }
         val source = if (synthetic) "synthetic" else "frame"
@@ -111,7 +110,7 @@ internal class ReplayInteractiveShell(
             println("[replay] save-fixture requires a path")
             return
         }
-        val path = Path.of(pathArg)
+        val path = Paths.get(pathArg)
         path.parent?.let { Files.createDirectories(it) }
         Files.write(path, fixtureLines, StandardCharsets.UTF_8)
         println("[replay] saved ${fixtureLines.size} frames to $path")
@@ -128,8 +127,14 @@ internal class ReplayInteractiveShell(
     }
 
     private fun resetReader() {
+        reader?.close()
         reader = Files.newBufferedReader(recording)
         iterator = reader!!.lineSequence().iterator()
+    }
+
+    private fun readerSession(): Closeable = Closeable {
+        reader?.close()
+        reader = null
     }
 
     private fun nextNonBlankLine(): String? {

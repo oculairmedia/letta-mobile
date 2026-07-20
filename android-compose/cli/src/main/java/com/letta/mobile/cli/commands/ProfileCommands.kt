@@ -14,6 +14,7 @@ import com.letta.mobile.cli.runtime.CliProfilePrefs
 import com.letta.mobile.cli.runtime.CliProfileStore
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlinx.serialization.json.Json
 
 internal class ProfileCommand : CliktCommand(
@@ -121,7 +122,7 @@ internal class ProfileExportCommand : CliktCommand(name = "export") {
         if (out == null) {
             println(json)
         } else {
-            val path = Path.of(out)
+            val path = Paths.get(out)
             path.parent?.let { Files.createDirectories(it) }
             Files.write(path, json.toByteArray(Charsets.UTF_8))
             println(jsonStatus("exported", path.toString()))
@@ -134,7 +135,7 @@ internal class ProfileImportCommand : CliktCommand(name = "import") {
 
     override fun run() {
         val document = CliJson.decodeFromString<CliProfileDocument>(
-            String(Files.readAllBytes(Path.of(file)), Charsets.UTF_8)
+            String(Files.readAllBytes(Paths.get(file)), Charsets.UTF_8)
         )
         val normalized = CliProfileStore.default().replace(document)
         println(profileJson(normalized.redacted(unless = false)))

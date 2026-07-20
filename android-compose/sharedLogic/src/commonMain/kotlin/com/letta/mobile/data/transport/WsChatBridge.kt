@@ -11,7 +11,6 @@ import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -69,15 +68,14 @@ class WsChatBridge(
         // ViewModel can show a banner / re-enable retry without
         // having to re-implement a state-collector.
         transport.state
-            .filter { it is ChannelTransportState.Disconnected }
+            .filterIsInstance<ChannelTransportState.Disconnected>()
             .map { state ->
-                val d = state as ChannelTransportState.Disconnected
                 WsTimelineEvent.Disconnected(
-                    code = d.code,
-                    reason = d.reason,
-                    isAuthFailure = d.isAuthFailure,
-                    willReconnect = d.willReconnect,
-                    reconnectAttempt = d.reconnectAttempt,
+                    code = state.code,
+                    reason = state.reason,
+                    isAuthFailure = state.isAuthFailure,
+                    willReconnect = state.willReconnect,
+                    reconnectAttempt = state.reconnectAttempt,
                 )
             },
     )

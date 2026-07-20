@@ -127,12 +127,11 @@ internal suspend fun runStreamSubscriber(
                                 // messages.
                                 val runId = message.runId
                                 if (runId != null && seenRunIds.markSeen(runId)) {
-                                    val capturedRunId = runId
-                                    runCatching { reconcileForExternalRun(capturedRunId) }.onFailure { t ->
+                                    runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
                                         Telemetry.error(
                                             "TimelineSync", "externalRunReconcile.failed", t,
                                             "conversationId" to conversationId,
-                                            "runId" to capturedRunId,
+                                            "runId" to runId,
                                         )
                                     }
                                 }
