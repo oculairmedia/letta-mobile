@@ -18,8 +18,8 @@ ignored_paths:
   - "android-compose/.gradle/**"
   - "android-compose/**/build/**"
   - ".local/**"
-read_only: false
+read_only: true
 excluded_tools: []
 included_optional_tools: []
-initial_prompt: "Use Serena for symbol-level navigation in the JVM and shared Kotlin modules. Treat generated SCIP data as advisory only."
+initial_prompt: "Use Serena read-only for symbol-level navigation in the JVM and shared Kotlin modules. Treat generated SCIP data as advisory only."
 symbol_info_budget: 10

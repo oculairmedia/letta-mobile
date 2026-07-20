@@ -67,7 +67,18 @@ class ArchitectureGraphPlugin : Plugin<Project> {
                     add(JsonLine.record("target", "module" to project.path, "name" to target.name, "platform" to target.platformType.name))
                 }
                 kotlin.sourceSets.sortedBy { it.name }.forEach { sourceSet ->
-                    add(JsonLine.record("sourceSet", "module" to project.path, "name" to sourceSet.name))
+                    val sourceDirectories = sourceSet.kotlin.sourceDirectories.files
+                        .map { directory -> directory.relativeTo(root.projectDir).invariantSeparatorsPath }
+                        .sorted()
+                        .joinToString(",")
+                    add(
+                        JsonLine.record(
+                            "sourceSet",
+                            "module" to project.path,
+                            "name" to sourceSet.name,
+                            "paths" to sourceDirectories,
+                        ),
+                    )
                     sourceSet.dependsOn.sortedBy { it.name }.forEach { parent ->
                         add(
                             JsonLine.record(

@@ -8,6 +8,9 @@ LOCAL_ROOT="${LETTA_TOOL_CACHE_ROOT:-$REPO_ROOT/.local}"
 
 # shellcheck disable=SC1090
 source "$ENV_FILE"
+[[ "$LOCAL_ROOT" == /* ]] || { printf 'scip-java: cache root must be absolute\n' >&2; exit 64; }
+mkdir -p -- "$LOCAL_ROOT"
+LOCAL_ROOT="$(CDPATH= cd -- "$LOCAL_ROOT" && pwd -P)"
 SCIP_ROOT="$LOCAL_ROOT/scip-java"
 BIN="$SCIP_ROOT/bin/scip-java-v$SCIP_JAVA_VERSION"
 INDEX="$SCIP_ROOT/out/index.scip"

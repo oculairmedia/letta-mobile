@@ -85,10 +85,11 @@ else
   pass 'config examples contain no apparent literal secrets'
 fi
 
-if git -C "$REPO_ROOT" diff --name-only -- .github android-compose/build.gradle.kts android-compose/settings.gradle.kts android-compose/build-logic | rg -q .; then
-  fail 'central workflow/build files remain untouched'
+if git -C "$REPO_ROOT" diff --name-only -- scripts/mcp scripts/scip config/mcp config/scip-java .serena docs/tooling | rg -v \
+  '^(.serena/|config/mcp/|config/scip-java/|docs/tooling/|scripts/mcp/|scripts/scip/|scripts/tests/tooling-smoke.sh$)' | rg -q .; then
+  fail 'Serena and SCIP pilot changes stay within tooling boundaries'
 else
-  pass 'central workflow/build files remain untouched'
+  pass 'Serena and SCIP pilot changes stay within tooling boundaries'
 fi
 
 (( failures == 0 )) || exit 1

@@ -6,6 +6,8 @@ on:
     paths:
       - ".github/workflows/architecture-graph.yml"
       - "android-compose/**/*.gradle.kts"
+      - "android-compose/**/*.kt"
+      - "android-compose/**/*.java"
       - "android-compose/gradle/**"
       - "android-compose/build-logic/**"
       - "android-compose/architecture-tests/**"
@@ -21,6 +23,8 @@ on:
     paths:
       - ".github/workflows/architecture-graph.yml"
       - "android-compose/**/*.gradle.kts"
+      - "android-compose/**/*.kt"
+      - "android-compose/**/*.java"
       - "android-compose/gradle/**"
       - "android-compose/build-logic/**"
       - "android-compose/architecture-tests/**"

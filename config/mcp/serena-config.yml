@@ -16,7 +16,6 @@ excluded_tools: []
 included_optional_tools: []
 base_modes:
   - interactive
-  - editing
 default_max_tool_answer_chars: 50000
 token_count_estimator: CHAR_COUNT
 symbol_info_budget: 10

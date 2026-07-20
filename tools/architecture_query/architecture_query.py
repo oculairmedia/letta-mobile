@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 SCHEMA_VERSION = 1
+MCP_PROTOCOL_VERSION = "2024-11-05"
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 CONTRACT_FILES = (
@@ -188,7 +189,7 @@ def import_contract(contract_value: str, db_value: str) -> dict[str, Any]:
             source_set = str(_first(record, SOURCE_SET_KEYS, required=True))
             raw_paths = _first(record, ("paths", "source_dirs", "sourceDirs", "directories")) or []
             if isinstance(raw_paths, str):
-                raw_paths = [raw_paths]
+                raw_paths = [path for path in raw_paths.split(",") if path]
             conn.execute("INSERT INTO source_sets VALUES (?, ?, ?, ?)",
                          (module, source_set, _compact(sorted(set(map(str, raw_paths)))), _compact(record)))
         for record in data["variants.jsonl"]:
@@ -411,9 +412,11 @@ def serve_mcp(db_value: str) -> int:
             request: Any = None
             try:
                 request = json.loads(line)
+                if not isinstance(request, dict):
+                    raise TypeError("request must be a JSON object")
                 method = request.get("method")
                 if method == "initialize":
-                    result = {"protocolVersion": request.get("params", {}).get("protocolVersion", "2024-11-05"),
+                    result = {"protocolVersion": MCP_PROTOCOL_VERSION,
                               "capabilities": {"tools": {}},
                               "serverInfo": {"name": "architecture-query", "version": "1.0"}}
                 elif method == "notifications/initialized":
@@ -427,9 +430,21 @@ def serve_mcp(db_value: str) -> int:
                     value = call_tool(query, params.get("name", ""), params.get("arguments", {}))
                     result = {"content": [{"type": "text", "text": _compact(value)}], "structuredContent": value}
                 else:
-                    raise ValueError(f"unsupported method: {method}")
-                response = {"jsonrpc": "2.0", "id": request.get("id"), "result": result}
+                    response = {"jsonrpc": "2.0", "id": request.get("id"),
+                                "error": {"code": -32601, "message": f"unsupported method: {method}"}}
+                    if "id" not in request:
+                        continue
+                    sys.stdout.write(_compact(response) + "\n")
+                    sys.stdout.flush()
+                    continue
+                if "id" not in request:
+                    continue
+                response = {"jsonrpc": "2.0", "id": request["id"], "result": result}
+            except json.JSONDecodeError as exc:
+                response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": str(exc)}}
             except Exception as exc:
+                if isinstance(request, dict) and "id" not in request:
+                    continue
                 response = {"jsonrpc": "2.0", "id": request.get("id") if isinstance(request, dict) else None,
                             "error": {"code": -32602, "message": str(exc)}}
             sys.stdout.write(_compact(response) + "\n")

@@ -11,6 +11,12 @@ if [[ "$LOCAL_ROOT" != /* ]]; then
   printf 'serena: LETTA_TOOL_CACHE_ROOT must be an absolute path\n' >&2
   exit 64
 fi
+mkdir -p -- "$LOCAL_ROOT"
+LOCAL_ROOT="$(CDPATH= cd -- "$LOCAL_ROOT" && pwd -P)"
+case "$LOCAL_ROOT" in
+  "$REPO_ROOT/.local"|"$REPO_ROOT/.local/"* ) ;;
+  *) printf 'serena: cache root must remain under %s/.local\n' "$REPO_ROOT" >&2; exit 64 ;;
+esac
 
 # shellcheck disable=SC1090
 source "$ENV_FILE"
