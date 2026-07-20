@@ -491,6 +491,27 @@ def tool_definitions() -> list[dict[str, Any]]:
             for name, spec in TOOLS.items()]
 
 
+def _tool_dispatchers(query: ArchitectureQuery) -> dict[str, Any]:
+    """Bind tool names to small argument adapters for one query connection."""
+    return {
+        "get_module": lambda args: query.get_module(args["module"]),
+        "module_deps": lambda args: query.module_deps(
+            args["module"], transitive=args.get("transitive", False), limit=args.get("limit"),
+        ),
+        "module_reverse_deps": lambda args: query.module_deps(
+            args["module"], reverse=True, transitive=args.get("transitive", False), limit=args.get("limit"),
+        ),
+        "source_set_owners": lambda args: query.source_set_owners(args["path"], limit=args.get("limit")),
+        "change_impact": lambda args: query.change_impact(
+            args["paths"], transitive=args.get("transitive", True), limit=args.get("limit"),
+        ),
+        "architecture_violations": lambda args: query.architecture_violations(limit=args.get("limit")),
+        "lookup": lambda args: query.lookup(
+            args["query"], kind=args.get("kind", "text"), limit=args.get("limit"),
+        ),
+    }
+
+
 def call_tool(query: ArchitectureQuery, name: str, args: dict[str, Any]) -> dict[str, Any]:
     """Validate and dispatch an MCP or CLI tool call."""
     if name not in TOOLS:
@@ -500,20 +521,7 @@ def call_tool(query: ArchitectureQuery, name: str, args: dict[str, Any]) -> dict
     missing = [key for key in TOOLS[name]["required"] if key not in args]
     if missing:
         raise ValueError(f"missing required tool argument(s): {', '.join(missing)}")
-    if name == "get_module":
-        return query.get_module(args["module"])
-    if name in ("module_deps", "module_reverse_deps"):
-        return query.module_deps(args["module"], reverse=name == "module_reverse_deps",
-                                 transitive=args.get("transitive", False), limit=args.get("limit"))
-    if name == "source_set_owners":
-        return query.source_set_owners(args["path"], limit=args.get("limit"))
-    if name == "change_impact":
-        return query.change_impact(args["paths"], transitive=args.get("transitive", True), limit=args.get("limit"))
-    if name == "architecture_violations":
-        return query.architecture_violations(limit=args.get("limit"))
-    if name == "lookup":
-        return query.lookup(args["query"], kind=args.get("kind", "text"), limit=args.get("limit"))
-    raise AssertionError(f"tool has no dispatcher: {name}")
+    return _tool_dispatchers(query)[name](args)
 
 
 def _mcp_result(query: ArchitectureQuery, request: dict[str, Any]) -> dict[str, Any]:
