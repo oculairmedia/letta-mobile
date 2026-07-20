@@ -482,7 +482,13 @@ class IrohNodeConnection(
                 "remoteEndpointId" to remoteEndpointId,
                 "peerCapabilities" to advertised.sorted().joinToString(","),
             )
-            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}","${IrohChannelTransport.SUBAGENT_RPC_CAPABILITY}"]}"""
+            val capabilities = advertisedCapabilities(adminRpcRouter)
+            buildJsonObject {
+                put("type", "auth_response")
+                put("request_id", requestId)
+                put("success", true)
+                put("capabilities", Json.encodeToJsonElement(capabilities))
+            }.toString()
         } else {
             val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
             Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)
@@ -807,6 +813,14 @@ class IrohNodeConnection(
     }
 
     companion object {
+        private val SUBAGENT_RPC_METHODS = setOf("subagent.list", "subagent.todos")
+
+        internal fun advertisedCapabilities(router: AdminRpcRouter): List<String> = buildList {
+            add(IrohFrameCodec.FRAME_PART_CAPABILITY)
+            if (SUBAGENT_RPC_METHODS.all { it in router.registeredMethods }) {
+                add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
+            }
+        }
         const val MAX_FRAME_BYTES = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES
         // Raised 5s -> 60s (P3): a heavy final turn (large tool_return, long
         // stop_reason flush) can legitimately still be draining when the control

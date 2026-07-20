@@ -4,7 +4,10 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
@@ -37,6 +40,12 @@ import kotlin.system.exitProcess
  * [iroh-app-server] Listening on Iroh... (Ctrl+C to stop)
  * ```
  */
+internal fun buildProductionAdminRouter(
+    adminBaseUrl: String,
+    controller: DefaultAppServerController,
+    subagentRegistrySource: SubagentRegistrySource?,
+): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource)
+
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
 ) {
@@ -134,9 +143,15 @@ internal class AppServerServeIrohCommand : CliktCommand(
             // to this host (Iroh purity: letta-mobile-qfa81). The handlers
             // proxy to the server-local HTTP API; only this process dials it.
             val rpcBase = adminBaseUrl.trimEnd('/')
-            val adminRpcRouter = com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry.buildRouter(rpcBase, controller)
+            val subagentRegistrySource =
+                com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
+            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
-            println("[iroh-app-server] admin_rpc handlers registered (proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount})")
+            println(
+                "[iroh-app-server] admin_rpc handlers registered " +
+                    "(proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount}, " +
+                    "subagent_registry_v1: ${subagentRegistrySource != null})",
+            )
 
             // Start accepting connections
             irohEndpoint.start(controller)
