@@ -39,6 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.components.CardGroup
+import com.letta.mobile.ui.components.CardGroupScope
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaCodeFont
@@ -76,9 +77,23 @@ internal fun EditAgentContentList(params: EditAgentContentListParams) {
     ) {
         editAgentHeaderItem(params)
         editAgentBasicsSection(params)
-        editAgentModelsSection(params)
+        editAgentStickyItems(
+            headerKey = SectionAnchors.MODELS,
+            titleRes = R.string.screen_agent_edit_section_models,
+            items = listOf(
+                "model" to { EditAgentModelPickerCard(params) },
+                "llm_config" to { EditAgentLlmConfigCard(params) },
+            ),
+        )
         editAgentAdvancedSection(params)
-        editAgentMemorySection(params)
+        editAgentStickyItems(
+            headerKey = SectionAnchors.MEMORY,
+            titleRes = R.string.screen_agent_edit_section_memory,
+            items = listOf(
+                "advanced_compaction" to { EditAgentCompactionCard(params) },
+                "memory_blocks" to { EditAgentMemoryBlocksCard(params) },
+            ),
+        )
         editAgentToolsSection(params)
         editAgentRuntimeAndDangerSection(params)
     }
@@ -268,15 +283,16 @@ private fun EditAgentTagsCard(
 }
 
 @OptIn(ExperimentalFoundationApi::class)
-private fun LazyListScope.editAgentModelsSection(params: EditAgentContentListParams) {
-    stickyHeader(key = SectionAnchors.MODELS) {
-        EditAgentSectionHeader(stringResource(R.string.screen_agent_edit_section_models))
+private fun LazyListScope.editAgentStickyItems(
+    headerKey: String,
+    titleRes: Int,
+    items: List<Pair<String, @Composable () -> Unit>>,
+) {
+    stickyHeader(key = headerKey) {
+        EditAgentSectionHeader(stringResource(titleRes))
     }
-    item(key = "model") {
-        EditAgentModelPickerCard(params)
-    }
-    item(key = "llm_config") {
-        EditAgentLlmConfigCard(params)
+    items.forEach { (itemKey, content) ->
+        item(key = itemKey) { content() }
     }
 }
 
@@ -318,76 +334,90 @@ private fun EditAgentModelPickerCard(params: EditAgentContentListParams) {
 
 @Composable
 private fun EditAgentLlmConfigCard(params: EditAgentContentListParams) {
+    CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_llm_configuration)) }) {
+        addLlmProviderAndSamplingItems(params)
+        addLlmLimitAndToggleItems(params)
+    }
+}
+
+private fun CardGroupScope.addLlmProviderAndSamplingItems(
+    params: EditAgentContentListParams,
+) {
     val state = params.state
     val callbacks = params.callbacks
-    CardGroup(title = { Text(stringResource(R.string.screen_agent_edit_llm_configuration)) }) {
-        item(
-            headlineContent = {
-                OutlinedTextField(
-                    value = state.providerType,
-                    onValueChange = callbacks.onProviderTypeChange,
-                    label = { Text(stringResource(R.string.screen_agent_edit_provider_type)) },
-                    placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+    item(
+        headlineContent = {
+            OutlinedTextField(
+                value = state.providerType,
+                onValueChange = callbacks.onProviderTypeChange,
+                label = { Text(stringResource(R.string.screen_agent_edit_provider_type)) },
+                placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        },
+    )
+    item(
+        headlineContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    stringResource(R.string.screen_agent_edit_temperature_value, state.temperature),
+                    style = MaterialTheme.typography.bodyMedium,
                 )
-            },
-        )
-        item(
-            headlineContent = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        stringResource(R.string.screen_agent_edit_temperature_value, state.temperature),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Slider(
-                        value = state.temperature,
-                        onValueChange = callbacks.onTemperatureChange,
-                        valueRange = 0f..2f,
-                        steps = 39,
-                    )
-                }
-            },
-        )
-        item(
-            headlineContent = {
-                ContextWindowLimitSlider(
-                    value = state.contextWindow,
-                    maxValue = params.selection.maxContextWindow,
-                    onValueChange = callbacks.onContextWindowChange,
+                Slider(
+                    value = state.temperature,
+                    onValueChange = callbacks.onTemperatureChange,
+                    valueRange = 0f..2f,
+                    steps = 39,
                 )
-            },
-        )
-        item(
-            headlineContent = { Text(stringResource(R.string.common_parallel_tool_calls)) },
-            trailingContent = {
-                Switch(
-                    checked = state.parallelToolCalls,
-                    onCheckedChange = callbacks.onParallelToolCallsChange,
-                )
-            },
-        )
-        item(
-            headlineContent = {
-                OutlinedTextField(
-                    value = state.maxOutputTokens.toString(),
-                    onValueChange = { it.toIntOrNull()?.let(callbacks.onMaxOutputTokensChange) },
-                    label = { Text(stringResource(R.string.common_max_output_tokens)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                )
-            },
-        )
-        item(
-            headlineContent = { Text(stringResource(R.string.common_enable_sleeptime)) },
-            trailingContent = {
-                Switch(
-                    checked = state.enableSleeptime,
-                    onCheckedChange = callbacks.onEnableSleeptimeChange,
-                )
-            },
-        )
-    }
+            }
+        },
+    )
+    item(
+        headlineContent = {
+            ContextWindowLimitSlider(
+                value = state.contextWindow,
+                maxValue = params.selection.maxContextWindow,
+                onValueChange = callbacks.onContextWindowChange,
+            )
+        },
+    )
+}
+
+private fun CardGroupScope.addLlmLimitAndToggleItems(
+    params: EditAgentContentListParams,
+) {
+    val state = params.state
+    val callbacks = params.callbacks
+    item(
+        headlineContent = { Text(stringResource(R.string.common_parallel_tool_calls)) },
+        trailingContent = {
+            Switch(
+                checked = state.parallelToolCalls,
+                onCheckedChange = callbacks.onParallelToolCallsChange,
+            )
+        },
+    )
+    item(
+        headlineContent = {
+            OutlinedTextField(
+                value = state.maxOutputTokens.toString(),
+                onValueChange = { it.toIntOrNull()?.let(callbacks.onMaxOutputTokensChange) },
+                label = { Text(stringResource(R.string.common_max_output_tokens)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+            )
+        },
+    )
+    item(
+        headlineContent = { Text(stringResource(R.string.common_enable_sleeptime)) },
+        trailingContent = {
+            Switch(
+                checked = state.enableSleeptime,
+                onCheckedChange = callbacks.onEnableSleeptimeChange,
+            )
+        },
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -414,19 +444,6 @@ private fun LazyListScope.editAgentAdvancedSection(params: EditAgentContentListP
             onModelToolCallParserChange = params.callbacks.onModelToolCallParserChange,
             onModelAnthropicEffortChange = params.callbacks.onModelAnthropicEffortChange,
         )
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-private fun LazyListScope.editAgentMemorySection(params: EditAgentContentListParams) {
-    stickyHeader(key = SectionAnchors.MEMORY) {
-        EditAgentSectionHeader(stringResource(R.string.screen_agent_edit_section_memory))
-    }
-    item(key = "advanced_compaction") {
-        EditAgentCompactionCard(params)
-    }
-    item(key = "memory_blocks") {
-        EditAgentMemoryBlocksCard(params)
     }
 }
 
