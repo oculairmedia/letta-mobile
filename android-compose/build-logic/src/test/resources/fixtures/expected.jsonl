@@ -1,0 +1,15 @@
+{"type":"externalDependency", "module":":", "configuration":"implementation", "group":"org.example", "name":"zeta", "version":"2.0"}
+{"type":"externalDependency", "module":":", "configuration":"kspJvm", "group":"org.example", "name":"processor", "version":"3.0"}
+{"type":"externalDependency", "module":":", "configuration":"testImplementation", "group":"org.example", "name":"alpha", "version":"1.0"}
+{"type":"externalDependency", "module":":lib", "configuration":"commonMainApi", "group":"org.example", "name":"api", "version":"1.0"}
+{"type":"module", "path":":", "directory":".", "kind":"java"}
+{"type":"module", "path":":lib", "directory":"lib", "kind":"kotlin-multiplatform"}
+{"type":"projectEdge", "from":":", "to":":lib", "configuration":"implementation"}
+{"type":"sourceSet", "module":":lib", "name":"commonMain", "paths":"lib/src/commonMain/alpha,lib/src/commonMain/zeta"}
+{"type":"sourceSet", "module":":lib", "name":"commonTest", "paths":"lib/src/commonTest/kotlin"}
+{"type":"sourceSet", "module":":lib", "name":"jvmMain", "paths":"lib/src/jvmMain/java,lib/src/jvmMain/kotlin"}
+{"type":"sourceSet", "module":":lib", "name":"jvmTest", "paths":"lib/src/jvmTest/java,lib/src/jvmTest/kotlin"}
+{"type":"sourceSetEdge", "module":":lib", "from":"jvmMain", "to":"commonMain"}
+{"type":"sourceSetEdge", "module":":lib", "from":"jvmTest", "to":"commonTest"}
+{"type":"target", "module":":lib", "name":"jvm", "platform":"jvm"}
+{"type":"target", "module":":lib", "name":"metadata", "platform":"common"}

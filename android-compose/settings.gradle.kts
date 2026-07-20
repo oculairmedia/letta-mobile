@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google()
         mavenCentral()
@@ -34,3 +35,4 @@ include(":cli")
 include(":appserver-cli")
 include(":macrobenchmark")
 include(":baselineprofile")
+include(":architecture-tests")

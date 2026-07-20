@@ -46,10 +46,17 @@ jobs:
                   raise SystemExit(f'Expected exactly one AGP declaration: {expected}')
               source = source.replace(expected, expected.replace('9.2.0', '9.0.0'))
           build.write_text(source)
+          build_logic = Path('.qodana-android-compose/build-logic/build.gradle.kts')
+          build_logic_source = build_logic.read_text()
+          agp_dependency = 'implementation("com.android.tools.build:gradle:9.2.0")'
+          if build_logic_source.count(agp_dependency) != 1:
+              raise SystemExit(f'Expected exactly one build-logic AGP dependency: {agp_dependency}')
+          build_logic.write_text(build_logic_source.replace(agp_dependency, agp_dependency.replace('9.2.0', '9.0.0')))
+          # AGP 9.0 requires Gradle 9.4.1. Keep the production wrapper unchanged in
+          # the CI-only projection; downgrading it makes Qodana model import fail.
           wrapper = Path('.qodana-android-compose/gradle/wrapper/gradle-wrapper.properties')
-          wrapper_source = wrapper.read_text()
-          wrapper_source = wrapper_source.replace('9.4.1', '9.3.0')
-          wrapper.write_text(wrapper_source)
+          if 'gradle-9.4.1-' not in wrapper.read_text():
+              raise SystemExit('Expected the Qodana projection to retain Gradle 9.4.1')
           PY
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1.3
