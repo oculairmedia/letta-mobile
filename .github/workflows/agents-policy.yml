@@ -49,11 +49,11 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/agents-policy
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            python3 scripts/ci/agents-policy-check.py --diff-base origin/main \
+            bash scripts/ci/agents-policy-check.sh --diff-base origin/main \
               | tee /tmp/agents-policy/findings.txt
           else
             # Full scan on main push / workflow_dispatch
-            python3 scripts/ci/agents-policy-check.py \
+            bash scripts/ci/agents-policy-check.sh \
               | tee /tmp/agents-policy/findings.txt
           fi
 
