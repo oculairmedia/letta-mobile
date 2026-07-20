@@ -1,5 +1,8 @@
+@file:SuppressLint("RestrictedApi")
+
 package com.letta.mobile.util
 
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import com.google.android.material.color.utilities.Blend
 import com.google.android.material.color.utilities.Hct
@@ -22,6 +25,10 @@ import javax.inject.Singleton
  *
  * Reference: https://github.com/oculairmedia/Overmorrow/blob/main/lib/services/color_service.dart
  * Material Color Utilities: https://github.com/material-foundation/material-color-utilities
+ *
+ * Material ships HCT/Scheme/Blend as `@RestrictTo(LIBRARY_GROUP)` helpers. We intentionally
+ * call them here (same pattern as Material's own dynamic-color samples); suppress RestrictedApi
+ * for this file only rather than reimplement HCT.
  */
 @Singleton
 class ColorHarmonizer @Inject constructor() {

@@ -10,3 +10,21 @@ profile:
   name: qodana.recommended
 include:
   - name: CheckDependencyLicenses
+
+# JVM/desktop/cli sources are analyzed under the Android linter model and
+# produce false-positive NewApi/SDK checks. Keep Android inspections scoped
+# to Android modules; CLI is a pure JVM tool.
+exclude:
+  - name: AndroidLintNewApi
+    paths:
+      - cli
+  - name: AndroidLintInlinedApi
+    paths:
+      - cli
+  - name: AndroidLintObsoleteSdkInt
+    paths:
+      - cli
+  # Dependency-version noise is tracked via Dependabot/Gradle, not Qodana gates.
+  - name: AndroidLintNewerVersionAvailable
+  - name: AndroidLintGradleDependency
+  - name: AndroidLintAndroidGradlePluginVersion

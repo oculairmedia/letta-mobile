@@ -27,6 +27,8 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_SELECTOR_WIDGET_ID
 
+private const val A2UI_LOG_TAG = "A2UI"
+
 @Composable
 fun A2uiRenderer(
     surfaceId: String,
@@ -192,12 +194,7 @@ private fun A2uiComponentNodeContent(
 ) {
     val nextVisited = visited + component.id
     androidx.compose.runtime.SideEffect {
-        if (android.util.Log.isLoggable("A2UI", android.util.Log.DEBUG)) {
-            android.util.Log.d(
-                "A2UI",
-                "Render component surfaceId=${surface.surfaceId} componentId=${component.id} type=${component.component}",
-            )
-        }
+        logA2uiRender(surface.surfaceId, component.id, component.component)
     }
     when (component.component) {
         "Text" -> A2uiText(component = component, surface = surface, modifier = modifier, renderScope = renderScope)
@@ -422,5 +419,15 @@ private fun A2uiComponentNodeContent(
             renderScope = renderScope,
         )
         else -> A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MissingComponent))
+    }
+}
+
+@android.annotation.SuppressLint("LogTagMismatch")
+private fun logA2uiRender(surfaceId: String, componentId: String, componentType: String) {
+    if (android.util.Log.isLoggable(A2UI_LOG_TAG, android.util.Log.DEBUG)) {
+        android.util.Log.d(
+            A2UI_LOG_TAG,
+            "Render component surfaceId=$surfaceId componentId=$componentId type=$componentType",
+        )
     }
 }

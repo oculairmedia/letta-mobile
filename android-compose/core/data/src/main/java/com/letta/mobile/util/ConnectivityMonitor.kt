@@ -1,10 +1,13 @@
 package com.letta.mobile.util
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -93,8 +96,16 @@ class ConnectivityMonitor(
         stopMonitoring()
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun startMonitoring() {
         if (isMonitoring) return
+        // ACCESS_NETWORK_STATE is a normal (install-time) permission declared on the
+        // app and this library manifest. Explicit check keeps the contract obvious.
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         isMonitoring = true
 
         val request = NetworkRequest.Builder()

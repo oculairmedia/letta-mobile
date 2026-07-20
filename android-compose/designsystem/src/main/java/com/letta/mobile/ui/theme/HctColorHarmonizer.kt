@@ -1,5 +1,8 @@
+@file:SuppressLint("RestrictedApi")
+
 package com.letta.mobile.ui.theme
 
+import android.annotation.SuppressLint
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
@@ -13,6 +16,9 @@ import com.google.android.material.color.utilities.Hct
  * toward the seed while preserving tone and chroma as much as the sRGB gamut
  * allows. Container harmonization can additionally move tone just far enough to
  * keep the paired content color above the requested contrast floor.
+ *
+ * Material ships HCT/Blend as `@RestrictTo(LIBRARY_GROUP)` helpers; suppress
+ * RestrictedApi for this intentional theme-harmonization use.
  */
 object HctColorHarmonizer {
     fun harmonize(

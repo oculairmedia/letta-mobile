@@ -93,7 +93,7 @@ fun MermaidDiagram(
         )
     }
 
-    var renderError by mutableStateOf<String?>(null)
+    var renderError by remember { mutableStateOf<String?>(null) }
 
     val nativeRender = remember(source, isDark, nativeStyle) {
         MermaidNativeBridge.renderToSvg(
