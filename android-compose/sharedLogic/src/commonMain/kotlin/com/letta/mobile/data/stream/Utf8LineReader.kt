@@ -5,7 +5,7 @@ import io.ktor.utils.io.readAvailable
 
 internal class Utf8LineReader(
     private val channel: ByteReadChannel,
-    private val chunkSize: Int = 1024,
+    chunkSize: Int = 1024,
 ) {
     private val pending = StringBuilder()
     private val buffer = ByteArray(chunkSize)

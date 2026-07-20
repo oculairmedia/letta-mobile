@@ -64,7 +64,6 @@ fun ShimmerBox(
 fun ShimmerCard(
     modifier: Modifier = Modifier,
 ) {
-    val color = shimmerColor()
     Column(
         modifier = modifier
             .fillMaxWidth()

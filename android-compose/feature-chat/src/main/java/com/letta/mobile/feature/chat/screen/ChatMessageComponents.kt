@@ -224,20 +224,11 @@ internal fun MessageAvatar(
             color = containerColor,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = contentColor,
-                        modifier = Modifier.size(LettaIconSizing.Inline),
-                    )
-                } else {
-                    Text(
-                        text = "Y",
-                        style = MaterialTheme.typography.chatBubbleSender,
-                        color = contentColor,
-                    )
-                }
+                Text(
+                    text = "Y",
+                    style = MaterialTheme.typography.chatBubbleSender,
+                    color = contentColor,
+                )
             }
         }
     } else {

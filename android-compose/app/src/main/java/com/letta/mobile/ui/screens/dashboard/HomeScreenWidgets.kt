@@ -37,6 +37,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -162,22 +163,22 @@ internal fun resolveContextualInfo(
     return when (shortcut) {
         DashboardShortcut.AGENTS -> {
             if (state.isAgentCountLoading) "—"
-            else state.agentCount?.let { stringResource(R.string.widget_tile_count_format, it) }
+            else state.agentCount?.let { pluralStringResource(R.plurals.widget_tile_count_format, it, it) }
         }
         DashboardShortcut.CONVERSATIONS -> {
             if (state.isConversationCountLoading) "—"
             else state.conversationCount?.let {
-                val count = stringResource(R.string.widget_tile_count_format, it)
+                val count = pluralStringResource(R.plurals.widget_tile_count_format, it, it)
                 if (state.isConversationCountApproximate) "$count+" else count
             }
         }
         DashboardShortcut.TOOLS -> {
             if (state.isToolCountLoading) "—"
-            else state.toolCount?.let { stringResource(R.string.widget_tile_count_format, it) }
+            else state.toolCount?.let { pluralStringResource(R.plurals.widget_tile_count_format, it, it) }
         }
         DashboardShortcut.BLOCKS -> {
             if (state.isBlockCountLoading) "—"
-            else state.blockCount?.let { stringResource(R.string.widget_tile_count_format, it) }
+            else state.blockCount?.let { pluralStringResource(R.plurals.widget_tile_count_format, it, it) }
         }
         DashboardShortcut.USAGE -> state.usageSummary?.let {
             formatNumber(it.totalTokens) + " tokens"

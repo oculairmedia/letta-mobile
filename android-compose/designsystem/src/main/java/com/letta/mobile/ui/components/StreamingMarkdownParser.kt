@@ -96,7 +96,7 @@ internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Bo
     var cellsSeen = 0
     while (j < end) {
         // Optional leading colon for alignment.
-        if (j < end && text[j] == ':') j++
+        if (text[j] == ':') j++
         // Must have at least one dash.
         var dashes = 0
         while (j < end && text[j] == '-') {
@@ -105,7 +105,7 @@ internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Bo
         }
         if (dashes == 0) return false
         // Optional trailing colon for alignment.
-        if (j < end && text[j] == ':') j++
+        if (text[j] == ':') j++
         skipSpaces()
         cellsSeen++
         if (j >= end) break
@@ -513,13 +513,8 @@ internal fun findLastSafeBoundary(text: String): Int {
     // a particular shape: at least one non-whitespace char must exist.
     if (runAllHavePipe && runSeparatorMatches && runLineCount >= 2 && lineStart < n) {
         var sawNonWs = false
-        var sawPipe = false
         for (j in lineStart until n) {
             val c = text[j]
-            if (c == '|') {
-                sawPipe = true
-                // Don't break — we want the full sawNonWs picture too.
-            }
             if (c != ' ' && c != '\t' && c != '\n') sawNonWs = true
         }
         if (sawNonWs) {

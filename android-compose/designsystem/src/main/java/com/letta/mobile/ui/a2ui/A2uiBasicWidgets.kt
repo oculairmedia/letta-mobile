@@ -162,7 +162,7 @@ internal fun A2uiTextField(
         readOnly = surfaceSubmitting,
         supportingText = when {
             surfaceSubmitting -> ({ Text("submitting...") })
-            isError -> ({ Text(validationError.orEmpty()) })
+            isError -> ({ Text(validationError) })
             else -> null
         },
         singleLine = fieldType != "longText",

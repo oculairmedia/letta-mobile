@@ -48,7 +48,10 @@
     <string name="screen_system_access_title">System Access</string>
     <string name="screen_system_access_entry_description">Review Android permissions, special access, and privileged-tool exposure.</string>
     <string name="screen_system_access_summary_headline">Capability registry</string>
-    <string name="screen_system_access_summary_body">%1$d of %2$d supported capabilities are currently tool-usable in the %3$s flavor.</string>
+    <plurals name="screen_system_access_summary_body">
+        <item quantity="one">%1$d of %2$d supported capability is currently tool-usable in the %3$s flavor.</item>
+        <item quantity="other">%1$d of %2$d supported capabilities are currently tool-usable in the %3$s flavor.</item>
+    </plurals>
     <string name="screen_system_access_tools_label">Unlocked tools</string>
     <string name="screen_system_access_audit_label">Audit policy</string>
     <string name="screen_system_access_risk_label">Policy risk</string>
@@ -57,7 +60,10 @@
     <string name="screen_system_access_saf_folder_granted">Folder access saved.</string>
     <string name="screen_system_access_saf_grant_failed">Android storage access could not be saved.</string>
     <string name="screen_system_access_action_future">This setup action will be wired by the capability implementation.</string>
-    <string name="widget_tile_count_format">%d items</string>
+    <plurals name="widget_tile_count_format">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
+    </plurals>
     <string name="screen_home_usage_empty">No token activity recorded in the last 24 hours.</string>
 
     <string name="screen_projects_title">Projects</string>
@@ -143,7 +149,10 @@
     <string name="screen_project_issues_completed_at">Completed %1$s</string>
     <string name="screen_project_issues_completion_metadata_partial">Best available completion metadata</string>
     <string name="screen_project_issues_timeline_more_available">More completed issues available</string>
-    <string name="screen_project_issues_timeline_count">%1$d completed</string>
+    <plurals name="screen_project_issues_timeline_count">
+        <item quantity="one">%1$d completed</item>
+        <item quantity="other">%1$d completed</item>
+    </plurals>
     <string name="screen_project_issue_detail_title">Issue detail</string>
     <string name="screen_project_issue_claim_action">Claim issue</string>
     <string name="screen_project_issue_unclaim_action">Clear assignee</string>
@@ -152,8 +161,14 @@
     <string name="screen_project_issue_add_note_action">Add note</string>
     <string name="screen_project_issue_note_label">Note</string>
     <string name="screen_project_issue_acceptance_title">Acceptance criteria</string>
-    <string name="screen_project_issue_acceptance_summary">%1$d criteria</string>
-    <string name="screen_project_issue_blocked_by_summary">Blocked by %1$d issue(s)</string>
+    <plurals name="screen_project_issue_acceptance_summary">
+        <item quantity="one">%1$d criterion</item>
+        <item quantity="other">%1$d criteria</item>
+    </plurals>
+    <plurals name="screen_project_issue_blocked_by_summary">
+        <item quantity="one">Blocked by %1$d issue</item>
+        <item quantity="other">Blocked by %1$d issues</item>
+    </plurals>
     <string name="screen_project_issue_notes_title">Notes</string>
 
     <string name="screen_usage_title">Usage Analytics</string>
@@ -195,7 +210,7 @@
     <string name="action_choose_file">Choose File</string>
     <string name="action_reset_messages">Reset Messages</string>
     
-    <string name="common_loading">Loading...</string>
+    <string name="common_loading">Loading\u2026</string>
     <string name="screen_conversations_empty">No conversations yet</string>
     <string name="screen_conversations_first_run_title">Welcome to Letta</string>
     <string name="screen_conversations_first_run_body">Create your first agent, choose where it runs, then start a conversation.</string>
@@ -552,7 +567,10 @@
     <string name="screen_mcp_server_created_by">Created by: %1$s</string>
     <string name="screen_mcp_server_updated_by">Updated by: %1$s</string>
     <string name="screen_mcp_server_metadata_count">Metadata entries: %1$d</string>
-    <string name="screen_mcp_server_tools_count">%1$d discovered tools</string>
+    <plurals name="screen_mcp_server_tools_count">
+        <item quantity="one">%1$d discovered tool</item>
+        <item quantity="other">%1$d discovered tools</item>
+    </plurals>
     <string name="screen_mcp_server_discovered_tools">Discovered Tools</string>
     <string name="screen_mcp_server_unchecked">Unchecked</string>
     <string name="screen_mcp_server_checking">Checking…</string>
@@ -595,11 +613,16 @@
     <string name="screen_settings_clone_dialog_helper">Cloning uses the current export format and re-imports it through Letta’s import endpoint.</string>
     <string name="screen_settings_clone_name_label">Clone name</string>
     <string name="screen_settings_clone_default_name_format">%1$s Copy</string>
-    <string name="screen_settings_clone_success_single">Cloned agent successfully</string>
-    <string name="screen_settings_clone_success_multiple">Cloned %1$d agents successfully</string>
+    <plurals name="screen_settings_clone_success">
+        <item quantity="one">Cloned agent successfully</item>
+        <item quantity="other">Cloned %1$d agents successfully</item>
+    </plurals>
     <string name="screen_agents_create_include_base_tools">Include Base Tools</string>
     <string name="screen_agents_create_select_tools">Select Tools</string>
-    <string name="screen_agents_create_selected_tools_count">%1$d selected</string>
+    <plurals name="screen_agents_create_selected_tools_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
     <string name="screen_agents_create_advanced_model_section">Advanced Model Settings</string>
     <string name="screen_agents_create_provider_placeholder">e.g. openai</string>
     <string name="screen_agents_import_title">Import Agent Export</string>
@@ -611,8 +634,10 @@
     <string name="screen_agents_import_strip_messages_title">Strip messages on import</string>
     <string name="screen_agents_import_strip_messages_helper">Recommended for clones to avoid copying chat history into the new agent.</string>
     <string name="screen_agents_import_read_failed">Couldn’t read the selected import file.</string>
-    <string name="screen_agents_import_success_single">Imported agent successfully</string>
-    <string name="screen_agents_import_success_multiple">Imported %1$d agents successfully</string>
+    <plurals name="screen_agents_import_success">
+        <item quantity="one">Imported agent successfully</item>
+        <item quantity="other">Imported %1$d agents successfully</item>
+    </plurals>
     <string name="action_dismiss">Dismiss</string>
     <string name="common_error">Error</string>
     <string name="screen_config_list_empty">No saved configurations</string>
@@ -664,8 +689,14 @@
     <string name="screen_blocks_created_label">Created: %1$s</string>
     <string name="screen_blocks_updated_label">Updated: %1$s</string>
     <string name="screen_blocks_no_available_agents">No available agents to attach</string>
-    <string name="screen_blocks_selected_count">%1$d selected</string>
-    <string name="screen_blocks_delete_selected_confirm">Delete %1$d selected blocks? This action cannot be undone.</string>
+    <plurals name="screen_blocks_selected_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="screen_blocks_delete_selected_confirm">
+        <item quantity="one">Delete %1$d selected block? This action cannot be undone.</item>
+        <item quantity="other">Delete %1$d selected blocks? This action cannot be undone.</item>
+    </plurals>
     <string name="screen_blocks_manage_agents">Manage Agents</string>
     <string name="screen_models_title">Models</string>
     <string name="screen_models_search_hint">Search models…</string>
@@ -925,8 +956,14 @@
     <string name="screen_runs_step_trace_section_title">Developer Traces</string>
     <string name="screen_runs_step_trace_request_accordion_title">Request JSON</string>
     <string name="screen_runs_step_trace_response_accordion_title">Response JSON</string>
-    <string name="screen_runs_step_trace_size_subtitle">%1$d chars</string>
-    <string name="screen_runs_step_trace_truncation_warning">Truncated at %1$d chars. Use Copy Full JSON for the whole payload.</string>
+    <plurals name="screen_runs_step_trace_size_subtitle">
+        <item quantity="one">%1$d char</item>
+        <item quantity="other">%1$d chars</item>
+    </plurals>
+    <plurals name="screen_runs_step_trace_truncation_warning">
+        <item quantity="one">Truncated at %1$d char. Use Copy Full JSON for the whole payload.</item>
+        <item quantity="other">Truncated at %1$d chars. Use Copy Full JSON for the whole payload.</item>
+    </plurals>
     <string name="screen_runs_step_trace_copy_full">Copy Full JSON</string>
     <string name="screen_runs_step_messages_title">Step Messages</string>
     <string name="screen_runs_step_feedback_positive_action">Mark Positive</string>
@@ -973,7 +1010,10 @@
     <string name="screen_identities_type_input_label">Identity Type</string>
     <string name="screen_identities_block_ids_label">Block IDs</string>
     <string name="screen_identities_block_ids_helper">Comma-separated block ids. Clear the field to remove all linked blocks.</string>
-    <string name="screen_identities_properties_chip">%1$d properties</string>
+    <plurals name="screen_identities_properties_chip">
+        <item quantity="one">%1$d property</item>
+        <item quantity="other">%1$d properties</item>
+    </plurals>
     <string name="screen_identities_identifier_label">Identifier: %1$s</string>
     <string name="screen_identities_type_label">Type: %1$s</string>
     <string name="screen_identities_project_label">Project: %1$s</string>
@@ -1007,7 +1047,10 @@
     <string name="screen_models_detail_endpoint_type">Endpoint Type: %1$s</string>
     <string name="screen_models_detail_endpoint">Endpoint: %1$s</string>
     <string name="screen_models_detail_context_window">Context Window: %1$s tokens</string>
-    <string name="screen_models_detail_max_output">Max Output: %1$d tokens</string>
+    <plurals name="screen_models_detail_max_output">
+        <item quantity="one">Max Output: %1$d token</item>
+        <item quantity="other">Max Output: %1$d tokens</item>
+    </plurals>
     <string name="screen_models_detail_temperature">Temperature: %1$.2f</string>
     <string name="screen_models_detail_max_tokens">Max Tokens: %1$d</string>
     <string name="screen_models_detail_parallel_tool_calls">Parallel Tool Calls: %1$s</string>

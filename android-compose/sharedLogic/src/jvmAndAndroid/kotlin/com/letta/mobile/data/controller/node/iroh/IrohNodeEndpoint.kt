@@ -100,7 +100,7 @@ class IrohNodeEndpoint(
      */
     fun ticketString(): String {
         val endpointAddr = addr()
-        val ticket = EndpointTicket.Companion.fromAddr(endpointAddr)
+        val ticket = EndpointTicket.fromAddr(endpointAddr)
         return ticket.toString()
     }
 

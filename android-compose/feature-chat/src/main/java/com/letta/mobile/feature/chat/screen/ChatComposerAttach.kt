@@ -168,7 +168,7 @@ internal fun encodeUnderByteCap(
     limits: AttachmentLimits,
 ): ByteArray {
     val ladder = limits.jpegQualityFallbackLadder()
-    var lastBytes: ByteArray = ByteArray(0)
+    var lastBytes = ByteArray(0)
     for ((i, quality) in ladder.withIndex()) {
         val out = ByteArrayOutputStream(128 * 1024)
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)

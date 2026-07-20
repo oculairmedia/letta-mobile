@@ -345,13 +345,12 @@ internal class ChatConversationCoordinator(
             return
         }
         val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
-        val cachedMessages = emptyList<AppMessage>()
-        if (cachedAgent != null || cachedMessages.isNotEmpty()) {
+        if (cachedAgent != null) {
             if (requestedConversationId == currentConversationId) {
                 val summary = ChatConversationSummary(
                     id = requestedConversationId,
-                    title = cachedAgent?.name ?: uiState.value.agentName,
-                    agentName = cachedAgent?.name ?: uiState.value.agentName,
+                    title = cachedAgent.name ?: uiState.value.agentName,
+                    agentName = cachedAgent.name ?: uiState.value.agentName,
                     updatedAtLabel = "",
                     lastMessagePreview = "",
                 )
@@ -360,8 +359,8 @@ internal class ChatConversationCoordinator(
                     ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
                 }
                 uiState.value = uiState.value.copy(
-                    agentName = cachedAgent?.name ?: uiState.value.agentName,
-                    messages = if (cachedMessages.isNotEmpty()) cachedMessages.toUiMessages().toImmutableList() else uiState.value.messages,
+                    agentName = cachedAgent.name ?: uiState.value.agentName,
+                    messages = uiState.value.messages,
                     messageListChange = ChatMessageListChange.Full,
                 )
             }

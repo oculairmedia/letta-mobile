@@ -98,7 +98,6 @@ class AllToolsViewModel @Inject constructor(
 
     override fun onCleared() {
         controller.close()
-        super.onCleared()
     }
 }
 

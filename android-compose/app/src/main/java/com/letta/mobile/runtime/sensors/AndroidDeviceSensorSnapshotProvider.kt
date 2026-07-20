@@ -88,10 +88,10 @@ class AndroidDeviceSensorSnapshotProvider(
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add("cellular")
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) add("ethernet")
             if (caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)) add("bluetooth")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)) add("wifi_aware")
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI_AWARE)) add("wifi_aware")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 && caps.hasTransport(NetworkCapabilities.TRANSPORT_LOWPAN)) add("lowpan")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && caps.hasTransport(NetworkCapabilities.TRANSPORT_USB)) add("usb")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) add("vpn")
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) add("vpn")
         }
         return NetworkSnapshot(
             isConnected = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),

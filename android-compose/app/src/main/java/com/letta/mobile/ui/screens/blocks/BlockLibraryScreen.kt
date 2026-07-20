@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -96,7 +97,7 @@ fun BlockLibraryScreen(
             LargeFlexibleTopAppBar(
                 title = {
                     if (isSelectionMode) {
-                        Text(stringResource(R.string.screen_blocks_selected_count, selectedIds.size))
+                        Text(pluralStringResource(R.plurals.screen_blocks_selected_count, selectedIds.size, selectedIds.size))
                     } else {
                         ExpandableTitleSearch(
                             query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
@@ -225,7 +226,7 @@ fun BlockLibraryScreen(
     ConfirmDialog(
         show = showDeleteConfirm,
         title = stringResource(R.string.screen_blocks_delete_title),
-        message = stringResource(R.string.screen_blocks_delete_selected_confirm, selectedIds.size),
+        message = pluralStringResource(R.plurals.screen_blocks_delete_selected_confirm, selectedIds.size, selectedIds.size),
         confirmText = stringResource(R.string.action_delete),
         dismissText = stringResource(R.string.action_cancel),
         onConfirm = {

@@ -137,9 +137,7 @@ private fun createKatexWebView(
     isHorizontalScrollBarEnabled = false
     addJavascriptInterface(KatexBridge { onError(it) }, "LettaKatex")
     webViewClient = KatexWebViewClient(ctx)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
-    }
+    importantForAutofill = android.view.View.IMPORTANT_FOR_AUTOFILL_NO
     loadDataWithBaseURL("https://appassets/", html, "text/html", "utf-8", null)
 }
 

@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -262,8 +263,9 @@ private fun SystemAccessSummaryCard(state: SystemAccessDashboardUiState) {
             headlineContent = { Text(stringResource(R.string.screen_system_access_summary_headline)) },
             supportingContent = {
                 Text(
-                    text = stringResource(
-                        R.string.screen_system_access_summary_body,
+                    text = pluralStringResource(
+                        R.plurals.screen_system_access_summary_body,
+                        state.grantedCount,
                         state.grantedCount,
                         state.visibleCount,
                         state.flavor.label,

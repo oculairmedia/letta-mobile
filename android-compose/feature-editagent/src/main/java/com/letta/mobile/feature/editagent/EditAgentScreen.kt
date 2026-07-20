@@ -319,8 +319,9 @@ internal fun EditAgentScreenContent(
                                 stripMessages = stripMessages,
                             ) { response ->
                                 snackbar.dispatch(
-                                    context.getString(
-                                        if (response.agentIds.size == 1) R.string.screen_settings_clone_success_single else R.string.screen_settings_clone_success_multiple,
+                                    context.resources.getQuantityString(
+                                        R.plurals.screen_settings_clone_success,
+                                        response.agentIds.size,
                                         response.agentIds.size,
                                     )
                                 )

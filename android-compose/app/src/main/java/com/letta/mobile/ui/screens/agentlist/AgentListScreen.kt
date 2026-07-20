@@ -134,8 +134,9 @@ fun AgentListScreen(
                 ) { response ->
                     val importedId = response.agentIds.firstOrNull()
                     snackbar.dispatch(
-                        context.getString(
-                            if (response.agentIds.size == 1) R.string.screen_agents_import_success_single else R.string.screen_agents_import_success_multiple,
+                        context.resources.getQuantityString(
+                            R.plurals.screen_agents_import_success,
+                            response.agentIds.size,
                             response.agentIds.size,
                         )
                     )

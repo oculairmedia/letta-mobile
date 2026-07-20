@@ -1044,7 +1044,7 @@ private fun ServerFrame.runIdForAssertionOrNull(): String? = when (this) {
 
 private fun ServerFrame.ToolCallMessage.toolCallIds(): List<String> {
     val payloads = when {
-        toolCalls != null -> toolCalls.orEmpty()
+        toolCalls != null -> toolCalls
         toolCall != null -> listOfNotNull(toolCall)
         else -> emptyList()
     }

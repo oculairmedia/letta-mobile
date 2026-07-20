@@ -396,7 +396,6 @@ class ProjectHomeViewModel private constructor(
 
     override fun onCleared() {
         vibesyncEventStreamRepository?.stop()
-        super.onCleared()
     }
 
     private inline fun updateSuccess(transform: (ProjectHomeUiState) -> ProjectHomeUiState) {

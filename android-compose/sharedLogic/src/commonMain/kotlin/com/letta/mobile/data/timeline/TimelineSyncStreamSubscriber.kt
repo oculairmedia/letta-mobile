@@ -39,9 +39,9 @@ internal suspend fun runStreamSubscriber(
     // proved too conservative — messages never arrived when the chat
     // screen was not foregrounded.
     var backoffMs = STREAM_BACKOFF_START_MS
-    var runOpenedAtMs = 0L
-    var runEventsCount = 0
-    var runHeartbeatCount = 0
+    var runOpenedAtMs: Long
+    var runEventsCount: Int
+    var runHeartbeatCount: Int
     while (currentCoroutineContext().isActive) {
         try {
             val stream = messageApi.streamConversation(conversationId)

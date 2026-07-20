@@ -777,7 +777,6 @@ private fun GeneratedImageToolCard(
     val reducedMotion = rememberReducedMotionEnabled()
     val hasImage = toolCall.generatedImageAttachments.isNotEmpty()
     val isError = ToolReturnStatus.isError(toolCall.status)
-    val isWarning = toolCall.status == "warning"
     val prompt = remember(toolCall.arguments) { summarizeGenerateImagePrompt(toolCall.arguments) }
     Card(
         modifier = modifier.fillMaxWidth(),

@@ -160,8 +160,6 @@ internal fun ChatScreen(
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
-    val projectBindings = viewModel.projectBindings
-
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
     LaunchedEffect(fontScale) { activeFontScale = fontScale }
 

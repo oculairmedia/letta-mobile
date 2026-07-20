@@ -18,9 +18,9 @@ internal object IrohRelayConfigMapper {
     @Throws(IrohException::class)
     fun toRelayMode(config: IrohRelayConfig): RelayMode {
         return when (config) {
-            is IrohRelayConfig.Default -> RelayMode.Companion.defaultMode()
-            is IrohRelayConfig.Custom -> RelayMode.Companion.customFromUrls(config.urls)
-            is IrohRelayConfig.Disabled -> RelayMode.Companion.disabled()
+            is IrohRelayConfig.Default -> RelayMode.defaultMode()
+            is IrohRelayConfig.Custom -> RelayMode.customFromUrls(config.urls)
+            is IrohRelayConfig.Disabled -> RelayMode.disabled()
         }
     }
 }

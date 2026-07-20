@@ -51,6 +51,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -1220,7 +1221,7 @@ private fun StepTraceAccordion(
         title = title,
         expanded = expanded,
         onExpandedChange = { expanded = it },
-        subtitle = stringResource(R.string.screen_runs_step_trace_size_subtitle, truncated.totalLength),
+        subtitle = pluralStringResource(R.plurals.screen_runs_step_trace_size_subtitle, truncated.totalLength, truncated.totalLength),
     ) {
         Column(
             modifier = Modifier
@@ -1240,8 +1241,9 @@ private fun StepTraceAccordion(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = stringResource(
-                            R.string.screen_runs_step_trace_truncation_warning,
+                        text = pluralStringResource(
+                            R.plurals.screen_runs_step_trace_truncation_warning,
+                            STEP_TRACE_DISPLAY_LIMIT,
                             STEP_TRACE_DISPLAY_LIMIT,
                         ),
                         style = MaterialTheme.typography.labelSmall,

@@ -40,19 +40,11 @@ object ChatPushAlarmScheduler {
             }
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setAndAllowWhileIdle(
-                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAt,
-                    pendingIntent,
-                )
-            } else {
-                alarmManager.set(
-                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                    triggerAt,
-                    pendingIntent,
-                )
-            }
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                triggerAt,
+                pendingIntent,
+            )
             Telemetry.event(
                 "ChatPushAlarm", "scheduled",
                 "intervalMinutes" to (INTERVAL_MS / 60_000L),

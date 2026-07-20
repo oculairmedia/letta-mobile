@@ -63,7 +63,7 @@ open class ToolRepository @Inject constructor(
         return toolApi.listTools(limit = limit, offset = offset)
     }
 
-    suspend fun refreshAgentTools(agentId: String, tools: List<Tool>) {
+    fun refreshAgentTools(agentId: String, tools: List<Tool>) {
         _toolsByAgent.update { current -> current.toMutableMap().apply {
                     put(agentId, tools)
                 } }

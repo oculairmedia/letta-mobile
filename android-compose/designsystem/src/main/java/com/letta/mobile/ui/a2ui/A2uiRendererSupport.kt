@@ -273,6 +273,7 @@ internal fun resolveBindingElement(
     }
 
 @Composable
+@Suppress("UnusedReceiverParameter")
 internal fun A2uiComponent.resolveInputValue(
     surface: A2uiSurfaceState,
     binding: JsonElement?,
@@ -416,6 +417,7 @@ internal fun A2uiComponent.contentScale(): ContentScale =
         else -> ContentScale.Crop
     }
 
+@Suppress("UnusedReceiverParameter")
 internal fun A2uiComponent.inputValue(
     value: String,
     fieldType: String,
@@ -463,6 +465,7 @@ internal fun JsonElement?.progressFractionOrNull(): Float? =
 
 internal fun Float.progressPercentLabel(): String = "${(this * 100f).roundToInt()}%"
 
+@Suppress("UnusedReceiverParameter")
 internal fun A2uiComponent.dateTimePlaceholder(
     enableDate: Boolean,
     enableTime: Boolean,

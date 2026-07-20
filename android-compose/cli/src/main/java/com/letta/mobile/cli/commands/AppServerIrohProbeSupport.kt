@@ -51,7 +51,7 @@ internal class ProbeSessionFixture(
     private val options: IrohProbeOptions,
 ) {
     suspend fun establish(request: ProbeEstablishRequest): ProbeSession {
-        val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.Companion.defaultMode()))
+        val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
         try {
             return openSession(endpoint, request)
         } catch (error: Throwable) {

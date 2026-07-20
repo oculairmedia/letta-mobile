@@ -619,7 +619,7 @@ class IrohChannelTransport(
         onConnect()
         val localEndpoint = runCatching {
             Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.Companion.defaultMode())
+                EndpointOptions(relayMode = RelayMode.defaultMode())
             )
         }.onFailure { t ->
             Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)

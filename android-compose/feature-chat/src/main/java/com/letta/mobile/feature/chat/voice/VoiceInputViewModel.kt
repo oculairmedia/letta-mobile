@@ -126,7 +126,6 @@ internal class VoiceInputViewModel @Inject constructor(@ApplicationContext priva
     override fun onEvent(eventType: Int, params: Bundle?) {}
 
     override fun onCleared() {
-        super.onCleared()
         speechRecognizer.destroy()
     }
 

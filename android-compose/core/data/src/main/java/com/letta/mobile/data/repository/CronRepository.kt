@@ -161,7 +161,6 @@ open class CronRepository(
             throw IllegalStateException(response.error ?: "cron_delete failed")
         }
         stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
-        Unit
     }
 
     private fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =

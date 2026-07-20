@@ -64,7 +64,7 @@ class AdminProxyRequest private constructor(
 }
 
 class AdminProxyClient(
-    private val adminBaseUrl: String,
+    adminBaseUrl: String,
     private val transport: AdminProxyTransport = defaultTransportFactory(),
     private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
 ) {

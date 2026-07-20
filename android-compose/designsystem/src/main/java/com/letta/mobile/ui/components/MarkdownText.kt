@@ -328,7 +328,6 @@ internal fun autolinkBareUrls(text: String): String {
 
     while (urlMatcher.find()) {
         val urlStart = urlMatcher.start()
-        val urlEnd = urlMatcher.end()
         var url = urlMatcher.group()
 
         // Skip if inside code fence, inline code, or markdown link

@@ -41,6 +41,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -391,7 +392,7 @@ private fun LlmModelDetailDialog(
                 DetailRow(stringResource(R.string.screen_models_detail_context_window, formatNumber(it)))
             }
             model.maxOutputTokens?.let {
-                DetailRow(stringResource(R.string.screen_models_detail_max_output, it))
+                DetailRow(pluralStringResource(R.plurals.screen_models_detail_max_output, it, it))
             }
             model.temperature?.let {
                 DetailRow(stringResource(R.string.screen_models_detail_temperature, it))

@@ -126,7 +126,7 @@ class IrohAppServerTransportAdapter(
 
             // Full iroh ticket (includes direct addresses) — machine format.
             try {
-                val ticket = EndpointTicket.Companion.fromString(address)
+                val ticket = EndpointTicket.fromString(address)
                 return ticket.endpointAddr()
             } catch (e: Exception) {
                 throw IllegalArgumentException(

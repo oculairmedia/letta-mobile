@@ -119,6 +119,7 @@ fun chatScreenStatusOf(state: ChatSessionState): ChatScreenStatus = when (state.
  * than the message list.  Delegates to [ChatSessionReducer.shouldShowStatePanel]
  * so the two stay in sync.
  */
+@Suppress("UnusedReceiverParameter")
 fun ChatScreenStatus.shouldShowStatePanel(state: ChatSessionState): Boolean =
     ChatSessionReducer.shouldShowStatePanel(state)
 

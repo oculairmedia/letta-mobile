@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
@@ -299,7 +300,11 @@ internal fun CreateAgentDialog(
                     )
                 } else {
                     Text(
-                        text = stringResource(R.string.screen_agents_create_selected_tools_count, selectedToolIds.size),
+                        text = pluralStringResource(
+                            R.plurals.screen_agents_create_selected_tools_count,
+                            selectedToolIds.size,
+                            selectedToolIds.size,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }

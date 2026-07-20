@@ -131,8 +131,10 @@
   <string name="screen_settings_clone_default_name_format">%1$s Copy</string>
   <string name="screen_settings_clone_dialog_helper">Cloning uses the current export format and re-imports it through Lettaâ€™s import endpoint.</string>
   <string name="screen_settings_clone_name_label">Clone name</string>
-  <string name="screen_settings_clone_success_multiple">Cloned %1$d agents successfully</string>
-  <string name="screen_settings_clone_success_single">Cloned agent successfully</string>
+  <plurals name="screen_settings_clone_success">
+    <item quantity="one">Cloned agent successfully</item>
+    <item quantity="other">Cloned %1$d agents successfully</item>
+  </plurals>
   <string name="screen_settings_clone_title">Clone Agent</string>
   <string name="screen_settings_export_ready">Agent export ready to share</string>
   <string name="screen_settings_export_subject">Letta agent export</string>

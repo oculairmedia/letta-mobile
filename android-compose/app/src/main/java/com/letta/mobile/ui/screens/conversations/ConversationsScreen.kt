@@ -535,7 +535,6 @@ fun ConversationCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     val title = conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
 

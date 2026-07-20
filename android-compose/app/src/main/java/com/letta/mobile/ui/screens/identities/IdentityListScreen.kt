@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -322,7 +323,7 @@ private fun IdentityCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 AssistChip(onClick = {}, label = { Text(identity.identityType) })
                 if (identity.properties.isNotEmpty()) {
-                    AssistChip(onClick = {}, label = { Text(stringResource(R.string.screen_identities_properties_chip, identity.properties.size)) })
+                    AssistChip(onClick = {}, label = { Text(pluralStringResource(R.plurals.screen_identities_properties_chip, identity.properties.size, identity.properties.size)) })
                 }
             }
         }

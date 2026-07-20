@@ -958,7 +958,6 @@ internal class AdminChatViewModel @Inject constructor(
     override fun onCleared() {
         adminChatA2uiCoordinator.release()
         currentConversationTracker.setCurrent(null)
-        super.onCleared()
     }
 
     // --- Composer coordination delegates ---

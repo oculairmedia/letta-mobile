@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -323,7 +324,7 @@ internal fun ServerCard(
                     if (tools.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = stringResource(R.string.screen_mcp_server_tools_count, tools.size),
+                            text = pluralStringResource(R.plurals.screen_mcp_server_tools_count, tools.size, tools.size),
                             style = MaterialTheme.typography.listItemMetadata,
                             color = MaterialTheme.colorScheme.primary,
                         )

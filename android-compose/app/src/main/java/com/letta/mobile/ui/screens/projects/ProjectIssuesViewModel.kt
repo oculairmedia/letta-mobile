@@ -153,7 +153,6 @@ class ProjectIssuesViewModel @Inject constructor(
 
     override fun onCleared() {
         vibesyncEventStreamRepository?.stop()
-        super.onCleared()
     }
 
     fun refresh() = loadIssues(forceRefresh = true)

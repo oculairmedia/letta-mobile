@@ -68,7 +68,7 @@ class AndroidSystemAccessEnvironment @Inject constructor(
         context.contentResolver.persistedUriPermissions.any { it.isReadPermission || it.isWritePermission }
 
     override fun canDrawOverlays(): Boolean =
-        Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(context)
+        Settings.canDrawOverlays(context)
 
     override fun isNotificationListenerEnabled(serviceClassName: String): Boolean =
         enabledComponentSettingContains(ENABLED_NOTIFICATION_LISTENERS, serviceClassName)
@@ -99,15 +99,15 @@ class AndroidSystemAccessEnvironment @Inject constructor(
 private const val ENABLED_NOTIFICATION_LISTENERS = "enabled_notification_listeners"
 
 internal object AndroidPermissionNames {
-    const val ReadMediaImages = Manifest.permission.READ_MEDIA_IMAGES
-    const val ReadMediaVideo = Manifest.permission.READ_MEDIA_VIDEO
-    const val ReadMediaAudio = Manifest.permission.READ_MEDIA_AUDIO
+    const val ReadMediaImages = "android.permission.READ_MEDIA_IMAGES"
+    const val ReadMediaVideo = "android.permission.READ_MEDIA_VIDEO"
+    const val ReadMediaAudio = "android.permission.READ_MEDIA_AUDIO"
     const val ReadExternalStorage = Manifest.permission.READ_EXTERNAL_STORAGE
     const val ManageExternalStorage = Manifest.permission.MANAGE_EXTERNAL_STORAGE
     const val ReadContacts = Manifest.permission.READ_CONTACTS
     const val WriteContacts = Manifest.permission.WRITE_CONTACTS
     const val SystemAlertWindow = Manifest.permission.SYSTEM_ALERT_WINDOW
-    const val PostNotifications = Manifest.permission.POST_NOTIFICATIONS
+    const val PostNotifications = "android.permission.POST_NOTIFICATIONS"
     const val BindAccessibilityService = Manifest.permission.BIND_ACCESSIBILITY_SERVICE
 
     const val ShizukuApiV23 = "moe.shizuku.manager.permission.API_V23"
