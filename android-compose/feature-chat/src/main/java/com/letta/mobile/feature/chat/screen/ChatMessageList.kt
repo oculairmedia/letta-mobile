@@ -80,6 +80,7 @@ import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 
+import kotlin.time.Duration.Companion.seconds
 internal fun chatRenderItemSeesLiveScale(
     isPinching: Boolean,
     scaleWindowIndexRange: IntRange,
@@ -419,7 +420,7 @@ internal fun ChatMessageList(
     LaunchedEffect(pinchTick) {
         if (pinchTick > 0) {
             showFontIndicator = true
-            delay(1000)
+            delay(1.seconds)
             showFontIndicator = false
         }
     }
@@ -635,7 +636,7 @@ internal fun ChatMessageList(
             )
             highlightedMessageId = scrollToMessageId
             hasScrolledToTarget = true
-            delay(2000)
+            delay(2.seconds)
             highlightedMessageId = null
         }
     }

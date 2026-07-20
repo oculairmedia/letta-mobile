@@ -31,6 +31,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 
+import kotlin.time.Duration.Companion.milliseconds
 internal class AdminShimRecorder {
     suspend fun record(
         baseUrl: String,
@@ -156,7 +157,7 @@ internal class AdminShimRecorder {
         try {
             client.newWebSocket(request, listener)
             try {
-                withTimeout(timeoutMs) { done.await() }
+                withTimeout(timeoutMs.milliseconds) { done.await() }
             } catch (e: TimeoutCancellationException) {
                 if (shouldSendMessage) throw e
             }

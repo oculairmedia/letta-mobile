@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.min
 import kotlin.random.Random
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Encapsulates low-level OkHttp WebSocket client requests, listener wiring,
  * thread-safe reference management, and active reconnect jobs.
@@ -142,7 +143,7 @@ internal class WebSocketConnection(
         onAttemptScheduled(attempt, delayMs)
         reconnectJob = scope.launch {
             Log.i(TAG, "redialing WS attempt=$attempt delayMs=$delayMs reason=$reason")
-            delay(delayMs)
+            delay(delayMs.milliseconds)
             connectFn(config.baseShimUrl, config.token, config.deviceId, config.clientVersion)
         }
     }

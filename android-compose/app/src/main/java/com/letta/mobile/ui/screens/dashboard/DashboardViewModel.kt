@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import kotlin.time.Duration.Companion.milliseconds
 data class PinnedAgent(val id: String, val name: String)
 
 /**
@@ -353,7 +354,7 @@ class DashboardViewModel @Inject constructor(
                     // Remote message search runs in a separate job so it doesn't
                     // block the collect loop from processing the next query.
                     messageSearchJob = viewModelScope.launch {
-                        delay(REMOTE_MESSAGE_SEARCH_DEBOUNCE_MS)
+                        delay(REMOTE_MESSAGE_SEARCH_DEBOUNCE_MS.milliseconds)
                         try {
                             val results = messageRepository.searchMessages(
                                 MessageSearchRequest(

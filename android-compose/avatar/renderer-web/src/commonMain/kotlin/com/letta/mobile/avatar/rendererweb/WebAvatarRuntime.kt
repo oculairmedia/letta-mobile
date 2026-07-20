@@ -13,6 +13,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Transport seam between [WebAvatarRuntime] and the renderer process/page:
  * a JCEF/WebView JS bridge on desktop/Android, a WebSocket in the dev
@@ -76,7 +77,7 @@ class WebAvatarRuntime(
         cancelPendingLoad("Superseded by a newer load")
 
         return try {
-            withTimeout(loadTimeoutMillis) {
+            withTimeout(loadTimeoutMillis.milliseconds) {
                 val protocolVersion = rendererReady.await()
                 if (protocolVersion != AvatarWireProtocol.VERSION) {
                     throw AvatarWireException(
@@ -194,7 +195,7 @@ class WebAvatarRuntime(
         pendingThumbnails[requestId] = pending
         sendCommand(AvatarRendererCommand.CaptureThumbnail(requestId, width, height))
         return try {
-            withTimeout(timeoutMillis) { pending.await() }
+            withTimeout(timeoutMillis.milliseconds) { pending.await() }
         } catch (e: TimeoutCancellationException) {
             throw AvatarWireException("Renderer did not answer the thumbnail capture in time", e)
         } finally {

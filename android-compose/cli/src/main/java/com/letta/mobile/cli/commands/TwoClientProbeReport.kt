@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.addJsonObject
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Collects and prints per-assertion results for the two-client live-sync probe.
  * One greppable `[iroh-2client]` line per check + a PASS/FAIL summary + a CI
@@ -63,8 +64,8 @@ internal class TwoClientReport(
         sender.send(conversationId, sentText)
 
         // Wait until the observer sees a terminal (or the budget elapses).
-        val gotTerminal = withTimeoutOrNull(OBSERVE_BUDGET_MS) {
-            while (observer.snapshot().none { it is ServerFrame.TurnDone }) delay(50)
+        val gotTerminal = withTimeoutOrNull(OBSERVE_BUDGET_MS.milliseconds) {
+            while (observer.snapshot().none { it is ServerFrame.TurnDone }) delay(50.milliseconds)
             true
         } == true
 

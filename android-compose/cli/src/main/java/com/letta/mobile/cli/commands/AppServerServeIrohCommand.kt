@@ -18,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
 
+import kotlin.time.Duration.Companion.seconds
 /**
  * CLI command to serve the Letta App Server over Iroh transport.
  * 
@@ -154,7 +155,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             
             // Wait indefinitely
             while (true) {
-                delay(1000)
+                delay(1.seconds)
             }
         } catch (e: Exception) {
             System.err.println("[iroh-app-server] Error: ${e.message}")

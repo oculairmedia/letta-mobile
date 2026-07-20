@@ -41,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+import kotlin.time.Duration.Companion.seconds
 internal fun defaultAgentRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -376,7 +377,7 @@ open class AgentRepository(
             val agent = fetchAgentRemote(id)
             emit(agent)
             updateAgentInCache(agent)
-            delay(3000)
+            delay(3.seconds)
         }
     }
 

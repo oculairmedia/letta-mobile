@@ -97,6 +97,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import java.time.Instant
 import java.util.Locale
 
+import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RunMonitorScreen(
@@ -337,7 +338,7 @@ private fun RunCard(
         LaunchedEffect(run.id, startEpochMs) {
             while (true) {
                 liveDuration = formatElapsedDuration(System.currentTimeMillis() - startEpochMs)
-                delay(1000L)
+                delay(1.seconds)
             }
         }
     }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+import kotlin.time.Duration.Companion.milliseconds
 internal class LegacyProbeScenarios(
     private val options: IrohProbeOptions,
     private val fixture: ProbeSessionFixture,
@@ -184,7 +185,7 @@ internal class NoHttpProbeScenario(
         val sampler = scope.launch {
             while (true) {
                 sample()
-                delay(100)
+                delay(100.milliseconds)
             }
         }
         return try {

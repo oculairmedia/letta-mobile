@@ -39,6 +39,7 @@ import kotlinx.serialization.json.JsonArray
 import java.time.Instant
 import java.util.UUID
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Lean desktop implementation of [IChannelTransport] over the shim's mobile WS
  * protocol (`{serverUrl}/shim/v1/mobile`), built on Ktor's WebSocket client.
@@ -178,7 +179,7 @@ class DesktopWsChannelTransport(
         pendingMutex.withLock { pending[requestId] = deferred }
         return try {
             active.sendFrame(frame)
-            withTimeout(timeoutMs) { deferred.await() }
+            withTimeout(timeoutMs.milliseconds) { deferred.await() }
         } finally {
             pendingMutex.withLock { pending.remove(requestId) }
         }

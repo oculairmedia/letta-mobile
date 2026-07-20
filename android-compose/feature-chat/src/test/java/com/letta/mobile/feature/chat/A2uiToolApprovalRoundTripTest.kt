@@ -60,6 +60,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+import kotlin.time.Duration.Companion.milliseconds
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 @Tag("integration")
@@ -686,7 +687,7 @@ private suspend fun Channel<JsonObject>.receiveOfType(type: String): JsonObject 
 
 private suspend fun Channel<JsonObject>.receiveOrNullWithin(timeoutMs: Long = 250L): JsonObject? =
     try {
-        withRealTimeout { withTimeout(timeoutMs) { receive() } }
+        withRealTimeout { withTimeout(timeoutMs.milliseconds) { receive() } }
     } catch (_: TimeoutCancellationException) {
         null
     }
@@ -696,7 +697,7 @@ private fun elapsedMs(startNanos: Long): Long =
 
 private suspend fun <T> withRealTimeout(block: suspend () -> T): T =
     withContext(Dispatchers.IO) {
-        withTimeout(TIMEOUT_MS) { block() }
+        withTimeout(TIMEOUT_MS.milliseconds) { block() }
     }
 
 private class A2uiShimServer {

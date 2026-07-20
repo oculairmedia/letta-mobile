@@ -14,6 +14,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.random.Random
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Runs the persistent SSE stream subscriber for a single conversation.
  * Handles backoff, reconnection, silence timeouts, and external-run reconciliation.
@@ -68,7 +69,7 @@ internal suspend fun runStreamSubscriber(
                     val frames = stream.produceIn(this)
                     try {
                         while (currentCoroutineContext().isActive) {
-                        val result = withTimeoutOrNull(streamSilenceTimeoutMs) {
+                        val result = withTimeoutOrNull(streamSilenceTimeoutMs.milliseconds) {
                             frames.receiveCatching()
                         }
                         if (result == null) {
@@ -159,7 +160,7 @@ internal suspend fun runStreamSubscriber(
                     "delayMs" to reconnectDelayMs,
                     "activeStreamCount" to activeStreamCountAfterClose,
                 )
-                delay(reconnectDelayMs)
+                delay(reconnectDelayMs.milliseconds)
                 continue
             }
             // Stream closed cleanly: run finished. Reset backoff.
@@ -187,7 +188,7 @@ internal suspend fun runStreamSubscriber(
                 "conversationId" to conversationId,
                 "backoffMs" to backoffMs,
             )
-            delay(backoffMs)
+            delay(backoffMs.milliseconds)
             // letta-mobile-qv6d: idle path uses the longer cap.
             backoffMs = (backoffMs * 2).coerceAtMost(STREAM_IDLE_BACKOFF_MAX_MS)
         } catch (t: Throwable) {
@@ -195,7 +196,7 @@ internal suspend fun runStreamSubscriber(
                 "TimelineSync", "streamSubscriber.networkError", t,
                 "conversationId" to conversationId,
             )
-            delay(STREAM_BACKOFF_MAX_MS)
+            delay(STREAM_BACKOFF_MAX_MS.milliseconds)
         }
     }
 }

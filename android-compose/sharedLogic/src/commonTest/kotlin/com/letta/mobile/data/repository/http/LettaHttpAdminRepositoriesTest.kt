@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 
+import kotlin.time.Duration.Companion.milliseconds
 class LettaHttpAdminRepositoriesTest {
     private val testJson = Json { ignoreUnknownKeys = true }
 
@@ -214,7 +215,7 @@ class LettaHttpAdminRepositoriesTest {
             MockEngine { request ->
                 if (request.url.encodedPath == "/v1/agents") {
                     agentFetches += 1
-                    delay(25)
+                    delay(25.milliseconds)
                     jsonResponse("""[{"id":"agent-1","name":"Ada"}]""")
                 } else {
                     jsonResponse("[]")

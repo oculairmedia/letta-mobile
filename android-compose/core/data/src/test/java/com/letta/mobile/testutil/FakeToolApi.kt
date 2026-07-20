@@ -14,6 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
+import kotlin.time.Duration.Companion.milliseconds
 class FakeToolApi : ToolApi(mockk(relaxed = true)) {
     var tools = mutableListOf<Tool>()
     var agentTools = mutableMapOf<String, MutableList<Tool>>()
@@ -27,7 +28,7 @@ class FakeToolApi : ToolApi(mockk(relaxed = true)) {
         offset: Int?
     ): List<Tool> {
         calls.add("listTools")
-        if (listDelayMillis > 0L) delay(listDelayMillis)
+        if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
         if (shouldFail) throw ApiException(500, "Server error")
         var result = tools.toList()
         if (offset != null) result = result.drop(offset)

@@ -37,6 +37,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.jsonPrimitive
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * TurnEngine backed by one App Server client/control owner.
  *
@@ -428,7 +429,7 @@ class AppServerTurnEngine(
             if (pendingCompleted == null) return
             terminalArmed = true
             terminalSettleJob = launch {
-                delay(terminalSettleQuietMs)
+                delay(terminalSettleQuietMs.milliseconds)
                 val terminal = pendingCompleted ?: return@launch
                 // letta-mobile-oqfbj / fix(no-settle-on-clean-completion): do NOT
                 // synthesize Failed returns here. This is a CLEAN Completed

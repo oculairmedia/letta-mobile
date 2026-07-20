@@ -14,6 +14,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-r3i1z (A) MOBILE RE-SUBSCRIBE ON RECONNECT.
  *
@@ -108,7 +110,7 @@ class IrohReSubscribeOnReconnectTest {
             // The user opens conversation conv-A: the timeline layer hydrates via
             // message.list on session-1. This is the ONLY user-driven message.list.
             val viewedConversation = "conv-A"
-            val hydrate = withTimeout(5_000) {
+            val hydrate = withTimeout(5.seconds) {
                 transport.adminRpc("message.list", messageListPath(viewedConversation), null)
             }
             assertTrue(hydrate.success, "initial hydrate on session-1 succeeded")
@@ -117,7 +119,7 @@ class IrohReSubscribeOnReconnectTest {
             // transport silently redials to session-2 — NO user action toward the
             // conversation. Mirrors the device-observed "QUIC timed out, app
             // redialed" scenario.
-            val health = withTimeout(5_000) {
+            val health = withTimeout(5.seconds) {
                 transport.adminRpc("health.check", "/v1/health", null)
             }
             assertTrue(health.success, "health.check resolved after redial")
@@ -127,7 +129,7 @@ class IrohReSubscribeOnReconnectTest {
             // fresh Ready on session-2 must auto-re-issue message.list for the
             // viewed conversation so the redialed connection re-registers as a
             // viewer server-side (the eaczz.3 onMethodObserved hook).
-            val reSubscribeOnSession2 = withTimeoutOrNull(5_000) {
+            val reSubscribeOnSession2 = withTimeoutOrNull(5.seconds) {
                 while (true) {
                     val hit = calls.any { call ->
                         call.session == "session-2" &&
@@ -135,7 +137,7 @@ class IrohReSubscribeOnReconnectTest {
                             call.path.contains(viewedConversation)
                     }
                     if (hit) return@withTimeoutOrNull true
-                    delay(20)
+                    delay(20.milliseconds)
                 }
                 @Suppress("UNREACHABLE_CODE") false
             }
@@ -178,11 +180,11 @@ class IrohReSubscribeOnReconnectTest {
         // A plain connect (fresh Ready) with no conversation ever opened.
         transport.connect("iroh://ticket", "", "device", "test")
         try {
-            withTimeout(2_000) {
-                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10)
+            withTimeout(2.seconds) {
+                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds)
             }
             // Give any (erroneous) auto re-subscribe a chance to fire.
-            delay(500)
+            delay(500.milliseconds)
             assertTrue(
                 calls.none { it.method == "message.list" },
                 "no conversation viewed yet -> a fresh Ready must not synthesize a message.list; " +

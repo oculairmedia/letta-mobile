@@ -23,6 +23,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * letta-mobile-m6oa1.3 (consumer wiring): end-to-end proof that the
  * previously WRITE-ONLY [SubagentCorrelator] is now OBSERVABLE. Frames flow
@@ -122,15 +124,15 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
         try {
             transport.connect("iroh://ticket", "", "device", "test")
             // Let the observer collector arm against the (test-overridden) stream.
-            withTimeout(3_000) {
-                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10)
+            withTimeout(3.seconds) {
+                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds)
             }
-            delay(100)
+            delay(100.milliseconds)
 
             assertTrue(observerStream.tryEmit(agentDispatchDelta("tc-1", "scout the repo")))
 
-            withTimeout(3_000) {
-                while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10)
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10.milliseconds)
             }
             val updated = frames.filterIsInstance<ServerFrame.SubagentsUpdated>().single()
             assertEquals(IrohChannelTransport.SUBAGENT_REASON_STARTED, updated.reason)
@@ -154,20 +156,20 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")
-            withTimeout(3_000) {
-                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10)
+            withTimeout(3.seconds) {
+                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds)
             }
-            delay(100)
+            delay(100.milliseconds)
 
             assertTrue(observerStream.tryEmit(agentDispatchDelta("tc-1", "scout the repo")))
-            withTimeout(3_000) {
-                while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10)
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10.milliseconds)
             }
             // Re-observe the byte-identical dispatch: reducer no-ops, revision
             // gate suppresses any second push.
             assertTrue(observerStream.tryEmit(agentDispatchDelta("tc-1", "scout the repo")))
             // Give any (incorrect) duplicate push time to race in.
-            delay(300)
+            delay(300.milliseconds)
 
             assertEquals(
                 1,
@@ -188,21 +190,21 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")
-            withTimeout(3_000) {
-                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10)
+            withTimeout(3.seconds) {
+                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds)
             }
-            delay(100)
+            delay(100.milliseconds)
 
             assertTrue(observerStream.tryEmit(agentDispatchDelta("tc-1", "scout the repo")))
-            withTimeout(3_000) {
-                while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10)
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.SubagentsUpdated }) delay(10.milliseconds)
             }
             assertTrue(observerStream.tryEmit(agentReturnDelta("tc-1")))
-            withTimeout(3_000) {
+            withTimeout(3.seconds) {
                 while (frames.filterIsInstance<ServerFrame.SubagentsUpdated>().none {
                         it.reason == IrohChannelTransport.SUBAGENT_REASON_COMPLETED
                     }
-                ) delay(10)
+                ) delay(10.milliseconds)
             }
 
             val completed = frames.filterIsInstance<ServerFrame.SubagentsUpdated>()
@@ -223,15 +225,15 @@ class IrohChannelTransportSubagentCorrelationEmitTest {
         val collector = clientScope.async { transport.events.collect { frames.add(it) } }
         try {
             transport.connect("iroh://ticket", "", "device", "test")
-            withTimeout(3_000) {
-                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10)
+            withTimeout(3.seconds) {
+                while (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) delay(10.milliseconds)
             }
-            delay(100)
+            delay(100.milliseconds)
 
             // A return whose tool_call_id was never dispatched: the reducer
             // ignores it, revision stays put, no push is produced.
             assertTrue(observerStream.tryEmit(agentReturnDelta("never-dispatched")))
-            delay(300)
+            delay(300.milliseconds)
 
             assertEquals(
                 0,

@@ -46,6 +46,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.util.Telemetry
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Handles a single Iroh connection serving the App Server protocol.
  *
@@ -441,7 +442,7 @@ class IrohNodeConnection(
             "remoteEndpointId" to remoteEndpointId,
             "activeJobs" to jobs.size,
         )
-        val completed = withTimeoutOrNull(STREAM_JOB_DRAIN_TIMEOUT_MS) {
+        val completed = withTimeoutOrNull(STREAM_JOB_DRAIN_TIMEOUT_MS.milliseconds) {
             jobs.joinAll()
             true
         } ?: false

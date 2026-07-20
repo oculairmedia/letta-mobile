@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import kotlin.time.Duration.Companion.milliseconds
 internal fun defaultConnectivityScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -155,7 +156,7 @@ class ConnectivityMonitor(
         lastPingTime = now
 
         scope.launch {
-            delay(200)
+            delay(200.milliseconds)
             
             if (settingsRepository.activeConfig.value == null) return@launch
             val url = "${apiClient.getBaseUrl().trimEnd('/')}/v1/agents?limit=1"

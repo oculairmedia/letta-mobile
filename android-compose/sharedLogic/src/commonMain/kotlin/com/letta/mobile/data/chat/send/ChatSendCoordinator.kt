@@ -26,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Platform-neutral SEND orchestration for the admin-shim mobile WebSocket
  * path, extracted from Android's `WsChatSendCoordinator` (letta-mobile-9ejia.5)
@@ -301,7 +302,7 @@ class ChatSendCoordinator(
         val sentAtMillis = currentTimeMillis()
         scope.launch {
             for (delayMs in postSendReconcileDelaysMs) {
-                delay(delayMs)
+                delay(delayMs.milliseconds)
                 if (hasLiveIngestSince(pending.conversationId, sentAtMillis)) {
                     Telemetry.event(
                         "AdminChatVM", "ws.postSendReconcile.skippedLiveStream",
@@ -390,7 +391,7 @@ class ChatSendCoordinator(
                 "queueDepth" to pendingQueueDepth(),
             )
             // Avoid a tight loop if TurnDone and the transport in-flight flag race.
-            delay(DEQUEUE_RETRY_DELAY_MS)
+            delay(DEQUEUE_RETRY_DELAY_MS.milliseconds)
         }
     }
 
@@ -466,7 +467,7 @@ class ChatSendCoordinator(
             Telemetry.error("AdminChatVM", "ws.connect.failed", error)
             return false
         }
-        return withTimeoutOrNull(CONNECT_WAIT_MS) {
+        return withTimeoutOrNull(CONNECT_WAIT_MS.milliseconds) {
             wsChatBridge.awaitConnected()
             true
         } ?: false

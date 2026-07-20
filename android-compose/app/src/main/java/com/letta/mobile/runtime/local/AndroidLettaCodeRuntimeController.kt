@@ -33,6 +33,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
+import kotlin.time.Duration.Companion.milliseconds
 interface LettaCodeRuntimeController {
     fun submit(command: TurnCommand, config: LettaConfig): Flow<String>
 
@@ -151,7 +152,7 @@ class AndroidLettaCodeRuntimeController @Inject constructor(
             }
         }
         val absoluteWatchdog = launch(start = CoroutineStart.UNDISPATCHED) {
-            delay(turnAbsoluteMaxMs)
+            delay(turnAbsoluteMaxMs.milliseconds)
             absoluteTimeout.trySend(Unit)
         }
         try {

@@ -21,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * eaczz.6 (S6-T): fault isolation + observer reconnect — a slow/dead OBSERVER
  * must NEVER block or fail the INITIATOR turn, and lifecycle transitions land
@@ -48,7 +49,7 @@ class ConversationTurnFanoutFaultIsolationTest {
     ) : ViewerFrameSink {
         val chunks = mutableListOf<ByteArray>()
         override suspend fun writeAll(bytes: ByteArray) {
-            if (delayMs > 0) delay(delayMs)
+            if (delayMs > 0) delay(delayMs.milliseconds)
             if (failWrites) throw RuntimeException("dead observer stream")
             chunks.add(bytes)
         }

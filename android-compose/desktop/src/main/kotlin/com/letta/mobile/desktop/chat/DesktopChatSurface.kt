@@ -52,6 +52,7 @@ import com.letta.mobile.desktop.DesktopDefaultButton
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.coroutines.delay
 
+import kotlin.time.Duration.Companion.milliseconds
 /** Surface + composer catalog inputs for [ChatDetailPane]. */
 internal data class ChatDetailPaneState(
     val surface: DesktopChatSurfaceState,
@@ -95,7 +96,7 @@ internal fun ChatDetailPane(
             }
             hadActiveRun -> {
                 ambientStatus = DesktopAmbientStatus.Completed
-                delay(1400)
+                delay(1400.milliseconds)
                 hadActiveRun = false
                 ambientStatus = DesktopAmbientStatus.Idle
             }

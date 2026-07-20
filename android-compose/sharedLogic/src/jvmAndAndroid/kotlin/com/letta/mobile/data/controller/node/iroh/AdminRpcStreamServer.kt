@@ -21,6 +21,7 @@ import kotlinx.serialization.json.put
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
+import kotlin.time.Duration.Companion.milliseconds
 internal interface AdminRpcRecvStream {
     suspend fun read(maxBytes: UInt): ByteArray
 }
@@ -137,7 +138,7 @@ internal class AdminRpcStreamServer(
     suspend fun handleStream(stream: AdminRpcBiStream) {
         val sendStream = stream.send()
         try {
-            val frameJson = withTimeoutOrNull(firstFrameTimeoutMs) {
+            val frameJson = withTimeoutOrNull(firstFrameTimeoutMs.milliseconds) {
                 readOneFrame(stream.recv())
             }
             val response = if (frameJson == null) {

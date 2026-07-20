@@ -106,6 +106,8 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * Feature flag: when false, the tool-affordance chip strip above the
  * composer is suppressed. The component (`ToolAffordanceRow`), the
@@ -191,7 +193,7 @@ internal fun ChatScreen(
             // re-evaluate, so we idle â€” no wakeups on the hot streaming path.
             while (subagentSnapshot.any { it.isTerminal || it.isActive }) {
                 lingerTick = System.currentTimeMillis()
-                kotlinx.coroutines.delay(1_000)
+                kotlinx.coroutines.delay(1.seconds)
             }
             lingerTick = System.currentTimeMillis()
         }
@@ -259,7 +261,7 @@ internal fun ChatScreen(
 
         LaunchedEffect(floatingBannerMessage) {
             if (floatingBannerMessage.isNotBlank()) {
-                kotlinx.coroutines.delay(2600)
+                kotlinx.coroutines.delay(2600.milliseconds)
                 floatingBannerMessage = ""
             }
         }
@@ -301,7 +303,7 @@ internal fun ChatScreen(
                 }
                 hadActiveAmbientRun -> {
                     ambientAgentStatus = "Completed"
-                    kotlinx.coroutines.delay(1400)
+                    kotlinx.coroutines.delay(1400.milliseconds)
                     hadActiveAmbientRun = false
                     ambientAgentStatus = "Idle"
                 }

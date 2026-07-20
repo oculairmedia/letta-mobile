@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ConversationUpdateParams
 import io.mockk.mockk
 import kotlinx.coroutines.delay
 
+import kotlin.time.Duration.Companion.milliseconds
 class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     var conversations = mutableListOf<Conversation>()
     var shouldFail = false
@@ -28,7 +29,7 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     ): List<Conversation> {
         calls.add("listConversations")
         listLimits.add(limit)
-        if (listDelayMillis > 0L) delay(listDelayMillis)
+        if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
         if (shouldFail) throw ApiException(500, "Server error")
         val filtered = if (agentId != null) {
             conversations.filter { it.agentId == agentId }

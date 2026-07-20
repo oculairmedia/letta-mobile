@@ -19,6 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Device-side live Iroh receive probe.
  *
@@ -88,12 +89,12 @@ class IrohLiveReceiveDeviceTest {
             )
             assertTrue("IrohChannelTransport.send should accept the turn", accepted)
 
-            withTimeout(timeoutMs) {
+            withTimeout(timeoutMs.milliseconds) {
                 while (true) {
                     val gotAssistant = frames.any { it is ServerFrame.AssistantMessage }
                     val gotDone = frames.any { it is ServerFrame.TurnDone }
                     if (gotAssistant && gotDone) break
-                    delay(100)
+                    delay(100.milliseconds)
                 }
             }
         } finally {

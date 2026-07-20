@@ -58,6 +58,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * P4 spike — the frameless pet-window surface host (PRD §4 P4, §5 B1).
  *
@@ -193,7 +195,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
             val timeSource = TimeSource.Monotonic
             var lastMark = timeSource.markNow()
             while (isActive) {
-                delay(33L)
+                delay(33.milliseconds)
                 val delta = lastMark.elapsedNow().inWholeMicroseconds / 1_000_000f
                 lastMark = timeSource.markNow()
                 director.tick(delta)
@@ -219,7 +221,7 @@ private fun androidx.compose.ui.window.WindowScope.PetSpikeContent(
     // revert after 10s (the real escape hatch is a global hotkey, P6/M1).
     LaunchedEffect(clickThrough) {
         if (clickThrough) {
-            delay(10_000)
+            delay(10.seconds)
             PetWindowStyles.setClickThrough(window, false)
             clickThrough = false
         }

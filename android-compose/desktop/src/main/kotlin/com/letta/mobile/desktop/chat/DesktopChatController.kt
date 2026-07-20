@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
@@ -680,7 +681,7 @@ class DesktopChatController(
         val generation = ++thinkingGeneration
         _thinkingConversationId.value = conversationId
         scope.launch {
-            kotlinx.coroutines.delay(THINKING_TIMEOUT_MS)
+            kotlinx.coroutines.delay(THINKING_TIMEOUT_MS.milliseconds)
             // Only the timer for the latest send may clear the indicator.
             if (generation == thinkingGeneration && _thinkingConversationId.value == conversationId) {
                 _thinkingConversationId.value = null

@@ -21,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * eaczz.7 (TEST-S7) — THE hermetic multi-connection fanout test matrix and the
  * PRIMARY required-green regression gate for the Iroh multi-client live-sync
@@ -57,7 +58,7 @@ class IrohFanoutServeTest {
     ) : ViewerFrameSink {
         val chunks = mutableListOf<ByteArray>()
         override suspend fun writeAll(bytes: ByteArray) {
-            if (delayMs > 0) delay(delayMs)
+            if (delayMs > 0) delay(delayMs.milliseconds)
             if (failWrites) throw RuntimeException("dead observer stream")
             chunks.add(bytes)
         }

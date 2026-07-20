@@ -41,6 +41,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import org.junit.Assume.assumeTrue
 
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 /**
  * FULL-STACK on-host harness for the mobile Iroh chat path (g3cva.8 automation).
  *
@@ -119,14 +121,14 @@ class IrohChannelTransportEndToEndTest {
             )
 
             // Wait until we observe an AssistantMessage carrying the reply AND a terminal TurnDone.
-            withTimeout(30_000) {
+            withTimeout(30.seconds) {
                 while (true) {
                     val gotAssistant = frames.any {
                         it is ServerFrame.AssistantMessage && it.content.contains(ASSISTANT_REPLY)
                     }
                     val gotDone = frames.any { it is ServerFrame.TurnDone }
                     if (gotAssistant && gotDone) break
-                    kotlinx.coroutines.delay(50)
+                    kotlinx.coroutines.delay(50.milliseconds)
                 }
             }
             collector.cancel()
@@ -239,14 +241,14 @@ class IrohChannelTransportEndToEndTest {
                     startNewConversation = false,
                 )
                 // Wait for THIS turn's assistant reply + a TurnDone before sending the next.
-                withTimeout(20_000) {
+                withTimeout(20.seconds) {
                     while (true) {
                         val gotReply = frames.any {
                             it is ServerFrame.AssistantMessage && it.content.contains("reply-for-turn-$i")
                         }
                         val doneCount = frames.count { it is ServerFrame.TurnDone }
                         if (gotReply && doneCount >= i) break
-                        kotlinx.coroutines.delay(50)
+                        kotlinx.coroutines.delay(50.milliseconds)
                     }
                 }
             }
@@ -296,13 +298,13 @@ class IrohChannelTransportEndToEndTest {
                     ),
                 ).collect { }
             }
-            withTimeout(2_000) {
-                while (!engine.isBusy) delay(10)
+            withTimeout(2.seconds) {
+                while (!engine.isBusy) delay(10.milliseconds)
             }
 
             assertTrue(transport.send("agent", "conversation", "second", "otid-2", null, false))
-            withTimeout(2_000) {
-                while (frames.none { it is ServerFrame.TurnDone && it.status == "failed" }) delay(10)
+            withTimeout(2.seconds) {
+                while (frames.none { it is ServerFrame.TurnDone && it.status == "failed" }) delay(10.milliseconds)
             }
 
             assertTrue(frames.any { it is ServerFrame.Error && it.code == "iroh_turn_engine_busy" })
@@ -339,7 +341,7 @@ class IrohChannelTransportEndToEndTest {
         )
 
         // Turn 1 never gets a terminal frame -> must end (Failed) via idle watchdog, not hang.
-        val turn1 = withTimeout(5_000) {
+        val turn1 = withTimeout(5.seconds) {
             val drafts = mutableListOf<com.letta.mobile.runtime.RuntimeEventDraft>()
             engine.runTurn(cmd("one")).collect { drafts.add(it) }
             drafts
@@ -349,7 +351,7 @@ class IrohChannelTransportEndToEndTest {
             "Stuck turn 1 should force-complete with Failed via the idle watchdog. Got: ${turn1.map { it.payload::class.simpleName }}",
         )
         // Turn 2 must still run (the engine lock was released), proving no permanent jam.
-        val turn2Ran = withTimeout(5_000) {
+        val turn2Ran = withTimeout(5.seconds) {
             var sawStarted = false
             engine.runTurn(cmd("two")).collect {
                 if (it.payload is RuntimeEventPayload.RunLifecycleChanged) sawStarted = true
@@ -381,15 +383,15 @@ class IrohChannelTransportEndToEndTest {
 
             // Turn 1
             transport.send("agent-test", "conv-test", "turn-1", "otid-1", null, false)
-            withTimeout(10_000) {
-                while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50)
+            withTimeout(10.seconds) {
+                while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50.milliseconds)
             }
 
             // Wait a bit then send turn 2
-            delay(100)
+            delay(100.milliseconds)
             transport.send("agent-test", "conv-test", "turn-2", "otid-2", null, false)
-            withTimeout(10_000) {
-                while (frames.count { it is ServerFrame.TurnDone } < 2) delay(50)
+            withTimeout(10.seconds) {
+                while (frames.count { it is ServerFrame.TurnDone } < 2) delay(50.milliseconds)
             }
 
             val assistant = frames.filterIsInstance<ServerFrame.AssistantMessage>()
@@ -413,7 +415,7 @@ class IrohChannelTransportEndToEndTest {
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> {
             val turnN = (command.input as? TurnInput.UserMessage)?.text?.let { t -> t.substringAfterLast('-').ifEmpty { "1" } } ?: "1"
             return flow {
-                delay(delayMs)
+                delay(delayMs.milliseconds)
                 emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RemoteStreamFrame("f-$turnN", "msg-$turnN", "assistant_message", "reply-for-turn-$turnN")))
                 delay(delayMs / 2)
                 emit(RuntimeEventDraft(BackendId("h"), RuntimeId("h"), command.agentId, command.conversationId, source = RuntimeEventSource.LocalRuntime, payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed)))
@@ -493,7 +495,7 @@ class IrohChannelTransportEndToEndTest {
             val frames = mutableListOf<ServerFrame>()
             val collector = clientScope.async { transport.events.collect { frames.add(it) } }
             transport.send("a", "c", "hi", "otid-1", null, false)
-            withTimeout(15_000) { while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50) }
+            withTimeout(15.seconds) { while (frames.count { it is ServerFrame.TurnDone } < 1) delay(50.milliseconds) }
             // Should have completed without OOM — the big frame should be handled gracefully
             assertTrue(frames.any { it is ServerFrame.TurnDone }, "Turn should complete even with oversized frame")
             collector.cancel()

@@ -19,6 +19,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 
+import kotlin.time.Duration.Companion.seconds
 /**
  * Hermetic stub app-server over Iroh for the probe CI gate (letta-mobile-q5iiv).
  *
@@ -140,7 +141,7 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
 
             val deadline = if (maxLifetimeMs > 0) System.currentTimeMillis() + maxLifetimeMs else Long.MAX_VALUE
             while (System.currentTimeMillis() < deadline) {
-                delay(1000)
+                delay(1.seconds)
             }
             println("[iroh-stub-server] max lifetime ${maxLifetimeMs}ms reached; shutting down")
             exitProcess(0)

@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Hybrid desktop chat gateway: live chat through the App Server TurnEngine,
  * listing/CRUD through HTTP.
@@ -154,7 +155,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
         }
         val heartbeats = flow<TimelineStreamFrame> {
             while (true) {
-                delay(heartbeatIntervalMs)
+                delay(heartbeatIntervalMs.milliseconds)
                 if (!client.isConnected.first()) break
                 emit(TimelineStreamFrame.Heartbeat)
             }

@@ -28,6 +28,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+import kotlin.time.Duration.Companion.milliseconds
 internal data class IrohProbeOptions(
     val token: String?,
     val adminBaseUrl: String,
@@ -201,7 +202,7 @@ internal class ProbeSessionFixture(
             collector.cancelAndJoin()
             return true
         }
-        while (observed.terminalCount == 0) delay(50)
+        while (observed.terminalCount == 0) delay(50.milliseconds)
         drainUntilQuiet(observed)
         collector.cancelAndJoin()
         return true
@@ -225,7 +226,7 @@ internal class ProbeSessionFixture(
     private suspend fun drainUntilQuiet(observed: ProbeAccumulator) {
         var drainedFrames = observed.recordedFrameCount
         while (true) {
-            delay(500)
+            delay(500.milliseconds)
             val current = observed.recordedFrameCount
             if (current == drainedFrames) break
             drainedFrames = current
@@ -263,7 +264,7 @@ internal class ProbeSessionFixture(
             block()
             var drained = accumulator.recordedFrameCount
             while (true) {
-                delay(quiesceMs)
+                delay(quiesceMs.milliseconds)
                 val current = accumulator.recordedFrameCount
                 if (current == drained) break
                 drained = current

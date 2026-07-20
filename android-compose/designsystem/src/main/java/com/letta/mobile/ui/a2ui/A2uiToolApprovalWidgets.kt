@@ -45,6 +45,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 
+import kotlin.time.Duration.Companion.seconds
 @Composable
 internal fun A2uiToolApprovalCard(
     component: A2uiComponent,
@@ -86,7 +87,7 @@ internal fun A2uiToolApprovalCard(
     LaunchedEffect(component.id, props.callId, props.timeoutSeconds, result) {
         if (result != null || props.timeoutSeconds <= 0) return@LaunchedEffect
         while (remainingSeconds > 0 && result == null) {
-            delay(1_000)
+            delay(1.seconds)
             remainingSeconds = (remainingSeconds - 1).coerceAtLeast(0)
         }
         if (remainingSeconds == 0 && result == null) {

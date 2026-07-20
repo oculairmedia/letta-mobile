@@ -18,6 +18,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.min
 import kotlin.random.Random
 
+import kotlin.time.Duration.Companion.milliseconds
 data class IrohConnectConfig(
     val baseShimUrl: String,
     val token: String,
@@ -93,7 +94,7 @@ class IrohConnectionSupervisor(
         var lastError: Throwable? = null
         while (System.currentTimeMillis() < deadline) {
             val waitMs = deadline - System.currentTimeMillis()
-            val result = withTimeoutOrNull(waitMs) {
+            val result = withTimeoutOrNull(waitMs.milliseconds) {
                 val deferred = ensureDialing()
                 runCatching { deferred.await() }
             } ?: break
@@ -367,7 +368,7 @@ class IrohConnectionSupervisor(
         redialReadyAtMs = System.currentTimeMillis() + delayMs
         redialJob = scope.launch {
             Telemetry.event("IrohSupervisor", "redial.scheduled", "reason" to reason, "delayMs" to delayMs.toString(), "attempt" to attempt.toString())
-            delay(delayMs)
+            delay(delayMs.milliseconds)
             val config = configProvider() ?: return@launch
             mutex.withLock {
                 redialReadyAtMs = null

@@ -21,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+import kotlin.time.Duration.Companion.milliseconds
 private const val KEEPALIVE_CLOSE_TEST_TIMEOUT_MS = 5_000L
 
 class ChannelTransportKeepaliveCloseTest {
@@ -64,7 +65,7 @@ class ChannelTransportKeepaliveCloseTest {
             shim.frames.receiveType("hello")
 
             transport.disconnect()
-            kotlinx.coroutines.delay(1_500L)
+            kotlinx.coroutines.delay(1500.milliseconds)
             assertEquals(1, shim.helloCount.get())
         } finally {
             transport.disconnect()
@@ -86,11 +87,11 @@ class ChannelTransportKeepaliveCloseTest {
             )
             shim.frames.receiveType("hello")
             shim.closeFirstSocket(4401, "unauthorized")
-            val disconnected = withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+            val disconnected = withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS.milliseconds) {
                 transport.state.first { it is ChannelTransportState.Disconnected } as ChannelTransportState.Disconnected
             }
 
-            kotlinx.coroutines.delay(1_500L)
+            kotlinx.coroutines.delay(1500.milliseconds)
             assertEquals(false, disconnected.willReconnect)
             assertEquals(1, shim.helloCount.get())
         } finally {
@@ -160,17 +161,17 @@ class ChannelTransportKeepaliveCloseTest {
             )
 
             val firstHello = shim.frames.receiveType("hello")
-            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS.milliseconds) {
                 transport.state.first { it is ChannelTransportState.Connected }
             }
             shim.closeFirstSocketAsKeepaliveTimeout()
-            val disconnected = withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+            val disconnected = withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS.milliseconds) {
                 transport.state.first { it is ChannelTransportState.Disconnected } as ChannelTransportState.Disconnected
             }
             assertEquals(true, disconnected.willReconnect)
             val secondHello = shim.frames.receiveType("hello")
 
-            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS.milliseconds) {
                 transport.state.first { it is ChannelTransportState.Connected }
             }
 
@@ -229,7 +230,7 @@ class ChannelTransportKeepaliveCloseTest {
         }
 
         suspend fun closeFirstSocket(code: Int, reason: String) {
-            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+            withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS.milliseconds) {
                 sockets.receive()
             }.close(code, reason)
         }
@@ -249,7 +250,7 @@ class ChannelTransportKeepaliveCloseTest {
 }
 
 private suspend fun Channel<JsonObject>.receiveType(type: String): JsonObject =
-    withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS) {
+    withTimeout(KEEPALIVE_CLOSE_TEST_TIMEOUT_MS.milliseconds) {
         while (true) {
             val frame = receive()
             if (frame.stringValue("type") == type) return@withTimeout frame

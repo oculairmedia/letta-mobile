@@ -82,6 +82,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.time.LocalTime
 
 
+import kotlin.time.Duration.Companion.milliseconds
 @Composable
 internal fun A2uiText(
     component: A2uiComponent,
@@ -1166,7 +1167,7 @@ internal fun A2uiButton(
 
     LaunchedEffect(inFlight) {
         if (!inFlight) return@LaunchedEffect
-        delay(A2uiButtonLocalTimeoutMillis)
+        delay(A2uiButtonLocalTimeoutMillis.milliseconds)
         inFlight = false
         onPendingActionDelta(-1)
     }

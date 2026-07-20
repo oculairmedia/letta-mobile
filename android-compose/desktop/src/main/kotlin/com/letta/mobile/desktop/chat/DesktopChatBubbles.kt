@@ -67,6 +67,7 @@ import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
+import kotlin.time.Duration.Companion.milliseconds
 @Composable
 internal fun DesktopMessageBubble(
     message: UiMessage,
@@ -132,7 +133,7 @@ internal fun CopyIconButton(
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
-            delay(1200)
+            delay(1200.milliseconds)
             copied = false
         }
     }

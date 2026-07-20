@@ -16,6 +16,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+import kotlin.time.Duration.Companion.milliseconds
 @OptIn(ExperimentalCoroutinesApi::class)
 class CoroutineExtensionsTest {
 
@@ -46,7 +47,7 @@ class CoroutineExtensionsTest {
         var executed = false
         
         viewModel.launchAction {
-            delay(10)
+            delay(10.milliseconds)
             executed = true
         }
         
@@ -62,7 +63,7 @@ class CoroutineExtensionsTest {
         viewModel.launchAction(
             onError = { errorCaught = it }
         ) {
-            delay(10)
+            delay(10.milliseconds)
             throw RuntimeException("Test Error")
         }
         
@@ -79,7 +80,7 @@ class CoroutineExtensionsTest {
         viewModel.launchAction(
             onError = { errorCaught = it }
         ) {
-            delay(10)
+            delay(10.milliseconds)
             throw CancellationException("Cancelled")
         }
         

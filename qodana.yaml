@@ -28,3 +28,20 @@ exclude:
   - name: AndroidLintNewerVersionAvailable
   - name: AndroidLintGradleDependency
   - name: AndroidLintAndroidGradlePluginVersion
+  # Fake* test doubles inherit these open API/repository classes (mockk ctor
+  # injection). Qodana analyzes production sources and flags the required
+  # `open` modality as redundant; keep inheritance working for fakes.
+  - name: RedundantModalityModifier
+    paths:
+      - core/data/src/main
+      - app/src/main/java/com/letta/mobile/runtime/local
+  # Duplicate-block notes are tracked via CodeScene / review, not this gate.
+  - name: DuplicatedCode
+  # Resource keep rules / build-script false positives without a line anchor.
+  - name: AndroidLintUnusedResources
+    paths:
+      - app/build.gradle.kts
+  # Manifest meta-data string consumed by Sentry SDK (not Kotlin R.string refs).
+  - name: AndroidLintUnusedResources
+    paths:
+      - app/src/main/res/values/sentry.xml

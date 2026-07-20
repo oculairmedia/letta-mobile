@@ -58,6 +58,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
 import java.util.UUID
 
+import kotlin.time.Duration.Companion.milliseconds
 /**
  * Mobile-compatible [IChannelTransport] backed by the App Server controller path over Iroh.
  *
@@ -1023,7 +1024,7 @@ class IrohChannelTransport(
             }
             // 2. Bounded wait for the server terminal to flow through the normal
             //    streaming path (emitTurnFrame claims the single terminal).
-            val serverTerminalStatus = withTimeoutOrNull(serverTerminalWaitMs) {
+            val serverTerminalStatus = withTimeoutOrNull(serverTerminalWaitMs.milliseconds) {
                 turn.terminalReached.await()
             }
             // 3. Fallback: only if the server never produced a terminal, synthesize
@@ -1288,7 +1289,7 @@ class IrohChannelTransport(
         mapSuccess: (kotlinx.serialization.json.JsonElement) -> T,
         onFailure: (String, String) -> T,
     ): T = try {
-        withTimeoutOrNull(timeoutMs) {
+        withTimeoutOrNull(timeoutMs.milliseconds) {
             val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
             if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
             val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")

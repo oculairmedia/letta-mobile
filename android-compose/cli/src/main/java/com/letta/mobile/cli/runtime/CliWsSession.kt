@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.milliseconds
 internal class CliWsSession(
     private val scope: CoroutineScope,
     private val agentId: String,
@@ -55,7 +56,7 @@ internal class CliWsSession(
             deviceId = deviceId,
             clientVersion = clientVersion,
         )
-        withTimeout(timeoutMs) {
+        withTimeout(timeoutMs.milliseconds) {
             bridge.state.filter { it is ChannelTransportState.Connected }.first()
         }
         val state = bridge.state.value as ChannelTransportState.Connected
@@ -98,7 +99,7 @@ internal class CliWsSession(
         println("[ws] sent otid=$otid conversationId=$conversationId attachments=${attachments.size}")
         if (waitForStable) {
             try {
-                withTimeout(timeoutMs) { turnDone.await() }
+                withTimeout(timeoutMs.milliseconds) { turnDone.await() }
             } catch (e: TimeoutCancellationException) {
                 throw IllegalStateException("timed out waiting for turn_done after ${timeoutMs}ms", e)
             }

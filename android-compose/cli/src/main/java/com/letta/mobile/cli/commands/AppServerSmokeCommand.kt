@@ -25,6 +25,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 
+import kotlin.time.Duration.Companion.milliseconds
 internal class AppServerSmokeCommand : CliktCommand(
     name = "app-server-smoke",
 ) {
@@ -75,7 +76,7 @@ internal class AppServerSmokeCommand : CliktCommand(
         }
 
         try {
-            withTimeout(timeoutMs) {
+            withTimeout(timeoutMs.milliseconds) {
                 coroutineScope {
                     val transport = KtorAppServerWebSocketTransport(
                         httpClient = httpClient,
