@@ -12,7 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -57,7 +57,7 @@ internal class CliWsSession(
             clientVersion = clientVersion,
         )
         withTimeout(timeoutMs.milliseconds) {
-            bridge.state.filter { it is ChannelTransportState.Connected }.first()
+            bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
         }
         val state = bridge.state.value as ChannelTransportState.Connected
         println(

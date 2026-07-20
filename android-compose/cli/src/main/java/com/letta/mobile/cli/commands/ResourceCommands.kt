@@ -80,8 +80,8 @@ private abstract class BaseResourceEndpointCommand(
         val path = buildResourcePathTemplate(endpoint.pathTemplate, values)
         val url = buildRestUrl(baseUrl, path, parseQueryParams(query))
         val client = cliHttpClient()
-        try {
-            val response = client.executeJsonRestRequest(
+        client.use {
+            val response = it.executeJsonRestRequest(
                 verb = endpoint.verb,
                 url = url,
                 token = token,
@@ -97,8 +97,6 @@ private abstract class BaseResourceEndpointCommand(
                 }
             }
             formatJsonResponse(text, compact, raw)?.let(::println)
-        } finally {
-            client.close()
         }
         Unit
     }
@@ -151,8 +149,8 @@ private class AgentImportCommand : AdminShimCommand(
         val bytes = Files.readAllBytes(filePath)
         val uploadName = fileName ?: filePath.fileName.toString()
         val client = cliHttpClient()
-        try {
-            val response = client.submitFormWithBinaryData(
+        client.use {
+            val response = it.submitFormWithBinaryData(
                 url = buildRestUrl(baseUrl, "/v1/agents/import", emptyList()),
                 formData = formData {
                     append("file", bytes, Headers.build {
@@ -177,8 +175,6 @@ private class AgentImportCommand : AdminShimCommand(
                 }
             }
             formatJsonResponse(text, compact, raw)?.let(::println)
-        } finally {
-            client.close()
         }
         Unit
     }
@@ -207,8 +203,7 @@ private class FolderUploadCommand : AdminShimCommand(
             customName?.let { CliQueryParam("name", it) },
         )
         val path = "/v1/folders/${encodeUrlComponent(folderId)}/upload"
-        val client = cliHttpClient()
-        try {
+        cliHttpClient().use { client ->
             val response = client.submitFormWithBinaryData(
                 url = buildRestUrl(baseUrl, path, query),
                 formData = formData {
@@ -230,8 +225,6 @@ private class FolderUploadCommand : AdminShimCommand(
                 }
             }
             formatJsonResponse(text, compact, raw)?.let(::println)
-        } finally {
-            client.close()
         }
         Unit
     }

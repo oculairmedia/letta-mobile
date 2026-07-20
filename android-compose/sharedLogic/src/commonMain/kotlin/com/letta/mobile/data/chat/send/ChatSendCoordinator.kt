@@ -441,7 +441,7 @@ class ChatSendCoordinator(
         dropped.forEach { pending ->
             timelineRepository.markExternalTransportLocalFailed(agentId, pending.conversationId, pending.otid)
         }
-        val attrs = buildList<Pair<String, Any?>> {
+        val attrs = buildList {
             add("reason" to reason)
             if (conversationId != null) add("conversationId" to conversationId)
             add("count" to dropped.size)

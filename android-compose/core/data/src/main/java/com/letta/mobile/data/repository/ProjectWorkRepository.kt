@@ -209,17 +209,17 @@ open class ProjectWorkRepository @Inject constructor(
                 else -> cached.ready
             },
             assignee = issue.assignee,
-            blockedBy = if (issue.blockedBy.isNotEmpty()) issue.blockedBy else cached.blockedBy,
-            blocks = if (issue.blocks.isNotEmpty()) issue.blocks else cached.blocks,
+            blockedBy = issue.blockedBy.ifEmpty { cached.blockedBy },
+            blocks = issue.blocks.ifEmpty { cached.blocks },
             isBlocked = issue.isBlocked,
             updatedAt = issue.updatedAt ?: cached.updatedAt,
             createdAt = issue.createdAt ?: cached.createdAt,
             summary = issue.summary ?: cached.summary,
-            acceptanceCriteria = if (issue.acceptanceCriteria.isNotEmpty()) issue.acceptanceCriteria else cached.acceptanceCriteria,
-            labels = if (issue.labels.isNotEmpty()) issue.labels else cached.labels,
+            acceptanceCriteria = issue.acceptanceCriteria.ifEmpty { cached.acceptanceCriteria },
+            labels = issue.labels.ifEmpty { cached.labels },
             parentId = issue.parentId ?: cached.parentId,
             childCount = if (issue.childCount != 0) issue.childCount else cached.childCount,
-            validationWarnings = if (issue.validationWarnings.isNotEmpty()) issue.validationWarnings else cached.validationWarnings,
+            validationWarnings = issue.validationWarnings.ifEmpty { cached.validationWarnings },
             etag = issue.etag ?: cached.etag,
         )
     }

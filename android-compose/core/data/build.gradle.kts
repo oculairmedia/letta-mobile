@@ -53,7 +53,7 @@ android {
                 it.maxHeapSize = "1536m"
                 it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=384m")
                 it.maxParallelForks = 1
-                it.setForkEvery(50L)
+                it.forkEvery = 50L
             }
         }
     }

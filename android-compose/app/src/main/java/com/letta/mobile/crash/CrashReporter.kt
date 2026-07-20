@@ -49,8 +49,7 @@ class CrashReporter @Inject constructor(
     val lastCrash: StateFlow<LastCrash?> = _lastCrash.asStateFlow()
 
     private val crashFile: File
-        get() = File(context.filesDir, CRASH_DIR).apply { mkdirs() }
-            .let { File(it, CRASH_FILE) }
+        get() = File(File(context.filesDir, CRASH_DIR).apply { mkdirs() }, CRASH_FILE)
 
     /**
      * Install the global uncaught-exception handler. Chains the previous

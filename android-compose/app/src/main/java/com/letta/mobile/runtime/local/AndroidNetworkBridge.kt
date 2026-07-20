@@ -130,7 +130,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 }
             }
             val contentLength = headers["content-length"]?.toIntOrNull() ?: 0
-            if (contentLength < 0 || contentLength > MAX_REQUEST_BODY_BYTES) {
+            if (contentLength !in 0..MAX_REQUEST_BODY_BYTES) {
                 socket.outputStream.writeJsonResponse(400, errorBody("invalid_request", "Content-Length out of range."))
                 return
             }

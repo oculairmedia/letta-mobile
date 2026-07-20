@@ -112,10 +112,10 @@ private fun extractContent(raw: JsonElement?): String {
     val parsed = raw.parseJsonStringPayload()
     if (parsed != null) return extractContent(parsed)
 
-    return when {
-        raw == null -> ""
-        raw is JsonPrimitive && raw.isString -> raw.content
-        raw is JsonArray -> {
+    return when (raw) {
+        null -> ""
+        is JsonPrimitive if raw.isString -> raw.content
+        is JsonArray -> {
             raw.mapNotNull { element ->
                 if (element is JsonObject) {
                     extractObjectContent(element)
@@ -124,7 +124,7 @@ private fun extractContent(raw: JsonElement?): String {
                 } else null
             }.joinToString("\n")
         }
-        raw is JsonObject -> extractObjectContent(raw).orEmpty()
+        is JsonObject -> extractObjectContent(raw).orEmpty()
         else -> ""
     }
 }

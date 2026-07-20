@@ -114,9 +114,9 @@ private fun Collection<ChatRenderItem>.pinchVisibleContentSummary(): ChatPinchVi
     var runBlocks = 0
 
     fun countMessage(message: UiMessage) {
-        when {
-            message.role == "user" -> userMessages++
-            message.role == "assistant" -> assistantMessages++
+        when (message.role) {
+            "user" -> userMessages++
+            "assistant" -> assistantMessages++
         }
         if (message.role == "tool" || !message.toolCalls.isNullOrEmpty() || message.generatedUi != null) {
             toolCards++

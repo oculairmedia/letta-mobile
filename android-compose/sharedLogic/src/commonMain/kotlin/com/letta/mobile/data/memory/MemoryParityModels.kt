@@ -200,7 +200,7 @@ data class MemoryTextSegment(
 )
 
 fun MemoryTextLink.isValidForText(text: String): Boolean =
-    start >= 0 && start < end && end <= text.length
+    start in 0 until end && end <= text.length
 
 fun List<MemoryTextLink>.validForText(text: String): List<MemoryTextLink> {
     val accepted = mutableListOf<MemoryTextLink>()

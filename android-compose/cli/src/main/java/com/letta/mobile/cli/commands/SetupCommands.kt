@@ -90,22 +90,20 @@ private class CliSetupApplier(
         val steps = mutableListOf<CliSetupPlanStep>()
         val refs = mutableMapOf<String, String>()
         val client = cliHttpClient()
-        try {
+        client.use {
             planProfiles(document, dryRun, steps)
-            applyResourceGroup(client, "agents", setupResourceSpecs.getValue("agents"), document.resources.agents, refs, steps, dryRun)
-            applyResourceGroup(client, "tools", setupResourceSpecs.getValue("tools"), document.resources.tools, refs, steps, dryRun)
-            applyResourceGroup(client, "blocks", setupResourceSpecs.getValue("blocks"), document.resources.blocks, refs, steps, dryRun)
-            applyResourceGroup(client, "archives", setupResourceSpecs.getValue("archives"), document.resources.archives, refs, steps, dryRun)
-            applyResourceGroup(client, "folders", setupResourceSpecs.getValue("folders"), document.resources.folders, refs, steps, dryRun)
-            applyResourceGroup(client, "groups", setupResourceSpecs.getValue("groups"), document.resources.groups, refs, steps, dryRun)
-            applyResourceGroup(client, "identities", setupResourceSpecs.getValue("identities"), document.resources.identities, refs, steps, dryRun)
-            applyResourceGroup(client, "providers", setupResourceSpecs.getValue("providers"), document.resources.providers, refs, steps, dryRun)
-            applyResourceGroup(client, "mcpServers", setupResourceSpecs.getValue("mcpServers"), document.resources.mcpServers, refs, steps, dryRun)
-            applyResourceGroup(client, "projects", setupResourceSpecs.getValue("projects"), document.resources.projects, refs, steps, dryRun)
-            applySchedules(client, document.resources.schedules, refs, steps, dryRun)
-            applyLinks(client, document.links, refs, steps, dryRun)
-        } finally {
-            client.close()
+            applyResourceGroup(it, "agents", setupResourceSpecs.getValue("agents"), document.resources.agents, refs, steps, dryRun)
+            applyResourceGroup(it, "tools", setupResourceSpecs.getValue("tools"), document.resources.tools, refs, steps, dryRun)
+            applyResourceGroup(it, "blocks", setupResourceSpecs.getValue("blocks"), document.resources.blocks, refs, steps, dryRun)
+            applyResourceGroup(it, "archives", setupResourceSpecs.getValue("archives"), document.resources.archives, refs, steps, dryRun)
+            applyResourceGroup(it, "folders", setupResourceSpecs.getValue("folders"), document.resources.folders, refs, steps, dryRun)
+            applyResourceGroup(it, "groups", setupResourceSpecs.getValue("groups"), document.resources.groups, refs, steps, dryRun)
+            applyResourceGroup(it, "identities", setupResourceSpecs.getValue("identities"), document.resources.identities, refs, steps, dryRun)
+            applyResourceGroup(it, "providers", setupResourceSpecs.getValue("providers"), document.resources.providers, refs, steps, dryRun)
+            applyResourceGroup(it, "mcpServers", setupResourceSpecs.getValue("mcpServers"), document.resources.mcpServers, refs, steps, dryRun)
+            applyResourceGroup(it, "projects", setupResourceSpecs.getValue("projects"), document.resources.projects, refs, steps, dryRun)
+            applySchedules(it, document.resources.schedules, refs, steps, dryRun)
+            applyLinks(it, document.links, refs, steps, dryRun)
         }
         return CliSetupPlan(steps)
     }
@@ -319,25 +317,23 @@ private class CliSetupExporter(
         }
 
         val client = cliHttpClient()
-        return try {
+        return client.use {
             CliSetupDocument(
                 activeProfile = profiles.activeProfile,
                 profiles = profiles.profiles,
                 resources = CliSetupResources(
-                    agents = exportResources(client, setupResourceSpecs.getValue("agents"), skipErrors),
-                    tools = exportResources(client, setupResourceSpecs.getValue("tools"), skipErrors),
-                    blocks = exportResources(client, setupResourceSpecs.getValue("blocks"), skipErrors),
-                    archives = exportResources(client, setupResourceSpecs.getValue("archives"), skipErrors),
-                    folders = exportResources(client, setupResourceSpecs.getValue("folders"), skipErrors),
-                    groups = exportResources(client, setupResourceSpecs.getValue("groups"), skipErrors),
-                    identities = exportResources(client, setupResourceSpecs.getValue("identities"), skipErrors),
-                    providers = exportResources(client, setupResourceSpecs.getValue("providers"), skipErrors),
-                    mcpServers = exportResources(client, setupResourceSpecs.getValue("mcpServers"), skipErrors),
-                    projects = exportResources(client, setupResourceSpecs.getValue("projects"), skipErrors),
+                    agents = exportResources(it, setupResourceSpecs.getValue("agents"), skipErrors),
+                    tools = exportResources(it, setupResourceSpecs.getValue("tools"), skipErrors),
+                    blocks = exportResources(it, setupResourceSpecs.getValue("blocks"), skipErrors),
+                    archives = exportResources(it, setupResourceSpecs.getValue("archives"), skipErrors),
+                    folders = exportResources(it, setupResourceSpecs.getValue("folders"), skipErrors),
+                    groups = exportResources(it, setupResourceSpecs.getValue("groups"), skipErrors),
+                    identities = exportResources(it, setupResourceSpecs.getValue("identities"), skipErrors),
+                    providers = exportResources(it, setupResourceSpecs.getValue("providers"), skipErrors),
+                    mcpServers = exportResources(it, setupResourceSpecs.getValue("mcpServers"), skipErrors),
+                    projects = exportResources(it, setupResourceSpecs.getValue("projects"), skipErrors),
                 ),
             )
-        } finally {
-            client.close()
         }
     }
 

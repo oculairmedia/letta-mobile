@@ -126,7 +126,7 @@ object CronSchedule {
                     for (m in sortedMinutes) {
                         val instant = date.atTime(h, m)
                             .toInstant(timeZone)
-                        if (instant >= start && instant < end) result.add(instant)
+                        if (instant in start..<end) result.add(instant)
                     }
                 }
             }

@@ -76,9 +76,9 @@ object MessageListPageGuard {
         }
     }
 
-    private fun extractMessages(el: JsonElement): List<JsonElement>? = when {
-        el is JsonArray -> el.toList()
-        el is JsonObject && el["messages"] is JsonArray -> (el["messages"] as JsonArray).toList()
+    private fun extractMessages(el: JsonElement): List<JsonElement>? = when (el) {
+        is JsonArray -> el.toList()
+        is JsonObject if el["messages"] is JsonArray -> (el["messages"] as JsonArray).toList()
         else -> null
     }
 

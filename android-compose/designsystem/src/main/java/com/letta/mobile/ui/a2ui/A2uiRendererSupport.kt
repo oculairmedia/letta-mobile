@@ -766,7 +766,7 @@ internal fun JsonObject.withValidationValue(value: String): JsonObject {
 }
 
 internal fun JsonElement.validationBoolean(): Boolean = when (this) {
-    is JsonPrimitive -> contentOrNull?.toBooleanStrictOrNull() ?: contentOrNull?.isNotBlank() == true
+    is JsonPrimitive -> contentOrNull?.toBooleanStrictOrNull() ?: (contentOrNull?.isNotBlank() == true)
     is JsonArray -> isNotEmpty()
     is JsonObject -> isNotEmpty()
     else -> false

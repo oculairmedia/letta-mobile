@@ -34,6 +34,7 @@ import java.nio.file.Path
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -126,7 +127,7 @@ internal class ConnectCommand : AdminShimCommand(
         try {
             bridge.connect(baseUrl, token, deviceId, clientVersion)
             withTimeout(timeoutMs.milliseconds) {
-                bridge.state.filter { it is ChannelTransportState.Connected }.first()
+                bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
             }
             val connected = bridge.state.value as ChannelTransportState.Connected
             println(
@@ -497,7 +498,7 @@ internal class DisconnectCommand : AdminShimCommand(
         val bridge = WsChatBridge(transport)
         bridge.connect(baseUrl, token, deviceId, clientVersion)
         withTimeout(5.seconds) {
-            bridge.state.filter { it is ChannelTransportState.Connected }.first()
+            bridge.state.filterIsInstance<ChannelTransportState.Connected>().first()
         }
         println("[disconnect] connected; sending bye")
         bridge.bye()
@@ -528,12 +529,12 @@ internal class ReconnectCommand : AdminShimCommand(
         }
         try {
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5.seconds) { bridge.state.filter { it is ChannelTransportState.Connected }.first() }
+            withTimeout(5.seconds) { bridge.state.filterIsInstance<ChannelTransportState.Connected>().first() }
             println("[reconnect] first connection up")
             bridge.disconnect()
             println("[reconnect] disconnected")
             bridge.connect(baseUrl, token, deviceId, clientVersion)
-            withTimeout(5.seconds) { bridge.state.filter { it is ChannelTransportState.Connected }.first() }
+            withTimeout(5.seconds) { bridge.state.filterIsInstance<ChannelTransportState.Connected>().first() }
             println("[reconnect] second connection up")
             delay(holdMs.milliseconds)
         } finally {

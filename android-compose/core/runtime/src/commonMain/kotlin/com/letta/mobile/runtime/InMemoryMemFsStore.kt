@@ -79,7 +79,7 @@ class InMemoryMemFsStore(
             operation = operation,
             createdAt = clock(),
         )
-        commitLog.value = commitLog.value + commit
+        commitLog.value += commit
         return commit
     }
 

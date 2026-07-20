@@ -84,7 +84,7 @@ class FakeAgentRepository(
             description = params.description,
             tags = params.tags.orEmpty(),
         )
-        agentsState.value = agentsState.value + agent
+        agentsState.value += agent
         return agent
     }
 
@@ -97,7 +97,7 @@ class FakeAgentRepository(
             description = params.description,
             tags = params.tags.orEmpty(),
         ).copy(metadata = params.metadata.orEmpty(), tools = emptyList())
-        agentsState.value = agentsState.value + agent
+        agentsState.value += agent
         return agent
     }
 
@@ -127,7 +127,7 @@ class FakeAgentRepository(
     override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
         calls += "importAgent:${params.fileName}"
         val importedId = "imported-${agentsState.value.size + 1}"
-        agentsState.value = agentsState.value + TestData.agent(
+        agentsState.value += TestData.agent(
             id = importedId,
             name = params.overrideName ?: "Imported Agent",
         )

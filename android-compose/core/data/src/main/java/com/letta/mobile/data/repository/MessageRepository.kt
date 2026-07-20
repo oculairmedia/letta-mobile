@@ -405,7 +405,7 @@ open class MessageRepository @Inject constructor(
                 detailLines = baseDetails,
             )
             is ErrorMessage -> {
-                val extra = buildList<Pair<String, String>> {
+                val extra = buildList {
                     add("Error Text" to text)
                     code?.let { add("Code" to it) }
                 }

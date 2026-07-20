@@ -216,6 +216,7 @@ internal data class PlatformHapticSpec(
     val composeType: HapticFeedbackType,
 )
 
+@SuppressLint("StaticFieldLeak") // caches HapticExecutor keyed by applicationContext only
 private object JindongHapticPatternPlayer {
     private var executorContext: Context? = null
     private var executor: HapticExecutor? = null
@@ -239,7 +240,7 @@ private object JindongHapticPatternPlayer {
         }
     }
 
-    internal fun LettaHapticPattern.toJindongPattern(): JindongHapticPattern = JindongHapticPattern(
+    private fun LettaHapticPattern.toJindongPattern(): JindongHapticPattern = JindongHapticPattern(
         events = pulses.map { pulse ->
             ScheduledHapticEvent(
                 startTimeMs = pulse.startTimeMs,

@@ -69,12 +69,10 @@ internal class StreamCommand : AdminShimCommand(
             }
         }
 
-        try {
+        client.use {
             val tracer = MergeTracer(verbose = !raw)
-            sendAndStream(client, tracer)
+            sendAndStream(it, tracer)
             tracer.printSummary()
-        } finally {
-            client.close()
         }
     }
 

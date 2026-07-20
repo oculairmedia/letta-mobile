@@ -74,7 +74,7 @@ open class PassageRepository(
 
     private fun replaceCachedPassages(agentId: String, passages: List<Passage>) {
         synchronized(cacheLock) {
-            _passages.value = _passages.value + (agentId to passages)
+            _passages.value += (agentId to passages)
             passageFlowsByAgent[agentId]?.value = passages
         }
     }

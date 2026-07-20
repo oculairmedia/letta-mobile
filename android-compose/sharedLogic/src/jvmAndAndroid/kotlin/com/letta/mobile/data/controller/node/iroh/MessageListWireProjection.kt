@@ -44,9 +44,9 @@ object MessageListWireProjection {
      * array of messages or an object wrapping one under `messages`; any other
      * shape is returned untouched.
      */
-    fun projectMessageList(response: JsonElement, conversationId: String): JsonElement = when {
-        response is JsonArray -> JsonArray(response.mapNotNull { projectElement(it, conversationId) })
-        response is JsonObject && response["messages"] is JsonArray -> JsonObject(
+    fun projectMessageList(response: JsonElement, conversationId: String): JsonElement = when (response) {
+        is JsonArray -> JsonArray(response.mapNotNull { projectElement(it, conversationId) })
+        is JsonObject if response["messages"] is JsonArray -> JsonObject(
             response.toMutableMap().apply {
                 this["messages"] = JsonArray((response["messages"] as JsonArray).mapNotNull { projectElement(it, conversationId) })
             },
