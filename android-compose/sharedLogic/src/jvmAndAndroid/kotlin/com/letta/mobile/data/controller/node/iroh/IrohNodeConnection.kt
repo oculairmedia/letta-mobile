@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -251,6 +252,24 @@ class IrohNodeConnection(
         server.serveAcceptLoop { connection.acceptBi().asAdminRpcBiStream() }
     }
 
+    private suspend fun handleAdminRpcControlCommand(
+        requestId: String?,
+        obj: JsonObject,
+    ): String {
+        val method = obj["method"]?.jsonPrimitive?.content
+        if (method == null || requestId == null) {
+            return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
+        }
+        return adminRpcRouter.dispatch(
+            AdminRpcInvocation(
+                requestId = requestId,
+                method = method,
+                params = obj["params"]?.jsonObject,
+                context = currentAdminRpcRequestContext(),
+            ),
+        )
+    }
+
     /**
      * Conversation-scoped auth context for both admin_rpc BiStreams and
      * control-channel admin_rpc frames. Empty authorized set when the peer
@@ -344,17 +363,7 @@ class IrohNodeConnection(
                     null
                 }
                 "admin_rpc" -> ifAuthorized(requestId) {
-                    val method = obj["method"]?.jsonPrimitive?.content
-                    if (method == null || requestId == null) {
-                        """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
-                    } else {
-                        adminRpcRouter.dispatch(
-                            requestId,
-                            method,
-                            obj["params"]?.jsonObject,
-                            currentAdminRpcRequestContext(),
-                        )
-                    }
+                    handleAdminRpcControlCommand(requestId, obj)
                 }
                 "sync" -> ifAuthorized(requestId) {
                     if (requestId == null) {

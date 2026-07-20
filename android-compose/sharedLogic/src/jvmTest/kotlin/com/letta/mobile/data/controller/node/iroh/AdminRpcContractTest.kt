@@ -19,79 +19,75 @@ class AdminRpcContractTest {
 
     private companion object {
         fun expectedRegisteredMethods(): Set<String> =
-            setOf(
-                "agent.context",
-                "agent.create",
-                "agent.delete",
-                "agent.get",
-                "agent.list",
-                "agent.update",
-                "approval.submit",
-                "archive.list",
-                "block.attach",
-                "block.create",
-                "block.delete",
-                "block.detach",
-                "block.get",
-                "block.list",
-                "block.update",
-                "block.update_agent",
-                "conversation.archive",
-                "conversation.create",
-                "conversation.delete",
-                "conversation.get",
-                "conversation.list",
-                "conversation.restore",
-                "folder.list",
-                "goal.command",
-                "goal.get",
-                "slash_command.list",
-                "slash_command.list_agent",
-                "skill.install",
-                "skill.list",
-                "skill.list_agent",
-                "skill.uninstall",
-                "group.list",
-                "health.check",
-                "identity.get",
-                "identity.list",
-                "job.get",
-                "job.list",
-                "mcp.list",
-                "message.get",
-                "message.list",
-                "model.list",
-                "model.list.embedding",
-                "passage.create",
-                "passage.delete",
-                "passage.list",
-                "project.archive",
-                "project.beadsRemoteStatus",
-                "project.create",
-                "project.delete",
-                "project.get",
-                "project.list",
-                "project.provisionBeadsRemote",
-                "project.triggerSync",
-                "project.update",
-                "provider.list",
-                "run.get",
-                "run.list",
-                "schedule.create",
-                "schedule.delete",
-                "schedule.get",
-                "schedule.list",
-                "step.list",
-                "subagent.list",
-                "subagent.todos",
-                "tool.attach",
-                "tool.create",
-                "tool.delete",
-                "tool.detach",
-                "tool.get",
-                "tool.list",
-                "tool.update",
-                "tool_return.get",
-            )
+            agentMethods() +
+                blockMethods() +
+                conversationMethods() +
+                projectMethods() +
+                toolMethods() +
+                miscMethods() +
+                subagentMethods()
+
+        fun agentMethods() = setOf(
+            "agent.context", "agent.create", "agent.delete", "agent.get", "agent.list", "agent.update",
+        )
+
+        fun blockMethods() = setOf(
+            "block.attach", "block.create", "block.delete", "block.detach",
+            "block.get", "block.list", "block.update", "block.update_agent",
+        )
+
+        fun conversationMethods() = setOf(
+            "conversation.archive", "conversation.create", "conversation.delete",
+            "conversation.get", "conversation.list", "conversation.restore",
+        )
+
+        fun projectMethods() = setOf(
+            "project.archive", "project.beadsRemoteStatus", "project.create", "project.delete",
+            "project.get", "project.list", "project.provisionBeadsRemote",
+            "project.triggerSync", "project.update",
+        )
+
+        fun toolMethods() = setOf(
+            "tool.attach", "tool.create", "tool.delete", "tool.detach",
+            "tool.get", "tool.list", "tool.update", "tool_return.get",
+        )
+
+        fun subagentMethods() = setOf("subagent.list", "subagent.todos")
+
+        fun miscMethods() = setOf(
+            "approval.submit",
+            "archive.list",
+            "folder.list",
+            "goal.command",
+            "goal.get",
+            "slash_command.list",
+            "slash_command.list_agent",
+            "skill.install",
+            "skill.list",
+            "skill.list_agent",
+            "skill.uninstall",
+            "group.list",
+            "health.check",
+            "identity.get",
+            "identity.list",
+            "job.get",
+            "job.list",
+            "mcp.list",
+            "message.get",
+            "message.list",
+            "model.list",
+            "model.list.embedding",
+            "passage.create",
+            "passage.delete",
+            "passage.list",
+            "provider.list",
+            "run.get",
+            "run.list",
+            "schedule.create",
+            "schedule.delete",
+            "schedule.get",
+            "schedule.list",
+            "step.list",
+        )
     }
 }

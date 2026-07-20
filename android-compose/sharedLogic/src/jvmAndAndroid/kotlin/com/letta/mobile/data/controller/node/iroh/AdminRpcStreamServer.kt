@@ -269,7 +269,14 @@ internal class AdminRpcStreamServer(
             } else {
                 val params = obj["params"]?.jsonObject
                 notifyMethodObserved(method, params)
-                router.dispatch(requestId, method, params, requestContextProvider())
+                router.dispatch(
+                    AdminRpcInvocation(
+                        requestId = requestId,
+                        method = method,
+                        params = params,
+                        context = requestContextProvider(),
+                    ),
+                )
             }
         } catch (ce: CancellationException) {
             throw ce

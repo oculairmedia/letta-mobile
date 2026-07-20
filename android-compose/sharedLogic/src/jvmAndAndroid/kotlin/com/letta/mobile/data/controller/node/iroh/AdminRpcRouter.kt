@@ -40,6 +40,14 @@ data class AdminRpcRequestContext(
     }
 }
 
+/** Bundles dispatch inputs so the router API stays free of multi-string arity. */
+data class AdminRpcInvocation(
+    val requestId: String,
+    val method: String,
+    val params: JsonObject?,
+    val context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
+)
+
 class AdminRpcRouter(
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
@@ -85,31 +93,31 @@ class AdminRpcRouter(
      * Returns the JSON response frame or an error frame if the method is unknown
      * or the handler throws.
      */
-    suspend fun dispatch(
-        requestId: String,
-        method: String,
-        params: JsonObject?,
-        context: AdminRpcRequestContext = AdminRpcRequestContext.Authenticated,
-    ): String {
-        val handler = handlers[method]
+    suspend fun dispatch(invocation: AdminRpcInvocation): String {
+        val handler = handlers[invocation.method]
         if (handler == null) {
-            Telemetry.event("AdminRpc", "method.not_found", "method" to method)
-            return encodeFailure(requestId, AdminRpcErrors.unknownMethod(method))
+            Telemetry.event("AdminRpc", "method.not_found", "method" to invocation.method)
+            return encodeFailure(invocation.requestId, AdminRpcErrors.unknownMethod(invocation.method))
         }
         return try {
-            val result = handler(params, context)
+            val result = handler(invocation.params, invocation.context)
             json.encodeToString(
                 kotlinx.serialization.serializer(),
                 buildJsonObject {
                     put("type", "admin_rpc_response")
-                    put("request_id", requestId)
+                    put("request_id", invocation.requestId)
                     put("success", true)
                     put("result", result)
                 },
             )
         } catch (e: Exception) {
-            Telemetry.event("AdminRpc", "handler.error", "method" to method, "error" to (e.message ?: ""))
-            encodeFailure(requestId, e.message ?: "Internal error")
+            Telemetry.event(
+                "AdminRpc",
+                "handler.error",
+                "method" to invocation.method,
+                "error" to (e.message ?: ""),
+            )
+            encodeFailure(invocation.requestId, e.message ?: "Internal error")
         }
     }
 

@@ -1210,53 +1210,95 @@ class IrohChannelTransport(
         val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
             ?: return subagentListFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
-        return try {
-            withTimeoutOrNull(timeoutMs) {
-                val response = callScopedSubagentRpc(
+        return invokeScopedSubagent(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = SubagentRpcLabels(
+                unsupported = SUBAGENT_RPC_UNSUPPORTED,
+                timedOut = "subagent.list timed out",
+                failed = "subagent.list failed",
+            ),
+            call = {
+                callScopedSubagentRpc(
                     method = "subagent.list",
                     scope = scope,
                     body = buildJsonObject { put("all", all) }.toString(),
-                ) ?: return@withTimeoutOrNull subagentListFailure(requestId, SUBAGENT_RPC_UNSUPPORTED)
-                if (!response.success) return@withTimeoutOrNull subagentListFailure(requestId, response.error ?: "subagent.list failed")
-                val result = response.result?.let { subagentJson.decodeFromJsonElement<SubagentListRpcResult>(it) }
-                    ?: return@withTimeoutOrNull subagentListFailure(requestId, "subagent.list returned no result")
-                ServerFrame.SubagentListResponse(
-                    id = frameId("subagent_list"), ts = nowIso(), requestId = requestId,
-                    success = true, subagents = result.subagents,
                 )
-            } ?: subagentListFailure(requestId, "subagent.list timed out")
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            subagentListFailure(requestId, error.message ?: "subagent.list failed")
-        }
+            },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result)
+                ServerFrame.SubagentListResponse(
+                    id = frameId("subagent_list"),
+                    ts = nowIso(),
+                    requestId = requestId,
+                    success = true,
+                    subagents = decoded.subagents,
+                )
+            },
+            onFailure = ::subagentListFailure,
+        )
     }
 
     override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
         val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
             ?: return subagentTodosFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
-        return try {
-            withTimeoutOrNull(timeoutMs) {
-                val response = callScopedSubagentRpc(
+        return invokeScopedSubagent(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = SubagentRpcLabels(
+                unsupported = SUBAGENT_RPC_UNSUPPORTED,
+                timedOut = "subagent.todos timed out",
+                failed = "subagent.todos failed",
+            ),
+            call = {
+                callScopedSubagentRpc(
                     method = "subagent.todos",
                     scope = scope,
                     body = buildJsonObject { put("tool_call_id", toolCallId) }.toString(),
-                ) ?: return@withTimeoutOrNull subagentTodosFailure(requestId, SUBAGENT_RPC_UNSUPPORTED)
-                if (!response.success) return@withTimeoutOrNull subagentTodosFailure(requestId, response.error ?: "subagent.todos failed")
-                val result = response.result?.let { subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(it) }
-                    ?: return@withTimeoutOrNull subagentTodosFailure(requestId, "subagent.todos returned no result")
-                ServerFrame.SubagentTodosResponse(
-                    id = frameId("subagent_todos"), ts = nowIso(), requestId = requestId,
-                    success = true, found = result.found, subagent = result.subagent,
-                    todos = result.todos, todosFound = result.todosFound,
                 )
-            } ?: subagentTodosFailure(requestId, "subagent.todos timed out")
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            subagentTodosFailure(requestId, error.message ?: "subagent.todos failed")
-        }
+            },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(result)
+                ServerFrame.SubagentTodosResponse(
+                    id = frameId("subagent_todos"),
+                    ts = nowIso(),
+                    requestId = requestId,
+                    success = true,
+                    found = decoded.found,
+                    subagent = decoded.subagent,
+                    todos = decoded.todos,
+                    todosFound = decoded.todosFound,
+                )
+            },
+            onFailure = ::subagentTodosFailure,
+        )
+    }
+
+    private data class SubagentRpcLabels(
+        val unsupported: String,
+        val timedOut: String,
+        val failed: String,
+    )
+
+    private suspend fun <T> invokeScopedSubagent(
+        requestId: String,
+        timeoutMs: Long,
+        labels: SubagentRpcLabels,
+        call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
+        mapSuccess: (kotlinx.serialization.json.JsonElement) -> T,
+        onFailure: (String, String) -> T,
+    ): T = try {
+        withTimeoutOrNull(timeoutMs) {
+            val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
+            if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
+            val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")
+            mapSuccess(result)
+        } ?: onFailure(requestId, labels.timedOut)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        onFailure(requestId, error.message ?: labels.failed)
     }
 
     private suspend fun callScopedSubagentRpc(
