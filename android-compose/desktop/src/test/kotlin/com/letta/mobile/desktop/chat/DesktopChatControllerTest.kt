@@ -1,5 +1,7 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
@@ -552,6 +554,47 @@ class DesktopChatControllerTest {
         controller.close()
     }
 
+    @Test
+    fun firstSubstantiveSendPersistsStableConversationTitle() = runTest {
+        val gateway = TitleSummaryGateway()
+        val loop = FakeDesktopTimelineLoop("conv-1").also { it.completeHydrate() }
+        val controller = testController(gateway = gateway, loopFactory = { _, _, _ -> loop })
+        val prompt = TITLE_PROMPT
+
+        controller.start()
+        runCurrent()
+        controller.updateComposerText(prompt)
+        controller.send()
+        runCurrent()
+        runCurrent()
+
+        assertEquals(TITLE_EXPECTED, gateway.lastUpdate?.summary?.value)
+        assertEquals(TITLE_EXPECTED, controller.state.value.conversations.single().title)
+        controller.close()
+    }
+
+    @Test
+    fun failedSendDoesNotPersistConversationTitle() = runTest {
+        val gateway = TitleSummaryGateway()
+        val loop = FakeDesktopTimelineLoop(
+            "conv-1",
+            sendFailure = IllegalStateException(SEND_REJECTED),
+        ).also { it.completeHydrate() }
+        val controller = testController(gateway = gateway, loopFactory = { _, _, _ -> loop })
+
+        controller.start()
+        runCurrent()
+        val originalTitle = controller.state.value.conversations.single().title
+        controller.updateComposerText(TITLE_EXPECTED)
+        controller.send()
+        runCurrent()
+        runCurrent()
+
+        assertNull(gateway.lastUpdate)
+        assertEquals(originalTitle, controller.state.value.conversations.single().title)
+        controller.close()
+    }
+
     private fun TestScope.testController(
         gateway: DesktopChatGateway,
         agentNamesByIdProvider: suspend (Set<String>) -> Map<String, String> = { emptyMap() },
@@ -594,6 +637,8 @@ class DesktopChatControllerTest {
 
 open class FakeDesktopChatGateway(
     private val conversationIds: List<String> = listOf("conv-1"),
+    private val blankSummaries: Boolean = false,
+    private val emptyHistory: Boolean = false,
 ) : DesktopChatGateway {
     val sentRequests = mutableListOf<MessageCreateRequest>()
     val conversationMessageRequests = mutableListOf<String>()
@@ -604,7 +649,11 @@ open class FakeDesktopChatGateway(
             Conversation(
                 id = ConversationId(conversationId),
                 agentId = AgentId("agent-$index"),
-                summary = if (index == 0) "Remote planning" else "Remote planning $index",
+                summary = when {
+                    blankSummaries -> ""
+                    index == 0 -> "Remote planning"
+                    else -> "Remote planning $index"
+                },
                 createdAt = "2026-06-07T01:00:00Z",
                 updatedAt = "2026-06-07T01:01:00Z",
                 lastMessageAt = "2026-06-07T01:02:00Z",
@@ -641,6 +690,7 @@ open class FakeDesktopChatGateway(
         order: String?,
     ): List<LettaMessage> {
         conversationMessageRequests += conversationId
+        if (emptyHistory) return emptyList()
         return listOf(
             UserMessage(
                 id = "user-1",
@@ -657,6 +707,7 @@ open class FakeDesktopChatGateway(
         conversationId: String?,
     ): List<LettaMessage> {
         agentMessageRequests += agentId to conversationId
+        if (emptyHistory) return emptyList()
         return listOf(
             UserMessage(
                 id = "agent-user-$agentId",
@@ -678,6 +729,21 @@ private class CloseTrackingGateway(
 
     override fun close() {
         closeCount++
+    }
+}
+
+private const val TITLE_PROMPT = "Plan the Windows release\nwith a checklist"
+private const val TITLE_EXPECTED = "Plan the Windows release"
+private const val SEND_REJECTED = "stream rejected"
+
+private class TitleSummaryGateway :
+    FakeDesktopChatGateway(blankSummaries = true, emptyHistory = true),
+    ConversationSummaryGateway {
+    var lastUpdate: ConversationSummaryUpdate? = null
+
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
+        lastUpdate = update
+        return getConversation(update.conversationId.value).copy(summary = update.summary.value)
     }
 }
 

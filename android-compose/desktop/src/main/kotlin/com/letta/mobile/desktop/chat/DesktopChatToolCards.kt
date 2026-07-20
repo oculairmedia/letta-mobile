@@ -38,21 +38,24 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.ui.theme.customColors
 
 /**
  * Full, collapsible single-tool card matching the Penpot "Tool call (expanded)"
- * board: terminal glyph + name + green outlined success badge + copy/chevron,
+ * board: terminal glyph + name + failure badge when needed + copy/chevron,
  * the command, an inset output block, and an exit-code footer.
  */
 @Composable
-internal fun ToolCard(toolCall: UiToolCall) {
-    var expanded by remember { mutableStateOf(true) }
+internal fun ToolCard(
+    toolCall: UiToolCall,
+    disclosureKey: String = toolCall.disclosureKey(),
+) {
+    var expanded by remember(disclosureKey) { mutableStateOf(toolCall.shouldInitiallyExpand()) }
     val isError = toolCall.isErrorStatus()
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -82,9 +85,13 @@ private fun ToolCardHeader(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
+    val collapsedSummary = toolCall.stepLabel()
+        .takeUnless { it == toolCall.name }
+        ?: toolCall.stepSummary()
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("tool-card-toggle")
             .clickable(onClick = onToggle)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -101,9 +108,22 @@ private fun ToolCardHeader(
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
         )
-        ToolStatusBadge(ToolStatusToken(toolCall.status ?: "tool call"))
-        Spacer(Modifier.weight(1f))
-        CopyIconButton(text = toolCall.copyPayload())
+        if (!expanded && collapsedSummary.isNotBlank()) {
+            Text(
+                text = collapsedSummary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        ToolFailureBadge(ToolStatusToken(toolCall.status ?: "tool call"))
+        if (expanded) Spacer(Modifier.weight(1f))
+        CopyIconButton(
+            text = toolCall.copyPayload(),
+            config = CopyActionConfig(contentDescription = "Copy tool call"),
+        )
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
@@ -122,7 +142,9 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
             .background(MaterialTheme.colorScheme.outlineVariant),
     )
     Column(
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+        modifier = Modifier
+            .testTag("tool-card-body")
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
@@ -134,7 +156,24 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
                 )
             }
         }
-        toolCall.result?.takeIf { it.isNotBlank() }?.let { ToolOutputBlock(it, isError = isError) }
+        toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Output",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.weight(1f))
+                CopyIconButton(
+                    text = result,
+                    config = CopyActionConfig(contentDescription = "Copy output"),
+                )
+            }
+            ToolOutputBlock(result, isError = isError)
+        }
         DesktopImageAttachmentsGrid(
             attachments = toolCall.generatedImageAttachments,
             modifier = Modifier.fillMaxWidth(),
@@ -250,7 +289,7 @@ internal fun ArtifactCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                ToolStatusBadge(status)
+                ToolFailureBadge(status)
                 Spacer(Modifier.weight(1f))
             }
             content()
@@ -259,22 +298,14 @@ internal fun ArtifactCard(
 }
 
 /**
- * Outlined status badge for tool cards (Penpot: green-bordered "success",
- * red-bordered "error", muted otherwise).
+ * Tool cards are quiet on success; only failures need a persistent badge.
  */
 @Composable
-internal fun ToolStatusBadge(status: String) =
-    ToolStatusBadge(ToolStatusToken(status))
-
-@Composable
-internal fun ToolStatusBadge(status: ToolStatusToken) {
-    val color = when {
-        status.isSuccess() -> MaterialTheme.customColors.successColor.takeIf { it != Color.Unspecified }
-            ?: MaterialTheme.colorScheme.primary
-        status.isError() -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+internal fun ToolFailureBadge(status: ToolStatusToken) {
+    if (!status.isError()) return
+    val color = MaterialTheme.colorScheme.error
     Surface(
+        modifier = Modifier.testTag("tool-failure-badge"),
         shape = RoundedCornerShape(5.dp),
         color = Color.Transparent,
         contentColor = color,

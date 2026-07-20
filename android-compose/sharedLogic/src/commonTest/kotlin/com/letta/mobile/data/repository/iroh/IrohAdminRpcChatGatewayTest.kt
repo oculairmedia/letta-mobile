@@ -1,7 +1,10 @@
 package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.chat.runtime.ConversationSummary
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
@@ -36,6 +39,24 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohAdminRpcChatGatewayTest {
+
+    @Test
+    fun setConversationSummaryUsesConversationUpdateRpc() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("conversation.update", call.method)
+            assertEquals("/v1/conversations/conv-1", call.path)
+            assertTrue(call.body.orEmpty().contains("\"summary\":\"Plan the release\""))
+            ok("""{"id":"conv-1","agent_id":"agent-1","summary":"Plan the release"}""")
+        }
+        val gateway = IrohAdminRpcChatGateway(transport)
+
+        val updated = gateway.setConversationSummary(
+            ConversationSummaryUpdate(ConversationId("conv-1"), ConversationSummary("Plan the release")),
+        )
+
+        assertEquals("Plan the release", updated.summary)
+    }
 
     @Test
     fun listConversationsDecodesAdminRpcResult() = runTest(UnconfinedTestDispatcher()) {

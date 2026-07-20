@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository.iroh
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
+import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
@@ -68,7 +70,7 @@ class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     private val deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-) : ChatGateway, ChatGatewayExtras {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway {
 
     private val bridge = WsChatBridge(transport)
     private val json = lettaWireJson
@@ -179,6 +181,13 @@ class IrohAdminRpcChatGateway(
     override suspend fun listLlmModels(): List<LlmModel> {
         val result = rpc(AdminRpcCall("model.list", "/v1/models", "{}")) ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(LlmModel.serializer()), result)
+    }
+
+    override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
+        val body = buildJsonObject { put("summary", update.summary.value) }.toString()
+        val result = rpc(AdminRpcCall("conversation.update", "/v1/conversations/${update.conversationId.value}", body))
+            ?: throw TimelineTransportHttpException(502, "conversation.update returned no result over iroh admin_rpc")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation {

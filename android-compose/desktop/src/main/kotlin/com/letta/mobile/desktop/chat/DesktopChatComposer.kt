@@ -45,7 +45,7 @@ internal fun ComposerBar(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 28.dp, top = 4.dp, end = 28.dp, bottom = 16.dp),
+            .padding(start = 28.dp, top = 4.dp, end = 28.dp, bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {

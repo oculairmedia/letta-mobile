@@ -76,6 +76,13 @@ internal fun UiToolCall.stepSummary(): String {
 internal fun UiToolCall.isErrorStatus(): Boolean =
     status?.let(::ToolStatusToken)?.isError() == true
 
+internal fun UiToolCall.shouldInitiallyExpand(): Boolean =
+    generatedImageAttachments.isNotEmpty() ||
+        status?.let(::ToolStatusToken)?.isDoneStatus() != true
+
+internal fun UiToolCall.disclosureKey(): String =
+    toolCallId?.takeIf { it.isNotBlank() } ?: "$name:${arguments.hashCode()}"
+
 internal fun UiToolCall.copyPayload(): String =
     listOfNotNull(
         arguments.takeIf { it.isNotBlank() },

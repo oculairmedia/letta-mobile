@@ -126,6 +126,29 @@ class AdminProxyRequestTest {
     }
 
     @Test
+    fun conversationUpdatePatchesSummaryOnBaseResource() = runTest {
+        val recording = installRecordingTransport()
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, "http://admin.local")
+
+        router.dispatch(
+            requestId = "req-1",
+            method = "conversation.update",
+            params = buildJsonObject {
+                put("conversation_id", "conv-1")
+                put("summary", "Plan the release")
+            },
+        )
+
+        val call = recording.calls.single()
+        assertEquals("PATCH", call.method)
+        assertEquals("http://admin.local/v1/conversations/conv-1", call.url)
+        val body = Json.parseToJsonElement(call.body!!).jsonObject
+        assertEquals("Plan the release", body["summary"]?.jsonPrimitive?.content)
+        assertEquals(false, "conversation_id" in body)
+    }
+
+    @Test
     fun restorePatchesBaseConversationResourceWithArchivedFalse() = runTest {
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()

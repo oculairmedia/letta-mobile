@@ -3,6 +3,12 @@ package com.letta.mobile.data.controller.node.iroh
 object ConversationAdminHandlers {
     fun register(router: AdminRpcRouter, adminBaseUrl: String) {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
+        registerConversationReadRoutes(router, api)
+        registerConversationWriteRoutes(router, api)
+        registerMessageRoutes(router, api)
+    }
+
+    private fun registerConversationReadRoutes(router: AdminRpcRouter, api: AdminHandlerSupport) {
         router.register("conversation.list") { params ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val path = if (agentId != null) {
@@ -23,6 +29,9 @@ object ConversationAdminHandlers {
             val id = params.requireParam(AdminParamKey("conversation_id"))
             api.get(AdminPath.v1("conversations", id))
         }
+    }
+
+    private fun registerConversationWriteRoutes(router: AdminRpcRouter, api: AdminHandlerSupport) {
         router.register("conversation.create") { params ->
             // Current App Server exposes the canonical create route at
             // POST /v1/conversations with agent_id in the JSON body. The
@@ -33,6 +42,15 @@ object ConversationAdminHandlers {
         router.register("conversation.delete") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
             api.delete(AdminPath.v1("conversations", id))
+        }
+        router.register("conversation.update") { params ->
+            val id = params.requireParam(AdminParamKey("conversation_id"))
+            val body = kotlinx.serialization.json.buildJsonObject {
+                params?.forEach { (key, value) ->
+                    if (key != "conversation_id") put(key, value)
+                }
+            }
+            api.patch(AdminPath.v1("conversations", id), body = body.toString())
         }
         router.register("conversation.archive") { params ->
             // Letta has no /conversations/{id}/archive|/unarchive sub-resource; archive
@@ -48,6 +66,9 @@ object ConversationAdminHandlers {
             val id = params.requireParam(AdminParamKey("conversation_id"))
             api.patch(AdminPath.v1("conversations", id), body = """{"archived":false}""")
         }
+    }
+
+    private fun registerMessageRoutes(router: AdminRpcRouter, api: AdminHandlerSupport) {
         router.register("message.list") { params ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             // letta-mobile-c4igq.9: enforce a bounded newest-window even when the

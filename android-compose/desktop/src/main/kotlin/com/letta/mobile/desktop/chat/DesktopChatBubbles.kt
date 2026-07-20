@@ -3,12 +3,19 @@ package com.letta.mobile.desktop.chat
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +23,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,8 +49,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -50,6 +63,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
@@ -87,7 +101,12 @@ private fun AssistantMessageColumn(
             attachments = message.attachments,
             modifier = Modifier.fillMaxWidth(),
         )
-        message.toolCalls.orEmpty().forEach { toolCall -> ToolCard(toolCall) }
+        message.toolCalls.orEmpty().forEachIndexed { index, toolCall ->
+            ToolCard(
+                toolCall = toolCall,
+                disclosureKey = toolCall.toolCallId ?: "${message.id}:$index",
+            )
+        }
         message.generatedUi?.let { GeneratedUiCard(it) }
         message.approvalRequest?.let { ApprovalRequestCard(it) }
         message.approvalResponse?.let { ApprovalResponseCard(it) }
@@ -104,8 +123,12 @@ internal fun CopyIconButton(
     text: String,
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    config: CopyActionConfig = CopyActionConfig(),
 ) {
     val clipboard = LocalClipboardManager.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val hovered by interactionSource.collectIsHoveredAsState()
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {
@@ -113,22 +136,77 @@ internal fun CopyIconButton(
             copied = false
         }
     }
-    Icon(
-        imageVector = if (copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
-        contentDescription = if (copied) "Copied" else "Copy",
-        tint = if (copied) Color(0xFF34C759) else tint,
-        modifier = modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) {
+    val visualAlpha by animateFloatAsState(
+        targetValue = if (config.emphasized or focused or hovered or copied) 1f else 0.58f,
+        animationSpec = tween(durationMillis = 120),
+        label = "copyActionAlpha",
+    )
+    val resolvedDescription = if (copied) "Copied" else config.contentDescription
+    DesktopTooltip(text = resolvedDescription) {
+        CopyButtonVisual(
+            state = CopyButtonVisualState(copied, focused, visualAlpha),
+            style = CopyButtonVisualStyle(tint, resolvedDescription),
+            interaction = CopyButtonInteraction(interactionSource) {
                 clipboard.setText(AnnotatedString(text))
                 copied = true
-            }
-            .padding(2.dp)
-            .size(14.dp),
-    )
+            },
+            modifier = modifier,
+        )
+    }
 }
+
+internal data class CopyActionConfig(
+    val contentDescription: String = "Copy",
+    val emphasized: Boolean = true,
+)
+
+@Composable
+private fun CopyButtonVisual(
+    state: CopyButtonVisualState,
+    style: CopyButtonVisualStyle,
+    interaction: CopyButtonInteraction,
+    modifier: Modifier,
+) {
+    Box(
+        modifier = modifier
+            .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
+            .graphicsLayer { alpha = state.visualAlpha }
+            .clip(CircleShape)
+            .border(1.dp, state.focusBorderColor(), CircleShape)
+            .semantics { contentDescription = style.description }
+            .clickable(
+                interactionSource = interaction.source,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = interaction.onCopy,
+            )
+            .focusable(interactionSource = interaction.source),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = if (state.copied) Icons.Outlined.Check else Icons.Outlined.ContentCopy,
+            contentDescription = null,
+            tint = if (state.copied) Color(0xFF34C759) else style.tint,
+            modifier = Modifier.size(14.dp),
+        )
+    }
+}
+
+private data class CopyButtonVisualState(
+    val copied: Boolean,
+    val focused: Boolean,
+    val visualAlpha: Float,
+) {
+    @Composable
+    fun focusBorderColor(): Color = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+}
+
+private data class CopyButtonVisualStyle(val tint: Color, val description: String)
+
+private data class CopyButtonInteraction(
+    val source: MutableInteractionSource,
+    val onCopy: () -> Unit,
+)
 
 /** User prompt — teal bubble, right-aligned, with a copy affordance. */
 @Composable
@@ -166,6 +244,7 @@ internal fun UserPrompt(message: UiMessage) {
             CopyIconButton(
                 text = message.content,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                config = CopyActionConfig(contentDescription = "Copy message"),
             )
         }
     }
@@ -281,14 +360,36 @@ internal fun AgentText(params: AgentTextParams) {
     } else {
         params.text
     }
-    com.letta.mobile.ui.markdown.SharedMarkdownText(
-        text = displayText,
-        textColor = if (params.isError) {
-            MaterialTheme.colorScheme.error
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        },
-    )
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .hoverable(hoverInteraction),
+    ) {
+        SelectionContainer {
+            com.letta.mobile.ui.markdown.SharedMarkdownText(
+                text = displayText,
+                modifier = Modifier.padding(end = 32.dp),
+                textColor = if (params.isError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+        }
+        Surface(
+            modifier = Modifier.align(Alignment.TopEnd),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (isHovered) 0.94f else 0.35f),
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            CopyIconButton(
+                text = params.text,
+                config = CopyActionConfig(contentDescription = "Copy response", emphasized = isHovered),
+            )
+        }
+    }
 }
 
 @Composable

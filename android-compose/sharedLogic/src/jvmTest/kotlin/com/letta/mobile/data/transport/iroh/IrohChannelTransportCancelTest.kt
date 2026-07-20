@@ -145,6 +145,7 @@ class IrohChannelTransportCancelTest {
             // this gate the assistant frame races the subscription and is lost under
             // CPU load, timing out the "hello" await.
             withTimeout(3_000) { while (!client.inputReceived) delay(10) }
+            withTimeout(3_000) { while (!client.hasEventSubscriber) delay(10) }
 
             // The first assistant frame carries the real server run id.
             client.emitAssistant(messageId = "letta-msg-1", content = "hello", runId = REAL_RUN_ID)
@@ -182,7 +183,8 @@ class IrohChannelTransportCancelTest {
     private class ControllableClient(
         private val emitTerminalOnAbort: Boolean = false,
     ) : AppServerClient {
-        override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 32)
+        private val eventFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 32)
+        override val events: Flow<AppServerReceivedFrame> = eventFlow
         val abortCommands = mutableListOf<AppServerCommand.AbortMessage>()
 
         // Set once the engine has started the runtime and sent input — i.e. the
@@ -190,6 +192,9 @@ class IrohChannelTransportCancelTest {
         // something to address.
         @Volatile
         var inputReceived = false
+
+        val hasEventSubscriber: Boolean
+            get() = eventFlow.subscriptionCount.value > 0
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
             AppServerInboundFrame.RuntimeStartResponse(
@@ -254,17 +259,19 @@ class IrohChannelTransportCancelTest {
         )
 
         private fun emit(frame: AppServerInboundFrame.StreamDelta) {
-            (events as MutableSharedFlow<AppServerReceivedFrame>).tryEmit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = frame,
-                    raw = buildJsonObject {
-                        put("type", "stream_delta")
-                        put("idempotency_key", frame.idempotencyKey)
-                        put("delta", frame.delta.jsonObject)
-                    },
+            check(
+                eventFlow.tryEmit(
+                    AppServerReceivedFrame(
+                        channel = AppServerChannel.Stream,
+                        frame = frame,
+                        raw = buildJsonObject {
+                            put("type", "stream_delta")
+                            put("idempotency_key", frame.idempotencyKey)
+                            put("delta", frame.delta.jsonObject)
+                        },
+                    ),
                 ),
-            )
+            ) { "test event buffer is full" }
         }
     }
 }

@@ -11,7 +11,7 @@ class AdminRpcContractTest {
         // Adding a new admin method must update both handler + this expected set.
         val router = AdminRpcRegistry.buildRouter("http://localhost:8080", null)
         assertEquals(
-            expectedRegisteredMethods().sorted(),
+            (expectedRegisteredMethods() + "conversation.update").sorted(),
             router.registeredMethods.sorted(),
             "Registered Admin RPC methods do not exactly match the expected contract. Did you add/remove a method? Update handlers and expected set.",
         )

@@ -83,6 +83,66 @@ class ChatSessionReducerTest {
     }
 
     @Test
+    fun displayTitleUsesPreviewForGenericConversationNames() {
+        val summary = conversation("conversation-abcdef").copy(
+            title = "Conversation abcdef",
+            lastMessagePreview = "  Investigate the Windows desktop layout regression  ",
+        )
+
+        assertEquals("Investigate the Windows desktop layout regression", summary.displayTitle())
+        assertEquals("Named conversation", summary.copy(title = "Named conversation").displayTitle())
+    }
+
+    @Test
+    fun displayTitleTruncatesLongPreviewsAndIgnoresLoadingPlaceholder() {
+        val summary = conversation("conversation-abcdef").copy(
+            title = "Conversation abcdef",
+            lastMessagePreview = "A long preview that should be shortened",
+        )
+
+        assertEquals("A long pre…", summary.displayTitle(maxLength = 11))
+        assertEquals(
+            "Conversation abcdef",
+            summary.copy(lastMessagePreview = "Loaded from backend").displayTitle(),
+        )
+    }
+
+    @Test
+    fun persistedTitleCandidateUsesOnlyGenericConversationAndSubstantiveText() {
+        val generic = conversation("conversation-abcdef").copy(
+            title = "Conversation abcdef",
+            lastMessagePreview = "",
+        )
+
+        assertEquals("Plan the Windows release", generic.persistedTitleCandidate("Plan the Windows release\nMore"))
+        assertEquals(null, generic.persistedTitleCandidate("  \n  "))
+        assertEquals(null, generic.copy(title = "Pinned title").persistedTitleCandidate("New message"))
+        assertEquals(
+            null,
+            generic.copy(title = "Conversation with support").persistedTitleCandidate("New message"),
+        )
+        assertEquals(
+            null,
+            generic.copy(lastMessagePreview = "Prior history").persistedTitleCandidate("New message"),
+        )
+        assertEquals(
+            "Plan the Windows release",
+            generic.copy(lastMessagePreview = "Loaded from backend")
+                .persistedTitleCandidate("Plan the Windows release"),
+        )
+    }
+
+    @Test
+    fun displayTitlePreservesCustomConversationPrefixedTitles() {
+        val summary = conversation("conversation-abcdef").copy(
+            title = "Conversation with support",
+            lastMessagePreview = "latest note",
+        )
+
+        assertEquals("Conversation with support", summary.displayTitle())
+    }
+
+    @Test
     fun mapsConversationSummaryWithApiProvidedAgentNameWhenCacheMisses() {
         val summary = Conversation(
             id = ConversationId("conversation-abcdef"),

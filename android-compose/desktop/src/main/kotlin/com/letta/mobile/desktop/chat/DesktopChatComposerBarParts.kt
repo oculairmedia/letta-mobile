@@ -1,9 +1,13 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowUpward
@@ -23,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,14 +37,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.composer.ActiveToken
 import com.letta.mobile.data.composer.AutocompleteTrigger
@@ -47,7 +59,6 @@ import com.letta.mobile.data.composer.ComposerEffort
 import com.letta.mobile.data.composer.MentionCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
-import com.letta.mobile.desktop.DesktopTextArea
 import com.letta.mobile.desktop.DesktopTooltip
 import com.letta.mobile.ui.theme.customColors
 
@@ -133,12 +144,12 @@ internal fun ComposerHintRow() {
         modifier = Modifier
             .fillMaxWidth()
             .widthIn(max = 760.dp)
-            .padding(start = 4.dp),
+            .padding(start = 8.dp, top = 2.dp, bottom = 2.dp),
     ) {
         Text(
-            text = "@ to add files   ·   / for commands   ·   ⏎ to send",
+            text = "@ add files   ·   / commands   ·   Enter or Ctrl+Enter send   ·   Shift+Enter newline",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
         )
     }
 }
@@ -196,19 +207,41 @@ private fun ComposerPendingAttachmentsRow(
 
 @Composable
 private fun ComposerTextField(params: ComposerInputSurfaceParams) {
-    DesktopTextArea(
-        value = params.state.text,
-        onValueChange = params.actions.onTextChanged,
+    var fieldValue by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = params.state.text,
+                selection = TextRange(params.state.text.length),
+            ),
+        )
+    }
+    LaunchedEffect(params.state.text) {
+        fieldValue = reconcileComposerFieldValue(fieldValue, params.state.text)
+    }
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+
+    BasicTextField(
+        value = fieldValue,
+        onValueChange = { nextValue ->
+            fieldValue = nextValue
+            if (nextValue.text != params.state.text) {
+                params.actions.onTextChanged(nextValue.text)
+            }
+        },
         enabled = params.state.enabled,
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 28.dp, max = 120.dp)
+            .heightIn(min = 24.dp, max = 120.dp)
+            .testTag("composer-input")
             .onPreviewKeyEvent { event ->
                 composerEnterKeyHandled(
                     ComposerEnterKeyParams(
                         eventKey = event.key,
                         eventType = event.type,
                         shiftPressed = event.isShiftPressed,
+                        ctrlPressed = event.isCtrlPressed,
                         matchedCommands = params.matchedCommands,
                         canSend = params.canSend,
                         onTextChanged = params.actions.onTextChanged,
@@ -216,26 +249,54 @@ private fun ComposerTextField(params: ComposerInputSurfaceParams) {
                     ),
                 )
             },
+        textStyle = textStyle,
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
         maxLines = 5,
-        placeholder = params.state.placeholder,
-        undecorated = true,
+        decorationBox = { innerTextField ->
+            Box(modifier = Modifier.fillMaxWidth()) {
+                if (fieldValue.text.isEmpty()) {
+                    Text(
+                        text = params.state.placeholder,
+                        style = textStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                innerTextField()
+            }
+        },
     )
 }
 
-private data class ComposerEnterKeyParams(
+internal fun reconcileComposerFieldValue(current: TextFieldValue, externalText: String): TextFieldValue =
+    if (current.text == externalText) {
+        current
+    } else {
+        TextFieldValue(
+            text = externalText,
+            selection = TextRange(externalText.length),
+        )
+    }
+
+internal data class ComposerEnterKeyParams(
     val eventKey: Key,
     val eventType: KeyEventType,
     val shiftPressed: Boolean,
+    val ctrlPressed: Boolean,
     val matchedCommands: List<ComposerCommand>,
     val canSend: Boolean,
     val onTextChanged: (String) -> Unit,
     val onSend: () -> Unit,
 )
 
-private fun composerEnterKeyHandled(params: ComposerEnterKeyParams): Boolean {
+internal fun composerEnterKeyHandled(params: ComposerEnterKeyParams): Boolean {
+    val sendChord = when {
+        params.shiftPressed -> false
+        params.ctrlPressed -> true
+        else -> true
+    }
     val isEnter = params.eventType == KeyEventType.KeyDown &&
         (params.eventKey == Key.Enter || params.eventKey == Key.NumPadEnter) &&
-        !params.shiftPressed
+        sendChord
     if (!isEnter) return false
     val actionCommand = params.matchedCommands.firstOrNull { !it.fillsComposer }
     return when {
@@ -258,17 +319,42 @@ internal fun ComposerControlRow(
     actions: ComposerBarActions,
     canSend: Boolean,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        ComposerAttachButton(enabled = state.enabled, onAttachImage = actions.onAttachImage)
-        ComposerModelControls(state = state, actions = actions)
-        ComposerSafetyChip()
-        ComposerEffortControls()
-        Spacer(Modifier.weight(1f))
-        ComposerSendButton(canSend = canSend, onSend = actions.onSend)
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth().testTag("composer-controls")) {
+        if (maxWidth < 540.dp) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ComposerAttachButton(enabled = state.enabled, onAttachImage = actions.onAttachImage)
+                    ComposerModelControls(state = state, actions = actions)
+                    Spacer(Modifier.weight(1f))
+                    ComposerSendButton(canSend = canSend, onSend = actions.onSend)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().testTag("composer-controls-secondary"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ComposerSafetyChip()
+                    ComposerEffortControls()
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ComposerAttachButton(enabled = state.enabled, onAttachImage = actions.onAttachImage)
+                ComposerModelControls(state = state, actions = actions)
+                ComposerSafetyChip()
+                ComposerEffortControls()
+                Spacer(Modifier.weight(1f))
+                ComposerSendButton(canSend = canSend, onSend = actions.onSend)
+            }
+        }
     }
 }
 
@@ -346,21 +432,42 @@ private fun ComposerEffortControls() {
 
 @Composable
 private fun ComposerSendButton(canSend: Boolean, onSend: () -> Unit) {
-    Surface(
-        onClick = onSend,
-        enabled = canSend,
-        modifier = Modifier.size(38.dp),
-        shape = CircleShape,
-        color = if (canSend) {
+    val containerColor by animateColorAsState(
+        targetValue = if (canSend) {
             MaterialTheme.colorScheme.primary
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         },
-        contentColor = if (canSend) {
+        animationSpec = tween(durationMillis = 160),
+        label = "composerSendContainer",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (canSend) {
             MaterialTheme.colorScheme.onPrimary
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         },
+        animationSpec = tween(durationMillis = 160),
+        label = "composerSendContent",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (canSend) 1f else 0.9f,
+        animationSpec = tween(durationMillis = 160),
+        label = "composerSendScale",
+    )
+    Surface(
+        onClick = onSend,
+        enabled = canSend,
+        modifier = Modifier
+            .size(38.dp)
+            .testTag("composer-send")
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+        shape = CircleShape,
+        color = containerColor,
+        contentColor = contentColor,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
