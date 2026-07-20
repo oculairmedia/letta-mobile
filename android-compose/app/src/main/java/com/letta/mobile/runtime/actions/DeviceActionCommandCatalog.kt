@@ -1,7 +1,6 @@
 package com.letta.mobile.runtime.actions
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 object DeviceActionCommandCatalog {

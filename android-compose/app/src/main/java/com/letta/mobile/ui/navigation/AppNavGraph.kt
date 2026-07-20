@@ -22,7 +22,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
 import com.letta.mobile.AppLaunchTarget
 import com.letta.mobile.channel.ChatPushAlarmScheduler
 import com.letta.mobile.data.model.toBackendLabel

@@ -37,7 +37,6 @@ import com.letta.mobile.data.repository.api.IConversationInspectorMessageReposit
 import com.letta.mobile.data.repository.api.IMessageRepository
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton

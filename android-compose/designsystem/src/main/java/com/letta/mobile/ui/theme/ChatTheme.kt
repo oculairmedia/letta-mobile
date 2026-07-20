@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.theme
 
-import com.letta.mobile.ui.theme.LettaCodeFont
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme

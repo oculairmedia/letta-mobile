@@ -9,7 +9,6 @@ import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
-import com.letta.mobile.data.model.ProjectId
 import io.mockk.mockk
 
 class FakeAgentApi : AgentApi(mockk(relaxed = true)) {

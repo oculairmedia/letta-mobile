@@ -12,7 +12,6 @@ import com.letta.mobile.cli.probe.DeviceGateLogScan
 import com.letta.mobile.cli.probe.DeviceGateSummary
 import java.io.File
 import kotlin.system.exitProcess
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**

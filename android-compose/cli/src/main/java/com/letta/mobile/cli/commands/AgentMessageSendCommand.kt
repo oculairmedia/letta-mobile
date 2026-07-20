@@ -6,7 +6,6 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.letta.mobile.data.transport.iroh.AgentSendResult
 import com.letta.mobile.data.transport.iroh.FileIrohAgentAddressStore
-import com.letta.mobile.data.transport.iroh.IrohAgentAddress
 import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage

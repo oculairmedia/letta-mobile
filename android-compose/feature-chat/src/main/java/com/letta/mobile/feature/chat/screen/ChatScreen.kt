@@ -51,8 +51,6 @@ import com.letta.mobile.feature.chat.render.LocalTruncatedToolResultResolver
 import com.letta.mobile.feature.chat.render.TruncatedToolResultResolver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -77,7 +75,6 @@ import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.components.FloatingBanner
 import com.letta.mobile.ui.components.MessageSkeletonList
 import com.letta.mobile.ui.components.StarterPrompts
-import com.letta.mobile.ui.components.ThinkingShader
 import com.letta.mobile.ui.components.ThinkingTextToken
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
@@ -87,7 +84,6 @@ import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
-import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 import com.letta.mobile.feature.chat.subagent.ActiveSubagent
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentRings
 import kotlinx.collections.immutable.toImmutableList

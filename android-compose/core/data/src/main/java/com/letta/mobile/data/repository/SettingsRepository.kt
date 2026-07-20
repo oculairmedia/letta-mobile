@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.update
 import androidx.datastore.preferences.core.floatPreferencesKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Provider

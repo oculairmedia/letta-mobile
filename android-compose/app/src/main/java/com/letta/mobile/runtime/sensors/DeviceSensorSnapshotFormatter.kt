@@ -2,7 +2,6 @@ package com.letta.mobile.runtime.sensors
 
 import java.util.Locale
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 object DeviceSensorSnapshotFormatter {
