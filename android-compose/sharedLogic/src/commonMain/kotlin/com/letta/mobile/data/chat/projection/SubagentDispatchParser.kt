@@ -13,8 +13,18 @@ fun extractSubagentDispatch(
     arguments: String,
     returnContent: String?,
 ): UiSubagentDispatch? {
-    val args = parseJsonObject(arguments) ?: return null
+    // Task-notification XML is rendered by SubagentNotificationCard; do not
+    // attach a dispatch vessel that would short-circuit that path.
+    if (returnContent != null &&
+        returnContent.indexOf("<task-notification", ignoreCase = true) >= 0
+    ) {
+        return null
+    }
+
+    val args = parseJsonObject(arguments) ?: JsonObject(emptyMap())
     val result = returnContent?.let(::parseJsonObject)
+    if (args.isEmpty() && result == null) return null
+
     return UiSubagentDispatch(
         toolCallId = toolCallId,
         description = args.subagentDescription(),
@@ -26,8 +36,21 @@ fun extractSubagentDispatch(
     )
 }
 
+/**
+ * Parse a JSON object, unwrapping one layer of JSON-encoded string when the
+ * tool-call `arguments` field is itself a quoted JSON object (same shape
+ * [com.letta.mobile.data.repository.subagent.SubagentCorrelator] accepts).
+ */
 private fun parseJsonObject(raw: String): JsonObject? =
-    runCatching { Json.parseToJsonElement(raw).jsonObject }.getOrNull()
+    runCatching {
+        if (raw.isBlank()) return@runCatching null
+        var element = Json.parseToJsonElement(raw)
+        (element as? JsonPrimitive)
+            ?.takeIf { it.isString }
+            ?.contentOrNull
+            ?.let { element = Json.parseToJsonElement(it) }
+        element.jsonObject
+    }.getOrNull()
 
 private fun JsonObject.primitiveField(name: String): JsonPrimitive? =
     this[name] as? JsonPrimitive
