@@ -38,6 +38,32 @@ import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.screens.tools.ToolPickerDialog
 
+internal data class CreateAgentFormState(
+    val name: String = "",
+    val description: String = "",
+    val model: String = "",
+    val embedding: String = "",
+    val providerType: String = "",
+    val systemPrompt: String = "",
+    val temperature: String = "1.0",
+    val maxOutputTokens: String = "4096",
+    val parallelToolCalls: Boolean = true,
+    val enableSleeptime: Boolean = false,
+    val includeBaseTools: Boolean = true,
+    val selectedToolIds: List<String> = emptyList(),
+    val runtimeOption: AgentCreateRuntimeOption = AgentCreateRuntimeOption.REMOTE,
+    val showToolPicker: Boolean = false,
+)
+
+internal data class CreateAgentDialogResources(
+    val localReadiness: LocalLettaCodeCreateReadiness,
+    val llmModels: List<LlmModel>,
+    val embeddingDropdownModels: List<LlmModel>,
+    val onOpenLocalSettings: () -> Unit,
+    val onLoadModels: () -> Unit,
+    val validation: CreateAgentValidation,
+)
+
 @Composable
 internal fun CreateAgentDialog(
     onDismiss: () -> Unit,
@@ -49,35 +75,21 @@ internal fun CreateAgentDialog(
     onOpenLocalSettings: () -> Unit = {},
     onCreate: (AgentCreateParams, AgentCreateRuntimeOption) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var embedding by remember { mutableStateOf("") }
-    var providerType by remember { mutableStateOf("") }
-    var systemPrompt by remember { mutableStateOf("") }
-    var temperature by remember { mutableStateOf("1.0") }
-    var maxOutputTokens by remember { mutableStateOf("4096") }
-    var parallelToolCalls by remember { mutableStateOf(true) }
-    var enableSleeptime by remember { mutableStateOf(false) }
-    var includeBaseTools by remember { mutableStateOf(true) }
-    var selectedToolIds by remember { mutableStateOf<List<String>>(emptyList()) }
     // letta-mobile-vc680: under a local config the dialog used to default to
     // REMOTE, presenting a remote model picker that can never list on-device
     // models — users concluded their downloaded model was missing.
-    var runtimeOption by remember {
-        mutableStateOf(
-            if (localReadiness.activeConfigIsLocal) {
-                AgentCreateRuntimeOption.LOCAL_LETTACODE
-            } else {
-                AgentCreateRuntimeOption.REMOTE
-            }
-        )
+    val defaultRuntime = if (localReadiness.activeConfigIsLocal) {
+        AgentCreateRuntimeOption.LOCAL_LETTACODE
+    } else {
+        AgentCreateRuntimeOption.REMOTE
     }
-    var showToolPicker by remember { mutableStateOf(false) }
-    val validation = remember(name, runtimeOption, localReadiness) {
+    var formState by remember {
+        mutableStateOf(CreateAgentFormState(runtimeOption = defaultRuntime))
+    }
+    val validation = remember(formState.name, formState.runtimeOption, localReadiness) {
         validateCreateAgentForm(
-            name = name,
-            runtimeOption = runtimeOption,
+            name = formState.name,
+            runtimeOption = formState.runtimeOption,
             localReadiness = localReadiness,
         )
     }
@@ -91,6 +103,14 @@ internal fun CreateAgentDialog(
             )
         }
     }
+    val resources = CreateAgentDialogResources(
+        localReadiness = localReadiness,
+        llmModels = llmModels,
+        embeddingDropdownModels = embeddingDropdownModels,
+        onOpenLocalSettings = onOpenLocalSettings,
+        onLoadModels = onLoadModels,
+        validation = validation,
+    )
 
     MultiFieldInputDialog(
         show = true,
@@ -101,70 +121,29 @@ internal fun CreateAgentDialog(
         confirmEnabled = validation.enabled,
         onConfirm = {
             onCreate(
-                buildAgentCreateParams(
-                    name = name,
-                    description = description,
-                    model = model,
-                    embedding = embedding,
-                    providerType = providerType,
-                    temperature = temperature,
-                    maxOutputTokens = maxOutputTokens,
-                    parallelToolCalls = parallelToolCalls,
-                    selectedToolIds = selectedToolIds,
-                    systemPrompt = systemPrompt,
-                    enableSleeptime = enableSleeptime,
-                    includeBaseTools = includeBaseTools,
-                    runtimeOption = runtimeOption,
-                ),
-                runtimeOption,
+                buildAgentCreateParams(formState),
+                formState.runtimeOption,
             )
         },
     ) {
         CreateAgentDialogForm(
-            name = name,
-            onNameChange = { name = it },
-            description = description,
-            onDescriptionChange = { description = it },
-            runtimeOption = runtimeOption,
-            onRuntimeOptionChange = { runtimeOption = it },
-            localReadiness = localReadiness,
-            onOpenLocalSettings = onOpenLocalSettings,
-            model = model,
-            onModelChange = { model = it },
-            embedding = embedding,
-            onEmbeddingChange = { embedding = it },
-            llmModels = llmModels,
-            embeddingDropdownModels = embeddingDropdownModels,
-            onLoadModels = onLoadModels,
-            providerType = providerType,
-            onProviderTypeChange = { providerType = it },
-            temperature = temperature,
-            onTemperatureChange = { temperature = it },
-            maxOutputTokens = maxOutputTokens,
-            onMaxOutputTokensChange = { maxOutputTokens = it },
-            parallelToolCalls = parallelToolCalls,
-            onParallelToolCallsChange = { parallelToolCalls = it },
-            systemPrompt = systemPrompt,
-            onSystemPromptChange = { systemPrompt = it },
-            enableSleeptime = enableSleeptime,
-            onEnableSleeptimeChange = { enableSleeptime = it },
-            includeBaseTools = includeBaseTools,
-            onIncludeBaseToolsChange = { includeBaseTools = it },
-            selectedToolIds = selectedToolIds,
-            onSelectToolsClick = { showToolPicker = true },
-            validation = validation,
+            formState = formState,
+            onFormStateChange = { formState = it },
+            resources = resources,
         )
     }
 
-    if (showToolPicker) {
+    if (formState.showToolPicker) {
         ToolPickerDialog(
             tools = availableTools,
-            selectedToolIds = selectedToolIds,
+            selectedToolIds = formState.selectedToolIds,
             title = stringResource(R.string.screen_agents_create_select_tools),
-            onDismiss = { showToolPicker = false },
+            onDismiss = { formState = formState.copy(showToolPicker = false) },
             onConfirm = { selectedIds ->
-                selectedToolIds = selectedIds
-                showToolPicker = false
+                formState = formState.copy(
+                    selectedToolIds = selectedIds,
+                    showToolPicker = false,
+                )
             },
         )
     }
@@ -195,128 +174,75 @@ fun validateCreateAgentForm(
     return CreateAgentValidation(enabled = true, disabledReason = null)
 }
 
-internal fun buildAgentCreateParams(
-    name: String,
-    description: String,
-    model: String,
-    embedding: String,
-    providerType: String,
-    temperature: String,
-    maxOutputTokens: String,
-    parallelToolCalls: Boolean,
-    selectedToolIds: List<String>,
-    systemPrompt: String,
-    enableSleeptime: Boolean,
-    includeBaseTools: Boolean,
-    runtimeOption: AgentCreateRuntimeOption,
-): AgentCreateParams {
-    val isLocal = runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE
+internal fun buildAgentCreateParams(formState: CreateAgentFormState): AgentCreateParams {
+    val isLocal = formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE
     return AgentCreateParams(
-        name = name,
-        description = description.ifBlank { null },
-        model = model.ifBlank { null },
-        embedding = embedding.ifBlank { null },
+        name = formState.name,
+        description = formState.description.ifBlank { null },
+        model = formState.model.ifBlank { null },
+        embedding = formState.embedding.ifBlank { null },
         modelSettings = ModelSettings(
-            providerType = providerType.ifBlank { null },
-            temperature = temperature.toDoubleOrNull(),
-            maxOutputTokens = maxOutputTokens.toIntOrNull(),
-            parallelToolCalls = parallelToolCalls,
+            providerType = formState.providerType.ifBlank { null },
+            temperature = formState.temperature.toDoubleOrNull(),
+            maxOutputTokens = formState.maxOutputTokens.toIntOrNull(),
+            parallelToolCalls = formState.parallelToolCalls,
         ),
-        toolIds = if (isLocal) null else selectedToolIds.map { ToolId(it) }.ifEmpty { null },
-        system = systemPrompt.ifBlank { null },
-        enableSleeptime = if (isLocal) false else enableSleeptime,
-        includeBaseTools = if (isLocal) false else includeBaseTools,
+        toolIds = if (isLocal) {
+            null
+        } else {
+            formState.selectedToolIds.map { ToolId(it) }.ifEmpty { null }
+        },
+        system = formState.systemPrompt.ifBlank { null },
+        enableSleeptime = if (isLocal) false else formState.enableSleeptime,
+        includeBaseTools = if (isLocal) false else formState.includeBaseTools,
         parallelToolCalls = if (isLocal) false else null,
     )
 }
 
 @Composable
 private fun CreateAgentDialogForm(
-    name: String,
-    onNameChange: (String) -> Unit,
-    description: String,
-    onDescriptionChange: (String) -> Unit,
-    runtimeOption: AgentCreateRuntimeOption,
-    onRuntimeOptionChange: (AgentCreateRuntimeOption) -> Unit,
-    localReadiness: LocalLettaCodeCreateReadiness,
-    onOpenLocalSettings: () -> Unit,
-    model: String,
-    onModelChange: (String) -> Unit,
-    embedding: String,
-    onEmbeddingChange: (String) -> Unit,
-    llmModels: List<LlmModel>,
-    embeddingDropdownModels: List<LlmModel>,
-    onLoadModels: () -> Unit,
-    providerType: String,
-    onProviderTypeChange: (String) -> Unit,
-    temperature: String,
-    onTemperatureChange: (String) -> Unit,
-    maxOutputTokens: String,
-    onMaxOutputTokensChange: (String) -> Unit,
-    parallelToolCalls: Boolean,
-    onParallelToolCallsChange: (Boolean) -> Unit,
-    systemPrompt: String,
-    onSystemPromptChange: (String) -> Unit,
-    enableSleeptime: Boolean,
-    onEnableSleeptimeChange: (Boolean) -> Unit,
-    includeBaseTools: Boolean,
-    onIncludeBaseToolsChange: (Boolean) -> Unit,
-    selectedToolIds: List<String>,
-    onSelectToolsClick: () -> Unit,
-    validation: CreateAgentValidation,
+    formState: CreateAgentFormState,
+    onFormStateChange: (CreateAgentFormState) -> Unit,
+    resources: CreateAgentDialogResources,
 ) {
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OutlinedTextField(
-            value = name,
-            onValueChange = onNameChange,
+            value = formState.name,
+            onValueChange = { onFormStateChange(formState.copy(name = it)) },
             label = { Text(stringResource(R.string.common_name)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
-            value = description,
-            onValueChange = onDescriptionChange,
+            value = formState.description,
+            onValueChange = { onFormStateChange(formState.copy(description = it)) },
             label = { Text(stringResource(R.string.common_description)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         CreateAgentRuntimeSection(
-            runtimeOption = runtimeOption,
-            onRuntimeOptionChange = onRuntimeOptionChange,
-            localReadiness = localReadiness,
-            onOpenLocalSettings = onOpenLocalSettings,
-            model = model,
-            onModelChange = onModelChange,
-            embedding = embedding,
-            onEmbeddingChange = onEmbeddingChange,
-            llmModels = llmModels,
-            embeddingDropdownModels = embeddingDropdownModels,
-            onLoadModels = onLoadModels,
+            formState = formState,
+            onFormStateChange = onFormStateChange,
+            resources = resources,
         )
-        if (runtimeOption != AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+        if (formState.runtimeOption != AgentCreateRuntimeOption.LOCAL_LETTACODE) {
             CreateAgentRemoteAdvancedSection(
-                providerType = providerType,
-                onProviderTypeChange = onProviderTypeChange,
-                temperature = temperature,
-                onTemperatureChange = onTemperatureChange,
-                maxOutputTokens = maxOutputTokens,
-                onMaxOutputTokensChange = onMaxOutputTokensChange,
-                parallelToolCalls = parallelToolCalls,
-                onParallelToolCallsChange = onParallelToolCallsChange,
+                formState = formState,
+                onFormStateChange = onFormStateChange,
             )
         }
         OutlinedTextField(
-            value = systemPrompt,
-            onValueChange = onSystemPromptChange,
+            value = formState.systemPrompt,
+            onValueChange = { onFormStateChange(formState.copy(systemPrompt = it)) },
             label = { Text(stringResource(R.string.common_system_prompt)) },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
             maxLines = 5,
         )
-        if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+        if (formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
             Text(
                 text = "Text only · tools off · approvals off",
                 style = MaterialTheme.typography.bodyMedium,
@@ -324,15 +250,11 @@ private fun CreateAgentDialogForm(
             )
         } else {
             CreateAgentRemoteToolsSection(
-                enableSleeptime = enableSleeptime,
-                onEnableSleeptimeChange = onEnableSleeptimeChange,
-                includeBaseTools = includeBaseTools,
-                onIncludeBaseToolsChange = onIncludeBaseToolsChange,
-                selectedToolIds = selectedToolIds,
-                onSelectToolsClick = onSelectToolsClick,
+                formState = formState,
+                onFormStateChange = onFormStateChange,
             )
         }
-        validation.disabledReason?.let { reason ->
+        resources.validation.disabledReason?.let { reason ->
             Text(
                 text = reason,
                 style = MaterialTheme.typography.bodyMedium,
@@ -344,17 +266,9 @@ private fun CreateAgentDialogForm(
 
 @Composable
 private fun CreateAgentRuntimeSection(
-    runtimeOption: AgentCreateRuntimeOption,
-    onRuntimeOptionChange: (AgentCreateRuntimeOption) -> Unit,
-    localReadiness: LocalLettaCodeCreateReadiness,
-    onOpenLocalSettings: () -> Unit,
-    model: String,
-    onModelChange: (String) -> Unit,
-    embedding: String,
-    onEmbeddingChange: (String) -> Unit,
-    llmModels: List<LlmModel>,
-    embeddingDropdownModels: List<LlmModel>,
-    onLoadModels: () -> Unit,
+    formState: CreateAgentFormState,
+    onFormStateChange: (CreateAgentFormState) -> Unit,
+    resources: CreateAgentDialogResources,
 ) {
     Text(
         text = "Runtime",
@@ -373,8 +287,10 @@ private fun CreateAgentRuntimeSection(
         },
         tail = {
             Switch(
-                checked = runtimeOption == AgentCreateRuntimeOption.REMOTE,
-                onCheckedChange = { if (it) onRuntimeOptionChange(AgentCreateRuntimeOption.REMOTE) },
+                checked = formState.runtimeOption == AgentCreateRuntimeOption.REMOTE,
+                onCheckedChange = {
+                    if (it) onFormStateChange(formState.copy(runtimeOption = AgentCreateRuntimeOption.REMOTE))
+                },
             )
         },
     )
@@ -391,48 +307,50 @@ private fun CreateAgentRuntimeSection(
         },
         tail = {
             Switch(
-                checked = runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE,
-                onCheckedChange = { if (it) onRuntimeOptionChange(AgentCreateRuntimeOption.LOCAL_LETTACODE) },
+                checked = formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE,
+                onCheckedChange = {
+                    if (it) onFormStateChange(formState.copy(runtimeOption = AgentCreateRuntimeOption.LOCAL_LETTACODE))
+                },
             )
         },
     )
-    if (runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
+    if (formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE) {
         LocalLettaCodeReadinessCard(
-            readiness = localReadiness,
-            onOpenLocalSettings = onOpenLocalSettings,
+            readiness = resources.localReadiness,
+            onOpenLocalSettings = resources.onOpenLocalSettings,
         )
-        if (localReadiness.ready) {
+        if (resources.localReadiness.ready) {
             // Local-mode model options: the custom endpoint's models
             // and downloaded on-device models, via repository routing
             // (letta-mobile-3icw7). Blank = config/seed default.
             ModelDropdown(
-                selectedModel = model,
-                models = llmModels,
-                onModelSelected = onModelChange,
-                onLoadModels = onLoadModels,
+                selectedModel = formState.model,
+                models = resources.llmModels,
+                onModelSelected = { onFormStateChange(formState.copy(model = it)) },
+                onLoadModels = resources.onLoadModels,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.common_model),
             )
         }
     } else {
         ModelDropdown(
-            selectedModel = model,
-            models = llmModels,
-            onModelSelected = onModelChange,
-            onLoadModels = onLoadModels,
+            selectedModel = formState.model,
+            models = resources.llmModels,
+            onModelSelected = { onFormStateChange(formState.copy(model = it)) },
+            onLoadModels = resources.onLoadModels,
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(R.string.common_model),
         )
         ModelDropdown(
-            selectedModel = embedding,
-            models = embeddingDropdownModels,
-            onModelSelected = onEmbeddingChange,
-            onLoadModels = onLoadModels,
+            selectedModel = formState.embedding,
+            models = resources.embeddingDropdownModels,
+            onModelSelected = { onFormStateChange(formState.copy(embedding = it)) },
+            onLoadModels = resources.onLoadModels,
             modifier = Modifier.fillMaxWidth(),
             label = stringResource(R.string.screen_agent_edit_embedding_model),
         )
         Text(
-            text = remoteCreateAgentModelHelp(model = model, embedding = embedding),
+            text = remoteCreateAgentModelHelp(model = formState.model, embedding = formState.embedding),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -441,43 +359,44 @@ private fun CreateAgentRuntimeSection(
 
 @Composable
 private fun CreateAgentRemoteAdvancedSection(
-    providerType: String,
-    onProviderTypeChange: (String) -> Unit,
-    temperature: String,
-    onTemperatureChange: (String) -> Unit,
-    maxOutputTokens: String,
-    onMaxOutputTokensChange: (String) -> Unit,
-    parallelToolCalls: Boolean,
-    onParallelToolCallsChange: (Boolean) -> Unit,
+    formState: CreateAgentFormState,
+    onFormStateChange: (CreateAgentFormState) -> Unit,
 ) {
     Text(
         text = stringResource(R.string.screen_agents_create_advanced_model_section),
         style = MaterialTheme.typography.titleSmall,
     )
     OutlinedTextField(
-        value = providerType,
-        onValueChange = onProviderTypeChange,
+        value = formState.providerType,
+        onValueChange = { onFormStateChange(formState.copy(providerType = it)) },
         label = { Text(stringResource(R.string.common_provider)) },
         placeholder = { Text(stringResource(R.string.screen_agents_create_provider_placeholder)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
-        value = temperature,
+        value = formState.temperature,
         onValueChange = { value ->
             if (value.isBlank() || value.toDoubleOrNull() != null) {
-                onTemperatureChange(value)
+                onFormStateChange(formState.copy(temperature = value))
             }
         },
-        label = { Text(stringResource(R.string.screen_agent_edit_temperature_value, temperature.toFloatOrNull() ?: 0f)) },
+        label = {
+            Text(
+                stringResource(
+                    R.string.screen_agent_edit_temperature_value,
+                    formState.temperature.toFloatOrNull() ?: 0f,
+                ),
+            )
+        },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
     )
     OutlinedTextField(
-        value = maxOutputTokens,
+        value = formState.maxOutputTokens,
         onValueChange = { value ->
             if (value.isBlank() || value.toIntOrNull() != null) {
-                onMaxOutputTokensChange(value)
+                onFormStateChange(formState.copy(maxOutputTokens = value))
             }
         },
         label = { Text(stringResource(R.string.common_max_output_tokens)) },
@@ -487,37 +406,42 @@ private fun CreateAgentRemoteAdvancedSection(
     FormItem(
         label = { Text(stringResource(R.string.common_parallel_tool_calls)) },
         tail = {
-            Switch(checked = parallelToolCalls, onCheckedChange = onParallelToolCallsChange)
+            Switch(
+                checked = formState.parallelToolCalls,
+                onCheckedChange = { onFormStateChange(formState.copy(parallelToolCalls = it)) },
+            )
         },
     )
 }
 
 @Composable
 private fun CreateAgentRemoteToolsSection(
-    enableSleeptime: Boolean,
-    onEnableSleeptimeChange: (Boolean) -> Unit,
-    includeBaseTools: Boolean,
-    onIncludeBaseToolsChange: (Boolean) -> Unit,
-    selectedToolIds: List<String>,
-    onSelectToolsClick: () -> Unit,
+    formState: CreateAgentFormState,
+    onFormStateChange: (CreateAgentFormState) -> Unit,
 ) {
     FormItem(
         label = { Text(stringResource(R.string.common_enable_sleeptime)) },
         tail = {
-            Switch(checked = enableSleeptime, onCheckedChange = onEnableSleeptimeChange)
+            Switch(
+                checked = formState.enableSleeptime,
+                onCheckedChange = { onFormStateChange(formState.copy(enableSleeptime = it)) },
+            )
         },
     )
     FormItem(
         label = { Text(stringResource(R.string.screen_agents_create_include_base_tools)) },
         tail = {
-            Switch(checked = includeBaseTools, onCheckedChange = onIncludeBaseToolsChange)
+            Switch(
+                checked = formState.includeBaseTools,
+                onCheckedChange = { onFormStateChange(formState.copy(includeBaseTools = it)) },
+            )
         },
     )
     Text(
         text = stringResource(R.string.common_tools),
         style = MaterialTheme.typography.titleSmall,
     )
-    if (selectedToolIds.isEmpty()) {
+    if (formState.selectedToolIds.isEmpty()) {
         Text(
             text = stringResource(R.string.screen_tools_empty_attached),
             style = MaterialTheme.typography.bodyMedium,
@@ -527,14 +451,14 @@ private fun CreateAgentRemoteToolsSection(
         Text(
             text = pluralStringResource(
                 R.plurals.screen_agents_create_selected_tools_count,
-                selectedToolIds.size,
-                selectedToolIds.size,
+                formState.selectedToolIds.size,
+                formState.selectedToolIds.size,
             ),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
     OutlinedButton(
-        onClick = onSelectToolsClick,
+        onClick = { onFormStateChange(formState.copy(showToolPicker = true)) },
         modifier = Modifier.fillMaxWidth(),
     ) {
         Icon(LettaIcons.Add, contentDescription = null)
