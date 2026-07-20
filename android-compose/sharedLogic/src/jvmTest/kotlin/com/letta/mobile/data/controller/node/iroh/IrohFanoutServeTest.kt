@@ -197,9 +197,9 @@ class IrohFanoutServeTest {
         }
     }
 
-    /** case4 helper: a viewer received the full cumulative sequence for exactly ONE otid, one terminal, monotonic seq. */
+    /** case4 helper: a viewer received one checkpoint then incremental text for exactly one otid. */
     private fun assertViewerSawOnlyConversation(sink: CapturingSink, who: String, otid: String) {
-        assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative text")
+        assertEquals(listOf("Hel", "lo world"), assistantContents(sink), "$who checkpoint plus incremental text")
         val ids = parsed(sink).mapNotNull { deltaOf(it)?.get("id")?.jsonPrimitive?.content }
             .filter { it.startsWith("cm-stream-") }
         assertTrue(ids.all { it == "cm-stream-$otid" }, "$who only $otid assistant ids")
@@ -257,8 +257,8 @@ class IrohFanoutServeTest {
                 .filter { it.startsWith("cm-stream-") }
             assertEquals(2, assistantIds.size, "$who cm-stream tagged assistant deltas")
             assertTrue(assistantIds.all { it == "cm-stream-otid-C" }, "$who cm-stream id")
-            // Cumulative accumulation carries full text in the last delta.
-            assertEquals(listOf("Hel", "Hello world"), assistantContents(sink), "$who cumulative text")
+            // Initial checkpoint followed by incremental text avoids repeated full snapshots.
+            assertEquals(listOf("Hel", "lo world"), assistantContents(sink), "$who checkpoint plus incremental text")
             // EXACTLY ONE terminal.
             assertEquals(1, terminalCount(sink), "$who exactly one terminal")
         }
@@ -397,7 +397,7 @@ class IrohFanoutServeTest {
         val elapsed = testScheduler.currentTime - start
 
         // Initiator got the full ordered sequence + terminal.
-        assertEquals(listOf("Hel", "Hello world"), assistantContents(sinkA), "initiator full stream")
+        assertEquals(listOf("Hel", "lo world"), assistantContents(sinkA), "initiator full incremental stream")
         assertEquals(1, terminalCount(sinkA), "initiator got terminal")
         // Bounded: de-registered after the FIRST stall, so total delay ~= one
         // timeout window, not one-per-delta.
@@ -489,7 +489,7 @@ class IrohFanoutServeTest {
         // LEAVER received nothing after its disconnect.
         assertEquals(leaverFramesAtDisconnect, leaverSink.frames().size, "no writes after disconnect")
         // INITIATOR unaffected: full text + one terminal.
-        assertEquals("Hello world", assistantContents(sinkA).last(), "initiator final text")
+        assertEquals(listOf("Hel", "lo wor", "ld"), assistantContents(sinkA), "initiator incremental text")
         assertEquals(1, terminalCount(sinkA), "initiator one terminal")
     }
 
@@ -551,7 +551,7 @@ class IrohFanoutServeTest {
         val expectedBodies = listOf(
             """{"message_type":"tool_call_message","tool_call":{"tool_call_id":"tc-C","name":"stub_tool","arguments":"{}"}}""",
             """{"message_type":"assistant_message","otid":"otid-C","content":"Hel","id":"cm-stream-otid-C"}""",
-            """{"message_type":"assistant_message","otid":"otid-C","content":"Hello world","id":"cm-stream-otid-C"}""",
+            """{"message_type":"assistant_message","otid":"otid-C","content":"lo world","id":"cm-stream-otid-C"}""",
             """{"message_type":"tool_return_message","tool_call_id":"tc-C","status":"success","tool_return":"ok"}""",
             """{"message_type":"stop_reason","stop_reason":"end_turn"}""",
         ).map { json.parseToJsonElement(it).jsonObject }

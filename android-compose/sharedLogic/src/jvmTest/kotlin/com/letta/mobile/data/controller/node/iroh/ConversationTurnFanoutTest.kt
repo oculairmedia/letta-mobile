@@ -188,14 +188,14 @@ class ConversationTurnFanoutTest {
             }.filter { it.startsWith("cm-stream-") }
             assertEquals(2, assistantIds.size, "$who cm-stream tagged assistant deltas")
             assertTrue(assistantIds.all { it == "cm-stream-otid-1" }, "$who cm-stream id")
-            // Cumulative accumulation: last assistant delta carries full text.
+            // Incremental fanout: viewers receive only each newly emitted chunk.
             val assistantContents = frames.mapNotNull {
                 val d = it["delta"]?.jsonObject ?: return@mapNotNull null
                 if (d["message_type"]?.jsonPrimitive?.content == "assistant_message") {
                     d["content"]?.jsonPrimitive?.content
                 } else null
             }
-            assertEquals(listOf("Hel", "Hello world"), assistantContents, "$who cumulative text")
+            assertEquals(listOf("Hel", "lo world"), assistantContents, "$who incremental text")
             // Exactly one terminal.
             val terminals = frames.count {
                 it["delta"]?.jsonObject?.get("message_type")?.jsonPrimitive?.content == "stop_reason"
@@ -293,6 +293,73 @@ class ConversationTurnFanoutTest {
         assertEquals(5, parked.size, "parking must be initiator-scoped, once per delta")
         // The tracked terminal is the stop_reason delta.
         assertTrue(parked.last().contains("stop_reason"))
+    }
+
+    @Test
+    fun longStreamWireBytesStayLinearAndLateJoinerGetsOneCheckpoint() = runTest {
+        val registry = ConnectionRegistry()
+        val initiatorSink = CapturingSink()
+        val initiator = viewer("conn-init", initiatorSink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+        val accumulated = StringBuilder()
+        val fragment = "abcdefgh"
+        val frameCount = 1_000
+
+        repeat(frameCount) { index ->
+            accumulated.append(fragment)
+            fanout.onDraft(
+                RuntimeEventPayload.RemoteStreamFrame(
+                    frameId = "long-$index",
+                    messageId = null,
+                    messageType = null,
+                    body = rawStreamDeltaBody(
+                        index.toLong() + 1,
+                        buildJsonObject {
+                            put("message_type", "assistant_message")
+                            put("otid", "otid-long")
+                            put("id", "letta-long")
+                            put("content", accumulated.toString())
+                        },
+                    ),
+                ),
+            )
+        }
+
+        val initiatorContents = initiatorSink.frames().mapNotNull { frame ->
+            val delta = json.parseToJsonElement(frame).jsonObject["delta"]?.jsonObject ?: return@mapNotNull null
+            delta["content"]?.jsonPrimitive?.content
+        }
+        assertEquals(frameCount, initiatorContents.size)
+        assertEquals(fragment, initiatorContents.first())
+        assertTrue(initiatorContents.drop(1).all { it == fragment })
+        val contentBytes = initiatorContents.sumOf { it.encodeToByteArray().size }
+        assertEquals(frameCount * fragment.length, contentBytes, "wire text must scale linearly with generated text")
+
+        val joinerSink = CapturingSink()
+        val joiner = viewer("conn-joiner", joinerSink)
+        registry.register(conversationId, joiner)
+        accumulated.append(fragment)
+        fanout.onDraft(
+            RuntimeEventPayload.RemoteStreamFrame(
+                frameId = "long-join",
+                messageId = null,
+                messageType = null,
+                body = rawStreamDeltaBody(
+                    frameCount.toLong() + 1,
+                    buildJsonObject {
+                        put("message_type", "assistant_message")
+                        put("otid", "otid-long")
+                        put("id", "letta-long")
+                        put("content", accumulated.toString())
+                    },
+                ),
+            ),
+        )
+        val joinerContent = joinerSink.frames().single().let { frame ->
+            json.parseToJsonElement(frame).jsonObject["delta"]!!.jsonObject["content"]!!.jsonPrimitive.content
+        }
+        assertEquals(accumulated.toString(), joinerContent, "late joiner receives one cumulative checkpoint")
     }
 
     @Test

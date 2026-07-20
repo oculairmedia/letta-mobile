@@ -27,7 +27,7 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * Design (uniform initiator-is-just-a-viewer):
  *  - The delta body is computed ONCE, initiator-side, preserving the exact
- *    [CumulativeStreamText] accumulation, [OpenToolCallTracker] observation,
+ *    [OpenToolCallTracker] observation,
  *    cm-stream optimistic-dedup tagging, and terminal-duplicate-skip semantics
  *    the single-connection path had.
  *  - That one body is then published to [ConnectionRegistry.viewersFor] and each
@@ -99,7 +99,8 @@ internal class ConversationTurnFanout(
     private val observerWriteTimeoutMs: Long = OBSERVER_WRITE_TIMEOUT_MS,
 ) {
     private val openToolCalls = OpenToolCallTracker()
-    private val cumulativeText = CumulativeStreamText()
+    private val incrementalText = IncrementalStreamText()
+    private val deliveredTextKeysByViewer = mutableMapOf<String, MutableSet<String>>()
     private var terminalWritten = false
 
     /** Whether a terminal frame has already been broadcast for this turn. */
@@ -186,25 +187,25 @@ internal class ConversationTurnFanout(
     /**
      * RemoteStreamFrame / ExternalTransportFrame path: the [body] is the FULL
      * upstream wire frame ({type,runtime,event_seq,...,delta}). Preserve the
-     * exact single-connection shaping — observe open tool_calls, apply cumulative
-     * assistant-text accumulation, cm-stream optimistic-dedup tag the inner delta
-     * — then extract that inner delta body and fan IT out. Each viewer re-wraps
+     * exact single-connection shaping — observe open tool_calls and cm-stream
+     * optimistic-dedup tag the inner delta, then fan IT out incrementally. Each viewer re-wraps
      * the delta with its own event_seq + idempotency_key (uniform with the
      * synthesized paths), so the initiator's per-connection monotonic event_seq
      * semantics match what the synthesized `writeStreamDelta` produced.
      */
     private suspend fun emitRawFrameBody(body: String): Boolean {
         openToolCalls.observe(body)
-        val cumulated = cumulativeText.applyToRawFrame(body)
-        val delta = innerDeltaOf(cumulated)
+        val delta = innerDeltaOf(body)
         if (delta == null) {
             // Not a stream_delta we can re-frame (e.g. usage_statistics-only or a
             // malformed body) — nothing to fan out; not a terminal.
             return false
         }
-        val tagged = tagStreamDeltaForOptimisticDedup(delta)
-        broadcastDeltaBody(tagged)
-        return deltaIsTerminal(tagged)
+        val incremental = incrementalText.applyToDelta(delta) ?: return false
+        val fragment = tagStreamDeltaForOptimisticDedup(incremental.fragment)
+        val checkpoint = tagStreamDeltaForOptimisticDedup(incremental.checkpoint)
+        broadcastDeltaBody(fragment, incremental.streamKey, checkpoint)
+        return deltaIsTerminal(fragment)
     }
 
     /** Flush a synthetic cancelled tool_return for every still-open tool_call (8s45p), fanned out. */
@@ -286,17 +287,21 @@ internal class ConversationTurnFanout(
 
     /**
      * The heart of the fanout: tag-preserving publish of ONE delta body to every
-     * viewer of the conversation. The body is already cumulated + cm-stream
-     * tagged; viewers do NOT re-accumulate or re-tag. Best-effort per viewer — a
+     * viewer of the conversation. The body is already cm-stream tagged; viewers
+     * do not re-tag or otherwise rewrite it. Best-effort per viewer — a
      * failing observer never breaks the loop or the turn. Initiator-only parking
      * is recorded ONCE here (not per-viewer).
      */
-    private suspend fun broadcastDeltaBody(delta: JsonObject) {
+    private suspend fun broadcastDeltaBody(
+        delta: JsonObject,
+        streamKey: String = "",
+        checkpoint: JsonObject = delta,
+    ) {
         // Initiator-only redial parking (q71yi): record the untagged-equivalent
         // delta JSON once, matching the pre-fanout writeStreamDelta which tracked
         // the delta it was handed. Never runs per-observer.
         trackInitiatorFrame(delta.toString())
-        broadcastDeltaBodyNoPark(delta)
+        broadcastDeltaBodyNoPark(delta, streamKey, checkpoint)
     }
 
     /**
@@ -327,7 +332,11 @@ internal class ConversationTurnFanout(
      * handled by the existing parking path in [IrohNodeConnection]. Timeout +
      * drop is observer-only.
      */
-    private suspend fun broadcastDeltaBodyNoPark(delta: JsonObject) {
+    private suspend fun broadcastDeltaBodyNoPark(
+        delta: JsonObject,
+        streamKey: String = "",
+        checkpoint: JsonObject = delta,
+    ) {
         val viewers = snapshotViewers()
         // eaczz observability: the fanout write path emits no stream.write
         // telemetry, so multi-client delivery was invisible in the wrapper log.
@@ -346,7 +355,9 @@ internal class ConversationTurnFanout(
                 async {
                     val isInitiator = viewer === initiatorViewer ||
                         (initiatorViewer != null && viewer.connectionId == initiatorViewer.connectionId)
-                    writeToViewerIsolated(viewer, delta, isInitiator)
+                    val viewerKeys = deliveredTextKeysByViewer.getOrPut(viewer.connectionId) { mutableSetOf() }
+                    val viewerDelta = if (streamKey.isNotEmpty() && viewerKeys.add(streamKey)) checkpoint else delta
+                    writeToViewerIsolated(viewer, viewerDelta, isInitiator)
                 }
             }.awaitAll()
         }
