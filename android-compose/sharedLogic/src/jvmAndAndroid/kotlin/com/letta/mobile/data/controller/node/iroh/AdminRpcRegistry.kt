@@ -49,7 +49,9 @@ object AdminRpcRegistry {
 
         HealthAdminHandlers.register(router, rpcBase)
         AgentAdminHandlers.register(router, rpcBase, controller)
-        SubagentAdminHandlers.register(router, subagentRegistrySource)
+        if (subagentRegistrySource != null) {
+            SubagentAdminHandlers.register(router, subagentRegistrySource)
+        }
         ConversationAdminHandlers.register(router, rpcBase)
         ProjectAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
@@ -65,11 +67,14 @@ object AdminRpcRegistry {
         ApprovalAdminHandlers.register(router, rpcBase, controller)
 
         router.requireNonEmpty()
-        val missingMethods = canonicalMethods - router.registeredMethods
+        val requiredMethods = if (subagentRegistrySource != null) canonicalMethods else canonicalMethods - subagentMethods
+        val missingMethods = requiredMethods - router.registeredMethods
         check(missingMethods.isEmpty()) {
             "Admin RPC registry missing canonical methods: ${missingMethods.sorted().joinToString(", ")}"
         }
 
         return router
     }
+
+    val subagentMethods: Set<String> = setOf("subagent.list", "subagent.todos")
 }

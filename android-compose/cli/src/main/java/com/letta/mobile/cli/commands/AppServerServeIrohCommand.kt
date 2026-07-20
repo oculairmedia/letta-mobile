@@ -4,7 +4,11 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
+import com.letta.mobile.data.controller.node.iroh.AppServerSubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
@@ -37,6 +41,16 @@ import kotlin.system.exitProcess
  * [iroh-app-server] Listening on Iroh... (Ctrl+C to stop)
  * ```
  */
+internal fun buildProductionAdminRouter(
+    adminBaseUrl: String,
+    controller: DefaultAppServerController,
+    subagentRegistrySource: AppServerSubagentRegistrySource,
+): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource).also { router ->
+    check(router.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods)) {
+        "Production admin RPC router must expose a usable subagent registry"
+    }
+}
+
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
 ) {
@@ -127,14 +141,16 @@ internal class AppServerServeIrohCommand : CliktCommand(
             
             // Create the controller (using a stub implementation for now)
             // In a full implementation, this would connect to a real Letta App Server
-            val controller = createController(appServerUrl, requestTimeout.toLong(), scope)
+            val client = createClient(appServerUrl, requestTimeout.toLong(), scope)
+            val controller = DefaultAppServerController(client)
+            val subagentRegistrySource = AppServerSubagentRegistrySource(client, scope)
 
             // Register admin_rpc handlers so clients on an iroh:// backend can
             // read conversations/messages/agents WITHOUT any direct HTTP route
             // to this host (Iroh purity: letta-mobile-qfa81). The handlers
             // proxy to the server-local HTTP API; only this process dials it.
             val rpcBase = adminBaseUrl.trimEnd('/')
-            val adminRpcRouter = com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry.buildRouter(rpcBase, controller)
+            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println("[iroh-app-server] admin_rpc handlers registered (proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount})")
 
@@ -164,11 +180,11 @@ internal class AppServerServeIrohCommand : CliktCommand(
         }
     }
 
-    private fun createController(
+    private fun createClient(
         appServerUrl: String?,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
-    ): DefaultAppServerController {
+    ): AppServerClient {
         // If an app server URL is provided, create a client that wraps it
         // Otherwise, create a stub controller for testing
         return if (appServerUrl != null) {
@@ -188,8 +204,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 bearerToken = null,
             )
             
-            val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-            DefaultAppServerController(client)
+            DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
         } else {
             // Stub controller - the server side will return errors for now
             // This allows testing the Iroh transport layer without a full app server
@@ -206,8 +221,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 bearerToken = null,
             )
             
-            val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-            DefaultAppServerController(client)
+            DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
         }
     }
 }

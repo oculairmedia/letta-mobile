@@ -482,7 +482,13 @@ class IrohNodeConnection(
                 "remoteEndpointId" to remoteEndpointId,
                 "peerCapabilities" to advertised.sorted().joinToString(","),
             )
-            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":["${IrohFrameCodec.FRAME_PART_CAPABILITY}","${IrohChannelTransport.SUBAGENT_RPC_CAPABILITY}"]}"""
+            val capabilities = buildList {
+                add(IrohFrameCodec.FRAME_PART_CAPABILITY)
+                if (adminRpcRouter.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods)) {
+                    add(IrohChannelTransport.SUBAGENT_RPC_CAPABILITY)
+                }
+            }.joinToString(",") { "\"$it\"" }
+            """{"type":"auth_response","request_id":"$requestId","success":true,"capabilities":[$capabilities]}"""
         } else {
             val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
             Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)
