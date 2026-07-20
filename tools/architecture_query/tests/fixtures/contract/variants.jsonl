@@ -1,0 +1,4 @@
+{"module":":app","variant":"debug"}
+{"module":":app","variant":"release"}
+{"module":":feature:chat","variant":"metadata"}
+{"module":":core:model","variant":"metadata"}

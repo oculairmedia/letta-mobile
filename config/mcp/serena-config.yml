@@ -1,0 +1,24 @@
+language_backend: LSP
+line_ending: native
+gui_log_window: false
+web_dashboard: false
+web_dashboard_open_on_launch: false
+web_dashboard_listen_address: 127.0.0.1
+log_level: 20
+trace_lsp_communication: false
+ignored_paths:
+  - "**/build/**"
+  - "**/.gradle/**"
+  - "third_party/**"
+  - ".local/**"
+tool_timeout: 120
+excluded_tools: []
+included_optional_tools: []
+base_modes:
+  - interactive
+default_max_tool_answer_chars: 50000
+token_count_estimator: CHAR_COUNT
+symbol_info_budget: 10
+project_serena_folder_location: "$projectDir/.serena"
+trusted_project_path_patterns: []
+projects: []

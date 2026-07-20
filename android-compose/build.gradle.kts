@@ -1,4 +1,9 @@
+import com.autonomousapps.DependencyAnalysisExtension
+import io.gitlab.arturbosch.detekt.Detekt
+
 plugins {
+    id("com.letta.mobile.architecture-graph")
+    id("com.autonomousapps.dependency-analysis") version "3.5.1" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.8"
     id("com.android.application") version "9.2.0" apply false
     id("com.android.library") version "9.2.0" apply false
@@ -24,6 +29,27 @@ plugins {
     id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
 }
 
+// Dependency Analysis is opt-in and advisory: AGP 9.2 is newer than the plugin's
+// supported AGP range and currently fails while creating Android test advice tasks.
+// CI probes it with continue-on-error so upgrades become visible without blocking.
+// Even when enabled, KMP source-set attribution is incomplete; the architecture
+// graph is authoritative for KMP targets, source sets, and declared edges.
+if (providers.gradleProperty("dependencyAnalysisAdvisory").orNull == "true") {
+    apply(plugin = "com.autonomousapps.dependency-analysis")
+    extensions.configure<DependencyAnalysisExtension> {
+        issues { all { onAny { severity("ignore") } } }
+    }
+    subprojects {
+        // Limit advice to plain JVM modules until AGP 9.2 and KMP are supported.
+        pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+            apply(plugin = "com.autonomousapps.dependency-analysis")
+            extensions.configure<DependencyAnalysisExtension> {
+                issues { all { onAny { severity("ignore") } } }
+            }
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Kotlin 2.4.0 + Dagger/Hilt metadata compatibility (letta-mobile, 2026-06-24)
 // ---------------------------------------------------------------------------
@@ -39,6 +65,34 @@ subprojects {
         resolutionStrategy {
             force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
         }
+    }
+
+    plugins.withId("io.gitlab.arturbosch.detekt") {
+        tasks.withType<Detekt>().configureEach {
+            // Detekt 1.x supports JVM targets through 22; analysis does not need the Gradle runtime target.
+            jvmTarget = "17"
+            // Keep rollout advisory by default; use -Parchitecture.strict=true to promote the gate.
+            ignoreFailures = providers.gradleProperty("architecture.strict").orNull != "true"
+            exclude("**/build/**", "**/generated/**", "**/ksp/**")
+            reports {
+                sarif.required.set(true)
+                xml.required.set(true)
+                html.required.set(true)
+                txt.required.set(false)
+                md.required.set(false)
+            }
+        }
+    }
+}
+
+val advisoryDetekt by tasks.registering {
+    description = "Run configured Detekt checks and emit SARIF/XML/HTML reports without blocking by default."
+    group = "verification"
+}
+
+gradle.projectsEvaluated {
+    advisoryDetekt.configure {
+        dependsOn(subprojects.flatMap { project -> project.tasks.withType<Detekt>().toList() })
     }
 }
 

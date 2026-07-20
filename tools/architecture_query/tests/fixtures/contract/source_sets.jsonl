@@ -1,0 +1,3 @@
+{"module":":app","source_set":"main","paths":["android-compose/app/src/main"]}
+{"module":":feature:chat","source_set":"commonMain","paths":["android-compose/feature/chat/src/commonMain"]}
+{"module":":core:model","source_set":"commonMain","paths":["android-compose/core/model/src/commonMain"]}

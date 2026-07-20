@@ -30,6 +30,15 @@ android-compose/native/mermaid_renderer/target/
 # Letta local config
 .letta/
 
+# Project-local MCP/code-intelligence caches and advisory artifacts
+.local/
+.serena/project.local.yml
+.serena/cache/
+.serena/logs/
+.serena/memories/
+index.scip
+*.scip
+
 # Generated reports
 LETTA_ADMIN_API_REPORT.md
 reports/*.md
@@ -38,7 +47,8 @@ reports/*.json
 # Local performance traces
 scripts/perf/traces/*
 !scripts/perf/traces/.gitignore
-scripts/__pycache__/
+**/__pycache__/
+*.py[cod]
 models-cache/
 android-compose/app/libs/embedded-git/
 android-compose/app/libs/embedded-bash/

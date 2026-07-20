@@ -1,0 +1,3 @@
+{"source":":app","target":":feature:chat","configuration":"implementation","allowed":true}
+{"source":":feature:chat","target":":core:model","configuration":"commonMainImplementation","allowed":true}
+{"source":":core:model","target":":app","configuration":"commonMainImplementation","allowed":false,"rule":"core-no-app","violation":"core modules cannot depend on applications"}
