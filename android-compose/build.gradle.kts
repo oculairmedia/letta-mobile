@@ -1,4 +1,6 @@
+<<<<<<< HEAD
 import com.autonomousapps.DependencyAnalysisExtension
+import io.gitlab.arturbosch.detekt.Detekt
 
 plugins {
     id("com.letta.mobile.architecture-graph")
@@ -64,6 +66,34 @@ subprojects {
         resolutionStrategy {
             force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
         }
+    }
+
+    plugins.withId("io.gitlab.arturbosch.detekt") {
+        tasks.withType<Detekt>().configureEach {
+            // Detekt 1.x supports JVM targets through 22; analysis does not need the Gradle runtime target.
+            jvmTarget = "17"
+            // Keep rollout advisory by default; use -Parchitecture.strict=true to promote the gate.
+            ignoreFailures = providers.gradleProperty("architecture.strict").orNull != "true"
+            exclude("**/build/**", "**/generated/**", "**/ksp/**")
+            reports {
+                sarif.required.set(true)
+                xml.required.set(true)
+                html.required.set(true)
+                txt.required.set(false)
+                md.required.set(false)
+            }
+        }
+    }
+}
+
+val advisoryDetekt by tasks.registering {
+    description = "Run configured Detekt checks and emit SARIF/XML/HTML reports without blocking by default."
+    group = "verification"
+}
+
+gradle.projectsEvaluated {
+    advisoryDetekt.configure {
+        dependsOn(subprojects.flatMap { project -> project.tasks.withType<Detekt>().toList() })
     }
 }
 
