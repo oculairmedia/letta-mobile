@@ -29,8 +29,6 @@ internal class ChatBannerController(
 
     fun showRetryConversationLoadBeforeSend() = showError("Retry conversation loading before sending a message")
 
-    fun showNoActiveConversationToReset() = showError("No active conversation to reset")
-
     fun clearStreamingAfterInterrupt() {
         uiState.update {
             it.copy(

@@ -26,7 +26,6 @@ object LettaColorTokens {
     const val lightPrimaryVariant = 0xFF00695C
     const val lightOnSurface = 0xFF161A20
     const val lightOnSurfaceVariant = 0xFF4A5360
-    const val lightOnSurfaceMuted = 0xFF6B7480
     const val lightError = 0xFFB00020
     const val lightOnError = 0xFFFFFFFF
     const val lightBackground = 0xFFFBFCFD
@@ -45,34 +44,13 @@ object LettaColorTokens {
     const val darkSurfaceContainerHighest = 0xFF2E343F
     const val darkOutlineVariant = 0xFF2A2F39
 
-    // Agent status tokens (fixed brand values — not derived from the scheme).
-    const val darkRunning = 0xFFE0A458
-    const val lightRunning = 0xFFB26A00
-    const val darkOnRunning = 0xFF2B1B00
-    const val lightOnRunning = 0xFFFFFFFF
-    const val darkSuccess = 0xFF46C08F
-    const val lightSuccess = 0xFF2E9E73
-    const val darkOnSuccess = 0xFF06302B
-    const val lightOnSuccess = 0xFFFFFFFF
-    const val darkAgentA = 0xFF8B7CF0
-    const val lightAgentA = 0xFF6B4EE6
-    const val darkAgentB = 0xFF4C9AFF
-    const val lightAgentB = 0xFF1A73E8
-    const val darkAgentC = 0xFFE36FB3
-    const val lightAgentC = 0xFFC03D8E
-
     // Memory-block category tokens (Phase 6 / §1.1b). Distinct from agentA/B/C
     // (subagent identity) — these color-code memory blocks by category.
     const val darkCategoryPersona = 0xFF00BFA5
-    const val lightCategoryPersona = 0xFF00BFA5
     const val darkCategoryHuman = 0xFF5C9BD6
-    const val lightCategoryHuman = 0xFF2F6FB0
     const val darkCategoryOnboarding = 0xFFD1A05A
-    const val lightCategoryOnboarding = 0xFF9A6A1F
     const val darkCategoryProject = 0xFF9B8AE0
-    const val lightCategoryProject = 0xFF6E5BB8
     const val darkCategoryArchival = 0xFF828B98
-    const val lightCategoryArchival = 0xFF5F6469
 }
 
 data class LettaThemePaletteTokens(

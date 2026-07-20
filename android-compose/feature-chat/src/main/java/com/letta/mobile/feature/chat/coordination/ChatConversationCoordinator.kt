@@ -98,10 +98,6 @@ internal class ChatConversationCoordinator(
         setRouteConversationId(conversationId)
     }
 
-    fun markClientModeBootstrapReady(conversationId: String) {
-        clientModeBootstrapState = ClientModeBootstrapState.Ready(conversationId)
-    }
-
     fun resolveConversationAndLoad(useClientModeForResolve: Boolean) {
         val isFirstResolve = !hasResolvedConversationOnce
         hasResolvedConversationOnce = true

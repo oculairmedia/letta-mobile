@@ -7,7 +7,6 @@ interface SystemAccessCapabilityRegistry {
     fun listCapabilities(): List<SystemAccessCapability>
     fun getCapability(id: String): SystemAccessCapability?
     fun checkToolAccess(toolId: String): SystemAccessToolCheck
-    fun canExposeTool(toolId: String): Boolean = checkToolAccess(toolId).allowed
 }
 
 @Singleton

@@ -96,25 +96,6 @@ object BackendConfigPolicy {
     }
 }
 
-class SettingsRepositoryBackendConfigStore(
-    private val settingsRepository: ISettingsRepository,
-) : BackendConfigStore {
-    override val activeConfig: StateFlow<LettaConfig?> = settingsRepository.activeConfig
-
-    override suspend fun loadActiveConfig(): LettaConfig? =
-        settingsRepository.activeConfig.value ?: settingsRepository.getActiveConfig().firstOrNull()
-
-    override suspend fun saveActiveConfig(config: LettaConfig) {
-        settingsRepository.saveConfig(config)
-    }
-
-    override suspend fun recentBackendUrls(): List<String> =
-        settingsRepository.configs.value
-            .map { it.serverUrl.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-}
-
 class BackendConfigSecureTokenStore(
     private val configStore: BackendConfigStore,
 ) : SecureTokenStore {

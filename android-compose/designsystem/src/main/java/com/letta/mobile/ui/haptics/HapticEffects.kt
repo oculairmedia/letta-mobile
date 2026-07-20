@@ -44,10 +44,6 @@ object HapticEffects {
         perform(LettaHapticCue.SegmentTick, haptic, view, enabled)
     }
 
-    fun segmentFrequentTick(haptic: HapticFeedback, view: View? = null, enabled: Boolean = true) {
-        perform(LettaHapticCue.SegmentFrequentTick, haptic, view, enabled)
-    }
-
     fun gestureThreshold(haptic: HapticFeedback, view: View? = null, enabled: Boolean = true) {
         perform(LettaHapticCue.GestureThreshold, haptic, view, enabled)
     }

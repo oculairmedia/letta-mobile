@@ -84,8 +84,6 @@ class ChatMessageGeometryState(
         }
         streamingFloors.keys.removeAll { it !in activeBuckets }
     }
-
-    fun exactSize(): Int = exactHeights.size
 }
 
 fun ChatRenderItem.chatGeometrySignature(

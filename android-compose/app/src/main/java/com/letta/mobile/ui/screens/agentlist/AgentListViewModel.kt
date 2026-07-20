@@ -486,10 +486,6 @@ class AgentListViewModel @Inject constructor(
     fun setPendingImportStripMessages(strip: Boolean) {
         _transient.update { it.copy(pendingImportStripMessages = strip) }
     }
-
-    fun setShareNavigationConsumed(consumed: Boolean) {
-        _transient.update { it.copy(shareNavigationConsumed = consumed) }
-    }
 }
 internal fun LettaConfig?.localLettaCodeCreateReadiness(
     runtimeRunnable: Boolean,

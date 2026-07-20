@@ -176,63 +176,6 @@ class LocalConversationHealer(
         )
     }
 
-    /**
-     * Pure detection: `toolResult` rows whose `toolCallId` has NO `toolCall`
-     * with that id anywhere in the transcript. These orphaned results make a
-     * strict OpenAI-shaped provider 400 ("role 'tool' must be a response to a
-     * preceding message with 'tool_calls'") on every replay.
-     */
-    internal fun findOrphanToolResultIds(rows: List<JsonObject>): Set<String> {
-        val declaredCallIds = mutableSetOf<String>()
-        for (row in rows) {
-            if (row.stringField("role") != "assistant") continue
-            val parts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-            for (part in parts) {
-                if (part.stringField("type") == "toolCall") {
-                    part.stringField("id")?.let(declaredCallIds::add)
-                }
-            }
-        }
-        val orphans = mutableSetOf<String>()
-        for (row in rows) {
-            if (row.stringField("role") != "toolResult") continue
-            val callId = row.stringField("toolCallId") ?: continue
-            if (callId !in declaredCallIds) orphans.add(callId)
-        }
-        return orphans
-    }
-
-    /**
-     * Pure detection over parsed rows: every `toolCall` part id that has no
-     * later `toolResult` row with a matching `toolCallId`. Order-aware — a
-     * toolResult only satisfies a toolCall that appears before or at it is not
-     * required (letta.js appends results after the call), but we treat the set
-     * of all toolResult ids as satisfying, which is correct for the API
-     * pairing requirement (the request just needs every tool_use to have a
-     * tool_result somewhere).
-     */
-    internal fun findOrphanToolCalls(rows: List<JsonObject>): List<OrphanToolCall> {
-        val satisfied = rows
-            .filter { it.stringField("role") == "toolResult" }
-            .mapNotNull { it.stringField("toolCallId") }
-            .toMutableSet()
-
-        val orphans = mutableListOf<OrphanToolCall>()
-        val seen = mutableSetOf<String>()
-        for (row in rows) {
-            if (row.stringField("role") != "assistant") continue
-            val parts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-            for (part in parts) {
-                if (part.stringField("type") != "toolCall") continue
-                val callId = part.stringField("id") ?: continue
-                if (callId in satisfied || callId in seen) continue
-                seen.add(callId)
-                orphans.add(OrphanToolCall(callId = callId, name = part.stringField("name") ?: "unknown"))
-            }
-        }
-        return orphans
-    }
-
     internal data class OrphanToolCall(val callId: String, val name: String)
 
     private fun syntheticToolResultRow(orphan: OrphanToolCall): JsonObject = buildJsonObject {

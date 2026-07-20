@@ -81,9 +81,6 @@ data class DesktopChatSurfaceState(
     val canSend: Boolean
         get() = ChatSessionReducer.canSend(runtimeState)
 
-    val hasComposerPayload: Boolean
-        get() = composer.hasPayload
-
     val shouldShowStatePanel: Boolean
         get() = ChatSessionReducer.shouldShowStatePanel(runtimeState)
 

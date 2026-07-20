@@ -49,8 +49,6 @@ data class PromptComposerState(
     fun beginStreaming(): PromptComposerState =
         if (status == PromptComposerStatus.Sending) copy(status = PromptComposerStatus.Streaming) else this
 
-    fun markReady(): PromptComposerState = copy(status = PromptComposerStatus.Ready)
-
     fun stop(): PromptComposerState = if (canStop) copy(status = PromptComposerStatus.Ready) else this
 }
 

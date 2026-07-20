@@ -48,13 +48,6 @@ interface OnDeviceOpenAiBridge {
     fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession
 }
 
-@Singleton
-class DisabledOnDeviceOpenAiBridge @Inject constructor() : OnDeviceOpenAiBridge {
-    override fun start(modelSelection: EmbeddedLettaCodeModelSelection): OnDeviceOpenAiBridgeSession {
-        error("Embedded LettaCode on-device provider bridge is disabled until bridge/device smoke is ready.")
-    }
-}
-
 interface OnDeviceChatCompletionEngine {
     fun generate(
         modelSelection: EmbeddedLettaCodeModelSelection,

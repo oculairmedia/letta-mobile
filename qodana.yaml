@@ -54,5 +54,6 @@ exclude:
       - designsystem/src/main/java/com/letta/mobile/ui/components/Previews.kt
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/subagent
       - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatUiStateProvider.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/agentlist/AgentListUiStateProvider.kt
   # Style notes (const naming) are not merge blockers; rename waves are separate.
   - name: ConstPropertyName

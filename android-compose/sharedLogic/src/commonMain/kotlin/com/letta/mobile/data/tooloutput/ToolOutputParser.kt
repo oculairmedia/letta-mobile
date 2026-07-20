@@ -93,30 +93,6 @@ data class StackFrame(
     val symbol: String? = null,
 )
 
-interface ToolSyntaxHighlighter {
-    fun highlight(languageHint: String?, source: String): List<SyntaxSpan>
-}
-
-data class SyntaxSpan(
-    val start: Int,
-    val end: Int,
-    val kind: SyntaxSpanKind,
-)
-
-enum class SyntaxSpanKind {
-    Keyword,
-    StringLiteral,
-    Number,
-    Comment,
-    Type,
-    Function,
-    Punctuation,
-}
-
-object NoOpToolSyntaxHighlighter : ToolSyntaxHighlighter {
-    override fun highlight(languageHint: String?, source: String): List<SyntaxSpan> = emptyList()
-}
-
 object ToolOutputParser {
     const val MaxAnalyzedChars = 100_000
 

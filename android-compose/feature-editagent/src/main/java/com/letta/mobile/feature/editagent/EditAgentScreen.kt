@@ -53,8 +53,6 @@ internal enum class EditAgentConfigTab(val label: String) {
 internal object EditAgentTestTags {
     const val CONTENT_LIST = "edit_agent_content_list"
     const val TAB_PREFIX = "edit_agent_tab_"
-    const val SECTION_PICKER_TRIGGER = "edit_agent_section_picker_trigger"
-    const val SECTION_PICKER_SHEET = "edit_agent_section_picker_sheet"
 
     fun tab(label: String): String = TAB_PREFIX + label.lowercase(Locale.US)
 }

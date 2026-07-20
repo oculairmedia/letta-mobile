@@ -379,10 +379,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun clearFavorite() {
-        settingsRepository.setFavoriteAgentId(null)
-    }
-
     fun unpinAgent(agentId: String) {
         viewModelScope.launch {
             settingsRepository.setAgentPinned(agentId, false)

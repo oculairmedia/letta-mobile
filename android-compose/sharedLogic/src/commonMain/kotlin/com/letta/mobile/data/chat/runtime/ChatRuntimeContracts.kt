@@ -186,12 +186,3 @@ data class ChatSessionState(
     val selectedMessages: List<UiMessage>
         get() = selectedConversationId?.let { messagesByConversationId[it] }.orEmpty()
 }
-
-sealed interface ChatAction {
-    data object RetryConnection : ChatAction
-    data class SelectConversation(val conversationId: String) : ChatAction
-    data class UpdateComposerText(val text: String) : ChatAction
-    data class AttachImage(val image: MessageContentPart.Image) : ChatAction
-    data class RemoveImageAttachment(val index: Int) : ChatAction
-    data object Send : ChatAction
-}

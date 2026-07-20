@@ -150,35 +150,6 @@ class ReconnectCoordinator(
     }
 
     /**
-     * Waits for the next connection drop and then executes reconnect.
-     *
-     * This is a convenience method for automatically reconnecting when the
-     * controller signals a disconnection.
-     *
-     * @return ReconnectResult from the reconnect operation
-     */
-    suspend fun waitForDisconnectAndReconnect(): ReconnectResult {
-        // Wait for disconnected state
-        val disconnectedState = connectionState.first { state ->
-            state is AppServerControllerState.Disconnected ||
-                state is AppServerControllerState.Error
-        }
-
-        // Only reconnect if this is a new disconnect (not a duplicate)
-        if (disconnectedState == lastReconnectState) {
-            return ReconnectResult(
-                reconnectedCount = 0,
-                errors = emptyList(),
-            )
-        }
-
-        lastReconnectState = disconnectedState
-
-        // Execute reconnect
-        return reconnect()
-    }
-
-    /**
      * Checks if reconnect is needed based on the current connection state.
      *
      * @return true if the controller is disconnected or in error state
@@ -245,11 +216,3 @@ enum class ReconnectPhase {
      */
     RECONNECT_RUNTIME,
 }
-
-/**
- * Exception thrown when reconnect operations fail.
- */
-class ReconnectCoordinatorException(
-    message: String,
-    cause: Throwable? = null,
-) : Exception(message, cause)

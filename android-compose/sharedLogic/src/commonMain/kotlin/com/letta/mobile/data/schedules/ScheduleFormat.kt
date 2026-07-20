@@ -21,9 +21,6 @@ object ScheduleFormat {
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
     )
     private val WEEKDAYS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-    private val WEEKDAYS_FULL = listOf(
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-    )
 
     fun pad2(value: Int): String = if (value < 10) "0$value" else value.toString()
 
@@ -49,17 +46,7 @@ object ScheduleFormat {
 
     fun weekdayShort(day: DayOfWeek): String = weekdayShort(day.isoDayNumber)
 
-    fun weekdayFull(isoDay: Int): String = WEEKDAYS_FULL[(isoDay - 1).coerceIn(0, 6)]
-
     fun monthShort(monthNumber: Int): String = MONTHS[(monthNumber - 1).coerceIn(0, 11)]
-
-    /** e.g. `Jun 24`. */
-    fun monthDay(instant: Instant, zone: TimeZone): String {
-        val ldt = instant.toLocalDateTime(zone)
-        return "${monthShort(ldt.month.ordinal + 1)} ${ldt.day}"
-    }
-
-    /** e.g. `Mon, Jun 24` — full weekday-prefixed date. */
     fun dateLabel(instant: Instant, zone: TimeZone): String {
         val ldt = instant.toLocalDateTime(zone)
         return "${weekdayShort(ldt.dayOfWeek)}, ${monthShort(ldt.month.ordinal + 1)} ${ldt.day}"
