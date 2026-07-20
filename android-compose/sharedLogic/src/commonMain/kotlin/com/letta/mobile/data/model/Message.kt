@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonArray
@@ -322,6 +323,10 @@ data class ToolReturnMessage(
                 toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && parsedStringPayload == null -> toolReturnRaw.content
                 toolReturnRaw is JsonPrimitive && toolReturnRaw.isString &&
                     parsedStringPayload.isSubagentDispatchResult() -> toolReturnRaw.content
+                // Structured (non-stringified) Agent return objects must keep
+                // their JSON body so hydration can recover taskId/agentId.
+                toolReturnRaw is JsonObject && toolReturnRaw.isSubagentDispatchResult() ->
+                    Json.encodeToString(JsonElement.serializer(), toolReturnRaw)
                 else -> null
             }
             val fromList = toolReturns?.firstOrNull()
@@ -353,10 +358,17 @@ data class ToolReturnMessage(
         get() = extractAttachments(toolReturnRaw)
 }
 
+/**
+ * True for Agent-tool return payloads that carry subagent correlation ids.
+ * Bare `agent_id` alone is too broad (admin/API tools also return it) — require
+ * an explicit task id or subagent-scoped agent id field.
+ */
 private fun JsonElement?.isSubagentDispatchResult(): Boolean {
     val obj = this as? JsonObject ?: return false
-    return listOf("task_id", "taskId", "subagent_agent_id", "subagentAgentId", "agent_id", "agentId")
-        .any(obj::containsKey)
+    return obj.containsKey("task_id") ||
+        obj.containsKey("taskId") ||
+        obj.containsKey("subagent_agent_id") ||
+        obj.containsKey("subagentAgentId")
 }
 
 private fun JsonObject.looksLikeToolReturnEnvelope(): Boolean {

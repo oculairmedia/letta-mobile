@@ -66,6 +66,97 @@ class SubagentDispatchTimelineProjectionTest {
     }
 
     @Test
+    fun `string-encoded Agent arguments still project dispatch metadata`() {
+        val call = ToolCallMessage(
+            id = "message-call",
+            toolCall = ToolCall(
+                toolCallId = "call-agent-1",
+                name = "Agent",
+                arguments = JsonPrimitive(arguments).toString(),
+            ),
+        )
+        val returned = ToolReturnMessage(
+            id = "message-return",
+            toolCallId = "call-agent-1",
+            status = "success",
+            toolReturnRaw = JsonPrimitive(result),
+        )
+        val afterCall = reduceStreamFrame(
+            TimelineReducerInput(Timeline("conv-1"), call, persistentMapOf()),
+        ).next
+        val afterReturn = reduceStreamFrame(
+            TimelineReducerInput(afterCall, returned, persistentMapOf()),
+        ).next
+        val event = afterReturn.events.filterIsInstance<TimelineEvent.Confirmed>().single()
+        assertEquals(
+            expected,
+            timelineEventToUiMessage(event)?.toolCalls?.single()?.subagentDispatch,
+        )
+    }
+
+    @Test
+    fun `structured object Agent return preserves task metadata`() {
+        val call = ToolCallMessage(
+            id = "message-call",
+            toolCall = ToolCall(
+                toolCallId = "call-agent-1",
+                name = "Agent",
+                arguments = arguments,
+            ),
+        )
+        val returned = ToolReturnMessage(
+            id = "message-return",
+            toolCallId = "call-agent-1",
+            status = "success",
+            toolReturnRaw = json.parseToJsonElement(result),
+        )
+        val afterCall = reduceStreamFrame(
+            TimelineReducerInput(Timeline("conv-1"), call, persistentMapOf()),
+        ).next
+        val afterReturn = reduceStreamFrame(
+            TimelineReducerInput(afterCall, returned, persistentMapOf()),
+        ).next
+        val event = afterReturn.events.filterIsInstance<TimelineEvent.Confirmed>().single()
+        val uiToolCall = assertNotNull(timelineEventToUiMessage(event)).toolCalls?.single()
+        assertEquals(expected, uiToolCall?.subagentDispatch)
+        assertEquals(result, uiToolCall?.result)
+    }
+
+    @Test
+    fun `task-notification Agent return does not mask notification card path`() {
+        val notification = """
+            <task-notification>
+            <summary>done</summary>
+            <status>completed</status>
+            </task-notification>
+        """.trimIndent()
+        val call = ToolCallMessage(
+            id = "message-call",
+            toolCall = ToolCall(
+                toolCallId = "call-agent-1",
+                name = "Agent",
+                arguments = arguments,
+            ),
+        )
+        val returned = ToolReturnMessage(
+            id = "message-return",
+            toolCallId = "call-agent-1",
+            status = "success",
+            toolReturnRaw = JsonPrimitive(notification),
+        )
+        val afterCall = reduceStreamFrame(
+            TimelineReducerInput(Timeline("conv-1"), call, persistentMapOf()),
+        ).next
+        val afterReturn = reduceStreamFrame(
+            TimelineReducerInput(afterCall, returned, persistentMapOf()),
+        ).next
+        val event = afterReturn.events.filterIsInstance<TimelineEvent.Confirmed>().single()
+        val uiToolCall = assertNotNull(timelineEventToUiMessage(event)).toolCalls?.single()
+        assertEquals(null, uiToolCall?.subagentDispatch)
+        assertEquals(notification, uiToolCall?.result)
+    }
+
+    @Test
     fun `message-list hydrated TOOL_CALL and TOOL_RETURN match live Agent dispatch metadata`() {
         val persistedPage = json.parseToJsonElement(
             """
