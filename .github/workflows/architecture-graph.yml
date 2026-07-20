@@ -54,6 +54,11 @@ jobs:
       # Checkout first, then remove the token-bearing header directly without
       # traversing gitlinks.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The boundary smoke compares the PR against its merge base. A
+          # depth-1 synthetic merge checkout cannot recover that ancestry by
+          # fetching only the base branch afterward.
+          fetch-depth: 0
       - name: Remove checkout credentials
         run: git config --local --unset-all http.https://github.com/.extraheader || true
         working-directory: .
