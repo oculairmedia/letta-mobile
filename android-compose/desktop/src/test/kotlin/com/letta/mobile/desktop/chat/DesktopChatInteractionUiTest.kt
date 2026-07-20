@@ -39,6 +39,22 @@ import kotlin.test.assertTrue
 
 class DesktopChatInteractionUiTest {
     @Test
+    fun assistantMarkdownCanShrinkAfterStreamReconciliation() = runComposeUiTest {
+        val longerText = "x".repeat(91)
+        val shorterText = "x".repeat(87)
+        var markdown by mutableStateOf("**$longerText**")
+        setContent {
+            MaterialTheme {
+                AgentText(text = markdown, isError = false)
+            }
+        }
+
+        onNodeWithText(longerText).assertExists()
+        runOnIdle { markdown = "**$shorterText**" }
+        onNodeWithText(shorterText).assertExists()
+    }
+
+    @Test
     fun assistantCopyActionIsFocusableDiscoverableAndUsablySized() = runComposeUiTest {
         setContent {
             MaterialTheme {
