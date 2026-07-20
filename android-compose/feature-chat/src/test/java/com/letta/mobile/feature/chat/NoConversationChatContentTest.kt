@@ -168,7 +168,7 @@ class NoConversationChatContentTest {
             advanceEventTime(1_200)
             up()
         }
-        composeRule.onNodeWithText("Dismiss").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Delete").assertIsDisplayed().performClick()
 
         composeRule.runOnIdle {
             assertEquals(SurfaceId, dismissedSurfaceId)

@@ -104,12 +104,15 @@ class AgentScaffoldHiltTest {
         every { viewModel.favoriteAgentId } returns MutableStateFlow<String?>(null)
         every { viewModel.pinnedAgentIds } returns MutableStateFlow(emptySet())
         every { viewModel.activeBackendLabel } returns MutableStateFlow<String?>("letta.test")
+        every { viewModel.llmModels } returns MutableStateFlow(emptyList())
+        every { viewModel.hapticsEnabled } returns MutableStateFlow(false)
         every { viewModel.projectBindings } returns projectBindings
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
         every { viewModel.projectContext } returns null
         every { conversationRepository.getConversations(any<AgentId>()) } returns flowOf(emptyList())
         coEvery { conversationRepository.refreshConversations(any<AgentId>()) } returns Unit
+        coEvery { conversationRepository.refreshConversationsIfStale(any<AgentId>(), any()) } returns false
     }
 
     @Test

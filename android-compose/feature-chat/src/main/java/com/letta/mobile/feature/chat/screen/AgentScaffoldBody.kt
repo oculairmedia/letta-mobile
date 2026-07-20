@@ -232,6 +232,10 @@ internal fun AgentScaffoldBody(
                         viewModel.toggleCurrentAgentPinned()
                     },
                     scrollBehavior = scrollBehavior,
+                    onSearchClick = {
+                        HapticEffects.contextClick(haptic, view)
+                        onChatSearchExpandedChange(true)
+                    },
                     onMenuClick = {
                         HapticEffects.contextClick(haptic, view)
                         projectBindings.refreshContextWindow()
@@ -315,6 +319,7 @@ private fun AgentScaffoldTopBar(
     onAgentTitleClick: () -> Unit,
     onAgentTitleLongClick: () -> Unit,
     scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior,
+    onSearchClick: () -> Unit,
     onMenuClick: () -> Unit,
 ) {
     TopAppBar(
@@ -384,6 +389,11 @@ private fun AgentScaffoldTopBar(
         windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal),
         scrollBehavior = scrollBehavior,
         actions = {
+            if (!isChatSearchExpanded && !isSearchActive) {
+                IconButton(onClick = onSearchClick) {
+                    Icon(LettaIcons.Search, contentDescription = "Search")
+                }
+            }
             IconButton(
                 onClick = onMenuClick,
                 modifier = Modifier.testTag(AgentScaffoldTestTags.MENU_BUTTON),
