@@ -143,7 +143,7 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         // Initiator got the full ordered sequence + exactly one terminal.
         val frames = sinkInit.frames()
-        assertEquals(listOf("Hel", "lo world"), assistantContents(frames), "initiator ordered fragments")
+        assertEquals(listOf("Hel", "Hello world"), assistantContents(frames), "initiator ordered deltas")
         assertEquals(1, countTerminals(frames), "initiator got terminal (turn completed)")
 
         // The failing observer was de-registered from the SAME registry the
@@ -176,7 +176,7 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         // Initiator got the full sequence + terminal.
         val frames = sinkInit.frames()
-        assertEquals(listOf("Hel", "lo world"), assistantContents(frames))
+        assertEquals(listOf("Hel", "Hello world"), assistantContents(frames))
         assertEquals(1, countTerminals(frames))
 
         // The dead observer is de-registered after the first stall, so the
@@ -214,10 +214,8 @@ class ConversationTurnFanoutFaultIsolationTest {
         val obsFrames = sinkObs.frames()
         assertEquals(listOf("Hello world"), assistantContents(obsFrames), "joiner gets remaining cumulative delta")
         assertEquals(1, countTerminals(obsFrames), "joiner gets terminal")
-        // Joiner checkpoint contains the complete text while the initiator keeps
-        // receiving only the new suffix.
-        assertEquals("ld", assistantContents(sinkInit.frames()).last())
-        assertEquals("Hello world", assistantContents(obsFrames).last())
+        // The final assistant text the joiner holds == the initiator's final text.
+        assertEquals(assistantContents(sinkInit.frames()).last(), assistantContents(obsFrames).last())
     }
 
     @Test

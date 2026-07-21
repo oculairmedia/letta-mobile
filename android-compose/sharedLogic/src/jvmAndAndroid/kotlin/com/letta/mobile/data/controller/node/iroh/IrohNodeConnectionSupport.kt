@@ -5,6 +5,7 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -336,62 +337,21 @@ internal object DanglingToolCallSynthesizer {
 }
 
 /**
- * Converts mixed cumulative/incremental provider text into incremental wire
- * fragments. Keeping only one mutable accumulator per logical message avoids
- * retransmitting and re-encoding the complete response for every token.
+ * Per-turn, per-connection cumulative accumulation of streamed assistant/reasoning
+ * text (h30cy). App Server assistant/reasoning deltas arrive as either cumulative
+ * or incremental chunks keyed by otid/id; this collapses them to a single
+ * cumulative body per key so the client renders one growing row, not N appended
+ * fragments. Idempotent: re-applying a body that is already a prefix/suffix of the
+ * accumulated text does not double it. Non-assistant/reasoning frames pass through
+ * unchanged.
+ *
+ * Extracted from IrohNodeConnection (eaczz.4) so the fanout core can compute the
+ * cumulated body ONCE, initiator-side, before publishing to all viewers.
  */
-internal data class IncrementalTextDelta(
-    val streamKey: String,
-    val fragment: JsonObject,
-    val checkpoint: JsonObject,
-)
+internal class CumulativeStreamText {
+    private val byKey = LinkedHashMap<String, String>()
 
-internal class IncrementalStreamText {
-    private val byKey = LinkedHashMap<String, StringBuilder>()
-
-    fun applyToDelta(delta: JsonObject): IncrementalTextDelta? {
-        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return passthrough(delta)
-        if (messageType !in TEXT_MESSAGE_TYPES) return passthrough(delta)
-        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
-            ?: delta["id"]?.jsonPrimitive?.contentOrNull
-            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
-            ?: messageType
-        val field = if (messageType == "assistant_message") "content" else "reasoning"
-        val incoming = textFrom(delta[field])
-            ?: textFrom(delta["content"])
-            ?: textFrom(delta["text"])
-            ?: return passthrough(delta)
-        val existing = byKey.getOrPut(textKey) { StringBuilder() }
-        val fragment = when {
-            existing.isEmpty() -> incoming.also(existing::append)
-            incoming.length >= existing.length && incoming.startsWith(existing) -> {
-                incoming.substring(existing.length).also {
-                    existing.clear()
-                    existing.append(incoming)
-                }
-            }
-            existing.endsWith(incoming) -> return null
-            else -> incoming.also(existing::append)
-        }
-        if (fragment.isEmpty()) return null
-        return IncrementalTextDelta(
-            streamKey = textKey,
-            fragment = delta.withText(field, messageType, fragment),
-            checkpoint = delta.withText(field, messageType, existing.toString()),
-        )
-    }
-
-    private fun passthrough(delta: JsonObject) = IncrementalTextDelta("", delta, delta)
-
-    private fun JsonObject.withText(field: String, messageType: String, text: String): JsonObject = buildJsonObject {
-        this@withText.forEach { (key, value) -> if (key != field) put(key, value) }
-        put(field, text)
-        if (messageType != "assistant_message" && !containsKey("reasoning")) {
-            put("reasoning", text)
-        }
-    }
-
-    private fun textFrom(element: kotlinx.serialization.json.JsonElement?): String? {
+    private fun textFrom(element: JsonElement?): String? {
         if (element == null) return null
         (element as? JsonPrimitive)?.contentOrNull?.let { return it }
         val array = element as? JsonArray ?: return null
@@ -407,15 +367,42 @@ internal class IncrementalStreamText {
         }.takeIf { it.isNotEmpty() }
     }
 
-    private fun String.startsWith(prefix: StringBuilder): Boolean =
-        length >= prefix.length && prefix.indices.all { this[it] == prefix[it] }
-
-    private fun StringBuilder.endsWith(suffix: String): Boolean =
-        suffix.length <= length && suffix.indices.all { this[length - suffix.length + it] == suffix[it] }
-
-    private companion object {
-        val TEXT_MESSAGE_TYPES = setOf("assistant_message", "reasoning_message", "hidden_reasoning_message")
-    }
+    fun applyToRawFrame(rawFrame: String): String = runCatching {
+        val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
+        if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
+        val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
+        if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
+            return@runCatching rawFrame
+        }
+        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
+            ?: delta["id"]?.jsonPrimitive?.contentOrNull
+            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
+            ?: messageType
+        val field = if (messageType == "assistant_message") "content" else "reasoning"
+        val chunk = textFrom(delta[field])
+            ?: textFrom(delta["content"])
+            ?: textFrom(delta["text"])
+            ?: return@runCatching rawFrame
+        val existing = byKey[textKey].orEmpty()
+        val cumulative = when {
+            existing.isEmpty() -> chunk
+            chunk.startsWith(existing) -> chunk
+            existing.endsWith(chunk) -> existing
+            else -> existing + chunk
+        }.also { byKey[textKey] = it }
+        val cumulativeDelta = buildJsonObject {
+            delta.forEach { (key, value) -> if (key != field) put(key, value) }
+            put(field, cumulative)
+            if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
+                put("reasoning", cumulative)
+            }
+        }
+        buildJsonObject {
+            obj.forEach { (key, value) -> if (key != "delta") put(key, value) }
+            put("delta", cumulativeDelta)
+        }.toString()
+    }.getOrDefault(rawFrame)
 }
 
 /**

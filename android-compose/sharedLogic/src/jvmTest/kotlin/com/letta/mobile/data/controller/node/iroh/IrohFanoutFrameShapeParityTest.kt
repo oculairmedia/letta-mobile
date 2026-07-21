@@ -354,13 +354,17 @@ class IrohFanoutFrameShapeParityTest {
         assertEquals(emitCount, ingestCount, "observer emit vs reduceIngest counters must balance")
         assertEquals(obsAssistantDeltas.size, ingestCount, "one ingest per fanned-out observer assistant delta")
 
-        // Every incremental fragment observed at emit reaches the reducer with the
-        // same length, so no fragment was dropped on the observer path.
+        // The max content length observed at the ingest gate == the max length at
+        // the emit gate == the final (longest) cumulative observer body: every
+        // character the fanout emitted reached the reducer, so NO characters were
+        // dropped on the observer emit->ingest path.
         fun maxLenAt(prefix: String) = events
             .filter { (it.attrs["gate"] as? String)?.startsWith(prefix) == true }
             .maxOf { (it.attrs["len"] as? Int) ?: 0 }
         val maxEmitLen = maxLenAt("gate1.emit")
         val maxIngestLen = maxLenAt("gate.reduceIngest")
+        val finalObserverBodyLen = obsAssistantDeltas.last()["content"]!!.jsonPrimitive.content.length
         assertEquals(maxEmitLen, maxIngestLen, "no dropped characters between observer emit and reduce-ingest")
+        assertEquals(finalObserverBodyLen, maxIngestLen, "reducer ingested the full final cumulative body")
     }
 }
