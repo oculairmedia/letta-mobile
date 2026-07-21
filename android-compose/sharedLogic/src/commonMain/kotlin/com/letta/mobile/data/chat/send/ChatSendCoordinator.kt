@@ -141,7 +141,7 @@ class ChatSendCoordinator(
         if (!wsChatBridge.hasActiveChatTurn && (ui.isStreaming() || ui.isAgentTyping())) {
             ui.onTurnVisuallyComplete()
             activeWsOtid = null
-            cancelRedialRecovery()
+            resetRedialRecovery()
             activeWsLocalConversationId = null
             activeWsTurnId = null
             activeWsRunId = null
@@ -784,12 +784,15 @@ class ChatSendCoordinator(
     }
 
     private fun activeRecoveryContext(event: RedialWhileTurnActive): RedialRecoveryContext? {
-        if (event.agentId != agentId) return null
-        if ((activeWsConversationId ?: activeConversationId()) != event.conversationId) return null
-        if (activeWsTurnId != null && activeWsTurnId != event.turnId) return null
-        if (activeWsOtid == null && !ui.isStreaming() && !ui.isAgentTyping()) return null
-        val baseline = activeAssistantBaseline ?: return null
-        return RedialRecoveryContext(event, baseline, activeSendGeneration)
+        val conversationMatches = (activeWsConversationId ?: activeConversationId()) == event.conversationId
+        val turnMatches = activeWsTurnId == null || activeWsTurnId == event.turnId
+        val active = activeWsOtid != null || ui.isStreaming() || ui.isAgentTyping()
+        val baseline = activeAssistantBaseline
+        return if (event.agentId == agentId && conversationMatches && turnMatches && active && baseline != null) {
+            RedialRecoveryContext(event, baseline, activeSendGeneration)
+        } else {
+            null
+        }
     }
 
     private suspend fun recoverDurableReply(recovery: RedialRecoveryContext) {
@@ -843,17 +846,21 @@ class ChatSendCoordinator(
     }
 
     private fun matchesActiveRecovery(recovery: RedialRecoveryContext): Boolean {
-        if (activeSendGeneration != recovery.generation) return false
         val event = recovery.event
-        if (event.agentId != agentId) return false
-        if ((activeWsConversationId ?: activeConversationId()) != event.conversationId) return false
-        if (activeWsTurnId != null && activeWsTurnId != event.turnId) return false
-        return activeWsOtid != null || ui.isStreaming() || ui.isAgentTyping()
+        val conversationMatches = (activeWsConversationId ?: activeConversationId()) == event.conversationId
+        val turnMatches = activeWsTurnId == null || activeWsTurnId == event.turnId
+        val active = activeWsOtid != null || ui.isStreaming() || ui.isAgentTyping()
+        return activeSendGeneration == recovery.generation && event.agentId == agentId &&
+            conversationMatches && turnMatches && active
     }
 
     private fun cancelRedialRecovery() {
         redialRecoveryJob?.cancel()
         redialRecoveryJob = null
+    }
+
+    private fun resetRedialRecovery() {
+        cancelRedialRecovery()
         activeAssistantBaseline = null
     }
 
@@ -1058,7 +1065,7 @@ class ChatSendCoordinator(
         // never resolve.
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
         activeWsOtid = null
-        cancelRedialRecovery()
+        resetRedialRecovery()
         activeWsLocalConversationId = null
         activeWsTurnId = null
         activeWsRunId = null
@@ -1111,7 +1118,7 @@ class ChatSendCoordinator(
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null
-        cancelRedialRecovery()
+        resetRedialRecovery()
         activeWsLocalConversationId = null
         activeWsTurnId = null
         activeWsRunId = null
