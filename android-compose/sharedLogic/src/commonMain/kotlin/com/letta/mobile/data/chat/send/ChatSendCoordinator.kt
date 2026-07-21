@@ -523,7 +523,9 @@ class ChatSendCoordinator(
                 // assistant run-id set) mid-turn corrupted post-tool
                 // settlement and contributed to the flicker. Update the run id
                 // and keep the turn state intact.
-                if (identityTransition is TurnIdentityTransition.SameTurn && activeWsTurnId != null) {
+                val exactActiveTurn = event.turnId == activeWsTurnId &&
+                    event.conversationId == activeWsConversationId
+                if (identityTransition is TurnIdentityTransition.SameTurn && exactActiveTurn) {
                     Telemetry.event(
                         "AdminChatVM", "ws.turnStarted.runPromoted",
                         "turnId" to event.turnId,

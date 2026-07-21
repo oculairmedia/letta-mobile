@@ -78,6 +78,28 @@ class ChatSendCoordinatorCleanupTest {
         }
 
     @Test
+    fun `accepted send adopts new turn when coordinator still holds stale turn id`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+            val recorded = mutableListOf<WsTimelineEvent>()
+            val coordinator = coordinator(timeline, ui, transport, recordRuntimeEvent = { event, _ -> recorded += event })
+
+            coordinator.send("first").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-old", AGENT_ID, "conv-1", "run-old"))
+            coordinator.send("second").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-new", AGENT_ID, "conv-1", "run-new"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-new", "run-new", "completed"))
+            advanceUntilIdle()
+
+            assertTrue(recorded.contains(WsTimelineEvent.TurnStarted("turn-new", AGENT_ID, "conv-1", "run-new")))
+            assertTrue(recorded.contains(WsTimelineEvent.TurnDone("turn-new", "run-new", "completed")))
+            assertFalse(ui.isStreaming())
+            assertFalse(ui.isAgentTyping())
+        }
+
+    @Test
     fun `next send does not clear presence while transport still owns active turn`() =
         runTest(UnconfinedTestDispatcher()) {
             val timeline = RecordingTimelineWriter()
