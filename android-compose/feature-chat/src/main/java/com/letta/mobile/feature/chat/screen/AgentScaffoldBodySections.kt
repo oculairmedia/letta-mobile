@@ -127,6 +127,9 @@ private fun AgentScaffoldDrawerSheet(state: AgentScaffoldRuntimeState) {
             onNavigateToSchedules = {
                 closeDrawerAndRun(state) { params.navigation.onNavigateToSchedules?.invoke(state.agentIdValue) }
             },
+            onNavigateToProjects = {
+                closeDrawerAndRun(state) { params.navigation.onNavigateToProjects?.invoke() }
+            },
             onClose = { state.scope.launch { state.drawerState.close() } },
             modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
         )

@@ -26,6 +26,7 @@ import com.letta.mobile.ui.navigation.AllToolsRoute
 import com.letta.mobile.ui.navigation.AdminRoute
 import com.letta.mobile.ui.navigation.ConversationsRoute
 import com.letta.mobile.ui.navigation.MemoryRoute
+import com.letta.mobile.ui.navigation.HomeRoute
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.isWideWidth
 
@@ -121,6 +122,9 @@ fun TwoPaneConversationsLayout(
                         },
                         onNavigateToAdmin = {
                             outerNavController.navigate(AdminRoute)
+                        },
+                        onNavigateToProjects = {
+                            outerNavController.navigate(HomeRoute)
                         },
                         onNavigateToConversationList = {
                             outerNavController.navigate(ConversationsRoute)

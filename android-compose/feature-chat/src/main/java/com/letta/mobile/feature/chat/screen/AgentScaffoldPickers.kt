@@ -964,6 +964,7 @@ internal fun DrawerContent(
     onNavigateToConversations: () -> Unit = {},
     onNavigateToMemory: () -> Unit = {},
     onNavigateToSchedules: () -> Unit = {},
+    onNavigateToProjects: () -> Unit = {},
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1132,6 +1133,16 @@ internal fun DrawerContent(
             onClick = {
                 HapticEffects.segmentTick(haptic, view)
                 onNavigateToSchedules()
+            },
+            colors = drawerItemColors,
+        )
+        NavigationDrawerItem(
+            icon = { Icon(LettaIcons.Apps, contentDescription = null) },
+            label = { Text(stringResource(R.string.screen_drawer_projects)) },
+            selected = false,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onNavigateToProjects()
             },
             colors = drawerItemColors,
         )
