@@ -99,7 +99,6 @@ data class AssistantMessage(
     @SerialName("sender_id") override val senderId: String? = null,
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
-    @SerialName("stream_mode") val streamMode: String? = null,
     @SerialName("message_type") override val messageType: String = "assistant_message",
 ) : LettaMessage {
     val content: String
@@ -255,7 +254,6 @@ data class ReasoningMessage(
     @SerialName("sender_id") override val senderId: String? = null,
     @SerialName("is_err") override val isErr: Boolean? = null,
     @SerialName("seq_id") override val seqId: Int? = null,
-    @SerialName("stream_mode") val streamMode: String? = null,
     val source: String? = null,
     val signature: String? = null,
     @SerialName("message_type") override val messageType: String = "reasoning_message",

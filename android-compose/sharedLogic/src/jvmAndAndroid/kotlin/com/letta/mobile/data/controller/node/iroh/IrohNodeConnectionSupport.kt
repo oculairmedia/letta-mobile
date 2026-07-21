@@ -350,45 +350,45 @@ internal class IncrementalStreamText {
     private val byKey = LinkedHashMap<String, StringBuilder>()
 
     fun applyToDelta(delta: JsonObject): IncrementalTextDelta? {
-        val input = textInput(delta) ?: return passthrough(delta)
-        val existing = byKey.getOrPut(input.key) { StringBuilder() }
-        val fragment = mergeFragment(existing, input.text) ?: return null
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return passthrough(delta)
+        if (messageType !in TEXT_MESSAGE_TYPES) return passthrough(delta)
+        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
+            ?: delta["id"]?.jsonPrimitive?.contentOrNull
+            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
+            ?: messageType
+        val field = if (messageType == "assistant_message") "content" else "reasoning"
+        val incoming = textFrom(delta[field])
+            ?: textFrom(delta["content"])
+            ?: textFrom(delta["text"])
+            ?: return passthrough(delta)
+        val existing = byKey.getOrPut(textKey) { StringBuilder() }
+        val fragment = when {
+            existing.isEmpty() -> incoming.also(existing::append)
+            incoming.length >= existing.length && incoming.startsWith(existing) -> {
+                incoming.substring(existing.length).also {
+                    existing.clear()
+                    existing.append(incoming)
+                }
+            }
+            existing.endsWith(incoming) -> return null
+            else -> incoming.also(existing::append)
+        }
+        if (fragment.isEmpty()) return null
         return IncrementalTextDelta(
-            streamKey = input.key,
-            fragment = delta.withText(input.field, fragment, "incremental"),
-            checkpoint = delta.withText(input.field, existing.toString(), "checkpoint"),
+            streamKey = textKey,
+            fragment = delta.withText(field, messageType, fragment),
+            checkpoint = delta.withText(field, messageType, existing.toString()),
         )
     }
 
-    private fun textInput(delta: JsonObject): TextInput? {
-        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return null
-        if (messageType !in TEXT_MESSAGE_TYPES) return null
-        val field = if (messageType == "assistant_message") "content" else "reasoning"
-        val text = textFrom(delta[field]) ?: textFrom(delta["content"]) ?: textFrom(delta["text"]) ?: return null
-        val key = delta["otid"]?.jsonPrimitive?.contentOrNull
-            ?: delta["client_message_id"]?.jsonPrimitive?.contentOrNull
-            ?: messageType
-        return TextInput(key, field, text)
-    }
-
-    private fun mergeFragment(existing: StringBuilder, incoming: String): String? = when {
-        existing.isEmpty() -> incoming.also(existing::append)
-        incoming.length >= existing.length && incoming.startsWith(existing) -> incoming.substring(existing.length).also {
-            existing.clear()
-            existing.append(incoming)
-        }
-        existing.endsWith(incoming) -> null
-        else -> incoming.also(existing::append)
-    }.takeIf { !it.isNullOrEmpty() }
-
-    private data class TextInput(val key: String, val field: String, val text: String)
-
     private fun passthrough(delta: JsonObject) = IncrementalTextDelta("", delta, delta)
 
-    private fun JsonObject.withText(field: String, text: String, streamMode: String): JsonObject = buildJsonObject {
-        this@withText.forEach { (key, value) -> if (key != field && key != "stream_mode") put(key, value) }
+    private fun JsonObject.withText(field: String, messageType: String, text: String): JsonObject = buildJsonObject {
+        this@withText.forEach { (key, value) -> if (key != field) put(key, value) }
         put(field, text)
-        put("stream_mode", streamMode)
+        if (messageType != "assistant_message" && !containsKey("reasoning")) {
+            put("reasoning", text)
+        }
     }
 
     private fun textFrom(element: kotlinx.serialization.json.JsonElement?): String? {

@@ -109,7 +109,6 @@ class IrohFanoutFrameShapeParityTest {
             runtime = runtime,
             remoteEndpointId = initiator.connectionId,
             viewersFor = { conv -> registry.viewersFor(conv) },
-            registrationEpoch = registry::registrationEpoch,
             initiatorViewer = initiator,
             trackInitiatorFrame = {},
             unregisterViewer = { conv, v -> registry.unregister(conv, v) },

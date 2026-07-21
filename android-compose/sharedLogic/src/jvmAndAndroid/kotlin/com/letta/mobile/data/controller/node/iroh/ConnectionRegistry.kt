@@ -37,13 +37,10 @@ class ConnectionRegistry {
     private val mutex = Mutex()
     // conversationId -> viewer handles
     private val viewersByConversation = mutableMapOf<String, MutableSet<ViewerHandle>>()
-    private val registrationEpochs = mutableMapOf<Pair<String, String>, Long>()
 
     suspend fun register(conversationId: String, viewer: ViewerHandle) {
         mutex.withLock {
             viewersByConversation.getOrPut(conversationId) { mutableSetOf() }.add(viewer)
-            val key = conversationId to viewer.connectionId
-            registrationEpochs[key] = (registrationEpochs[key] ?: 0L) + 1L
         }
     }
 
@@ -71,9 +68,6 @@ class ConnectionRegistry {
     /** Snapshot of viewers for a conversation (defensive copy — safe to iterate + write outside the lock). */
     suspend fun viewersFor(conversationId: String): Set<ViewerHandle> =
         mutex.withLock { viewersByConversation[conversationId]?.toSet() ?: emptySet() }
-
-    suspend fun registrationEpoch(conversationId: String, connectionId: String): Long =
-        mutex.withLock { registrationEpochs[conversationId to connectionId] ?: 0L }
 
     /** Test/telemetry: total distinct conversations currently viewed. */
     suspend fun conversationCount(): Int = mutex.withLock { viewersByConversation.size }

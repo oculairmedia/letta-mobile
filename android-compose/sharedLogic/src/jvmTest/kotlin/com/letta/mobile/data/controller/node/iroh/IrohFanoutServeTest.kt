@@ -115,7 +115,6 @@ class IrohFanoutServeTest {
         runtime = runtimeFor(conversationId),
         remoteEndpointId = initiator?.connectionId ?: "conn-init",
         viewersFor = { conv -> registry.viewersFor(conv) },
-        registrationEpoch = registry::registrationEpoch,
         initiatorViewer = initiator,
         trackInitiatorFrame = { parked.add(it) },
         unregisterViewer = { conv, v -> registry.unregister(conv, v) },
@@ -551,8 +550,8 @@ class IrohFanoutServeTest {
         val goldenBodies = frames.map { deltaOf(it)!! }
         val expectedBodies = listOf(
             """{"message_type":"tool_call_message","tool_call":{"tool_call_id":"tc-C","name":"stub_tool","arguments":"{}"}}""",
-            """{"message_type":"assistant_message","otid":"otid-C","content":"Hel","stream_mode":"checkpoint","id":"cm-stream-otid-C"}""",
-            """{"message_type":"assistant_message","otid":"otid-C","content":"lo world","stream_mode":"incremental","id":"cm-stream-otid-C"}""",
+            """{"message_type":"assistant_message","otid":"otid-C","content":"Hel","id":"cm-stream-otid-C"}""",
+            """{"message_type":"assistant_message","otid":"otid-C","content":"lo world","id":"cm-stream-otid-C"}""",
             """{"message_type":"tool_return_message","tool_call_id":"tc-C","status":"success","tool_return":"ok"}""",
             """{"message_type":"stop_reason","stop_reason":"end_turn"}""",
         ).map { json.parseToJsonElement(it).jsonObject }

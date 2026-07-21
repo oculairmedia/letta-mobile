@@ -268,7 +268,6 @@ sealed interface ServerFrame {
         val otid: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
-        @SerialName("stream_mode") val streamMode: String? = null,
     ) : ServerFrame
 
     @Serializable
@@ -285,7 +284,6 @@ sealed interface ServerFrame {
         val signature: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
-        @SerialName("stream_mode") val streamMode: String? = null,
     ) : ServerFrame
 
     /**

@@ -99,7 +99,6 @@ internal object IrohStreamDeltaServerFrameMapper {
                         ?: meta.assistantStreamOtid(),
                     seq = meta.eventSeq,
                     seqId = meta.seqId,
-                    streamMode = delta.string("stream_mode"),
                 ),
             )
 
@@ -116,7 +115,6 @@ internal object IrohStreamDeltaServerFrameMapper {
                     signature = delta.string("signature"),
                     seq = meta.eventSeq,
                     seqId = meta.seqId,
-                    streamMode = delta.string("stream_mode"),
                 ),
             )
 

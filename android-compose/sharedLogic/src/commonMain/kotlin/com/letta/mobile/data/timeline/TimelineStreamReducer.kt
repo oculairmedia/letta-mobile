@@ -207,8 +207,6 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 incoming = newText,
                 canUseSnapshotMerge = canUseSnapshotMerge,
                 incomingIsForwardDelta = incomingIsForwardDelta,
-                incrementalForwardAppend = message is com.letta.mobile.data.model.AssistantMessage &&
-                    message.streamMode == "incremental",
             )
         }
         val mergedText = textMerge.text
