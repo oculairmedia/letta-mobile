@@ -46,7 +46,7 @@ internal suspend fun runStreamSubscriber(
         try {
             val stream = messageApi.streamConversation(conversationId)
             val activeStreamCountOnOpen = activeStreamCount.incrementAndGet()
-            var activeStreamCountAfterClose = activeStreamCountOnOpen
+            var activeStreamCountAfterClose: Int
             var streamTimedOut = false
             var timedOutSilenceMs = 0L
             try {
@@ -127,12 +127,11 @@ internal suspend fun runStreamSubscriber(
                                 // messages.
                                 val runId = message.runId
                                 if (runId != null && seenRunIds.markSeen(runId)) {
-                                    val capturedRunId = runId
-                                    runCatching { reconcileForExternalRun(capturedRunId) }.onFailure { t ->
+                                    runCatching { reconcileForExternalRun(runId) }.onFailure { t ->
                                         Telemetry.error(
                                             "TimelineSync", "externalRunReconcile.failed", t,
                                             "conversationId" to conversationId,
-                                            "runId" to capturedRunId,
+                                            "runId" to runId,
                                         )
                                     }
                                 }

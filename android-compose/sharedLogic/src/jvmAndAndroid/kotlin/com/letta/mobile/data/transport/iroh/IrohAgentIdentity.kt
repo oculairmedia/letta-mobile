@@ -23,9 +23,6 @@ class IrohAgentIdentity private constructor(
     /** Hex-encoded node id (public key) — the dialable identity of this agent. */
     val nodeIdHex: String,
 ) {
-    /** Build an Iroh [SecretKey] handle from the persisted bytes (caller closes it). */
-    fun secretKey(): SecretKey = SecretKey.fromBytes(secretKeyBytes)
-
     companion object {
         /**
          * Load the agent's persisted identity, or create + persist a new one.

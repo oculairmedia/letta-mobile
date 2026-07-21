@@ -110,11 +110,11 @@ internal fun JsonObject.stringField(vararg names: String): String? =
     names.firstNotNullOfOrNull { name -> (this[name] as? JsonPrimitive)?.contentOrNull }
 
 internal fun JsonElement.asObjectList(): List<JsonObject> = when (this) {
-    is JsonArray -> mapNotNull { it as? JsonObject }
+    is JsonArray -> filterIsInstance<JsonObject>()
     is JsonObject -> {
         val nested = listOf("projects", "items", "data", "results")
             .firstNotNullOfOrNull { key -> this[key] as? JsonArray }
-        nested?.mapNotNull { it as? JsonObject } ?: listOf(this)
+        nested?.filterIsInstance<JsonObject>() ?: listOf(this)
     }
     else -> emptyList()
 }

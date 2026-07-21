@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.editagent
 
-import com.letta.mobile.data.model.Agent
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.json.JsonArray
 

@@ -26,6 +26,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.statement.bodyAsText
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -44,7 +45,7 @@ internal class SetupApplyCommand : AdminShimCommand(
     private val compact by option("--compact", help = "Print compact JSON plan output.").flag(default = false)
 
     override fun run() = runBlocking {
-        val document = readCliSetupDocument(Path.of(file))
+        val document = readCliSetupDocument(Paths.get(file))
         val applier = CliSetupApplier(baseUrl, if (document.hasServerWork()) token else optionalToken.orEmpty())
         val plan = applier.apply(document, dryRun)
         println(writeCliSetupPlan(plan, compact))
@@ -71,7 +72,7 @@ internal class SetupExportCommand : AdminShimCommand(
         if (out == null) {
             println(output)
         } else {
-            val path = Path.of(out)
+            val path = Paths.get(out)
             path.parent?.let { Files.createDirectories(it) }
             Files.write(path, output.toByteArray(Charsets.UTF_8))
             println(jsonStatus("exported", path.toString()))

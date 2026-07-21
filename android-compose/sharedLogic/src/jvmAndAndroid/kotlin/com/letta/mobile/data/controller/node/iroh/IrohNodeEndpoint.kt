@@ -2,7 +2,6 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.node.IrohRelayConfig
-import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.iroh.IrohDiagnostics
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
@@ -102,15 +101,6 @@ class IrohNodeEndpoint(
         val endpointAddr = addr()
         val ticket = EndpointTicket.fromAddr(endpointAddr)
         return ticket.toString()
-    }
-
-    fun asAppServerEndpoint(): AppServerEndpoint {
-        // Use the ticket format which includes direct addresses, so loopback works
-        return AppServerEndpoint(
-            scheme = "iroh",
-            address = ticketString(),
-            bearerToken = null,
-        )
     }
 
     suspend fun create() {
@@ -231,10 +221,8 @@ class IrohNodeEndpoint(
                                 IrohNodeConnection(
                                     connection = connection,
                                     controller = controller,
-                                    alpn = alpn,
                                     adminRpcRouter = adminRpcRouter,
                                     requiredBearerToken = requiredBearerToken,
-                                    allowedPeerIds = allowedPeerIds,
                                     remoteEndpointId = remoteId,
                                     connectionRegistry = connectionRegistry,
                                 ).serve()

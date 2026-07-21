@@ -174,10 +174,16 @@ class ChatPushService : Service() {
 
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val foregroundServiceType =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+                    } else {
+                        0
+                    }
                 startForeground(
                     FOREGROUND_NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+                    foregroundServiceType,
                 )
             } else {
                 startForeground(FOREGROUND_NOTIFICATION_ID, notification)
@@ -194,7 +200,7 @@ class ChatPushService : Service() {
     }
 
     private fun createServiceChannelIfNeeded() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val existing = manager.getNotificationChannel(SERVICE_CHANNEL_ID)
         if (existing != null) return
         val channel = NotificationChannel(

@@ -471,9 +471,8 @@ private fun Timeline.recentTailContainsEquivalent(incoming: TimelineEvent.Confir
     if (incomingContent.isEmpty()) return false
     val start = (events.size - RECONCILE_CONTENT_DEDUPE_TAIL).coerceAtLeast(0)
     for (i in events.size - 1 downTo start) {
-        val event = events[i]
         // letta-mobile-20tat: check both Confirmed AND Local user events
-        when (event) {
+        when (val event = events[i]) {
             is TimelineEvent.Confirmed -> {
                 if (event.messageType != incoming.messageType) continue
                 if (event.content.trim() == incomingContent) return true

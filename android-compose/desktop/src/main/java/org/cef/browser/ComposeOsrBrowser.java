@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  * <p>Threading: {@link #onPaint} arrives on a CEF thread. The consumer must
  * copy the buffer before returning — CEF reuses it for the next frame.
  */
-public final class ComposeOsrBrowser extends CefBrowser_N implements CefRenderHandler {
+public class ComposeOsrBrowser extends CefBrowser_N implements CefRenderHandler {
     /** Receives raw BGRA frames sized {@code width * height * 4} bytes. */
     public interface FrameConsumer {
         void onFrame(ByteBuffer bgraBuffer, int width, int height);

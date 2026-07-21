@@ -94,7 +94,7 @@ data class StackFrame(
 )
 
 object ToolOutputParser {
-    const val MaxAnalyzedChars = 100_000
+    const val MAX_ANALYZED_CHARS = 100_000
 
     private val json = Json {
         prettyPrint = true
@@ -112,7 +112,7 @@ object ToolOutputParser {
             return ToolOutputDocument(raw = raw, blocks = listOf(ToolOutputBlock.PlainText(raw)))
         }
 
-        val analyzed = raw.take(MaxAnalyzedChars)
+        val analyzed = raw.take(MAX_ANALYZED_CHARS)
         val isTruncated = raw.length > analyzed.length
         val normalized = analyzed.normalizeLineEndings()
         val hasAnsi = ansiRegex.containsMatchIn(normalized)

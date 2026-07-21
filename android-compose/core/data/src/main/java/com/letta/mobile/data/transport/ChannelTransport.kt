@@ -49,8 +49,8 @@ internal fun defaultChannelTransportScope(): CoroutineScope =
 @Singleton
 class ChannelTransport internal constructor(
     private val scope: CoroutineScope,
-    private val cursorStore: RunCursorStore,
-    private val conversationCursorStore: ConversationCursorStore,
+    cursorStore: RunCursorStore,
+    conversationCursorStore: ConversationCursorStore,
 ) : IChannelTransport {
     @Inject
     constructor(
@@ -714,7 +714,7 @@ class ChannelTransport internal constructor(
         while (true) {
             val queuedFrame = synchronized(pendingA2uiActionLock) {
                 val pending = conversationStateManager.existingPendingA2uiActions(conversationId)
-                if (pending == null || pending.isEmpty()) null else pending.removeFirst()
+                if (pending.isNullOrEmpty()) null else pending.removeFirst()
             } ?: return
             val frame = queuedFrame.withActiveRoutingFallback(conversationId)
             if (frame.runId == null) {
@@ -756,8 +756,6 @@ class ChannelTransport internal constructor(
         private const val NEW_CONVERSATION_STATE_KEY = "__new_conversation__"
         const val KEEPALIVE_PONG_TIMEOUT_CLOSE_CODE = 4001
         private val AUTH_FAILURE_CLOSE_CODES = setOf(4003, 4401, 4403)
-
-        const val DEFAULT_CRON_TIMEOUT_MS: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS
 
         internal fun nowIso(): String = Instant.now().toString()
 

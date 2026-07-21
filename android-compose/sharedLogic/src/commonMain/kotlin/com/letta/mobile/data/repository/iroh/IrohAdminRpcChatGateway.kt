@@ -230,7 +230,7 @@ class IrohAdminRpcChatGateway(
         }
     }
 
-    private suspend fun dispatchSend(conversationId: ConversationId, agentId: AgentId, outbound: OutboundMessageCreate) {
+    private fun dispatchSend(conversationId: ConversationId, agentId: AgentId, outbound: OutboundMessageCreate) {
         val accepted = transport.send(
             agentId = agentId.value,
             conversationId = conversationId.value,

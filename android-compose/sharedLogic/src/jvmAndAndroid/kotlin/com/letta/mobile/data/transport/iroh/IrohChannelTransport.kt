@@ -210,7 +210,7 @@ class IrohChannelTransport(
         }
 
         /** Wins exactly once; the first terminal (server or synthetic) claims it. */
-        fun claimTerminal(): Boolean = terminalClaimed.compareAndSet(false, true)
+        fun claimTerminal(): Boolean = terminalClaimed.compareAndSet(expect = false, update = true)
         val hasTerminal: Boolean get() = terminalClaimed.value
     }
 

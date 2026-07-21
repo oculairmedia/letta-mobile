@@ -55,10 +55,16 @@ class LocalLettaCodeService : Service() {
 
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val foregroundServiceType =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+                    } else {
+                        0
+                    }
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
+                    foregroundServiceType,
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
@@ -71,7 +77,7 @@ class LocalLettaCodeService : Service() {
     }
 
     private fun createChannelIfNeeded() {
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         if (manager.getNotificationChannel(CHANNEL_ID) != null) return
         manager.createNotificationChannel(
             NotificationChannel(
@@ -110,10 +116,15 @@ class LocalLettaCodeService : Service() {
             // Record notification visibility for the UX layer, but never block the
             // launch on it: Android allows foreground services to start without
             // POST_NOTIFICATIONS (the notification appears in Task Manager instead).
-            val notificationsGranted = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PackageManager.PERMISSION_GRANTED
+            val notificationsGranted =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) == PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
             if (!notificationsWillBeVisible(Build.VERSION.SDK_INT, notificationsGranted)) {
                 Log.i(
                     TAG,

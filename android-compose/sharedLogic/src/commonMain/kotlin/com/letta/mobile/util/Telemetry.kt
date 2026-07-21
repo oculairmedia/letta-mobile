@@ -42,13 +42,6 @@ class TelemetryContext {
         vararg attrs: Pair<String, Any?>,
     ) = Telemetry.error(tag, name, throwable, *attrs)
 
-    inline fun <T> measure(
-        tag: String,
-        name: String,
-        vararg attrs: Pair<String, Any?>,
-        block: () -> T,
-    ): T = Telemetry.measure(tag, name, *attrs, block = block)
-
     inline fun startTimer(tag: String, name: String): Telemetry.Timer =
         Telemetry.startTimer(tag, name)
 }

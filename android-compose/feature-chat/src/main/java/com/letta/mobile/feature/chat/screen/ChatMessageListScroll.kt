@@ -1,16 +1,10 @@
 package com.letta.mobile.feature.chat.screen
 
+import androidx.compose.foundation.lazy.LazyListState
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
 import com.letta.mobile.data.model.UiMessage
 import kotlin.math.abs
-import androidx.compose.foundation.lazy.LazyListState
-
-internal data class ActivePromptState(
-    val promptItem: ChatRenderItem.Single,
-    val renderIndex: Int,
-    val lazyIndex: Int,
-)
 
 @JvmInline
 internal value class ChatMessageRole(val raw: String)

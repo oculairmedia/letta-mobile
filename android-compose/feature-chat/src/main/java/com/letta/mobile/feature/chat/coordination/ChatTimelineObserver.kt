@@ -211,7 +211,6 @@ internal class ChatTimelineObserver(
                     val ui = projection.ui
                     val a2uiSurfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
                     val tailIsAssistant = projection.tailIsAssistant
-                    val anyLettaServerLocalPending = projection.anyLettaServerLocalPending
                     val clearLoading = ui.isNotEmpty()
                     val newHasMoreOlder = if (projection.anyConfirmed) true else uiState.value.hasMoreOlderMessages
 

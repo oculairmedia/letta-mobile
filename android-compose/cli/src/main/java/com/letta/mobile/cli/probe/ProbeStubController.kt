@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Behavior knobs for the hermetic stub app-server, including the documented
@@ -136,7 +137,7 @@ class ProbeStubController(
             val assistantText = StringBuilder()
             var cancelled = false
             for (index in 0 until behavior.assistantDeltas) {
-                delay(behavior.deltaDelayMs)
+                delay(behavior.deltaDelayMs.milliseconds)
                 if (run.cancelRequested.get()) {
                     cancelled = true
                     break

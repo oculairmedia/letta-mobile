@@ -77,27 +77,23 @@ class SubagentCorrelator {
         val parsed = parseAgentArguments(arguments)
         val existing = entries[toolCallId]
 
-        val next = if (existing == null) {
-            SubagentEntry(
-                toolCallId = toolCallId,
-                description = parsed.description,
-                subagentType = parsed.subagentType,
-                status = SubagentStatus.RUNNING,
-                parentRunId = parent.runId,
-                parentAgentId = parent.agentId,
-                parentConversationId = parent.conversationId,
-            )
-        } else {
+        val next = existing?.copy(
             // Backfill only: never clobber a populated field with an empty one,
             // and never downgrade a terminal status back to running.
-            existing.copy(
-                description = existing.description.ifEmpty { parsed.description },
-                subagentType = existing.subagentType.ifEmpty { parsed.subagentType },
-                parentRunId = existing.parentRunId ?: parent.runId,
-                parentAgentId = existing.parentAgentId ?: parent.agentId,
-                parentConversationId = existing.parentConversationId ?: parent.conversationId,
-            )
-        }
+            description = existing.description.ifEmpty { parsed.description },
+            subagentType = existing.subagentType.ifEmpty { parsed.subagentType },
+            parentRunId = existing.parentRunId ?: parent.runId,
+            parentAgentId = existing.parentAgentId ?: parent.agentId,
+            parentConversationId = existing.parentConversationId ?: parent.conversationId,
+        ) ?: SubagentEntry(
+            toolCallId = toolCallId,
+            description = parsed.description,
+            subagentType = parsed.subagentType,
+            status = SubagentStatus.RUNNING,
+            parentRunId = parent.runId,
+            parentAgentId = parent.agentId,
+            parentConversationId = parent.conversationId,
+        )
 
         if (next != existing) {
             entries[toolCallId] = next

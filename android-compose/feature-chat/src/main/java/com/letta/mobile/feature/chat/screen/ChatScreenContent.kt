@@ -53,7 +53,6 @@ import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.components.StarterPrompts
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableMap
 

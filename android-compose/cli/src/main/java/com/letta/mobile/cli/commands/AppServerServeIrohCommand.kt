@@ -124,11 +124,12 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val port = irohPort.toIntOrNull() ?: 0
             if (port > 0) {
                 val lanAddrs = try {
-                    java.net.NetworkInterface.getNetworkInterfaces().toList()
+                    java.net.NetworkInterface.getNetworkInterfaces().asSequence()
                         .filter { it.isUp && !it.isLoopback }
-                        .flatMap { it.inetAddresses.toList() }
+                        .flatMap { it.inetAddresses.asSequence() }
                         .filterIsInstance<java.net.Inet4Address>()
                         .map { "${it.hostAddress}:$port" }
+                        .toList()
                 } catch (_: Exception) { emptyList() }
                 if (lanAddrs.isNotEmpty()) {
                     println("[iroh-app-server] Short URL: iroh://$nodeId@${lanAddrs.joinToString(",")}")

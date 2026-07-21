@@ -10,7 +10,6 @@ import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.data.repository.api.IModelRepository
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.ui.common.UiState
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,7 +28,6 @@ internal class EditAgentViewModel @Inject constructor(
     private val messageRepository: MessageRepository,
     private val modelRepository: IModelRepository,
     private val toolRepository: IToolRepository,
-    private val settingsRepository: ISettingsRepository,
 ) : ViewModel() {
 
     private val agentId: String = requireNotNull(savedStateHandle.get<String>("agentId")) {
@@ -126,7 +124,7 @@ internal class EditAgentViewModel @Inject constructor(
             originalBlocks = originalBlocks,
             originalEmbedding = originalEmbedding,
             originalProviderType = originalProviderType,
-            servedModelIds = { llmModels.value.mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } } },
+            servedModelIds = { llmModels.value.map { model -> model.handle ?: model.name.ifBlank { model.id } } },
         )
         state.setSuccess(snapshot.uiState)
     }

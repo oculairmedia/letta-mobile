@@ -61,8 +61,7 @@ class SharedChatSessionResolver(
     private fun mostRecentCachedConversationId(agentId: String): String? {
         return conversationRepository.getCachedConversations(AgentId(agentId))
             .filterNot { it.id.value.startsWith(DEFAULT_SHIM_CONVERSATION_PREFIX) }
-            .sortedByDescending { it.lastMessageAt ?: it.createdAt ?: "" }
-            .firstOrNull()
+            .maxByOrNull { it.lastMessageAt ?: it.createdAt ?: "" }
             ?.id
             ?.value
     }

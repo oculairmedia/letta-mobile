@@ -334,8 +334,7 @@ open class MessageApi @Inject constructor(
     }
 
     private fun JsonObject.extractSearchText(): String? {
-        val content = this["content"]
-        return when (content) {
+        return when (val content = this["content"]) {
             is JsonPrimitive -> content.contentOrNull
             is JsonArray -> content.mapNotNull { part ->
                 when (part) {

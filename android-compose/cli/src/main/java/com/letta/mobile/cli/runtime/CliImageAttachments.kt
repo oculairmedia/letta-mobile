@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.MessageContentPart
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.Base64
 
 internal fun readImageAttachments(values: List<String>): List<MessageContentPart.Image> =
@@ -18,7 +19,7 @@ internal fun readImageAttachment(value: String): MessageContentPart.Image {
     return if (trimmed.startsWith("data:", ignoreCase = true)) {
         parseImageDataUrl(trimmed)
     } else {
-        readImageFile(Path.of(trimmed))
+        readImageFile(Paths.get(trimmed))
     }
 }
 

@@ -214,11 +214,11 @@ kover {
                 classes(
                     // Hilt/Dagger generated code
                     "*_Factory",
-                    "*_Factory\$*",
+                    "*_Factory$*",
                     "*_MembersInjector",
-                    "*_MembersInjector\$*",
+                    "*_MembersInjector$*",
                     "*_HiltModules",
-                    "*_HiltModules\$*",
+                    "*_HiltModules$*",
                     "dagger.hilt.*",
                     "hilt_aggregated_deps.*",
                     // Databinding & generated

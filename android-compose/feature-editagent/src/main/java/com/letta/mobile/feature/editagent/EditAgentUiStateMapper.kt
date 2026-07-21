@@ -3,7 +3,6 @@ package com.letta.mobile.feature.editagent
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.Tool
-import kotlinx.collections.immutable.toImmutableList
 
 internal data class EditAgentMapperInput(
     val agent: Agent,

@@ -58,7 +58,6 @@ import kotlin.time.Duration.Companion.milliseconds
 class IrohNodeConnection(
     private val connection: Connection,
     private val controller: AppServerController,
-    private val alpn: ByteArray,
     /**
      * Router for admin RPC calls. Domain handlers register here.
      * Defaults to an empty router — methods register on the same instance
@@ -66,7 +65,6 @@ class IrohNodeConnection(
      */
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
     private val requiredBearerToken: String? = null,
-    private val allowedPeerIds: Set<String> = emptySet(),
     private val remoteEndpointId: String = "",
     // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
     // so a turn on one connection fans out to every connection viewing the same
@@ -284,9 +282,7 @@ class IrohNodeConnection(
     /** Control-channel sync frame — kept out of [handleControlFrame] for complexity. */
     private suspend fun handleControlSync(obj: JsonObject): String {
         val requestId = obj["request_id"]?.jsonPrimitive?.content
-        if (requestId == null) {
-            return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
-        }
+            ?: return """{"type":"sync_response","success":false,"error":"request_id is required"}"""
         return try {
             val agentId = obj["agent_id"]?.jsonPrimitive?.content
             val conversationId = obj["conversation_id"]?.jsonPrimitive?.content

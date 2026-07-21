@@ -3,6 +3,7 @@ package com.letta.mobile.crash
 import android.content.Context
 import android.util.Log
 import androidx.startup.Initializer
+import com.letta.mobile.R
 import io.sentry.android.core.SentryAndroid
 
 /**
@@ -33,25 +34,15 @@ class SentryInitializer : Initializer<Unit> {
     override fun create(context: Context) {
         val res = context.resources
         val dsn = runCatching {
-            res.getString(
-                res.getIdentifier("sentry_dsn", "string", context.packageName),
-            )
+            res.getString(R.string.sentry_dsn)
         }.getOrNull().orEmpty()
 
         val environment = runCatching {
-            res.getString(
-                res.getIdentifier("sentry_env", "string", context.packageName),
-            )
+            res.getString(R.string.sentry_env)
         }.getOrNull() ?: "development"
 
         val tracesSampleRate = runCatching {
-            res.getString(
-                res.getIdentifier(
-                    "sentry_traces_sample_rate",
-                    "string",
-                    context.packageName,
-                ),
-            ).toDoubleOrNull()
+            res.getString(R.string.sentry_traces_sample_rate).toDoubleOrNull()
         }.getOrNull() ?: DEFAULT_TRACES_SAMPLE_RATE
 
         if (dsn.isBlank()) {

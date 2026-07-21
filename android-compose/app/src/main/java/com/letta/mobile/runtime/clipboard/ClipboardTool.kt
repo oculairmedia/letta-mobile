@@ -44,8 +44,7 @@ class ClipboardTool @Inject constructor(
     )
 
     override fun handle(input: JsonObject, actionId: String): MobileActionToolResponse {
-        val action = input.string("action")?.trim()
-        return when (action) {
+        return when (val action = input.string("action")?.trim()) {
             "read" -> handleRead(actionId)
             "write" -> handleWrite(input, actionId)
             else -> MobileActionToolResponse(
@@ -80,8 +79,7 @@ class ClipboardTool @Inject constructor(
 
     private fun handleWrite(input: JsonObject, actionId: String): MobileActionToolResponse {
         val text = input.string("text")
-        if (text == null) {
-            return MobileActionToolResponse(
+            ?: return MobileActionToolResponse(
                 success = false,
                 toolName = CLIPBOARD_WRITE_TOOL_NAME,
                 status = MobileActionCapabilityStatus.Error,
@@ -90,7 +88,6 @@ class ClipboardTool @Inject constructor(
                 actionId = actionId,
                 error = "missing_text",
             )
-        }
         val response = provider.writeText(text)
         return MobileActionToolResponse(
             success = response.success,

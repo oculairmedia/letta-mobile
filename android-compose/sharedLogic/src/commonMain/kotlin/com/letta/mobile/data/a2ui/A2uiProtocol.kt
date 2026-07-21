@@ -303,7 +303,7 @@ fun decodeA2uiMessagesLenient(json: Json, raw: String): List<A2uiMessage>? {
         substr = substr.substring(0, endIdx + 1)
     }
 
-    substr = substr.replace(Regex("[,\\s]+\$"), "")
+    substr = substr.replace(Regex("[,\\s]+$"), "")
 
     var unescapedQuotes = 0
     var i = 0

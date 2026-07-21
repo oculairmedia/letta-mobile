@@ -177,9 +177,7 @@ data class RootShellGrantResult(
     val granted: Boolean,
     val uid: String?,
     val result: RootShellCommandResult,
-) {
-    val providerHint: String? = result.providerHint
-}
+)
 
 data class RootShellCommandResult(
     val exitCode: Int?,

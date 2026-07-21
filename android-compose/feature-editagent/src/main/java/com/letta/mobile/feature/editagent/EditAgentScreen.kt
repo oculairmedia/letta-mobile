@@ -43,61 +43,16 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 internal enum class EditAgentConfigTab(val label: String) {
-    Basics("Basics"),
-    Models("Models"),
     Memory("Memory"),
     Tools("Tools"),
-    Runtime("Runtime"),
     Advanced("Advanced"),
 }
 
 internal object EditAgentTestTags {
     const val CONTENT_LIST = "edit_agent_content_list"
-    const val TAB_PREFIX = "edit_agent_tab_"
-
-    fun tab(label: String): String = TAB_PREFIX + label.lowercase(Locale.US)
 }
-
-internal data class EditAgentActionsSheetActions(
-    val onDismiss: () -> Unit,
-    val onSave: () -> Unit,
-    val onExport: () -> Unit,
-    val onClone: () -> Unit,
-)
-
-internal data class EditAgentOverlayState(
-    val showSectionIndex: Boolean,
-    val showActionSheet: Boolean,
-    val showResetDialog: Boolean,
-    val showDeleteDialog: Boolean,
-    val showCloneDialog: Boolean,
-)
-
-internal data class EditAgentOverlayCallbacks(
-    val onDismissSectionIndex: () -> Unit,
-    val onSectionSelected: (String) -> Unit,
-    val onDismissActionSheet: () -> Unit,
-    val onSave: () -> Unit,
-    val onExport: () -> Unit,
-    val onClone: () -> Unit,
-    val onDismissResetDialog: () -> Unit,
-    val onConfirmReset: () -> Unit,
-    val onDismissDeleteDialog: () -> Unit,
-    val onConfirmDelete: () -> Unit,
-    val onDismissCloneDialog: () -> Unit,
-    val onCloneAgent: (String?, Boolean, Boolean) -> Unit,
-)
-
-internal data class EditAgentLoadedData(
-    val state: EditAgentUiState,
-    val llmModels: List<LlmModel>,
-    val embeddingModels: List<EmbeddingModel>,
-    val contentPadding: PaddingValues,
-    val lazyListState: LazyListState,
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

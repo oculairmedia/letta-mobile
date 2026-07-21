@@ -292,7 +292,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
                 val role = row.stringField("role") ?: return@flatMapIndexed emptyList()
                 val date = (row["metadata"] as? JsonObject)?.stringField("created_at")
                 // Resolve image_ref parts before typed parsing
-                val rawContentParts = (row["content"] as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+                val rawContentParts = (row["content"] as? JsonArray)?.filterIsInstance<JsonObject>().orEmpty()
                 val contentParts = rawContentParts.map { part -> resolveImageRef(part, blobStore) }
                 val text = contentParts
                     .filter { it.stringField("type") == "text" }

@@ -365,10 +365,6 @@ class AgentListViewModel @Inject constructor(
         }
     }
 
-    fun clearError() {
-        _transient.update { it.copy(error = null) }
-    }
-
     fun createAgent(
         params: AgentCreateParams,
         runtimeOption: AgentCreateRuntimeOption = AgentCreateRuntimeOption.REMOTE,

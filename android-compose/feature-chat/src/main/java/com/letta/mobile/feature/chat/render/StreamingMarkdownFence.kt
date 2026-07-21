@@ -1,9 +1,6 @@
 package com.letta.mobile.feature.chat.render
 
-import androidx.annotation.VisibleForTesting
-
 /** True if the text contains an odd number of ``` fences (i.e. a code block is currently open). */
-@VisibleForTesting
 internal fun insideOpenCodeFence(text: String): Boolean {
     var count = 0
     var i = 0
@@ -21,7 +18,6 @@ internal fun insideOpenCodeFence(text: String): Boolean {
 private fun isCodeFenceAt(text: String, index: Int): Boolean =
     text[index] == '`' && text[index + 1] == '`' && text[index + 2] == '`'
 
-@VisibleForTesting
 internal fun hasOpenDisplayMathFence(text: String): Boolean {
     var open = false
     var i = 0

@@ -231,7 +231,7 @@ internal fun rememberSubagentRegistry(
         ),
     )
     val activeSubagents = produceState(
-        initialValue = emptyList<SubagentEntry>(),
+        initialValue = emptyList(),
         subagentRepository,
         parentScope,
     ) {

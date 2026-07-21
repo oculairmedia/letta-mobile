@@ -26,8 +26,7 @@ object AppServerProtocol {
     fun decodeFrame(rawJson: String, channel: AppServerChannel): AppServerReceivedFrame {
         val element = json.parseToJsonElement(rawJson)
         val raw = element.jsonObject
-        val type = raw["type"]?.jsonPrimitive?.content
-        val frame = when (type) {
+        val frame = when (val type = raw["type"]?.jsonPrimitive?.content) {
             "auth_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(element)
             "runtime_start_response" -> json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(element)
             "sync_response" -> json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(element)

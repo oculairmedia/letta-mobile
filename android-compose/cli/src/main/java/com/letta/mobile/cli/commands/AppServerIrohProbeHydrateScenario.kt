@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class HydrateHeavyProbeScenario(
     private val options: IrohProbeOptions,
@@ -52,7 +53,7 @@ internal class HydrateHeavyProbeScenario(
         var session: ProbeSession? = null
         return try {
             val startedAt = nowMs()
-            withTimeoutOrNull(options.timeoutMs) {
+            withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 val established = fixture.establish(
                     ProbeEstablishRequest(
                         target = target,

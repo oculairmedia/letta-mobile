@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.iroh.IrohProbeAssertions
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
 import java.util.UUID
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class DuplicateSendProbeScenario(
     private val options: IrohProbeOptions,
@@ -24,7 +25,7 @@ internal class DuplicateSendProbeScenario(
         val firstScope = newProbeScope()
         var firstSession: ProbeSession? = null
         return try {
-            withTimeoutOrNull(options.timeoutMs * 2) {
+            withTimeoutOrNull((options.timeoutMs * 2).milliseconds) {
                 val established = fixture.establish(
                     ProbeEstablishRequest(target = target, scope = firstScope, turn = 1),
                 )
@@ -82,7 +83,7 @@ internal class DuplicateSendProbeScenario(
         val redialScope = newProbeScope()
         var redialSession: ProbeSession? = null
         return try {
-            withTimeoutOrNull(options.timeoutMs) {
+            withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 val established = fixture.establish(
                     ProbeEstablishRequest(target = target, scope = redialScope, turn = 3),
                 )

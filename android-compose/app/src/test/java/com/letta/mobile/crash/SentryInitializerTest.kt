@@ -3,6 +3,7 @@ package com.letta.mobile.crash
 import android.content.Context
 import android.content.res.Resources
 import android.util.Log
+import com.letta.mobile.R
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -48,8 +49,12 @@ class SentryInitializerTest {
     }
 
     private fun setupStringResource(name: String, value: String?) {
-        val id = name.hashCode()
-        every { resources.getIdentifier(name, "string", "com.letta.mobile") } returns id
+        val id = when (name) {
+            "sentry_dsn" -> R.string.sentry_dsn
+            "sentry_env" -> R.string.sentry_env
+            "sentry_traces_sample_rate" -> R.string.sentry_traces_sample_rate
+            else -> error("Unexpected Sentry resource: $name")
+        }
         if (value != null) {
             every { resources.getString(id) } returns value
         } else {

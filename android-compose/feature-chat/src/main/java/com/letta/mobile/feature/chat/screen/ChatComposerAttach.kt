@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.model.MessageContentPart
@@ -203,7 +204,7 @@ private fun scaleToMaxEdge(src: Bitmap, maxEdge: Int): Bitmap {
     val scale = maxEdge.toFloat() / longest
     val w = (src.width * scale).toInt().coerceAtLeast(1)
     val h = (src.height * scale).toInt().coerceAtLeast(1)
-    return Bitmap.createScaledBitmap(src, w, h, true)
+    return src.scale(w, h, filter = true)
 }
 
 private val ExifInterface.rotationDegrees: Int

@@ -4,7 +4,6 @@ import androidx.compose.runtime.Immutable
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonContentPolymorphicSerializer
 import kotlinx.serialization.json.JsonArray
@@ -117,11 +116,11 @@ private fun extractContent(raw: JsonElement?): String {
         is JsonPrimitive if raw.isString -> raw.content
         is JsonArray -> {
             raw.mapNotNull { element ->
-                if (element is JsonObject) {
-                    extractObjectContent(element)
-                } else if (element is JsonPrimitive) {
-                    element.parseJsonStringPayload()?.let { extractContent(it) } ?: element.content
-                } else null
+                when (element) {
+                    is JsonObject -> extractObjectContent(element)
+                    is JsonPrimitive -> element.parseJsonStringPayload()?.let { extractContent(it) } ?: element.content
+                    else -> null
+                }
             }.joinToString("\n")
         }
         is JsonObject -> extractObjectContent(raw).orEmpty()
@@ -319,14 +318,19 @@ data class ToolReturnMessage(
         get() {
             val contentPartResponse = extractContentPartResponse(toolReturnRaw)
             val parsedStringPayload = toolReturnRaw.parseJsonStringPayload()
-            val rawFuncResponse = when {
-                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString && parsedStringPayload == null -> toolReturnRaw.content
-                toolReturnRaw is JsonPrimitive && toolReturnRaw.isString &&
-                    parsedStringPayload.isSubagentDispatchResult() -> toolReturnRaw.content
+            val rawFuncResponse = when (val raw = toolReturnRaw) {
+                is JsonPrimitive -> when {
+                    raw.isString && parsedStringPayload == null -> raw.content
+                    raw.isString && parsedStringPayload.isSubagentDispatchResult() -> raw.content
+                    else -> null
+                }
                 // Structured (non-stringified) Agent return objects must keep
                 // their JSON body so hydration can recover taskId/agentId.
-                toolReturnRaw is JsonObject && toolReturnRaw.isSubagentDispatchResult() ->
-                    Json.encodeToString(JsonElement.serializer(), toolReturnRaw)
+                is JsonObject -> if (raw.isSubagentDispatchResult()) {
+                    Json.encodeToString(JsonElement.serializer(), raw)
+                } else {
+                    null
+                }
                 else -> null
             }
             val fromList = toolReturns?.firstOrNull()
@@ -720,8 +724,7 @@ object ToolCallListSerializer : KSerializer<List<ToolCall>?> {
     override fun deserialize(decoder: Decoder): List<ToolCall>? {
         val jd = decoder as? JsonDecoder
             ?: error("ToolCallListSerializer only supports JSON")
-        val element = jd.decodeJsonElement()
-        return when (element) {
+        return when (val element = jd.decodeJsonElement()) {
             is JsonArray -> jd.json.decodeFromJsonElement(listDelegate, element)
             is JsonObject -> listOf(jd.json.decodeFromJsonElement(objectDelegate, element))
             else -> null

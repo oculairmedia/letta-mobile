@@ -85,7 +85,7 @@ open class SubagentRepository(
      * `subagent_list` round-trip.
      */
     override fun activeSubagentsFlow(scope: SubagentParentScope): Flow<List<SubagentEntry>> {
-        if (initialized.compareAndSet(false, true)) {
+        if (initialized.compareAndSet(expect = false, update = true)) {
             this.scope.launch { refresh() }
         }
         return state.asStateFlow().map { entries -> entries.inParentScope(scope) }

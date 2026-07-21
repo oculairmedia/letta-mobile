@@ -8,7 +8,6 @@ import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
 import java.nio.ByteBuffer
 import me.friwi.jcefmaven.CefAppBuilder
 import me.friwi.jcefmaven.EnumProgress
-import me.friwi.jcefmaven.IProgressHandler
 import org.cef.CefApp
 import org.cef.CefClient
 import org.cef.browser.ComposeOsrBrowser
@@ -89,7 +88,7 @@ class PetCefHost private constructor(
             )
             builder.cefSettings.windowless_rendering_enabled = true
             builder.setProgressHandler(
-                IProgressHandler { state: EnumProgress, percent: Float ->
+                { state: EnumProgress, percent: Float ->
                     if (state == EnumProgress.DOWNLOADING || state == EnumProgress.EXTRACTING) {
                         onLog("jcef $state ${percent.toInt().coerceAtLeast(0)}%")
                     }
