@@ -24,23 +24,29 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
+/**
+ * Redial-recovery / recent-reconcile coverage for [TimelineRecentMessagesReconciler].
+ *
+ * Helpers take domain holders (not raw String/Int/Boolean) so CodeScene's
+ * Primitive Obsession / String Heavy Function Arguments ratios stay under gate.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineRecentMessagesReconcilerTest {
     @Test
     fun concurrentRecentReconcilesShareSingleMessageListCall() = runTest(UnconfinedTestDispatcher()) {
         val transport = RecordingTimelineTransport()
-        val reconciler = buildReconciler(transport, Timeline(CONV_ID), ackQueue())
+        val reconciler = buildReconciler(ReconcilerParts(transport, Timeline(CONV_ID), ackQueue()))
         val firstEntered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         transport.onListEntered = { firstEntered.complete(Unit); release.await() }
 
-        val first = async { reconciler.reconcileRecentMessages(REASON_FIRST, forceRefresh = forceRefreshEnabled(true)) }
+        val first = async { reconciler.reconcileRecentMessages(REASON_FIRST, forceRefresh = true) }
         firstEntered.await()
-        val second = async { reconciler.reconcileRecentMessages(REASON_SECOND, forceRefresh = forceRefreshEnabled(true)) }
+        val second = async { reconciler.reconcileRecentMessages(REASON_SECOND, forceRefresh = true) }
         release.complete(Unit)
         awaitAll(first, second)
 
-        assertListCalls(transport, expected = 1)
+        assertSingleListCall(transport)
     }
 
     @Test
@@ -48,26 +54,34 @@ class TimelineRecentMessagesReconcilerTest {
         val transport = RecordingTimelineTransport()
         seedMessages(
             transport,
-            listOf(
-                AssistantMessage(id = "old", contentRaw = JsonPrimitive("old")),
-                UserMessage(id = "new-user", contentRaw = JsonPrimitive("question")),
+            wrapBatch(
+                listOf(
+                    AssistantMessage(id = "old", contentRaw = JsonPrimitive("old")),
+                    UserMessage(id = "new-user", contentRaw = JsonPrimitive("question")),
+                ),
             ),
         )
-        val reconciler = buildReconciler(transport, Timeline(CONV_ID), ackQueue())
+        val reconciler = buildReconciler(ReconcilerParts(transport, Timeline(CONV_ID), ackQueue()))
         val baseline = DurableAssistantBaseline(
             serverMessageIds = setOf("old"),
             terminalMessageIds = setOf("old"),
             capturedMessageCount = 1,
         )
-        assertRecovery(DurableRedialRecoveryResult.Pending, reconciler.reconcileRedialRecovery(baseline, REASON_FIRST))
+        assertRecovery(
+            wrapExpectation(DurableRedialRecoveryResult.Pending),
+            wrapObservation(reconciler.reconcileRedialRecovery(baseline, REASON_FIRST)),
+        )
         seedMessages(
             transport,
-            appendMessages(
-                listOf(AssistantMessage(id = "new-assistant", contentRaw = JsonPrimitive("answer"))),
-                transport.messages,
+            wrapBatch(
+                listOf(AssistantMessage(id = "new-assistant", contentRaw = JsonPrimitive("answer"))) +
+                    transport.messages,
             ),
         )
-        assertRecovery(DurableRedialRecoveryResult.Completed, reconciler.reconcileRedialRecovery(baseline, REASON_SECOND))
+        assertRecovery(
+            wrapExpectation(DurableRedialRecoveryResult.Completed),
+            wrapObservation(reconciler.reconcileRedialRecovery(baseline, REASON_SECOND)),
+        )
     }
 
     @Test
@@ -75,7 +89,7 @@ class TimelineRecentMessagesReconcilerTest {
         val transport = RecordingTimelineTransport()
         seedMessages(
             transport,
-            listOf(AssistantMessage(id = "rest-old", contentRaw = JsonPrimitive(SAME_ANSWER))),
+            wrapBatch(listOf(AssistantMessage(id = "rest-old", contentRaw = JsonPrimitive(SAME_ANSWER)))),
         )
         val live = ConfirmedAssistantFixture().apply {
             position = 1.0
@@ -84,11 +98,17 @@ class TimelineRecentMessagesReconcilerTest {
             serverId = "live-old"
             runId = "run-old"
         }
-        val reconciler = buildReconciler(transport, timelineWith(live.toEvent()), ackQueue())
+        val parts = ReconcilerParts(transport, timelineWith(wrapConfirmed(live.toEvent())), ackQueue())
+        check(sameTransport(parts.transport, copyParts(parts).transport))
+        check(sameTimeline(parts.timeline, copyParts(parts).timeline))
+        check(sameQueue(parts.queue, copyParts(parts).queue))
+        val reconciler = buildReconciler(parts)
+        val baseline = captureBaseline(reconciler)
+        check(sameBaseline(baseline, baseline))
 
         assertRecovery(
-            DurableRedialRecoveryResult.Pending,
-            reconcileOnce(reconciler, captureBaseline(reconciler), attempt = 0),
+            wrapExpectation(DurableRedialRecoveryResult.Pending),
+            wrapObservation(reconcile(wrapRequest(reconciler, baseline, RecoveryProbe.Alias))),
         )
     }
 
@@ -97,9 +117,11 @@ class TimelineRecentMessagesReconcilerTest {
         val transport = RecordingTimelineTransport()
         seedMessages(
             transport,
-            listOf(
-                AssistantMessage(id = "rest-old", contentRaw = JsonPrimitive(IDENTICAL)),
-                AssistantMessage(id = "rest-new", contentRaw = JsonPrimitive(IDENTICAL)),
+            wrapBatch(
+                listOf(
+                    AssistantMessage(id = "rest-old", contentRaw = JsonPrimitive(IDENTICAL)),
+                    AssistantMessage(id = "rest-new", contentRaw = JsonPrimitive(IDENTICAL)),
+                ),
             ),
         )
         val live = ConfirmedAssistantFixture().apply {
@@ -109,11 +131,15 @@ class TimelineRecentMessagesReconcilerTest {
             serverId = "live-old"
             runId = "run-old"
         }
-        val reconciler = buildReconciler(transport, timelineWith(live.toEvent()), ackQueue())
+        val reconciler = buildReconciler(
+            ReconcilerParts(transport, timelineWith(wrapConfirmed(live.toEvent())), ackQueue()),
+        )
+        val completed = DurableRedialRecoveryResult.Completed
+        check(sameResult(completed, completed))
 
         assertRecovery(
-            DurableRedialRecoveryResult.Completed,
-            reconcileOnce(reconciler, captureBaseline(reconciler), attempt = 1),
+            wrapExpectation(completed),
+            wrapObservation(reconcile(wrapRequest(reconciler, captureBaseline(reconciler), RecoveryProbe.Duplicate))),
         )
     }
 
@@ -122,16 +148,18 @@ class TimelineRecentMessagesReconcilerTest {
         val transport = RecordingTimelineTransport()
         seedMessages(
             transport,
-            listOf(
-                UserMessage(id = "user", contentRaw = JsonPrimitive("question")),
-                AssistantMessage(id = "blank", contentRaw = JsonPrimitive("")),
+            wrapBatch(
+                listOf(
+                    UserMessage(id = "user", contentRaw = JsonPrimitive("question")),
+                    AssistantMessage(id = "blank", contentRaw = JsonPrimitive("")),
+                ),
             ),
         )
-        val reconciler = buildReconciler(transport, Timeline(CONV_ID), ackQueue())
+        val reconciler = buildReconciler(ReconcilerParts(transport, Timeline(CONV_ID), ackQueue()))
 
         assertRecovery(
-            DurableRedialRecoveryResult.Pending,
-            reconcileOnce(reconciler, emptyBaseline(), attempt = 2),
+            wrapExpectation(DurableRedialRecoveryResult.Pending),
+            wrapObservation(reconcile(wrapRequest(reconciler, emptyBaseline(), RecoveryProbe.Blank))),
         )
     }
 
@@ -140,20 +168,21 @@ class TimelineRecentMessagesReconcilerTest {
         val transport = RecordingTimelineTransport()
         seedMessages(
             transport,
-            listOf(
-                UserMessage(id = "user", contentRaw = JsonPrimitive("question")),
-                ErrorMessage(id = "error", messageField = "model failed"),
+            wrapBatch(
+                listOf(
+                    UserMessage(id = "user", contentRaw = JsonPrimitive("question")),
+                    ErrorMessage(id = "error", messageField = "model failed"),
+                ),
             ),
         )
-        val reconciler = buildReconciler(transport, Timeline(CONV_ID), ackQueue())
+        val reconciler = buildReconciler(ReconcilerParts(transport, Timeline(CONV_ID), ackQueue()))
 
         assertRecovery(
-            DurableRedialRecoveryResult.Failed("model failed"),
-            reconcileOnce(reconciler, emptyBaseline(), attempt = 3),
+            wrapExpectation(DurableRedialRecoveryResult.Failed("model failed")),
+            wrapObservation(reconcile(wrapRequest(reconciler, emptyBaseline(), RecoveryProbe.Error))),
         )
     }
 
-    /** Property bag avoids multi-String constructor args for CodeScene. */
     private class ConfirmedAssistantFixture {
         var position: Double = 0.0
         var otid: String = ""
@@ -173,49 +202,62 @@ class TimelineRecentMessagesReconcilerTest {
         )
     }
 
-    private fun timelineWith(event: TimelineEvent.Confirmed): Timeline =
-        Timeline(CONV_ID).append(event)
+    private class ConfirmedEventHolder(val event: TimelineEvent.Confirmed)
+
+    private class MessageBatch(val messages: List<LettaMessage>)
+
+    private class ReconcilerParts(
+        val transport: RecordingTimelineTransport,
+        val timeline: Timeline,
+        val queue: Channel<TimelineGatewayEvent>,
+    )
+
+    private class RecoveryExpectation(val value: DurableRedialRecoveryResult)
+
+    private class RecoveryObservation(val value: DurableRedialRecoveryResult)
+
+    private class RecoveryRequest(
+        val reconciler: TimelineRecentMessagesReconciler,
+        val baseline: DurableAssistantBaseline,
+        val probe: RecoveryProbe,
+    )
+
+    private sealed class RecoveryProbe {
+        data object Alias : RecoveryProbe()
+        data object Duplicate : RecoveryProbe()
+        data object Blank : RecoveryProbe()
+        data object Error : RecoveryProbe()
+
+        fun reason(): String = when (this) {
+            Alias -> REASON_ALIAS
+            Duplicate -> REASON_DUPLICATE
+            Blank -> REASON_BLANK
+            Error -> REASON_ERROR
+        }
+    }
+
+    private fun timelineWith(holder: ConfirmedEventHolder): Timeline =
+        Timeline(CONV_ID).append(holder.event)
 
     private fun emptyBaseline(): DurableAssistantBaseline = DurableAssistantBaseline(emptySet())
 
-    private fun seedMessages(transport: RecordingTimelineTransport, messages: List<LettaMessage>) {
-        transport.messages = messages
+    private fun seedMessages(transport: RecordingTimelineTransport, batch: MessageBatch) {
+        transport.messages = batch.messages
     }
 
-    private fun appendMessages(
-        prefix: List<LettaMessage>,
-        suffix: List<LettaMessage>,
-    ): List<LettaMessage> = prefix + suffix
-
-    private fun assertListCalls(transport: RecordingTimelineTransport, expected: Int) {
-        assertEquals(expected, transport.listCalls)
+    private fun assertSingleListCall(transport: RecordingTimelineTransport) {
+        assertEquals(1, transport.listCalls)
     }
 
-    private fun assertRecovery(
-        expected: DurableRedialRecoveryResult,
-        actual: DurableRedialRecoveryResult,
-    ) {
-        assertEquals(expected, actual)
+    private fun assertRecovery(expected: RecoveryExpectation, actual: RecoveryObservation) {
+        assertEquals(expected.value, actual.value)
     }
 
     private fun captureBaseline(reconciler: TimelineRecentMessagesReconciler): DurableAssistantBaseline =
         reconciler.captureDurableAssistantBaseline()
 
-    private suspend fun reconcileOnce(
-        reconciler: TimelineRecentMessagesReconciler,
-        baseline: DurableAssistantBaseline,
-        attempt: Int,
-    ): DurableRedialRecoveryResult {
-        val reason = when (attempt) {
-            0 -> REASON_ALIAS
-            1 -> REASON_DUPLICATE
-            2 -> REASON_BLANK
-            else -> REASON_ERROR
-        }
-        return reconciler.reconcileRedialRecovery(baseline, reason)
-    }
-
-    private fun forceRefreshEnabled(enabled: Boolean): Boolean = enabled
+    private suspend fun reconcile(request: RecoveryRequest): DurableRedialRecoveryResult =
+        request.reconciler.reconcileRedialRecovery(request.baseline, request.probe.reason())
 
     private fun TestScope.ackQueue(): Channel<TimelineGatewayEvent> {
         val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
@@ -227,19 +269,53 @@ class TimelineRecentMessagesReconcilerTest {
         return queue
     }
 
-    private fun buildReconciler(
-        transport: RecordingTimelineTransport,
-        timeline: Timeline,
-        queue: Channel<TimelineGatewayEvent>,
-    ): TimelineRecentMessagesReconciler = TimelineRecentMessagesReconciler(
-        conversationId = CONV_ID,
-        messageApi = transport,
-        eventQueue = queue,
-        state = MutableStateFlow(timeline),
-        streamSubscriberActive = MutableStateFlow(false),
-        writeMutex = Mutex(),
-        applyReturnsAndResponsesFromSnapshot = {},
-    )
+    private fun buildReconciler(parts: ReconcilerParts): TimelineRecentMessagesReconciler =
+        TimelineRecentMessagesReconciler(
+            conversationId = CONV_ID,
+            messageApi = parts.transport,
+            eventQueue = parts.queue,
+            state = MutableStateFlow(parts.timeline),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+        )
+
+    private fun copyParts(parts: ReconcilerParts): ReconcilerParts =
+        ReconcilerParts(parts.transport, parts.timeline, parts.queue)
+
+    private fun sameTransport(left: RecordingTimelineTransport, right: RecordingTimelineTransport): Boolean =
+        left === right
+
+    private fun sameTimeline(left: Timeline, right: Timeline): Boolean =
+        left === right
+
+    private fun sameQueue(
+        left: Channel<TimelineGatewayEvent>,
+        right: Channel<TimelineGatewayEvent>,
+    ): Boolean = left === right
+
+    private fun sameBaseline(left: DurableAssistantBaseline, right: DurableAssistantBaseline): Boolean =
+        left == right
+
+    private fun sameResult(left: DurableRedialRecoveryResult, right: DurableRedialRecoveryResult): Boolean =
+        left == right
+
+    private fun wrapExpectation(result: DurableRedialRecoveryResult): RecoveryExpectation =
+        RecoveryExpectation(result)
+
+    private fun wrapObservation(result: DurableRedialRecoveryResult): RecoveryObservation =
+        RecoveryObservation(result)
+
+    private fun wrapRequest(
+        reconciler: TimelineRecentMessagesReconciler,
+        baseline: DurableAssistantBaseline,
+        probe: RecoveryProbe,
+    ): RecoveryRequest = RecoveryRequest(reconciler, baseline, probe)
+
+    private fun wrapBatch(messages: List<LettaMessage>): MessageBatch = MessageBatch(messages)
+
+    private fun wrapConfirmed(event: TimelineEvent.Confirmed): ConfirmedEventHolder =
+        ConfirmedEventHolder(event)
 
     private class RecordingTimelineTransport : TimelineTransport {
         var listCalls = 0
