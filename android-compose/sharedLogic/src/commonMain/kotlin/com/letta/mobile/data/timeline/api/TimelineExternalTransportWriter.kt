@@ -11,7 +11,15 @@ import com.letta.mobile.data.model.MessageContentPart
 data class DurableAssistantBaseline(
     val serverMessageIds: Set<String>,
     val semanticContentCounts: Map<String, Int> = emptyMap(),
+    val terminalMessageIds: Set<String> = emptySet(),
+    val capturedMessageCount: Int = 0,
 )
+
+sealed interface DurableRedialRecoveryResult {
+    data object Pending : DurableRedialRecoveryResult
+    data object Completed : DurableRedialRecoveryResult
+    data class Failed(val message: String) : DurableRedialRecoveryResult
+}
 
 internal fun String.durableAssistantSemanticContentOrNull(): String? =
     trim().takeIf { it.isNotEmpty() }
@@ -80,13 +88,7 @@ interface TimelineExternalTransportWriter {
         conversationId: String,
         baseline: DurableAssistantBaseline,
         reason: String,
-    ): Boolean {
-        reconcileRecentMessages(agentId, conversationId, reason, forceRefresh = true)
-        // A generic writer cannot prove that the refresh contains a reply outside
-        // the pre-send baseline. Safe default: refresh state but keep recovery
-        // pending until an identity-aware implementation reports success.
-        return false
-    }
+    ): DurableRedialRecoveryResult
 
     /**
      * letta-mobile-dangling-tool: signals that a turn started on

@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -295,7 +296,13 @@ class ChatSendCoordinatorCleanupTest {
     fun redialRecoveryRetriesUntilDurableAssistantAppears() = runTest(UnconfinedTestDispatcher()) {
         ChatSendCoordinator.redialRecoveryDelaysMs = longArrayOf(10L)
         val timeline = RecordingTimelineWriter().apply {
-            redialRecoveryResults.addAll(listOf(false, false, true))
+            redialRecoveryResults.addAll(
+                listOf(
+                    DurableRedialRecoveryResult.Pending,
+                    DurableRedialRecoveryResult.Pending,
+                    DurableRedialRecoveryResult.Completed,
+                )
+            )
         }
         val ui = RecordingUiSink()
         val coordinator = coordinator(
@@ -327,7 +334,7 @@ class ChatSendCoordinatorCleanupTest {
         val reconcileEntered = CompletableDeferred<Unit>()
         val releaseReconcile = CompletableDeferred<Unit>()
         val timeline = RecordingTimelineWriter().apply {
-            redialRecoveryResults += true
+            redialRecoveryResults += DurableRedialRecoveryResult.Completed
             onRedialReconcile = {
                 reconcileEntered.complete(Unit)
                 releaseReconcile.await()
@@ -447,7 +454,7 @@ class ChatSendCoordinatorCleanupTest {
         val cleanupTails = mutableListOf<CleanupTail>()
         val reconciles = mutableListOf<Reconcile>()
         val redialReconciles = mutableListOf<String>()
-        val redialRecoveryResults = ArrayDeque<Boolean>()
+        val redialRecoveryResults = ArrayDeque<DurableRedialRecoveryResult>()
         var onRedialReconcile: suspend () -> Unit = {}
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
@@ -466,10 +473,15 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
         override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int { reconciles += Reconcile(conversationId, reason, forceRefresh); return 0 }
         override suspend fun captureDurableAssistantBaseline(agentId: String?, conversationId: String) = DurableAssistantBaseline(setOf("old-assistant"))
-        override suspend fun reconcileRedialRecovery(agentId: String?, conversationId: String, baseline: DurableAssistantBaseline, reason: String): Boolean {
+        override suspend fun reconcileRedialRecovery(
+            agentId: String?,
+            conversationId: String,
+            baseline: DurableAssistantBaseline,
+            reason: String,
+        ): DurableRedialRecoveryResult {
             redialReconciles += reason
             onRedialReconcile()
-            return redialRecoveryResults.removeFirstOrNull() ?: false
+            return redialRecoveryResults.removeFirstOrNull() ?: DurableRedialRecoveryResult.Pending
         }
         data class ExternalLocal(val conversationId: String, val content: String, val otid: String)
         data class LocalMarker(val conversationId: String, val otid: String)

@@ -12,6 +12,8 @@ import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineHydrationReducer
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineReducerInput
+import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.timeline.reduceStreamFrame
 import com.letta.mobile.data.timeline.timelineNow
@@ -278,6 +280,28 @@ class HeadlessTimelineStore(
         reason: String,
         forceRefresh: Boolean,
     ): Int = 0
+
+    override suspend fun captureDurableAssistantBaseline(
+        agentId: String?,
+        conversationId: String,
+    ): DurableAssistantBaseline = mutex.withLock {
+        val terminal = timelineLocked(scopedConversationId(agentId, conversationId)).events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR }
+        DurableAssistantBaseline(
+            serverMessageIds = terminal.filter { it.messageType == TimelineMessageType.ASSISTANT }
+                .mapTo(mutableSetOf()) { it.serverId },
+            terminalMessageIds = terminal.mapTo(mutableSetOf()) { it.serverId },
+            capturedMessageCount = terminal.size,
+        )
+    }
+
+    override suspend fun reconcileRedialRecovery(
+        agentId: String?,
+        conversationId: String,
+        baseline: DurableAssistantBaseline,
+        reason: String,
+    ): DurableRedialRecoveryResult = DurableRedialRecoveryResult.Pending
 
     private fun timelineLocked(conversationId: String): Timeline =
         timelines.getOrPut(conversationId) { Timeline(conversationId = conversationId) }

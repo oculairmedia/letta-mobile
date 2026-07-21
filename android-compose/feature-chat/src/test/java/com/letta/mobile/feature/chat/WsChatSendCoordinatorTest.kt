@@ -1075,7 +1075,9 @@ class WsChatSendCoordinatorTest {
     fun `redial during active turn reconciles and settles without resend`() = runTest {
         val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
         val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
-        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val timelineRepository = FakeTimelineExternalTransportWriter().apply {
+            redialRecoveryResult = com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult.Completed
+        }
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
         val coordinator = WsChatSendCoordinator(
             scope = backgroundScope,

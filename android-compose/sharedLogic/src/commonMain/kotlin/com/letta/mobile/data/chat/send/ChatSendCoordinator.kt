@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -798,10 +799,16 @@ class ChatSendCoordinator(
     private suspend fun recoverDurableReply(recovery: RedialRecoveryContext) {
         var attempt = 0
         while (matchesActiveRecovery(recovery)) {
-            val recovered = reconcileRedialRecovery(recovery, attempt)
-            if (recovered && matchesActiveRecovery(recovery)) {
-                finishRecoveredTurn(recovery.event)
-                return
+            when (val result = reconcileRedialRecovery(recovery, attempt)) {
+                DurableRedialRecoveryResult.Completed -> if (matchesActiveRecovery(recovery)) {
+                    finishRecoveredTurn(recovery.event, status = "completed", error = null)
+                    return
+                }
+                is DurableRedialRecoveryResult.Failed -> if (matchesActiveRecovery(recovery)) {
+                    finishRecoveredTurn(recovery.event, status = "failed", error = result.message)
+                    return
+                }
+                DurableRedialRecoveryResult.Pending -> Unit
             }
             val delayMs = redialRecoveryDelaysMs[minOf(attempt, redialRecoveryDelaysMs.lastIndex)]
             attempt++
@@ -809,7 +816,10 @@ class ChatSendCoordinator(
         }
     }
 
-    private suspend fun reconcileRedialRecovery(recovery: RedialRecoveryContext, attempt: Int): Boolean = try {
+    private suspend fun reconcileRedialRecovery(
+        recovery: RedialRecoveryContext,
+        attempt: Int,
+    ): DurableRedialRecoveryResult = try {
         timelineRepository.reconcileRedialRecovery(
             agentId = agentId,
             conversationId = recovery.event.conversationId,
@@ -826,12 +836,17 @@ class ChatSendCoordinator(
             "runId" to recovery.event.runId,
             "attempt" to attempt,
         )
-        false
+        DurableRedialRecoveryResult.Pending
     }
 
-    private suspend fun finishRecoveredTurn(event: RedialWhileTurnActive) {
+    private suspend fun finishRecoveredTurn(
+        event: RedialWhileTurnActive,
+        status: String,
+        error: String?,
+    ) {
+        if (error != null) bufferedErrorMessage = error
         finishActiveTurn(
-            status = "completed",
+            status = status,
             runId = event.runId,
             turnId = event.turnId,
             lossy = false,
@@ -840,7 +855,7 @@ class ChatSendCoordinator(
             recordEvent = WsTimelineEvent.TurnDone(
                 turnId = event.turnId,
                 runId = event.runId,
-                status = "completed",
+                status = status,
             ),
         )
     }

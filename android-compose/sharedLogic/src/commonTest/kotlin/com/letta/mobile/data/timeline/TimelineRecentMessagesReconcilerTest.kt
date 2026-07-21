@@ -1,8 +1,10 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UserMessage
 import kotlinx.coroutines.CompletableDeferred
@@ -21,8 +23,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineRecentMessagesReconcilerTest {
@@ -82,9 +82,14 @@ class TimelineRecentMessagesReconcilerTest {
             applyReturnsAndResponsesFromSnapshot = {},
         )
 
-        assertEquals(false, reconciler.reconcileRedialRecovery(DurableAssistantBaseline(setOf("old")), "first"))
-        transport.messages = transport.messages + AssistantMessage(id = "new-assistant", contentRaw = JsonPrimitive("answer"))
-        assertEquals(true, reconciler.reconcileRedialRecovery(DurableAssistantBaseline(setOf("old")), "second"))
+        val baseline = DurableAssistantBaseline(
+            serverMessageIds = setOf("old"),
+            terminalMessageIds = setOf("old"),
+            capturedMessageCount = 1,
+        )
+        assertEquals(DurableRedialRecoveryResult.Pending, reconciler.reconcileRedialRecovery(baseline, "first"))
+        transport.messages = listOf(AssistantMessage(id = "new-assistant", contentRaw = JsonPrimitive("answer"))) + transport.messages
+        assertEquals(DurableRedialRecoveryResult.Completed, reconciler.reconcileRedialRecovery(baseline, "second"))
     }
 
     @Test
@@ -110,7 +115,7 @@ class TimelineRecentMessagesReconcilerTest {
 
         val baseline = reconciler.captureDurableAssistantBaseline()
 
-        assertFalse(reconciler.reconcileRedialRecovery(baseline, "alias"))
+        assertEquals(DurableRedialRecoveryResult.Pending, reconciler.reconcileRedialRecovery(baseline, "alias"))
     }
 
     @Test
@@ -137,7 +142,42 @@ class TimelineRecentMessagesReconcilerTest {
             ),
         )
 
-        assertTrue(reconciler.reconcileRedialRecovery(reconciler.captureDurableAssistantBaseline(), "duplicate-content"))
+        assertEquals(
+            DurableRedialRecoveryResult.Completed,
+            reconciler.reconcileRedialRecovery(reconciler.captureDurableAssistantBaseline(), "duplicate-content"),
+        )
+    }
+
+    @Test
+    fun redialRecoveryIgnoresBlankAssistantPlaceholder() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport().apply {
+            messages = listOf(
+                UserMessage(id = "user", contentRaw = JsonPrimitive("question")),
+                AssistantMessage(id = "blank", contentRaw = JsonPrimitive("")),
+            )
+        }
+        val reconciler = reconciler(transport, Timeline("conv-1"))
+
+        assertEquals(
+            DurableRedialRecoveryResult.Pending,
+            reconciler.reconcileRedialRecovery(DurableAssistantBaseline(emptySet()), "blank"),
+        )
+    }
+
+    @Test
+    fun redialRecoveryRecognizesDurableErrorTerminal() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport().apply {
+            messages = listOf(
+                UserMessage(id = "user", contentRaw = JsonPrimitive("question")),
+                ErrorMessage(id = "error", messageField = "model failed"),
+            )
+        }
+        val reconciler = reconciler(transport, Timeline("conv-1"))
+
+        assertEquals(
+            DurableRedialRecoveryResult.Failed("model failed"),
+            reconciler.reconcileRedialRecovery(DurableAssistantBaseline(emptySet()), "error"),
+        )
     }
 
     private fun TestScope.reconciler(

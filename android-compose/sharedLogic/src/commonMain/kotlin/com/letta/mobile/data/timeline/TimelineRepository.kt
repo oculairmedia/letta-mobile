@@ -368,14 +368,18 @@ open class TimelineRepository(
     override suspend fun captureDurableAssistantBaseline(
         agentId: String?,
         conversationId: String,
-    ) = getOrCreate(agentId, conversationId).captureDurableAssistantBaseline()
+    ): com.letta.mobile.data.timeline.api.DurableAssistantBaseline {
+        val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
+        return getOrCreateLoopWithoutHydrate(key).captureDurableAssistantBaseline()
+    }
 
     override suspend fun reconcileRedialRecovery(
         agentId: String?,
         conversationId: String,
         baseline: com.letta.mobile.data.timeline.api.DurableAssistantBaseline,
         reason: String,
-    ): Boolean = getOrCreate(agentId, conversationId).reconcileRedialRecovery(baseline, reason)
+    ): com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult =
+        getOrCreate(agentId, conversationId).reconcileRedialRecovery(baseline, reason)
 
     // letta-mobile-dangling-tool: forward turn-lifecycle signals to the
     // per-conversation loop so DanglingToolCallResolver knows when to

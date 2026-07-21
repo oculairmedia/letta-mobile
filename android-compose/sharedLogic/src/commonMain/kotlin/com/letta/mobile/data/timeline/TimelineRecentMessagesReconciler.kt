@@ -1,8 +1,10 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.durableAssistantSemanticContentOrNull
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
@@ -60,42 +62,45 @@ class TimelineRecentMessagesReconciler(
     }
 
     fun captureDurableAssistantBaseline(): DurableAssistantBaseline {
-        val assistants = state.value.events.asSequence()
-            .filterIsInstance<TimelineEvent.Confirmed>()
-            .filter { it.messageType == TimelineMessageType.ASSISTANT }
-            .toList()
+        val confirmed = state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
+        val assistants = confirmed.filter { it.messageType == TimelineMessageType.ASSISTANT }
         return DurableAssistantBaseline(
             serverMessageIds = assistants.mapTo(mutableSetOf()) { it.serverId },
             semanticContentCounts = assistants.mapNotNull { it.content.durableAssistantSemanticContentOrNull() }
                 .groupingBy { it }
                 .eachCount(),
+            terminalMessageIds = confirmed.asSequence()
+                .filter { it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR }
+                .mapTo(mutableSetOf()) { it.serverId },
+            capturedMessageCount = confirmed.count {
+                it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR
+            },
         )
     }
 
     suspend fun reconcileRedialRecovery(
         baseline: DurableAssistantBaseline,
         reason: String,
-    ): Boolean {
+    ): DurableRedialRecoveryResult {
         val serverMessages = messageApi.listConversationMessages(
             conversationId = conversationId,
             limit = RECONCILE_LIMIT,
             order = "desc",
         ).reversed()
-        val remainingSemanticBaseline = baseline.semanticContentCounts.toMutableMap()
-        val durableAssistantFound = serverMessages.asSequence()
-            .filterIsInstance<AssistantMessage>()
-            .any { message ->
-                if (message.id in baseline.serverMessageIds) return@any false
-                val semantic = message.content.durableAssistantSemanticContentOrNull()
-                val baselineCount = semantic?.let(remainingSemanticBaseline::get) ?: 0
-                if (semantic != null && baselineCount > 0) {
-                    if (baselineCount == 1) remainingSemanticBaseline.remove(semantic)
-                    else remainingSemanticBaseline[semantic] = baselineCount - 1
-                    false
-                } else {
-                    true
+        val terminalMessages = serverMessages.filter { it is AssistantMessage || it is ErrorMessage }
+        val postBaseline = terminalMessages.drop(baseline.capturedMessageCount.coerceAtMost(terminalMessages.size))
+        val recovery = postBaseline.asSequence()
+            .filter { it.id !in baseline.terminalMessageIds }
+            .mapNotNull { message ->
+                when (message) {
+                    is ErrorMessage -> DurableRedialRecoveryResult.Failed(message.text)
+                    is AssistantMessage -> message.content.durableAssistantSemanticContentOrNull()
+                        ?.let { DurableRedialRecoveryResult.Completed }
+                    else -> null
                 }
             }
+            .firstOrNull()
+            ?: DurableRedialRecoveryResult.Pending
         val ack = CompletableDeferred<Int>()
         eventQueue.send(
             TimelineGatewayEvent.RecentMessagesSnapshot(
@@ -106,7 +111,7 @@ class TimelineRecentMessagesReconciler(
             )
         )
         ack.await()
-        return durableAssistantFound
+        return recovery
     }
 
     suspend fun reconcileRecentMessagesFromServer(
