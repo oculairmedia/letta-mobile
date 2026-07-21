@@ -8,6 +8,10 @@ import com.letta.mobile.data.model.MessageContentPart
  * This keeps WebSocket tests on deterministic fakes instead of mocking the
  * process-wide TimelineRepository and its cached TimelineSyncLoop state.
  */
+data class DurableAssistantBaseline(
+    val serverMessageIds: Set<String>,
+)
+
 interface TimelineExternalTransportWriter {
     suspend fun appendExternalTransportLocal(
         conversationId: String,
@@ -61,6 +65,21 @@ interface TimelineExternalTransportWriter {
     suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String> = emptySet()): Int
 
     suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean = false): Int
+
+    suspend fun captureDurableAssistantBaseline(
+        agentId: String?,
+        conversationId: String,
+    ): DurableAssistantBaseline = DurableAssistantBaseline(emptySet())
+
+    suspend fun reconcileRedialRecovery(
+        agentId: String?,
+        conversationId: String,
+        baseline: DurableAssistantBaseline,
+        reason: String,
+    ): Boolean {
+        reconcileRecentMessages(agentId, conversationId, reason, forceRefresh = true)
+        return true
+    }
 
     /**
      * letta-mobile-dangling-tool: signals that a turn started on

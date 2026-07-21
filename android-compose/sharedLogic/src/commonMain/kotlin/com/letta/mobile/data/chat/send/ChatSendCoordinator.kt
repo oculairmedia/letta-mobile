@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -80,6 +81,8 @@ class ChatSendCoordinator(
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile private var activeWsTurnId: String? = null
     @Volatile private var activeWsRunId: String? = null
+    @Volatile private var activeAssistantBaseline: DurableAssistantBaseline? = null
+    private var redialRecoveryJob: Job? = null
     private val activeAssistantMessageRunIds = linkedSetOf<String>()
     @Volatile private var stopReasonForTurn: String? = null
     @Volatile private var usageRecordedForTurn: Boolean = false
@@ -137,6 +140,9 @@ class ChatSendCoordinator(
         if (!wsChatBridge.hasActiveChatTurn && (ui.isStreaming() || ui.isAgentTyping())) {
             ui.onTurnVisuallyComplete()
             activeWsOtid = null
+            activeAssistantBaseline = null
+            redialRecoveryJob?.cancel()
+            redialRecoveryJob = null
             activeWsLocalConversationId = null
             activeWsTurnId = null
             activeWsRunId = null
@@ -260,6 +266,10 @@ class ChatSendCoordinator(
             "otid" to pending.otid,
             "appendOptimisticLocal" to appendOptimisticLocal,
         )
+        val assistantBaseline = timelineRepository.captureDurableAssistantBaseline(
+            agentId = agentId,
+            conversationId = pending.conversationId,
+        )
         val accepted = wsChatBridge.send(
             agentId = agentId,
             conversationId = pending.conversationId,
@@ -276,6 +286,7 @@ class ChatSendCoordinator(
         )
         if (!accepted) return false
 
+        activeAssistantBaseline = assistantBaseline
         activeWsOtid = pending.otid
         activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
         activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
@@ -525,6 +536,8 @@ class ChatSendCoordinator(
                     activeWsRunId = event.runId
                     return
                 }
+                redialRecoveryJob?.cancel()
+                redialRecoveryJob = null
                 // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
                 // turn is starting while a PREVIOUS turn's optimistic-local user
                 // bubble may still be unsettled (activeWsOtid set, no terminal
@@ -679,6 +692,8 @@ class ChatSendCoordinator(
                     )
                     return
                 }
+                redialRecoveryJob?.cancel()
+                redialRecoveryJob = null
                 finishActiveTurn(
                     status = event.status,
                     runId = event.runId,
@@ -763,39 +778,60 @@ class ChatSendCoordinator(
         }
     }
 
-    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) {
-        if (event.agentId != agentId) return
-        val activeConversation = activeWsConversationId ?: activeConversationId()
-        if (activeConversation != event.conversationId) return
-        if (activeWsOtid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
-        runCatching {
-            timelineRepository.reconcileRecentMessages(
-                agentId = agentId,
-                conversationId = event.conversationId,
-                reason = "redial-recovery",
-                forceRefresh = true,
-            )
-        }.onFailure { error ->
-            Telemetry.error(
-                "AdminChatVM", "ws.redialRecovery.reconcileFailed", error,
-                "conversationId" to event.conversationId,
-                "turnId" to event.turnId,
-                "runId" to event.runId,
-            )
+    internal fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) {
+        if (!matchesActiveTurn(event)) return
+        if (redialRecoveryJob?.isActive == true) return
+        val baseline = activeAssistantBaseline ?: return
+        redialRecoveryJob = scope.launch {
+            var attempt = 0
+            while (matchesActiveTurn(event)) {
+                val recovered = try {
+                    timelineRepository.reconcileRedialRecovery(
+                        agentId = agentId,
+                        conversationId = event.conversationId,
+                        baseline = baseline,
+                        reason = "redial-recovery-$attempt",
+                    )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Throwable) {
+                    Telemetry.error(
+                        "AdminChatVM", "ws.redialRecovery.reconcileFailed", error,
+                        "conversationId" to event.conversationId,
+                        "turnId" to event.turnId,
+                        "runId" to event.runId,
+                        "attempt" to attempt,
+                    )
+                    false
+                }
+                if (recovered && matchesActiveTurn(event)) {
+                    finishActiveTurn(
+                        status = "completed",
+                        runId = event.runId,
+                        turnId = event.turnId,
+                        lossy = false,
+                        dropCount = 0L,
+                        reason = "redial-recovery",
+                        recordEvent = WsTimelineEvent.TurnDone(
+                            turnId = event.turnId,
+                            runId = event.runId,
+                            status = "completed",
+                        ),
+                    )
+                    return@launch
+                }
+                val delayMs = redialRecoveryDelaysMs[minOf(attempt, redialRecoveryDelaysMs.lastIndex)]
+                attempt++
+                delay(delayMs.milliseconds)
+            }
         }
-        finishActiveTurn(
-            status = "completed",
-            runId = event.runId,
-            turnId = event.turnId,
-            lossy = false,
-            dropCount = 0L,
-            reason = "redial-recovery",
-            recordEvent = WsTimelineEvent.TurnDone(
-                turnId = event.turnId,
-                runId = event.runId,
-                status = "completed",
-            ),
-        )
+    }
+
+    private fun matchesActiveTurn(event: RedialWhileTurnActive): Boolean {
+        if (event.agentId != agentId) return false
+        if ((activeWsConversationId ?: activeConversationId()) != event.conversationId) return false
+        if (activeWsTurnId != null && activeWsTurnId != event.turnId) return false
+        return activeWsOtid != null || ui.isStreaming() || ui.isAgentTyping()
     }
 
     private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
@@ -999,6 +1035,7 @@ class ChatSendCoordinator(
         // never resolve.
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
         activeWsOtid = null
+        activeAssistantBaseline = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
         activeWsRunId = null
@@ -1050,7 +1087,10 @@ class ChatSendCoordinator(
             runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
+        redialRecoveryJob?.cancel()
+        redialRecoveryJob = null
         activeWsOtid = null
+        activeAssistantBaseline = null
         activeWsLocalConversationId = null
         activeWsTurnId = null
         activeWsRunId = null
@@ -1102,6 +1142,7 @@ class ChatSendCoordinator(
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
         internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
+        internal var redialRecoveryDelaysMs = longArrayOf(250L, 500L, 1_000L, 2_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
             "Agent run failed after your message was sent. No error details were provided by the shim."
         private const val CURSOR_EXPIRED_ERROR_CODE = "cursor_expired"

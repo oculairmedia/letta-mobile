@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -290,6 +291,37 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun redialRecoveryRetriesUntilDurableAssistantAppears() = runTest(UnconfinedTestDispatcher()) {
+        ChatSendCoordinator.redialRecoveryDelaysMs = longArrayOf(10L)
+        val timeline = RecordingTimelineWriter().apply {
+            redialRecoveryResults.addAll(listOf(false, false, true))
+        }
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+            scope = backgroundScope,
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleRedialWhileTurnActive(
+            com.letta.mobile.data.transport.api.RedialWhileTurnActive(AGENT_ID, "conv-1", "turn-1", "run-1")
+        )
+        advanceTimeBy(9L)
+        assertTrue(ui.isStreaming())
+        advanceTimeBy(25L)
+        advanceUntilIdle()
+
+        assertEquals(3, timeline.redialReconciles.size)
+        assertFalse(ui.isStreaming())
+        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+        ChatSendCoordinator.redialRecoveryDelaysMs = longArrayOf(250L, 500L, 1_000L, 2_000L)
+    }
+
+    @Test
     fun postSendReconcileSkipsWhenLiveIngestArrivesAfterSend() = runTest(UnconfinedTestDispatcher()) {
         ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(10L)
         val timeline = RecordingTimelineWriter()
@@ -374,6 +406,8 @@ class ChatSendCoordinatorCleanupTest {
         val clearedActiveConversations = mutableListOf<String>()
         val cleanupTails = mutableListOf<CleanupTail>()
         val reconciles = mutableListOf<Reconcile>()
+        val redialReconciles = mutableListOf<String>()
+        val redialRecoveryResults = ArrayDeque<Boolean>()
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
         override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestedMessages += message }
@@ -390,6 +424,11 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
         override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int { reconciles += Reconcile(conversationId, reason, forceRefresh); return 0 }
+        override suspend fun captureDurableAssistantBaseline(agentId: String?, conversationId: String) = DurableAssistantBaseline(setOf("old-assistant"))
+        override suspend fun reconcileRedialRecovery(agentId: String?, conversationId: String, baseline: DurableAssistantBaseline, reason: String): Boolean {
+            redialReconciles += reason
+            return redialRecoveryResults.removeFirstOrNull() ?: true
+        }
         data class ExternalLocal(val conversationId: String, val content: String, val otid: String)
         data class LocalMarker(val conversationId: String, val otid: String)
         data class CleanupTail(val agentId: String?, val conversationId: String, val activeRunId: String?, val activeTurnId: String?, val candidateRunIds: Set<String>)

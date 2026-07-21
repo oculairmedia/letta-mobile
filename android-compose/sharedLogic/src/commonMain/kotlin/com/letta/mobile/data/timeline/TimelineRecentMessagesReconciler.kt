@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -54,6 +56,39 @@ class TimelineRecentMessagesReconciler(
                 if (inFlightRecentReconcile === shared) inFlightRecentReconcile = null
             }
         }
+    }
+
+    fun captureDurableAssistantBaseline(): DurableAssistantBaseline = DurableAssistantBaseline(
+        serverMessageIds = state.value.events.asSequence()
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+            .map { it.serverId }
+            .toSet(),
+    )
+
+    suspend fun reconcileRedialRecovery(
+        baseline: DurableAssistantBaseline,
+        reason: String,
+    ): Boolean {
+        val serverMessages = messageApi.listConversationMessages(
+            conversationId = conversationId,
+            limit = RECONCILE_LIMIT,
+            order = "desc",
+        ).reversed()
+        val durableAssistantFound = serverMessages.any { message ->
+            message is AssistantMessage && message.id !in baseline.serverMessageIds
+        }
+        val ack = CompletableDeferred<Int>()
+        eventQueue.send(
+            TimelineGatewayEvent.RecentMessagesSnapshot(
+                serverMessages = serverMessages,
+                telemetryName = "redialRecovery",
+                telemetryAttrs = listOf("reason" to reason),
+                ack = ack,
+            )
+        )
+        ack.await()
+        return durableAssistantFound
     }
 
     suspend fun reconcileRecentMessagesFromServer(

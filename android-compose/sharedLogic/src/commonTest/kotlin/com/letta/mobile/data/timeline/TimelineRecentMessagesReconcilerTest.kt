@@ -1,6 +1,8 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UserMessage
 import kotlinx.coroutines.CompletableDeferred
@@ -54,15 +56,44 @@ class TimelineRecentMessagesReconcilerTest {
         assertEquals(1, transport.listCalls)
     }
 
+    @Test
+    fun redialRecoveryRequiresAssistantOutsideBaseline() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport().apply {
+            messages = listOf(
+                AssistantMessage(id = "old", contentRaw = JsonPrimitive("old")),
+                UserMessage(id = "new-user", contentRaw = JsonPrimitive("question")),
+            )
+        }
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { events ->
+            backgroundScope.launch {
+                for (event in events) if (event is TimelineGatewayEvent.RecentMessagesSnapshot) event.ack.complete(0)
+            }
+        }
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = queue,
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+        )
+
+        assertEquals(false, reconciler.reconcileRedialRecovery(DurableAssistantBaseline(setOf("old")), "first"))
+        transport.messages = transport.messages + AssistantMessage(id = "new-assistant", contentRaw = JsonPrimitive("answer"))
+        assertEquals(true, reconciler.reconcileRedialRecovery(DurableAssistantBaseline(setOf("old")), "second"))
+    }
+
     private class RecordingTimelineTransport : TimelineTransport {
         var listCalls = 0
+        var messages: List<LettaMessage> = listOf(UserMessage(id = "m-1", contentRaw = JsonPrimitive("hello")))
         var onListEntered: suspend () -> Unit = {}
         override suspend fun sendConversationMessage(conversationId: String, request: MessageCreateRequest): Flow<LettaMessage> = emptyFlow()
         override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
         override suspend fun listConversationMessages(conversationId: String, limit: Int?, after: String?, order: String?): List<LettaMessage> {
             listCalls += 1
             onListEntered()
-            return listOf(UserMessage(id = "m-1", contentRaw = JsonPrimitive("hello")))
+            return messages
         }
         override suspend fun listAgentMessages(agentId: String, limit: Int?, order: String?, conversationId: String?): List<LettaMessage> = emptyList()
     }

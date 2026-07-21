@@ -365,6 +365,18 @@ open class TimelineRepository(
         return getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
     }
 
+    override suspend fun captureDurableAssistantBaseline(
+        agentId: String?,
+        conversationId: String,
+    ) = getOrCreate(agentId, conversationId).captureDurableAssistantBaseline()
+
+    override suspend fun reconcileRedialRecovery(
+        agentId: String?,
+        conversationId: String,
+        baseline: com.letta.mobile.data.timeline.api.DurableAssistantBaseline,
+        reason: String,
+    ): Boolean = getOrCreate(agentId, conversationId).reconcileRedialRecovery(baseline, reason)
+
     // letta-mobile-dangling-tool: forward turn-lifecycle signals to the
     // per-conversation loop so DanglingToolCallResolver knows when to
     // supersede a pending sweep (turnStarted) and when to (re)schedule one
