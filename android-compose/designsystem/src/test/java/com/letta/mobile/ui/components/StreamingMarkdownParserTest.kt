@@ -90,6 +90,7 @@ class StreamingMarkdownParserTest {
     fun `lineLooksLikeTableSeparator correctly identifies separator`() {
         assertTrue(lineLooksLikeTableSeparator("| --- | --- |", 0, 13))
         assertTrue(lineLooksLikeTableSeparator("| :--- | :---: | ---: |", 0, 23))
+        assertFalse(lineLooksLikeTableSeparator("---", 0, 3))
         assertFalse(lineLooksLikeTableSeparator("| a | b |", 0, 9))
     }
 
