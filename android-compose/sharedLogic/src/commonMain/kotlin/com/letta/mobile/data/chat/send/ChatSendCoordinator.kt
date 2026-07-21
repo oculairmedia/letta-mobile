@@ -80,6 +80,7 @@ class ChatSendCoordinator(
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile private var activeWsTurnId: String? = null
     @Volatile private var activeWsRunId: String? = null
+    private val turnIdentity = TurnIdentityLifecycle()
     private val activeAssistantMessageRunIds = linkedSetOf<String>()
     @Volatile private var stopReasonForTurn: String? = null
     @Volatile private var usageRecordedForTurn: Boolean = false
@@ -137,6 +138,7 @@ class ChatSendCoordinator(
         if (!wsChatBridge.hasActiveChatTurn && (ui.isStreaming() || ui.isAgentTyping())) {
             ui.onTurnVisuallyComplete()
             activeWsOtid = null
+            turnIdentity.clear()
             activeWsLocalConversationId = null
             activeWsTurnId = null
             activeWsRunId = null
@@ -276,6 +278,7 @@ class ChatSendCoordinator(
         )
         if (!accepted) return false
 
+        turnIdentity.acceptedSend(pending.conversationId)
         activeWsOtid = pending.otid
         activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
         activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
@@ -508,6 +511,11 @@ class ChatSendCoordinator(
         if (dropDuplicateBridgeEvent(event)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> {
+                val identityTransition = turnIdentity.turnStarted(
+                    conversationId = event.conversationId,
+                    turnId = event.turnId,
+                    runId = event.runId,
+                )
                 // Iroh run-id promotion re-emits TurnStarted for the SAME turn
                 // once the real server run id replaces the synthetic
                 // `iroh-run-*` placeholder. That is a run-id update, not a new
@@ -515,7 +523,7 @@ class ChatSendCoordinator(
                 // assistant run-id set) mid-turn corrupted post-tool
                 // settlement and contributed to the flicker. Update the run id
                 // and keep the turn state intact.
-                if (event.turnId == activeWsTurnId && activeWsConversationId == event.conversationId) {
+                if (identityTransition is TurnIdentityTransition.SameTurn && activeWsTurnId != null) {
                     Telemetry.event(
                         "AdminChatVM", "ws.turnStarted.runPromoted",
                         "turnId" to event.turnId,
@@ -999,6 +1007,7 @@ class ChatSendCoordinator(
         // never resolve.
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
         activeWsOtid = null
+        turnIdentity.clear()
         activeWsLocalConversationId = null
         activeWsTurnId = null
         activeWsRunId = null
@@ -1051,6 +1060,7 @@ class ChatSendCoordinator(
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
         activeWsOtid = null
+        turnIdentity.clear()
         activeWsLocalConversationId = null
         activeWsTurnId = null
         activeWsRunId = null
