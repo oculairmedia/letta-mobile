@@ -61,7 +61,7 @@ class TimelineRecentMessagesReconciler(
         }
     }
 
-    fun captureDurableAssistantBaseline(): DurableAssistantBaseline {
+    fun captureDurableAssistantBaseline(hydrated: Boolean): DurableAssistantBaseline {
         val confirmed = state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
         val assistants = confirmed.filter { it.messageType == TimelineMessageType.ASSISTANT }
         return DurableAssistantBaseline(
@@ -75,6 +75,7 @@ class TimelineRecentMessagesReconciler(
             capturedMessageCount = confirmed.count {
                 it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR
             },
+            hydrated = hydrated,
         )
     }
 
@@ -82,13 +83,35 @@ class TimelineRecentMessagesReconciler(
         baseline: DurableAssistantBaseline,
         reason: String,
     ): DurableRedialRecoveryResult {
+        if (!baseline.hydrated) return DurableRedialRecoveryResult.Pending
         val serverMessages = messageApi.listConversationMessages(
             conversationId = conversationId,
             limit = RECONCILE_LIMIT,
             order = "desc",
         ).reversed()
         val terminalMessages = serverMessages.filter { it is AssistantMessage || it is ErrorMessage }
-        val postBaseline = terminalMessages.drop(baseline.capturedMessageCount.coerceAtMost(terminalMessages.size))
+        val remainingSemanticBaseline = baseline.semanticContentCounts.toMutableMap()
+        var lastKnownBaselineIndex = -1
+        terminalMessages.forEachIndexed { index, message ->
+            if (message.id in baseline.terminalMessageIds) {
+                lastKnownBaselineIndex = index
+                return@forEachIndexed
+            }
+            val semantic = (message as? AssistantMessage)?.content?.durableAssistantSemanticContentOrNull()
+            val remaining = semantic?.let(remainingSemanticBaseline::get) ?: 0
+            if (semantic != null && remaining > 0) {
+                if (remaining == 1) remainingSemanticBaseline.remove(semantic)
+                else remainingSemanticBaseline[semantic] = remaining - 1
+                lastKnownBaselineIndex = index
+            }
+        }
+        val postBaseline = if (baseline.capturedMessageCount == 0) {
+            terminalMessages
+        } else if (lastKnownBaselineIndex >= 0) {
+            terminalMessages.drop(lastKnownBaselineIndex + 1)
+        } else {
+            emptyList()
+        }
         val recovery = postBaseline.asSequence()
             .filter { it.id !in baseline.terminalMessageIds }
             .mapNotNull { message ->

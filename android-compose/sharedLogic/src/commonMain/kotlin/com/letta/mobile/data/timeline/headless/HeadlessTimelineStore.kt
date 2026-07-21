@@ -15,6 +15,7 @@ import com.letta.mobile.data.timeline.TimelineReducerInput
 import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
 import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
+import com.letta.mobile.data.timeline.api.durableAssistantSemanticContentOrNull
 import com.letta.mobile.data.timeline.reduceStreamFrame
 import com.letta.mobile.data.timeline.timelineNow
 import com.letta.mobile.data.timeline.toTimelinePersistentList
@@ -288,11 +289,15 @@ class HeadlessTimelineStore(
         val terminal = timelineLocked(scopedConversationId(agentId, conversationId)).events
             .filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR }
+        val assistants = terminal.filter { it.messageType == TimelineMessageType.ASSISTANT }
         DurableAssistantBaseline(
-            serverMessageIds = terminal.filter { it.messageType == TimelineMessageType.ASSISTANT }
-                .mapTo(mutableSetOf()) { it.serverId },
+            serverMessageIds = assistants.mapTo(mutableSetOf()) { it.serverId },
+            semanticContentCounts = assistants.mapNotNull { it.content.durableAssistantSemanticContentOrNull() }
+                .groupingBy { it }
+                .eachCount(),
             terminalMessageIds = terminal.mapTo(mutableSetOf()) { it.serverId },
             capturedMessageCount = terminal.size,
+            hydrated = true,
         )
     }
 

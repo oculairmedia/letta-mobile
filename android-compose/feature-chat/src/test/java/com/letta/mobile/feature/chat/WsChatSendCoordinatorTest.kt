@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.repository.ConversationRepository
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
@@ -1076,7 +1077,7 @@ class WsChatSendCoordinatorTest {
         val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
         val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
         val timelineRepository = FakeTimelineExternalTransportWriter().apply {
-            redialRecoveryResult = com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult.Completed
+            redialRecoveryResult = DurableRedialRecoveryResult.Completed
         }
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
         val coordinator = WsChatSendCoordinator(
@@ -1116,7 +1117,7 @@ class WsChatSendCoordinatorTest {
         advanceUntilIdle()
 
         assertEquals(
-            listOf(FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery", emptySet(), true)),
+            listOf(FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery-0", emptySet(), true)),
             timelineRepository.recentReconciles,
         )
         assertEquals(false, uiState.value.isStreaming)

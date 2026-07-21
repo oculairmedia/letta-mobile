@@ -370,7 +370,9 @@ open class TimelineRepository(
         conversationId: String,
     ): com.letta.mobile.data.timeline.api.DurableAssistantBaseline {
         val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
-        return getOrCreateLoopWithoutHydrate(key).captureDurableAssistantBaseline()
+        val cached = loopsMutex.withLock { getLoopLocked(key) ?: getAliasedLoopLocked(key) }
+        return cached?.captureDurableAssistantBaseline()
+            ?: com.letta.mobile.data.timeline.api.DurableAssistantBaseline(emptySet(), hydrated = false)
     }
 
     override suspend fun reconcileRedialRecovery(

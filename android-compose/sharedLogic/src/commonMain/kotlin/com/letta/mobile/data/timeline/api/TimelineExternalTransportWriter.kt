@@ -13,6 +13,7 @@ data class DurableAssistantBaseline(
     val semanticContentCounts: Map<String, Int> = emptyMap(),
     val terminalMessageIds: Set<String> = emptySet(),
     val capturedMessageCount: Int = 0,
+    val hydrated: Boolean = false,
 )
 
 sealed interface DurableRedialRecoveryResult {
@@ -81,7 +82,7 @@ interface TimelineExternalTransportWriter {
     suspend fun captureDurableAssistantBaseline(
         agentId: String?,
         conversationId: String,
-    ): DurableAssistantBaseline = DurableAssistantBaseline(emptySet())
+    ): DurableAssistantBaseline = DurableAssistantBaseline(emptySet(), hydrated = false)
 
     suspend fun reconcileRedialRecovery(
         agentId: String?,

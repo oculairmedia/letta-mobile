@@ -396,7 +396,8 @@ class TimelineSyncLoop(
         return recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh)
     }
 
-    fun captureDurableAssistantBaseline() = recentMessagesReconciler.captureDurableAssistantBaseline()
+    fun captureDurableAssistantBaseline() =
+        recentMessagesReconciler.captureDurableAssistantBaseline(hydrated = hasHydratedSuccessfully)
 
     suspend fun reconcileRedialRecovery(
         baseline: com.letta.mobile.data.timeline.api.DurableAssistantBaseline,

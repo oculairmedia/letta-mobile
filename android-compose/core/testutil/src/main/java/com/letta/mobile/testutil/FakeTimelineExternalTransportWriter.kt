@@ -17,7 +17,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val scopedClearedActiveConversations: MutableList<ScopedConversation> = mutableListOf()
     val abandonedFragmentCleanups: MutableList<AbandonedFragmentCleanup> = mutableListOf()
     val recentReconciles: MutableList<RecentReconcile> = mutableListOf()
-    var durableBaseline: DurableAssistantBaseline = DurableAssistantBaseline(emptySet())
+    var durableBaseline: DurableAssistantBaseline = DurableAssistantBaseline(emptySet(), hydrated = true)
     var redialRecoveryResult: DurableRedialRecoveryResult = DurableRedialRecoveryResult.Pending
     var cleanupFailure: Throwable? = null
     val repairedCursors: MutableList<CursorRepair> = mutableListOf()

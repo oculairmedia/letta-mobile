@@ -845,6 +845,10 @@ class ChatSendCoordinator(
         error: String?,
     ) {
         if (error != null) bufferedErrorMessage = error
+        // This is the recovery coroutine itself. Detach it before terminal
+        // cleanup so resetRedialRecovery() does not cancel the coroutine before
+        // clearExternalTransportActive() and queued-send drain can complete.
+        redialRecoveryJob = null
         finishActiveTurn(
             status = status,
             runId = event.runId,

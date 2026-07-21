@@ -50,6 +50,27 @@ class TimelineRecentMessagesReconcilerTest {
     }
 
     @Test
+    fun unhydratedBaselineFailsClosedWithoutFetchingHistory() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        seedMessages(
+            transport,
+            wrapBatch(listOf(AssistantMessage(id = "old", contentRaw = JsonPrimitive("old")))),
+        )
+        val reconciler = buildReconciler(ReconcilerParts(transport, Timeline(CONV_ID), ackQueue()))
+
+        assertRecovery(
+            wrapExpectation(DurableRedialRecoveryResult.Pending),
+            wrapObservation(
+                reconciler.reconcileRedialRecovery(
+                    DurableAssistantBaseline(emptySet(), hydrated = false),
+                    REASON_FIRST,
+                ),
+            ),
+        )
+        assertEquals(0, transport.listCalls)
+    }
+
+    @Test
     fun redialRecoveryRequiresAssistantOutsideBaseline() = runTest(UnconfinedTestDispatcher()) {
         val transport = RecordingTimelineTransport()
         seedMessages(
@@ -66,6 +87,7 @@ class TimelineRecentMessagesReconcilerTest {
             serverMessageIds = setOf("old"),
             terminalMessageIds = setOf("old"),
             capturedMessageCount = 1,
+            hydrated = true,
         )
         assertRecovery(
             wrapExpectation(DurableRedialRecoveryResult.Pending),
@@ -81,6 +103,32 @@ class TimelineRecentMessagesReconcilerTest {
         assertRecovery(
             wrapExpectation(DurableRedialRecoveryResult.Completed),
             wrapObservation(reconciler.reconcileRedialRecovery(baseline, REASON_SECOND)),
+        )
+    }
+
+    @Test
+    fun redialRecoveryIgnoresOlderHistoryOutsideCapturedWindow() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        seedMessages(
+            transport,
+            wrapBatch(
+                listOf(
+                    AssistantMessage(id = "captured", contentRaw = JsonPrimitive("captured")),
+                    AssistantMessage(id = "older-outside-window", contentRaw = JsonPrimitive("older")),
+                ),
+            ),
+        )
+        val reconciler = buildReconciler(ReconcilerParts(transport, Timeline(CONV_ID), ackQueue()))
+        val baseline = DurableAssistantBaseline(
+            serverMessageIds = setOf("captured"),
+            terminalMessageIds = setOf("captured"),
+            capturedMessageCount = 1,
+            hydrated = true,
+        )
+
+        assertRecovery(
+            wrapExpectation(DurableRedialRecoveryResult.Pending),
+            wrapObservation(reconciler.reconcileRedialRecovery(baseline, REASON_FIRST)),
         )
     }
 
@@ -239,7 +287,7 @@ class TimelineRecentMessagesReconcilerTest {
     private fun timelineWith(holder: ConfirmedEventHolder): Timeline =
         Timeline(CONV_ID).append(holder.event)
 
-    private fun emptyBaseline(): DurableAssistantBaseline = DurableAssistantBaseline(emptySet())
+    private fun emptyBaseline(): DurableAssistantBaseline = DurableAssistantBaseline(emptySet(), hydrated = true)
 
     private fun seedMessages(transport: RecordingTimelineTransport, batch: MessageBatch) {
         transport.messages = batch.messages
@@ -254,7 +302,7 @@ class TimelineRecentMessagesReconcilerTest {
     }
 
     private fun captureBaseline(reconciler: TimelineRecentMessagesReconciler): DurableAssistantBaseline =
-        reconciler.captureDurableAssistantBaseline()
+        reconciler.captureDurableAssistantBaseline(hydrated = true)
 
     private suspend fun reconcile(request: RecoveryRequest): DurableRedialRecoveryResult =
         request.reconciler.reconcileRedialRecovery(request.baseline, request.probe.reason())
