@@ -10,6 +10,9 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.ToolCallId
+import com.letta.mobile.runtime.ToolExecutionStatus
+import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlinx.coroutines.sync.Mutex
@@ -293,6 +296,63 @@ class ConversationTurnFanoutTest {
         assertEquals(5, parked.size, "parking must be initiator-scoped, once per delta")
         // The tracked terminal is the stop_reason delta.
         assertTrue(parked.last().contains("stop_reason"))
+    }
+
+    @Test
+    fun rawAndSemanticToolEventsBroadcastOneLogicalCallAndReturn() = runTest {
+        val registry = ConnectionRegistry()
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+        val seq = AtomicLong(0)
+        fun raw(delta: JsonObject) = RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "dedup-${seq.incrementAndGet()}",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(seq.get(), delta),
+        )
+        val callId = ToolCallId("tc-dedup")
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(callId, ToolName("bash"), "{}"))
+        fanout.onDraft(raw(buildJsonObject {
+            put("message_type", "tool_call_message")
+            put("tool_call", buildJsonObject {
+                put("tool_call_id", callId.value)
+                put("name", "bash")
+                put("arguments", "{}")
+            })
+        }))
+        fanout.onDraft(raw(buildJsonObject {
+            put("message_type", "tool_return_message")
+            put("id", "message-tool-return-rotating")
+            put("tool_call_id", callId.value)
+            put("status", "success")
+            put("tool_return", "ok")
+        }))
+        fanout.onDraft(RuntimeEventPayload.ToolReturnObserved(callId, ToolExecutionStatus.Succeeded, "ok"))
+
+        val deltas = sink.frames().map { json.parseToJsonElement(it).jsonObject["delta"]!!.jsonObject }
+        assertEquals(1, deltas.count { it["message_type"]!!.jsonPrimitive.content == "tool_call_message" })
+        assertEquals(1, deltas.count { it["message_type"]!!.jsonPrimitive.content == "tool_return_message" })
+        fanout.flushOpenToolCalls()
+        assertEquals(2, sink.frames().size, "real return must close the tracker despite duplicate suppression")
+    }
+
+    @Test
+    fun distinctToolCallIdsAreNotDeduplicated() = runTest {
+        val registry = ConnectionRegistry()
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+
+        listOf("tc-one", "tc-two").forEach { id ->
+            fanout.onDraft(RuntimeEventPayload.ToolCallObserved(ToolCallId(id), ToolName("bash"), "{}"))
+            fanout.onDraft(RuntimeEventPayload.ToolReturnObserved(ToolCallId(id), ToolExecutionStatus.Succeeded, "ok"))
+        }
+
+        assertEquals(4, sink.frames().size)
     }
 
     @Test
