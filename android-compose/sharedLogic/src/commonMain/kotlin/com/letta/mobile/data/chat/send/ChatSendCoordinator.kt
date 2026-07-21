@@ -11,7 +11,7 @@ import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryIdentity
 import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
@@ -82,7 +82,6 @@ class ChatSendCoordinator(
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile private var activeWsTurnId: String? = null
     @Volatile private var activeWsRunId: String? = null
-    @Volatile private var activeAssistantBaseline: DurableAssistantBaseline? = null
     @Volatile private var activeSendGeneration: Long = 0L
     private var redialRecoveryJob: Job? = null
     private val activeAssistantMessageRunIds = linkedSetOf<String>()
@@ -254,10 +253,6 @@ class ChatSendCoordinator(
             "otid" to pending.otid,
             "appendOptimisticLocal" to appendOptimisticLocal,
         )
-        val assistantBaseline = timelineRepository.captureDurableAssistantBaseline(
-            agentId = agentId,
-            conversationId = pending.conversationId,
-        )
         val accepted = wsChatBridge.send(
             agentId = agentId,
             conversationId = pending.conversationId,
@@ -274,7 +269,6 @@ class ChatSendCoordinator(
         )
         if (!accepted) return false
 
-        activeAssistantBaseline = assistantBaseline
         activeSendGeneration += 1L
         activeWsOtid = pending.otid
         activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
@@ -775,9 +769,10 @@ class ChatSendCoordinator(
     }
 
     private fun activeRecoveryContext(event: RedialWhileTurnActive): RedialRecoveryContext? {
-        val baseline = activeAssistantBaseline ?: return null
+        val otid = activeWsOtid ?: return null
         if (!isRedialRecoveryEligible(event)) return null
-        return RedialRecoveryContext(event, baseline, activeSendGeneration)
+        val identity = DurableRedialRecoveryIdentity(otid = otid, runId = event.runId)
+        return RedialRecoveryContext(event, identity, activeSendGeneration)
     }
 
     private fun recoveryConversationMatches(conversationId: String): Boolean =
@@ -823,7 +818,7 @@ class ChatSendCoordinator(
         timelineRepository.reconcileRedialRecovery(
             agentId = agentId,
             conversationId = recovery.event.conversationId,
-            baseline = recovery.baseline,
+            identity = recovery.identity,
             reason = "redial-recovery-$attempt",
         )
     } catch (cancelled: CancellationException) {
@@ -876,7 +871,6 @@ class ChatSendCoordinator(
 
     private fun resetRedialRecovery() {
         cancelRedialRecovery()
-        activeAssistantBaseline = null
     }
 
     private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
@@ -1198,7 +1192,7 @@ class ChatSendCoordinator(
 
     private data class RedialRecoveryContext(
         val event: RedialWhileTurnActive,
-        val baseline: DurableAssistantBaseline,
+        val identity: DurableRedialRecoveryIdentity,
         val generation: Long,
     )
 

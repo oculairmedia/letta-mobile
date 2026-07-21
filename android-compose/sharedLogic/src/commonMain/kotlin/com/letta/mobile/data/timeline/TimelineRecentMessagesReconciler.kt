@@ -3,9 +3,8 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryIdentity
 import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
-import com.letta.mobile.data.timeline.api.durableAssistantSemanticContentOrNull
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -61,69 +60,40 @@ class TimelineRecentMessagesReconciler(
         }
     }
 
-    fun captureDurableAssistantBaseline(hydrated: Boolean): DurableAssistantBaseline {
-        val confirmed = state.value.events.filterIsInstance<TimelineEvent.Confirmed>()
-        val assistants = confirmed.filter { it.messageType == TimelineMessageType.ASSISTANT }
-        return DurableAssistantBaseline(
-            serverMessageIds = assistants.mapTo(mutableSetOf()) { it.serverId },
-            semanticContentCounts = assistants.mapNotNull { it.content.durableAssistantSemanticContentOrNull() }
-                .groupingBy { it }
-                .eachCount(),
-            terminalMessageIds = confirmed.asSequence()
-                .filter { it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR }
-                .mapTo(mutableSetOf()) { it.serverId },
-            capturedMessageCount = confirmed.count {
-                it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR
-            },
-            hydrated = hydrated,
-        )
-    }
-
     suspend fun reconcileRedialRecovery(
-        baseline: DurableAssistantBaseline,
+        identity: DurableRedialRecoveryIdentity,
         reason: String,
     ): DurableRedialRecoveryResult {
-        if (!baseline.hydrated) return DurableRedialRecoveryResult.Pending
         val serverMessages = messageApi.listConversationMessages(
             conversationId = conversationId,
             limit = RECONCILE_LIMIT,
             order = "desc",
         ).reversed()
-        val terminalMessages = serverMessages.filter { it is AssistantMessage || it is ErrorMessage }
-        val remainingSemanticBaseline = baseline.semanticContentCounts.toMutableMap()
-        var lastKnownBaselineIndex = -1
-        terminalMessages.forEachIndexed { index, message ->
-            if (message.id in baseline.terminalMessageIds) {
-                lastKnownBaselineIndex = index
-                return@forEachIndexed
-            }
-            val semantic = (message as? AssistantMessage)?.content?.durableAssistantSemanticContentOrNull()
-            val remaining = semantic?.let(remainingSemanticBaseline::get) ?: 0
-            if (semantic != null && remaining > 0) {
-                if (remaining == 1) remainingSemanticBaseline.remove(semantic)
-                else remainingSemanticBaseline[semantic] = remaining - 1
-                lastKnownBaselineIndex = index
-            }
+        val durableUserIndex = serverMessages.indexOfLast { message ->
+            message is com.letta.mobile.data.model.UserMessage && message.otid == identity.otid
         }
-        val postBaseline = if (baseline.capturedMessageCount == 0) {
-            terminalMessages
-        } else if (lastKnownBaselineIndex >= 0) {
-            terminalMessages.drop(lastKnownBaselineIndex + 1)
+        val currentTurnMessages = if (durableUserIndex >= 0) {
+            serverMessages.drop(durableUserIndex + 1).asSequence()
+                .filter { it.runId == null || it.runId == identity.runId }
         } else {
-            emptyList()
+            serverMessages.asSequence().filter { it.runId == identity.runId }
         }
-        val recovery = postBaseline.asSequence()
-            .filter { it.id !in baseline.terminalMessageIds }
-            .mapNotNull { message ->
-                when (message) {
-                    is ErrorMessage -> DurableRedialRecoveryResult.Failed(message.text)
-                    is AssistantMessage -> message.content.durableAssistantSemanticContentOrNull()
-                        ?.let { DurableRedialRecoveryResult.Completed }
-                    else -> null
-                }
-            }
+        val recovery = currentTurnMessages
+            .mapNotNull(::toDurableRecoveryResult)
             .firstOrNull()
             ?: DurableRedialRecoveryResult.Pending
+        applyRedialSnapshot(serverMessages, reason)
+        return recovery
+    }
+
+    private fun toDurableRecoveryResult(message: LettaMessage): DurableRedialRecoveryResult? = when (message) {
+        is ErrorMessage -> DurableRedialRecoveryResult.Failed(message.text)
+        is AssistantMessage -> message.content.trim().takeIf(String::isNotEmpty)
+            ?.let { DurableRedialRecoveryResult.Completed }
+        else -> null
+    }
+
+    private suspend fun applyRedialSnapshot(serverMessages: List<LettaMessage>, reason: String) {
         val ack = CompletableDeferred<Int>()
         eventQueue.send(
             TimelineGatewayEvent.RecentMessagesSnapshot(
@@ -134,7 +104,6 @@ class TimelineRecentMessagesReconciler(
             )
         )
         ack.await()
-        return recovery
     }
 
     suspend fun reconcileRecentMessagesFromServer(

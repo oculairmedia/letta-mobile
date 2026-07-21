@@ -8,12 +8,9 @@ import com.letta.mobile.data.model.MessageContentPart
  * This keeps WebSocket tests on deterministic fakes instead of mocking the
  * process-wide TimelineRepository and its cached TimelineSyncLoop state.
  */
-data class DurableAssistantBaseline(
-    val serverMessageIds: Set<String>,
-    val semanticContentCounts: Map<String, Int> = emptyMap(),
-    val terminalMessageIds: Set<String> = emptySet(),
-    val capturedMessageCount: Int = 0,
-    val hydrated: Boolean = false,
+data class DurableRedialRecoveryIdentity(
+    val otid: String,
+    val runId: String,
 )
 
 sealed interface DurableRedialRecoveryResult {
@@ -21,9 +18,6 @@ sealed interface DurableRedialRecoveryResult {
     data object Completed : DurableRedialRecoveryResult
     data class Failed(val message: String) : DurableRedialRecoveryResult
 }
-
-internal fun String.durableAssistantSemanticContentOrNull(): String? =
-    trim().takeIf { it.isNotEmpty() }
 
 interface TimelineExternalTransportWriter {
     suspend fun appendExternalTransportLocal(
@@ -79,15 +73,10 @@ interface TimelineExternalTransportWriter {
 
     suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean = false): Int
 
-    suspend fun captureDurableAssistantBaseline(
-        agentId: String?,
-        conversationId: String,
-    ): DurableAssistantBaseline = DurableAssistantBaseline(emptySet(), hydrated = false)
-
     suspend fun reconcileRedialRecovery(
         agentId: String?,
         conversationId: String,
-        baseline: DurableAssistantBaseline,
+        identity: DurableRedialRecoveryIdentity,
         reason: String,
     ): DurableRedialRecoveryResult
 

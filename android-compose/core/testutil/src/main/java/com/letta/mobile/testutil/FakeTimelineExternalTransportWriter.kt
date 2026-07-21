@@ -2,7 +2,7 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryIdentity
 import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 
@@ -17,7 +17,6 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     val scopedClearedActiveConversations: MutableList<ScopedConversation> = mutableListOf()
     val abandonedFragmentCleanups: MutableList<AbandonedFragmentCleanup> = mutableListOf()
     val recentReconciles: MutableList<RecentReconcile> = mutableListOf()
-    var durableBaseline: DurableAssistantBaseline = DurableAssistantBaseline(emptySet(), hydrated = true)
     var redialRecoveryResult: DurableRedialRecoveryResult = DurableRedialRecoveryResult.Pending
     var cleanupFailure: Throwable? = null
     val repairedCursors: MutableList<CursorRepair> = mutableListOf()
@@ -129,15 +128,10 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         return 0
     }
 
-    override suspend fun captureDurableAssistantBaseline(
-        agentId: String?,
-        conversationId: String,
-    ): DurableAssistantBaseline = durableBaseline
-
     override suspend fun reconcileRedialRecovery(
         agentId: String?,
         conversationId: String,
-        baseline: DurableAssistantBaseline,
+        identity: DurableRedialRecoveryIdentity,
         reason: String,
     ): DurableRedialRecoveryResult {
         recentReconciles += RecentReconcile(agentId, conversationId, reason, emptySet(), true)

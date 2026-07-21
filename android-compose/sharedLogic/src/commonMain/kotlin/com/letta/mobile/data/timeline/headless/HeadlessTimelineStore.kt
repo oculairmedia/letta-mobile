@@ -12,10 +12,9 @@ import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineHydrationReducer
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.TimelineReducerInput
-import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryIdentity
 import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
-import com.letta.mobile.data.timeline.api.durableAssistantSemanticContentOrNull
 import com.letta.mobile.data.timeline.reduceStreamFrame
 import com.letta.mobile.data.timeline.timelineNow
 import com.letta.mobile.data.timeline.toTimelinePersistentList
@@ -282,29 +281,10 @@ class HeadlessTimelineStore(
         forceRefresh: Boolean,
     ): Int = 0
 
-    override suspend fun captureDurableAssistantBaseline(
-        agentId: String?,
-        conversationId: String,
-    ): DurableAssistantBaseline = mutex.withLock {
-        val terminal = timelineLocked(scopedConversationId(agentId, conversationId)).events
-            .filterIsInstance<TimelineEvent.Confirmed>()
-            .filter { it.messageType == TimelineMessageType.ASSISTANT || it.messageType == TimelineMessageType.ERROR }
-        val assistants = terminal.filter { it.messageType == TimelineMessageType.ASSISTANT }
-        DurableAssistantBaseline(
-            serverMessageIds = assistants.mapTo(mutableSetOf()) { it.serverId },
-            semanticContentCounts = assistants.mapNotNull { it.content.durableAssistantSemanticContentOrNull() }
-                .groupingBy { it }
-                .eachCount(),
-            terminalMessageIds = terminal.mapTo(mutableSetOf()) { it.serverId },
-            capturedMessageCount = terminal.size,
-            hydrated = true,
-        )
-    }
-
     override suspend fun reconcileRedialRecovery(
         agentId: String?,
         conversationId: String,
-        baseline: DurableAssistantBaseline,
+        identity: DurableRedialRecoveryIdentity,
         reason: String,
     ): DurableRedialRecoveryResult = DurableRedialRecoveryResult.Pending
 

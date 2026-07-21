@@ -396,14 +396,11 @@ class TimelineSyncLoop(
         return recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh)
     }
 
-    fun captureDurableAssistantBaseline() =
-        recentMessagesReconciler.captureDurableAssistantBaseline(hydrated = hasHydratedSuccessfully)
-
     suspend fun reconcileRedialRecovery(
-        baseline: com.letta.mobile.data.timeline.api.DurableAssistantBaseline,
+        identity: com.letta.mobile.data.timeline.api.DurableRedialRecoveryIdentity,
         reason: String,
     ): com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult =
-        recentMessagesReconciler.reconcileRedialRecovery(baseline, reason)
+        recentMessagesReconciler.reconcileRedialRecovery(identity, reason)
 
     suspend fun markExternalTransportLocalSent(otid: String) {
         externalTransportAppender.markExternalTransportLocalSent(otid)

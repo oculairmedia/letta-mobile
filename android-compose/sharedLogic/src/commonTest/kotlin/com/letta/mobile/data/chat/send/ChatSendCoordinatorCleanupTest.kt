@@ -9,7 +9,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
-import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.DurableRedialRecoveryIdentity
 import com.letta.mobile.data.timeline.api.DurableRedialRecoveryResult
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
@@ -472,12 +472,10 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
         override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int { reconciles += Reconcile(conversationId, reason, forceRefresh); return 0 }
-        override suspend fun captureDurableAssistantBaseline(agentId: String?, conversationId: String) =
-            DurableAssistantBaseline(setOf("old-assistant"), hydrated = true)
         override suspend fun reconcileRedialRecovery(
             agentId: String?,
             conversationId: String,
-            baseline: DurableAssistantBaseline,
+            identity: DurableRedialRecoveryIdentity,
             reason: String,
         ): DurableRedialRecoveryResult {
             redialReconciles += reason
