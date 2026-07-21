@@ -347,6 +347,7 @@ internal object DanglingToolCallSynthesizer {
  */
 internal class CumulativeStreamText {
     private val byKey = LinkedHashMap<String, String>()
+    private val seenFrameIds = LinkedHashSet<String>()
 
     private fun textFrom(element: JsonElement?): String? {
         if (element == null) return null
@@ -367,6 +368,8 @@ internal class CumulativeStreamText {
     fun applyToRawFrame(rawFrame: String): String = runCatching {
         val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
         if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
+        val frameId = obj["idempotency_key"]?.jsonPrimitive?.contentOrNull
+        val isReplay = frameId != null && !seenFrameIds.add(frameId)
         val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
         val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
         if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
@@ -383,9 +386,15 @@ internal class CumulativeStreamText {
             ?: return@runCatching rawFrame
         val existing = byKey[textKey].orEmpty()
         val cumulative = when {
+            isReplay -> existing.ifEmpty { chunk }
             existing.isEmpty() -> chunk
-            chunk.startsWith(existing) -> chunk
-            existing.endsWith(chunk) -> existing
+            chunk.length > existing.length && chunk.startsWith(existing) -> chunk
+            // App Server assistant frames are incremental unless the incoming
+            // body is an explicit cumulative extension. Byte-equal suffixes can
+            // be legitimate consecutive tokens ("ha" + "ha", repeated spaces,
+            // punctuation, or newlines), so sequence-blind suffix suppression
+            // loses authored text. The upstream idempotency key handles actual
+            // replayed envelopes without conflating them with equal new tokens.
             else -> existing + chunk
         }.also { byKey[textKey] = it }
         val cumulativeDelta = buildJsonObject {

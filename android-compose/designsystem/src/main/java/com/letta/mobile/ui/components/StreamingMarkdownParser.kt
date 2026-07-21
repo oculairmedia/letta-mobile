@@ -104,8 +104,9 @@ internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Bo
             j++
         }
         if (dashes == 0) return false
-        // Optional trailing colon for alignment.
-        if (text[j] == ':') j++
+        // Optional trailing colon for alignment. The dash run can end exactly
+        // at the current streaming boundary, so never index before checking it.
+        if (j < end && text[j] == ':') j++
         skipSpaces()
         cellsSeen++
         if (j >= end) break
