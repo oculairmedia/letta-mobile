@@ -135,19 +135,7 @@ class ChatSendCoordinator(
         // visually active after Iroh has already reached terminal. Before a
         // sequential send, heal that impossible state from transport ownership
         // so the new message is dispatched instead of queued behind a ghost turn.
-        if (!wsChatBridge.hasActiveChatTurn && (ui.isStreaming() || ui.isAgentTyping())) {
-            ui.onTurnVisuallyComplete()
-            activeWsOtid = null
-            turnIdentity.clear()
-            activeWsLocalConversationId = null
-            activeWsTurnId = null
-            activeWsRunId = null
-            activeAssistantMessageRunIds.clear()
-            stopReasonForTurn = null
-            usageRecordedForTurn = false
-            bufferedErrorMessage = null
-            Telemetry.event("IrohTrace", "coordinator.send.stalePresenceHealed")
-        }
+        healStaleVisualPresence()
         Telemetry.event(
             "IrohTrace", "coordinator.send.begin",
             "agentId" to agentId,
@@ -510,80 +498,7 @@ class ChatSendCoordinator(
         )
         if (dropDuplicateBridgeEvent(event)) return
         when (event) {
-            is WsTimelineEvent.TurnStarted -> {
-                val identityTransition = turnIdentity.turnStarted(
-                    conversationId = event.conversationId,
-                    turnId = event.turnId,
-                    runId = event.runId,
-                )
-                // Iroh run-id promotion re-emits TurnStarted for the SAME turn
-                // once the real server run id replaces the synthetic
-                // `iroh-run-*` placeholder. That is a run-id update, not a new
-                // turn: resetting per-turn state here (stop/usage/error guards,
-                // assistant run-id set) mid-turn corrupted post-tool
-                // settlement and contributed to the flicker. Update the run id
-                // and keep the turn state intact.
-                val exactActiveTurn = event.turnId == activeWsTurnId &&
-                    event.conversationId == activeWsConversationId
-                if (identityTransition is TurnIdentityTransition.SameTurn && exactActiveTurn) {
-                    Telemetry.event(
-                        "AdminChatVM", "ws.turnStarted.runPromoted",
-                        "turnId" to event.turnId,
-                        "previousRunId" to (activeWsRunId ?: ""),
-                        "runId" to event.runId,
-                    )
-                    activeWsRunId = event.runId
-                    return
-                }
-                // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
-                // turn is starting while a PREVIOUS turn's optimistic-local user
-                // bubble may still be unsettled (activeWsOtid set, no terminal
-                // reconciled it). If we adopt the new turn without settling the
-                // old otid, the orphaned pending-local row keeps the coordinator
-                // believing a send is in flight and re-latches Thinking. Since a
-                // fresh server turn is proceeding, the prior local send did land:
-                // settle it as sent before adopting the new turn identity.
-                activeWsOtid?.let { staleOtid ->
-                    val staleLocalConv = activeWsLocalConversationId ?: activeWsConversationId ?: event.conversationId
-                    scope.launch {
-                        runCatching {
-                            timelineRepository.markExternalTransportLocalSent(agentId, staleLocalConv, staleOtid)
-                        }
-                    }
-                    Telemetry.event(
-                        "AdminChatVM", "ws.turnStarted.staleOtidSettled",
-                        "staleOtid" to staleOtid,
-                        "newTurnId" to event.turnId,
-                        "conversationId" to event.conversationId,
-                    )
-                }
-                activeWsConversationId = event.conversationId
-                activeWsTurnId = event.turnId
-                activeWsRunId = event.runId
-                activeAssistantMessageRunIds.clear()
-                stopReasonForTurn = null
-                usageRecordedForTurn = false
-                bufferedErrorMessage = null
-                // letta-mobile-dangling-tool: a fresh turn on this conversation
-                // supersedes whatever the previous turn's post-turn dangling-
-                // tool-call sweep left pending.
-                runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
-                recordRuntimeEvent(event, activeWsConversationId)
-                setActiveConversationId(event.conversationId)
-                startTimelineObserver(event.conversationId)
-                ui.onTurnStarted(event.conversationId)
-                pendingConversationBootstrapLocal?.let { pending ->
-                    timelineRepository.appendExternalTransportLocal(
-                        agentId = agentId,
-                        conversationId = event.conversationId,
-                        content = pending.text,
-                        otid = pending.otid,
-                        attachments = pending.attachments,
-                    )
-                    pendingConversationBootstrapLocal = null
-                }
-                drainPreConversationMessages(event.conversationId)
-            }
+            is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
             is WsTimelineEvent.MessageDelta -> {
                 val conversationId = event.conversationId ?: activeWsConversationId ?: activeConversationId()
                 Telemetry.event(
@@ -808,6 +723,81 @@ class ChatSendCoordinator(
         )
     }
 
+    private suspend fun handleTurnStarted(event: WsTimelineEvent.TurnStarted) {
+        val identityTransition = turnIdentity.turnStarted(
+            conversationId = event.conversationId,
+            turnId = event.turnId,
+            runId = event.runId,
+        )
+        // Iroh run-id promotion re-emits TurnStarted for the SAME turn
+        // once the real server run id replaces the synthetic
+        // `iroh-run-*` placeholder. That is a run-id update, not a new
+        // turn: resetting per-turn state here (stop/usage/error guards,
+        // assistant run-id set) mid-turn corrupted post-tool
+        // settlement and contributed to the flicker. Update the run id
+        // and keep the turn state intact.
+        val exactActiveTurn = event.turnId == activeWsTurnId &&
+            event.conversationId == activeWsConversationId
+        if (identityTransition is TurnIdentityTransition.SameTurn && exactActiveTurn) {
+            Telemetry.event(
+                "AdminChatVM", "ws.turnStarted.runPromoted",
+                "turnId" to event.turnId,
+                "previousRunId" to (activeWsRunId ?: ""),
+                "runId" to event.runId,
+            )
+            activeWsRunId = event.runId
+            return
+        }
+        // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
+        // turn is starting while a PREVIOUS turn's optimistic-local user
+        // bubble may still be unsettled (activeWsOtid set, no terminal
+        // reconciled it). If we adopt the new turn without settling the
+        // old otid, the orphaned pending-local row keeps the coordinator
+        // believing a send is in flight and re-latches Thinking. Since a
+        // fresh server turn is proceeding, the prior local send did land:
+        // settle it as sent before adopting the new turn identity.
+        activeWsOtid?.let { staleOtid ->
+            val staleLocalConv = activeWsLocalConversationId ?: activeWsConversationId ?: event.conversationId
+            scope.launch {
+                runCatching {
+                    timelineRepository.markExternalTransportLocalSent(agentId, staleLocalConv, staleOtid)
+                }
+            }
+            Telemetry.event(
+                "AdminChatVM", "ws.turnStarted.staleOtidSettled",
+                "staleOtid" to staleOtid,
+                "newTurnId" to event.turnId,
+                "conversationId" to event.conversationId,
+            )
+        }
+        activeWsConversationId = event.conversationId
+        activeWsTurnId = event.turnId
+        activeWsRunId = event.runId
+        activeAssistantMessageRunIds.clear()
+        stopReasonForTurn = null
+        usageRecordedForTurn = false
+        bufferedErrorMessage = null
+        // letta-mobile-dangling-tool: a fresh turn on this conversation
+        // supersedes whatever the previous turn's post-turn dangling-
+        // tool-call sweep left pending.
+        runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
+        recordRuntimeEvent(event, activeWsConversationId)
+        setActiveConversationId(event.conversationId)
+        startTimelineObserver(event.conversationId)
+        ui.onTurnStarted(event.conversationId)
+        pendingConversationBootstrapLocal?.let { pending ->
+            timelineRepository.appendExternalTransportLocal(
+                agentId = agentId,
+                conversationId = event.conversationId,
+                content = pending.text,
+                otid = pending.otid,
+                attachments = pending.attachments,
+            )
+            pendingConversationBootstrapLocal = null
+        }
+        drainPreConversationMessages(event.conversationId)
+    }
+
     private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
         val key = bridgeEventKey(event) ?: return false
         val isDuplicate = if (event is WsTimelineEvent.MessageDelta) {
@@ -1008,6 +998,20 @@ class ChatSendCoordinator(
         // cancelled) needs exactly this unconditional reschedule or it would
         // never resolve.
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
+        clearActiveTurnState()
+        timelineRepository.clearExternalTransportActive(conversationId)
+        drainPendingSend()
+    }
+
+    private fun healStaleVisualPresence() {
+        if (wsChatBridge.hasActiveChatTurn) return
+        if (!ui.isStreaming() && !ui.isAgentTyping()) return
+        ui.onTurnVisuallyComplete()
+        clearActiveTurnState()
+        Telemetry.event("IrohTrace", "coordinator.send.stalePresenceHealed")
+    }
+
+    private fun clearActiveTurnState() {
         activeWsOtid = null
         turnIdentity.clear()
         activeWsLocalConversationId = null
@@ -1017,8 +1021,6 @@ class ChatSendCoordinator(
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
-        timelineRepository.clearExternalTransportActive(conversationId)
-        drainPendingSend()
     }
 
     private suspend fun failActiveTurnForDisconnect(event: WsTimelineEvent.Disconnected) {
@@ -1061,15 +1063,7 @@ class ChatSendCoordinator(
             runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
-        activeWsOtid = null
-        turnIdentity.clear()
-        activeWsLocalConversationId = null
-        activeWsTurnId = null
-        activeWsRunId = null
-        activeAssistantMessageRunIds.clear()
-        stopReasonForTurn = null
-        usageRecordedForTurn = false
-        bufferedErrorMessage = null
+        clearActiveTurnState()
     }
 
     private fun activeCleanupCandidateRunIds(primaryRunId: String?): Set<String> = buildSet {
