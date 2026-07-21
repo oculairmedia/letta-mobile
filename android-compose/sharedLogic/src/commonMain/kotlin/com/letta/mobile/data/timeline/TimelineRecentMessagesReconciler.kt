@@ -3,6 +3,7 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.timeline.api.DurableAssistantBaseline
+import com.letta.mobile.data.timeline.api.durableAssistantSemanticContentOrNull
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
@@ -58,13 +59,18 @@ class TimelineRecentMessagesReconciler(
         }
     }
 
-    fun captureDurableAssistantBaseline(): DurableAssistantBaseline = DurableAssistantBaseline(
-        serverMessageIds = state.value.events.asSequence()
+    fun captureDurableAssistantBaseline(): DurableAssistantBaseline {
+        val assistants = state.value.events.asSequence()
             .filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.messageType == TimelineMessageType.ASSISTANT }
-            .map { it.serverId }
-            .toSet(),
-    )
+            .toList()
+        return DurableAssistantBaseline(
+            serverMessageIds = assistants.mapTo(mutableSetOf()) { it.serverId },
+            semanticContentCounts = assistants.mapNotNull { it.content.durableAssistantSemanticContentOrNull() }
+                .groupingBy { it }
+                .eachCount(),
+        )
+    }
 
     suspend fun reconcileRedialRecovery(
         baseline: DurableAssistantBaseline,
@@ -75,9 +81,21 @@ class TimelineRecentMessagesReconciler(
             limit = RECONCILE_LIMIT,
             order = "desc",
         ).reversed()
-        val durableAssistantFound = serverMessages.any { message ->
-            message is AssistantMessage && message.id !in baseline.serverMessageIds
-        }
+        val remainingSemanticBaseline = baseline.semanticContentCounts.toMutableMap()
+        val durableAssistantFound = serverMessages.asSequence()
+            .filterIsInstance<AssistantMessage>()
+            .any { message ->
+                if (message.id in baseline.serverMessageIds) return@any false
+                val semantic = message.content.durableAssistantSemanticContentOrNull()
+                val baselineCount = semantic?.let(remainingSemanticBaseline::get) ?: 0
+                if (semantic != null && baselineCount > 0) {
+                    if (baselineCount == 1) remainingSemanticBaseline.remove(semantic)
+                    else remainingSemanticBaseline[semantic] = baselineCount - 1
+                    false
+                } else {
+                    true
+                }
+            }
         val ack = CompletableDeferred<Int>()
         eventQueue.send(
             TimelineGatewayEvent.RecentMessagesSnapshot(

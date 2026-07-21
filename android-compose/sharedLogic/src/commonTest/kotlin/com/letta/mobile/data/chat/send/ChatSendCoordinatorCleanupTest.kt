@@ -19,6 +19,7 @@ import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -322,6 +323,45 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun subscribeDoneCancelsStaleRecoveryBeforeQueuedSendDispatch() = runTest(UnconfinedTestDispatcher()) {
+        val reconcileEntered = CompletableDeferred<Unit>()
+        val releaseReconcile = CompletableDeferred<Unit>()
+        val timeline = RecordingTimelineWriter().apply {
+            redialRecoveryResults += true
+            onRedialReconcile = {
+                reconcileEntered.complete(Unit)
+                releaseReconcile.await()
+            }
+        }
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = false)
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = transport,
+            activeConversationId = { "conv-1" },
+            scope = backgroundScope,
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.send("second").join()
+        coordinator.handleRedialWhileTurnActive(
+            com.letta.mobile.data.transport.api.RedialWhileTurnActive(AGENT_ID, "conv-1", "turn-1", "run-1")
+        )
+        reconcileEntered.await()
+
+        coordinator.handleEvent(WsTimelineEvent.SubscribeDone(runId = "run-1", lastSeq = 1L, status = "completed"))
+        releaseReconcile.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf("first", "second"), transport.sentTexts)
+        assertEquals(1, timeline.clearedActiveConversations.size)
+        assertEquals(1, timeline.redialReconciles.size, "the stale recovery must not poll or finalize again")
+        assertEquals(2, timeline.sentLocals.size, "SubscribeDone settles the first send and TurnStarted settles its stale otid")
+    }
+
+    @Test
     fun postSendReconcileSkipsWhenLiveIngestArrivesAfterSend() = runTest(UnconfinedTestDispatcher()) {
         ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(10L)
         val timeline = RecordingTimelineWriter()
@@ -408,6 +448,7 @@ class ChatSendCoordinatorCleanupTest {
         val reconciles = mutableListOf<Reconcile>()
         val redialReconciles = mutableListOf<String>()
         val redialRecoveryResults = ArrayDeque<Boolean>()
+        var onRedialReconcile: suspend () -> Unit = {}
         override suspend fun appendExternalTransportLocal(conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String { externalLocals += ExternalLocal(conversationId, content, otid); return otid }
         override suspend fun appendExternalTransportLocal(agentId: String?, conversationId: String, content: String, otid: String, attachments: List<MessageContentPart.Image>): String = appendExternalTransportLocal(conversationId, content, otid, attachments)
         override suspend fun ingestExternalTransportMessage(conversationId: String, message: LettaMessage, source: String) { ingestedMessages += message }
@@ -427,7 +468,8 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun captureDurableAssistantBaseline(agentId: String?, conversationId: String) = DurableAssistantBaseline(setOf("old-assistant"))
         override suspend fun reconcileRedialRecovery(agentId: String?, conversationId: String, baseline: DurableAssistantBaseline, reason: String): Boolean {
             redialReconciles += reason
-            return redialRecoveryResults.removeFirstOrNull() ?: true
+            onRedialReconcile()
+            return redialRecoveryResults.removeFirstOrNull() ?: false
         }
         data class ExternalLocal(val conversationId: String, val content: String, val otid: String)
         data class LocalMarker(val conversationId: String, val otid: String)

@@ -10,7 +10,11 @@ import com.letta.mobile.data.model.MessageContentPart
  */
 data class DurableAssistantBaseline(
     val serverMessageIds: Set<String>,
+    val semanticContentCounts: Map<String, Int> = emptyMap(),
 )
+
+internal fun String.durableAssistantSemanticContentOrNull(): String? =
+    trim().takeIf { it.isNotEmpty() }
 
 interface TimelineExternalTransportWriter {
     suspend fun appendExternalTransportLocal(
@@ -78,7 +82,10 @@ interface TimelineExternalTransportWriter {
         reason: String,
     ): Boolean {
         reconcileRecentMessages(agentId, conversationId, reason, forceRefresh = true)
-        return true
+        // A generic writer cannot prove that the refresh contains a reply outside
+        // the pre-send baseline. Safe default: refresh state but keep recovery
+        // pending until an identity-aware implementation reports success.
+        return false
     }
 
     /**

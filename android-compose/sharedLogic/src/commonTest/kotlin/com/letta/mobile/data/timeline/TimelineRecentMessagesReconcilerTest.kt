@@ -15,11 +15,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimelineRecentMessagesReconcilerTest {
@@ -82,6 +85,78 @@ class TimelineRecentMessagesReconcilerTest {
         assertEquals(false, reconciler.reconcileRedialRecovery(DurableAssistantBaseline(setOf("old")), "first"))
         transport.messages = transport.messages + AssistantMessage(id = "new-assistant", contentRaw = JsonPrimitive("answer"))
         assertEquals(true, reconciler.reconcileRedialRecovery(DurableAssistantBaseline(setOf("old")), "second"))
+    }
+
+    @Test
+    fun redialRecoveryDoesNotTreatRestIdAliasAsNewAssistant() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport().apply {
+            messages = listOf(AssistantMessage(id = "rest-old", contentRaw = JsonPrimitive("same durable answer")))
+        }
+        val reconciler = reconciler(
+            transport = transport,
+            timeline = Timeline("conv-1").append(
+                TimelineEvent.Confirmed(
+                    position = 1.0,
+                    otid = "live-old",
+                    content = "same durable answer",
+                    serverId = "live-old",
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = timelineNow(),
+                    runId = "run-old",
+                    stepId = null,
+                )
+            ),
+        )
+
+        val baseline = reconciler.captureDurableAssistantBaseline()
+
+        assertFalse(reconciler.reconcileRedialRecovery(baseline, "alias"))
+    }
+
+    @Test
+    fun redialRecoveryUsesSemanticMultiplicityForIdenticalReplies() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport().apply {
+            messages = listOf(
+                AssistantMessage(id = "rest-old", contentRaw = JsonPrimitive("identical")),
+                AssistantMessage(id = "rest-new", contentRaw = JsonPrimitive("identical")),
+            )
+        }
+        val reconciler = reconciler(
+            transport = transport,
+            timeline = Timeline("conv-1").append(
+                TimelineEvent.Confirmed(
+                    position = 1.0,
+                    otid = "live-old",
+                    content = "identical",
+                    serverId = "live-old",
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = timelineNow(),
+                    runId = "run-old",
+                    stepId = null,
+                )
+            ),
+        )
+
+        assertTrue(reconciler.reconcileRedialRecovery(reconciler.captureDurableAssistantBaseline(), "duplicate-content"))
+    }
+
+    private fun TestScope.reconciler(
+        transport: RecordingTimelineTransport,
+        timeline: Timeline,
+    ): TimelineRecentMessagesReconciler {
+        val queue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED)
+        backgroundScope.launch {
+            for (event in queue) if (event is TimelineGatewayEvent.RecentMessagesSnapshot) event.ack.complete(0)
+        }
+        return TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = queue,
+            state = MutableStateFlow(timeline),
+            streamSubscriberActive = MutableStateFlow(false),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+        )
     }
 
     private class RecordingTimelineTransport : TimelineTransport {
