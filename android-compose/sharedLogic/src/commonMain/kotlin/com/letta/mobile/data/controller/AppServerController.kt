@@ -129,6 +129,24 @@ interface AppServerController {
     suspend fun stopRuntime(agentId: AgentId) {
         // Default no-op: controllers without a runtime cache have nothing to evict.
     }
+
+    /**
+     * Signals that the underlying transport generation failed (lgns8.5).
+     * Implementations must drop every cached canonical runtime scope — scopes
+     * are generation-local and must be re-fetched via runtime_start on the next
+     * generation — and reflect [AppServerControllerState.Disconnected].
+     */
+    suspend fun onTransportDisconnected(reason: String? = null) {
+        // Default no-op: controllers without connection-derived caches.
+    }
+
+    /**
+     * Signals that a new transport generation completed recovery and the
+     * controller may report [AppServerControllerState.Connected] again.
+     */
+    fun markConnected() {
+        // Default no-op.
+    }
 }
 
 /**
