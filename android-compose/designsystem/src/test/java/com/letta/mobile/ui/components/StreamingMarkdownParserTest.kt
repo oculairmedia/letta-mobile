@@ -96,6 +96,17 @@ class StreamingMarkdownParserTest {
     }
 
     @Test
+    fun `lineLooksLikeTableSeparator respects separator slice end`() {
+        val text = "prefix| --- | ---:suffix"
+        val start = "prefix".length
+        val end = start + "| --- | ---".length
+
+        assertTrue(lineLooksLikeTableSeparator("| ---", 0, 5))
+        assertTrue(lineLooksLikeTableSeparator(text, start, end))
+        assertFalse(lineLooksLikeTableSeparator(text, start, start + 1))
+    }
+
+    @Test
     fun `containsPipe returns true if text has pipe in range`() {
         assertTrue(containsPipe("a | b", 0, 5))
         assertFalse(containsPipe("a b", 0, 3))
