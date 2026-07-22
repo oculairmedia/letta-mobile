@@ -200,19 +200,19 @@ private fun SystemAccessDashboardBody(
     onPermissionIntentClick: (SystemAccessPermissionIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when (val state = uiState) {
+    when (uiState) {
         is UiState.Loading -> {
             Column(modifier = modifier.padding(16.dp)) {
                 ShimmerCard(modifier = Modifier.fillMaxWidth())
             }
         }
         is UiState.Error -> ErrorContent(
-            message = state.message,
+            message = uiState.message,
             onRetry = onRetry,
             modifier = modifier,
         )
         is UiState.Success -> SystemAccessDashboardContent(
-            state = state.data,
+            state = uiState.data,
             onPermissionIntentClick = onPermissionIntentClick,
             modifier = modifier,
         )

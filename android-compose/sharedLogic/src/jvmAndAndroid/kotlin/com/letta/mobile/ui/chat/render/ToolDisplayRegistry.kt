@@ -102,8 +102,7 @@ class ToolDisplayRegistry {
         while (i < json.length) {
             val c = json[i]
             if (c == '\\' && i + 1 < json.length) {
-                val next = json[i + 1]
-                when (next) {
+                when (val next = json[i + 1]) {
                     '"' -> sb.append('"')
                     '\\' -> sb.append('\\')
                     'n' -> sb.append(' ')

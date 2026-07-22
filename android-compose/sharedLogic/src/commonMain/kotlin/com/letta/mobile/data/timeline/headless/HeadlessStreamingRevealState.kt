@@ -31,12 +31,6 @@ class HeadlessStreamingRevealState(
     val pending: String
         get() = buffer.substring(revealed.length)
 
-    val pendingCodePoints: Int
-        get() = pending.codePointCount()
-
-    val isStopped: Boolean
-        get() = phase == HeadlessStreamingRevealPhase.STOPPED
-
     init {
         require(defaultRevealCodePoints > 0) { "defaultRevealCodePoints must be positive" }
         require(initialRevealedCount >= 0) { "initialRevealedCount must not be negative" }
@@ -141,10 +135,7 @@ data class HeadlessStreamingRevealSnapshot(
     val phase: HeadlessStreamingRevealPhase,
     val pending: String,
     val sourceComplete: Boolean,
-) {
-    val pendingCodePoints: Int
-        get() = pending.codePointCount()
-}
+)
 
 private fun String.takePrefixCodePoints(maxCodePoints: Int): String {
     if (maxCodePoints <= 0 || isEmpty()) return ""
@@ -155,16 +146,6 @@ private fun String.takePrefixCodePoints(maxCodePoints: Int): String {
         codePoints += 1
     }
     return substring(0, index)
-}
-
-private fun String.codePointCount(): Int {
-    var count = 0
-    var index = 0
-    while (index < length) {
-        index += codePointWidthAt(index)
-        count += 1
-    }
-    return count
 }
 
 private fun String.codePointWidthAt(index: Int): Int =

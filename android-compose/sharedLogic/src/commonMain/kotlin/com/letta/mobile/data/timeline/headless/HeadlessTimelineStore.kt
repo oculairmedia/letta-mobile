@@ -93,20 +93,6 @@ class HeadlessTimelineStore(
 
     suspend fun assertTimeline(
         conversationId: String,
-        assertNoDuplicateUiMessages: Boolean,
-        assertOtidUnique: Boolean,
-        assertSeqMonotonic: Boolean,
-    ): TimelineAssertionReport = assertTimeline(
-        conversationId = conversationId,
-        options = TimelineAssertionOptions(
-            assertNoDuplicateUiMessages = assertNoDuplicateUiMessages,
-            assertOtidUnique = assertOtidUnique,
-            assertSeqMonotonic = assertSeqMonotonic,
-        )
-    )
-
-    suspend fun assertTimeline(
-        conversationId: String,
         options: TimelineAssertionOptions,
     ): TimelineAssertionReport = mutex.withLock {
         val timeline = timelineLocked(conversationId)

@@ -150,8 +150,6 @@ class ChatTextGeometryCacheTest {
     private fun geometry(lineCount: Int): ChatTextGeometry =
         ChatTextGeometry(
             lineCount = lineCount,
-            heightPx = lineCount * 20,
-            maxLineWidthPx = 100,
             visibleLineEndOffsets = IntArray(lineCount) { it + 1 },
         )
 }

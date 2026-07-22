@@ -34,7 +34,7 @@ open class ConversationRepository(
     private val conversationApi: ConversationApi,
     private val agentRepository: IAgentRepository,
     private val conversationDao: ConversationDao,
-    private val repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
+    repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
     private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,

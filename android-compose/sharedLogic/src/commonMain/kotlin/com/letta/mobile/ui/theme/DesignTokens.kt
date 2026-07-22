@@ -82,7 +82,6 @@ object LettaShapeTokens {
 
 object LettaElevationTokens {
     const val NONE = 0f
-    const val LOW = 1f
     const val ACTION_SHEET_ITEM_RESTING = 2f
     const val ACTION_SHEET_ITEM_PRESSED = 4f
     const val FLOATING_BANNER_TONAL = 3f

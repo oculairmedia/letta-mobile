@@ -69,8 +69,8 @@ import kotlinx.collections.immutable.persistentMapOf
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationStateHolder(
-    private val conversationId: String,
-    private val scope: CoroutineScope,
+    conversationId: String,
+    scope: CoroutineScope,
     private val frames: Flow<LettaMessage>,
     private val hydrationSeed: Flow<Timeline> = flowOf(Timeline(conversationId = conversationId)),
 ) {

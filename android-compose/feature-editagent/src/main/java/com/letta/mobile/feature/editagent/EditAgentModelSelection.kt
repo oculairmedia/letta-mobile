@@ -35,7 +35,7 @@ internal class EditAgentModelSelection(
         val validation = ModelHandleValidator.validate(
             handle = selectedHandle,
             backend = backend,
-            servedModels = llmModels().mapNotNull { model -> model.handle ?: model.name.ifBlank { model.id } },
+            servedModels = llmModels().map { model -> model.handle ?: model.name.ifBlank { model.id } },
         )
         return (validation as? ModelHandleValidator.Result.Invalid)?.reason
     }

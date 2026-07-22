@@ -38,18 +38,15 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.haptics.HapticEffects
-import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 
-
 internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
     val toolCall = toolCalls?.singleOrNull()
-    if (toolCall == null) {
-        return if (role == "tool") {
+        ?: return if (role == "tool") {
             if (content.isNotBlank()) {
                 "Tool output"
             } else {
@@ -58,7 +55,6 @@ internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
         } else {
             defaultLabel
         }
-    }
     return toolCall.name
 }
 

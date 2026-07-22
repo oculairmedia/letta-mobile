@@ -58,7 +58,6 @@ import com.letta.mobile.desktop.DesktopTextField
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

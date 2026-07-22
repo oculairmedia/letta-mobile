@@ -1,7 +1,5 @@
 package com.letta.mobile.feature.chat.render
 
-import androidx.annotation.VisibleForTesting
-
 private sealed interface OpenerScanStep {
     data class Continue(val nextIndex: MarkdownOpenerScanIndex) : OpenerScanStep
     data class Unmatched(val index: MarkdownOpenerScanIndex) : OpenerScanStep
@@ -32,7 +30,6 @@ internal data class MarkdownOpenerScanBounds(
  * span opener — the position where a closer hasn't yet arrived.
  * Returns -1 if the line is fully balanced.
  */
-@VisibleForTesting
 internal fun findUnmatchedOpenerInLine(line: MarkdownOpenerScanLine): Int {
     var cursor = MarkdownOpenerScanCursor(line, MarkdownOpenerScanIndex(0))
     val end = line.length

@@ -176,9 +176,6 @@ data class ChatSessionState(
     val errorMessage: String? = null,
     val selectionGeneration: Long = 0L,
 ) {
-    val selectedConversation: ChatConversationSummary?
-        get() = conversations.firstOrNull { it.id == selectedConversationId }
-
     val selectedMessages: List<UiMessage>
         get() = selectedConversationId?.let { messagesByConversationId[it] }.orEmpty()
 }

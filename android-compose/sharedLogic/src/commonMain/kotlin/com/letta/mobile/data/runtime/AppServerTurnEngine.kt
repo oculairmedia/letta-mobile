@@ -105,14 +105,6 @@ class AppServerTurnEngine(
     val isBusy: Boolean get() = !activeTurn.tryLock().also { if (it) activeTurn.unlock() }
 
     /**
-     * The runtime scope for the most recently started/cached runtime, or null if
-     * no runtime has been started on this engine yet. Exposed so the transport
-     * can build an `abort_message` addressed to the exact agent/conversation the
-     * active turn is running against.
-     */
-    val currentRuntime: AppServerRuntimeScope? get() = runtime
-
-    /**
      * Sends an `abort_message` for the active runtime so the server tears down
      * the in-flight run and emits its own terminal frame. Returns null when no
      * runtime has been started yet (nothing to abort). [runId] should be the
@@ -251,7 +243,7 @@ class AppServerTurnEngine(
         // finally so the released event carries a RELEASE REASON. Defaults to a
         // normal completion; overwritten (pure write) if a distinct terminal
         // path is observed. Never gates control flow.
-        var releaseReason: String = "normal_completion"
+        var releaseReason = "normal_completion"
         try {
             val turnPermissionMode = permissionModeProvider(command)
             Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
@@ -389,10 +381,8 @@ class AppServerTurnEngine(
         var speculativeCompletionArmed = false
         var sawToolReturn = false
         var sawAssistantAfterToolReturn = false
-        // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame currently being
-        // processed, and the seq of the frame that produced the pending
-        // completed terminal (so the delayed settle can record it). Pure reads.
-        var currentFrameSeq: Long? = null
+        // letta-mobile-kyqdt: TELEMETRY-ONLY. Seq of the frame that produced
+        // the pending completed terminal, so the delayed settle can record it.
         var pendingCompletedSeq: Long? = null
         
         // letta-mobile-oqfbj: track emitted and returned tool_call_ids for settlement
@@ -510,7 +500,6 @@ class AppServerTurnEngine(
                 // same place the engine learns the real run id (frames carry
                 // run_id → draft.runId); we do not alter that promotion flow.
                 val frameSeq = received.eventSeqOrNull()
-                currentFrameSeq = frameSeq
                 val drafts = mapper.map(command, received)
                 drafts.firstOrNull { it.runId != null }?.runId?.value?.let { promoteOwnerRunId(it) }
                 drafts.forEach { draft ->

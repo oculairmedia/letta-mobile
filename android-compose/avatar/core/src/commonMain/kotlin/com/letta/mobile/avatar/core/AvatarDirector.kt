@@ -135,21 +135,6 @@ class AvatarDirector(
     var state: AvatarState = AvatarState.IDLE
         private set
 
-    /**
-     * Legacy view of [state] for the original 5-value API. Reads back the last
-     * value [setActivity] arbitrated to a legacy state, so existing consumers
-     * that poll `director.activity` keep observing the same thing. States with
-     * no legacy equivalent report the nearest legacy activity.
-     */
-    val activity: AvatarActivity
-        get() = when (state) {
-            AvatarState.SPEAKING -> AvatarActivity.SPEAKING
-            AvatarState.THINKING, AvatarState.WAITING_INPUT -> AvatarActivity.THINKING
-            AvatarState.ERROR, AvatarState.FAILED -> AvatarActivity.ERROR
-            AvatarState.LISTENING -> AvatarActivity.LISTENING
-            else -> AvatarActivity.IDLE
-        }
-
     // --- input signals (candidates for arbitration) ---------------------------
     private var lifecycle: AvatarLifecycle = AvatarLifecycle.NONE
     private var dragged = false

@@ -353,7 +353,7 @@ internal fun MutableList<ToolOutputHighlightSpan>.addValid(
     end: Int,
     kind: ToolOutputHighlightKind,
 ): Boolean {
-    if (start < 0 || end <= start) return false
+    if (start !in 0 until end) return false
     if (!hasHighlightBudget()) return false
     add(ToolOutputHighlightSpan(start = start, end = end, kind = kind))
     return true
@@ -624,7 +624,7 @@ fun ToolOutputBlock.previewText(): String = when (this) {
     is ToolOutputBlock.Json -> pretty
     is ToolOutputBlock.Diff -> raw
     is ToolOutputBlock.StackTrace -> headline
-    is ToolOutputBlock.ShellTranscript -> if (output.isNotBlank()) output else commandLines.joinToString("\n")
+    is ToolOutputBlock.ShellTranscript -> output.ifBlank { commandLines.joinToString("\n") }
     is ToolOutputBlock.AnsiLog -> stripped
     is ToolOutputBlock.Table -> formatTable(rows)
     is ToolOutputBlock.CodeLike -> raw

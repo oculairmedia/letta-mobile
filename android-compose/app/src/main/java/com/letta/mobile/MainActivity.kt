@@ -18,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.widget.Toast
 import com.letta.mobile.channel.ChatPushService
 import com.letta.mobile.crash.CrashReporter
@@ -113,7 +112,7 @@ class MainActivity : ComponentActivity() {
                 if (result == SnackbarResult.ActionPerformed) {
                     val payload = crash.sentryEventId
                         ?: "${crash.type}: ${crash.message}\n${crash.stackHead}"
-                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    val clipboard = getSystemService(CLIPBOARD_SERVICE) as? ClipboardManager
                     clipboard?.setPrimaryClip(ClipData.newPlainText("letta-mobile crash", payload))
                     Toast.makeText(this@MainActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                 }
@@ -177,7 +176,7 @@ class MainActivity : ComponentActivity() {
         if (encodedPayload.isBlank()) {
             return
         }
-        getSharedPreferences(AutomationAuthBootstrap.PREFS_NAME, Context.MODE_PRIVATE)
+        getSharedPreferences(AutomationAuthBootstrap.PREFS_NAME, MODE_PRIVATE)
             .edit(commit = true) {
                 putString(AutomationAuthBootstrap.KEY_PAYLOAD_BASE64, encodedPayload)
             }

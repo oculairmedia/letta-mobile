@@ -48,9 +48,8 @@ class MobileActionRegistry @Inject constructor(
     fun matrixJson(): String = json.encodeToString(matrix())
 
     fun handle(toolName: String, input: JsonObject, actionId: String = newActionId()): MobileActionToolResponse {
-        val handler = handlersByName[toolName]
-        val response = if (handler == null) {
-            MobileActionToolResponse(
+        val response = handlersByName[toolName]?.handle(input, actionId)
+            ?: MobileActionToolResponse(
                 success = false,
                 toolName = toolName,
                 status = MobileActionCapabilityStatus.Error,
@@ -59,9 +58,6 @@ class MobileActionRegistry @Inject constructor(
                 actionId = actionId,
                 error = "not_registered",
             )
-        } else {
-            handler.handle(input, actionId)
-        }
         record(response)
         return response
     }

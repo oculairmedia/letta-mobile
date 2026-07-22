@@ -40,12 +40,6 @@ interface AppServerTransportAdapter {
 object AppServerTransportRegistry {
     private val adapters = mutableMapOf<String, AppServerTransportAdapter>()
 
-    init {
-        // Register default adapters
-        // Note: KtorAppServerWebSocketTransportAdapter is registered lazily
-        // to avoid requiring Ktor dependencies if not used
-    }
-
     /**
      * Registers a transport adapter for the given scheme(s).
      * Overwrites any existing adapter for the same scheme.

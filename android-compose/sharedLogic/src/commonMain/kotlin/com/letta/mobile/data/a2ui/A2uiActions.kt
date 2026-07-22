@@ -18,18 +18,6 @@ fun resolveA2uiActionContext(
     else -> JsonObject(emptyMap())
 }
 
-// letta-mobile-lwmo: legacy overload kept for tests / external callers that
-// still pass an A2uiDataModel directly. Template-string references like
-// $<componentId>.value can't be resolved without component metadata, so they
-// fall through unchanged on this path.
-fun resolveA2uiActionContext(
-    context: JsonElement?,
-    dataModel: A2uiDataModel,
-): JsonObject = resolveA2uiActionContext(
-    context,
-    A2uiSurfaceState(surfaceId = "", dataModel = dataModel),
-)
-
 private fun resolveContextObject(
     context: JsonObject,
     surface: A2uiSurfaceState,

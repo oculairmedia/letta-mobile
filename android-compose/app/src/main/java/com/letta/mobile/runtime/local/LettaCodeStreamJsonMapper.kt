@@ -93,7 +93,7 @@ class LettaCodeStreamJsonMapper @Inject constructor() {
     }
 
     private fun JsonObject.toolCallDrafts(command: TurnCommand): List<RuntimeEventDraft> {
-        val calls = (this["tool_calls"] as? JsonArray)?.mapNotNull { it as? JsonObject }
+        val calls = (this["tool_calls"] as? JsonArray)?.filterIsInstance<JsonObject>()
             ?: listOfNotNull(this["tool_call"] as? JsonObject)
         return calls.mapNotNull { call ->
             val callId = call.string("tool_call_id") ?: call.string("id") ?: return@mapNotNull null

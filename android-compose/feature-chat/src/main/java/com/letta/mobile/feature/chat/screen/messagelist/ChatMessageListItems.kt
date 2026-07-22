@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat.screen.messagelist
 
 import com.letta.mobile.ui.theme.LettaCodeFont
-import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState

@@ -132,7 +132,7 @@ internal class ProbeSessionFixture(
         val turnStartedAt = nowMs()
         val setupMetrics = ProbeSetupMetrics(turn)
         return try {
-            val metrics = withTimeoutOrNull(options.timeoutMs) {
+            val metrics = withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 val established = establish(
                     ProbeEstablishRequest(
                         target = target,
@@ -164,7 +164,7 @@ internal class ProbeSessionFixture(
         val observed = ProbeAccumulator(request.turn, dumpPath = options.dumpPath())
         observed.scenarioViolations += request.session.scenarioViolations
         var firstFrameMs: Long? = null
-        val completed = withTimeoutOrNull(options.timeoutMs) {
+        val completed = withTimeoutOrNull(options.timeoutMs.milliseconds) {
             collectUntilQuiet(request, observed) { ms ->
                 if (firstFrameMs == null) firstFrameMs = ms
             }

@@ -27,7 +27,7 @@ import javax.inject.Singleton
 import kotlinx.serialization.Serializable
 
 class ProjectIssueConflictException(
-    val conflictResponse: ProjectIssueConflictResponse,
+    conflictResponse: ProjectIssueConflictResponse,
 ) : Exception(conflictResponse.error)
 
 data class ProjectIssueMutationHeaders(

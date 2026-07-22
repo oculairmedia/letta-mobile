@@ -3,6 +3,7 @@ package com.letta.mobile.cli.runtime
 import com.github.ajalt.clikt.core.UsageError
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import kotlinx.serialization.Serializable
 
@@ -121,16 +122,10 @@ internal class CliProfileStore(
 
         fun defaultPath(): Path {
             val home = System.getenv("LETTA_MOBILE_CLI_HOME")?.takeIf { it.isNotBlank() }
-                ?: Path.of(System.getProperty("user.home"), ".letta-mobile-cli").toString()
-            return Path.of(home, "profiles.json")
+                ?: Paths.get(System.getProperty("user.home"), ".letta-mobile-cli").toString()
+            return Paths.get(home, "profiles.json")
         }
 
         fun default(): CliProfileStore = CliProfileStore(defaultPath())
     }
-}
-
-private val prettyJson = kotlinx.serialization.json.Json {
-    prettyPrint = true
-    explicitNulls = false
-    encodeDefaults = true
 }

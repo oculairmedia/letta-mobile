@@ -20,4 +20,4 @@ const val ToolOutputMaxHighlightSpans = 800
 /**
  * Maximum size (in raw characters) of a tool output document that will be cached.
  */
-const val ToolOutputDocumentMaxCacheableRawChars = ToolOutputParser.MaxAnalyzedChars
+const val ToolOutputDocumentMaxCacheableRawChars = ToolOutputParser.MAX_ANALYZED_CHARS

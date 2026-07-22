@@ -4,8 +4,6 @@ import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.Step
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 enum class TimeRange(val label: String, val hours: Int) {
@@ -147,16 +145,12 @@ internal object UsageAnalyticsCalculator {
     }
 
     private fun buildTimeBuckets(steps: List<Step>, timeRange: TimeRange): List<TimeBucket> {
-        val now = Instant.now()
-        val windowStart = now.minus(timeRange.hours.toLong(), ChronoUnit.HOURS)
-
         val bucketCount = when (timeRange) {
             TimeRange.ONE_HOUR -> 6
             TimeRange.TWENTY_FOUR_HOURS -> 12
             TimeRange.SEVEN_DAYS -> 7
             TimeRange.THIRTY_DAYS -> 10
         }
-        val bucketDurationMinutes = (timeRange.hours * 60L) / bucketCount
 
         val buckets = (0 until bucketCount).map { i ->
             val label = when (timeRange) {

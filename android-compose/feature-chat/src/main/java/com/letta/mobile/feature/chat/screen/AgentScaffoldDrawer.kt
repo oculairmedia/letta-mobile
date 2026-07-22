@@ -603,7 +603,6 @@ internal fun minLinesFor(key: ProjectBriefSectionKey): Int = when (key) {
     ProjectBriefSectionKey.RecentChanges -> 4
 }
 
-@androidx.annotation.VisibleForTesting
 @Composable
 internal fun ProjectInfoTray(
     project: ProjectChatContext,

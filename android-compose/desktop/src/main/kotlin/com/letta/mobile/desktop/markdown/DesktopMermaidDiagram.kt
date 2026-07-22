@@ -139,7 +139,7 @@ private fun MermaidSvg(svg: String, source: String) {
 }
 
 private fun mermaidAspectRatio(viewBox: Rect?): Float =
-    viewBox?.takeIf(::hasPositiveSize)?.let { it.width / it.height } ?: 16f / 9f
+    viewBox?.takeIf(::hasPositiveSize)?.let { it.width / it.height } ?: (16f / 9f)
 
 private fun hasPositiveSize(viewBox: Rect): Boolean =
     viewBox.width > 0f && viewBox.height > 0f

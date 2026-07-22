@@ -37,13 +37,6 @@ data class ToolLibraryState(
             .flatMap { it.tags }
             .distinct()
             .sorted()
-
-    val emptyMessage: String
-        get() = if (searchQuery.isBlank()) {
-            "No tools available."
-        } else {
-            "No tools match \"$searchQuery\"."
-        }
 }
 
 object ToolLibraryFilter {

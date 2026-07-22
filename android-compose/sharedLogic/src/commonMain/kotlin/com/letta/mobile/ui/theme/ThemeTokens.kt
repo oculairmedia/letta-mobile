@@ -23,7 +23,6 @@ object LettaColorTokens {
     const val LIGHT_SURFACE_VARIANT = 0xFFEAEEF3
     const val LIGHT_SURFACE_CONTAINER = 0xFFDDE3EA
     const val LIGHT_PRIMARY = 0xFF00897B
-    const val LIGHT_PRIMARY_VARIANT = 0xFF00695C
     const val LIGHT_ON_SURFACE = 0xFF161A20
     const val LIGHT_ON_SURFACE_VARIANT = 0xFF4A5360
     const val LIGHT_ERROR = 0xFFB00020
@@ -33,7 +32,6 @@ object LettaColorTokens {
 
     const val TEAL_ACCENT = 0xFF1DE9B6
     const val CYAN_ACCENT = 0xFF00E5FF
-    const val AMBER_ACCENT = 0xFFFFD740
 
     // Surface levels (dark) used by the desktop scheme + template chrome
     // (cool-slate retune).

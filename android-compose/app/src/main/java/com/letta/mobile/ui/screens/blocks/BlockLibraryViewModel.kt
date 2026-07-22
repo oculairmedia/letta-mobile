@@ -166,10 +166,6 @@ class BlockLibraryViewModel @Inject constructor(
         }
     }
 
-    fun updateBlock(blockId: String, value: String, description: String, limit: Int?) {
-        updateGlobalBlock(blockId, value, description, limit) {}
-    }
-
     fun updateGlobalBlock(
         blockId: String,
         value: String,

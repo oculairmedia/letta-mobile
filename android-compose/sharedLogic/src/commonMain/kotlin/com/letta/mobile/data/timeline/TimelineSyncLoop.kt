@@ -36,7 +36,7 @@ class TimelineSyncLoop(
     pendingLocalStore: PendingLocalStore = NoOpPendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val streamSilenceTimeoutMs: Long = STREAM_SILENCE_TIMEOUT_MS,
-    private val startStreamSubscriber: Boolean = true,
+    startStreamSubscriber: Boolean = true,
     // letta-mobile-c4igq.4: owning agent for this conversation loop (from the
     // repository cache key). Threaded onto ingested Confirmed events for render
     // scoping. Null when unknown/legacy. LAST param so positional callers are

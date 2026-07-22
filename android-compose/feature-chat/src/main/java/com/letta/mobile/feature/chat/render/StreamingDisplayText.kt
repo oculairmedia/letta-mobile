@@ -13,7 +13,6 @@ internal const val MAX_HELD_TAIL_CHARS = 24
  *
  * See StreamingDisplayTextTest for exhaustive contract verification.
  */
-@VisibleForTesting
 internal fun streamingDisplayText(raw: String): String {
     if (raw.isEmpty()) return ""
     if (insideOpenCodeFence(raw)) return raw
@@ -46,7 +45,6 @@ internal fun Char.isStreamingBoundary(): Boolean =
 internal fun shouldShowStreamingCursor(raw: String): Boolean =
     raw.isNotEmpty() && !insideOpenCodeFence(raw)
 
-@VisibleForTesting
 internal fun shouldPulseForStreamingReveal(
     previousLength: Int,
     revealedText: String,

@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen.messagelist
 
-import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.screen.LocalChatShouldDeferHeavyToolCards
 import com.letta.mobile.feature.chat.screen.ChatFadeEdgeLength
 import com.letta.mobile.feature.chat.screen.ChatFadingEdgesBox
@@ -14,7 +13,6 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatShapes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues

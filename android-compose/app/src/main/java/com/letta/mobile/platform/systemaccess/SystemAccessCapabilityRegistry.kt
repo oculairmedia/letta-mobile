@@ -21,15 +21,12 @@ class DefaultSystemAccessCapabilityRegistry @Inject constructor(
 
     override fun checkToolAccess(toolId: String): SystemAccessToolCheck {
         val capability = listCapabilities().firstOrNull { toolId in it.toolIds }
-        return if (capability == null) {
-            SystemAccessToolCheck(
+            ?: return SystemAccessToolCheck(
                 toolId = toolId,
                 allowed = false,
                 reason = "No system-access capability declares this tool id.",
             )
-        } else {
-            capability.toolCheck(toolId)
-        }
+        return capability.toolCheck(toolId)
     }
 
     private fun SystemAccessCapabilityDefinition.resolve(

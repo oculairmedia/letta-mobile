@@ -217,12 +217,11 @@ internal fun SubagentNotificationCard(
     val effectiveToolCallId = toolCallId ?: notification.toolCallId ?: notification.taskId
     val canOpenSubagent = !effectiveToolCallId.isNullOrBlank()
     val openSubagent = {
-        val targetId = effectiveToolCallId
-        if (!targetId.isNullOrBlank()) {
+        if (!effectiveToolCallId.isNullOrBlank()) {
             HapticEffects.segmentTick(haptic, view)
             opener(
                 SubagentTodoSheetTarget(
-                    toolCallId = targetId,
+                    toolCallId = effectiveToolCallId,
                     description = notification.summary ?: fallbackDescription,
                     subagentAgentId = notification.subagentAgentId,
                 )
@@ -1553,10 +1552,6 @@ internal fun shouldRunToolCallEntranceAnimation(
 ): Boolean =
     animateEntrance && toolCallEntranceAnimationHistory.addIfAbsent(key)
 
-internal fun recordToolCallEntranceAnimationRun(key: String) {
-    toolCallEntranceAnimationHistory.addIfAbsent(key)
-}
-
 internal fun clearToolCallEntranceAnimationHistoryForTest() {
     toolCallEntranceAnimationHistory.clear()
 }
@@ -1714,8 +1709,7 @@ internal fun extractJsonStringField(json: String, field: String): String? {
     while (i < json.length) {
         val c = json[i]
         if (c == '\\' && i + 1 < json.length) {
-            val next = json[i + 1]
-            when (next) {
+            when (val next = json[i + 1]) {
                 '"' -> sb.append('"')
                 '\\' -> sb.append('\\')
                 'n' -> sb.append(' ')

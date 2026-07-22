@@ -51,7 +51,6 @@ class ConnectivityMonitor(
     ) : this(context, settingsRepository, apiClient, defaultConnectivityScope())
 
     private val _isOnline = MutableStateFlow(false)
-    val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
 
     private val _isServerReachable = MutableStateFlow(false)
     val isServerReachable: StateFlow<Boolean> = _isServerReachable.asStateFlow()

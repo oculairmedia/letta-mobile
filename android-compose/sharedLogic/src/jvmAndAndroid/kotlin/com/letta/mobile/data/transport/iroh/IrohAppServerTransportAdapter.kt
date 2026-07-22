@@ -4,7 +4,6 @@ import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.AppServerTransportAdapter
-import com.letta.mobile.data.transport.appserver.AppServerTransportRegistry
 import computer.iroh.Endpoint
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointId
@@ -140,18 +139,6 @@ class IrohAppServerTransportAdapter(
         private fun hexToEndpointId(hex: String): EndpointId {
             val bytes = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
             return EndpointId.fromBytes(bytes)
-        }
-
-        /**
-         * Registers this adapter for the "iroh" scheme.
-         * Call this once at app initialization if using Iroh transports.
-         *
-         * @param endpoint The local iroh endpoint to use for all connections
-         * @param alpn The ALPN protocol identifier (defaults to "/letta/appserver/0")
-         */
-        fun registerDefault(endpoint: Endpoint, alpn: ByteArray = DEFAULT_ALPN) {
-            val adapter = IrohAppServerTransportAdapter(endpoint, alpn)
-            AppServerTransportRegistry.register(adapter)
         }
     }
 }

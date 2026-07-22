@@ -1,14 +1,11 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.channel.CurrentConversationTracker
-import com.letta.mobile.data.mapper.toUiMessages
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -16,7 +13,6 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
-import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ChatConversationSummary
 import com.letta.mobile.data.chat.runtime.ChatSessionState
@@ -63,9 +59,7 @@ internal class ChatConversationCoordinator(
     private val updateSessionState: ((ChatSessionState) -> ChatSessionState) -> Unit,
     private val pendingClientModeBootstrapMessages: () -> kotlinx.collections.immutable.ImmutableList<UiMessage>,
     private val setPendingClientModeBootstrapUserMessage: (UiMessage) -> Unit,
-    private val clearPendingClientModeBootstrapUserMessage: () -> Unit,
     private val currentClientModeConversationId: () -> String?,
-    private val setClientModeConversationId: (String?) -> Unit,
     private val startTimelineObserver: (String) -> Unit,
     private val stopTimelineObserver: () -> Unit,
     // letta-mobile-ork1: invoked from loadMessagesInternal so opening a

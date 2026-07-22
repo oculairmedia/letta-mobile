@@ -75,7 +75,7 @@ internal class AppServerSmokeCommand : CliktCommand(
             }
         }
 
-        try {
+        httpClient.use {
             withTimeout(timeoutMs.milliseconds) {
                 coroutineScope {
                     val transport = KtorAppServerWebSocketTransport(
@@ -110,8 +110,6 @@ internal class AppServerSmokeCommand : CliktCommand(
                     }
                 }
             }
-        } finally {
-            httpClient.close()
         }
     }
 }

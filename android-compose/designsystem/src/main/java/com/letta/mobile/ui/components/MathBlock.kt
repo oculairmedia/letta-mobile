@@ -2,7 +2,6 @@ package com.letta.mobile.ui.components
 
 import android.annotation.SuppressLint
 import android.graphics.Color as AndroidColor
-import android.os.Build
 import android.util.Base64
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
